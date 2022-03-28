@@ -1,0 +1,18 @@
+{
+  "name" : "spectral-uplifting",
+  "version-string" : "0.1.0",
+  "dependencies" : [
+    "glfw3",
+    {
+      "name": "glad",
+      "features": [ "gl-api-latest" ]
+    },
+    {
+      "name" : "imgui",
+      "features": [ "opengl3-binding", "glfw-binding", "docking-experimental" ] 
+    }
+  ],
+  "features" : {
+    
+  }
+}
