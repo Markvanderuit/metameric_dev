@@ -1,11 +1,9 @@
 #pragma once
 
-// #include <array>
 #include <initializer_list>
 #include <tuple>
 #include <span>
 #include <utility>
-#include <vector>
 #include <metameric/core/define.h>
 #include <metameric/core/fwd.h>
 
@@ -38,7 +36,7 @@ protected:
         == tie(o._is_init, o._handle);
   }
 
-  MET_CLASS_NON_COPYABLE_CONSTR(GLObject)
+  MET_DECLARE_NONCOPYABLE(GLObject)
 
 protected:
   bool _is_init = false;
@@ -60,231 +58,109 @@ enum class GLBufferTarget {
   eUniform,
 };
 
-// struct vec2 {
-//   float x, y;
-// };
+enum class GLBufferStorageFlags : uint {
+  eNone           = 0x0000,
+  eDynamicStorage = 0x0100,
+  eClientStorage  = 0x0200
+};
 
-/* template <typename T>
-class TestBuffer : public GLObject {
-  using Base = GLObject;  
-
-  size_t _size;
-
-public:
-  TestBuffer() = default;
-  ~TestBuffer();
-  
-  TestBuffer(size_t size, void const *data = nullptr);
-  // TestBuffer(size_t size) : TestBuffer(nullptr, size) { }
-  TestBuffer(const std::vector<T> &v) : TestBuffer(v.size(), v.data()) { }
-  TestBuffer(const std::initializer_list<T> &l) : TestBuffer(l.size(), l.begin()) { }
-  
-  template <typename T_>
-  TestBuffer(TestBuffer<T_> &&o) noexcept {
-    swap(reinterpret_cast<TestBuffer<T> &&>(o));
-    _size = (_size * sizeof(T_)) / sizeof(T);
-  } 
-
-  template <typename T_>
-  inline
-  TestBuffer<T> & operator=(TestBuffer<T_> &&o) noexcept {
-    swap(reinterpret_cast<TestBuffer<T> &&>(o));
-    _size = (_size * sizeof(T_)) / sizeof(T);
-    return *this;
-  }
-
-  inline size_t size() const { return _size; }
-
-  inline
-  void swap(TestBuffer<T> &o) {
-    using std::swap;
-    Base::swap(o);
-    swap(_size, o._size);
-  }
-
-  inline bool operator==(const TestBuffer<T> &o) const {
-    using std::tie;
-    return Base::operator==(o)
-        && tie(_size)
-        == tie(o._size);
-  }
-
-  MET_CLASS_NON_COPYABLE_CONSTR(TestBuffer<T>)
-}; */
+MET_DECLARE_ENUM_FLAGS(GLBufferStorageFlags);
 
 class GLBuffer : public GLObject {
   using Base = GLObject;
 
+  size_t _size;
+  uint _storage_flags;
+
 public:
+  // Size in bytes of buffer storage
   inline size_t size() const { return _size; }
 
-  /*
-    - set subset of data to multiple values
-    - set all data to multiple values
-    - set subset of data to one value
-    - set all data to one value
-    - get subset of data
-    - get all data
+  // Underlying storage flags matching GLBufferStorageFlags
+  inline uint storage_flags() const { return _storage_flags; }
 
-    - copy subset of data to other buffer
-    - copy all data to other buffer
-  */
-
-  /* void set_data(void const *data, size_t size = 0, size_t offset = 0);
-  void get_data(void * data, size_t size = 0, size_t offset = 0);
-  void fill_data(void const *data, size_t stride = 1, size_t size = 0, size_t offset = 0);
-  void clear_data(size_t size = 0, size_t offset = 0); */
-
-  /* template <typename T>
-  void fill_data(const T *t, size_t stride = 1, size_t size = 0, size_t offset = 0) {
-    
-  } */
-
-  /* template <typename T>
-  void set_data(const T &t, size_t size = 0, size_t offset = 0) {
-    if (size != 0 && offset != 0) {
-      set_data(t.data(), size, offset);
-    } else {
-      set_data(t.data(), t.size() * sizeof(T::value_type));
-    }
-  } */
-
-  /* template <typename T>
-  std::vector<T> get_data(size_t size = 0, size_t offset = 0) {
-    if (size != 0 && offset != 0) {
-      std::vector<T> v(size);
-      get_data(v.data(), size, offset);
-      return v;
-    } else {
-      std::vector<T> v(_size / sizeof(T));
-      get_data(v.data(), _size);
-      return v;
-    }
-  } */
-
-  /* template <typename T>
-  void get_data(const std::initializer_list<T> &data, size_t size = 0, size_t offset = 0) {
-    if (size != 0 || offset != 0) {
-      get_data(data.begin(), size, offset);
-    } else {
-      get_data(data.begin(), data.size() * sizeof(T));
-    }
-  } */
-
-  /* template <typename T>
-  void get_data(T &t, size_t size = 0, size_t offset = 0) {
-    if (size != 0 || offset != 0) {
-      get_data(t.data(), size, offset);
-    } else {
-      get_data(t.data(), t.size() * sizeof(T::value_type));
-    }
-  } */
-
-
-  /* template <typename T>
-  void set_sub_data(size_t size, const T &t) { set_sub_data(size, t.data()); }
-  template <typename T>
-  void set_sub_data(size_t size, size_t offset, const T &t) { set_sub_data(size, offset, t.data()); }
-
-  void set_sub_data(size_t size, void const *data);
-  void set_sub_data(size_t size, size_t offset, void const *data);
-
-  template <typename T>
-  void get_sub_data(size_t size, T &t) { get_sub_data(size, t.data()); }
-  template <typename T>
-  void get_sub_data(size_t size, size_t offset, T &t) { get_sub_data(size, offset, t.data()); }
-
-  void get_sub_data(size_t size, void *data);
-  void get_sub_data(size_t size, size_t offset, void *data);
-
-  template <typename T>
-  void clear_data(const T &t) { clear_data(t.data()); }
-  template <typename T>
-  void clear_sub_data(size_t size, size_t offset, const T &t) { clear_sub_data(size, offset, t.data()); }
-
-  void clear_data(void const *data);
-  void clear_sub_data(size_t size, size_t offset, void const *data);
-  
-  void copy_data(size_t size,
-                 size_t first_offset, 
-                 size_t second_offset,
-                 const GLBuffer &o);
-
-  void bind_to(GLBufferTarget target); */
+  // Test presence of specific storage flag matching GLBufferStorageFlags
+  inline bool has_storage_flag(GLBufferStorageFlags f) { return (_storage_flags & (uint) f) != 0u; }
 
 public:
-  // Base constructors to setup/teardown resources
+  // Base constructors to setup and tear down buffer storage
   GLBuffer() = default;
-  GLBuffer(void const *data, size_t size);
+  GLBuffer(size_t size, void const *data = nullptr, uint storage_flags = 0u);
   ~GLBuffer();
 
-  // Convenience constructors
-  GLBuffer(size_t size) 
-  : GLBuffer(nullptr, size) { }
+  // Convenience constructors accepting a number of STL types
   template <typename T>
-  GLBuffer(std::initializer_list<const T> c)
-  : GLBuffer(std::data(c), c.size() * sizeof(T)) { }
+  GLBuffer(std::initializer_list<const T> c, uint storage_flags = 0u)
+  : GLBuffer(c.size() * sizeof(T), std::data(c), storage_flags) { }
   template <typename T, size_t E>
-  GLBuffer(std::span<const T, E> c) 
-  : GLBuffer(std::data(c), c.size() * sizeof(T)) { }
+  GLBuffer(std::span<const T, E> c, uint storage_flags = 0u) 
+  : GLBuffer(c.size() * sizeof(T), std::data(c), storage_flags) { }
   template <typename C>
-  GLBuffer(const C &c)
-  : GLBuffer(std::data(c), c.size() * sizeof(typename C::value_type)) { }
-  
-  // Swap in-place with other object
-  inline void swap(GLBuffer &o) {
-    Base::swap(o);
-    using std::swap;
-    swap(_size, o._size);
-  }
-  
-  // Comparison operator checks underlying handle in superclass
-  inline bool operator==(const GLBuffer &o) const {
-    using std::tie;
-    return Base::operator==(o)
-        && tie(_size)
-        == tie(o._size);
-  }
-
-  // Object is movable, but not directly copyable
-  MET_CLASS_NON_COPYABLE_CONSTR(GLBuffer)
+  GLBuffer(const C &c, uint storage_flags = 0u)
+  : GLBuffer(c.size() * sizeof(typename C::value_type), std::data(c), storage_flags) { }
 
 public:
-  // Direct get/set/fill/clear functions
-  void get_data(void *data, size_t size = 0, size_t offset = 0) const;
-  void set_data(void const *data, size_t size = 0, size_t offset = 0);
-  void fill_data(void const *data, size_t stride = 1, size_t size = 0, size_t offset = 0);
+  // Base get/set/fill/clear functions
+  void get(void *data, size_t size = 0, size_t offset = 0) const;
+  void set(void const *data, size_t size = 0, size_t offset = 0);
+  void fill(void const *data, size_t stride = 1, size_t size = 0, size_t offset = 0);
   void clear(size_t size = 0, size_t offset = 0);
 
-  // Convenience set overrides
+  // Convenience get overrides accepting a number of STL types
   template <typename T, size_t E>
-  void get(std::span<T, E> c) { get_data(std::data(c), c.size() * sizeof(T)); }
+  auto get(std::span<T, E> c) const    { get(std::data(c), c.size() * sizeof(T)); return c; }
   template <typename C>
-  void get(C &c) { get_data(std::data(c), c.size() * sizeof(typename C::value_type)); }
+  auto & get(C &c) const               { get(std::data(c), c.size() * sizeof(typename C::value_type)); return c; }
 
-  // Convenience get overrides
-  // template <typename T>
-  // void set(std::initializer_list<T> c) { set_data(std::data(c), c.size() * sizeof(T)); }
-  // template <typename T, size_t E>
-  // void set(std::span<T, E> c) { set_data(std::data(c), c.size() * sizeof(T)); }
+  // Convenience set overrides accepting a number of STL types
+  template <typename T>
+  void set(std::initializer_list<T> c) { set(std::data(c), c.size() * sizeof(T)); }
+  template <typename T, size_t E>
+  void set(std::span<T, E> c)          { set(std::data(c), c.size() * sizeof(T)); }
   template <typename C>
-  void set(const C &c) { set_data(std::data(c), c.size() * sizeof(typename C::value_type)); }
+  void set(const C &c)                 { set(std::data(c), c.size() * sizeof(typename C::value_type)); }
 
-  // Constructing accessor for vector/list containers
-  template <typename Cont>
-  Cont get_as() { 
-    Cont c(size() / sizeof(typename Cont::value_type));
-    get(c);
-    return c;
+  // Convenience fill overrides accepting a number of STL types
+  template <typename T>
+  void fill(std::initializer_list<T> c) { fill(std::data(c), c.size()); }
+  template <typename T, size_t E>
+  void fill(std::span<T, E> c)          { fill(std::data(c), c.size()); }
+  template <typename C>
+  void fill(const C &c)                 { fill(std::data(c), c.size()); }
+
+  // Convenience get_as which constructs and writes directly into vector/list container
+  template <typename C>
+  C get_as() const { C c(size() / sizeof(typename C::value_type)); return get(c); }
+
+  // Copy constr/assign is deleted to prevent accidental usage, but an explicit copy can still 
+  // be performed between (parts of) buffers, if truly unavoidable
+  GLBuffer copy(size_t size = 0, size_t offset = 0) const;
+  void copy_from(const GLBuffer &other, size_t size = 0, size_t r_offset = 0, size_t w_offset = 0);
+  void copy_to(GLBuffer &other, size_t size = 0, size_t r_offset = 0, size_t w_offset = 0) const;
+
+public:
+  // Convenience merge of bind/range bind
+  void bind(GLBufferTarget target, uint index, size_t offset = 0, size_t size = 0) const;
+
+public:
+  inline
+  void swap(GLBuffer &o) {
+    using std::swap;
+    Base::swap(o);
+    swap(_size, o._size);
+    swap(_storage_flags, o._storage_flags);
+  }
+  
+  inline
+  bool operator==(const GLBuffer &o) const {
+    using std::tie;
+    return Base::operator==(o)
+      && tie(_size, _storage_flags)
+      == tie(o._size, o._storage_flags);
   }
 
-  // Convenience data operators
-  // template <typename T>
-  // inline
-  // void set_data(const std::vector<T> &v)
-
-private:
-  size_t _size;
+  // Define move constr/assign, but do not allow direct copies to prevent accidental usage
+  MET_DECLARE_NONCOPYABLE(GLBuffer)
 };
 
 } // namespace metameric

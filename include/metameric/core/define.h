@@ -32,10 +32,20 @@ using uint = unsigned int;
 #define guard(expr, ...) guard_(expr, ##__VA_ARGS__)
 #define guard_(expr, value) if (!(expr)) { return value; }
 
-#define MET_CLASS_NON_COPYABLE_CONSTR(T)\
+#define MET_DECLARE_NONCOPYABLE(T)\
   T(const T &) = delete;\
   T & operator= (const T &) = delete;\
   T(T &&o) noexcept { swap(o); }\
   inline T & operator= (T &&o) noexcept { swap(o); return *this; }
+
+#define MET_DECLARE_ENUM_FLAGS(T)\
+  constexpr uint operator|(T a, T b) { return (uint) a | (uint) b; }\
+  constexpr uint operator|(uint a, T b) { return a | (uint) b; }\
+  constexpr uint operator&(T a, T b) { return (uint) a & (uint) b; }\
+  constexpr uint operator&(uint a, T b) { return a & (uint) b; }\
+  constexpr uint operator~(T t) { return ~ (uint) t; }\
+  constexpr uint operator+(T t) { return (uint) t; }\
+  template <typename UInt>\
+  constexpr auto has_flag(UInt flags, T t) { return (flags & (uint) t) != 0u; }
 
 } // namespace metameric

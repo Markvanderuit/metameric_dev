@@ -61,8 +61,8 @@ add_library_r(core core)
 target_link_libraries(core PRIVATE
   glad::glad
   glfw
+  fmt::fmt-header-only
 )
-
 
 set(link_libraries
   core

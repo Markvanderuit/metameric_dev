@@ -17,6 +17,7 @@
 // Core includes
 #include <metameric/core/define.h>
 #include <metameric/core/opengl.h>
+#include <metameric/core/gl/buffer.h>
 
 
 /**
@@ -139,57 +140,37 @@ int main() {
   try {
     init_glfw();
 
+    std::vector<float> vf(4);
+    std::vector<int> vi(4);
+    
     using namespace metameric;
 
+    auto storage_flags = gl::BufferStorageFlags::eClient
+                       | gl::BufferStorageFlags::eDynamic;
+    auto mapping_flags = gl::BufferMappingFlags::eRead
+                       | gl::BufferMappingFlags::eWrite
+                       | gl::BufferMappingFlags::eCoherent
+                       | gl::BufferMappingFlags::ePersistent;
+                       
+    gl::Buffer test_buffer(16, nullptr, storage_flags, mapping_flags);
 
-    GLBuffer bf = { 0.5f, 0.5f, 0.5f }; // { 0.5, 0.5, 0.5, 0.5 };
-    runtime_gl_assert("Buffer creation");
+    GLBuffer buffer = { {0.7f, 0.7f, 0.6f, 0.8f}, (uint) GLBufferStorageFlags::eDynamicStorage };
+    GLBuffer b2 = { 0.5f, 0.5f, 0.5f, 0.5f };
 
-    std::vector<float> v({0.7f, 0.7f, 0.6f});
-    bf.set(v);
-    runtime_gl_assert("Buffer set");
-
-    auto vf = bf.get_as<std::vector<float>>();
-    runtime_gl_assert("Buffer get");
+    buffer.set({0.8f, 0.8f, 0.3f});
+    print_container(buffer.get(vf));
     
-    
-    // bf.set({ 0.66, 0.66, 0.66 });
+    buffer.fill({2.5f});
+    print_container(buffer.get(vf));
 
-    // print_container(f);
-    print_container(vf);
+    buffer.clear();
+    print_container(buffer.get(vf));
 
-    // fmt::print("{}\n", bf.size());
+    buffer.copy_from(b2);
+    print_container(buffer.get(vf));
 
-
-    // GLBuffer bvv(std::span{ v });
-
-    // TestBuffer<vec2> b(16);
-    // fmt::print("{}\n", b.size());
-    // TestBuffer<float> b_ = TestBuffer<vec2>(16);
-    // fmt::print("{}\n", b_.size());
-
-
-
-    // std::vector<float> v(16, 2.5f);
-
-    // TestBuffer<float> b(v);
-    // fmt::print("{}", b.size());
-    // b = TestBuffer<float>();
-    // fmt::print("{}", b.size());
-
-    /* std::vector<float> v(16, 2.5f);
-    for (auto &f : v) {
-      fmt::print("{} ", f);
-    }
-    fmt::print("\n");
-
-    GLBuffer a(v.size() * sizeof(float), v.data());
-
-    std::vector<float> v2 = a.get_data<float>();
-    for (auto &f : v2) {
-      fmt::print("{} ", f);
-    }
-    fmt::print("\n"); */
+    buffer.set({ 4, 4, 4, 4 });
+    print_container(buffer.get(vi));
 
     dstr_glfw();
   } catch (const std::exception &e) {
