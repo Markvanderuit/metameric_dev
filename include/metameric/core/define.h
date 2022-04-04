@@ -30,7 +30,7 @@ using uint = unsigned int;
 
 // Extremely simple guard statement sugar
 #define guard(expr, ...) guard_(expr, ##__VA_ARGS__)
-#define guard_(expr, value) if (!expr) { return value; }
+#define guard_(expr, value) if (!(expr)) { return value; }
 
 #define MET_CLASS_NON_COPYABLE_CONSTR(T)\
   T(const T &) = delete;\

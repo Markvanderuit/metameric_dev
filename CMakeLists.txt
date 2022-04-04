@@ -36,10 +36,9 @@ function(init_target_r target srcs)
       --forward-unknown-to-host-compiler
     >)
   else()
-    target_compile_features(${target} PRIVATE cxx_std_17)
+    target_compile_features(${target} PRIVATE cxx_std_20)
   endif()
-
-  target_compile_options(${target} PRIVATE -fsanitize=address)
+  # target_compile_options(${target} PRIVATE -fsanitize=address)
 endfunction()
 
 function(add_library_r target dir)
@@ -59,14 +58,13 @@ function(add_executable_r target src)
 endfunction()
 
 add_library_r(core core)
-add_executable_r(main src/main.cpp)
-add_executable_r(main_imgui src/main_imgui.cpp)
-
 target_link_libraries(core PRIVATE
   glad::glad
   glfw
 )
-target_link_libraries(main PUBLIC
+
+
+set(link_libraries
   core
   glad::glad
   glfw
@@ -75,11 +73,10 @@ target_link_libraries(main PUBLIC
   fmt::fmt-header-only
   Thrust
 )
-target_link_libraries(main_imgui PUBLIC 
-  core
-  glad::glad
-  glfw
-  imgui::imgui
-  imguizmo::imguizmo
-  fmt::fmt-header-only
-)
+
+add_executable_r(main src/main.cpp)
+add_executable_r(main_imgui src/main_imgui.cpp)
+add_executable_r(main_playground src/main_playground.cpp)
+target_link_libraries(main PUBLIC ${link_libraries})
+target_link_libraries(main_imgui PUBLIC ${link_libraries})
+target_link_libraries(main_playground PUBLIC ${link_libraries})

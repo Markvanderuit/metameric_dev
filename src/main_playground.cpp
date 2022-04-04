@@ -1,26 +1,23 @@
 // STL includes
+#include <array>
 #include <cstdlib>
 #include <exception>
 #include <map>
 #include <string>
+#include <vector>
 
 // OpenGL includes
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 
-// Imgui includes
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-
 // Misc includes
-#include <ImGuizmo.h>
 #include <fmt/core.h>
 
 // Core includes
 #include <metameric/core/define.h>
 #include <metameric/core/opengl.h>
+
 
 /**
  * Preprocessor defines
@@ -36,7 +33,6 @@
  */
 
 GLFWwindow * glfw_handle;
-int window_width, window_height;
 
 
 /**
@@ -96,13 +92,13 @@ void init_glfw() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SRGB_CAPABLE, 1);
-  glfwWindowHint(GLFW_VISIBLE, 1);
-  glfwWindowHint(GLFW_DECORATED, 1);
-  glfwWindowHint(GLFW_FOCUSED, 1);
-  glfwWindowHint(GLFW_RESIZABLE, 1);
+  glfwWindowHint(GLFW_VISIBLE, 0);
+  glfwWindowHint(GLFW_DECORATED, 0);
+  glfwWindowHint(GLFW_FOCUSED, 0);
+  glfwWindowHint(GLFW_RESIZABLE, 0);
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, 1);
 
-  glfw_handle = glfwCreateWindow(1024, 768, "Imgui test", nullptr, nullptr);
+  glfw_handle = glfwCreateWindow(1, 1, "", nullptr, nullptr);
   
   runtime_assert(glfw_handle, "glfwCreateWindow(...) failed");
 
@@ -117,45 +113,12 @@ void dstr_glfw() {
   glfw_handle = nullptr;
 }
 
-void init_imgui() {
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-
-  ImGui::StyleColorsDark();
-  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  
-  ImGui_ImplGlfw_InitForOpenGL(glfw_handle, true);
-  ImGui_ImplOpenGL3_Init("#version 460");
-
-  runtime_gl_assert("ImGui initialization");
-}
-
-void dstr_imgui() {
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  ImGui::DestroyContext();
-  
-  runtime_gl_assert("ImGui destruction");
-}
-
 void begin_render_glfw() {
   glfwPollEvents();
 }
 
 void end_render_glfw() {
   glfwSwapBuffers(glfw_handle);
-  glfwGetFramebufferSize(glfw_handle, &window_width, &window_height);
-}
-
-void begin_render_imgui() {
-  ImGui_ImplOpenGL3_NewFrame();
-  ImGui_ImplGlfw_NewFrame();
-  ImGui::NewFrame();
-}
-
-void end_render_imgui() {
-  ImGui::Render();
-  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 
@@ -163,61 +126,75 @@ void end_render_imgui() {
  * Program code
  */
 
-void render_loop() {
-  while (!glfwWindowShouldClose(glfw_handle)) {
-    begin_render_glfw();
-    begin_render_imgui();
-    runtime_gl_assert("Begin of render loop");
-
-    // Clear framebuffer
-    glClearColor(1.0, 1.0, 1.0, 1.0);
-    glClearDepth(0.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Add some ImGui components
-    ImGui::ShowDemoWindow();
-    ImGui::Begin("Hello world");
-    ImGui::Text("Uhh.....");
-    ImGui::End();
-
-    end_render_imgui();
-    end_render_glfw();
-    runtime_gl_assert("End of render loop");
+template <typename C>
+void print_container(const C &c) {
+  fmt::print("{{");
+  for (auto f : c) {
+    fmt::print(" {}", f);
   }
+  fmt::print(" }}\n");
 }
 
 int main() {
-  try { 
+  try {
     init_glfw();
-    init_imgui();
 
     using namespace metameric;
-    // GLBuffer a(4 * sizeof(uint));
 
-    // GLBuffer a;
-    // GLBuffer b(4 * sizeof(uint));
-    // fmt::print("a: {}, b: {}\n", a.handle(), b.handle());
-    GLBuffer a = GLBuffer(4 * sizeof(uint));
-    GLBuffer b = GLBuffer(4 * sizeof(uint));
-    uint handle = a.handle();
-    fmt::print("a {} {}\n", a.handle(), glIsBuffer(handle));
-    a = GLBuffer();
-    fmt::print("a {} {}\n", a.handle(), glIsBuffer(handle));
+
+    GLBuffer bf = { 0.5f, 0.5f, 0.5f }; // { 0.5, 0.5, 0.5, 0.5 };
+    runtime_gl_assert("Buffer creation");
+
+    std::vector<float> v({0.7f, 0.7f, 0.6f});
+    bf.set(v);
+    runtime_gl_assert("Buffer set");
+
+    auto vf = bf.get_as<std::vector<float>>();
+    runtime_gl_assert("Buffer get");
     
-    fmt::print("init? {}\n", a.is_init());
-    fmt::print("init? {}\n", b.is_init());
-    fmt::print("Equality: {}\n", a == a);
-    fmt::print("Equality: {}\n", a == b);
     
-    // fmt::print("a: {}, b: {}\n", a.handle(), b.handle());
+    // bf.set({ 0.66, 0.66, 0.66 });
 
-    // render_loop();
+    // print_container(f);
+    print_container(vf);
 
-    dstr_imgui();
+    // fmt::print("{}\n", bf.size());
+
+
+    // GLBuffer bvv(std::span{ v });
+
+    // TestBuffer<vec2> b(16);
+    // fmt::print("{}\n", b.size());
+    // TestBuffer<float> b_ = TestBuffer<vec2>(16);
+    // fmt::print("{}\n", b_.size());
+
+
+
+    // std::vector<float> v(16, 2.5f);
+
+    // TestBuffer<float> b(v);
+    // fmt::print("{}", b.size());
+    // b = TestBuffer<float>();
+    // fmt::print("{}", b.size());
+
+    /* std::vector<float> v(16, 2.5f);
+    for (auto &f : v) {
+      fmt::print("{} ", f);
+    }
+    fmt::print("\n");
+
+    GLBuffer a(v.size() * sizeof(float), v.data());
+
+    std::vector<float> v2 = a.get_data<float>();
+    for (auto &f : v2) {
+      fmt::print("{} ", f);
+    }
+    fmt::print("\n"); */
+
     dstr_glfw();
-  } catch (const std::exception  e) {
+  } catch (const std::exception &e) {
     fmt::print(stderr, e.what());
     return EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
+  return 0;
 }
