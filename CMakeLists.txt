@@ -1,18 +1,47 @@
 cmake_minimum_required(VERSION 3.22)
 
+option(ENABLE_CUDA "Enable building of CUDA backend if ON" OFF)
+
 # Specify vcpkg toolchain file
 set(CMAKE_TOOLCHAIN_FILE 
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake
   CACHE STRING "Vcpkg toolchain file")
-
-project(Metameric LANGUAGES CXX CUDA)
+  
+if(ENABLE_CUDA)
+  project(Metameric LANGUAGES CXX CUDA)
+else()
+  project(Metameric LANGUAGES CXX)
+endif()
 
 # Include third party libraries provided through vcpkg
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(imguizmo CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 
-# Define function to add a library while recursively globbing its files from a specified directory
+# Include remaining third party libraries
+find_package(Thrust CONFIG REQUIRED)
+thrust_create_target(Thrust)
+
+function(init_target_r target srcs)
+  target_include_directories(${target} PUBLIC include)
+  if(ENABLE_CUDA)
+    set_source_files_properties(srcs PROPERTIES LANGUAGE CUDA)
+    target_compile_features(${target} PRIVATE cuda_std_17)
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+      --use_fast_math
+      --expt-relaxed-constexpr
+      --extended-lambda
+      --forward-unknown-to-host-compiler
+    >)
+  else()
+    target_compile_features(${target} PRIVATE cxx_std_17)
+  endif()
+
+  target_compile_options(${target} PRIVATE -fsanitize=address)
+endfunction()
+
 function(add_library_r target dir)
   file(GLOB_RECURSE srcs 
     ${CMAKE_CURRENT_SOURCE_DIR}/include/metameric/${dir}/*.h
@@ -21,15 +50,36 @@ function(add_library_r target dir)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cu
   )
   add_library(${target} ${srcs})
-  target_compile_features(${target} PRIVATE cxx_std_17)
-  target_include_directories(${target} PUBLIC include)
+  init_target_r(${target} ${srcs})
+endfunction()
+
+function(add_executable_r target src)
+  add_executable(${target} ${src})
+  init_target_r(${target} ${src}})
 endfunction()
 
 add_library_r(core core)
-# add_library_r(gui gui)
+add_executable_r(main src/main.cpp)
+add_executable_r(main_imgui src/main_imgui.cpp)
 
-add_executable(main src/main.cpp)
-
-target_link_libraries(main PUBLIC core glad::glad glfw imgui::imgui)
-# target_link_libraries(gui PUBLIC core)
-# target_link_libraries(main PUBLIC core gui)
+target_link_libraries(core PRIVATE
+  glad::glad
+  glfw
+)
+target_link_libraries(main PUBLIC
+  core
+  glad::glad
+  glfw
+  imgui::imgui
+  imguizmo::imguizmo
+  fmt::fmt-header-only
+  Thrust
+)
+target_link_libraries(main_imgui PUBLIC 
+  core
+  glad::glad
+  glfw
+  imgui::imgui
+  imguizmo::imguizmo
+  fmt::fmt-header-only
+)
