@@ -18,15 +18,17 @@
 #include <metameric/core/define.h>
 #include <metameric/core/opengl.h>
 #include <metameric/core/gl/buffer.h>
+#include <metameric/core/exception.h>
+#include <metameric/core/gl/detail/exception.h>
 
 
 /**
  * Preprocessor defines
  */
 
-// Assert sugar
+/* // Assert sugar
 #define runtime_assert(expr, msg) detail::runtime_assert_(expr, msg, __FILE__, __LINE__);
-#define runtime_gl_assert(msg) detail::runtime_gl_assert_(msg, __FILE__, __LINE__);
+#define runtime_gl_assert(msg) detail::runtime_gl_assert_(msg, __FILE__, __LINE__); */
 
 
 /**
@@ -136,42 +138,63 @@ void print_container(const C &c) {
   fmt::print(" }}\n");
 }
 
+void render() {
+  std::vector<float> vf(4);
+  std::vector<int> vi(4);
+  
+  using namespace metameric;
+
+  auto storage_flags = gl::BufferStorageFlags::eClient
+                      | gl::BufferStorageFlags::eDynamic;
+  auto mapping_flags = gl::BufferMappingFlags::eRead
+                      | gl::BufferMappingFlags::eWrite
+                      | gl::BufferMappingFlags::eCoherent
+                      | gl::BufferMappingFlags::ePersistent;
+                      
+  gl::Buffer buffer({4.f, 4.f, 4.f, 4.f}, storage_flags, mapping_flags);
+  auto v = buffer.get_as<std::vector<float>>();
+  
+  buffer.set({4.f}, 1, 0);
+  buffer.set({3.f}, 1, 1);
+  buffer.set({2.f, 1.f}, 2, 2);
+  print_container(buffer.get(v));
+
+  gl::Buffer other_buffer = buffer.copy();
+  other_buffer.set({-1.f, -2.f}, 2, 2);
+
+  buffer.fill({ 16.f });
+  buffer.clear(2);
+
+  print_container(buffer.get(v));
+  print_container(other_buffer.get(v));
+
+  gl_assert("After buffer creation");
+
+  // gl::Buffer test_buffer(16, nullptr, storage_flags, mapping_flags);
+
+  /* GLBuffer buffer = { {0.7f, 0.7f, 0.6f, 0.8f}, (uint) GLBufferStorageFlags::eDynamicStorage };
+  GLBuffer b2 = { 0.5f, 0.5f, 0.5f, 0.5f };
+
+  buffer.set({0.8f, 0.8f, 0.3f});
+  print_container(buffer.get(vf));
+  
+  buffer.fill({2.5f});
+  print_container(buffer.get(vf));
+
+  buffer.clear();
+  print_container(buffer.get(vf));
+
+  buffer.copy_from(b2);
+  print_container(buffer.get(vf));
+
+  buffer.set({ 4, 4, 4, 4 });
+  print_container(buffer.get(vi)); */
+}
+
 int main() {
   try {
     init_glfw();
-
-    std::vector<float> vf(4);
-    std::vector<int> vi(4);
-    
-    using namespace metameric;
-
-    auto storage_flags = gl::BufferStorageFlags::eClient
-                       | gl::BufferStorageFlags::eDynamic;
-    auto mapping_flags = gl::BufferMappingFlags::eRead
-                       | gl::BufferMappingFlags::eWrite
-                       | gl::BufferMappingFlags::eCoherent
-                       | gl::BufferMappingFlags::ePersistent;
-                       
-    gl::Buffer test_buffer(16, nullptr, storage_flags, mapping_flags);
-
-    GLBuffer buffer = { {0.7f, 0.7f, 0.6f, 0.8f}, (uint) GLBufferStorageFlags::eDynamicStorage };
-    GLBuffer b2 = { 0.5f, 0.5f, 0.5f, 0.5f };
-
-    buffer.set({0.8f, 0.8f, 0.3f});
-    print_container(buffer.get(vf));
-    
-    buffer.fill({2.5f});
-    print_container(buffer.get(vf));
-
-    buffer.clear();
-    print_container(buffer.get(vf));
-
-    buffer.copy_from(b2);
-    print_container(buffer.get(vf));
-
-    buffer.set({ 4, 4, 4, 4 });
-    print_container(buffer.get(vi));
-
+    render();
     dstr_glfw();
   } catch (const std::exception &e) {
     fmt::print(stderr, e.what());

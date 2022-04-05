@@ -9,10 +9,8 @@ class Colour;
 class GLWindow;
 class Logger;
 class Spectrum;
-class Texture;
 
 class Managed;
 class Vector;
 class Matrix;
-
 } // namespace metameric

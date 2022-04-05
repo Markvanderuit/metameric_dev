@@ -18,6 +18,7 @@ namespace metameric {
       throw e;
     }
   } // namespace detail
-
-  #define gl_assert(msg) detail::gl_assert_impl(msg, __FILE__, __LINE__);
 } // namespace metameric
+
+#define gl_assert(msg)\
+  metameric::detail::gl_assert_impl(msg, __FILE__, __LINE__);

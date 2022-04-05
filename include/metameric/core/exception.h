@@ -44,7 +44,7 @@ namespace metameric {
       throw e;
     }
   } // namespace detail
-
-  #define runtime_assert(expr, msg)\
-    detail::runtime_assert_impl(expr, msg, __FILE__, __LINE__);
 } // namespace metameric
+
+#define runtime_assert(expr, msg)\
+  metameric::detail::runtime_assert_impl(expr, msg, __FILE__, __LINE__);

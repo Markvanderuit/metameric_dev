@@ -6,6 +6,10 @@
 #include <metameric/core/fwd.h>
 
 namespace metameric::gl {
+  /**
+   * Thin abstract class wrapping OpenGL objects, which holds
+   * a resource handle and signals initialization of said resource.
+   */
   struct AbstractObject {
     // Handle to the OpenGL object which this object owns
     inline uint handle() const { return _handle; }

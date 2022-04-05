@@ -10,7 +10,7 @@ namespace metameric::gl {
   /**
    * This list of values classifies targets for a buffer binding operation.
    */
-  enum class BufferTarget { eArray, eAtomicCounter, eShaderStorage, eTransformFeedback, eUniform };
+  enum class BufferTarget { eAtomicCounter, eShaderStorage, eTransformFeedback, eUniform };
 
   /**
    * This list of flags classifies the intended usage of a Buffer's data store. Note that map bits 
@@ -74,7 +74,10 @@ namespace metameric::gl {
     uint _mapping_constr_flags;
     uint _mapping_access_flags;
     bool _is_mapped;
-  
+    
+    template <typename T>
+    size_t check_size(size_t size) const { return size > 0 ? size * sizeof(T) : _size; }
+
   public:
     // Base constructor to setup/teardown underlying buffer storage
     Buffer() = default;
@@ -96,37 +99,51 @@ namespace metameric::gl {
     : Buffer(c.size() * sizeof(typename C::value_type), std::data(c), strg_fl, map_fl) { }
 
   public:
-    // Base get/set/fill/clear operations to interact with underlying data
-    void get(void *ptr, size_t size = 0, size_t offset = 0) const;
-    void set(void const *ptr, size_t size = 0, size_t offset = 0);
-    void fill(void const *ptr, size_t stride = 1, size_t size = 0, size_t offset = 0);
-    void clear(size_t size = 0, size_t offset = 0);
+    // Base get/set/fill operations to read/write underlying data
+    void get_mem(void *ptr, size_t size = 0, size_t offset = 0) const;
+    void set_mem(void const *ptr, size_t size = 0, size_t offset = 0);
+    void fill_mem(void const *ptr, size_t stride = 1, size_t size = 0, size_t offset = 0);
 
-    // Convenience get() variants accepting common STL formats
+    // Convenience get_mem() variants accepting common STL formats
     template <typename T, size_t E>
-    auto get(std::span<T, E> c) const    { get(std::data(c), c.size() * sizeof(T)); return c; }
+    auto get(std::span<T, E> c, size_t size = 0, size_t offset = 0) const    
+    { get_mem(std::data(c), check_size<T>(size), offset * sizeof(T)); return c; }
     template <typename C>
-    auto & get(C &c) const               { get(std::data(c), c.size() * sizeof(typename C::value_type)); return c; }
-
-    // Convenience set() variants accepting common STL formats
-    template <typename T>
-    void set(std::initializer_list<T> c) { set(std::data(c), c.size() * sizeof(T)); }
-    template <typename T, size_t E>
-    void set(std::span<T, E> c)          { set(std::data(c), c.size() * sizeof(T)); }
-    template <typename C>
-    void set(const C &c)                 { set(std::data(c), c.size() * sizeof(typename C::value_type)); }
-
-    // Convenience fill() variants accepting common STL formats
-    template <typename T>
-    void fill(std::initializer_list<T> c) { fill(std::data(c), c.size()); }
-    template <typename T, size_t E>
-    void fill(std::span<T, E> c)          { fill(std::data(c), c.size()); }
-    template <typename C>
-    void fill(const C &c)                 { fill(std::data(c), c.size()); }
-
+    auto & get(C &c, size_t size = 0, size_t offset = 0) const               
+    { get_mem(std::data(c), check_size<C::value_type>(size), offset * sizeof(typename C::value_type)); return c; }
+    
     // Convenience function which constructs and writes directly into vector/list container
     template <typename C>
-    C get_as() const { C c(size() / sizeof(typename C::value_type)); return get(c); }
+    C get_as(size_t size = 0, size_t offset = 0) const { 
+      size_t checked_size = check_size<C::value_type>(size) / sizeof(typename C::value_type);
+      C c(checked_size); 
+      return get(c, checked_size, offset); 
+    }
+
+    // Convenience set_mem() variants accepting common STL formats
+    template <typename T>
+    void set(std::initializer_list<T> c, size_t size = 0, size_t offset = 0) 
+    { set_mem(std::data(c), check_size<T>(size), offset * sizeof(T)); }
+    template <typename T, size_t E>
+    void set(std::span<T, E> c, size_t size = 0, size_t offset = 0)
+    { set(std::data(c), check_size<T>(size), offset * sizeof(T)); }
+    template <typename C>
+    void set(const C &c, size_t size = 0, size_t offset = 0)
+    { set_mem(std::data(c), check_size<C::value_type>(size), offset * sizeof(typename C::value_type)); }
+
+    // Convenience fill_mem() variants accepting common STL formats
+    template <typename T>
+    void fill(std::initializer_list<T> c, size_t size = 0, size_t offset = 0)
+    { fill_mem(std::data(c), check_size<T>(size), offset * sizeof(T)); }
+    template <typename T, size_t E>
+    void fill(std::span<T, E> c, size_t size = 0, size_t offset = 0)
+    { fill_mem(std::data(c), check_size<T>(size), offset * sizeof(T)); }
+    template <typename C>
+    void fill(const C &c, size_t size = 0, size_t offset = 0)
+    { fill_mem(std::data(c), check_size<C::value_type>(size), offset * sizeof(typename C::value_type)); }
+
+    // Convenience clear() function which fills a subrange with all zeroes
+    void clear(size_t size = 0, size_t offset = 0);
 
     // Copy constr/assign is deleted to prevent accidental usage, but explicit copies can still be
     // performed between (parts of) buffers, if necessary.
@@ -135,7 +152,7 @@ namespace metameric::gl {
     void copy_to(Buffer &o, size_t size = 0, size_t r_offset = 0, size_t w_offset = 0) const;
 
     // Convenience function merging OpenGL's bindBase/bindRange
-    void bind(BufferTarget target, uint index, size_t offset = 0, size_t size = 0) const;
+    void bind_to(BufferTarget target, uint index, size_t offset = 0, size_t size = 0) const;
 
     // Mapping/unmapping of buffer - note: ensure flags are set corretly
     /* void * map(size_t size = 0, size_t offset = 0);
