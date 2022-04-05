@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <iostream>
 
 // OpenGL includes
 #define GLFW_INCLUDE_NONE
@@ -16,19 +17,11 @@
 
 // Core includes
 #include <metameric/core/define.h>
-#include <metameric/core/opengl.h>
-#include <metameric/core/gl/buffer.h>
+#include <metameric/core/math.h>
 #include <metameric/core/exception.h>
+#include <metameric/core/gl/buffer.h>
+#include <metameric/core/gl/texture.h>
 #include <metameric/core/gl/detail/exception.h>
-
-
-/**
- * Preprocessor defines
- */
-
-/* // Assert sugar
-#define runtime_assert(expr, msg) detail::runtime_assert_(expr, msg, __FILE__, __LINE__);
-#define runtime_gl_assert(msg) detail::runtime_gl_assert_(msg, __FILE__, __LINE__); */
 
 
 /**
@@ -138,6 +131,31 @@ void print_container(const C &c) {
   fmt::print(" }}\n");
 }
 
+void test_eigen() {
+  using namespace metameric;
+
+  
+  Vector3f v = { 1.5, 1.5, 1.5 };
+  // v = v.array().pow(2.0f);
+  v = eig::pow(v.array(), 2.0f);
+  // v = eg::pow(2.0f, v);
+  std::cout << v << std::endl;
+  // fmt::print("{}", v);
+
+  // using Eigen::MatrixXf;
+  // using Eigen::VectorXf;
+
+  // MatrixXf m = MatrixXf::Random(3, 3);
+  // m = (m + MatrixXf::Constant(3, 3, 1.2f)) * 50.f;
+  // std::cout << m << std::endl;
+
+  // VectorXf v(3);
+  // v << 1, 2, 3;
+  // std::cout << v << std::endl;
+
+  // std::cout << m * v << std::endl;
+}
+
 void render() {
   std::vector<float> vf(4);
   std::vector<int> vi(4);
@@ -151,10 +169,21 @@ void render() {
                       | gl::BufferMappingFlags::eCoherent
                       | gl::BufferMappingFlags::ePersistent;
                       
-  gl::Buffer buffer({4.f, 4.f, 4.f, 4.f}, storage_flags, mapping_flags);
+  gl::Buffer buffer(256 * 256 * sizeof(uint), nullptr, 0 | gl::BufferStorageFlags::eDynamic);
+  buffer.fill({ 1u });
+  buffer.set({4u}, 1, 0);
+  auto v = buffer.get_as<std::vector<uint>>();
+  gl_assert("After buffer creation");
+
+  gl::Texture tex_0(gl::TextureFormat::eRGBA32Float, 1, 256, 256);
+  VectorXi vx {{ 256, 256 }};
+  gl::Texture tex_1(gl::TextureFormat::eR16Int, 1, Vector2i { 256, 256 });
+  fmt::print("Hello!");
+  gl_assert("After texture creation");
+
+ /*  gl::Buffer buffer({4.f, 4.f, 4.f, 4.f}, storage_flags, mapping_flags);
   auto v = buffer.get_as<std::vector<float>>();
   
-  buffer.set({4.f}, 1, 0);
   buffer.set({3.f}, 1, 1);
   buffer.set({2.f, 1.f}, 2, 2);
   print_container(buffer.get(v));
@@ -166,35 +195,15 @@ void render() {
   buffer.clear(2);
 
   print_container(buffer.get(v));
-  print_container(other_buffer.get(v));
+  print_container(other_buffer.get(v)); */
 
-  gl_assert("After buffer creation");
-
-  // gl::Buffer test_buffer(16, nullptr, storage_flags, mapping_flags);
-
-  /* GLBuffer buffer = { {0.7f, 0.7f, 0.6f, 0.8f}, (uint) GLBufferStorageFlags::eDynamicStorage };
-  GLBuffer b2 = { 0.5f, 0.5f, 0.5f, 0.5f };
-
-  buffer.set({0.8f, 0.8f, 0.3f});
-  print_container(buffer.get(vf));
-  
-  buffer.fill({2.5f});
-  print_container(buffer.get(vf));
-
-  buffer.clear();
-  print_container(buffer.get(vf));
-
-  buffer.copy_from(b2);
-  print_container(buffer.get(vf));
-
-  buffer.set({ 4, 4, 4, 4 });
-  print_container(buffer.get(vi)); */
 }
 
 int main() {
   try {
     init_glfw();
     render();
+    test_eigen();
     dstr_glfw();
   } catch (const std::exception &e) {
     fmt::print(stderr, e.what());

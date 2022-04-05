@@ -98,7 +98,6 @@ namespace metameric::gl {
     Buffer(const C &c, uint strg_fl = 0u, uint map_fl = 0u)
     : Buffer(c.size() * sizeof(typename C::value_type), std::data(c), strg_fl, map_fl) { }
 
-  public:
     // Base get/set/fill operations to read/write underlying data
     void get_mem(void *ptr, size_t size = 0, size_t offset = 0) const;
     void set_mem(void const *ptr, size_t size = 0, size_t offset = 0);

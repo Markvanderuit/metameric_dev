@@ -4,12 +4,13 @@
 #include <span>
 #include <metameric/core/define.h>
 #include <metameric/core/fwd.h>
+#include <metameric/core/math.h>
 #include <metameric/core/gl/abstract_object.h>
 
 namespace metameric::gl {
   /**
    * This list of values classifies possible internal formats for
-   * a texture.
+   * a texture object. Unorm/Snorm and 8-bit types have been stripped.
    */
   enum class TextureFormat {
     eR32UInt,  eRG32UInt,  eRGB32UInt,  eRGBA32UInt,
@@ -44,12 +45,17 @@ namespace metameric::gl {
   public:
     // Base constructors to setup/teardown underlying texture
     Texture() = default;
-    Texture(TextureFormat format, 
+
+    // Texture(TextureFormat format, uint levels, const eig::Vector<int, eig::Dynamic, 1> &dims);
+
+    Texture(TextureFormat format, uint levels, VectorXi dims);
+    Texture(TextureFormat format, uint levels,
             uint w, uint h = 1u, uint d = 1u);
-    Texture(TextureFormat format, const void *ptr, uint levels, 
-            uint w, uint h = 1u, uint d = 1u);
+    /* Texture(TextureFormat format, const void *ptr, uint levels, 
+            uint w, uint h = 1u, uint d = 1u); */
     ~Texture();
     
+    void set_image(void const *ptr, uint level = 0, uint xo = 0, uint yo = 0, uint zo = 0);    
   };
 
   /**

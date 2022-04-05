@@ -19,6 +19,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
 
 # Include remaining third party libraries
 find_package(Thrust CONFIG REQUIRED)
@@ -60,6 +61,7 @@ endfunction()
 add_library_r(core core)
 target_link_libraries(core PRIVATE
   glad::glad
+  Eigen3::Eigen
   glfw
   fmt::fmt-header-only
 )
@@ -67,10 +69,11 @@ target_link_libraries(core PRIVATE
 set(link_libraries
   core
   glad::glad
+  Eigen3::Eigen
+  fmt::fmt-header-only
   glfw
   imgui::imgui
   imguizmo::imguizmo
-  fmt::fmt-header-only
   Thrust
 )
 
