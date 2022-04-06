@@ -29,14 +29,14 @@ namespace metameric::gl {
    * not allow copy construction or assignment.
    */
   class Texture : public AbstractObject {
+    using Array = const eig::Ref<const ArrayXi> &;
+
   public:
     inline uint levels() const { return _levels; }
     inline TextureFormat format() const { return _format; }
     inline ArrayXi dims() const { return _dims; }
 
   private:
-    using ArrayRef = const eig::Ref<const ArrayXi> &;
-
     uint _levels;
     TextureFormat _format;
     ArrayXi _dims;
@@ -44,48 +44,47 @@ namespace metameric::gl {
   public:
     // Base constructors to setup/teardown underlying texture
     Texture() = default;
-    Texture(TextureFormat format, ArrayRef dims, uint levels = 1, const void *ptr = nullptr);
+    Texture(TextureFormat format, 
+            Array dims, 
+            uint levels = 1, 
+            const void *ptr = nullptr);
     ~Texture();
 
-  public:
-    void set_image_mem(void const *ptr,
-                       size_t ptr_size,
-                       uint level = 0, 
-                       ArrayRef dims = ArrayXi {0},
-                       ArrayRef off = ArrayXi {0});
-    void get_image_mem(void *ptr, 
-                       size_t ptr_size,
-                       uint level = 0) const;
+    // Base get/set operations to read/write texture data. Subimage get is not supported r.n.
+    void get_image_mem(void *ptr, size_t ptr_size,uint level = 0) const;
+    void set_image_mem(void const *ptr, size_t ptr_size, uint level = 0,  Array dims = ArrayXi {0}, Array off = ArrayXi {0});
     /*  void get_subimage(void *ptr,
                       uint level = 0, 
                       const eig::Ref<const ArrayXi> &dims = ArrayXi::Zero(1),
                       const eig::Ref<const ArrayXi> &off = ArrayXi::Zero(1)) const; */
 
-    // Convenience set_image_mem() variants accepting common STL formats
-    template <typename T, size_t E>
-    void set_image(std::span<T, E> c, 
-                   uint level = 0,
-                   ArrayXi dims = ArrayXi {0},
-                   ArrayXi off = ArrayXi {0}) {
-      set_image_mem(std::data(c), std::size(c) * sizeof(T), level, dims, off);
-    }
-    template <typename C>
-    void set_image(const C &c, 
-                   uint level = 0,
-                   ArrayXi dims = ArrayXi {0},
-                   ArrayXi off = ArrayXi {0}) {
-      set_image_mem(std::data(c), std::size(c) * sizeof(C::value_type), level, dims, off);
-    }
-
     // Convenience get_image_mem() variants accepting common STL formats
     template <typename T, size_t E>
-    void get_image(std::span<T, E> c, uint level = 0) {
-      get_image_mem(std::data(c), std::size(c) * sizeof(T), level);
-    }
+    auto get_image(std::span<T, E> c, uint level = 0) 
+    { get_image_mem(std::data(c), std::size(c) * sizeof(T), level); return c; }
     template <typename C>
-    void get_image(C &c, uint level = 0) {
-      get_image_mem(std::data(c), std::size(c) * sizeof(C::value_type), level);
+    auto & get_image(C &c, uint level = 0) const
+    { get_image_mem(std::data(c), std::size(c) * sizeof(C::value_type), level); return c; }
+
+    // Convenience set_image_mem() variants accepting common STL formats
+    template <typename T, size_t E>
+    void set_image(std::span<T, E> c, uint level = 0, Array dims = ArrayXi {0}, Array off = ArrayXi {0}) 
+    { set_image_mem(std::data(c), std::size(c) * sizeof(T), level, dims, off); }
+    template <typename C>
+    void set_image(const C &c, uint level = 0, Array dims = ArrayXi {0}, Array off = ArrayXi {0}) 
+    { set_image_mem(std::data(c), std::size(c) * sizeof(C::value_type), level, dims, off); }
+
+    template <typename C>
+    C get_as(uint level = 0) const {
+      C c(_dims.prod() * sizeof(C::value_type)); // TODO should check against underlying type
+      return get_image(c, level);
     }
+
+    // void clear()
+
+    // Texture copy() const;
+    void copy_from(const Texture &o, uint level = 0, Array dims = ArrayXi {0}, Array off = ArrayXi {0});
+    // void copy_to(Texture &o) const;
 
   public:
     inline void swap(Texture &o) {

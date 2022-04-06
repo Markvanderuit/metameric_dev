@@ -133,34 +133,28 @@ void print_container(const C &c) {
 
 void render() {
   using namespace metameric;
-
-  auto storage_flags = gl::BufferStorageFlags::eClient
-                      | gl::BufferStorageFlags::eDynamic;
-  auto mapping_flags = gl::BufferMappingFlags::eRead
-                      | gl::BufferMappingFlags::eWrite
-                      | gl::BufferMappingFlags::eCoherent
-                      | gl::BufferMappingFlags::ePersistent;
                       
-  gl::Buffer buffer(256 * 256 * sizeof(uint), nullptr, 0 | gl::BufferStorageFlags::eDynamic);
-  buffer.fill({ 1u });
+  gl::Buffer buffer = { 0u, 1u, 2u, 3u };
+  buffer.fill({ 1u }, 1, 0);
   buffer.set({4u}, 1, 0);
-  auto v = buffer.get_as<std::vector<uint>>();
+
+  auto buffer_v = buffer.get_as<std::vector<uint>>();
+  print_container(buffer_v);
   gl_assert("After buffer creation");
 
   // Input data
   std::vector<unsigned short> texture_input(256 * 256, 7);
   gl::Texture texture(gl::TextureFormat::eR16UInt, Array2i { 256, 256 });
-  gl_assert("After texture creation");
   texture.set_image(texture_input);
   
   // Output data
-  gl_assert("After texture set_image");
-  std::vector<unsigned short> texture_output(texture.dims().prod());
+  auto texture_output = texture.get_as<std::vector<unsigned short>>();
   texture.get_image(texture_output);
 
   // Test equality
-  bool equal = std::equal(texture_input.begin(), texture_input.end(), texture_output.begin());
-  fmt::print("Equal ?= {}", equal);
+  bool is_equal = std::equal(texture_input.begin(), texture_input.end(), 
+                             texture_output.begin());
+  fmt::print("is_equal ?= {}", is_equal);
 }
 
 int main() {

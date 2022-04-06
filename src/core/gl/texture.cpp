@@ -71,7 +71,7 @@ constexpr EnumMap<TextureFormat, 28> _internal_format_map({
 });
 
 
-Texture::Texture(TextureFormat format, ArrayRef dims, uint levels, const void *ptr)
+Texture::Texture(TextureFormat format, Array dims, uint levels, const void *ptr)
 : AbstractObject(true), _format(format), _dims(dims), _levels(levels) {
   guard(_is_init);
   runtime_assert(_dims.size() <= 3, 
@@ -104,7 +104,7 @@ Texture::~Texture() {
   gl_assert("Texture::~Texture(...)");
 }
 
-void Texture::set_image_mem(void const *ptr, size_t ptr_size, uint level,  const eig::Ref<const ArrayXi> &dims, ArrayXi off) {
+void Texture::set_image_mem(void const *ptr, size_t ptr_size, uint level, Array dims, Array off) {
   auto set_dims = dims.isZero() ? _dims : ArrayXi(dims);
   auto set_off = off.isZero() ? ArrayXi::Zero(_dims.size()) : ArrayXi(off);
   auto base_format = _format_map[_format];
@@ -127,12 +127,17 @@ void Texture::set_image_mem(void const *ptr, size_t ptr_size, uint level,  const
   gl_assert("Texture::set_image(...)");
 }
 
-  void Texture::get_image_mem(void *ptr, size_t ptr_size, uint level) const {
-    auto base_format = _format_map[_format];
-    auto base_type = _type_map[_format];
-    glGetTextureImage(_handle, level, base_format, base_type, ptr_size, ptr);
-    gl_assert("Texture::get_image(...)");
-  }
+void Texture::get_image_mem(void *ptr, size_t ptr_size, uint level) const {
+  auto base_format = _format_map[_format];
+  auto base_type = _type_map[_format];
+  glGetTextureImage(_handle, level, base_format, base_type, ptr_size, ptr);
+  gl_assert("Texture::get_image(...)");
+}
+
+void Texture::copy_from(const Texture &o, uint level = 0, Array dims = ArrayXi {0}, Array off = ArrayXi {0}) {
+  
+}
+
 
 /* void Texture::get_subimage_mem(void *ptr, size_t ptr_size, uint level,  const eig::Ref<const ArrayXi> &dims, const eig::Ref<const ArrayXi> &off) const {
   auto set_dims = dims.isZero() ? _dims : ArrayXi(dims);
