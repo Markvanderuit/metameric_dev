@@ -20,7 +20,6 @@
 
 // Core includes
 #include <metameric/core/define.h>
-#include <metameric/core/opengl.h>
 
 /**
  * Preprocessor defines

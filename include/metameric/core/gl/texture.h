@@ -29,33 +29,83 @@ namespace metameric::gl {
    * not allow copy construction or assignment.
    */
   class Texture : public AbstractObject {
+  public:
     inline uint levels() const { return _levels; }
-    inline uint dims() const { return _dims; }
-    inline uint w() const { return _w; }
-    inline uint h() const { return _h; }
-    inline uint d() const { return _d; }
     inline TextureFormat format() const { return _format; }
+    inline ArrayXi dims() const { return _dims; }
 
   private:
+    using ArrayRef = const eig::Ref<const ArrayXi> &;
+
     uint _levels;
-    uint _dims;
-    uint _w, _h, _d;
     TextureFormat _format;
+    ArrayXi _dims;
 
   public:
     // Base constructors to setup/teardown underlying texture
     Texture() = default;
-
-    // Texture(TextureFormat format, uint levels, const eig::Vector<int, eig::Dynamic, 1> &dims);
-
-    Texture(TextureFormat format, uint levels, VectorXi dims);
-    Texture(TextureFormat format, uint levels,
-            uint w, uint h = 1u, uint d = 1u);
-    /* Texture(TextureFormat format, const void *ptr, uint levels, 
-            uint w, uint h = 1u, uint d = 1u); */
+    Texture(TextureFormat format, ArrayRef dims, uint levels = 1, const void *ptr = nullptr);
     ~Texture();
+
+  public:
+    void set_image_mem(void const *ptr,
+                       size_t ptr_size,
+                       uint level = 0, 
+                       ArrayRef dims = ArrayXi {0},
+                       ArrayRef off = ArrayXi {0});
+    void get_image_mem(void *ptr, 
+                       size_t ptr_size,
+                       uint level = 0) const;
+    /*  void get_subimage(void *ptr,
+                      uint level = 0, 
+                      const eig::Ref<const ArrayXi> &dims = ArrayXi::Zero(1),
+                      const eig::Ref<const ArrayXi> &off = ArrayXi::Zero(1)) const; */
+
+    // Convenience set_image_mem() variants accepting common STL formats
+    template <typename T, size_t E>
+    void set_image(std::span<T, E> c, 
+                   uint level = 0,
+                   ArrayXi dims = ArrayXi {0},
+                   ArrayXi off = ArrayXi {0}) {
+      set_image_mem(std::data(c), std::size(c) * sizeof(T), level, dims, off);
+    }
+    template <typename C>
+    void set_image(const C &c, 
+                   uint level = 0,
+                   ArrayXi dims = ArrayXi {0},
+                   ArrayXi off = ArrayXi {0}) {
+      set_image_mem(std::data(c), std::size(c) * sizeof(C::value_type), level, dims, off);
+    }
+
+    // Convenience get_image_mem() variants accepting common STL formats
+    template <typename T, size_t E>
+    void get_image(std::span<T, E> c, uint level = 0) {
+      get_image_mem(std::data(c), std::size(c) * sizeof(T), level);
+    }
+    template <typename C>
+    void get_image(C &c, uint level = 0) {
+      get_image_mem(std::data(c), std::size(c) * sizeof(C::value_type), level);
+    }
+
+  public:
+    inline void swap(Texture &o) {
+      using std::swap;
+      AbstractObject::swap(o);
+      swap(_levels, o._levels);
+      swap(_format, o._format);
+      swap(_dims, o._dims);
+    }
     
-    void set_image(void const *ptr, uint level = 0, uint xo = 0, uint yo = 0, uint zo = 0);    
+    inline bool operator==(const Texture &o) const {
+      using std::tie;
+      return AbstractObject::operator==(o)
+        && tie(_levels, _format)
+        == tie(o._levels, o._format)
+        && (_dims.array() == o._dims.array()).all();
+    }
+
+    // Enable move constr/assign, but disallow direct copies to prevent accidental usage
+    MET_DECLARE_NONCOPYABLE(Texture);
   };
 
   /**
@@ -77,20 +127,6 @@ namespace metameric::gl {
     AbstractTexture() = default;
     explicit AbstractTexture(size_t levels = 1) noexcept;
     virtual ~AbstractTexture() = default;
-  
-    inline
-    void swap(AbstractTexture &o) {
-      using std::swap;
-      AbstractObject::swap(o);
-      swap(_levels, o._levels);
-    }
-    
-    inline bool operator==(const AbstractTexture &o) const {
-      using std::tie;
-      return AbstractObject::operator==(o)
-        && tie(_levels)
-        == tie(o._levels);
-    }
 
     MET_DECLARE_NONCOPYABLE(AbstractTexture);
   };

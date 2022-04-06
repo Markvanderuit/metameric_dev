@@ -15,12 +15,12 @@ constexpr EnumMap<TextureFormat, 28> _type_map({
   { TextureFormat::eRGB32Int,   GL_INT }, { TextureFormat::eRGBA32Int,   GL_INT },
   { TextureFormat::eRGB32Float, GL_FLOAT }, { TextureFormat::eRGBA32Float, GL_FLOAT },
 
-  { TextureFormat::eR16UInt,  GL_UNSIGNED_INT }, { TextureFormat::eRG16UInt,  GL_UNSIGNED_INT },
-  { TextureFormat::eR16Int,   GL_INT }, { TextureFormat::eRG16Int,   GL_INT },
-  { TextureFormat::eR16Float, GL_FLOAT }, { TextureFormat::eRG16Float, GL_FLOAT },
-  { TextureFormat::eRGB16UInt,  GL_UNSIGNED_INT }, { TextureFormat::eRGBA16UInt,  GL_UNSIGNED_INT },
-  { TextureFormat::eRGB16Int,   GL_INT }, { TextureFormat::eRGBA16Int,   GL_INT },
-  { TextureFormat::eRGB16Float, GL_FLOAT }, { TextureFormat::eRGBA16Float, GL_FLOAT },
+  { TextureFormat::eR16UInt,  GL_UNSIGNED_SHORT }, { TextureFormat::eRG16UInt,  GL_UNSIGNED_SHORT },
+  { TextureFormat::eR16Int,   GL_SHORT }, { TextureFormat::eRG16Int,   GL_SHORT },
+  { TextureFormat::eR16Float, GL_HALF_FLOAT }, { TextureFormat::eRG16Float, GL_HALF_FLOAT },
+  { TextureFormat::eRGB16UInt,  GL_UNSIGNED_SHORT }, { TextureFormat::eRGBA16UInt,  GL_UNSIGNED_SHORT },
+  { TextureFormat::eRGB16Int,   GL_SHORT }, { TextureFormat::eRGBA16Int,   GL_SHORT },
+  { TextureFormat::eRGB16Float, GL_HALF_FLOAT }, { TextureFormat::eRGBA16Float, GL_HALF_FLOAT },
   
   { TextureFormat::eDepth32, GL_FLOAT },
   { TextureFormat::eDepth24, GL_FLOAT },
@@ -29,18 +29,18 @@ constexpr EnumMap<TextureFormat, 28> _type_map({
 });
 
 constexpr EnumMap<TextureFormat, 28> _format_map({
-  { TextureFormat::eR32UInt,  GL_RED }, { TextureFormat::eRG32UInt,  GL_RG },
-  { TextureFormat::eR32Int,   GL_RED }, { TextureFormat::eRG32Int,   GL_RG },
+  { TextureFormat::eR32UInt,  GL_RED_INTEGER }, { TextureFormat::eRG32UInt,  GL_RG_INTEGER },
+  { TextureFormat::eR32Int,   GL_RED_INTEGER }, { TextureFormat::eRG32Int,   GL_RG_INTEGER },
   { TextureFormat::eR32Float, GL_RED }, { TextureFormat::eRG32Float, GL_RG },
-  { TextureFormat::eRGB32UInt,  GL_RGB }, { TextureFormat::eRGBA32UInt,  GL_RGBA },
-  { TextureFormat::eRGB32Int,   GL_RGB }, { TextureFormat::eRGBA32Int,   GL_RGBA },
+  { TextureFormat::eRGB32UInt,  GL_RGB_INTEGER }, { TextureFormat::eRGBA32UInt,  GL_RGBA_INTEGER },
+  { TextureFormat::eRGB32Int,   GL_RGB_INTEGER }, { TextureFormat::eRGBA32Int,   GL_RGBA_INTEGER },
   { TextureFormat::eRGB32Float, GL_RGB }, { TextureFormat::eRGBA32Float, GL_RGBA },
   
-  { TextureFormat::eR16UInt,  GL_RED }, { TextureFormat::eRG16UInt,  GL_RG },
-  { TextureFormat::eR16Int,   GL_RED }, { TextureFormat::eRG16Int,   GL_RG },
+  { TextureFormat::eR16UInt,  GL_RED_INTEGER }, { TextureFormat::eRG16UInt,  GL_RG_INTEGER },
+  { TextureFormat::eR16Int,   GL_RED_INTEGER }, { TextureFormat::eRG16Int,   GL_RG_INTEGER },
   { TextureFormat::eR16Float, GL_RED }, { TextureFormat::eRG16Float, GL_RG },
-  { TextureFormat::eRGB16UInt,  GL_RGB }, { TextureFormat::eRGBA16UInt,  GL_RGBA },
-  { TextureFormat::eRGB16Int,   GL_RGB }, { TextureFormat::eRGBA16Int,   GL_RGBA },
+  { TextureFormat::eRGB16UInt,  GL_RGB_INTEGER }, { TextureFormat::eRGBA16UInt,  GL_RGBA_INTEGER },
+  { TextureFormat::eRGB16Int,   GL_RGB_INTEGER }, { TextureFormat::eRGBA16Int,   GL_RGBA_INTEGER },
   { TextureFormat::eRGB16Float, GL_RGB }, { TextureFormat::eRGBA16Float, GL_RGBA },
 
   { TextureFormat::eDepth32, GL_DEPTH_COMPONENT },
@@ -71,88 +71,81 @@ constexpr EnumMap<TextureFormat, 28> _internal_format_map({
 });
 
 
-Texture::Texture(TextureFormat format, uint levels, VectorXi dims)
-: AbstractObject(true), _format(format), _levels(levels) {
+Texture::Texture(TextureFormat format, ArrayRef dims, uint levels, const void *ptr)
+: AbstractObject(true), _format(format), _dims(dims), _levels(levels) {
   guard(_is_init);
-  runtime_assert(dims.size() <= 3, 
+  runtime_assert(_dims.size() <= 3, 
     "Texture::Texture(...), specified dims argument exceeds supported dimensionality");
-
-  std::cout << dims.size() << std::endl;
-  std::cout << dims.x() << std::endl;
-  std::cout << dims.y() << std::endl;
   
-  gl_assert("Texture::Texture(...)");
-}
-
-Texture::Texture(TextureFormat format, uint levels, uint w, uint h, uint d)
-: AbstractObject(true), _format(format), _levels(levels), _w(w), _h(h), _d(d) {
-  guard(_is_init);
-
-  auto _dc = { _w, _h, _d };
-  _dims = std::count_if(_dc.begin(), _dc.end(), [](uint i) { return i > 1; });
-
   auto internal_format = _internal_format_map[_format];
-  switch (_dims) {
+  switch (_dims.size()) {
     case 3:
       glCreateTextures(GL_TEXTURE_3D, 1, &_handle);
-      glTextureStorage3D(_handle, _levels, internal_format, _w, _h, _d);
+      glTextureStorage3D(_handle, _levels, internal_format, _dims.x(), _dims.y(), _dims.z());
       break;
     case 2:
       glCreateTextures(GL_TEXTURE_2D, 1, &_handle);
-      glTextureStorage2D(_handle, _levels, internal_format, _w, _h);
+      glTextureStorage2D(_handle, _levels, internal_format, _dims.x(), _dims.y());
       break;
     case 1:
       glCreateTextures(GL_TEXTURE_1D, 1, &_handle);
-      glTextureStorage1D(_handle, _levels, internal_format, _w);
+      glTextureStorage1D(_handle, _levels, internal_format, _dims.x());
       break;
     default:
-      runtime_assert(false, "Texture dimensionality is faulty");
+      runtime_assert(false, "Texture::Texture(...), _dims param is faulty");
   }
-  
+
   gl_assert("Texture::Texture(...)");
 }
-
-/* Texture::Texture(TextureFormat format, const void *ptr, uint levels, uint w, uint h, uint d)
-: AbstractObject(true), _format(format), _w(w), _h(h), _d(d) {
-  guard(_is_init);
-
-  auto _dc = { _w, _h, _d };
-  _dims = std::count_if(_dc.begin(), _dc.end(),[](uint i) { return i > 1; });
-
-  auto internal_format = _internal_format_map[_format];
-  auto base_format = _format_map[_format];
-  auto type = _type_map[_format];
-  switch (_dims) {
-    case 3:
-      glCreateTextures(GL_TEXTURE_3D, 1, &_handle);
-      glTextureStorage3D(_handle, _levels, internal_format, _w, _h, _d);
-      for (uint i = 0; i < levels; ++i) {
-        glTextureSubImage3D(_handle, i, 0, 0, 0, _w, _h, _d, base_format, type, ptr);
-      }
-      break;
-    case 2:
-      glCreateTextures(GL_TEXTURE_2D, 1, &_handle);
-      glTextureStorage2D(_handle, _levels, internal_format, _w, _h);
-      for (uint i = 0; i < levels; ++i) {
-        glTextureSubImage2D(_handle, i, 0, 0, _w, _h, base_format, type, ptr);
-      }
-      break;
-    case 1:
-      glCreateTextures(GL_TEXTURE_1D, 1, &_handle);
-      glTextureStorage1D(_handle, _levels, internal_format, _w);
-      for (uint i = 0; i < levels; ++i) {
-        glTextureSubImage1D(_handle, i, 0, _w, base_format, type, ptr);
-      }
-      break;
-    default:
-      runtime_assert(false, "Texture dimensionality is faulty");
-  }
-
-  gl_assert("Texture::Texture(...)");  
-} */
 
 Texture::~Texture() {
   guard(_is_init);
   glDeleteTextures(1, &_handle);
   gl_assert("Texture::~Texture(...)");
 }
+
+void Texture::set_image_mem(void const *ptr, size_t ptr_size, uint level,  const eig::Ref<const ArrayXi> &dims, ArrayXi off) {
+  auto set_dims = dims.isZero() ? _dims : ArrayXi(dims);
+  auto set_off = off.isZero() ? ArrayXi::Zero(_dims.size()) : ArrayXi(off);
+  auto base_format = _format_map[_format];
+  auto type = _type_map[_format];
+
+  switch (_dims.size()) {
+    case 3:
+      glTextureSubImage3D(_handle, level, set_off.x(), set_off.y(), set_off.z(), set_dims.x(), set_dims.y(), set_dims.z(), base_format, type, ptr);
+      break;
+    case 2:
+      glTextureSubImage2D(_handle, level, set_off.x(), set_off.y(), set_dims.x(), set_dims.y(), base_format, type, ptr);
+      break;
+    case 1:
+      glTextureSubImage1D(_handle, level, set_off.x(), set_dims.x(), base_format, type, ptr);
+      break;
+    default:
+      runtime_assert(false, "Texture::set_image(...), internal _dims param is faulty");
+  }
+
+  gl_assert("Texture::set_image(...)");
+}
+
+  void Texture::get_image_mem(void *ptr, size_t ptr_size, uint level) const {
+    auto base_format = _format_map[_format];
+    auto base_type = _type_map[_format];
+    glGetTextureImage(_handle, level, base_format, base_type, ptr_size, ptr);
+    gl_assert("Texture::get_image(...)");
+  }
+
+/* void Texture::get_subimage_mem(void *ptr, size_t ptr_size, uint level,  const eig::Ref<const ArrayXi> &dims, const eig::Ref<const ArrayXi> &off) const {
+  auto set_dims = dims.isZero() ? _dims : ArrayXi(dims);
+  auto set_off = off.isZero() ? ArrayXi::Zero(_dims.size()) : ArrayXi(off);
+  auto base_format = _format_map[_format];
+  auto type = _type_map[_format];
+
+  uint n_dims = set_dims.size();
+  
+  // glBindTexture()
+  glGetTextureSubImage(_handle, level, 
+    set_off.x(), n_dims > 1 ? set_off.y() : 0, n_dims > 2 ? set_off.z() : 0,
+    set_dims.x(), n_dims > 1 ? set_dims.y() : 1, n_dims > 2 ? set_dims.z() : 1,
+    base_format, type, ptr_size, ptr); // TODO assert input texture size, instead of being an idiot
+  gl_assert("Texture::get_subimage(...)");
+} */

@@ -131,35 +131,7 @@ void print_container(const C &c) {
   fmt::print(" }}\n");
 }
 
-void test_eigen() {
-  using namespace metameric;
-
-  
-  Vector3f v = { 1.5, 1.5, 1.5 };
-  // v = v.array().pow(2.0f);
-  v = eig::pow(v.array(), 2.0f);
-  // v = eg::pow(2.0f, v);
-  std::cout << v << std::endl;
-  // fmt::print("{}", v);
-
-  // using Eigen::MatrixXf;
-  // using Eigen::VectorXf;
-
-  // MatrixXf m = MatrixXf::Random(3, 3);
-  // m = (m + MatrixXf::Constant(3, 3, 1.2f)) * 50.f;
-  // std::cout << m << std::endl;
-
-  // VectorXf v(3);
-  // v << 1, 2, 3;
-  // std::cout << v << std::endl;
-
-  // std::cout << m * v << std::endl;
-}
-
 void render() {
-  std::vector<float> vf(4);
-  std::vector<int> vi(4);
-  
   using namespace metameric;
 
   auto storage_flags = gl::BufferStorageFlags::eClient
@@ -175,35 +147,26 @@ void render() {
   auto v = buffer.get_as<std::vector<uint>>();
   gl_assert("After buffer creation");
 
-  gl::Texture tex_0(gl::TextureFormat::eRGBA32Float, 1, 256, 256);
-  VectorXi vx {{ 256, 256 }};
-  gl::Texture tex_1(gl::TextureFormat::eR16Int, 1, Vector2i { 256, 256 });
-  fmt::print("Hello!");
+  // Input data
+  std::vector<unsigned short> texture_input(256 * 256, 7);
+  gl::Texture texture(gl::TextureFormat::eR16UInt, Array2i { 256, 256 });
   gl_assert("After texture creation");
-
- /*  gl::Buffer buffer({4.f, 4.f, 4.f, 4.f}, storage_flags, mapping_flags);
-  auto v = buffer.get_as<std::vector<float>>();
+  texture.set_image(texture_input);
   
-  buffer.set({3.f}, 1, 1);
-  buffer.set({2.f, 1.f}, 2, 2);
-  print_container(buffer.get(v));
+  // Output data
+  gl_assert("After texture set_image");
+  std::vector<unsigned short> texture_output(texture.dims().prod());
+  texture.get_image(texture_output);
 
-  gl::Buffer other_buffer = buffer.copy();
-  other_buffer.set({-1.f, -2.f}, 2, 2);
-
-  buffer.fill({ 16.f });
-  buffer.clear(2);
-
-  print_container(buffer.get(v));
-  print_container(other_buffer.get(v)); */
-
+  // Test equality
+  bool equal = std::equal(texture_input.begin(), texture_input.end(), texture_output.begin());
+  fmt::print("Equal ?= {}", equal);
 }
 
 int main() {
   try {
     init_glfw();
     render();
-    test_eigen();
     dstr_glfw();
   } catch (const std::exception &e) {
     fmt::print(stderr, e.what());
