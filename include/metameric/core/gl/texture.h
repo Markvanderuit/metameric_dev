@@ -24,6 +24,118 @@ namespace metameric::gl {
     eDepth32, eDepth24, eDepth24Stencil8, eStencil8,
   };
 
+  enum class TextureType {
+    eDefault,
+    eArray,
+    eBuffer,
+    eCubemap,
+    eCubemapArray,
+    eMultisample,
+    eMultisampleArray
+  };
+
+  template <typename T, uint D, TextureType Ty = TextureType::eDefault>
+  class AbstractTexture : public AbstractObject {
+    using Array = eig::Array<uint, D, 1>;
+    using ArrayRef = const eig::Ref<const Array> &;
+
+  protected:
+    AbstractTexture() = default;
+    AbstractTexture(Array dims, uint levels = 1, T const *ptr = nullptr);
+    ~AbstractTexture();
+  
+  public:
+    virtual void get_image_mem(T *ptr, size_t ptr_size, uint level = 0) const;
+    virtual void set_image_mem(T const *ptr, size_t ptr_size, uint level = 0);
+    virtual void get_subimage_mem(T *ptr, size_t ptr_size, uint level = 0,
+                                  ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) const;
+    virtual void set_subimage_mem(T const *ptr, size_t ptr_size, uint level = 0, 
+                                  ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero());
+    
+    // Convenience get_image_mem() variants accepting common STL formats
+    template <size_t E>
+    auto get_image(std::span<T, E> c, uint level = 0) 
+    { get_image_mem(std::data(c), std::size(c) * sizeof(T), level); return c; }
+    template <template <typename> class C>
+    auto & get_image(C<T> &c, uint level = 0) const
+    { get_image_mem(std::data(c), std::size(c) * sizeof(T), level); return c; }                 
+
+    // Convenience set_image_mem() variants accepting common STL formats
+    template <size_t E>
+    void set_image(std::span<T, E> c, uint level = 0) 
+    { set_image_mem(std::data(c), std::size(c) * sizeof(T), level); }
+    template <template <typename> class C>
+    void set_image(const C<T> &c, uint level = 0) 
+    { set_image_mem(std::data(c), std::size(c) * sizeof(T), level); }
+    
+    // Convenience set_subimage_mem() variants accepting common STL formats
+    template <size_t E>
+    void set_subimage(std::span<T, E> c, uint level = 0, ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) 
+    { set_image_mem(std::data(c), std::size(c) * sizeof(T), level, dims, off); }
+    template <template <typename> class C>
+    void set_subimage(const C<T> &c, uint level = 0, ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) 
+    { set_image_mem(std::data(c), std::size(c) * sizeof(T), level, dims, off); }
+
+    template <template <typename> class C>
+    void get_image_as(uint level = 0) const {
+      // C<T> c() ...
+    }
+  };
+
+  template <typename T, uint D, TextureType Ty = TextureType::eDefault>
+  class ImageTexture : public AbstractTexture<T, D, Ty> {
+    using Array = eig::Array<uint, D, 1>;
+    using ArrayRef = const eig::Ref<const Array> &;
+
+  public:
+    ImageTexture() = default;
+    ImageTexture(Array dims, uint levels = 1, T const *ptr = nullptr);
+    ~ImageTexture();
+
+  public:
+    void get_image_mem(T *ptr, size_t ptr_size, uint level = 0) const override;
+    void set_image_mem(T const *ptr, size_t ptr_size, uint level = 0) override;
+    void get_subimage_mem(T *ptr, size_t ptr_size, uint level = 0,
+                          ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) const override;
+    void set_subimage_mem(T const *ptr, size_t ptr_size, uint level = 0, 
+                          ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) override;
+  };
+
+  template <uint D, TextureType Ty = TextureType::eDefault>
+  class DepthTexture : public AbstractTexture<float, D, Ty> {
+    using Array = eig::Array<uint, D, 1>;
+    using ArrayRef = const eig::Ref<const Array> &;
+  
+  public:
+    DepthTexture() = default;
+    DepthTexture(Array dims, uint levels = 1, float const *ptr = nullptr);
+    ~DepthTexture();
+
+  };
+
+  template <typename T, uint Precision, uint Dimensions>
+  class TemplatedTexture : public AbstractObject {
+    using Array = eig::Array<T, Dimensions, 1>;
+    using ArrayRef = const eig::Ref<const Array> &;
+    
+  public:
+
+  private:
+
+  public:
+    TemplatedTexture() = default;
+    TemplatedTexture(Array dims, uint levels = 1, const void *ptr = nullptr);
+    ~TemplatedTexture();
+
+    void get_image_mem(void *ptr, size_t ptr_size, uint level = 0) const;
+    void set_image_mem(void const *ptr, size_t ptr_size, uint level = 0);
+    void get_subimage_mem(void *ptr, size_t ptr_size, uint level = 0,
+                          ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) const;
+    void set_subimage_mem(void const *ptr, size_t ptr_size, uint level = 0, 
+                          ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero());
+
+  };
+
   /**
    * Thin wrapper around an OpenGL texture object with a number of convenience functions. Does
    * not allow copy construction or assignment.
@@ -76,7 +188,7 @@ namespace metameric::gl {
 
     template <typename C>
     C get_as(uint level = 0) const {
-      C c(_dims.prod() * sizeof(C::value_type)); // TODO should check against underlying type
+      C c(_dims.prod() * sizeof(C::value_type)); // TODO should test against underlying type
       return get_image(c, level);
     }
 

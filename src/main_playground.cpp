@@ -142,6 +142,9 @@ void render() {
   print_container(buffer_v);
   gl_assert("After buffer creation");
 
+  gl::ImageTexture<uint, 2> test_texture;
+  // gl::DepthTexture<2> depth_texture;
+
   // Input data
   std::vector<unsigned short> texture_input(256 * 256, 7);
   gl::Texture texture(gl::TextureFormat::eR16UInt, Array2i { 256, 256 });

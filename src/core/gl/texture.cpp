@@ -134,7 +134,7 @@ void Texture::get_image_mem(void *ptr, size_t ptr_size, uint level) const {
   gl_assert("Texture::get_image(...)");
 }
 
-void Texture::copy_from(const Texture &o, uint level = 0, Array dims = ArrayXi {0}, Array off = ArrayXi {0}) {
+void Texture::copy_from(const Texture &o, uint level, Array dims, Array off) {
   
 }
 
@@ -154,3 +154,52 @@ void Texture::copy_from(const Texture &o, uint level = 0, Array dims = ArrayXi {
     base_format, type, ptr_size, ptr); // TODO assert input texture size, instead of being an idiot
   gl_assert("Texture::get_subimage(...)");
 } */
+
+
+/*
+  Attempt 2 below
+*/
+
+template <uint D, TextureType Ty>
+constexpr
+uint gl_get_texture_type() {
+  if constexpr (Ty == TextureType::eDefault) {
+    static_assert(D > 0 && D <= 3, "TextureType::eDefault, dimensionality must be > 0 || <= 3");
+    switch (D) {
+      case 1 : return GL_TEXTURE_1D;
+      case 2 : return GL_TEXTURE_2D;
+      case 3 : return GL_TEXTURE_3D;
+    }
+  } else if constexpr (Ty == TextureType::eArray) {
+    static_assert(D > 0 && D <= 2, "TextureType::eArray, dimensionality must be > 0 || <= 2");
+    switch (D) {
+      case 1 : return GL_TEXTURE_1D_ARRAY;
+      case 2 : return GL_TEXTURE_2D_ARRAY;
+    }
+  } else if constexpr (Ty == TextureType::eBuffer) {
+    static_assert(D == 1, "TextureType::eBuffer, dimensionality must be 1");
+    return GL_TEXTURE_BUFFER;
+  } else if constexpr (Ty == TextureType::eCubemap) {
+    static_assert(D == 2, "TextureType::eCubemap, dimensionality must be 2");
+    return GL_TEXTURE_CUBE_MAP;
+  } else if constexpr (Ty == TextureType::eCubemapArray) {
+    static_assert(D == 2, "TextureType::eCubemapArray, dimensionality must be 2");
+    return GL_TEXTURE_CUBE_MAP_ARRAY;
+  } else if constexpr (Ty == TextureType::eMultisample) {
+    // ...
+  }
+}
+
+template <typename T, uint D, TextureType Ty>
+AbstractTexture<T, D, Ty>::AbstractTexture(Array dims, uint levels = 1, T const *ptr)
+: AbstractObject(true) {
+  guard(_is_init);
+
+}
+
+template <typename T, uint D, TextureType Ty>
+AbstractTexture<T, D, Ty>::~AbstractTexture() {
+  guard(_is_init);
+  glDeleteTextures(1, &_handle);
+}
+
