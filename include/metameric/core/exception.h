@@ -19,7 +19,8 @@ namespace metameric {
       RuntimeException(const std::string &msg) : _msg(msg) { }
 
       const char * what() const noexcept override {
-        std::string s = "Runtime exception\n", fmt = "- {:<7} : {}\n";
+        constexpr std::string_view fmt = "- {:<7} : {}\n";
+        std::string s = "Runtime exception\n";
 
         s += fmt::format(fmt, "message", _msg);
         for (const auto &[key, msg] : _attached)

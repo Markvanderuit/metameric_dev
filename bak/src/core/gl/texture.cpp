@@ -191,7 +191,7 @@ uint gl_get_texture_type() {
 }
 
 template <typename T, uint D, TextureType Ty>
-AbstractTexture<T, D, Ty>::AbstractTexture(Array dims, uint levels = 1, T const *ptr)
+AbstractTexture<T, D, Ty>::AbstractTexture(Array dims, uint levels, T const *ptr)
 : AbstractObject(true) {
   guard(_is_init);
 

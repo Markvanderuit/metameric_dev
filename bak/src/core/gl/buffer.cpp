@@ -6,14 +6,14 @@
 using namespace metameric;
 using namespace metameric::gl;
 
-constexpr EnumMap<BufferTarget, 4> _target_map({
+/* constexpr EnumMap<BufferTarget, 4> _target_map({
   { BufferTarget::eAtomicCounter, GL_ATOMIC_COUNTER_BUFFER },
   { BufferTarget::eShaderStorage, GL_SHADER_STORAGE_BUFFER },
   { BufferTarget::eTransformFeedback, GL_TRANSFORM_FEEDBACK_BUFFER },
   { BufferTarget::eUniform, GL_UNIFORM_BUFFER },
-});
+}); */
 
-constexpr EnumMap<BufferStorageFlags, 2> _storage_flags_map({
+/* constexpr EnumMap<BufferStorageFlags, 2> _storage_flags_map({
   { BufferStorageFlags::eDynamic, GL_DYNAMIC_STORAGE_BIT },
   { BufferStorageFlags::eClient, GL_CLIENT_STORAGE_BIT },
 });
@@ -23,15 +23,16 @@ constexpr EnumMap<BufferMappingFlags, 4> _mappings_flags_map({
   { BufferMappingFlags::eWrite, GL_MAP_WRITE_BIT },
   { BufferMappingFlags::ePersistent, GL_MAP_PERSISTENT_BIT },
   { BufferMappingFlags::eCoherent, GL_MAP_COHERENT_BIT }
-});
+}); */
 
-Buffer::Buffer(size_t size, void const *ptr, uint storage_flags, uint mapping_flags)
+Buffer::Buffer(size_t size, void const *ptr, BufferStorageFlags storage_flags, BufferMappingFlags mapping_flags)
 : AbstractObject(size > 0), _size(size), _storage_flags(storage_flags), 
-  _mapping_constr_flags(mapping_flags), _mapping_access_flags(0u) {
+  _mapping_constr_flags(mapping_flags), _mapping_access_flags(BufferMappingFlags::eNone) {
   guard(_is_init);
-  uint flags = _storage_flags_map.map(storage_flags) | _mappings_flags_map.map(mapping_flags);
+  // uint flags = _storage_flags_map.map(storage_flags) | _mappings_flags_map.map(mapping_flags);
+
   glCreateBuffers(1, &_handle);
-  glNamedBufferStorage(_handle, _size, ptr, flags);
+  glNamedBufferStorage(_handle, _size, ptr, (uint) storage_flags | (uint) mapping_flags);
   gl_assert("Buffer::Buffer(...)");
 }
 
@@ -52,7 +53,7 @@ void Buffer::get_mem(void *ptr, size_t size, size_t offset) const {
 void Buffer::set_mem(void const *ptr, size_t size, size_t offset) {
   runtime_assert(size == 0 || (offset + size) <= _size, 
     "Buffer::set_mem(...), requested offset + size exceeds buffer size");
-  runtime_assert(has_flag(_storage_flags, BufferStorageFlags::eDynamic),
+  runtime_assert((uint) (_storage_flags & BufferStorageFlags::eDynamic),
     "Buffer::set_mem(...), buffer does not have dynamic flag set");
   
   glNamedBufferSubData(_handle, offset, size, ptr);
@@ -108,9 +109,9 @@ void Buffer::bind_to(BufferTarget target, uint index, size_t offset, size_t size
     "Buffer::copy_to(...), requested read offset + size exceeds buffer size");
   
   if (size != 0 || offset != 0) {
-    glBindBufferRange(_target_map[target], index, _handle, offset, size);
+    glBindBufferRange(static_cast<uint>(target), index, _handle, offset, size);
   } else {
-    glBindBufferBase(_target_map[target], index, _handle);
+    glBindBufferBase(static_cast<uint>(target), index, _handle);
   }
 
   gl_assert("Buffer::bind_to(...)");

@@ -19,62 +19,18 @@
 #include <metameric/core/define.h>
 #include <metameric/core/math.h>
 #include <metameric/core/exception.h>
-#include <metameric/core/gl/buffer.h>
-#include <metameric/core/gl/texture.h>
-#include <metameric/core/gl/detail/exception.h>
 
+// GL includes
+#include <metameric/gl/detail/assert.h>
+#include <metameric/gl/buffer.h>
+#include <metameric/gl/sampler.h>
+#include <metameric/gl/texture.h>
 
 /**
  * Globals
  */
 
 GLFWwindow * glfw_handle;
-
-
-/**
- * Assert and exception code
- */
-
-namespace detail {
-struct RuntimeException : public std::exception {
-  std::map<std::string, std::string> logs;
-
-  RuntimeException() { }
-  RuntimeException(const std::string &msg)
-  : logs({{"message", msg}}) { }
-
-  const char * what() const noexcept override {
-    std::string s = "Runtime exception\n";
-    std::string fmt = "- {:<7} : {}\n";
-
-    for (const auto &[key, log] : logs)
-      s += fmt::format(fmt, key, log);
-
-    return (_what = s).c_str();
-  }
-  
-private:
-  mutable std::string _what;
-};
-  
-inline void runtime_gl_assert_(const std::string &msg, const char *file, int line) {
-  GLenum err = glGetError();
-  guard(err != GL_NO_ERROR);
-  RuntimeException e(msg);
-  e.logs["gl_err"] = std::to_string(err);
-  e.logs["file"] = std::string(file);
-  e.logs["line"] = std::to_string(line);
-  throw e;
-}
-
-inline void runtime_assert_(bool expr, const std::string &msg, const char *file, int line) {
-  guard(!expr);
-  RuntimeException e(msg);
-  e.logs["file"] = file;
-  e.logs["line"] = std::to_string(line);
-  throw e;
-}
-} // namespace detail
 
 
 /**
@@ -131,33 +87,61 @@ void print_container(const C &c) {
   fmt::print(" }}\n");
 }
 
+using uint = unsigned int;
+
 void render() {
   using namespace metameric;
-                      
-  gl::Buffer buffer = { 0u, 1u, 2u, 3u };
-  buffer.fill({ 1u }, 1, 0);
-  buffer.set({4u}, 1, 0);
 
-  auto buffer_v = buffer.get_as<std::vector<uint>>();
-  print_container(buffer_v);
-  gl_assert("After buffer creation");
+  gl::Sampler sampler = {{
+    .min_filter   = gl::SamplerMinFilter::eNearest,
+    .mag_filter   = gl::SamplerMagFilter::eLinear,
+    .wrap         = gl::SamplerWrap::eRepeat
+  }};
 
-  gl::ImageTexture<uint, 2> test_texture;
-  // gl::DepthTexture<2> depth_texture;
+  std::vector<float> buffer = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+  };
+  std::vector<float> readback_buffer(16);
+  // buffer[7] = 256; buffer[3] = 8192; buffer[15] = 314;
 
-  // Input data
-  std::vector<unsigned short> texture_input(256 * 256, 7);
-  gl::Texture texture(gl::TextureFormat::eR16UInt, Array2i { 256, 256 });
-  texture.set_image(texture_input);
+  gl::Texture1d1f texture = {{
+    .dims = Array1i(16),
+    .levels = 5,
+    .data = buffer.data(),
+    .data_size = buffer.size() * sizeof(float)
+  }};
   
-  // Output data
-  auto texture_output = texture.get_as<std::vector<unsigned short>>();
-  texture.get_image(texture_output);
+  gl_assert("texture init");
 
-  // Test equality
-  bool is_equal = std::equal(texture_input.begin(), texture_input.end(), 
-                             texture_output.begin());
-  fmt::print("is_equal ?= {}", is_equal);
+  /* gl::Texture1d1f texture = {
+    Array1i(16),
+    5,
+    buffer.data(),
+    buffer.size() * sizeof(float)
+  }; */
+  // gl_assert("texture init");
+
+  // gl::Texture1d1ui texture(Array1i(16), 1, buffer.data(), buffer.size() * sizeof(uint));
+
+  fmt::print("input:");
+  print_container(buffer);
+
+  // texture.set_image(buffer.data(), buffer.size() * sizeof(float));
+  // gl_assert("texture set");
+
+  texture.get_image(readback_buffer.data(), readback_buffer.size() * sizeof(float), 0);
+  texture.get_subimage(readback_buffer.data(), readback_buffer.size() * sizeof(float), 1,
+    Array1i(8), Array1i(0));
+  gl_assert("texture get");
+  
+  fmt::print("get:");
+  print_container(readback_buffer);
+
+  texture.clear_image(nullptr, 0);
+  texture.get_image(readback_buffer.data(), readback_buffer.size() * sizeof(float));
+  
+  fmt::print("clear:");
+  print_container(readback_buffer);
 }
 
 int main() {
@@ -166,7 +150,7 @@ int main() {
     render();
     dstr_glfw();
   } catch (const std::exception &e) {
-    fmt::print(stderr, e.what());
+    fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;
   }
   return 0;

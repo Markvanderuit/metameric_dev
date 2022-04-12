@@ -48,4 +48,14 @@ using uint = unsigned int;
   template <typename UInt>\
   constexpr auto has_flag(UInt flags, T t) { return (flags & (uint) t) != 0u; }
 
+  
+#define MET_DECLARE_ENUM_FLAGS_EXP(T)\
+  constexpr T operator|(T a, T b) { return (T) ((uint) a | (uint) b); }\
+  constexpr T operator&(T a, T b) { return (T) ((uint) a & (uint) b); }\
+  constexpr T operator|(uint a, T b) { return (T) (a | (uint) b); }\
+  constexpr T operator&(uint a, T b) { return (T) (a & (uint) b); }\
+  constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
+  // template <typename UInt>\
+  // constexpr auto has_flag(UInt flags, T t) { return (flags & (uint) t) != 0u; }
+
 } // namespace metameric

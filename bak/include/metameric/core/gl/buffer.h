@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glad/glad.h>
 #include <initializer_list>
 #include <span>
 #include <metameric/core/define.h>
@@ -10,7 +11,21 @@ namespace metameric::gl {
   /**
    * This list of values classifies targets for a buffer binding operation.
    */
-  enum class BufferTarget { eAtomicCounter, eShaderStorage, eTransformFeedback, eUniform };
+  enum class BufferTarget : uint {
+    eAtomicCounter      = GL_ATOMIC_COUNTER_BUFFER,
+    eShaderStorage      = GL_SHADER_STORAGE_BUFFER,
+    eTransformFeedback  = GL_TRANSFORM_FEEDBACK_BUFFER,
+    eUniform            = GL_UNIFORM_BUFFER
+  };
+
+  enum class _BufferStorageFlags : uint {
+    eStorageDynamic = GL_DYNAMIC_STORAGE_BIT,
+    eStorageClient = GL_CLIENT_STORAGE_BIT,
+    eMapRead = GL_MAP_READ_BIT,
+    eMapWrite = GL_MAP_WRITE_BIT,
+    eMapPersistent = GL_MAP_PERSISTENT_BIT,
+    eMapCoherent = GL_MAP_COHERENT_BIT
+  };
 
   /**
    * This list of flags classifies the intended usage of a Buffer's data store. Note that map bits 
@@ -21,10 +36,10 @@ namespace metameric::gl {
     eNone           = 0x0000,
 
     // The contents of the data store may be updated after creation from the OpenGL client
-    eDynamic        = 0x0100,
+    eDynamic        = GL_DYNAMIC_STORAGE_BIT,
 
     // The data store is local to the OpenGL client, instead of the OpenGL server
-    eClient         = 0x0200
+    eClient         = GL_CLIENT_STORAGE_BIT
   };
 
   /**
@@ -35,16 +50,16 @@ namespace metameric::gl {
     eNone           = 0x0000,
 
     // The data store may be mapped by the client for read access
-    eRead           = 0x0100,
+    eRead           = GL_MAP_READ_BIT,
 
     // The data store may be mapped by the client for write access
-    eWrite          = 0x0200,
+    eWrite          = GL_MAP_WRITE_BIT,
 
     // The server may read/write to/from the data store while it is mapped
-    ePersistent     = 0x0300,
+    ePersistent     = GL_MAP_PERSISTENT_BIT,
 
     // The data store is local to the OpenGL client, instead of the OpenGL server
-    eCoherent       = 0x0400
+    eCoherent       = GL_MAP_COHERENT_BIT
   };
   
   /**
@@ -57,22 +72,22 @@ namespace metameric::gl {
     inline size_t size() const { return _size; }
 
     // Storage flags set for the underlying buffer storage
-    inline uint storage_flags() const { return _storage_flags; }
+    inline BufferStorageFlags storage_flags() const { return _storage_flags; }
 
     // Mapping flags set during buffer initialization
-    inline uint mapping_constr_flags() const { return _mapping_constr_flags; }
+    inline BufferMappingFlags mapping_constr_flags() const { return _mapping_constr_flags; }
 
     // Mapping flags set during buffer mapping
-    inline uint mapping_access_flags() const { return _mapping_access_flags; }
+    inline BufferMappingFlags mapping_access_flags() const { return _mapping_access_flags; }
 
     // Is the buffer currently mapped?
     inline bool is_mapped() const { return _is_mapped; }
 
   private:
     size_t _size;
-    uint _storage_flags;
-    uint _mapping_constr_flags;
-    uint _mapping_access_flags;
+    BufferStorageFlags _storage_flags;
+    BufferMappingFlags _mapping_constr_flags;
+    BufferMappingFlags _mapping_access_flags;
     bool _is_mapped;
     
     template <typename T>
@@ -83,19 +98,19 @@ namespace metameric::gl {
     Buffer() = default;
     Buffer(size_t size, 
            void const *ptr = nullptr, 
-           uint storage_flags = 0u,
-           uint mapping_flags = 0u);
+           BufferStorageFlags storage_flags = BufferStorageFlags::eNone,
+           BufferMappingFlags mapping_flags = BufferMappingFlags::eNone);
     ~Buffer();
 
     // Convenience constructors accepting common STL formats
     template <typename T>
-    Buffer(std::initializer_list<const T> c, uint strg_fl = 0u, uint map_fl = 0u)
+    Buffer(std::initializer_list<const T> c, BufferStorageFlags strg_fl = { }, BufferMappingFlags map_fl = { })
     : Buffer(c.size() * sizeof(T), std::data(c), strg_fl, map_fl) { }
     template <typename T, size_t E>
-    Buffer(std::span<const T, E> c, uint strg_fl = 0u, uint map_fl = 0u) 
+    Buffer(std::span<const T, E> c, BufferStorageFlags strg_fl = { }, BufferMappingFlags map_fl = { }) 
     : Buffer(c.size() * sizeof(T), std::data(c), strg_fl, map_fl) { }
     template <typename C>
-    Buffer(const C &c, uint strg_fl = 0u, uint map_fl = 0u)
+    Buffer(const C &c, BufferStorageFlags strg_fl = { }, BufferMappingFlags map_fl = { })
     : Buffer(c.size() * sizeof(typename C::value_type), std::data(c), strg_fl, map_fl) { }
 
     // Base get/set/fill operations to read/write underlying data
@@ -187,6 +202,6 @@ namespace metameric::gl {
     MET_DECLARE_NONCOPYABLE(Buffer);
   };
 
-  MET_DECLARE_ENUM_FLAGS(BufferStorageFlags)
-  MET_DECLARE_ENUM_FLAGS(BufferMappingFlags)
+  MET_DECLARE_ENUM_FLAGS_EXP(BufferStorageFlags)
+  MET_DECLARE_ENUM_FLAGS_EXP(BufferMappingFlags)
 } // namespace metameric::gl

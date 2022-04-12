@@ -5,11 +5,20 @@
 
 namespace metameric {
 
+using uchar = unsigned char;
+using uint = unsigned int;
+using ushort = unsigned short;
+
 /**
  * Map most common vector/matrix types from Eigen into program namespace
  */
 
 namespace eig = Eigen;
+
+// Single length types are useful for some parts of templating
+using Array1i = eig::Array<int, 1, 1>;
+using Array1ui = eig::Array<uint, 1, 1>;
+using Array1f = eig::Array<float, 1, 1>;
 
 using eig::Array2i;
 using eig::ArrayXi;

@@ -7,7 +7,9 @@
     "glfw3",
     { "name": "glad", "features": [ "gl-api-latest" ] },
     { "name" : "imgui", "features": [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
-    "imguizmo"
+    "imguizmo",
+    "vulkan-memory-allocator",
+    "vk-bootstrap"
   ],
   "features" : { }
 }

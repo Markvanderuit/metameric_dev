@@ -40,11 +40,11 @@ namespace metameric::gl {
     using ArrayRef = const eig::Ref<const Array> &;
 
   protected:
+  public:
     AbstractTexture() = default;
     AbstractTexture(Array dims, uint levels = 1, T const *ptr = nullptr);
     ~AbstractTexture();
   
-  public:
     virtual void get_image_mem(T *ptr, size_t ptr_size, uint level = 0) const;
     virtual void set_image_mem(T const *ptr, size_t ptr_size, uint level = 0);
     virtual void get_subimage_mem(T *ptr, size_t ptr_size, uint level = 0,
@@ -110,29 +110,6 @@ namespace metameric::gl {
     DepthTexture() = default;
     DepthTexture(Array dims, uint levels = 1, float const *ptr = nullptr);
     ~DepthTexture();
-
-  };
-
-  template <typename T, uint Precision, uint Dimensions>
-  class TemplatedTexture : public AbstractObject {
-    using Array = eig::Array<T, Dimensions, 1>;
-    using ArrayRef = const eig::Ref<const Array> &;
-    
-  public:
-
-  private:
-
-  public:
-    TemplatedTexture() = default;
-    TemplatedTexture(Array dims, uint levels = 1, const void *ptr = nullptr);
-    ~TemplatedTexture();
-
-    void get_image_mem(void *ptr, size_t ptr_size, uint level = 0) const;
-    void set_image_mem(void const *ptr, size_t ptr_size, uint level = 0);
-    void get_subimage_mem(void *ptr, size_t ptr_size, uint level = 0,
-                          ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero()) const;
-    void set_subimage_mem(void const *ptr, size_t ptr_size, uint level = 0, 
-                          ArrayRef dims = Array::Zero(), ArrayRef off = Array::Zero());
 
   };
 
