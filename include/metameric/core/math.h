@@ -68,11 +68,4 @@ using eig::Matrix2f;
 using eig::Matrix3f;
 using eig::Matrix4f;
 using eig::MatrixXf;
-
-/**
- * Custom formatter for Eigen's matrix/array types
- */
-
-// template <> struct fmt::formatter<>
-
 } // namespace metameric

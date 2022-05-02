@@ -8,7 +8,7 @@
 namespace metameric::gl {
   struct FramebufferAttachmentCreateInfo {
     FramebufferAttachmentType type;
-    const Handle<> &texture;
+    const Handle<> *texture;
     uint index = 0;
     uint level = 0;
   };
@@ -26,26 +26,23 @@ namespace metameric::gl {
 
     /* state management */
 
+    template <typename T>
+    void clear(FramebufferAttachmentType type, T t = { }, uint index = 0);
     void bind() const;
     void unbind() const;
-
-    void clear(FramebufferClearType type, 
-               std::span<std::byte> data,
-               uint index = 0);
-
+    
     /* miscellaneous */  
 
-    // Returns an uninitialized framebuffer to act as default framebuffer.
+    // Returns uninitialized object to act as a "placeholder" for a default framebuffer.
     static Framebuffer default_framebuffer() { return Framebuffer(); }
 
     inline void swap(Framebuffer &o) {
       using std::swap;
       Base::swap(o);
-      // swap(_loc, o._loc);
     }
 
     inline bool operator==(const Framebuffer &o) const {
-      return Base::operator==(o); // && _loc == o._loc;
+      return Base::operator==(o);
     }
 
     MET_NONCOPYABLE_CONSTR(Framebuffer);

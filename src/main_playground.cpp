@@ -32,27 +32,12 @@
 #include <metameric/gl/sync.h>
 #include <metameric/gl/texture.h>
 #include <metameric/gl/vertexarray.h>
+#include <metameric/gl/utility.h>
 #include <metameric/gl/window.h>
 
 /* 
   Boilerplate
 */
-
-std::vector<char> load_shader_binary(const std::string &file_path) {
-  using namespace metameric;
-
-  std::ifstream ifs(file_path, std::ios::ate | std::ios::binary);
-  runtime_assert(ifs.is_open(),
-    fmt::format("load_shader_binary(...), failed to load file \"{}\"", file_path));
-
-  size_t file_size = static_cast<size_t>(ifs.tellg());
-  std::vector<char> buffer(file_size);
-  ifs.seekg(0);
-  ifs.read((char *) buffer.data(), file_size);
-  ifs.close();
-  
-  return buffer;
-}
 
 template <typename C>
 void print_container(const C &c) {
@@ -109,24 +94,20 @@ void init() {
   gl::WindowFlags flags = gl::WindowFlags::eVisible   | gl::WindowFlags::eDecorated
                         | gl::WindowFlags::eSRGB      | gl::WindowFlags::eFocused
                         | gl::WindowFlags::eResizable | gl::WindowFlags::eDebug;
-  window = gl::Window({ .size = { 512, 512 }, .title = "Hello window 1", .flags = flags });
+  window = gl::Window({ .size = { 512, 512 }, .title = "Hello window", .flags = flags });
 
   // Setup framebuffer as default
   triangle_framebuffer = gl::Framebuffer::default_framebuffer();
 
   // Upload triangle data into buffer objects
-  triangle_vertex_buffer = gl::Buffer({ .size = triangle_vertices.size() * sizeof(Vector3f),
-                                        .data = reinterpret_span<Vector3f>(triangle_vertices) });
-  triangle_color_buffer = gl::Buffer({ .size = triangle_colors.size() * sizeof(Vector3f),
-                                        .data = reinterpret_span<Vector3f>(triangle_colors) });
-  triangle_index_buffer = gl::Buffer({ .size = triangle_indices.size() * sizeof(Vector3i),
-                                       .data = reinterpret_span<Vector3ui>(triangle_indices),
-                                       .flags = gl::BufferStorageFlags::eStorageDynamic });
+  triangle_vertex_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_vertices)) });
+  triangle_color_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_colors)) });
+  triangle_index_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_indices)) });
                                        
   // Setup triangle vertex array object
   std::vector<gl::VertexBufferInfo> triangle_buffer_info = {
-    { .buffer = triangle_vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
-    { .buffer = triangle_color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
+    { .buffer = &triangle_vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
+    { .buffer = &triangle_color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
   std::vector<gl::VertexAttribInfo> triangle_attrib_info = {
     { .attrib_binding = 0, .buffer_binding = 0, 
       .format_type = gl::VertexFormatType::eFloat, 
@@ -136,50 +117,46 @@ void init() {
       .format_size = gl::VertexFormatSize::e3 }};
   triangle_array = gl::Vertexarray({ .buffers = triangle_buffer_info,
                                      .attribs = triangle_attrib_info,
-                                     .elements = triangle_index_buffer });
+                                     .elements = &triangle_index_buffer });
+                                     
+  // Setup draw program
+  triangle_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
+                                    .file_path = "../resources/shaders/triangle.vert.spv" },
+                                  { .type = gl::ShaderType::eFragment, 
+                                    .file_path = "../resources/shaders/triangle.frag.spv" }});
+  triangle_program.uniform("scalar", 0.5f);
+
 
   // Setup data fro draw call of vertex array object
   triangle_draw = { .type = gl::PrimitiveType::eTriangles,
                     .array = &triangle_array,
-                    .vertex_count = (uint) triangle_index_buffer.size() / sizeof(uint) };
-                                     
-  // Setup draw program
-  triangle_program = gl::Program({
-    { .type = gl::ShaderType::eVertex, 
-      .data = load_shader_binary("../resources/shaders/triangle.vert.spv") },
-    { .type = gl::ShaderType::eFragment, 
-      .data = load_shader_binary("../resources/shaders/triangle.frag.spv") }});
-  triangle_program.uniform("scalar", 0.5f);
+                    .vertex_count = (uint) triangle_indices.size() * 3,
+                    .program = &triangle_program };
 
   // Bind objects used constantly
-  triangle_program.bind();
   triangle_framebuffer.bind();
 }
 
-void loop_step() {
+void step() {
   using namespace metameric;
 
   // Specify draw capabilities for this scope
-  std::vector<gl::state::scoped_set> capabilities = {
-    { gl::DrawCapability::eCullFace, true },
-    { gl::DrawCapability::eDepthTest, true },
-    { gl::DrawCapability::eBlendOp, false }
-  };
+  std::vector<gl::state::ScopedSet> capabilities = {{ gl::DrawCapability::eCullFace, true },
+                                                    { gl::DrawCapability::eDepthTest, true },
+                                                    { gl::DrawCapability::eBlendOp, false }};
 
   // Prepare for draw call
   gl::state::set_viewport(window.framebuffer_size());
-  triangle_framebuffer.clear(gl::FramebufferClearType::eColor, 
-                             reinterpret_span<float>(clear_value) );
+  triangle_framebuffer.clear<Array3f>(gl::FramebufferAttachmentType::eColor, { 1, 0, 1 });
 
   // Submit draw call
   gl::draw(triangle_draw);
 }
 
-void run_loop() {
+void run() {
   while (!window.should_close()) {
-    loop_step();
-
     window.poll_events();
+    step();
     window.swap_buffers();
   }
 }
@@ -187,7 +164,7 @@ void run_loop() {
 int main() {
   try {
     init();
-    run_loop();
+    run();
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;

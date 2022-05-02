@@ -6,23 +6,23 @@
 
 namespace metameric::gl {
   /**
-   * Helper data object to construct a buffer with default settings. Works 
-   * with aggregate/designated initialization.
+   * Helper data object to construct buffer
    */
   struct BufferCreateInfo {
-    size_t size;
-    std::span<std::byte> data = { };
+    size_t size = 0;
+    std::span<const std::byte> data = { };
     BufferStorageFlags flags = { };
   };
 
   /**
-   * Buffer object.
+   * Buffer object
    */
   class Buffer : public Handle<> {
     using Base = Handle<>;
 
     bool _is_mapped;
     size_t _size;
+    BufferStorageFlags _flags;
 
   public:
     /* constr/destr */
@@ -35,6 +35,7 @@ namespace metameric::gl {
 
     inline size_t size() const { return _size; }
     inline bool is_mapped() const { return _is_mapped; }
+    inline BufferStorageFlags flags() const { return _flags; }
 
     /* operands */
 
@@ -42,18 +43,18 @@ namespace metameric::gl {
              size_t size = 0,
              size_t offset = 0) const;
 
-    void set(std::span<std::byte> data,
+    void set(std::span<const std::byte> data,
              size_t size = 0,
              size_t offset = 0);
 
-    void clear(std::span<std::byte> data = { },
+    void clear(std::span<const std::byte> data = { },
                size_t stride = 1,
                size_t size = 0,
                size_t offset = 0);
 
     /* state */
 
-    void bind_to(BufferTarget target, 
+    void bind_to(BufferTargetType target, 
                  uint index,
                  size_t size = 0,
                  size_t offset = 0) const;
@@ -69,18 +70,22 @@ namespace metameric::gl {
 
     /* miscellaneous */
 
+    // Assume lifetime ownership over a provided object, now wrapped in gl::Buffer
+    static Buffer make_from(uint object);
+
     inline constexpr void swap(Buffer &o) {
       using std::swap;
       Base::swap(o);
       swap(_size, o._size);
       swap(_is_mapped, o._is_mapped);
+      swap(_flags, o._flags);
     }
 
     inline constexpr bool operator==(const Buffer &o) const {
       using std::tie;
       return Base::operator==(o)
-        && tie(_size, o._is_mapped)
-        == tie(o._size, o._is_mapped);
+        && tie(_size, _is_mapped, _flags)
+        == tie(o._size, o._is_mapped, o._flags);
     }
 
     MET_NONCOPYABLE_CONSTR(Buffer);

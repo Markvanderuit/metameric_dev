@@ -2,55 +2,61 @@
 
 #include <metameric/gl/detail/fwd.h>
 #include <metameric/gl/detail/handle.h>
-#include <metameric/gl/vertexarray.h>
-#include <initializer_list>
-#include <optional>
 
 namespace metameric::gl {
   struct DrawInfo {
+    // Draw information
     PrimitiveType type;
-    const Vertexarray *array = nullptr;
-    uint vertex_count = 0;
+    const Vertexarray *array;
+
+    // Vertex range data
+    uint vertex_count;
     uint vertex_first = 0;
+
+    // Instancing data
     uint instance_count = 0;
     uint vertex_base = 0;
     uint instance_base = 0;
+
+    // Optional bindable program
+    const Program *program = nullptr;
   };
 
   struct DrawIndirectInfo {
+    // Draw information
     PrimitiveType type;
-    const Vertexarray &array;
-    const Buffer &indirect_buffer;
+    const Vertexarray *array;
+
+    // Indirect buffer
+    const Buffer *buffer;
+
+    // Optional bindable program
+    const Program *program = nullptr; 
   };
 
+  struct ComputeInfo {
+    // Dispatch dimensions
+    uint groups_x = 1;
+    uint groups_y = 1;
+    uint groups_z = 1;
+    
+    // Optional bindable program
+    const Program *program = nullptr;
+  };
+
+  struct ComputeIndirectInfo {
+    // Indirect buffer
+    const Buffer *buffer;
+
+    // Optional bindable program
+    const Program *program = nullptr;
+  };
+
+  // Dispatch a draw operation
   void draw(DrawInfo info);
   void draw(DrawIndirectInfo info);
-                      
-  namespace state {
-    class scoped_set {
-      DrawCapability _capability;
-      bool _prev, _curr;
-      
-    public:
-      scoped_set(DrawCapability capability, bool enabled);
-      ~scoped_set();
-    };
 
-    template <DrawCapability C, bool B>
-    class ScopedSet {
-      bool _prev;
-
-    public:
-      ScopedSet();
-      ~ScopedSet();
-    };
-
-    void set(DrawCapability capability, bool enabled);
-    bool get(DrawCapability capability);
-
-    void set_op(BlendOp src_operand, BlendOp dst_operand);
-    void set_op(LogicOp operand);
-    
-    void set_viewport(Array2i size, Array2i offset = Array2i::Zero());
-  } // namespace state
+  // Dispatch a compute operation
+  void compute(ComputeInfo info);
+  void compute(ComputeIndirectInfo info); 
 } // namespace metameric::gl

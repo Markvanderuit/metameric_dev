@@ -1,4 +1,5 @@
 #include <metameric/gl/program.h>
+#include <metameric/gl/utility.h>
 #include <metameric/gl/detail/assert.h>
 #include <ranges>
 
@@ -16,88 +17,111 @@ namespace metameric::gl {
       return value;
     }
 
-    GLuint compile_shader_object(const ShaderCreateInfo &info) {
-      const GLchar *data_ptr = info.data.data();
-      const GLint data_size = info.data.size_bytes();
-      
-      GLuint handle = glCreateShader((uint) info.type);
-
-      if (info.is_binary_spirv) {
-        glShaderBinary(1, &handle, GL_SHADER_BINARY_FORMAT_SPIR_V, data_ptr, data_size);
-        glSpecializeShader(handle, info.entry_point.c_str(), 0, nullptr, nullptr);
-      } else {
-        glShaderSource(handle, 1, &data_ptr, &data_size);
-        glCompileShader(handle);
+    std::string fmt_info_log(const std::string &log) {
+      std::stringstream ss_o, ss_i(log);
+      for (std::string line; std::getline(ss_i, line);) {
+        guard_continue(line.length() > 2);
+        ss_o << fmt::format("{:<8}\n", line);
       }
-      
-      return handle;
+      return ss_o.str();
     }
 
-    void assert_shader_compilation(GLuint shader) {
+    void assert_shader_compile(GLuint shader) {
       guard(!get_shader_iv(shader, GL_COMPILE_STATUS));
 
       // Compilation failed, obtain error log
       std::string info(get_shader_iv(shader, GL_INFO_LOG_LENGTH), ' ');
       glGetShaderInfoLog(shader, GLint(info.size()), nullptr, info.data());
 
-      // Format compilation log
-      std::stringstream ss_log;
-      std::stringstream infss(info);
-      for (std::string line; std::getline(infss, line);) {
-        guard_continue(line.length() > 2);
-        ss_log << fmt::format("{:<8}\n", line);
-      }
-
       // Construct exception with attached compilation log
       metameric::detail::RuntimeException e("Failed to specialize shader");
-      e["log"] = ss_log.str();
+      e["log"] = fmt_info_log(info);
       throw e;
     }
 
-    void assert_program_linkage(GLuint program) {
+    void assert_program_link(GLuint program) {
       guard(!get_program_iv(program, GL_LINK_STATUS));
 
       // Compilation failed, obtain error log
       std::string info(get_program_iv(program, GL_INFO_LOG_LENGTH), ' ');
       glGetProgramInfoLog(program, GLint(info.size()), nullptr, info.data());
 
-      // Format compilation log
-      std::stringstream ss_log;
-      std::stringstream infss(info);
-      for (std::string line; std::getline(infss, line);) {
-        guard_continue(line.length() > 2);
-        ss_log << fmt::format("{:<8}\n", line);
-      }
-
       // Construct exception with attached compilation log
       metameric::detail::RuntimeException e("Failed to link program");
-      e["log"] = ss_log.str();
+      e["log"] = fmt_info_log(info);
       throw e;
     }
+
+    GLuint attach_shader_object(GLuint program, const ShaderCreateInfo &info) {
+      GLuint handle = glCreateShader((uint) info.type);
+      const auto [ptr, size] = std::tuple { (const GLchar *) info.data.data(), (GLint) info.data.size_bytes() };
+      
+      // Compile or specialize shader and check for correctness
+      if (info.is_binary_spirv) {
+        glShaderBinary(1, &handle, GL_SHADER_BINARY_FORMAT_SPIR_V, ptr, size);
+        glSpecializeShader(handle, info.entry_point.c_str(), 0, nullptr, nullptr);
+      } else {
+        glShaderSource(handle, 1, &ptr, &size);
+        glCompileShader(handle);
+      }
+      assert_shader_compile(handle);
+
+      glAttachShader(program, handle);
+      return handle;
+    }
+
+    void detach_shader_object(GLuint program, GLuint shader) {
+      glDetachShader(program, shader);
+      glDeleteShader(shader);
+    }
+
+    GLuint constr_program_object(std::vector<ShaderCreateInfo> info) {
+      GLuint handle = glCreateProgram();
+      
+      std::vector<GLuint> shaders;
+      shaders.reserve(info.size());
+
+      // Generate, compile, and attach shader objects
+      std::ranges::transform(info, std::back_inserter(shaders),
+        [handle] (const auto &i) { return attach_shader_object(handle, i); });
+
+      // Link program and check for correctness
+      glLinkProgram(handle);
+      detail::assert_program_link(handle);
+
+      // Detach and destroy shader objects
+      std::ranges::for_each(shaders, 
+        [handle] (const auto &i) { detach_shader_object(handle, i); });
+      
+      return handle;
+    }
   }
-  
-  Program::Program(std::initializer_list<ShaderCreateInfo> info)
+
+  Program::Program(std::initializer_list<ShaderLoadInfo> info)
   : Base(true) {
     guard(_is_init);
 
-    // Generate and compile shader objects
-    std::vector<GLuint> shaders;
-    std::ranges::transform(info, std::back_inserter(shaders), detail::compile_shader_object);
-    std::ranges::for_each(shaders, detail::assert_shader_compilation);
+    // Load binary shader data
+    std::vector<std::vector<std::byte>> shader_bins;
+    shader_bins.reserve(info.size());
+    std::ranges::transform(info, std::back_inserter(shader_bins),
+      [](const auto &i) { return load_shader_binary(i.file_path); });
 
-    // Generate and link program object
-    _object = glCreateProgram();
-    for (const auto &s : shaders) {
-      glAttachShader(_object, s);
-    }
-    glLinkProgram(_object);
-    detail::assert_program_linkage(_object);
-
-    // Detach and destroy shader objects
-    for (const auto &s : shaders) {
-      glDetachShader(_object, s);
-      glDeleteShader(s);
-    }
+    // Construct shader create info
+    std::vector<ShaderCreateInfo> shader_info;
+    std::transform(shader_bins.begin(), shader_bins.end(), 
+                   info.begin(), std::back_inserter(shader_info),
+      [&] (const auto &shader, const auto& i) {
+      return ShaderCreateInfo { i.type, shader, i.is_binary_spirv, i.entry_point };
+    });
+    
+    _object = detail::constr_program_object(shader_info);
+  }
+  
+  Program::Program(std::initializer_list<ShaderCreateInfo> shader_info)
+  : Base(true) {
+    guard(_is_init);
+    _object = detail::constr_program_object(shader_info);
   }
 
   Program::~Program() {

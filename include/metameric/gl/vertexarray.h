@@ -7,7 +7,7 @@
 
 namespace metameric::gl {
   struct VertexBufferInfo {
-    const Buffer &buffer;
+    const Buffer *buffer;
     uint binding = 0;
     size_t offset = 0;
     size_t stride = 4;
@@ -25,7 +25,7 @@ namespace metameric::gl {
   struct VertexarrayCreateInfo {
     std::vector<VertexBufferInfo> buffers;
     std::vector<VertexAttribInfo> attribs;
-    const Buffer &elements = Buffer();
+    const Buffer *elements = nullptr;
   };
   
   class Vertexarray : public Handle<> {

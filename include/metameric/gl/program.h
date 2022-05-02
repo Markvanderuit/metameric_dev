@@ -2,15 +2,23 @@
 
 #include <metameric/gl/detail/fwd.h>
 #include <metameric/gl/detail/handle.h>
+#include <metameric/gl/utility.h>
 #include <initializer_list>
-#include <span>
 #include <string_view>
+#include <span>
 #include <unordered_map>
 
 namespace metameric::gl {
+  struct ShaderLoadInfo {
+    ShaderType type;
+    fs::path file_path;
+    bool is_binary_spirv = true;
+    std::string entry_point = "main";
+  };
+
   struct ShaderCreateInfo {
     ShaderType type;
-    std::span<const char> data;
+    std::span<const std::byte> data;
     bool is_binary_spirv = true;
     std::string entry_point = "main";
   };
@@ -25,6 +33,7 @@ namespace metameric::gl {
     /* constr/destr */
 
     Program() = default;
+    Program(std::initializer_list<ShaderLoadInfo> info);
     Program(std::initializer_list<ShaderCreateInfo> info);
     ~Program();
 

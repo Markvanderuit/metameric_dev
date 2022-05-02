@@ -4,17 +4,19 @@
 #include <glad/glad.h>
 
 namespace metameric::gl {
-  /**
-   * Buffer enums
-   */
+  /*
+    Buffer enums
+  */
 
-  enum class BufferTarget : uint {
+  // Binding target for gl::Buffer::bind_to(...)
+  enum class BufferTargetType : uint {
     eAtomicCounter      = GL_ATOMIC_COUNTER_BUFFER,
     eShaderStorage      = GL_SHADER_STORAGE_BUFFER,
     eTransformFeedback  = GL_TRANSFORM_FEEDBACK_BUFFER,
     eUniform            = GL_UNIFORM_BUFFER
   };
 
+  // Storage flags for gl::Buffer(...) construction
   enum class BufferStorageFlags : uint {
     eStorageDynamic     = GL_DYNAMIC_STORAGE_BIT,
     eStorageClient      = GL_CLIENT_STORAGE_BIT,
@@ -25,6 +27,7 @@ namespace metameric::gl {
   };
   MET_DECLARE_BITFLAG(BufferStorageFlags);
 
+  // Access flags for gl::Buffer::map(...)
   enum class BufferAccessFlags : uint {
     eMapRead            = GL_MAP_READ_BIT,
     eMapWrite           = GL_MAP_WRITE_BIT,
@@ -34,15 +37,16 @@ namespace metameric::gl {
   };
   MET_DECLARE_BITFLAG(BufferAccessFlags);
 
-  /**
-   * Draw state enums
-   */
+  /*
+    Draw and state enums
+  */
 
+  //  Draw capabilities for gl::state::set(...)/get(...)
   enum class DrawCapability : uint {
     // Misc capabilities
     eCullFace           = GL_CULL_FACE,
     eFramebufferSRGB    = GL_FRAMEBUFFER_SRGB,
-    eMultisample        = GL_MULTISAMPLE,
+    eMSAA               = GL_MULTISAMPLE,
     eDebugOutput        = GL_DEBUG_OUTPUT,
     eDebugOutputSync    = GL_DEBUG_OUTPUT_SYNCHRONOUS,
 
@@ -61,6 +65,7 @@ namespace metameric::gl {
     ePolySmooth         = GL_POLYGON_SMOOTH,
   };
 
+  // Blend operations for gl::state::set_op(...)
   enum class BlendOp : uint {
     eZero               = GL_ZERO,
     eOne                = GL_ONE,
@@ -83,6 +88,7 @@ namespace metameric::gl {
     eOneMinusSrc1Alpha  = GL_ONE_MINUS_SRC1_ALPHA
   };
 
+  // Logic operations for gl::state::set_op(...)
   enum class LogicOp : uint {
     eClear              = GL_CLEAR,
     eSet                = GL_SET,
@@ -102,6 +108,7 @@ namespace metameric::gl {
     eOrInverse          = GL_OR_INVERTED,
   };
 
+  // Primitive types for gl::draw(...)
   enum class PrimitiveType : uint{
     ePoints             = GL_POINTS,
     eLines              = GL_LINES,
@@ -120,26 +127,24 @@ namespace metameric::gl {
   };
 
 
-  /**
-   * Framebuffer enums
+  /*
+    Framebuffer enums
   */
 
+  // Attachment types for gl::Framebuffer(...) construction
+  // and for gl::Framebuffer::clear(...) targets
  enum class FramebufferAttachmentType : uint {
-   eColor               = GL_COLOR_ATTACHMENT0,
-   eDepth               = GL_DEPTH_ATTACHMENT,
-   eStencil             = GL_STENCIL_ATTACHMENT
- };
-
- enum class FramebufferClearType : uint {
    eColor               = GL_COLOR,
    eDepth               = GL_DEPTH,
-   eStencil             = GL_STENCIL,
+   eStencil             = GL_STENCIL
  };
 
-  /**
-   * Shader enums
-   */
 
+  /*
+    Shader enums
+  */
+
+  // Created type for gl::Program(...) internal construction
   enum class ShaderType : uint {
     eCompute            = GL_COMPUTE_SHADER,
     eVertex             = GL_VERTEX_SHADER,
@@ -150,10 +155,11 @@ namespace metameric::gl {
   };
 
 
-  /**
-   * Texture enums
-   */
+  /*
+    Texture enums
+  */
   
+  // Created type for gl::Texture<...>(...) construction
   enum class TextureType {
     eBase,
     eArray,
@@ -164,10 +170,11 @@ namespace metameric::gl {
   };
 
 
-  /**
-   * Sampler enums
-   */
+  /*
+    Sampler enums
+  */
   
+  // Filter used for minimization in gl::Sampler
   enum class SamplerMinFilter : uint {
     eNearest                = GL_NEAREST,
     eLinear                 = GL_LINEAR,
@@ -177,11 +184,13 @@ namespace metameric::gl {
     eLinearMipmapLinear     = GL_LINEAR_MIPMAP_LINEAR
   };
   
+  // Filter used for magnification in gl::Sampler
   enum class SamplerMagFilter : uint {
     eNearest                = GL_NEAREST,
     eLinear                 = GL_LINEAR
   };
 
+  // Technique used for wrapping in gl::Sampler
   enum class SamplerWrap : uint {
     eRepeat                 = GL_REPEAT,
     eMirroredRepeat         = GL_MIRRORED_REPEAT,
@@ -206,10 +215,11 @@ namespace metameric::gl {
   };
 
 
-  /**
-   * Sync enums
-   */
+  /*
+    Sync enums
+  */
 
+  // Barrier types for gl::memory_barrier(...)
   enum class BarrierFlags : uint {
     // Data sourced from element buffers reflects shader writes prior to barrier
     eElementArray           = GL_ELEMENT_ARRAY_BARRIER_BIT,
@@ -248,10 +258,11 @@ namespace metameric::gl {
   };
   MET_DECLARE_BITFLAG(BarrierFlags);
 
-  /**
-   * Vertexarray enums
-   */
+  /*
+    Vertexarray enums
+  */
 
+  //  Format used for gl::VertexArray(...) in gl::VertexAttribInfo(...) object
   enum class VertexFormatType : uint {
     eByte                   = GL_BYTE,
     eUByte                  = GL_UNSIGNED_BYTE,
@@ -260,6 +271,7 @@ namespace metameric::gl {
     eFloat                  = GL_FLOAT
   };
 
+  // Size used for gl::VertexArray(...) in gl::VertexAttribInfo(...) object
   enum class VertexFormatSize : uint {
     e1                      = 1,
     e2                      = 2,
@@ -268,23 +280,26 @@ namespace metameric::gl {
   };
 
 
-  /**
-   * Window/context enums
-   */
+  /*
+    Window/context enums
+  */
 
+  // Window hint flags to pass to GLFW
   enum class WindowFlags : uint {
-    eDebug      = 0x001u,
-    eDecorated  = 0x002u,
-    eFloating   = 0x004u,
-    eFullscreen = 0x008u,
-    eFocused    = 0x010u,
-    eMaximized  = 0x020u,
-    eVisible    = 0x040u,
-    eResizable  = 0x080u,
-    eSRGB       = 0x100u
+    eDebug                  = 0x001u,
+    eDecorated              = 0x002u,
+    eFloating               = 0x004u,
+    eFullscreen             = 0x008u,
+    eFocused                = 0x010u,
+    eMaximized              = 0x020u,
+    eVisible                = 0x040u,
+    eResizable              = 0x080u,
+    eSRGB                   = 0x100u,
+    eMSAA                   = 0x200u
   };  
   MET_DECLARE_BITFLAG(WindowFlags);
 
+  // Preferred OpenGL profile for GLFW to support
   enum class ProfileType {
     eAny,
     eCore,

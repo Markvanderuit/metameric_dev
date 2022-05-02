@@ -21,6 +21,11 @@ namespace metameric::gl {
     constexpr Handle(bool init) noexcept : _is_init(init) { }
     constexpr virtual ~Handle() = default;
 
+    // Assume lifetime ownership over a provided object
+    static inline constexpr Handle make_from(T object) {
+      return { true, object };
+    }
+
     inline constexpr void swap(Handle &o) {
       using std::swap;
       swap(_is_init, o._is_init);

@@ -1,11 +1,9 @@
 #include <metameric/gl/vertexarray.h>
 #include <metameric/gl/detail/assert.h>
-#include <ranges>
 
 namespace metameric::gl {
   Vertexarray::Vertexarray(VertexarrayCreateInfo info)
-  : Handle<>(true),
-    _has_elements(info.elements.is_init()) {
+  : Handle<>(true), _has_elements(info.elements) {
     guard(_is_init);
     glCreateVertexArrays(1, &_object);
 
@@ -13,14 +11,14 @@ namespace metameric::gl {
     for (const auto &info : info.buffers) {
       glVertexArrayVertexBuffer(_object,
                                 info.binding,
-                                info.buffer.object(),
+                                info.buffer->object(),
                                 info.offset, 
                                 info.stride);
     }
 
     // Bind element buffer object to vao, if exists
     if (_has_elements) {
-      glVertexArrayElementBuffer(_object, info.elements.object());
+      glVertexArrayElementBuffer(_object, info.elements->object());
     }
 
     // Set vertex attrib formats and their bindings

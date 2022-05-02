@@ -51,6 +51,7 @@ namespace metameric::gl {
     glfwWindowHint(GLFW_VISIBLE,      has_flag(info.flags, WindowFlags::eVisible));
     glfwWindowHint(GLFW_RESIZABLE,    has_flag(info.flags, WindowFlags::eResizable));
     glfwWindowHint(GLFW_SRGB_CAPABLE, has_flag(info.flags, WindowFlags::eSRGB));
+    glfwWindowHint(GLFW_SAMPLES, has_flag(info.flags, WindowFlags::eMSAA) ? 4 : 0); 
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, 
                                       has_flag(info.flags, WindowFlags::eDebug));
 

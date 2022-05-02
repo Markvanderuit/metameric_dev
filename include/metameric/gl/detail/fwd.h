@@ -4,7 +4,6 @@
 #include <metameric/gl/enum.h>
 
 namespace metameric::gl {
-
   /* Non-templated OpenGL object wrappers */
   class Buffer;
   class Fence;
@@ -14,8 +13,6 @@ namespace metameric::gl {
   class Shader;
   class Vertexarray;
   class Window;
-
-  /* Not implemented */
   class Query;
 
   /* Templated texture and subobjects */
@@ -24,7 +21,9 @@ namespace metameric::gl {
   template <typename T, uint D, uint Components, TextureType Ty = TextureType::eBase>
   class Texture;
 
-  /* Shorthand texture size specializations... */
+  /* 
+    Shorthand texture size specializations...
+  */
 
   template <TextureType Ty = TextureType::eBase> using TextureObject1d1f = Texture<float, 1, 1, Ty>;
   template <TextureType Ty = TextureType::eBase> using TextureObject2d1f = Texture<float, 2, 1, Ty>;
@@ -98,7 +97,9 @@ namespace metameric::gl {
   template <TextureType Ty = TextureType::eBase> using StencilTextureObject2d = Texture<StencilComponent, 2, 1, Ty>;
   template <TextureType Ty = TextureType::eBase> using StencilTextureObject3d = Texture<StencilComponent, 3, 1, Ty>;
 
-  /* Shorthand default type texture size specializations */
+  /*
+    Shorthand default size + type texture specializations
+  */
   
   using Texture1d1f = TextureObject1d1f<>;
   using Texture2d1f = TextureObject2d1f<>;

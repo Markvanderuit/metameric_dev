@@ -2,6 +2,16 @@
 #include <metameric/gl/detail/assert.h>
 
 namespace metameric::gl {
+  namespace detail {
+    GLenum framebuffer_attachment(gl::FramebufferAttachmentType type) {
+      switch (type) {
+        case gl::FramebufferAttachmentType::eDepth: return GL_DEPTH_ATTACHMENT;
+        case gl::FramebufferAttachmentType::eStencil: return GL_STENCIL_ATTACHMENT;
+        default: return GL_COLOR_ATTACHMENT0;
+      }
+    }
+  } // namespace detail
+
   Framebuffer::Framebuffer(FramebufferAttachmentCreateInfo info)
   : Framebuffer({info}) { }
 
@@ -12,8 +22,8 @@ namespace metameric::gl {
 
     for (const auto &info : info) {
       glNamedFramebufferTexture(_object, 
-        (uint) info.type + info.index, 
-        info.texture.object(), 
+        detail::framebuffer_attachment(info.type) + info.index, 
+        info.texture->object(), 
         info.level);
     }
 
@@ -34,17 +44,22 @@ namespace metameric::gl {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
   }
 
-  void Framebuffer::clear(FramebufferClearType type, std::span<std::byte> data, uint index) {
-    switch (type) {
-    case FramebufferClearType::eColor:
-      glClearNamedFramebufferfv(_object, (uint) type, index, (float *) data.data());
-      break;
-    case FramebufferClearType::eDepth:
-      glClearNamedFramebufferfv(_object, (uint) type, 0, (float *) data.data());
-      break;
-    case FramebufferClearType::eStencil:
-      glClearNamedFramebufferiv(_object, (uint) type, 0, (int *) data.data());
-      break;
-    }
-  }
+  #define MET_IMPL_CLEAR(type, type_short)\
+    template <> void Framebuffer::clear<type>\
+    (FramebufferAttachmentType t, type v, uint i)\
+    { glClearNamedFramebuffer ## type_short ## v(_object, (uint) t, i, &v); }\
+    template <> void Framebuffer::clear<eig::Array<type, 2, 1>>\
+    (FramebufferAttachmentType t, eig::Array<type, 2, 1> v, uint i)\
+    { glClearNamedFramebuffer ## type_short ## v(_object, (uint) t, i, v.data()); }\
+    template <> void Framebuffer::clear<eig::Array<type, 3, 1>>\
+    (FramebufferAttachmentType t, eig::Array<type, 3, 1> v, uint i)\
+    { glClearNamedFramebuffer ## type_short ## v(_object, (uint) t, i, v.data()); }\
+    template <> void Framebuffer::clear<eig::Array<type, 4, 1>>\
+    (FramebufferAttachmentType t, eig::Array<type, 4, 1> v, uint i)\
+    { glClearNamedFramebuffer ## type_short ## v(_object, (uint) t, i, v.data()); }
+
+  // Explicit template specializations
+  MET_IMPL_CLEAR(float, f)
+  MET_IMPL_CLEAR(uint, ui)
+  MET_IMPL_CLEAR(int, i)
 } // namespace metameric::gl
