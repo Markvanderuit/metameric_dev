@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 #include <source_location>
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <metameric/core/define.h>
 #include <metameric/core/fwd.h>
 

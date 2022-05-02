@@ -31,7 +31,7 @@ using uint = unsigned int;
 // Extremely simple guard statement sugar
 #define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
 #define guard_continue(expr) if (!(expr)) { continue; }
-#define guard_break(expr) if (!(expr)) { continue; }
+#define guard_break(expr) if (!(expr)) { break; }
 
 // Declare move constr/operator and set copy constr/operator to explicitly deleted
 // Assumes a swap(other) is implemented
