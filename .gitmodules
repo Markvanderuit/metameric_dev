@@ -1,3 +1,6 @@
 [submodule "third_party/vcpkg"]
 	path = third_party/vcpkg
 	url = https://github.com/Microsoft/vcpkg.git
+[submodule "third_party/small_gl"]
+	path = third_party/small_gl
+	url = https://github.com/Markvanderuit/small_gl.git
