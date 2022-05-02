@@ -23,17 +23,16 @@
 #include <metameric/core/exception.h>
 
 // GL includes
-#include <metameric/gl/detail/assert.h>
-#include <metameric/gl/buffer.h>
-#include <metameric/gl/draw.h>
-#include <metameric/gl/framebuffer.h>
-#include <metameric/gl/program.h>
-#include <metameric/gl/sampler.h>
-#include <metameric/gl/sync.h>
-#include <metameric/gl/texture.h>
-#include <metameric/gl/vertexarray.h>
-#include <metameric/gl/utility.h>
-#include <metameric/gl/window.h>
+#include <small_gl/detail/exception.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/dispatch.hpp>
+#include <small_gl/framebuffer.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/sampler.hpp>
+#include <small_gl/texture.hpp>
+#include <small_gl/array.hpp>
+#include <small_gl/utility.hpp>
+#include <small_gl/window.hpp>
 
 /* 
   Boilerplate
@@ -58,14 +57,14 @@ std::span<O> reinterpret_span(std::span<T> s) {
   Program objects
 */
 
-metameric::gl::Window window;
-metameric::gl::Framebuffer triangle_framebuffer;
-metameric::gl::Buffer triangle_vertex_buffer;
-metameric::gl::Buffer triangle_color_buffer;
-metameric::gl::Buffer triangle_index_buffer;
-metameric::gl::Vertexarray triangle_array;
-metameric::gl::Program triangle_program;
-metameric::gl::DrawInfo triangle_draw;
+gl::Window window;
+gl::Framebuffer triangle_framebuffer;
+gl::Buffer triangle_vertex_buffer;
+gl::Buffer triangle_color_buffer;
+gl::Buffer triangle_index_buffer;
+gl::Array triangle_array;
+gl::Program triangle_program;
+gl::DrawInfo triangle_draw;
 
 std::vector<float> clear_value = { 1.f, 0.f, 1.f, 0.f };
 std::vector<metameric::Vector3f> triangle_vertices = {
@@ -97,7 +96,7 @@ void init() {
   window = gl::Window({ .size = { 512, 512 }, .title = "Hello window", .flags = flags });
 
   // Setup framebuffer as default
-  triangle_framebuffer = gl::Framebuffer::default_framebuffer();
+  triangle_framebuffer = gl::Framebuffer::make_default();
 
   // Upload triangle data into buffer objects
   triangle_vertex_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_vertices)) });
@@ -108,22 +107,22 @@ void init() {
   std::vector<gl::VertexBufferInfo> triangle_buffer_info = {
     { .buffer = &triangle_vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
     { .buffer = &triangle_color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
-  std::vector<gl::VertexAttribInfo> triangle_attrib_info = {
-    { .attrib_binding = 0, .buffer_binding = 0, 
+  std::vector<gl::VertexAttributeInfo> triangle_attrib_info = {
+    { .attribute_binding = 0, .buffer_binding = 0, 
       .format_type = gl::VertexFormatType::eFloat, 
       .format_size = gl::VertexFormatSize::e3 },
-    { .attrib_binding = 1, .buffer_binding = 1,
+    { .attribute_binding = 1, .buffer_binding = 1,
       .format_type = gl::VertexFormatType::eFloat,
       .format_size = gl::VertexFormatSize::e3 }};
-  triangle_array = gl::Vertexarray({ .buffers = triangle_buffer_info,
-                                     .attribs = triangle_attrib_info,
-                                     .elements = &triangle_index_buffer });
+  triangle_array = gl::Array({ .buffers = triangle_buffer_info,
+                               .attributes = triangle_attrib_info,
+                               .elements = &triangle_index_buffer });
                                      
   // Setup draw program
   triangle_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                    .file_path = "../resources/shaders/triangle.vert.spv" },
+                                    .path = "../resources/shaders/triangle.vert.spv" },
                                   { .type = gl::ShaderType::eFragment, 
-                                    .file_path = "../resources/shaders/triangle.frag.spv" }});
+                                    .path = "../resources/shaders/triangle.frag.spv" }});
   triangle_program.uniform("scalar", 0.5f);
 
 
@@ -147,10 +146,10 @@ void step() {
 
   // Prepare for draw call
   gl::state::set_viewport(window.framebuffer_size());
-  triangle_framebuffer.clear<Array3f>(gl::FramebufferAttachmentType::eColor, { 1, 0, 1 });
+  triangle_framebuffer.clear<Array3f>(gl::FramebufferType::eColor, { 1, 0, 1 });
 
   // Submit draw call
-  gl::draw(triangle_draw);
+  gl::dispatch(triangle_draw);
 }
 
 void run() {

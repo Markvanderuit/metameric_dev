@@ -16,6 +16,9 @@ find_package(imguizmo CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 
+# Include third party libraries provided directly
+add_subdirectory(third_party/small_gl)
+
 function(init_target_r target srcs)
   target_include_directories(${target} PUBLIC include)
   target_compile_features(${target} PRIVATE cxx_std_23)
@@ -45,17 +48,9 @@ target_link_libraries(core PRIVATE
   fmt::fmt-header-only
 )
 
-add_library_r(gl gl)
-target_link_libraries(gl PRIVATE
-  Eigen3::Eigen
-  glad::glad
-  glfw
-  fmt::fmt-header-only
-)
-
 set(link_libraries
   core
-  gl
+  small_gl
   glad::glad
   Eigen3::Eigen
   fmt::fmt-header-only
@@ -66,14 +61,6 @@ set(link_libraries
 
 add_executable_r(main_playground src/main_playground.cpp)
 target_link_libraries(main_playground PUBLIC ${link_libraries})
-
-# add_executable_r(main src/main.cpp)
-# add_executable_r(main_imgui src/main_imgui.cpp)
-# add_executable_r(main_vk src/main_vk.cpp)
-
-# target_link_libraries(main PUBLIC ${link_libraries})
-# target_link_libraries(main_imgui PUBLIC ${link_libraries})
-# target_link_libraries(main_vk PUBLIC ${link_libraries})
 
 # Quickly find all shaders
 file(GLOB_RECURSE glsl_srcs
