@@ -2,37 +2,28 @@
 #include <glad/glad.h>
 
 namespace metameric::gl {
-  Sampler::Sampler(SamplerMinFilter min_filter,
-                   SamplerMagFilter mag_filter,
-                   SamplerWrap wrap,
-                   SamplerCompareFunc compare_func,
-                   SamplerCompareMode compare_mode)
-  : Handle<>(true), _min_filter(min_filter), _mag_filter(mag_filter), 
-      _wrap(wrap), _compare_func(compare_func), _compare_mode(compare_mode)
-    {
-    if (!_is_init) {
-      return;
-    }
+  Sampler::Sampler(SamplerCreateInfo info)
+  : Handle<>(true),
+    _min_filter(info.min_filter),
+    _mag_filter(info.mag_filter), 
+    _wrap(info.wrap),
+    _compare_func(info.compare_func),
+    _compare_mode(info.compare_mode) {
+    guard(_is_init);
     
     glCreateSamplers(1, &_object);
 
-    glSamplerParameteri(_object, GL_TEXTURE_MIN_FILTER, (uint) min_filter);
-    glSamplerParameteri(_object, GL_TEXTURE_MAG_FILTER, (uint) mag_filter);
-    glSamplerParameteri(_object, GL_TEXTURE_WRAP_R, (uint) wrap);
-    glSamplerParameteri(_object, GL_TEXTURE_WRAP_S, (uint) wrap);
-    glSamplerParameteri(_object, GL_TEXTURE_WRAP_T, (uint) wrap);
-    glSamplerParameteri(_object, GL_TEXTURE_COMPARE_FUNC, (uint) compare_func);
-    glSamplerParameteri(_object, GL_TEXTURE_COMPARE_MODE, (uint) compare_mode);
+    glSamplerParameteri(_object, GL_TEXTURE_MIN_FILTER, (uint) info.min_filter);
+    glSamplerParameteri(_object, GL_TEXTURE_MAG_FILTER, (uint) info.mag_filter);
+    glSamplerParameteri(_object, GL_TEXTURE_WRAP_R, (uint) info.wrap);
+    glSamplerParameteri(_object, GL_TEXTURE_WRAP_S, (uint) info.wrap);
+    glSamplerParameteri(_object, GL_TEXTURE_WRAP_T, (uint) info.wrap);
+    glSamplerParameteri(_object, GL_TEXTURE_COMPARE_FUNC, (uint) info.compare_func);
+    glSamplerParameteri(_object, GL_TEXTURE_COMPARE_MODE, (uint) info.compare_mode);
   }
 
-  
-  Sampler::Sampler(SamplerCreateInfo info)
-  : Sampler(info.min_filter, info.mag_filter, info.wrap, info.compare_func, info.compare_mode) { }
-
   Sampler::~Sampler() {
-    if (!_is_init) {
-      return;
-    }
+    guard(_is_init);
     glDeleteSamplers(1, &_object);
   }
 

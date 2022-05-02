@@ -5,185 +5,204 @@
 
 namespace metameric::gl {
   template <typename T, uint D, uint Components, TextureType Ty>
-  Texture<T, D, Components, Ty>::Texture(ArrayXi size,
-                                         uint levels,
-                                         T const *data,
-                                         size_t data_size) 
-  : Handle(true), _size(size), _levels(levels) {
+  Texture<T, D, Components, Ty>::Texture(Info info)
+  : Handle(true), _size(info.size), _levels(info.levels) {
     constexpr auto target = detail::target_from_type<D, Ty>();
     constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
     constexpr auto internal_format = detail::internal_format_from_type<Components, T>();
     
+    guard(_is_init);
     glCreateTextures(target, 1, &_object);
     
     if constexpr (storage_dims_type == detail::StorageDimsType::e1D) {
-      glTextureStorage1D(_object, levels, internal_format, size.x());
+      glTextureStorage1D(_object, _levels, internal_format, _size.x());
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e2D) {
-      glTextureStorage2D(_object, levels, internal_format, size.x(), size.y());
+      glTextureStorage2D(_object, _levels, internal_format, _size.x(), _size.y());
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D) {
-      GLsizei size_z = detail::is_cubemap_type<Ty> ? size.z() * 6 : size.z(); // array cubemap
-      glTextureStorage3D(_object, levels, internal_format, size.x(), size.y(), size_z);
+      GLsizei size_z = detail::is_cubemap_type<Ty> ? _size.z() * 6 : _size.z(); // array cubemap
+      glTextureStorage3D(_object, _levels, internal_format, _size.x(), _size.y(), size_z);
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e2DMultisample) {
-      glTextureStorage2DMultisample(_object, 4, internal_format, size.x(), size.y(), true);
+      glTextureStorage2DMultisample(_object, 4, internal_format, _size.x(), _size.y(), true);
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e3DMultisample) {
-      glTextureStorage3DMultisample(_object, 4, internal_format, size.x(), size.y(), size.z(), true);
+      glTextureStorage3DMultisample(_object, 4, internal_format, _size.x(), _size.y(), _size.z(), true);
     }
 
-    if (data) {
-      set_image(data, data_size, 0);
+    if (info.data.data()) {
+      set(info.data);
       generate_mipmaps();
     }
   }
-  
-  template <typename T, uint D, uint Components, TextureType Ty>
-  Texture<T, D, Components, Ty>::Texture(TextureCreateInfo info)
-  : Texture(info.dims, info.levels, info.data, info.data_size) { }
 
   template <typename T, uint D, uint Components, TextureType Ty>
   Texture<T, D, Components, Ty>::~Texture() {
-    if (!is_init()) {
-      return;
-    }
+    guard(_is_init);
     glDeleteTextures(1, &_object);
   }
 
   template <typename T, uint D, uint Components, TextureType Ty>
   void Texture<T, D, Components, Ty>::generate_mipmaps() {
-    if (_levels > 1)
-      glGenerateTextureMipmap(_object);
+    guard(_levels > 1);
+    glGenerateTextureMipmap(_object);
   }
 
-  template <typename T, uint D, uint Components, TextureType Ty>
-  void Texture<T, D, Components, Ty>::set_image(const T *data,
-                                                size_t data_size,
-                                                uint level)
-  requires !detail::is_cubemap_type<Ty> {
-    set_subimage(data, data_size, level, _size, ArrayXi::Zero());
-  }
+  /* 
+    Non-cubemap function implementations follow
+  */
 
   template <typename T, uint D, uint Components, TextureType Ty>
-  void Texture<T, D, Components, Ty>::set_subimage(const T *data, 
-                                                   size_t data_size, 
-                                                   uint level,
-                                                   ArrayXi size, 
-                                                   ArrayXi offset) 
-  requires !detail::is_cubemap_type<Ty> {
+  void Texture<T, D, Components, Ty>::set(std::span<T> data, uint level, Array size, Array offset)
+  requires(!detail::is_cubemap_type<Ty>) {
     constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
     constexpr auto format = detail::format_from_type<Components, T>();
     constexpr auto pixel_type = detail::pixel_type_from_type<T>();
+    const Array safe_size = (size == 0).all() ? _size : size;
 
     if constexpr (storage_dims_type == detail::StorageDimsType::e1D) {
-      glTextureSubImage1D(_object, level, offset.x(), size.x(), format, pixel_type, data);
+      glTextureSubImage1D(_object, level, 
+        offset.x(), 
+        safe_size.x(), 
+        format, pixel_type, data.data());
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e2D
                       || storage_dims_type == detail::StorageDimsType::e2DMultisample) {
-      glTextureSubImage2D(_object, level, offset.x(), offset.y(), size.x(), size.y(), format, pixel_type, data);
+      glTextureSubImage2D(_object, level, 
+        offset.x(), offset.y(), 
+        safe_size.x(), safe_size.y(), 
+        format, pixel_type, data.data());              
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D
                       || storage_dims_type == detail::StorageDimsType::e3DMultisample) {
-      glTextureSubImage3D(_object, level, offset.x(), offset.y(), offset.z(), size.x(), size.y(), size.z(), format, pixel_type, data);
-    }
-  }
-  
-
-  template <typename T, uint D, uint Components, TextureType Ty>
-  void Texture<T, D, Components, Ty>::get_image(T *data, size_t data_size, uint level) const
-  requires !detail::is_cubemap_type<Ty> {
-    get_subimage(data, data_size, level, _size, ArrayXi::Zero());
-  }
-
-  template <typename T, uint D, uint Components, TextureType Ty>
-  void Texture<T, D, Components, Ty>::get_subimage(T *data,
-                                                   size_t data_size,
-                                                   uint level,
-                                                   ArrayXi size,
-                                                   ArrayXi offset) const
-  requires !detail::is_cubemap_type<Ty> {
-    constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
-    constexpr auto format = detail::format_from_type<Components, T>();
-    constexpr auto pixel_type = detail::pixel_type_from_type<T>();
-
-    if constexpr (storage_dims_type == detail::StorageDimsType::e1D) {
-      glGetTextureSubImage(_object, level, offset.x(), 0, 0, size.x(), 1, 1, format, pixel_type, data_size, data);
-    } else if constexpr (storage_dims_type == detail::StorageDimsType::e2D
-                      || storage_dims_type == detail::StorageDimsType::e2DMultisample) {
-      glGetTextureSubImage(_object, level, offset.x(), offset.y(), 0, size.x(), size.y(), 1, format, pixel_type, data_size, data);
-    } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D
-                      || storage_dims_type == detail::StorageDimsType::e3DMultisample) {
-      glGetTextureSubImage(_object, level, offset.x(), offset.y(), offset.z(), size.x(), size.y(), size.z(), format, pixel_type, data_size, data);
+      glTextureSubImage3D(_object, level, 
+        offset.x(), offset.y(), offset.z(),
+        safe_size.x(), safe_size.y(), safe_size.z(),
+        format, pixel_type, data.data());
     }
   }
 
   template <typename T, uint D, uint Components, TextureType Ty>
-  void Texture<T, D, Components, Ty>::set_image(const T *data,
-                                                size_t data_size,
-                                                uint face,
-                                                uint level)
-  requires detail::is_cubemap_type<Ty> {
-    set_subimage(data, data_size, level, face, _size, ArrayXi::Zero());
-  }
-    
-  template <typename T, uint D, uint Components, TextureType Ty> 
-  void Texture<T, D, Components, Ty>::set_subimage(const T *data, 
-                                                   size_t data_size,
-                                                   uint level,
-                                                   uint face,
-                                                   ArrayXi size,
-                                                   ArrayXi offset) 
-  requires detail::is_cubemap_type<Ty> {
+  void Texture<T, D, Components, Ty>::get(std::span<T> data, uint level, Array size, Array offset) const
+  requires(!detail::is_cubemap_type<Ty>) {
     constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
     constexpr auto format = detail::format_from_type<Components, T>();
     constexpr auto pixel_type = detail::pixel_type_from_type<T>();
+    const Array safe_size = (size == 0).all() ? _size : size;
+
+    if constexpr (storage_dims_type == detail::StorageDimsType::e1D) {
+      glGetTextureSubImage(_object, level, 
+        offset.x(), 0, 0, 
+        safe_size.x(), 1, 1, 
+        format, pixel_type, data.size_bytes(), data.data());
+    } else if constexpr (storage_dims_type == detail::StorageDimsType::e2D
+                      || storage_dims_type == detail::StorageDimsType::e2DMultisample) {
+      glGetTextureSubImage(_object, level, 
+        offset.x(), offset.y(), 0, 
+        safe_size.x(), safe_size.y(), 1, 
+        format, pixel_type, data.size_bytes(), data.data());
+    } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D
+                      || storage_dims_type == detail::StorageDimsType::e3DMultisample) {
+      glGetTextureSubImage(_object, level, 
+        offset.x(), offset.y(), offset.z(), 
+        safe_size.x(), safe_size.y(), safe_size.z(), 
+        format, pixel_type, data.size_bytes(), data.data());
+    }
+  }
+
+  template <typename T, uint D, uint Components, TextureType Ty>
+  void Texture<T, D, Components, Ty>::clear(std::span<T> data, uint level, Array size, Array offset)
+  requires(!detail::is_cubemap_type<Ty>) {
+    constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
+    constexpr auto format = detail::format_from_type<Components, T>();
+    constexpr auto pixel_type = detail::pixel_type_from_type<T>();
+    const Array safe_size = (size == 0).all() ? _size : size;
+
+    if constexpr (storage_dims_type == detail::StorageDimsType::e1D) {
+      glClearTexSubImage(_object, level, 
+        offset.x(), 0, 0, 
+        safe_size.x(), 1, 1, 
+        format, pixel_type, data.data());
+    } else if constexpr (storage_dims_type == detail::StorageDimsType::e2D
+                      || storage_dims_type == detail::StorageDimsType::e2DMultisample) {
+      glClearTexSubImage(_object, level, 
+        offset.x(), offset.y(), 0, 
+        safe_size.x(), safe_size.y(), 1, 
+        format, pixel_type, data.data());
+    } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D
+                      || storage_dims_type == detail::StorageDimsType::e3DMultisample) {
+      glClearTexSubImage(_object, level, 
+        offset.x(), offset.y(), offset.z(), 
+        safe_size.x(), safe_size.y(), safe_size.z(), 
+        format, pixel_type, data.data());
+    }
+  }
+
+  /* 
+    Cubemap function implementations follow
+  */
+
+  template <typename T, uint D, uint Components, TextureType Ty>
+  void Texture<T, D, Components, Ty>::set(std::span<T> data, uint face, uint level, Array size, Array offset)
+  requires(detail::is_cubemap_type<Ty>) {
+    constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
+    constexpr auto format = detail::format_from_type<Components, T>();
+    constexpr auto pixel_type = detail::pixel_type_from_type<T>();
+    const Array safe_size = (size == 0).all() ? _size : size;
 
     if constexpr (storage_dims_type == detail::StorageDimsType::e2D) {
-      glTextureSubImage3D(_object, level, offset.x(), offset.y(), face, size.x(), size.y(), 1, format, pixel_type, data);
+      glTextureSubImage3D(_object, level, 
+      offset.x(), offset.y(), face, 
+      safe_size.x(), safe_size.y(), 1, 
+      format, pixel_type, data.data());
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D) {
-      glTextureSubImage3D(_object, level, offset.x(), offset.y(), size.z() * face, size.x(), size.y(), size.z(), format, pixel_type, data);
+      glTextureSubImage3D(_object, level, 
+      offset.x(), offset.y(), safe_size.z() * face, 
+      safe_size.x(), safe_size.y(), safe_size.z(), 
+      format, pixel_type, data.data());
     }
   }
-  
-  template <typename T, uint D, uint Components, TextureType Ty> 
-  void Texture<T, D, Components, Ty>::clear_image(const T *data, 
-                                                     uint level)
-  requires !detail::is_cubemap_type<Ty> {
-    clear_subimage(data, level, _size, ArrayXi::Zero());
-  }
 
-  template <typename T, uint D, uint Components, TextureType Ty> 
-  void Texture<T, D, Components, Ty>::clear_subimage(const T *data, 
-                                                     uint level, 
-                                                     ArrayXi size,
-                                                     ArrayXi offset)
-  requires !detail::is_cubemap_type<Ty> {
+  template <typename T, uint D, uint Components, TextureType Ty>
+  void Texture<T, D, Components, Ty>::get(std::span<T> data, uint face, uint level, Array size, Array offset) const 
+  requires(detail::is_cubemap_type<Ty>) {
     constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
     constexpr auto format = detail::format_from_type<Components, T>();
     constexpr auto pixel_type = detail::pixel_type_from_type<T>();
-
-    if constexpr (storage_dims_type == detail::StorageDimsType::e1D) {
-      glClearTexSubImage(_object, level, offset.x(), 0, 0, size.x(), 1, 1, format, pixel_type, data);
-    } else if constexpr (storage_dims_type == detail::StorageDimsType::e2D
-                      || storage_dims_type == detail::StorageDimsType::e2DMultisample) {
-      glClearTexSubImage(_object, level, offset.x(), offset.y(), 0, size.x(), size.y(), 1, format, pixel_type, data);
-    } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D
-                      || storage_dims_type == detail::StorageDimsType::e3DMultisample) {
-      glClearTexSubImage(_object, level, offset.x(), offset.y(), offset.z(), size.x(), size.y(), size.z(), format, pixel_type, data);
-    }
-  }
-  
-  template <typename T, uint D, uint Components, TextureType Ty> 
-  void Texture<T, D, Components, Ty>::clear_subimage(const T *data, 
-                                                     uint level,
-                                                     uint face, 
-                                                     ArrayXi size,
-                                                     ArrayXi offset)
-  requires detail::is_cubemap_type<Ty> {
-    constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
-    constexpr auto format = detail::format_from_type<Components, T>();
-    constexpr auto pixel_type = detail::pixel_type_from_type<T>();
+    const Array safe_size = (size == 0).all() ? _size : size;
     
     if constexpr (storage_dims_type == detail::StorageDimsType::e2D) {
-      glClearTexSubImage(_object, level, offset.x(), offset.y(), face, size.x(), size.y(), 1, format, pixel_type, data);
+      glGetTextureSubImage(_object, level, 
+        offset.x(), offset.y(), face, 
+        safe_size.x(), safe_size.y(), 1, 
+        format, pixel_type, data.size_bytes(), data.data());
     } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D) {
-      glClearTexSubImage(_object, level, offset.x(), offset.y(), offset.z() * face, size.x(), size.y(), size.z(), format, pixel_type, data);
+      glGetTextureSubImage(_object, level, 
+        offset.x(), offset.y(), offset.z() * face, 
+        safe_size.x(), safe_size.y(), safe_size.z(), 
+        format, pixel_type, data.size_bytes(), data.data());
     }
+  }
+
+  template <typename T, uint D, uint Components, TextureType Ty>
+  void Texture<T, D, Components, Ty>::clear(std::span<T> data, uint face, uint level, Array size, Array offset)
+  requires(detail::is_cubemap_type<Ty>) {
+    constexpr auto storage_dims_type = detail::storage_dims_from_type<D, Ty>();
+    constexpr auto format = detail::format_from_type<Components, T>();
+    constexpr auto pixel_type = detail::pixel_type_from_type<T>();
+    const Array safe_size = (size == 0).all() ? _size : size;
+    
+    if constexpr (storage_dims_type == detail::StorageDimsType::e2D) {
+      glClearTexSubImage(_object, level,
+        offset.x(), offset.y(), face,
+        safe_size.x(), safe_size.y(), 1,
+        format, pixel_type, data.data());
+    } else if constexpr (storage_dims_type == detail::StorageDimsType::e3D) {
+      glClearTexSubImage(_object, level,
+        offset.x(), offset.y(), offset.z() * face,
+        safe_size.x(), safe_size.y(), safe_size.z(),
+        format, pixel_type, data.data());
+    }
+  }
+  
+  template <typename T, uint D, uint Components, TextureType Ty>
+  void Texture<T, D, Components, Ty>::bind_to(uint index) const {
+    glBindTextureUnit(index, _object);
   }
   
   /* 

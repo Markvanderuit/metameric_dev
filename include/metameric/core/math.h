@@ -15,12 +15,22 @@ using ushort = unsigned short;
 
 namespace eig = Eigen;
 
-// Single length types are useful for some parts of templating
-using Array1i = eig::Array<int, 1, 1>;
 using Array1ui = eig::Array<uint, 1, 1>;
-using Array1f = eig::Array<float, 1, 1>;
+using Array2ui = eig::Array<uint, 2, 1>;
+using Array3ui = eig::Array<uint, 3, 1>;
+using Array4ui = eig::Array<uint, 4, 1>;
+using ArrayXui = eig::Array<uint, -1, 1>;
 
+using Vector1ui = eig::Matrix<uint, 1, 1>;
+using Vector2ui = eig::Matrix<uint, 2, 1>;
+using Vector3ui = eig::Matrix<uint, 3, 1>;
+using Vector4ui = eig::Matrix<uint, 4, 1>;
+using VectorXui = eig::Matrix<uint, -1, 1>;
+
+using Array1i = eig::Array<int, 1, 1>;
 using eig::Array2i;
+using eig::Array3i;
+using eig::Array4i;
 using eig::ArrayXi;
 
 using eig::Vector2i;
@@ -28,7 +38,10 @@ using eig::Vector3i;
 using eig::Vector4i;
 using eig::VectorXi;
 
+using Array1f = eig::Array<float, 1, 1>;
 using eig::Array2f;
+using eig::Array3f;
+using eig::Array4f;
 using eig::ArrayXf;
 
 using eig::Vector2f;
@@ -55,7 +68,6 @@ using eig::Matrix2f;
 using eig::Matrix3f;
 using eig::Matrix4f;
 using eig::MatrixXf;
-
 
 /**
  * Custom formatter for Eigen's matrix/array types

@@ -29,33 +29,26 @@ namespace metameric {
 using uint = unsigned int;
 
 // Extremely simple guard statement sugar
-#define guard(expr, ...) guard_(expr, ##__VA_ARGS__)
-#define guard_(expr, value) if (!(expr)) { return value; }
+#define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
+#define guard_continue(expr) if (!(expr)) { continue; }
+#define guard_break(expr) if (!(expr)) { continue; }
 
+// Declare move constr/operator and set copy constr/operator to explicitly deleted
+// Assumes a swap(other) is implemented
 #define MET_DECLARE_NONCOPYABLE(T)\
   T(const T &) = delete;\
   T & operator= (const T &) = delete;\
   T(T &&o) noexcept { swap(o); }\
   inline T & operator= (T &&o) noexcept { swap(o); return *this; }
-
-#define MET_DECLARE_ENUM_FLAGS(T)\
-  constexpr uint operator|(T a, T b) { return (uint) a | (uint) b; }\
-  constexpr uint operator|(uint a, T b) { return a | (uint) b; }\
-  constexpr uint operator&(T a, T b) { return (uint) a & (uint) b; }\
-  constexpr uint operator&(uint a, T b) { return a & (uint) b; }\
-  constexpr uint operator~(T t) { return ~ (uint) t; }\
-  constexpr uint operator+(T t) { return (uint) t; }\
-  template <typename UInt>\
-  constexpr auto has_flag(UInt flags, T t) { return (flags & (uint) t) != 0u; }
-
   
-#define MET_DECLARE_ENUM_FLAGS_EXP(T)\
+// Declare common bitflag operands for a given (enum class) type
+#define MET_DECLARE_BITFLAG(T)\
+  constexpr T operator~(T a) { return (T) (~ (uint) a); }\
   constexpr T operator|(T a, T b) { return (T) ((uint) a | (uint) b); }\
   constexpr T operator&(T a, T b) { return (T) ((uint) a & (uint) b); }\
-  constexpr T operator|(uint a, T b) { return (T) (a | (uint) b); }\
-  constexpr T operator&(uint a, T b) { return (T) (a & (uint) b); }\
+  constexpr T operator^(T a, T b) { return (T) ((uint) a ^ (uint) b); }\
+  constexpr T& operator|=(T &a, T b) { return a = a | b; }\
+  constexpr T& operator&=(T &a, T b) { return a = a & b; }\
+  constexpr T& operator^=(T &a, T b) { return a = a ^ b; }\
   constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
-  // template <typename UInt>\
-  // constexpr auto has_flag(UInt flags, T t) { return (flags & (uint) t) != 0u; }
-
 } // namespace metameric

@@ -3,6 +3,7 @@
 #include <exception>
 #include <map>
 #include <string>
+#include <source_location>
 #include <fmt/core.h>
 #include <metameric/core/define.h>
 #include <metameric/core/fwd.h>
@@ -22,7 +23,10 @@ namespace metameric {
         constexpr std::string_view fmt = "- {:<7} : {}\n";
         std::string s = "Runtime exception\n";
 
-        s += fmt::format(fmt, "message", _msg);
+        if (!_msg.empty()) {
+          s += fmt::format(fmt, "message", _msg);
+        }
+
         for (const auto &[key, msg] : _attached)
           s += fmt::format(fmt, key, msg);
 
@@ -33,19 +37,18 @@ namespace metameric {
         return _attached[key];
       }
     };
-  
-    inline
-    void runtime_assert_impl(bool expr, const std::string &msg, const char *file_path, uint line_nr) {
-      guard(!expr);
-
-      RuntimeException e(msg);
-      e["file_path"] = file_path;
-      e["line_nr"] = std::to_string(line_nr);
-      
-      throw e;
-    }
   } // namespace detail
-} // namespace metameric
+  
+  inline
+  void runtime_assert(bool expr, 
+                      const std::string &msg = "",
+                      const std::source_location loc = std::source_location::current()) {
+    guard(!expr);
 
-#define runtime_assert(expr, msg)\
-  metameric::detail::runtime_assert_impl(expr, msg, __FILE__, __LINE__);
+    detail::RuntimeException e(msg);
+    e["src"]  = "metameric::runtime_assert";
+    e["file"]  = fmt::format("{}({}:{})", loc.file_name(), loc.line(), loc.column());
+    e["func"] = loc.function_name();
+    throw e;
+  }
+} // namespace metameric

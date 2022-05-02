@@ -3,22 +3,19 @@
 #include <metameric/core/exception.h>
 #include <glad/glad.h>
 
-namespace metameric {
-  namespace detail {
-    inline
-    void gl_assert_impl(const std::string &msg, const char *file_path, uint line_nr) {
-      GLenum err = glGetError();
-      guard(err != GL_NO_ERROR);
+namespace metameric::gl {
+  inline
+  void err_assert(const std::string &msg = "",
+                  const std::source_location loc = std::source_location::current()) {
+    GLenum err = glGetError();
+    guard(err != GL_NO_ERROR);
 
-      RuntimeException e(msg);
-      e["file_path"] = file_path;
-      e["line_nr"] = std::to_string(line_nr);
-      e["gl_err"] = std::to_string(err);
-
-      throw e;
-    }
-  } // namespace detail
-} // namespace metameric
-
-#define gl_assert(msg)\
-  metameric::detail::gl_assert_impl(msg, __FILE__, __LINE__);
+    metameric::detail::RuntimeException e(msg);
+    e["src"]   = "metameric::gl::err_assert";
+    e["file"]   = fmt::format("{}({}:{})", loc.file_name(), loc.line(), loc.column());
+    e["func"]  = loc.function_name();
+    e["gl_err"] = std::to_string(err);
+    
+    throw e;
+  }
+} // namespace metameric::gl

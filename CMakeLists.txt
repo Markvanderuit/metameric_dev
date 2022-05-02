@@ -1,14 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Specify vcpkg toolchain file
+# set(VCPKG_TARGET_TRIPLET x64-mingw-static CACHE STRING "VCPKG Target Triplet to use")
 set(CMAKE_TOOLCHAIN_FILE 
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake
   CACHE STRING "Vcpkg toolchain file")
   
 project(Metameric LANGUAGES CXX)
-
-# First, find the the vulkan sdk
-# find_package(Vulkan REQUIRED)
 
 # Include third party libraries provided through vcpkg
 find_package(glfw3 CONFIG REQUIRED)
@@ -18,12 +16,9 @@ find_package(imguizmo CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 
-# find_package(vk-bootstrap CONFIG REQUIRED)
-find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
-
 function(init_target_r target srcs)
   target_include_directories(${target} PUBLIC include)
-  target_compile_features(${target} PRIVATE cxx_std_20)
+  target_compile_features(${target} PRIVATE cxx_std_23)
   # target_compile_options(${target} PRIVATE -fsanitize=address)
 endfunction()
 
@@ -47,11 +42,7 @@ target_link_libraries(core PRIVATE
   glad::glad
   Eigen3::Eigen
   glfw
-  fmt::fmt
-
-  # unofficial::vulkan-memory-allocator::vulkan-memory-allocator
-  # vk-bootstrap::vk-bootstrap
-  # Vulkan::Vulkan
+  fmt::fmt-header-only
 )
 
 add_library_r(gl gl)
@@ -59,7 +50,7 @@ target_link_libraries(gl PRIVATE
   Eigen3::Eigen
   glad::glad
   glfw
-  fmt::fmt
+  fmt::fmt-header-only
 )
 
 set(link_libraries
@@ -67,14 +58,10 @@ set(link_libraries
   gl
   glad::glad
   Eigen3::Eigen
-  fmt::fmt
+  fmt::fmt-header-only
   glfw
   imgui::imgui
   imguizmo::imguizmo
-
-  # unofficial::vulkan-memory-allocator::vulkan-memory-allocator
-  # vk-bootstrap::vk-bootstrap
-  # Vulkan::Vulkan
 )
 
 add_executable_r(main_playground src/main_playground.cpp)
@@ -107,7 +94,7 @@ foreach(glsl_src ${glsl_srcs})
   
   add_custom_command(
     OUTPUT ${spirv_bin}
-    COMMAND ${GLSL_VALIDATOR} -V ${glsl_src} -o ${spirv_bin}
+    COMMAND ${GLSL_VALIDATOR} -G ${glsl_src} -o ${spirv_bin}
     DEPENDS ${glsl_src})
   list(APPEND spirv_bins ${spirv_bin})
 endforeach()

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <span>
 
 // OpenGL includes
 #define GLFW_INCLUDE_NONE
@@ -23,60 +25,34 @@
 // GL includes
 #include <metameric/gl/detail/assert.h>
 #include <metameric/gl/buffer.h>
+#include <metameric/gl/draw.h>
+#include <metameric/gl/framebuffer.h>
+#include <metameric/gl/program.h>
 #include <metameric/gl/sampler.h>
+#include <metameric/gl/sync.h>
 #include <metameric/gl/texture.h>
+#include <metameric/gl/vertexarray.h>
+#include <metameric/gl/window.h>
 
-/**
- * Globals
- */
+/* 
+  Boilerplate
+*/
 
-GLFWwindow * glfw_handle;
+std::vector<char> load_shader_binary(const std::string &file_path) {
+  using namespace metameric;
 
+  std::ifstream ifs(file_path, std::ios::ate | std::ios::binary);
+  runtime_assert(ifs.is_open(),
+    fmt::format("load_shader_binary(...), failed to load file \"{}\"", file_path));
 
-/**
- * Render loop setup/teardown functions
- */
-
-void init_glfw() {
-  runtime_assert(glfwInit(), "glfwInit() failed");
-
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_SRGB_CAPABLE, 1);
-  glfwWindowHint(GLFW_VISIBLE, 0);
-  glfwWindowHint(GLFW_DECORATED, 0);
-  glfwWindowHint(GLFW_FOCUSED, 0);
-  glfwWindowHint(GLFW_RESIZABLE, 0);
-  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, 1);
-
-  glfw_handle = glfwCreateWindow(1, 1, "", nullptr, nullptr);
+  size_t file_size = static_cast<size_t>(ifs.tellg());
+  std::vector<char> buffer(file_size);
+  ifs.seekg(0);
+  ifs.read((char *) buffer.data(), file_size);
+  ifs.close();
   
-  runtime_assert(glfw_handle, "glfwCreateWindow(...) failed");
-
-  glfwMakeContextCurrent(glfw_handle);
-
-  runtime_assert(gladLoadGL(), "gladLoadGL() failed");
+  return buffer;
 }
-
-void dstr_glfw() {
-  glfwDestroyWindow(glfw_handle);
-  glfwTerminate();
-  glfw_handle = nullptr;
-}
-
-void begin_render_glfw() {
-  glfwPollEvents();
-}
-
-void end_render_glfw() {
-  glfwSwapBuffers(glfw_handle);
-}
-
-
-/**
- * Program code
- */
 
 template <typename C>
 void print_container(const C &c) {
@@ -87,68 +63,131 @@ void print_container(const C &c) {
   fmt::print(" }}\n");
 }
 
-using uint = unsigned int;
+template <typename T, typename O = std::byte>
+std::span<O> reinterpret_span(std::span<T> s) {
+  return { reinterpret_cast<O *>(s.data()), s.size_bytes() / sizeof(O) };
+}
 
-void render() {
+
+/* 
+  Program objects
+*/
+
+metameric::gl::Window window;
+metameric::gl::Framebuffer triangle_framebuffer;
+metameric::gl::Buffer triangle_vertex_buffer;
+metameric::gl::Buffer triangle_color_buffer;
+metameric::gl::Buffer triangle_index_buffer;
+metameric::gl::Vertexarray triangle_array;
+metameric::gl::Program triangle_program;
+metameric::gl::DrawInfo triangle_draw;
+
+std::vector<float> clear_value = { 1.f, 0.f, 1.f, 0.f };
+std::vector<metameric::Vector3f> triangle_vertices = {
+  { 1.f, 1.f, 0.f },
+  { -1.f, 1.f, 0.f },
+  { 0.f, -1.f, 0.f },
+};
+std::vector<metameric::Vector3f> triangle_colors = {
+  { 1.f, 0.f, 0.f },
+  { 0.f, 1.f, 0.f },
+  { 0.f, 0.f, 1.f }
+};
+std::vector<metameric::Vector3ui> triangle_indices = {
+  { 0, 1, 2 }
+};
+
+
+/**
+ * Program code
+ */
+
+void init() {
+  using namespace metameric;
+    
+  // Setup OpenGL context and primary window
+  gl::WindowFlags flags = gl::WindowFlags::eVisible   | gl::WindowFlags::eDecorated
+                        | gl::WindowFlags::eSRGB      | gl::WindowFlags::eFocused
+                        | gl::WindowFlags::eResizable | gl::WindowFlags::eDebug;
+  window = gl::Window({ .size = { 512, 512 }, .title = "Hello window 1", .flags = flags });
+
+  // Setup framebuffer as default
+  triangle_framebuffer = gl::Framebuffer::default_framebuffer();
+
+  // Upload triangle data into buffer objects
+  triangle_vertex_buffer = gl::Buffer({ .size = triangle_vertices.size() * sizeof(Vector3f),
+                                        .data = reinterpret_span<Vector3f>(triangle_vertices) });
+  triangle_color_buffer = gl::Buffer({ .size = triangle_colors.size() * sizeof(Vector3f),
+                                        .data = reinterpret_span<Vector3f>(triangle_colors) });
+  triangle_index_buffer = gl::Buffer({ .size = triangle_indices.size() * sizeof(Vector3i),
+                                       .data = reinterpret_span<Vector3ui>(triangle_indices),
+                                       .flags = gl::BufferStorageFlags::eStorageDynamic });
+                                       
+  // Setup triangle vertex array object
+  std::vector<gl::VertexBufferInfo> triangle_buffer_info = {
+    { .buffer = triangle_vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
+    { .buffer = triangle_color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
+  std::vector<gl::VertexAttribInfo> triangle_attrib_info = {
+    { .attrib_binding = 0, .buffer_binding = 0, 
+      .format_type = gl::VertexFormatType::eFloat, 
+      .format_size = gl::VertexFormatSize::e3 },
+    { .attrib_binding = 1, .buffer_binding = 1,
+      .format_type = gl::VertexFormatType::eFloat,
+      .format_size = gl::VertexFormatSize::e3 }};
+  triangle_array = gl::Vertexarray({ .buffers = triangle_buffer_info,
+                                     .attribs = triangle_attrib_info,
+                                     .elements = triangle_index_buffer });
+
+  // Setup data fro draw call of vertex array object
+  triangle_draw = { .type = gl::PrimitiveType::eTriangles,
+                    .array = &triangle_array,
+                    .vertex_count = (uint) triangle_index_buffer.size() / sizeof(uint) };
+                                     
+  // Setup draw program
+  triangle_program = gl::Program({
+    { .type = gl::ShaderType::eVertex, 
+      .data = load_shader_binary("../resources/shaders/triangle.vert.spv") },
+    { .type = gl::ShaderType::eFragment, 
+      .data = load_shader_binary("../resources/shaders/triangle.frag.spv") }});
+  triangle_program.uniform("scalar", 0.5f);
+
+  // Bind objects used constantly
+  triangle_program.bind();
+  triangle_framebuffer.bind();
+}
+
+void loop_step() {
   using namespace metameric;
 
-  gl::Sampler sampler = {{
-    .min_filter   = gl::SamplerMinFilter::eNearest,
-    .mag_filter   = gl::SamplerMagFilter::eLinear,
-    .wrap         = gl::SamplerWrap::eRepeat
-  }};
-
-  std::vector<float> buffer = {
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+  // Specify draw capabilities for this scope
+  std::vector<gl::state::scoped_set> capabilities = {
+    { gl::DrawCapability::eCullFace, true },
+    { gl::DrawCapability::eDepthTest, true },
+    { gl::DrawCapability::eBlendOp, false }
   };
-  std::vector<float> readback_buffer(16);
-  // buffer[7] = 256; buffer[3] = 8192; buffer[15] = 314;
 
-  gl::Texture1d1f texture = {{
-    .dims = Array1i(16),
-    .levels = 5,
-    .data = buffer.data(),
-    .data_size = buffer.size() * sizeof(float)
-  }};
-  
-  gl_assert("texture init");
+  // Prepare for draw call
+  gl::state::set_viewport(window.framebuffer_size());
+  triangle_framebuffer.clear(gl::FramebufferClearType::eColor, 
+                             reinterpret_span<float>(clear_value) );
 
-  /* gl::Texture1d1f texture = {
-    Array1i(16),
-    5,
-    buffer.data(),
-    buffer.size() * sizeof(float)
-  }; */
-  // gl_assert("texture init");
+  // Submit draw call
+  gl::draw(triangle_draw);
+}
 
-  // gl::Texture1d1ui texture(Array1i(16), 1, buffer.data(), buffer.size() * sizeof(uint));
+void run_loop() {
+  while (!window.should_close()) {
+    loop_step();
 
-  fmt::print("input:");
-  print_container(buffer);
-
-  // texture.set_image(buffer.data(), buffer.size() * sizeof(float));
-  // gl_assert("texture set");
-
-  texture.get_image(readback_buffer.data(), readback_buffer.size() * sizeof(float), 0);
-  texture.get_subimage(readback_buffer.data(), readback_buffer.size() * sizeof(float), 1,
-    Array1i(8), Array1i(0));
-  gl_assert("texture get");
-  
-  fmt::print("get:");
-  print_container(readback_buffer);
-
-  texture.clear_image(nullptr, 0);
-  texture.get_image(readback_buffer.data(), readback_buffer.size() * sizeof(float));
-  
-  fmt::print("clear:");
-  print_container(readback_buffer);
+    window.poll_events();
+    window.swap_buffers();
+  }
 }
 
 int main() {
   try {
-    init_glfw();
-    render();
-    dstr_glfw();
+    init();
+    run_loop();
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;

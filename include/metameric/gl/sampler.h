@@ -2,7 +2,6 @@
 
 #include <metameric/gl/detail/fwd.h>
 #include <metameric/gl/detail/handle.h>
-#include <metameric/gl/enums.h>
 
 namespace metameric::gl {
   /**
@@ -30,6 +29,12 @@ namespace metameric::gl {
     SamplerCompareMode _compare_mode;
 
   public:
+    /* constr/destr */
+
+    Sampler() = default;
+    Sampler(SamplerCreateInfo info);
+    ~Sampler();
+
     /* getters/setters */
 
     inline SamplerMinFilter min_filter() const { return _min_filter; }
@@ -44,20 +49,9 @@ namespace metameric::gl {
     void set_depth_compare_func(SamplerCompareFunc compare_func);
     void set_depth_compare_mode(SamplerCompareMode compare_mode);
 
-    /* primary constr/destr */
-
-    Sampler() = default;
-    Sampler(SamplerMinFilter min_filter,
-            SamplerMagFilter mag_filter,
-            SamplerWrap wrap,
-            SamplerCompareFunc compare_func,
-            SamplerCompareMode compare_mode);
-    Sampler(SamplerCreateInfo info);
-    ~Sampler();
-
     /* miscellaneous */
 
-    inline void swap(Sampler &o) {
+    inline constexpr void swap(Sampler &o) {
       using std::swap;
       Base::swap(o);
       swap(_min_filter, o._min_filter);
@@ -67,7 +61,7 @@ namespace metameric::gl {
       swap(_compare_mode, o._compare_mode);
     }
 
-    inline bool operator==(const Sampler &o) const {
+    inline constexpr bool operator==(const Sampler &o) const {
       using std::tie;
       return Base::operator==(o)
           && std::tie(_min_filter, _mag_filter, _wrap, _compare_func, _compare_mode)

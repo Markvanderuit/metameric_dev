@@ -1,11 +1,11 @@
-#version 450
+#version 460 core
+
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 color_in;
+layout (location = 0) out vec3 color_out;
+layout (location = 0) uniform float scalar;
 
 void main() {
-  const vec3 positions[3] = vec3[3](
-    vec3(1.f, 1.f, 0.f),
-    vec3(-1.f, 1.f, 0.f),
-    vec3(0.f, -1.f, 0.f)
-  );
-
-  gl_Position = vec4(positions[gl_VertexIndex], 1.f);
+  color_out = color_in;
+  gl_Position = vec4(scalar * position, 1.f);
 }
