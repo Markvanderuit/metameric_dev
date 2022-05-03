@@ -1,12 +1,6 @@
 // STL includes
-#include <array>
 #include <cstdlib>
-#include <exception>
-#include <map>
-#include <string>
 #include <vector>
-#include <iostream>
-#include <fstream>
 #include <span>
 
 // Misc includes
@@ -27,25 +21,6 @@
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
-
-/* 
-  Boilerplate
-*/
-
-template <typename C>
-void print_container(const C &c) {
-  fmt::print("{{");
-  for (auto f : c) {
-    fmt::print(" {}", f);
-  }
-  fmt::print(" }}\n");
-}
-
-template <typename T, typename O = std::byte>
-std::span<O> reinterpret_span(std::span<T> s) {
-  return { reinterpret_cast<O *>(s.data()), s.size_bytes() / sizeof(O) };
-}
-
 
 /* 
   Program objects
