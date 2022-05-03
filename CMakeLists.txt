@@ -19,12 +19,7 @@ find_package(Eigen3 CONFIG REQUIRED)
 # Include third party libraries provided directly
 add_subdirectory(third_party/small_gl)
 
-function(init_target_r target srcs)
-  target_include_directories(${target} PUBLIC include)
-  target_compile_features(${target} PRIVATE cxx_std_23)
-  # target_compile_options(${target} PRIVATE -fsanitize=address)
-endfunction()
-
+# Simple function to add library with basic settings
 function(add_library_r target dir)
   file(GLOB_RECURSE srcs 
     ${CMAKE_CURRENT_SOURCE_DIR}/include/metameric/${dir}/*.hpp
@@ -32,35 +27,35 @@ function(add_library_r target dir)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cpp
   )
   add_library(${target} ${srcs})
-  init_target_r(${target} ${srcs})
+  target_include_directories(${target} PUBLIC include)
+  target_compile_features(${target} PRIVATE cxx_std_23)
 endfunction()
 
 function(add_executable_r target src)
   add_executable(${target} ${src})
-  init_target_r(${target} ${src}})
+  target_include_directories(${target} PUBLIC include)
+  target_compile_features(${target} PRIVATE cxx_std_23)
 endfunction()
 
+# Set up core library
 add_library_r(core core)
 target_link_libraries(core PRIVATE
-  glad::glad
   Eigen3::Eigen
-  glfw
   fmt::fmt-header-only
 )
 
-set(link_libraries
+# Set up gui library
+
+# Set up main executable
+add_executable_r(main_playground src/main_playground.cpp)
+target_link_libraries(main_playground PRIVATE
   core
   small_gl
-  glad::glad
   Eigen3::Eigen
   fmt::fmt-header-only
-  glfw
   imgui::imgui
   imguizmo::imguizmo
 )
-
-add_executable_r(main_playground src/main_playground.cpp)
-target_link_libraries(main_playground PUBLIC ${link_libraries})
 
 # Quickly find all shaders
 file(GLOB_RECURSE glsl_srcs
@@ -75,7 +70,7 @@ find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{
 foreach(glsl_src ${glsl_srcs})
   message(STATUS "Building shader : ${glsl_src}")
 
-  # TODO impl. support for recursive paths!
+  # TODO impl. support for deep paths!
   get_filename_component(file_name ${glsl_src} NAME)
   set(spirv_bin "${PROJECT_BINARY_DIR}/resources/shaders/${file_name}.spv")
   
