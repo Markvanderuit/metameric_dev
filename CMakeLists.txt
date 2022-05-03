@@ -9,12 +9,11 @@ set(CMAKE_TOOLCHAIN_FILE
 project(Metameric LANGUAGES CXX)
 
 # Include third party libraries provided through vcpkg
-find_package(glfw3 CONFIG REQUIRED)
-find_package(glad CONFIG REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
-find_package(Eigen3 CONFIG REQUIRED)
+find_package(TBB CONFIG REQUIRED)
 
 # Include third party libraries provided directly
 add_subdirectory(third_party/small_gl)
@@ -33,8 +32,7 @@ endfunction()
 
 function(add_executable_r target src)
   add_executable(${target} ${src})
-  target_include_directories(${target} PUBLIC include)
-  target_compile_features(${target} PRIVATE cxx_std_23)
+  target_compile_features(${target} PRIVATE cxx_std_20)
 endfunction()
 
 # Set up core library
@@ -55,6 +53,7 @@ target_link_libraries(main_playground PRIVATE
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
+  TBB:tbb
 )
 
 # Quickly find all shaders

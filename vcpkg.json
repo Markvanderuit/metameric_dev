@@ -4,10 +4,12 @@
   "dependencies" : [
     "eigen3",
     "fmt",
-    "glfw3",
-    { "name": "glad", "features": [ "gl-api-latest" ] },
-    { "name" : "imgui", "features": [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
-    "imguizmo"
+    { "name": "glad", 
+      "features" : [ "gl-api-latest" ] },
+    { "name" : "imgui", 
+      "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
+    "imguizmo",
+    "tbb"
   ],
   "features" : { }
 }

@@ -6,6 +6,13 @@
 // Misc includes
 #include <fmt/core.h>
 
+// TBB includes
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
+// #include <tbb/tbb.h>
+// #include <tbb/flow_graph.h>
+
 // Metameric includes
 #include <metameric/core/define.h>
 #include <metameric/core/math.h>
@@ -15,6 +22,7 @@
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
+#include <small_gl/exception.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/sampler.hpp>
@@ -68,6 +76,7 @@ void init() {
   std::vector<gl::VertexBufferInfo> triangle_buffer_info = {
     { .buffer = &vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
     { .buffer = &color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
+
   std::vector<gl::VertexAttributeInfo> triangle_attrib_info = {
     { .attribute_binding = 0, .buffer_binding = 0, 
       .format_type = gl::VertexFormatType::eFloat, 
@@ -75,6 +84,7 @@ void init() {
     { .attribute_binding = 1, .buffer_binding = 1,
       .format_type = gl::VertexFormatType::eFloat,
       .format_size = gl::VertexFormatSize::e3 }};
+
   array = gl::Array({ .buffers = triangle_buffer_info,
                       .attributes = triangle_attrib_info,
                       .elements = &index_buffer });
@@ -84,8 +94,7 @@ void init() {
                            .path = "../resources/shaders/triangle.vert.spv" },
                          { .type = gl::ShaderType::eFragment, 
                            .path = "../resources/shaders/triangle.frag.spv" }});
-  program.uniform("scalar", 0.5f);
-
+  program.uniform("scalar", 0.66f);
 
   // Setup data fro draw call of vertex array object
   main_draw = { .type = gl::PrimitiveType::eTriangles,
@@ -97,20 +106,26 @@ void init() {
   program.bind();
 }
 
+void step_graph() {
+
+}
+
 void step() {
   using namespace metameric;
+
+  window.set_context_current(true);
+
+  gl::state::set_viewport(window.framebuffer_size());
+  framebuffer.clear<Vector4f>(gl::FramebufferType::eColor, framebuffer_clear);
 
   // Specify draw capabilities for this scope
   std::vector<gl::state::ScopedSet> capabilities = {{ gl::DrawCapability::eCullFace, true },
                                                     { gl::DrawCapability::eDepthTest, true },
                                                     { gl::DrawCapability::eBlendOp, false }};
 
-  // Prepare for draw call
-  gl::state::set_viewport(window.framebuffer_size());
-  framebuffer.clear<Vector4f>(gl::FramebufferType::eColor, framebuffer_clear);
-
   // Submit draw call
   gl::dispatch(main_draw);
+  gl::gl_check();
 }
 
 void run() {
@@ -129,5 +144,5 @@ int main() {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;
   }
-  return 0;
+  return EXIT_SUCCESS;
 }
