@@ -13,6 +13,7 @@ find_package(Eigen3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
+find_path(STB_INCLUDE_DIRS "stb.h")
 find_package(TBB CONFIG REQUIRED)
 
 # Include third party libraries provided directly
@@ -37,14 +38,35 @@ endfunction()
 
 # Set up core library
 add_library_r(core core)
-target_link_libraries(core PRIVATE
+target_link_libraries(core PUBLIC
   Eigen3::Eigen
   fmt::fmt-header-only
 )
+target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
 
 # Set up gui library
+add_library_r(gui gui)
+target_link_libraries(gui PUBLIC
+  core
+  small_gl
+  imgui::imgui
+  imguizmo::imguizmo
+)
 
 # Set up main executable
+add_executable_r(metameric src/metameric.cpp)
+target_link_libraries(metameric PRIVATE gui)
+# target_link_libraries(main_playground PRIVATE
+#   core
+#   small_gl
+#   Eigen3::Eigen
+#   fmt::fmt-header-only
+#   imgui::imgui
+#   imguizmo::imguizmo
+#   TBB::tbb
+# )
+
+# Set up playground executable
 add_executable_r(main_playground src/main_playground.cpp)
 target_link_libraries(main_playground PRIVATE
   core
@@ -53,7 +75,7 @@ target_link_libraries(main_playground PRIVATE
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
-  TBB:tbb
+  TBB::tbb
 )
 
 # Quickly find all shaders

@@ -9,6 +9,7 @@
     { "name" : "imgui", 
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
     "imguizmo",
+    "stb",
     "tbb"
   ],
   "features" : { }
