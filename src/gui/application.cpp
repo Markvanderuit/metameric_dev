@@ -42,8 +42,7 @@ namespace met {
       gl::Framebuffer default_framebuffer = gl::Framebuffer::make_default();
 
       gl::Texture<float, 2, 3> texture({ .size = { 128, 128 } });
-      gl::Array3f texture_clear_value = { 255.f, 0.f, 255.f };
-      texture.clear(std::span<float>{ texture_clear_value.data(), 3 });
+      texture.clear(std::vector<float> { 255.f, 0.f, 255.f });
 
       // Begin primary render loop
       while (!window.should_close()) {
@@ -55,9 +54,6 @@ namespace met {
         ImGui::NewFrame();
         
         { /* Begin render loop scope */
-          // Wipe framebuffer to black
-          default_framebuffer.clear<gl::Vector4f>(gl::FramebufferType::eColor);
-
           { // Draw a texture filling an ImGui window
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4,4));
             ImGui::SetNextWindowSize(ImVec2 { 256, 256 });
@@ -80,9 +76,12 @@ namespace met {
 
           gl::gl_check();
         } /* End render loop scope */
-
         
-        // Render ImGui components to default framebuffer
+        // Wipe framebuffer to black
+        default_framebuffer.bind();
+        default_framebuffer.clear<gl::Vector4f>(gl::FramebufferType::eColor);
+
+        // Draw ImGui components to default framebuffer
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
