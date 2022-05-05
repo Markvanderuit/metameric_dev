@@ -1,6 +1,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <small_gl/buffer.hpp>
 #include <small_gl/exception.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
@@ -8,6 +9,12 @@
 #include <small_gl/window.hpp>
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/detail/imgui.hpp>
+
+gl::WindowFlags main_window_flags = gl::WindowFlags::eVisible   
+                                  | gl::WindowFlags::eSRGB      
+                                  | gl::WindowFlags::eDecorated
+                                  | gl::WindowFlags::eFocused
+                                  | gl::WindowFlags::eResizable;
 
 namespace met {
   template <typename T>
@@ -20,17 +27,30 @@ namespace met {
   std::span<T> to_span(const Array &v) { return std::span<T>((T *) v.data(), v.rows() * v.cols()); }
 
   void create_application(ApplicationCreateInfo info) {
-    // Specify window hint flags
-    gl::WindowFlags flags = gl::WindowFlags::eVisible   | gl::WindowFlags::eDecorated
-                          | gl::WindowFlags::eSRGB      | gl::WindowFlags::eFocused
-                          | gl::WindowFlags::eResizable;
-#ifdef NDEBUG
+    // Initialize OpenGL context and primary window
+    gl::WindowFlags flags = main_window_flags;
+#ifndef NDEBUG
     flags |= gl::WindowFlags::eDebug;
 #endif
-
-    // Initialize OpenGL context and primary window
     gl::Window window({.size = { 1024, 768 }, .title = "Metameric", .flags = flags });
+
     window.attach_context();
+
+#ifndef NDEBUG
+    gl::enable_debug_callbacks();
+#endif
+
+    // Cause an error intentionally
+    std::vector<gl::uint> false_data = { 1 };
+    gl::Buffer false_buffer({
+      .size = sizeof(gl::uint),
+      .data = std::as_bytes(std::span(false_data))
+    });
+
+    gl::debug::begin_group("omg", false_buffer);
+
+    gl::debug::end_group();
+
     ImGui::Init(window);
 
     { /* Initialize context-dependent objects _inside_ this scope */
