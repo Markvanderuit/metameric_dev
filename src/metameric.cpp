@@ -13,7 +13,7 @@ int main() {
   try {
     create_application({});
   } catch (const std::exception &e) {
-    fmt::print(stderr, "{}", e.what());
+    fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

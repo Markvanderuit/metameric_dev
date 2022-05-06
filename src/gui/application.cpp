@@ -11,6 +11,9 @@
 #include <metameric/gui/detail/imgui.hpp>
 
 gl::WindowFlags main_window_flags = gl::WindowFlags::eVisible   
+#ifndef NDEBUG                    
+                                  | gl::WindowFlags::eDebug 
+#endif
                                   | gl::WindowFlags::eSRGB      
                                   | gl::WindowFlags::eDecorated
                                   | gl::WindowFlags::eFocused
@@ -28,28 +31,17 @@ namespace met {
 
   void create_application(ApplicationCreateInfo info) {
     // Initialize OpenGL context and primary window
-    gl::WindowFlags flags = main_window_flags;
-#ifndef NDEBUG
-    flags |= gl::WindowFlags::eDebug;
-#endif
-    gl::Window window({.size = { 1024, 768 }, .title = "Metameric", .flags = flags });
-
+    gl::Window window({.size = { 1024, 768 }, .title = "Metameric", .flags = main_window_flags });
     window.attach_context();
 
+    // Enable OpenGL debug messages at default settings
 #ifndef NDEBUG
-    gl::enable_debug_callbacks();
+    gl::debug::enable_messages();
 #endif
 
-    // Cause an error intentionally
-    std::vector<gl::uint> false_data = { 1 };
-    gl::Buffer false_buffer({
-      .size = sizeof(gl::uint),
-      .data = std::as_bytes(std::span(false_data))
-    });
-
-    gl::debug::begin_group("omg", false_buffer);
-
-    gl::debug::end_group();
+    gl::debug::begin_message_group("Hello groups!");
+    gl::debug::insert_message("Hello OpenGL", gl::DebugMessageSeverity::eLow);
+    gl::debug::end_message_group();
 
     ImGui::Init(window);
 
