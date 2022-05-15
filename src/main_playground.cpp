@@ -20,7 +20,6 @@
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
-#include <small_gl/exception.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/sampler.hpp>
@@ -176,7 +175,7 @@ void step(gl::Window &window, gl::Framebuffer &framebuffer, gl::Program &program
   // Finally, swap framebuffers
   window.swap_buffers();
 
-  gl::gl_check();
+  gl::debug::check_gl();
 }
 
 void run() {

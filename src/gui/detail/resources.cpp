@@ -1,0 +1,1 @@
+#include <metameric/gui/detail/resources.hpp>

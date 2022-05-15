@@ -7,7 +7,7 @@ namespace ImGui {
     // Initialize ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui::StyleColorsLight();
+    ImGui::StyleColorsClassic();
 
     // Specify optional config flags
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
