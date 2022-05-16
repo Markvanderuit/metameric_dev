@@ -1,6 +1,4 @@
 #include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
@@ -9,6 +7,10 @@
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/view.hpp>
+#include <metameric/gui/detail/linear_scheduler/scheduler.hpp>
+#include <metameric/gui/task/lambda_task.hpp>
+#include <metameric/gui/task/viewport_task.hpp>
+#include <iostream>
 
 namespace met {
   template <typename T>
@@ -20,23 +22,7 @@ namespace met {
   template <typename T, typename Array>
   std::span<T> to_span(const Array &v) { return std::span<T>((T *) v.data(), v.rows() * v.cols()); }
 
-  struct TestButtonTask : public AbstractTask {
-    TestButtonTask(const std::string &name) : AbstractTask(name) { }
-
-    void create(CreateTaskInfo &info) override {
-      // ...
-    }
-
-    void run(RuntimeTaskInfo &info) {
-      ImGui::Begin("Floating window");
-      if (ImGui::Button("Close me, dammit!")) {
-        info.remove_task(name());
-      }
-      ImGui::End();
-    }
-  };
-
-  ApplicationScheduler create_scheduler() {
+  void graph_example() {
     detail::DirectedGraph graph;
 
     /* map-based approach */
@@ -55,97 +41,61 @@ namespace met {
     
     graph.compile();
     graph.traverse();
+  }
 
-    std::exit(0);
+  detail::LinearScheduler create_initial_schedule() {
+    detail::LinearScheduler scheduler;
 
-    ApplicationScheduler scheduler;
-      
-    scheduler.insert_task(LambdaTask( "imgui_demo_task",
-    [](auto &) { }, [](auto &) {
-      ImGui::ShowDemoWindow();
-    }));
-    
-    scheduler.insert_task(LambdaTask("imgui_dockable_task_0", 
-    [](auto &) { }, [](auto &) {
-      ImGui::Begin("Dockable 1");
-      ImGui::LabelText("Label", "Text %i", 16);
-      ImGui::LabelText("Label", "Text %i", 32);
-      ImGui::LabelText("Label", "Text %i", 64);
-      ImGui::End();
-    }));
-    
-    scheduler.insert_task(LambdaTask("other_task", 
-    [](auto &info) { 
-      // Declare created objects
-      info.emplace_resource<int>("integer", 5);
-      info.emplace_resource<bool>("boolean", true);
-    }, [](auto &info) {
-      ImGui::Begin("Dockable 2");
-      ImGui::LabelText("Label", "Text %i", 16);
-      ImGui::LabelText("Label", "Text %i", 32);
-      ImGui::LabelText("Label", "Text %i", 64);
+    // Create task to instantiate main menu bar
+    scheduler.emplace_task<LambdaFunctionTask>("main_menu_bar", [](auto &info) {
+      guard(ImGui::BeginMainMenuBar());
 
-      if (ImGui::Button("Test button, please ignore")) {
-        info.insert_task_after<TestButtonTask>("other_task", "Spawned button");
+      if (ImGui::BeginMenu("File")) {
+        // ...
+        ImGui::EndMenu();
       }
 
-      ImGui::End();
-    }));
-    
-    scheduler.insert_task(LambdaTask("imgui_resizable_texture", 
-    [](auto &info) { 
-      // Initialize a simple texture to pink
-      gl::Texture<float, 2, 3> texture({ .size = { 128, 128 } });
-      texture.clear(to_span<float, gl::Array3f>({ 255.f, 0.f, 255.f }));
-
-      // Declare created objects
-      auto texture_create = info.emplace_resource<gl::Texture<float, 2, 3>>(
-        "texture", std::move(texture)
-      );
-
-      // Declare inputs
-      auto integer_read = info.read_resource("other_task", "integer");
-      auto boolean_read = info.read_resource("other_task", "boolean");
-
-      // Declare outputs
-      info.write_resource(integer_read, "written integer");
-      info.write_resource(texture_create, "written texture");
-    }, [](auto &info) {
-      // Obtain shared objects
-      auto &texture = info.get_resource<gl::Texture<float, 2, 3>>("texture");
-
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4,4));
-      ImGui::Begin("Main window", nullptr, ImGuiWindowFlags_NoTitleBar);
-      
-      // Resize texture if necessary
-      if (auto window_size = to_array(ImGui::GetWindowSize()); 
-          (texture.size() != (window_size - 8)).any()) {
-        gl::Array3f texture_clear_value = { 255.f, 0.f, 255.f };
-        texture = gl::Texture<float, 2, 3>({ .size = (window_size) - 8 });
-        texture.clear(to_span<float, gl::Array3f>({ 255.f, 0.f, 255.f }));
+      if (ImGui::BeginMenu("Edit")) {
+        // ...
+        ImGui::EndMenu();
       }
 
-      // Pass texture to ImGUi
-      ImGui::Image((void *) (size_t) texture.object(), to_imvec2(texture.size()) );
+      if (ImGui::BeginMenu("View")) {
+        // ...
+        ImGui::EndMenu();
+      }
 
-      ImGui::End();
-      ImGui::PopStyleVar();
-    }));
+      if (ImGui::BeginMenu("Help")) {
+        // ...
+        ImGui::EndMenu();
+      }
 
-    scheduler.insert_task(LambdaTask("clear_default_framebuffer",
-    [](auto &) {}, [](auto &) {
+      ImGui::EndMainMenuBar();
+    });
+
+    // Create task to insert the primary dock space 
+    scheduler.emplace_task<LambdaFunctionTask>("primary_dock_space", [](auto &info) {
+      auto flags = ImGuiDockNodeFlags_AutoHideTabBar
+                 | ImGuiDockNodeFlags_PassthruCentralNode;
+      ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), flags);
+    });
+
+    // Create application tasks
+    scheduler.emplace_task<ViewportTask>("viewport");
+    scheduler.emplace_task<LambdaFunctionTask>("imgui_demo", [](auto &) { ImGui::ShowDemoWindow(); });
+
+    // Create task to wipe default framebuffer all the way at the end
+    scheduler.emplace_task<LambdaFunctionTask>("clear_default_framebuffer", [](auto &) {
       gl::Framebuffer framebuffer = gl::Framebuffer::make_default();
       framebuffer.bind();
       framebuffer.clear<gl::Vector4f>(gl::FramebufferType::eColor);
       framebuffer.clear<float>(gl::FramebufferType::eDepth);
-    }));
+    });
 
-    scheduler.compile();
     return scheduler;
   }
 
   void create_application(ApplicationCreateInfo info) {
-    // Initialize OpenGL context and primary window
     gl::WindowFlags window_flags = gl::WindowFlags::eVisible
     #ifndef NDEBUG                    
                                  | gl::WindowFlags::eDebug 
@@ -154,30 +104,28 @@ namespace met {
                                  | gl::WindowFlags::eDecorated
                                  | gl::WindowFlags::eResizable
                                  | gl::WindowFlags::eSRGB;
-    gl::Window window({.size = { 1280, 800 }, .title = "Metameric", .flags = window_flags });
-    window.attach_context();
+                                 
+    // Initialize OpenGL context, primary window, and ImGui
+    gl::Window window({.size = { 1280, 800 }, 
+                       .title = "Metameric", 
+                       .flags = window_flags });
+    ImGui::Init(window);
 
-    // Enable OpenGL debug messages at default settings
+    // Enable OpenGL debug messages, ignoring notification-type messages
 #ifndef NDEBUG
     gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
 
-    // Set up ImGui support in a subfunction
-    ImGui::Init(window);
-
-    // Set up application tasks in a subfunction
-    ApplicationScheduler scheduler = create_scheduler();
-
-    // Begin program loop
+    // Program loop
+    auto scheduler = create_initial_schedule();
     while (!window.should_close()) {
       // Begin frame
       window.poll_events();
       ImGui::BeginFrame();
       
-      // Scheduler handles all application tasks
+      // Scheduler handles all tasks inside window
       scheduler.run();
-      scheduler.output_schedule();
 
       // End frame
       ImGui::DrawFrame();

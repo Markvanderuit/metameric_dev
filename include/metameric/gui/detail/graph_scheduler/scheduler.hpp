@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/gui/detail/graph.hpp>
+#include <metameric/gui/detail/graph_scheduler/graph.hpp>
 
 namespace met {
   struct AbstractTask {

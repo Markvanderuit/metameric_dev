@@ -1,1 +1,1 @@
-#include <metameric/gui/detail/resources.hpp>
+#include <metameric/gui/detail/graph_scheduler/resources.hpp>

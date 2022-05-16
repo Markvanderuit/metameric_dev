@@ -5,9 +5,9 @@
 #include <string>
 #include <unordered_map>
 #include <fmt/core.h>
-#include <metameric/gui/detail/resources.hpp>
-#include <metameric/gui/detail/tasks.hpp>
-#include <metameric/gui/detail/graph.hpp>
+#include <metameric/gui/detail/graph_scheduler/resources.hpp>
+#include <metameric/gui/detail/graph_scheduler/tasks.hpp>
+#include <metameric/gui/detail/graph_scheduler/graph.hpp>
 
 namespace met {
   struct AbstractResourceNode; // fwd
