@@ -4,7 +4,7 @@
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 
 namespace met {
-  class LambdaFunctionTask : public detail::AbstractTask {
+  class LambdaTask : public detail::AbstractTask {
     using InitType = std::function<void(detail::TaskInitInfo &)>;
     using EvalType = std::function<void(detail::TaskEvalInfo &)>;
 
@@ -12,14 +12,13 @@ namespace met {
     EvalType _eval;
 
   public:
-    LambdaFunctionTask(const std::string &name, EvalType eval)
+    LambdaTask(const std::string &name, EvalType eval)
     : detail::AbstractTask(name),
       _eval(eval) { }
 
-    LambdaFunctionTask(const std::string &name, InitType init, EvalType eval)
+    LambdaTask(const std::string &name, InitType init, EvalType eval)
     : detail::AbstractTask(name),
-      _init(init),
-      _eval(eval) { }
+      _init(init), _eval(eval) { }
 
     void init(detail::TaskInitInfo &init_info) override {
       if (_init)

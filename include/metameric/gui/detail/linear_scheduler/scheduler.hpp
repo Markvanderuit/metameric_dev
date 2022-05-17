@@ -5,7 +5,6 @@
 #include <string>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 #include <metameric/gui/detail/linear_scheduler/resource.hpp>
-#include <fmt/core.h>
 
 namespace met::detail {
   class LinearScheduler {

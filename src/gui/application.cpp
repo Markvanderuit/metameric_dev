@@ -1,95 +1,39 @@
-#include <imgui.h>
-#include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
-#include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
-#include <metameric/gui/application.hpp>
 #include <metameric/gui/detail/imgui.hpp>
-#include <metameric/gui/detail/view.hpp>
 #include <metameric/gui/detail/linear_scheduler/scheduler.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
+#include <metameric/gui/task/viewport_base_task.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
-#include <iostream>
+#include <metameric/gui/application.hpp>
 
 namespace met {
-  template <typename T>
-  gl::Array2i to_array(T t) { return { static_cast<int>(t[0]), static_cast<int>(t[1]) }; }
-
-  template <typename T>
-  ImVec2 to_imvec2(T t) { return { static_cast<float>(t[0]), static_cast<float>(t[1]) }; }
-
-  template <typename T, typename Array>
-  std::span<T> to_span(const Array &v) { return std::span<T>((T *) v.data(), v.rows() * v.cols()); }
-
-  void graph_example() {
-    detail::DirectedGraph graph;
-
-    /* map-based approach */
-    using Node = detail::DirectedGraphNode<std::string>;
-    using Edge = detail::DirectedGraphEdge<std::string>;
-
-    graph.create_node<Node>("node_0");
-    graph.create_node<Node>("node_1");
-    graph.create_node<Node>("node_2");
-    graph.create_node<Node>("node_3");
-
-    graph.create_edge<Edge>("node_0", "node_1");
-    graph.create_edge<Edge>("node_1", "node_3");
-    graph.create_edge<Edge>("node_0", "node_3");
-    graph.create_edge<Edge>("node_3", "node_2");
-    
-    graph.compile();
-    graph.traverse();
-  }
-
-  detail::LinearScheduler create_initial_schedule() {
+  detail::LinearScheduler init_scheduler(gl::Window &window) {
     detail::LinearScheduler scheduler;
 
-    // Create task to instantiate main menu bar
-    scheduler.emplace_task<LambdaFunctionTask>("main_menu_bar", [](auto &info) {
-      guard(ImGui::BeginMainMenuBar());
-
-      if (ImGui::BeginMenu("File")) {
-        // ...
-        ImGui::EndMenu();
-      }
-
-      if (ImGui::BeginMenu("Edit")) {
-        // ...
-        ImGui::EndMenu();
-      }
-
-      if (ImGui::BeginMenu("View")) {
-        // ...
-        ImGui::EndMenu();
-      }
-
-      if (ImGui::BeginMenu("Help")) {
-        // ...
-        ImGui::EndMenu();
-      }
-
-      ImGui::EndMainMenuBar();
+    // First task to run prepares for a new frame
+    scheduler.emplace_task<LambdaTask>("frame_begin", [&] (auto &) {
+      window.poll_events();
+      ImGui::BeginFrame();
     });
 
-    // Create task to insert the primary dock space 
-    scheduler.emplace_task<LambdaFunctionTask>("primary_dock_space", [](auto &info) {
-      auto flags = ImGuiDockNodeFlags_AutoHideTabBar
-                 | ImGuiDockNodeFlags_PassthruCentralNode;
-      ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), flags);
-    });
+    // Next task to run prepares imgui's viewport
+    scheduler.emplace_task<ViewportBaseTask>("viewport_base");
 
-    // Create application tasks
+    // Next tasks to run define main program components 
     scheduler.emplace_task<ViewportTask>("viewport");
-    scheduler.emplace_task<LambdaFunctionTask>("imgui_demo", [](auto &) { ImGui::ShowDemoWindow(); });
+    scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) { ImGui::ShowDemoWindow(); });
 
-    // Create task to wipe default framebuffer all the way at the end
-    scheduler.emplace_task<LambdaFunctionTask>("clear_default_framebuffer", [](auto &) {
-      gl::Framebuffer framebuffer = gl::Framebuffer::make_default();
-      framebuffer.bind();
-      framebuffer.clear<gl::Vector4f>(gl::FramebufferType::eColor);
-      framebuffer.clear<float>(gl::FramebufferType::eDepth);
+    // Last task to run ends a frame
+    scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &) {
+      auto fb = gl::Framebuffer::make_default();
+      fb.bind();
+      fb.clear<gl::Vector4f>(gl::FramebufferType::eColor);
+      fb.clear<float>(gl::FramebufferType::eDepth);
+      
+      ImGui::DrawFrame();
+      window.swap_buffers();
     });
 
     return scheduler;
@@ -118,20 +62,9 @@ namespace met {
 #endif
 
     // Program loop
-    auto scheduler = create_initial_schedule();
-    while (!window.should_close()) {
-      // Begin frame
-      window.poll_events();
-      ImGui::BeginFrame();
-      
-      // Scheduler handles all tasks inside window
-      scheduler.run();
-
-      // End frame
-      ImGui::DrawFrame();
-      window.swap_buffers();
-    } 
+    auto scheduler = init_scheduler(window);
+    while (!window.should_close()) { scheduler.run(); } 
     
-    ImGui::Destroy();
+    ImGui::Destr();
   }
 } // namespace met

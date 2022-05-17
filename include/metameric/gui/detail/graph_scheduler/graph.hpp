@@ -158,4 +158,25 @@ namespace met::detail {
       });
     }
   };
+  
+  void graph_example() {
+    detail::DirectedGraph graph;
+
+    /* map-based approach */
+    using Node = detail::DirectedGraphNode<std::string>;
+    using Edge = detail::DirectedGraphEdge<std::string>;
+
+    graph.create_node<Node>("node_0");
+    graph.create_node<Node>("node_1");
+    graph.create_node<Node>("node_2");
+    graph.create_node<Node>("node_3");
+
+    graph.create_edge<Edge>("node_0", "node_1");
+    graph.create_edge<Edge>("node_1", "node_3");
+    graph.create_edge<Edge>("node_0", "node_3");
+    graph.create_edge<Edge>("node_3", "node_2");
+    
+    graph.compile();
+    graph.traverse();
+  }
 } // namespace met::detail

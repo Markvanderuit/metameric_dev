@@ -17,7 +17,7 @@ namespace ImGui {
     ImGui_ImplOpenGL3_Init();
   }
 
-  void Destroy() {
+  void Destr() {
     ImGui_ImplGlfw_Shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui::DestroyContext();

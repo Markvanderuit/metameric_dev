@@ -1,1 +1,0 @@
-#include <metameric/core/spectrum.h>
