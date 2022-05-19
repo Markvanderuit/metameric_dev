@@ -9,6 +9,7 @@ set(CMAKE_TOOLCHAIN_FILE
 project(Metameric LANGUAGES CXX)
 
 # Include third party libraries provided through vcpkg
+find_package(glm CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
@@ -41,6 +42,8 @@ add_library_r(core core)
 target_link_libraries(core PUBLIC
   Eigen3::Eigen
   fmt::fmt-header-only
+  TBB::tbb
+  glm::glm
 )
 target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
 

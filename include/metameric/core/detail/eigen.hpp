@@ -3,6 +3,12 @@
 #include <metameric/core/fwd.hpp>
 #include <Eigen/Dense>
 
+// TODO remove
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 namespace met {
   using Array1ui = Eigen::Array<uint, 1, 1>;
   using Array2ui = Eigen::Array<uint, 2, 1>;
@@ -57,4 +63,61 @@ namespace met {
   using Eigen::Matrix3f;
   using Eigen::Matrix4f;
   using Eigen::MatrixXf;
+
+  namespace math {
+    inline
+    Matrix4f orthogonal_matrix(float left, 
+                               float right, 
+                               float bottom,
+                               float top,
+                               float z_near,
+                               float z_far) {
+      Matrix4f m = Matrix4f::Identity();
+
+      m(0, 0) = 2.f / (right - left);
+      m(1, 1) = 2.f / (top - bottom);
+      m(2, 2) = - 2.f / (z_far - z_near);
+      m(3, 0) = - (right + left) / (right - left);
+      m(3, 1) = - (top + bottom) / (top - bottom);
+      m(3, 2) = - (z_far + z_near) / (z_far - z_near);
+
+      return m;
+    }
+
+    inline
+    Matrix4f perspective_matrix(float fov_y, 
+                                float aspect,
+                                float z_near,
+                                float z_far) {
+      const float tan_half_fov_y = std::tanf(fov_y / 2.f);
+
+      Matrix4f m = Matrix4f::Zero();
+
+      m(0, 0) = 1.f / (aspect * tan_half_fov_y);
+      m(1, 1) = 1.f / tan_half_fov_y;
+      m(2, 2) = - (z_far + z_near) / (z_far - z_near);
+      m(2, 3) = - 1.f;
+      m(3, 2) = - (2.f * z_far * z_near) / (z_far - z_near);
+
+      return m.transpose();
+    }
+
+    inline
+    Matrix4f lookat_matrix(const Vector3f &eye,
+                           const Vector3f &center,
+                           const Vector3f &up) {
+      const auto f = (center.transpose() - eye.transpose()).normalized();
+      const auto s = f.cross(up.transpose()).normalized();
+      const auto u = s.cross(f);
+
+      Matrix4f m;
+
+      m << s, 0,
+           u, 0,
+          -f, 0,
+          -s.dot(eye), -u.dot(eye), f.dot(eye), 1;
+
+      return m.transpose();
+    }
+  } // namespace math
 } // namespace met

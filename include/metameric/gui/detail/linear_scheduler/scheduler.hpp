@@ -84,6 +84,22 @@ namespace met::detail {
       _resource_registry.erase(key);
     }
 
+    /* create/add/remove global resources */
+
+    template <typename Ty, typename InfoTy>
+    void emplace_resource(const KeyType &key, InfoTy info) {
+      _resource_registry["global"].emplace(key, std::make_unique<detail::Resource<Ty>>(Ty(info)));
+    }
+  
+    template <typename Ty>
+    void insert_resource(const KeyType &key, Ty &&rsrc) {
+      _resource_registry["global"].emplace(key, std::make_unique<detail::Resource<Ty>>(std::move(rsrc)));
+    }
+
+    void remove_resource(const KeyType &key) {
+      _resource_registry["global"].erase(key);
+    }
+
     /* scheduling */
 
     void run() {

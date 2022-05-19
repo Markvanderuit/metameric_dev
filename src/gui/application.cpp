@@ -1,6 +1,7 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/linear_scheduler/scheduler.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
@@ -9,9 +10,7 @@
 #include <metameric/gui/application.hpp>
 
 namespace met {
-  detail::LinearScheduler init_scheduler(gl::Window &window) {
-    detail::LinearScheduler scheduler;
-
+  void init_schedule(detail::LinearScheduler &scheduler, gl::Window &window) {
     // First task to run prepares for a new frame
     scheduler.emplace_task<LambdaTask>("frame_begin", [&] (auto &) {
       window.poll_events();
@@ -35,8 +34,6 @@ namespace met {
       ImGui::DrawFrame();
       window.swap_buffers();
     });
-
-    return scheduler;
   }
 
   void create_application(ApplicationCreateInfo info) {
@@ -61,8 +58,15 @@ namespace met {
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
 
-    // Program loop
-    auto scheduler = init_scheduler(window);
+    detail::LinearScheduler scheduler;
+
+    // Load initial texture data, strip gamma correction, submit to scheduler
+    auto texture_data = io::load_texture_float(info.texture_path);
+    io::apply_srgb_to_lrgb(texture_data, true);
+    scheduler.insert_resource("texture_data", std::move(texture_data));
+
+    // Create and run loop
+    init_schedule(scheduler, window);
     while (!window.should_close()) { scheduler.run(); } 
     
     ImGui::Destr();

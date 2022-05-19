@@ -2,6 +2,9 @@
 
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/detail/utility.hpp>
+#include <fmt/format.h>
+#include <glm/glm.hpp>
+#include <filesystem>
 #include <source_location>
 
 // Simple guard statement syntactic sugar
@@ -10,6 +13,26 @@
 #define guard_break(expr) if (!(expr)) { break; }
 
 namespace met {
+  namespace io {
+    // Return object for load_texture_*(...) below
+    template <typename Ty>
+    struct TextureData {
+      std::vector<Ty> data;
+      glm::ivec2 size;
+      int channels;
+    };
+
+    // Load raw texture data from the given filepath
+    TextureData<std::byte> load_texture_byte(std::filesystem::path path);
+    
+    // Load float-scaled texture data from the given filepath
+    TextureData<float> load_texture_float(std::filesystem::path path);
+
+    // Linearize/delinearize srgb texture data
+    void apply_srgb_to_lrgb(TextureData<float> &obj, bool skip_alpha = true);
+    void apply_lrgb_to_srgb(TextureData<float> &obj, bool skip_alpha = true);
+  };
+
   namespace debug {
     // Evaluate a boolean expression, throwing a detailed exception pointing
     // to the expression's origin if said expression fails
