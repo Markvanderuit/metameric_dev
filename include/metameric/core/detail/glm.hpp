@@ -94,17 +94,115 @@ namespace glm {
     };
   } // namespace detail
 
-  // Reduce sum
+  // Reduce sum of vector
   template<length_t L, typename T, qualifier Q>
-	GLM_FUNC_QUALIFIER T sum(vec<L, T, Q> const& v)
+	GLM_FUNC_QUALIFIER GLM_CONSTEXPR 
+  T sum(vec<L, T, Q> const& v)
 	{
 		return detail::compute_sum<vec<L, T, Q>, T, detail::is_aligned<Q>::value>::call(v);
 	}
 
-  // Reduce prod
+  // Reduce prod of vector
   template<length_t L, typename T, qualifier Q>
-	GLM_FUNC_QUALIFIER T prod(vec<L, T, Q> const& v)
+	GLM_FUNC_QUALIFIER GLM_CONSTEXPR 
+  T prod(vec<L, T, Q> const& v)
 	{
 		return detail::compute_prod<vec<L, T, Q>, T, detail::is_aligned<Q>::value>::call(v);
 	}
+  
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<1, bool, Q> operator<=(vec<1, T, Q> const& v1, vec<1, T, Q> const& v2) {
+    return vec<1, bool, Q>(v1.x <= v2.x);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<1, bool, Q> operator>=(vec<1, T, Q> const& v1, vec<1, T, Q> const& v2) {
+    return vec<1, bool, Q>(v1.x >= v2.x);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<1, bool, Q> operator<(vec<1, T, Q> const& v1, vec<1, T, Q> const& v2) {
+    return vec<1, bool, Q>(v1.x < v2.x);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<1, bool, Q> operator>(vec<1, T, Q> const& v1, vec<1, T, Q> const& v2) {
+    return vec<1, bool, Q>(v1.x > v2.x);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<2, bool, Q> operator<=(vec<2, T, Q> const& v1, vec<2, T, Q> const& v2) {
+    return vec<2, bool, Q>(v1.x <= v2.x, v1.y <= v2.y);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<2, bool, Q> operator>=(vec<2, T, Q> const& v1, vec<2, T, Q> const& v2) {
+    return vec<2, bool, Q>(v1.x >= v2.x, v1.y >= v2.y);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<2, bool, Q> operator<(vec<2, T, Q> const& v1, vec<2, T, Q> const& v2) {
+    return vec<2, bool, Q>(v1.x < v2.x, v1.y < v2.y);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<2, bool, Q> operator>(vec<2, T, Q> const& v1, vec<2, T, Q> const& v2) {
+    return vec<2, bool, Q>(v1.x > v2.x, v1.y > v2.y);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<3, bool, Q> operator<=(vec<3, T, Q> const& v1, vec<3, T, Q> const& v2) {
+    return vec<3, bool, Q>(v1.x <= v2.x, v1.y <= v2.y, v1.z <= v2.z);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<3, bool, Q> operator>=(vec<3, T, Q> const& v1, vec<3, T, Q> const& v2) {
+    return vec<3, bool, Q>(v1.x >= v2.x, v1.y >= v2.y, v1.z >= v2.z);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<3, bool, Q> operator<(vec<3, T, Q> const& v1, vec<3, T, Q> const& v2) {
+    return vec<3, bool, Q>(v1.x < v2.x, v1.y < v2.y, v1.z < v2.z);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<3, bool, Q> operator>(vec<3, T, Q> const& v1, vec<3, T, Q> const& v2) {
+    return vec<3, bool, Q>(v1.x > v2.x, v1.y > v2.y, v1.z > v2.z);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<4, bool, Q> operator<=(vec<4, T, Q> const& v1, vec<4, T, Q> const& v2) {
+    return vec<4, bool, Q>(v1.x <= v2.x, v1.y <= v2.y, v1.z <= v2.z, v1.w <= v2.w);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<4, bool, Q> operator>=(vec<4, T, Q> const& v1, vec<4, T, Q> const& v2) {
+    return vec<4, bool, Q>(v1.x >= v2.x, v1.y >= v2.y, v1.z >= v2.z, v1.w >= v2.w);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<4, bool, Q> operator<(vec<4, T, Q> const& v1, vec<4, T, Q> const& v2) {
+    return vec<4, bool, Q>(v1.x < v2.x, v1.y < v2.y, v1.z < v2.z, v1.w < v2.w);
+  }
+
+  template <typename T, qualifier Q>
+  GLM_FUNC_QUALIFIER GLM_CONSTEXPR
+  vec<4, bool, Q> operator>(vec<4, T, Q> const& v1, vec<4, T, Q> const& v2) {
+    return vec<4, bool, Q>(v1.x > v2.x, v1.y > v2.y, v1.z > v2.z, v1.w > v2.w);
+  }
 } // namespace glm

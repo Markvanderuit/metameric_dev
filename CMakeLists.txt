@@ -10,7 +10,6 @@ project(Metameric LANGUAGES CXX)
 
 # Include third party libraries provided through vcpkg
 find_package(glm CONFIG REQUIRED)
-find_package(Eigen3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
@@ -40,7 +39,6 @@ endfunction()
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC
-  Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb
   glm::glm
@@ -62,7 +60,6 @@ target_link_libraries(metameric PRIVATE gui)
 # target_link_libraries(main_playground PRIVATE
 #   core
 #   small_gl
-#   Eigen3::Eigen
 #   fmt::fmt-header-only
 #   imgui::imgui
 #   imguizmo::imguizmo
@@ -74,7 +71,6 @@ add_executable_r(main_playground src/main_playground.cpp)
 target_link_libraries(main_playground PRIVATE
   core
   small_gl
-  Eigen3::Eigen
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
