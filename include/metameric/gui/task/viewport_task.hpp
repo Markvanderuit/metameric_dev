@@ -10,12 +10,15 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
-#include <glm/glm.hpp>
 #include <imgui.h>
 #include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <iostream>
+
+namespace gl {
+  using Texture2dms = Texture2d<float, 3, gl::TextureType::eMultisample>;
+} // namespace gl
 
 namespace met {
   namespace detail {
@@ -23,7 +26,7 @@ namespace met {
     std::span<T> as_typed_span(C &c) {
       auto data = c.data();
       guard(data, {});
-      return { reinterpret_cast<T&>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
+      return { reinterpret_cast<T*>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
     }
 
     template <class T, class U>
@@ -32,88 +35,81 @@ namespace met {
       guard(data, {});
       return { reinterpret_cast<T*>(data), s.size_bytes() / sizeof(T) };
     }
-    
-    template <typename T, typename Array>
-    std::span<T> to_span(const Array &v) { return std::span<T>((T *) v.data(), v.rows() * v.cols()); }
-  }
+  } // namespace detail
 
   class ViewportTask : public detail::AbstractTask {
-    using Tex3f2d = gl::Texture<float, 2, 3>;
-    using Tex3f2dInfo = gl::TextureCreateInfo<float, 2>;
+    // Test components for a simple triangle draw
+    gl::Array        m_triangle_array;
+    gl::Buffer       m_triangle_buffer;
+    gl::DrawInfo     m_triangle_draw;
     
     // Array draw components
-    gl::Array       _texture_array;
-    gl::Buffer      _texture_buffer; 
-    gl::DrawInfo    _texture_draw;
-    gl::Program     _texture_program;
+    gl::Array        m_texture_array;
+    gl::Buffer       m_texture_buffer; 
+    gl::DrawInfo     m_texture_draw;
+    gl::Program      m_texture_program;
 
     // Camera components
-    gl::Matrix4f    _model_view_matrix;
-    gl::Matrix4f    _projection_matrix;
+    float            m_model_rotation = 0.f;
+    glm::mat4        m_model_view_matrix;
 
     // Frame draw components
-    gl::Framebuffer _fb;
-    gl::Array3f     _fb_clear = { 255.f, 0.f, 255.f };
-    Tex3f2d         _fb_texture;
+    gl::Framebuffer  m_fb_msaa, m_fb;
+    gl::Texture2dms  m_fb_texture_msaa;
+    gl::Texture2d3f  m_fb_texture;
 
     // Testing components
-    Tex3f2d         _temp_texture;
-
-  private:
+    gl::Texture2d3f  m_temp_texture;
 
   public:
     ViewportTask(const std::string &name)
     : detail::AbstractTask(name) { }
 
-    template <typename uint D>
-    void test_func(glm::vec<D, float> v) {
-
-    }
-
     void init(detail::TaskInitInfo &info) override {
-      // Obtain handle to loaded texture data
+      // Obtain texture data from external resource
       auto &texture_obj = info.get_resource<io::TextureData<float>>("global", "texture_data");
-      auto texture_data = std::span(texture_obj.data);
+      auto texture_data = detail::as_typed_span<glm::vec3>(texture_obj.data);
 
-      // Load texture data into buffer object
-      _texture_buffer = gl::Buffer({ .data = detail::convert_span<std::byte>(texture_data) });
-
-      // Assemble vertex array around buffer object
-      _texture_array = gl::Array({ .buffers = {{ .buffer = &_texture_buffer, 
-                                                 .binding = 0,
-                                                 .stride  = sizeof(Vector3f) }},
-                                   .attributes = {{ .attribute_binding = 0,
-                                                    .buffer_binding = 0,
-                                                    .format_size = gl::VertexFormatSize::e3 }}});
-
-      _model_view_matrix = math::lookat_matrix({ 1.f, 0.f, 2.f },
-                                               { 1.f, 0.f, 0.f },
-                                               { 0.f, 1.f, 0.f });
-      _projection_matrix = math::perspective_matrix(45.f, 1.f, 0.0001f, 1000.f);
-
+      // Load texture data into vertex buffer and create vertex array around it
+      m_texture_buffer = gl::Buffer({ .data = detail::convert_span<std::byte>(texture_data) });
+      m_texture_array = gl::Array({ 
+        .buffers = {{ .buffer = &m_texture_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
+        .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+      });
+        
+      // Temporary triangle data
+      std::vector<glm::vec3> triangle_data = { 
+        glm::vec3(-.66f, .33f, 0), glm::vec3(.66f, .33f, 0), glm::vec3(0, -.66f, 0) };
+      m_triangle_buffer = gl::Buffer({ .data = detail::as_typed_span<std::byte>(triangle_data) });
+      m_triangle_array = gl::Array({ 
+        .buffers = {{ .buffer = &m_triangle_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
+        .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+      });
+      
       // Build shader program
-      _texture_program = gl::Program({{ .type = gl::ShaderType::eVertex,
-                                        .path = "../resources/shaders/texture_draw.vert.spv" },
-                                      { .type = gl::ShaderType::eFragment,
-                                        .path = "../resources/shaders/texture_draw.frag.spv" }});
-      _texture_program.uniform("model_view_matrix", _model_view_matrix);
-      _texture_program.uniform("projection_matrix", _projection_matrix);
+      m_texture_program = gl::Program({
+        { .type = gl::ShaderType::eVertex, .path = "../resources/shaders/texture_draw.vert.spv" },
+        { .type = gl::ShaderType::eFragment,  .path = "../resources/shaders/texture_draw.frag.spv" }
+      });
+      m_texture_program.uniform("projection_matrix", glm::perspective(45.f, 1.f, 0.0001f, 1000.f));
 
       // Assemble draw object for render of vertex array
-      _texture_draw = { .type = gl::PrimitiveType::ePoints,
-                        .array = &_texture_array,
-                        .vertex_count = (uint) texture_data.size(),
-                        .program = &_texture_program };
+      m_texture_draw = {
+        .type = gl::PrimitiveType::ePoints, .array = &m_texture_array, 
+        .vertex_count = (uint) texture_data.size(), .program = &m_texture_program };
+      m_triangle_draw = { 
+        .type = gl::PrimitiveType::eTriangles, .array = &m_triangle_array,
+        .vertex_count = (uint) triangle_data.size(), .program = &m_texture_program };
 
-      _temp_texture = Tex3f2d({ .size = texture_obj.size, .data = texture_obj.data });
+      // Simple texture for testing purposes; holds texture object data
+      m_temp_texture = gl::Texture2d3f({ .size = texture_obj.size, .data = texture_obj.data });
     }
 
     void eval(detail::TaskEvalInfo &info) override {
-      auto scope_vars = { ImGui::ScopedStyleVar { ImGuiStyleVar_WindowRounding, 0.f }, 
-                          ImGui::ScopedStyleVar { ImGuiStyleVar_WindowBorderSize, 0.f }, 
-                          ImGui::ScopedStyleVar { ImGuiStyleVar_WindowPadding, { 0.f, 0.f } }};
-                          
       // Begin window draw
+      auto viewport_vars = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 0.f), 
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoDecoration);
 
       // Compute texture viewport size based on window content region
@@ -121,22 +117,46 @@ namespace met {
                                - static_cast<glm::ivec2>(ImGui::GetWindowContentRegionMin());
 
       // (Re)initialize framebuffer and texture objects on viewport resize
-      if (!_fb_texture.is_init() || glm::any(_fb_texture.size() != viewport_size)) {
-        _fb_texture = Tex3f2d({ .size = viewport_size });
-        _fb = gl::Framebuffer({ .type = gl::FramebufferType::eColor, .texture = &_fb_texture });
+      if (!m_fb.is_init() || m_fb_texture.size() != viewport_size) {
+        // Intermediate framebuffer is backed by a multisample texture
+        m_fb_texture_msaa = {{ .size = viewport_size }};
+        m_fb_msaa = {{ .type = gl::FramebufferType::eColor, .texture = &m_fb_texture_msaa }};
+
+        // Output framebuffer is single-sample
+        m_fb_texture = {{ .size = viewport_size }};
+        m_fb = {{ .type = gl::FramebufferType::eColor, .texture = &m_fb_texture }};
       }
 
-      gl::state::set_viewport(viewport_size);
-      glPointSize(1.f);
-      _fb.bind();
-      _fb.clear<Vector3f>(gl::FramebufferType::eColor, Vector3f(0.f, 1.f, 0.f));
-      _texture_program.bind();
-      gl::state::set(gl::DrawCapability::eCullFace, false);
-      gl::dispatch_draw(_texture_draw);
+      // Setup framebuffer as draw target
+      m_fb_msaa.bind();
+      m_fb_msaa.clear(gl::FramebufferType::eColor, glm::vec3(0.f));
 
-      // Draw texture to viewport
-      ImGui::Image(ImGui::to_ptr(_fb_texture.object()), ImVec2(_fb_texture.size()));
-      // ImGui::Image(ImGui::to_ptr(_temp_texture.object()), ImVec2(_temp_texture.size()));
+      // Perform minr rotation until I get a trackball working
+      m_model_rotation += 1.5f;
+      m_model_view_matrix = glm::lookAt(glm::vec3(0.f, 0.f, 2.f),
+                                        glm::vec3(0.f, 0.f, 0.f),
+                                        glm::vec3(0.f, 1.f, 0.f))
+                          * glm::rotate(glm::radians(m_model_rotation), 
+                                        glm::vec3(0.f, 1.f, 0.f));
+      m_texture_program.uniform("model_view_matrix", m_model_view_matrix);
+      m_texture_program.uniform("viewport_size", viewport_size);
+
+      { // Setup draw state and dispatch a draw call
+        auto draw_state = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
+                            gl::state::ScopedSet(gl::DrawCapability::eCullFace, false) };
+        gl::state::set_viewport(viewport_size);
+        gl::dispatch_draw(m_triangle_draw);
+        gl::sync::texture_barrier();
+      }
+
+      // Blit from MSAA framebuffer to single-sample output framebuffer 
+      m_fb_msaa.blit_to(m_fb, m_fb_texture_msaa.size(), { 0, 0}, 
+                              m_fb_texture.size(), { 0, 0 }, 
+                              gl::FramebufferMaskFlags::eColor);
+
+      // Draw framebuffer to viewport
+      ImGui::Image(ImGui::to_ptr(m_fb_texture.object()), m_fb_texture.size());
+      // ImGui::Image(ImGui::to_ptr(m_temp_texture.object()), m_temp_texture.size());
 
       // End window draw
       ImGui::End();
