@@ -87,8 +87,9 @@ namespace met::detail {
     /* create/add/remove global resources */
 
     template <typename Ty, typename InfoTy>
-    void emplace_resource(const KeyType &key, InfoTy info) {
+    Ty& emplace_resource(const KeyType &key, InfoTy info) {
       _resource_registry["global"].emplace(key, std::make_unique<detail::Resource<Ty>>(Ty(info)));
+      return _resource_registry.at("global").at(key)->get<Ty>();
     }
   
     template <typename Ty>
