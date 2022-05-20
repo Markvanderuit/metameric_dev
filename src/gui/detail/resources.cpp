@@ -1,1 +1,0 @@
-#include <metameric/gui/detail/graph_scheduler/resources.hpp>
