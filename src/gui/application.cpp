@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+#include <fmt/chrono.h>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
@@ -9,7 +11,6 @@
 #include <metameric/gui/task/viewport_base_task.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/application.hpp>
-#include <iostream>
 
 namespace met {
   gl::WindowCreateFlags window_flags = gl::WindowCreateFlags::eVisible
@@ -29,20 +30,20 @@ namespace met {
       ImGui::BeginFrame();
     });
 
-    // Next task to run prepares imgui's viewport layout
+    // Second task to run prepares imgui's viewport layout
     scheduler.emplace_task<ViewportBaseTask>("viewport_base");
 
-    // Next tasks to run define main program components 
+    // Next tasks to run define main program components and tasks
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) { ImGui::ShowDemoWindow(); });
 
-    scheduler.emplace_task<LambdaTask>("mouse_output", [&] (auto &info) {
+    /* scheduler.emplace_task<LambdaTask>("mouse_output", [&] (auto &info) {
       const auto &window = info.get_resource<gl::Window>("global", "window");
       const auto &input = window.input_info();
       std::cout << input.mouse_position << std::endl;
-    });
+    }); */
 
-    // Last task to run ends a frame
+    // Final task to run ends a frame
     scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &) {
       auto fb = gl::Framebuffer::make_default();
       fb.bind();
@@ -76,7 +77,17 @@ namespace met {
 
     // Create and run loop
     init_schedule(scheduler, window);
-    while (!window.should_close()) { scheduler.run(); } 
+    auto t_prev = std::chrono::system_clock::now();
+    while (!window.should_close()) { 
+      { // Output frametime
+        auto t_curr = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t_curr - t_prev);
+        fmt::print("{}\n", diff);
+        t_prev = t_curr;
+      }
+
+      scheduler.run(); 
+    } 
     
     ImGui::Destr();
   }

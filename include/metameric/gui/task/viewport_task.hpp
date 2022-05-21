@@ -5,6 +5,7 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
+#include <small_gl/renderbuffer.hpp>
 #include <small_gl/texture.hpp>
 #include <metameric/core/detail/glm.hpp>
 #include <metameric/core/utility.hpp>
@@ -15,10 +16,6 @@
 #include <cmath>
 #include <numbers>
 #include <iostream>
-
-namespace gl {
-  using Texture2dms = Texture2d<float, 3, gl::TextureType::eMultisample>;
-} // namespace gl
 
 namespace met {
   namespace detail {
@@ -55,7 +52,8 @@ namespace met {
 
     // Frame draw components
     gl::Framebuffer  m_fb_msaa, m_fb;
-    gl::Texture2dms  m_fb_texture_msaa;
+    gl::Renderbuffer<float, 3, gl::RenderbufferType::eMultisample>
+                     m_fb_rbuffer_msaa;
     gl::Texture2d3f  m_fb_texture;
 
     // Testing components
@@ -88,9 +86,14 @@ namespace met {
       
       // Build shader program
       m_texture_program = gl::Program({
-        { .type = gl::ShaderType::eVertex, .path = "../resources/shaders/texture_draw.vert.spv" },
-        { .type = gl::ShaderType::eFragment,  .path = "../resources/shaders/texture_draw.frag.spv" }
+        { .type = gl::ShaderType::eVertex, 
+          .path = "resources/shaders/viewport_task/texture_draw.vert",
+          .is_spirv_binary = false },
+        { .type = gl::ShaderType::eFragment,  
+          .path = "resources/shaders/viewport_task/texture_draw.frag",
+          .is_spirv_binary = false }
       });
+      m_texture_program.bind();
       m_texture_program.uniform("projection_matrix", glm::perspective(45.f, 1.f, 0.0001f, 1000.f));
 
       // Assemble draw object for render of vertex array
@@ -110,28 +113,28 @@ namespace met {
       auto viewport_vars = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 0.f), 
                              ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                              ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
-      ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoDecoration);
+      ImGui::Begin("Viewport");
 
-      // Compute texture viewport size based on window content region
+      // Compute framebuffer/texture/viewport size based on window content region
       const auto viewport_size = static_cast<glm::ivec2>(ImGui::GetWindowContentRegionMax())
                                - static_cast<glm::ivec2>(ImGui::GetWindowContentRegionMin());
 
       // (Re)initialize framebuffer and texture objects on viewport resize
       if (!m_fb.is_init() || m_fb_texture.size() != viewport_size) {
-        // Intermediate framebuffer is backed by a multisample texture
-        m_fb_texture_msaa = {{ .size = viewport_size }};
-        m_fb_msaa = {{ .type = gl::FramebufferType::eColor, .texture = &m_fb_texture_msaa }};
+        // Intermediate framebuffer is backed by a multisampled renderbuffer
+        m_fb_rbuffer_msaa = {{ .size = viewport_size }};
+        m_fb_msaa = {{ .type = gl::FramebufferType::eColor, .attachment = &m_fb_rbuffer_msaa }};
 
         // Output framebuffer is single-sample
         m_fb_texture = {{ .size = viewport_size }};
-        m_fb = {{ .type = gl::FramebufferType::eColor, .texture = &m_fb_texture }};
+        m_fb = {{ .type = gl::FramebufferType::eColor, .attachment = &m_fb_texture }};
       }
 
       // Setup framebuffer as draw target
       m_fb_msaa.bind();
       m_fb_msaa.clear(gl::FramebufferType::eColor, glm::vec3(0.f));
 
-      // Perform minr rotation until I get a trackball working
+      // Perform minor rotation until I get a trackball working
       m_model_rotation += 1.5f;
       m_model_view_matrix = glm::lookAt(glm::vec3(0.f, 0.f, 2.f),
                                         glm::vec3(0.f, 0.f, 0.f),
@@ -139,24 +142,22 @@ namespace met {
                           * glm::rotate(glm::radians(m_model_rotation), 
                                         glm::vec3(0.f, 1.f, 0.f));
       m_texture_program.uniform("model_view_matrix", m_model_view_matrix);
-      m_texture_program.uniform("viewport_size", viewport_size);
+      // m_texture_program.uniform("viewport_size", viewport_size);
 
-      { // Setup draw state and dispatch a draw call
+      { // Setup scoped draw state and dispatch a draw call
         auto draw_state = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
                             gl::state::ScopedSet(gl::DrawCapability::eCullFace, false) };
         gl::state::set_viewport(viewport_size);
-        gl::dispatch_draw(m_triangle_draw);
-        gl::sync::texture_barrier();
+        gl::dispatch_draw(m_texture_draw);
       }
 
-      // Blit from MSAA framebuffer to single-sample output framebuffer 
-      m_fb_msaa.blit_to(m_fb, m_fb_texture_msaa.size(), { 0, 0}, 
-                              m_fb_texture.size(), { 0, 0 }, 
+      // Blit MSAA framebuffer into single-sample framebuffer to obtain output texture
+      m_fb_msaa.blit_to(m_fb, viewport_size, { 0, 0 }, 
+                              viewport_size, { 0, 0 }, 
                               gl::FramebufferMaskFlags::eColor);
 
-      // Draw framebuffer to viewport
+      // Pass output to viewport
       ImGui::Image(ImGui::to_ptr(m_fb_texture.object()), m_fb_texture.size());
-      // ImGui::Image(ImGui::to_ptr(m_temp_texture.object()), m_temp_texture.size());
 
       // End window draw
       ImGui::End();

@@ -37,8 +37,9 @@ namespace met {
         ImGui::EndMainMenuBar();
       }
       
-      auto flags = ImGuiDockNodeFlags_AutoHideTabBar  
-                 | ImGuiDockNodeFlags_PassthruCentralNode;
+      auto flags = ImGuiDockNodeFlags_PassthruCentralNode;
+      // auto flags = ImGuiDockNodeFlags_AutoHideTabBar  
+      //            | ImGuiDockNodeFlags_PassthruCentralNode;
       ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), flags);
     }
   };

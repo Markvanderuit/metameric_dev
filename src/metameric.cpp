@@ -11,9 +11,7 @@
 int main() {
   using namespace met;
   try {
-    create_application({
-      .texture_path = "texture.png"
-    });
+    create_application({ .texture_path = "texture.png"});
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
