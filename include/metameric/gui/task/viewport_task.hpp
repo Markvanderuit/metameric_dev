@@ -11,7 +11,6 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
-#include <imgui.h>
 
 namespace met {
   namespace detail {
