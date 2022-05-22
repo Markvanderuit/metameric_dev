@@ -9,25 +9,29 @@ set(CMAKE_TOOLCHAIN_FILE
 project(Metameric LANGUAGES CXX)
 
 # Specify output directories as /dist
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # Punch MSVC's multi-configuration output directories until they follow suit
 if(MSVC)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
+
+# Specify resource directory name
+set(MET_RESOURCE_DIRECTORY "resources")
+set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RESOURCE_DIRECTORY}")
 
 # Include third party libraries provided through vcpkg
 find_package(glm CONFIG REQUIRED)
@@ -62,8 +66,6 @@ foreach(glsl_src ${glsl_srcs})
   cmake_path(RELATIVE_PATH glsl_src
     BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE relative_path)
-  cmake_path(GET relative_path 
-    FILENAME file_name)
   message(STATUS "Found shader : ${relative_path}")
 
   set(shader_spirv_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}.spv")
@@ -90,6 +92,26 @@ endforeach()
 # Add targets to perform compilation/copy
 add_custom_target(shaders_spirv DEPENDS ${shader_spirv_list})
 add_custom_target(shaders_copy DEPENDS ${shader_copy_list})
+
+# Add commands to copy resources/misc files
+file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/misc/*)
+foreach(misc_file ${misc_files})
+  # Obtain path, stripped of lead, and filename
+  cmake_path(RELATIVE_PATH misc_file
+    BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE relative_path)
+  message(STATUS "Found misc resource : ${relative_path}")
+
+  set(misc_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}")
+  add_custom_command(
+    OUTPUT ${misc_out}
+    COMMAND ${CMAKE_COMMAND} -E copy ${misc_file} ${misc_out}
+    DEPENDS ${misc_file}
+  )
+  list(APPEND misc_copy_list ${misc_out})
+endforeach()
+add_custom_target(misc_copy DEPENDS ${misc_copy_list})
+
 
 # Simple function to add library with basic settings
 function(add_library_r target dir)
@@ -125,7 +147,7 @@ target_link_libraries(gui PUBLIC
   imgui::imgui
   imguizmo::imguizmo
 )
-add_dependencies(gui shaders_copy shaders_spirv)
+add_dependencies(gui shaders_copy shaders_spirv misc_copy)
 
 # Set up main executable
 add_executable_r(metameric src/metameric.cpp)
