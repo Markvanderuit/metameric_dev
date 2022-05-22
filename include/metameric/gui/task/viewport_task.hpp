@@ -12,10 +12,6 @@
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 #include <imgui.h>
-#include <algorithm>
-#include <cmath>
-#include <numbers>
-#include <iostream>
 
 namespace met {
   namespace detail {
@@ -40,7 +36,7 @@ namespace met {
     gl::Buffer       m_triangle_buffer;
     gl::DrawInfo     m_triangle_draw;
     
-    // Array draw components
+    // Vertex draw components
     gl::Array        m_texture_array;
     gl::Buffer       m_texture_buffer; 
     gl::DrawInfo     m_texture_draw;
@@ -49,6 +45,7 @@ namespace met {
     // Camera components
     float            m_model_rotation = 0.f;
     glm::mat4        m_model_view_matrix;
+    glm::mat4        m_projection_matrix;
 
     // Frame draw components
     gl::Framebuffer  m_fb_msaa, m_fb;
@@ -77,7 +74,7 @@ namespace met {
         
       // Temporary triangle data
       std::vector<glm::vec3> triangle_data = { 
-        glm::vec3(-.66f, .33f, 0), glm::vec3(.66f, .33f, 0), glm::vec3(0, -.66f, 0) };
+        glm::vec3(-.66f, 0.f, 0), glm::vec3(.66f, 0.f, 0), glm::vec3(0, 1.f, 0) };
       m_triangle_buffer = gl::Buffer({ .data = detail::as_typed_span<std::byte>(triangle_data) });
       m_triangle_array = gl::Array({ 
         .buffers = {{ .buffer = &m_triangle_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
@@ -94,7 +91,6 @@ namespace met {
           .is_spirv_binary = false }
       });
       m_texture_program.bind();
-      m_texture_program.uniform("projection_matrix", glm::perspective(45.f, 1.f, 0.0001f, 1000.f));
 
       // Assemble draw object for render of vertex array
       m_texture_draw = {
@@ -128,6 +124,12 @@ namespace met {
         // Output framebuffer is single-sample
         m_fb_texture = {{ .size = viewport_size }};
         m_fb = {{ .type = gl::FramebufferType::eColor, .attachment = &m_fb_texture }};
+
+        const float aspect = static_cast<float>(viewport_size.x) /
+                             static_cast<float>(viewport_size.y);
+        m_projection_matrix = glm::perspective(45.f, aspect, 0.0001f, 1000.f);
+        m_texture_program.uniform("projection_matrix", m_projection_matrix);
+        // m_texture_program.uniform("viewport_size", viewport_size);
       }
 
       // Setup framebuffer as draw target
@@ -136,13 +138,14 @@ namespace met {
 
       // Perform minor rotation until I get a trackball working
       m_model_rotation += 1.5f;
-      m_model_view_matrix = glm::lookAt(glm::vec3(0.f, 0.f, 2.f),
+      m_model_view_matrix = glm::lookAt(glm::vec3(0.f, 0.f, 1.5f),
                                         glm::vec3(0.f, 0.f, 0.f),
                                         glm::vec3(0.f, 1.f, 0.f))
                           * glm::rotate(glm::radians(m_model_rotation), 
-                                        glm::vec3(0.f, 1.f, 0.f));
+                                        glm::vec3(1.f, 1.f, 0.f))
+                          * glm::translate(glm::vec3(0.5f))
+                          * glm::scale(glm::vec3(-1.f));
       m_texture_program.uniform("model_view_matrix", m_model_view_matrix);
-      // m_texture_program.uniform("viewport_size", viewport_size);
 
       { // Setup scoped draw state and dispatch a draw call
         auto draw_state = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
