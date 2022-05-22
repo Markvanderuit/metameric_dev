@@ -34,6 +34,7 @@ namespace met {
     gl::Array        m_triangle_array;
     gl::Buffer       m_triangle_buffer;
     gl::DrawInfo     m_triangle_draw;
+    gl::Texture2d3f  m_temp_texture;
     
     // Vertex draw components
     gl::Array        m_texture_array;
@@ -51,9 +52,6 @@ namespace met {
     gl::Renderbuffer<float, 3, gl::RenderbufferType::eMultisample>
                      m_fb_rbuffer_msaa;
     gl::Texture2d3f  m_fb_texture;
-
-    // Testing components
-    gl::Texture2d3f  m_temp_texture;
 
   public:
     ViewportTask(const std::string &name)
@@ -89,7 +87,6 @@ namespace met {
           .path = "resources/shaders/viewport_task/texture_draw.frag",
           .is_spirv_binary = false }
       });
-      m_texture_program.bind();
 
       // Assemble draw object for render of vertex array
       m_texture_draw = {
@@ -147,7 +144,7 @@ namespace met {
       m_texture_program.uniform("model_view_matrix", m_model_view_matrix);
 
       { // Setup scoped draw state and dispatch a draw call
-        auto draw_state = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
+       auto draw_state = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
                             gl::state::ScopedSet(gl::DrawCapability::eCullFace, false) };
         gl::state::set_viewport(viewport_size);
         gl::dispatch_draw(m_texture_draw);

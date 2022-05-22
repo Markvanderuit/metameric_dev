@@ -1,5 +1,3 @@
-#include <fmt/core.h>
-#include <fmt/chrono.h>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
@@ -35,13 +33,29 @@ namespace met {
 
     // Next tasks to run define main program components and tasks
     scheduler.emplace_task<ViewportTask>("viewport");
-    scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) { ImGui::ShowDemoWindow(); });
 
-    /* scheduler.emplace_task<LambdaTask>("mouse_output", [&] (auto &info) {
-      const auto &window = info.get_resource<gl::Window>("global", "window");
-      const auto &input = window.input_info();
-      std::cout << input.mouse_position << std::endl;
-    }); */
+    // Next tasks to run are temporary testing tasks
+    scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
+    scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
+    scheduler.emplace_task<LambdaTask>("imgui_delta", [](auto &info) {
+      if (ImGui::Begin("Imgui timings")) {
+        auto &io = ImGui::GetIO();
+
+        // Report frame times
+        ImGui::LabelText("Frame delta, last", "%.3f ms (%.1f fps)", 1000.f * io.DeltaTime, 1.f / io.DeltaTime);
+        ImGui::LabelText("Frame delta, average", "%.3f ms (%.1f fps)", 1000.f / io.Framerate, io.Framerate);
+        
+        // Report mouse pos
+        const auto &window = info.get_resource<gl::Window>("global", "window");
+        const auto &input = window.input_info();
+
+        glm::vec2 mouse_pos = io.MousePos;
+        glm::vec2 mouse_pos_2 = input.mouse_position;
+        ImGui::LabelText("Mouse position", "%.1f, %.1f", mouse_pos.x, mouse_pos.y);
+        ImGui::LabelText("Mouse position (glfw)", "%.1f, %.1f", mouse_pos_2.x, mouse_pos_2.y);
+      }
+      ImGui::End();
+    });
 
     // Final task to run ends a frame
     scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &) {
@@ -77,15 +91,7 @@ namespace met {
 
     // Create and run loop
     init_schedule(scheduler, window);
-    auto t_prev = std::chrono::system_clock::now();
     while (!window.should_close()) { 
-      { // Output frametime
-        auto t_curr = std::chrono::system_clock::now();
-        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t_curr - t_prev);
-        fmt::print("{}\n", diff);
-        t_prev = t_curr;
-      }
-
       scheduler.run(); 
     } 
     
