@@ -1,8 +1,7 @@
 #pragma once
 
 // #define GLM_FORCE_SIZE_FUNC
-// #define GLM_MESSAGES
-// #define GLM_FORCE_MESSAGES 
+#define GLM_FORCE_MESSAGES 
 
 #include <glm/glm.hpp>
 #include <glm/gtx/scalar_relational.hpp>
@@ -11,6 +10,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/io.hpp>
 #include <glm/gtx/range.hpp>
+#include <glm/gtx/vector_angle.hpp>
 #include <glm/gtc/color_space.hpp>
 
 namespace glm {

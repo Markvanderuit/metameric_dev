@@ -48,10 +48,10 @@ namespace met {
         // Report mouse pos
         const auto &window = info.get_resource<gl::Window>("global", "window");
         const auto &input = window.input_info();
-
-        glm::vec2 mouse_pos = io.MousePos;
+        
         glm::vec2 mouse_pos_2 = input.mouse_position;
-        ImGui::LabelText("Mouse position", "%.1f, %.1f", mouse_pos.x, mouse_pos.y);
+        ImGui::LabelText("Mouse delta", "%.1f, %.1f", io.MouseDelta.x, io.MouseDelta.y);
+        ImGui::LabelText("Mouse position", "%.1f, %.1f", io.MousePos.x, io.MousePos.y);
         ImGui::LabelText("Mouse position (glfw)", "%.1f, %.1f", mouse_pos_2.x, mouse_pos_2.y);
       }
       ImGui::End();

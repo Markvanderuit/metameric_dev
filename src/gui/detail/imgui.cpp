@@ -2,6 +2,7 @@
 #include <metameric/gui/detail/imgui.hpp>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <ImGuizmo.h>
 #include <fmt/core.h>
 
 namespace ImGui {
@@ -19,6 +20,9 @@ namespace ImGui {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsLight();
+
+    // Pass context to ImGuizmo as they are separate libraries
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 
     auto &io = ImGui::GetIO();
     auto &style = ImGui::GetStyle();
@@ -58,6 +62,7 @@ namespace ImGui {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
   }
 
   void DrawFrame() {
