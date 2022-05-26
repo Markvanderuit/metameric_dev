@@ -5,11 +5,14 @@
 
 namespace met::detail {
   struct ArcballCreateInfo {
-    float fov_y  = glm::radians(45.f);
-    float near_z = 0.001f;
-    float far_z  = 1000.f;
-    float aspect = 1.f;
-    float dist   = 1.f;
+    float fov_y       = glm::radians(45.f);
+    float near_z      = 0.001f;
+    float far_z       = 1000.f;
+    float aspect      = 1.f;
+    float dist        = 1.f;
+    glm::vec3 eye     = glm::vec3(1, 0, 0);
+    glm::vec3 center  = glm::vec3(0, 0, 0);
+    glm::vec3 up      = glm::vec3(0, 1, 0);
   };
 
   /* 
@@ -22,20 +25,21 @@ namespace met::detail {
 
     glm::mat4 m_view;
     glm::mat4 m_proj;
-    glm::vec3 m_eye    = glm::vec3(1, 0, 0);
-    glm::vec3 m_center = glm::vec3(0, 0, 0);
-    glm::vec3 m_up     = glm::vec3(0, 1, 0);
 
   public:
     /* constr */
     Arcball(ArcballCreateInfo info = {})
     : m_fov_y(info.fov_y), m_near_z(info.near_z), m_far_z(info.far_z), 
-      m_aspect(info.aspect), m_dist(info.dist) {
+      m_aspect(info.aspect), m_dist(info.dist), m_eye(info.eye),
+      m_center(info.center), m_up(info.up) {
       update_matrices();
     }
 
     /* public data members */
 
+    glm::vec3 m_eye;
+    glm::vec3 m_center;
+    glm::vec3 m_up;
     float m_fov_y;
     float m_near_z;
     float m_far_z;
@@ -54,7 +58,9 @@ namespace met::detail {
     glm::mat4 full() const { return m_proj * m_view; }
 
     void update_matrices() {
-      m_view = glm::lookAt(m_dist * m_eye, m_center, m_up);
+      m_view = glm::lookAt(m_dist * (m_eye - m_center) + m_center, 
+                           m_center, 
+                           m_up);
       m_proj = glm::perspective(m_fov_y, m_aspect, m_near_z, m_far_z);
     }
 
@@ -62,7 +68,6 @@ namespace met::detail {
       if (m_dist + dist_delta > 0.01f) {
         m_dist += dist_delta;
       }
-      std::cout << m_dist << std::endl;
     }
 
     // Update trackball internal information with new mouse delta, expected [-1, 1]
