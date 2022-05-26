@@ -33,6 +33,7 @@ namespace ImGui {
 
     // Enable docking mode
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
 
     // Handle font loading/dpi scaling
     // io.Fonts->AddFontDefault();
