@@ -8,6 +8,7 @@
 #include <metameric/gui/task/lambda_task.hpp>
 #include <metameric/gui/task/viewport_base_task.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
+#include <metameric/gui/task/viewport_pointdraw_task.hpp>
 #include <metameric/gui/application.hpp>
 
 namespace met {
@@ -31,8 +32,9 @@ namespace met {
     // Second task to run prepares imgui's viewport layout
     scheduler.emplace_task<ViewportBaseTask>("viewport_base");
 
-    // Next tasks to run define main program components and tasks
+    // Next tasks to run define main viewport components and tasks
     scheduler.emplace_task<ViewportTask>("viewport");
+    scheduler.emplace_task<ViewportPointdrawTask>("viewport_draw");
 
     // Next tasks to run are temporary testing tasks
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
