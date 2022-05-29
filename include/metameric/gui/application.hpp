@@ -3,9 +3,14 @@
 #include <filesystem>
 
 namespace met {
+  enum class AppliationColorMode {
+    eDark,
+    eLight
+  };
+
   struct ApplicationCreateInfo {
-    // Pass parameters to application here
     std::filesystem::path texture_path;
+    AppliationColorMode color_mode = AppliationColorMode::eDark;
   };
   
   // Initialize and run the metameric application

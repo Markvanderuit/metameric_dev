@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <filesystem>
 #include <source_location>
+#include <span>
 
 // Simple guard statement syntactic sugar
 #define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
@@ -13,6 +14,22 @@
 #define guard_break(expr) if (!(expr)) { break; }
 
 namespace met {
+  // Interpret a container type as a span of type T
+  template <class T, class C>
+  std::span<T> as_typed_span(C &c) {
+    auto data = c.data();
+    guard(data, {});
+    return { reinterpret_cast<T*>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
+  }
+
+  // Convert a span over type U to 
+  template <class T, class U>
+  std::span<T> convert_span(std::span<U> s) {
+    auto data = s.data();
+    guard(data, {});
+    return { reinterpret_cast<T*>(data), s.size_bytes() / sizeof(T) };
+  }
+  
   namespace io {
     // Return object for load_texture_*(...) below
     template <typename Ty>

@@ -17,11 +17,11 @@
     static_cast<int>(x), static_cast<int>(y),                 \
     static_cast<int>(z), static_cast<int>(w)}; }
 
+#include <metameric/gui/application.hpp>
 #include <small_gl/window.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <imgui.h>
-#include <filesystem>
 
 namespace ImGui {
   template <typename T>
@@ -29,7 +29,7 @@ namespace ImGui {
     return (void *) static_cast<size_t>(t);
   }
 
-  void Init(const gl::Window &window, std::filesystem::path resource_path = "./resources/misc");
+  void Init(const gl::Window &window, met::ApplicationCreateInfo info);
   void Destr();
   void BeginFrame();
   void DrawFrame();

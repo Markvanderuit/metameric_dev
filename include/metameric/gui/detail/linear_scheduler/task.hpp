@@ -77,7 +77,7 @@ namespace met::detail {
     template <typename Ty, typename... Args>
     void emplace_task(const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back("", std::make_unique<Ty>(std::move(Ty(args...))));
+      add_task_registry.emplace_back("", std::make_unique<Ty>(key, args...));
     }
 
     template <typename Ty>
@@ -89,7 +89,7 @@ namespace met::detail {
     template <typename Ty, typename... Args>
     void emplace_task_after(const KeyType &prev, const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back(prev, std::make_unique<Ty>(Ty(key, args...)));
+      add_task_registry.emplace_back(prev, std::make_unique<Ty>(key, args...));
     }
 
     template <typename Ty>

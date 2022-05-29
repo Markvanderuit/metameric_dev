@@ -10,16 +10,25 @@ namespace ImGui {
   static std::string appl_imgui_ini_path;
   static std::string appl_imgui_font_path;
   
-  void Init(const gl::Window &window, std::filesystem::path resource_path) {
+  void Init(const gl::Window &window, met::ApplicationCreateInfo info) {
     guard(!appl_imgui_init);
     appl_imgui_init = true;
-    appl_imgui_ini_path = (resource_path / "imgui.ini").string();
-    appl_imgui_font_path = (resource_path / "atkinson_hyperlegible.ttf").string();
+    appl_imgui_ini_path = "resources/misc/imgui.ini";
+    appl_imgui_font_path = "resources/misc/atkinson_hyperlegible.ttf";
 
     // Initialize ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui::StyleColorsLight();
+
+    // Apply requested application color scheme
+    switch (info.color_mode) {
+      case met::AppliationColorMode::eLight:
+        ImGui::StyleColorsLight();
+        break;
+      case met::AppliationColorMode::eDark:
+        ImGui::StyleColorsDark();
+        break;
+    }
 
     // Pass context to ImGuizmo as they are separate libraries
     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
@@ -36,15 +45,8 @@ namespace ImGui {
     io.ConfigWindowsMoveFromTitleBarOnly = true;
 
     // Handle font loading/dpi scaling
-    // io.Fonts->AddFontDefault();
     io.Fonts->AddFontFromFileTTF(appl_imgui_font_path.c_str(), 12 * content_scale , 0, 0);
     style.ScaleAllSizes(content_scale);
-    // ImGui::GetFontSize();
-
-    // Specify IO/style params
-    // io.FontGlobalScale = content_scale;
-    // ImGui::GetWindowDpiScale();
-    // ImGui::SetWindowFontScale(content_scale);
 
     // Initialize ImGui platform specific bindings
     ImGui_ImplGlfw_InitForOpenGL((GLFWwindow *) window.object(), true);

@@ -8,7 +8,7 @@
 #include <metameric/gui/task/lambda_task.hpp>
 #include <metameric/gui/task/viewport_base_task.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
-#include <metameric/gui/task/viewport_pointdraw_task.hpp>
+#include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/application.hpp>
 
 namespace met {
@@ -29,12 +29,12 @@ namespace met {
       ImGui::BeginFrame();
     });
 
-    // Second task to run prepares imgui's viewport layout
+    // Third task to run prepares imgui's viewport layout
     scheduler.emplace_task<ViewportBaseTask>("viewport_base");
 
     // Next tasks to run define main viewport components and tasks
+    scheduler.emplace_task<GamutPickerTask>("gamut_picker");
     scheduler.emplace_task<ViewportTask>("viewport");
-    scheduler.emplace_task<ViewportPointdrawTask>("viewport_draw");
 
     // Next tasks to run are temporary testing tasks
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
@@ -65,7 +65,6 @@ namespace met {
       fb.bind();
       fb.clear<glm::vec3>(gl::FramebufferType::eColor);
       fb.clear<float>(gl::FramebufferType::eDepth);
-      
       ImGui::DrawFrame();
       window.swap_buffers();
     });
@@ -78,6 +77,7 @@ namespace met {
     auto texture_data = io::load_texture_float(info.texture_path);
     io::apply_srgb_to_lrgb(texture_data, true);
     scheduler.insert_resource("texture_data", std::move(texture_data));
+    scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
 
     // Initialize OpenGL context and primary window, submit to scheduler
     auto &window = scheduler.emplace_resource<gl::Window, gl::WindowCreateInfo>("window", 
@@ -89,7 +89,7 @@ namespace met {
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
 
-    ImGui::Init(window);
+    ImGui::Init(window, info);
 
     // Create and run loop
     init_schedule(scheduler, window);
