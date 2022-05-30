@@ -7,7 +7,7 @@
 #include <execution>
 #include <ranges>
 #include <span>
-#include <metameric/core/detail/glm.hpp> // TODO remove
+#include <metameric/core/detail/glm.hpp>
 
 namespace met {
   namespace detail {
