@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/utility.hpp>
-#include <iostream>
+#include <metameric/core/detail/glm.hpp>
 
 namespace met::detail {
   struct ArcballCreateInfo {

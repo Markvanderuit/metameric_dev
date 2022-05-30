@@ -6,7 +6,6 @@
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 #include <numeric>
-#include <iostream>
 
 namespace met {
   class GamutPickerTask : public detail::AbstractTask {
