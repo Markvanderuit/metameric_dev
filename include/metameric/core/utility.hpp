@@ -39,11 +39,20 @@ namespace met {
       int channels;
     };
 
+    struct SpectralData {
+      std::vector<std::vector<float>> data;
+      size_t size;
+      size_t channels;
+    };
+
     // Load raw texture data from the given filepath
     TextureData<std::byte> load_texture_byte(std::filesystem::path path);
     
     // Load float-scaled texture data from the given filepath
     TextureData<float> load_texture_float(std::filesystem::path path);
+
+    // Load raw spectral database from the given hd5 filepath
+    SpectralData load_spectral_data_hd5(std::filesystem::path path);
 
     // Linearize/delinearize srgb texture data
     void apply_srgb_to_lrgb(TextureData<float> &obj, bool skip_alpha = true);

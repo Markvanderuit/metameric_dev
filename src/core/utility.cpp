@@ -1,13 +1,15 @@
 #pragma once
 
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/glm.hpp>
+#include <highfive/H5File.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <algorithm>
 #include <execution>
 #include <ranges>
 #include <span>
-#include <metameric/core/detail/glm.hpp>
+
 
 namespace met {
   namespace detail {
@@ -38,6 +40,21 @@ namespace met {
       } else {
         return std::pow<Float>((f + 0.055) / 1.055, 2.4);
       }
+    }
+
+    template <typename T>
+    constexpr inline
+    std::vector<std::vector<T>> pivot(const std::vector<std::vector<T>> &v) {
+      std::vector<std::vector<T>> r(v[0].size(), std::vector<T>(v.size()));
+
+      #pragma omp parallel for
+      for (size_t j = 0; j < v.size(); j++) {
+        for (size_t i = 0; i < v[0].size(); i++) {
+            r[i][j] = v[j][i];
+        }
+      }
+
+      return r;
     }
   }
 
@@ -77,6 +94,26 @@ namespace met {
       obj.data.assign(ptr, ptr + glm::prod(obj.size) * obj.channels);
 
       stbi_image_free(ptr);
+      return obj;
+    }
+
+    // TODO: Remove once done with testing
+    SpectralData load_spectral_data_hd5(std::filesystem::path path) {
+      // Check that file path exists
+      debug::check_expr(std::filesystem::exists(path),
+        fmt::format("failed to resolve path \"{}\"", path.string()));
+
+      SpectralData obj;
+
+      // Attempt to read file, then extract forcibly named dataset from file
+      HighFive::File file(path.string(), HighFive::File::ReadOnly);
+      HighFive::DataSet ds = file.getDataSet("TotalRefs");
+      ds.read(obj.data);
+
+      obj.data = detail::pivot(obj.data);
+      obj.size = obj.data.size();
+      obj.channels = obj.data[0].size();
+
       return obj;
     }
     

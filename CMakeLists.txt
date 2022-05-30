@@ -37,6 +37,7 @@ set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RES
 find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
+find_package(HighFive CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 find_package(TBB CONFIG REQUIRED)
@@ -136,6 +137,7 @@ target_link_libraries(core PUBLIC
   fmt::fmt-header-only
   TBB::tbb
   glm::glm
+  libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
 )
 target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
 
