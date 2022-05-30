@@ -25,6 +25,7 @@ namespace met::detail {
 
     glm::mat4 m_view;
     glm::mat4 m_proj;
+    glm::mat4 m_full;
 
   public:
     /* constr */
@@ -55,13 +56,14 @@ namespace met::detail {
     glm::mat4 & proj() { return m_proj; }
 
     // Obtain full camera matrix
-    glm::mat4 full() const { return m_proj * m_view; }
+    glm::mat4 & full() { return m_full; }
 
     void update_matrices() {
       m_view = glm::lookAt(m_dist * (m_eye - m_center) + m_center, 
                            m_center, 
                            m_up);
       m_proj = glm::perspective(m_fov_y, m_aspect, m_near_z, m_far_z);
+      m_full = m_proj * m_view;
     }
 
     void update_dist_delta(float dist_delta) {
