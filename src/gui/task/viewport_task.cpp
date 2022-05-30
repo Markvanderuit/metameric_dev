@@ -13,24 +13,29 @@
 
 namespace met {
   namespace detail {
+    // Convert a world-space vector to screen space in [0, 1]
     glm::vec2 screen_space(const glm::vec3 &v,        // world-space vector
                            const glm::mat4 &mat) {    // camera view/proj matrix
       glm::vec4 trf = mat * glm::vec4(v, 1);
       return glm::vec2(trf) / trf.w * .5f + .5f;
     }
 
+    // Convert a screen-space vector in [0, 1] to window space
     glm::vec2 window_space(const glm::vec2 &v,        // screen-space vector
                            const glm::vec2 &offset,   // window offset
                            const glm::vec2 &size) {   // window size
       return offset + glm::vec2(v.x, 1.f - v.y) * size;
     }
 
+    // Convert a world-space vector to window space
     glm::vec2 window_space(const glm::vec3 &v,        // world-space vector
                            const glm::mat4 &mat,      // camera view/proj matrix
                            const glm::vec2 &offset,   // window offset
                            const glm::vec2 &size) {   // window size
       return window_space(screen_space(v, mat), offset, size);
     }
+    
+    constexpr auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
   } // namespace detail
 
   ViewportTask::ViewportTask(const std::string &name)
@@ -108,8 +113,8 @@ namespace met {
       // Right-click-release fixes the selection area; determine selected gamut positions
       if (io.MouseReleased[1]) {
         // Test if a world-space position is inside the window-space selection area
-        auto p0 = glm::vec2(io.MouseClickedPos[1]), p1 = glm::vec2(io.MousePos), 
-             ul = glm::min(p0, p1), br = glm::max(p0, p1);
+        auto ul = glm::min(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos)),
+             br = glm::max(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos));
         auto is_in_rect = [&](const glm::vec3 &v) {
           glm::vec2 p = detail::window_space(v, i_viewport_arcball.full(), viewport_offs, viewport_size);
           return glm::clamp(p, ul, br) == p;
@@ -124,6 +129,7 @@ namespace met {
         std::ranges::copy(ind, std::back_inserter(m_gamut_selection_indices));
       }
 
+      // Left-click selects a gamut position
       if (io.MouseClicked[0] && !ImGuizmo::IsOver()) {
         // Function to test if a world-space position is near a window-space click position
         glm::vec2 clicked_pos = glm::vec2(io.MouseClickedPos[0]);
@@ -142,12 +148,13 @@ namespace met {
       }
     }
 
+    // Process transformations to selected gamut positions
     if (!m_gamut_selection_indices.empty()) {
-      constexpr auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
+      // Range over selected gamut positions
       const auto gamut_selection = m_gamut_selection_indices 
-                                 | std::views::transform(i_get(e_gamut_buffer_map));
+                                 | std::views::transform(detail::i_get(e_gamut_buffer_map));
 
-      // Anchor position is mean of selected gamut positions
+      // Gizmo anchor position is mean of selected gamut positions
       m_gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end())
                          / static_cast<float>(gamut_selection.size());
 
@@ -156,7 +163,7 @@ namespace met {
       glm::mat4 gamut_anchor_trf = glm::translate(m_gamut_anchor_pos);
       glm::vec4 gamut_pre_pos = gamut_anchor_trf * glm::vec4(0, 0, 0, 1);
 
-      // Insert ImGuizmo manipulator
+      // Insert ImGuizmo manipulator at anchor position
       auto rmin = glm::vec2(ImGui::GetWindowPos())
                 + glm::vec2(ImGui::GetWindowContentRegionMin()), 
            rmax = glm::vec2(ImGui::GetWindowSize())
