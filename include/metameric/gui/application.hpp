@@ -10,6 +10,8 @@ namespace met {
 
   struct ApplicationCreateInfo {
     std::filesystem::path texture_path;
+    std::filesystem::path spectral_db_path;
+    
     AppliationColorMode color_mode = AppliationColorMode::eDark;
   };
   

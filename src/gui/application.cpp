@@ -74,10 +74,15 @@ namespace met {
     detail::LinearScheduler scheduler;
 
     // Load initial texture data, strip gamma correction, submit to scheduler
+    fmt::print("Loading startup texture: {}\n", info.texture_path.string());
     auto texture_data = io::load_texture_float(info.texture_path);
     io::apply_srgb_to_lrgb(texture_data, true);
     scheduler.insert_resource("texture_data", std::move(texture_data));
     scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
+
+    // Load test spectral database
+    fmt::print("Loading test database: {}\n", info.spectral_db_path.string());
+    auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path);
 
     // Initialize OpenGL context and primary window, submit to scheduler
     auto &window = scheduler.emplace_resource<gl::Window, gl::WindowCreateInfo>("window", 
