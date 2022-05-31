@@ -81,8 +81,8 @@ namespace met {
     scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
 
     // Load test spectral database
-    fmt::print("Loading test database: {}\n", info.spectral_db_path.string());
-    auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path);
+    /* fmt::print("Loading test database: {}\n", info.spectral_db_path.string());
+    auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path); */
 
     // Initialize OpenGL context and primary window, submit to scheduler
     auto &window = scheduler.emplace_resource<gl::Window, gl::WindowCreateInfo>("window", 
