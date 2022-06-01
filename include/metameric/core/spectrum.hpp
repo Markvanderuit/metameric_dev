@@ -22,6 +22,8 @@ namespace met {
     /* operators */
 
     met_array_decl_operators(Base, StaticSpectrum, float);
+    met_array_decl_reductions(StaticSpectrum, float);
+    met_array_decl_comparators(StaticSpectrum, float);
   };
 
   class DynamicSpectrum : public DynamicArray<float> {
@@ -37,5 +39,7 @@ namespace met {
     /* operators */
 
     met_array_decl_operators(Base, DynamicSpectrum, float);
+    met_array_decl_reductions(DynamicSpectrum, float);
+    met_array_decl_comparators(DynamicSpectrum, float);
   };
 } // met

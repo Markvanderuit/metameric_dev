@@ -11,6 +11,10 @@
 #include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/application.hpp>
 
+// TODO: remove
+#include <metameric/core/array.hpp>
+#include <metameric/core/spectrum.hpp>
+
 namespace met {
   gl::WindowCreateFlags window_flags = gl::WindowCreateFlags::eVisible
   #ifndef NDEBUG                    
@@ -71,6 +75,17 @@ namespace met {
   }
 
   void create_application(ApplicationCreateInfo info) {
+    // StaticArray<float, 16> a = 2.f;
+    // StaticArray<float, 16> b = 4.f;
+    
+    StaticSpectrum a = 5.f, b = 6.f;
+    a[11] = 16.f;
+    a[12] = 1.f;
+    a *= 2.f;
+    a = a + b;
+    
+    fmt::print("v: {}, {}\n", a.max_value(), a.min_value());
+    
     detail::LinearScheduler scheduler;
 
     // Load initial texture data, strip gamma correction, submit to scheduler

@@ -58,7 +58,12 @@ namespace met {
     /* operators */
 
     met_array_decl_operators(Base, StaticArray, T);
+    met_array_decl_reductions(StaticArray, T);
+    met_array_decl_comparators(StaticArray, T);
   };
+  // met_array_decl_operands(StaticArray<float>, float);
+  // met_array_decl_operands(StaticArray<uint>, uint);
+  // met_array_decl_operands(StaticArray<int>, int);
 
   template <typename T>
   class DynamicArray : public Array<T> {
@@ -96,5 +101,10 @@ namespace met {
     /* operators */
 
     met_array_decl_operators(Base, DynamicArray, T);
+    met_array_decl_reductions(DynamicArray, T);
+    met_array_decl_comparators(DynamicArray, T);
   };
+  // met_array_decl_operands(DynamicArray<float>, float);
+  // met_array_decl_operands(DynamicArray<uint>, uint);
+  // met_array_decl_operands(DynamicArray<int>, int);
 } // namespace met
