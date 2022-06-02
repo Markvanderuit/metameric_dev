@@ -6,6 +6,127 @@
 #include <metameric/core/detail/array.hpp>
 
 namespace met {
+  // FWD
+  template <typename T, size_t Size, 
+            template <typename, size_t> typename C = std::array>
+  class _Array;
+  template <size_t Size, 
+            template <typename, size_t> typename C = std::array>
+  class _MaskArray;
+
+  template <typename T, size_t Size, template <typename, size_t> typename C>
+  class _Array {
+    using value_type = T;
+    using ref_type   = T &;
+    using ptr_type   = T *;
+    using cref_type  = const T &;
+    using size_type  = size_t;
+    using cont_type  = C<value_type, Size>;
+
+    using base_type  = _Array;
+    using mask_type  = _MaskArray<Size, C>;
+
+    cont_type m_cont;
+    
+  public:
+    /* constrs */
+
+    constexpr _Array() = default;
+
+    constexpr _Array(value_type value) { 
+      std::fill(m_cont.begin(), m_cont.end(), value);
+    }
+
+    constexpr _Array(std::span<value_type> values) {
+      std::copy(values.begin(), values.end(), m_cont.begin());
+    }
+
+    /* accessors */
+
+    constexpr size_type size() const noexcept { return Size; }
+
+    constexpr size_type empty() const noexcept {  return false; }
+
+    constexpr ref_type at(size_type i) { return m_cont[i]; }
+
+    constexpr cref_type at(size_type i) const { return m_cont[i]; }
+
+    constexpr ref_type operator[](size_type i) { return m_cont[i]; }
+
+    constexpr cref_type operator[](size_type i) const { return m_cont[i]; }
+
+    constexpr ptr_type data() noexcept { return m_cont.data(); }
+
+    /* iterators */
+
+    constexpr friend auto begin(_Array &a) noexcept { return a.m_cont.begin(); }
+
+    constexpr friend auto end(_Array &a) noexcept { return a.m_cont.end(); }
+
+    constexpr auto begin() noexcept { return m_cont.begin(); }
+
+    constexpr auto end() noexcept { return m_cont.end(); }
+
+    /* operators */
+
+    met_array_decl_op_add(_Array);
+    met_array_decl_op_sub(_Array);
+    met_array_decl_op_mul(_Array);
+    met_array_decl_op_div(_Array);
+    met_array_decl_op_com(_Array);
+
+    /* reductions */
+
+    met_array_decl_red_val(_Array);
+    met_array_decl_mod_val(_Array);
+  };
+
+  template <size_t Size, template <typename, size_t> typename C>
+  class _MaskArray : public _Array<bool, Size, C> {
+    using value_type = bool;
+    using ref_type   = bool &;
+    using ptr_type   = bool *;
+    using cref_type  = const bool &;
+    using size_type  = size_t;
+
+    using base_type  = _Array<bool, Size, C>;
+    using mask_type  = _MaskArray;
+
+  public:
+    /* constrs */
+
+    using base_type::base_type;
+
+    /* operators */
+
+    met_array_decl_op_com(_MaskArray);
+
+    /* reductions */
+
+    constexpr value_type all() const noexcept {
+      value_type v = base_type::operator[](0);
+      for (size_type i = 0; i < base_type::size(); ++i)
+        v &= base_type::operator[](i);
+      return v;
+    }
+
+    constexpr value_type any() const noexcept {
+      value_type v = base_type::operator[](0);
+      for (size_type i = 0; i < base_type::size(); ++i)
+        v |= base_type::operator[](i);
+      return v;
+    }
+
+    constexpr value_type none() const noexcept {
+      value_type v = base_type::operator[](0);
+      for (size_type i = 0; i < base_type::size(); ++i)
+        v &= base_type::operator[](i);
+      return !v;
+    }
+  };
+
+  /* begin/end */  
+  
   template <typename T>
   class Array {
   public:

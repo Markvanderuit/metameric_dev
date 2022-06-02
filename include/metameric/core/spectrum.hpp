@@ -8,6 +8,42 @@ namespace met {
   constexpr static float wavelength_min = 400.f;  
   constexpr static float wavelength_max = 710.f;  
   constexpr static float wavelength_range = wavelength_max - wavelength_min;  
+ 
+  template <size_t Size, template <typename, size_t> typename C = std::array>
+  class _SpectrumArray : public _Array<float, Size, C> {
+    using value_type = float;
+    using ref_type   = float &;
+    using ptr_type   = float *;
+    using cref_type  = const float &;
+    using size_type  = size_t;
+    
+    using base_type  = _Array<float, Size, C>;
+    using mask_type  = _MaskArray<Size, C>;
+
+  public:
+    /* constrs */
+
+    using base_type::base_type;
+
+    /* operators */
+
+    met_array_decl_op_add(_SpectrumArray);
+    met_array_decl_op_sub(_SpectrumArray);
+    met_array_decl_op_mul(_SpectrumArray);
+    met_array_decl_op_div(_SpectrumArray);
+    met_array_decl_op_com(_SpectrumArray);
+
+    /* reductions */
+
+    met_array_decl_red_val(_SpectrumArray);
+    met_array_decl_mod_val(_SpectrumArray);
+
+    /* spectrum-specific functions */
+
+    
+  };
+
+  using Spectrum = _SpectrumArray<wavelength_samples>;
 
   class StaticSpectrum : public StaticArray<float, wavelength_samples> {
     using Base = StaticArray<float, wavelength_samples>;

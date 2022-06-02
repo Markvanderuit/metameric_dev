@@ -74,17 +74,26 @@ namespace met {
     });
   }
 
+  consteval bool test_func() {
+    Spectrum spe_a = 5.f;
+    Spectrum spe_b = 6.f;
+    auto spe_c = dot(spe_a, spe_b);
+    return (spe_a == spe_c).all();
+  }
+
   void create_application(ApplicationCreateInfo info) {
-    // StaticArray<float, 16> a = 2.f;
-    // StaticArray<float, 16> b = 4.f;
+    fmt::print("{}\n", test_func());
     
-    StaticSpectrum a = 5.f, b = 6.f;
+    /* StaticSpectrum a = 5.f, b = 6.f;
     a[11] = 16.f;
     a[12] = 1.f;
     a *= 2.f;
-    a = a + b;
+    a = a + b; */
+
+    // StaticSpectrum a = 5.f, b = 5.f;
+    // fmt::print("{}\n", a == b);
     
-    fmt::print("v: {}, {}\n", a.max_value(), a.min_value());
+    // fmt::print("v: {}, {}\n", a.max_value(), a.min_value());
     
     detail::LinearScheduler scheduler;
 
