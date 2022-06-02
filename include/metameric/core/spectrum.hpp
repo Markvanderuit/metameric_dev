@@ -8,9 +8,19 @@ namespace met {
   constexpr static float wavelength_min = 400.f;  
   constexpr static float wavelength_max = 710.f;  
   constexpr static float wavelength_range = wavelength_max - wavelength_min;  
+  constexpr static float wavelength_sample_size = wavelength_range / static_cast<float>(wavelength_samples);  
  
+  constexpr float wavelength_at_index(size_t i) {
+    return wavelength_min + (static_cast<float>(i) + .5f) * wavelength_sample_size;
+  }
+
+  constexpr size_t index_at_wavelength(float f) {
+    return static_cast<size_t>((f - wavelength_min) / wavelength_sample_size);
+  }
+  
   template <size_t Size, template <typename, size_t> typename C = std::array>
   class _SpectrumArray : public _Array<float, Size, C> {
+    using wvl_type   = float;
     using value_type = float;
     using ref_type   = float &;
     using ptr_type   = float *;
@@ -40,7 +50,13 @@ namespace met {
 
     /* spectrum-specific functions */
 
-    
+    constexpr ref_type operator()(wvl_type f) {
+      return base_type::operator[](index_at_wavelength(f));
+    }
+
+    constexpr cref_type operator()(wvl_type f) const {
+      return base_type::operator[](index_at_wavelength(f));
+    }
   };
 
   using Spectrum = _SpectrumArray<wavelength_samples>;

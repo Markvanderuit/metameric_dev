@@ -77,12 +77,21 @@ namespace met {
   consteval bool test_func() {
     Spectrum spe_a = 5.f;
     Spectrum spe_b = 6.f;
-    auto spe_c = dot(spe_a, spe_b);
+    auto spe_c = min(spe_a, spe_b);
+    spe_c(500.f) = 5.f;
     return (spe_a == spe_c).all();
   }
 
   void create_application(ApplicationCreateInfo info) {
     fmt::print("{}\n", test_func());
+
+    for (float f = wavelength_min; f <= wavelength_max; ++f)
+      fmt::print("{} - {}\n", f, index_at_wavelength(f));
+    // for (size_t i = 0; i < wavelength_samples; ++i)
+    //   fmt::print("{} - {} - {}\n", 
+    //     i, 
+    //     wavelength_at_index(i),
+    //     index_at_wavelength(wavelength_at_index(i)));
     
     /* StaticSpectrum a = 5.f, b = 6.f;
     a[11] = 16.f;
