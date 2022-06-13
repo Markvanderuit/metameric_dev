@@ -34,6 +34,7 @@ set(MET_RESOURCE_DIRECTORY "resources")
 set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RESOURCE_DIRECTORY}")
 
 # Include third party libraries provided through vcpkg
+find_package(Eigen3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
@@ -134,6 +135,7 @@ endfunction()
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC
+  Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb
   glm::glm
