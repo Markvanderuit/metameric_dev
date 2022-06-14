@@ -9,7 +9,7 @@
 #include <metameric/gui/task/viewport_base_task.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/task/gamut_picker.hpp>
-// #include <metameric/gui/task/image_viewer.hpp>
+#include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/application.hpp>
 
 // TODO: remove
@@ -40,7 +40,7 @@ namespace met {
     // Next tasks to run define main viewport components and tasks
     scheduler.emplace_task<GamutPickerTask>("gamut_picker");
     scheduler.emplace_task<ViewportTask>("viewport");
-    // scheduler.emplace_task<ImageViewerTask>("image_viewer");
+    scheduler.emplace_task<ImageViewerTask>("image_viewer");
 
     // Next tasks to run are temporary testing tasks
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
@@ -77,8 +77,14 @@ namespace met {
   }
 
   void create_application(ApplicationCreateInfo info) {
-    Spectrum s = 5;
-    fmt::print("{}\n", s.prod());
+    Spectrum a = 6.f, b = 5.f;
+    Spectrum c = select(a < b, a, Spectrum(1.f));
+    fmt::print("{}\n", c.sum());
+
+    // Array<float, 16, 1> test_array;
+    // test_array[15] = 2.f;
+    // test_array *= 16.f;
+    // auto test_vec = test_array.col_at(0);
 
     detail::LinearScheduler scheduler;
 

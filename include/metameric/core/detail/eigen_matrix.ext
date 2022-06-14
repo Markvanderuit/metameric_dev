@@ -1,0 +1,2 @@
+Matrix(const Scalar &scalar)
+: Matrix(Matrix::Constant(scalar)) { }

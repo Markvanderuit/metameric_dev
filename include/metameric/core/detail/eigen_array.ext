@@ -1,0 +1,2 @@
+Array(const Scalar &scalar)
+: Array(Array::Constant(scalar)) { }

@@ -1,0 +1,2 @@
+ArrayBase(const Scalar &scalar)
+: ArrayBase(ArrayBase::Constant(scalar)) { }
