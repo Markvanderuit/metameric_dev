@@ -42,8 +42,8 @@ include(FindAVX)
 
 # Include third party libraries provided through vcpkg
 find_package(benchmark CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 find_package(HighFive CONFIG REQUIRED)
@@ -56,7 +56,6 @@ add_subdirectory(third_party/small_gl)
 
 # Ensure OpenMP is available
 find_package(OpenMP REQUIRED)
-
 
 # Find glslLangValidator program on system
 find_program(GLSL_VALIDATOR glslangValidator HINTS 
@@ -160,6 +159,7 @@ endfunction()
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC
+  Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb
   glm::glm

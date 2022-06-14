@@ -2,6 +2,7 @@
   "name" : "spectral-uplifting",
   "version-string" : "0.1.0",
   "dependencies" : [
+    "eigen3",
     "fmt",
     { "name": "glad", 
       "features": [ "gl-api-latest" ] },
@@ -12,8 +13,7 @@
     "imguizmo",
     "stb",
     "tbb",
-    "benchmark",
-    "eigen3"
+    "benchmark"
   ],
   "features" : { }
 }

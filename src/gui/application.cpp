@@ -9,10 +9,11 @@
 #include <metameric/gui/task/viewport_base_task.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/task/gamut_picker.hpp>
+// #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/application.hpp>
 
 // TODO: remove
-#include <metameric/core/array.hpp>
+#include <fmt/format.h>
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
@@ -39,6 +40,7 @@ namespace met {
     // Next tasks to run define main viewport components and tasks
     scheduler.emplace_task<GamutPickerTask>("gamut_picker");
     scheduler.emplace_task<ViewportTask>("viewport");
+    // scheduler.emplace_task<ImageViewerTask>("image_viewer");
 
     // Next tasks to run are temporary testing tasks
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
@@ -74,36 +76,10 @@ namespace met {
     });
   }
 
-  consteval bool test_func() {
-    Spectrum spe_a = 5.f;
-    Spectrum spe_b = 6.f;
-    auto spe_c = min(spe_a, spe_b);
-    spe_c(500.f) = 5.f;
-    return (spe_a == spe_c).all();
-  }
-
   void create_application(ApplicationCreateInfo info) {
-    fmt::print("{}\n", test_func());
+    Spectrum s = 5;
+    fmt::print("{}\n", s.prod());
 
-    for (float f = wavelength_min; f <= wavelength_max; ++f)
-      fmt::print("{} - {}\n", f, index_at_wavelength(f));
-    // for (size_t i = 0; i < wavelength_samples; ++i)
-    //   fmt::print("{} - {} - {}\n", 
-    //     i, 
-    //     wavelength_at_index(i),
-    //     index_at_wavelength(wavelength_at_index(i)));
-    
-    /* StaticSpectrum a = 5.f, b = 6.f;
-    a[11] = 16.f;
-    a[12] = 1.f;
-    a *= 2.f;
-    a = a + b; */
-
-    // StaticSpectrum a = 5.f, b = 5.f;
-    // fmt::print("{}\n", a == b);
-    
-    // fmt::print("v: {}, {}\n", a.max_value(), a.min_value());
-    
     detail::LinearScheduler scheduler;
 
     // Load initial texture data, strip gamma correction, submit to scheduler
