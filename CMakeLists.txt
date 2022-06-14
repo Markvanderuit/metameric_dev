@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
 
-# Specify vcpkg toolchain file
+# Specify vcpkg toolchain path
 # set(VCPKG_TARGET_TRIPLET x64-mingw-static CACHE STRING "VCPKG Target Triplet to use")
 set(CMAKE_TOOLCHAIN_FILE 
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake
   CACHE STRING "Vcpkg toolchain file")
-  
+
+# Specify CMake modules path
+set(CMAKE_MODULE_PATH 
+  ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+
 project(Metameric LANGUAGES CXX)
 
 # Specify output directories as /dist
@@ -33,8 +37,13 @@ endif(MSVC)
 set(MET_RESOURCE_DIRECTORY "resources")
 set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RESOURCE_DIRECTORY}")
 
+# Test for SSE/AVX
+include(FindAVX)
+
 # Include third party libraries provided through vcpkg
+find_package(benchmark CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
 find_package(HighFive CONFIG REQUIRED)
@@ -44,6 +53,10 @@ find_package(TBB CONFIG REQUIRED)
 
 # Include third party libraries provided directly
 add_subdirectory(third_party/small_gl)
+
+# Ensure OpenMP is available
+find_package(OpenMP REQUIRED)
+
 
 # Find glslLangValidator program on system
 find_program(GLSL_VALIDATOR glslangValidator HINTS 
@@ -129,6 +142,19 @@ endfunction()
 function(add_executable_r target src)
   add_executable(${target} ${src})
   target_compile_features(${target} PRIVATE cxx_std_20)
+  
+  if(CXX_AVX_FOUND)
+    message(STATUS "Target ${target} supports AVX")
+    target_compile_options(${target} PRIVATE ${CXX_AVX_FLAGS})
+  endif()
+  if(CXX_AVX2_FOUND)
+    message(STATUS "Target ${target} supports AVX2")
+    target_compile_options(${target} PRIVATE ${CXX_AVX2_FLAGS})
+  endif()
+  if(CXX_AVX512_FOUND)
+    message(STATUS "Target ${target} supports AVX512")
+    target_compile_options(${target} PRIVATE ${CXX_AVX512_FLAGS})
+  endif()
 endfunction()
 
 # Set up core library
@@ -153,7 +179,18 @@ add_dependencies(gui shaders_copy shaders_spirv misc_copy)
 
 # Set up main executable
 add_executable_r(metameric src/metameric.cpp)
-target_link_libraries(metameric PRIVATE gui)
+target_link_libraries(metameric PRIVATE
+  gui
+)
+
+# Set up bench executable
+add_executable_r(benchmark src/main_benchmark.cpp)
+target_link_libraries(benchmark PRIVATE 
+  core
+  benchmark::benchmark
+  benchmark::benchmark_main
+  Eigen3::Eigen
+)
 
 # Set up playground executable
 add_executable_r(main_playground src/main_playground.cpp)

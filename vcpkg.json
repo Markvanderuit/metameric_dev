@@ -11,7 +11,9 @@
     "highfive",
     "imguizmo",
     "stb",
-    "tbb"
+    "tbb",
+    "benchmark",
+    "eigen3"
   ],
   "features" : { }
 }
