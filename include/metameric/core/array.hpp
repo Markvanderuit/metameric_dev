@@ -2,6 +2,7 @@
 
 #include <array>
 #include <span>
+#include <sstream>
 #include <vector>
 #include <metameric/core/detail/array.hpp>
 
@@ -21,12 +22,12 @@ namespace met {
     using ptr_type   = T *;
     using cref_type  = const T &;
     using size_type  = size_t;
-    using cont_type  = C<value_type, Size>;
 
+    using cont_type  = C<value_type, Size>;
     using base_type  = _Array;
     using mask_type  = _MaskArray<Size, C>;
 
-    cont_type m_cont;
+    alignas(sizeof(value_type)) cont_type m_cont;
     
   public:
     /* constrs */
@@ -44,8 +45,6 @@ namespace met {
     /* accessors */
 
     constexpr size_type size() const noexcept { return Size; }
-
-    constexpr size_type empty() const noexcept {  return false; }
 
     constexpr ref_type at(size_type i) { return m_cont[i]; }
 
@@ -79,6 +78,17 @@ namespace met {
 
     met_array_decl_red_val(_Array);
     met_array_decl_mod_val(_Array);
+
+    /* misc */
+
+    constexpr std::string to_string() const {
+      std::stringstream ss;
+      ss << "[ ";
+      for (size_t i = 0; i < size() - 1; ++i)
+        ss << operator[](i) << ", ";
+      ss << operator[](size() - 1) << " ]";
+      return ss.str();
+    }
   };
 
   template <size_t Size, template <typename, size_t> typename C>
