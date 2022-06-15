@@ -44,7 +44,7 @@ namespace met {
     return std::min(i, wavelength_samples - 1);
   }
 
-  // Load a set of color matching functions from arbitrary wvl/value data
+  // Load a discrete trio of color matching functions from arbitrary wvl/value data
   CMFS cmfs_from_data(std::span<const float> wvls, 
                       std::span<const float> values_x,
                       std::span<const float> values_y,
@@ -54,26 +54,29 @@ namespace met {
   Spectrum spectrum_from_data(std::span<const float> wvls, 
                               std::span<const float> values);
   
+  // Convert a spectral distribution to cie XYZ under a given illuminant whitepoint
   inline
-  Color spectrum_to_xyz(const Spectrum &s) {
-    return cmfs_cie_xyz * s.matrix();
+  Color spectrum_to_xyz(const Spectrum &sd, 
+                        const Spectrum &illum = emitter_cie_d65) {
+    const float k = 1.f / (cmfs_cie_xyz.row(1).transpose().array() * illum).sum();
+    return k * cmfs_cie_xyz * (illum * sd).matrix();
   }
   
   // Convert a color in cie XYZ to linear sRGB
   inline
   Color xyz_to_srgb(const Color &c) {
-    const eig::Matrix3f m {{ 3.240479f, -1.537150f, -0.498535f },
-                           {-0.969256f,  1.875991f,  0.041556f },
-                           { 0.055648f, -0.204043f,  1.057311f }};
-    return (m * c.matrix());
+    static const eig::Matrix3f m {{ 3.240479f, -1.537150f,-0.498535f },
+                                  {-0.969256f,  1.875991f, 0.041556f },
+                                  { 0.055648f, -0.204043f, 1.057311f }};
+    return m * c.matrix();
   }
 
   // Convert a color in linear sRGB to cie XYZ
   inline
   Color srgb_to_xyz(const Color &c) {
-    const eig::Matrix3f m {{ 0.412453f, 0.357580f, 0.180423f },
-                           { 0.212671f, 0.715160f, 0.072169f },
-                           { 0.019334f, 0.119193f, 0.950227f }};
-    return (m * c.matrix());
+    static const eig::Matrix3f m {{ 0.412453f, 0.357580f, 0.180423f },
+                                  { 0.212671f, 0.715160f, 0.072169f },
+                                  { 0.019334f, 0.119193f, 0.950227f }};
+    return m * c.matrix();
   }
 } // namespace met

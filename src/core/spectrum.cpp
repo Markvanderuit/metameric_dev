@@ -550,8 +550,8 @@ namespace met {
       c(2, index) += values_z[i];
       n[index]++;
     }
-    for (size_t i = 0; i < 3; ++i) {
-      c.row(i).array() /= n;
+    for (auto row : c.rowwise()) {
+      row.array() /= n.max(1.f);
     }
     return c.eval();
   }

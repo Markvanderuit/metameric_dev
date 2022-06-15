@@ -13,6 +13,7 @@
 #include <metameric/gui/application.hpp>
 
 // TODO: remove
+#include <iostream>
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
@@ -64,19 +65,26 @@ namespace met {
       ImGui::End();
     });
 
+    // Temporary window to plot some distributions
     scheduler.emplace_task<LambdaTask>("plot_spectrum", [](auto &info) {
       if (ImGui::Begin("Plots")) {
         auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
                            - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
 
         ImGui::PlotLines("Emitter, d65", emitter_cie_d65.data(), wavelength_samples, 0,
-          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
         ImGui::PlotLines("CIE XYZ, x()", cmfs_cie_xyz.row(0).eval().data(), wavelength_samples, 0,
-          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
         ImGui::PlotLines("CIE XYZ, y()", cmfs_cie_xyz.row(1).eval().data(), wavelength_samples, 0,
-          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
         ImGui::PlotLines("CIE XYZ, z()", cmfs_cie_xyz.row(2).eval().data(), wavelength_samples, 0,
-          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
+
+        auto color_xyz = spectrum_to_xyz(emitter_cie_d65);
+        auto color_rgb = xyz_to_srgb(color_xyz);
+
+        ImGui::PlotLines("Color, rgb", color_rgb.data(), 3);
+        std::cout << color_xyz << '\n';
       }
       ImGui::End();
     });
