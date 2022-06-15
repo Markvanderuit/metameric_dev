@@ -13,7 +13,6 @@
 #include <metameric/gui/application.hpp>
 
 // TODO: remove
-#include <fmt/format.h>
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
@@ -65,6 +64,23 @@ namespace met {
       ImGui::End();
     });
 
+    scheduler.emplace_task<LambdaTask>("plot_spectrum", [](auto &info) {
+      if (ImGui::Begin("Plots")) {
+        auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
+                           - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+
+        ImGui::PlotLines("Emitter, d65", emitter_cie_d65.data(), wavelength_samples, 0,
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+        ImGui::PlotLines("CIE XYZ, x()", cmfs_cie_xyz.row(0).eval().data(), wavelength_samples, 0,
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+        ImGui::PlotLines("CIE XYZ, y()", cmfs_cie_xyz.row(1).eval().data(), wavelength_samples, 0,
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+        ImGui::PlotLines("CIE XYZ, z()", cmfs_cie_xyz.row(2).eval().data(), wavelength_samples, 0,
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(1.f, 0.3f));
+      }
+      ImGui::End();
+    });
+
     // Final task to run ends a frame
     scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &) {
       auto fb = gl::Framebuffer::make_default();
@@ -77,15 +93,6 @@ namespace met {
   }
 
   void create_application(ApplicationCreateInfo info) {
-    Spectrum a = 6.f, b = 5.f;
-    Spectrum c = select(a < b, a, Spectrum(1.f));
-    fmt::print("{}\n", c.sum());
-
-    // Array<float, 16, 1> test_array;
-    // test_array[15] = 2.f;
-    // test_array *= 16.f;
-    // auto test_vec = test_array.col_at(0);
-
     detail::LinearScheduler scheduler;
 
     // Load initial texture data, strip gamma correction, submit to scheduler
