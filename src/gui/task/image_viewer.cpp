@@ -1,4 +1,5 @@
 #include <metameric/core/detail/glm.hpp>
+#include <metameric/core/io.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/detail/imgui.hpp>

@@ -1,6 +1,7 @@
 #include <small_gl/dispatch.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
+#include <metameric/core/io.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/detail/imgui.hpp>

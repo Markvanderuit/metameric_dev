@@ -1,6 +1,8 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
+#include <metameric/core/io.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/glm.hpp>
 #include <metameric/gui/detail/imgui.hpp>
@@ -11,10 +13,6 @@
 #include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/application.hpp>
-
-// TODO: remove
-#include <iostream>
-#include <metameric/core/spectrum.hpp>
 
 namespace met {
   gl::WindowCreateFlags window_flags = gl::WindowCreateFlags::eVisible
@@ -66,25 +64,54 @@ namespace met {
     });
 
     // Temporary window to plot some distributions
-    scheduler.emplace_task<LambdaTask>("plot_spectrum", [](auto &info) {
-      if (ImGui::Begin("Plots")) {
+    scheduler.emplace_task<LambdaTask>("plot_models", [](auto &) {
+      if (ImGui::Begin("Model plots")) {
         auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
                            - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
 
-        ImGui::PlotLines("Emitter, d65", emitter_cie_d65.data(), wavelength_samples, 0,
+        ImGui::PlotLines("Emitter, d65", models::emitter_cie_d65.data(), wavelength_samples, 0,
           nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-        ImGui::PlotLines("CIE XYZ, x()", cmfs_cie_xyz.row(0).eval().data(), wavelength_samples, 0,
+        ImGui::PlotLines("Emitter, e", models::emitter_cie_e.data(), wavelength_samples, 0,
           nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-        ImGui::PlotLines("CIE XYZ, y()", cmfs_cie_xyz.row(1).eval().data(), wavelength_samples, 0,
+        ImGui::PlotLines("CIE XYZ, x()", models::cmfs_cie_xyz.row(0).eval().data(), wavelength_samples, 0,
           nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-        ImGui::PlotLines("CIE XYZ, z()", cmfs_cie_xyz.row(2).eval().data(), wavelength_samples, 0,
+        ImGui::PlotLines("CIE XYZ, y()", models::cmfs_cie_xyz.row(1).eval().data(), wavelength_samples, 0,
+          nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
+        ImGui::PlotLines("CIE XYZ, z()", models::cmfs_cie_xyz.row(2).eval().data(), wavelength_samples, 0,
           nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
 
-        auto color_xyz = spectrum_to_xyz(emitter_cie_d65);
-        auto color_rgb = xyz_to_srgb(color_xyz);
+        Color rgb = xyz_to_srgb(reflectance_to_xyz(1.f));
+        ImGui::PlotLines("Color, rgb", rgb.data(), 3);
+        ImGui::ColorEdit3("Test color", rgb.data());
+      }
+      ImGui::End();
+    });
+    
+    scheduler.emplace_task<LambdaTask>("plot_spectra", [](auto &info) {
+      if (ImGui::Begin("Reflectance plots")) {
+        const auto &spectra = info.get_resource<std::vector<Spectrum>>("global", "spectral_data");
+        const auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
+                                 - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+        
+        ImGui::PlotLines("reflectance 0", spectra[0].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        Color rgb_0 = xyz_to_srgb(reflectance_to_xyz(spectra[0]));
+        ImGui::ColorEdit3("Test color ", rgb_0.data());
 
-        ImGui::PlotLines("Color, rgb", color_rgb.data(), 3);
-        std::cout << color_xyz << '\n';
+        ImGui::PlotLines("reflectance 1", spectra[1].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        Color rgb_1 = xyz_to_srgb(reflectance_to_xyz(spectra[1]));
+        ImGui::ColorEdit3("Test color 1", rgb_1.data());
+
+        ImGui::PlotLines("reflectance 2", spectra[2].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        Color rgb_2 = xyz_to_srgb(reflectance_to_xyz(spectra[2]));
+        ImGui::ColorEdit3("Test color 2", rgb_2.data());
+
+        ImGui::PlotLines("reflectance 3", spectra[3].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        Color rgb_3 = xyz_to_srgb(reflectance_to_xyz(spectra[3]));
+        ImGui::ColorEdit3("Test color 3", rgb_3.data());
       }
       ImGui::End();
     });
@@ -111,8 +138,21 @@ namespace met {
     scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
 
     // Load test spectral database
-    /* fmt::print("Loading test database: {}\n", info.spectral_db_path.string());
-    auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path); */
+    fmt::print("Loading test database: {}\n", info.spectral_db_path.string());
+    auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path);
+    fmt::print("Loaded spectral database\n\tsize: {}\n\tchan: {}\n", 
+      spectral_data.size, spectral_data.channels);
+    
+    // Process subset of test spectral database
+    std::vector<Spectrum> retained_spectra(128, 0.5f);
+    #pragma omp parallel for
+    for (size_t i = 0; i < retained_spectra.size(); ++i) {
+      std::ranges::copy(spectral_data.data[4'500'000 + i], retained_spectra[i].begin());
+    }
+
+    // Clean up test spectral database
+    spectral_data = {};
+    scheduler.insert_resource<std::vector<Spectrum>>("spectral_data", std::move(retained_spectra));
 
     // Initialize OpenGL context and primary window, submit to scheduler
     auto &window = scheduler.emplace_resource<gl::Window, gl::WindowCreateInfo>("window", 
