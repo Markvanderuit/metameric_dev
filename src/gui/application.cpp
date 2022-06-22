@@ -13,6 +13,7 @@
 #include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/application.hpp>
+#include <metameric/core/cuda.hpp>
 
 namespace met {
   gl::WindowCreateFlags window_flags = gl::WindowCreateFlags::eVisible
@@ -129,6 +130,10 @@ namespace met {
 
   void create_application(ApplicationCreateInfo info) {
     detail::LinearScheduler scheduler;
+
+    // parallel_func(256, MET_CPU_GPU [](uint i) mutable {
+
+    // });
 
     // Load initial texture data, strip gamma correction, submit to scheduler
     fmt::print("Loading startup texture: {}\n", info.texture_path.string());

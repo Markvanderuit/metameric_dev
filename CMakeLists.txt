@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Specify vcpkg toolchain path
-# set(VCPKG_TARGET_TRIPLET x64-mingw-static CACHE STRING "VCPKG Target Triplet to use")
 set(CMAKE_TOOLCHAIN_FILE 
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake
   CACHE STRING "Vcpkg toolchain file")
 
 # Specify CMake modules path
 set(CMAKE_MODULE_PATH 
-  ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+  ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+  CACHE STRING "CMake module path")
 
-project(Metameric LANGUAGES CXX)
+project(Metameric LANGUAGES CXX CUDA)
 
-# Specify output directories as /dist
+# Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -37,17 +37,25 @@ endif(MSVC)
 set(MET_RESOURCE_DIRECTORY "resources")
 set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RESOURCE_DIRECTORY}")
 
-# Test for SSE/AVX
+# Include CMake modules
+include(CheckLanguage)
 include(FindAVX)
+
+# Test for and enable CUDA
+check_language(CUDA)
+if (CMAKE_CUDA_COMPILER)
+  enable_language(CUDA)
+endif()
+# set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};--expt-relaxed-constexpr;--extended-lambda;")
 
 # Include third party libraries provided through vcpkg
 find_package(benchmark CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(HighFive CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
-find_package(HighFive CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 find_package(TBB CONFIG REQUIRED)
 
@@ -136,6 +144,14 @@ function(add_library_r target dir)
   add_library(${target} ${srcs})
   target_include_directories(${target} PUBLIC include)
   target_compile_features(${target} PRIVATE cxx_std_23)
+
+  if (CMAKE_CUDA_COMPILER)
+    file(GLOB_RECURSE cu_srcs ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cu) 
+    target_sources(${target} PRIVATE ${cu_srcs})
+    target_compile_features(${target} PRIVATE cuda_std_17)
+    set_target_properties(${target} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    message(STATUS "Target ${target} supports CUDA")
+  endif()
 endfunction()
 
 function(add_executable_r target src)
@@ -154,7 +170,25 @@ function(add_executable_r target src)
     message(STATUS "Target ${target} supports AVX512")
     target_compile_options(${target} PRIVATE ${CXX_AVX512_FLAGS})
   endif()
+  
+  if (CMAKE_CUDA_COMPILER)
+    message(STATUS "Target ${target} supports CUDA")
+    set_target_properties(${target} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    target_compile_features(${target} PRIVATE cuda_std_17)
+  endif()
 endfunction()
+
+function(add_executable_cu target src)
+  add_executable(${target} ${src})
+  target_compile_features(${target} PRIVATE cxx_std_20)
+  if (CMAKE_CUDA_COMPILER)
+    message(STATUS "Target ${target} supports CUDA")
+    set_target_properties(${target} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    target_compile_features(${target} PRIVATE cuda_std_17)
+    target_compile_options(${target} PUBLIC --extended-lambda --expt-relaxed-constexpr)
+  endif()
+endfunction()
+
 
 # Set up core library
 add_library_r(core core)
@@ -200,5 +234,14 @@ target_link_libraries(main_playground PRIVATE
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
+  TBB::tbb
+)
+
+# Set up tbb/cu executable
+find_package(Thrust REQUIRED CONFIG)
+thrust_create_target(Thrust)
+add_executable_cu(main_tbb_cu src/main_tbb_cu.cu)
+target_link_libraries(main_tbb_cu PRIVATE
+  Thrust
   TBB::tbb
 )
