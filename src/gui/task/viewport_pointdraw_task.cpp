@@ -31,6 +31,8 @@ namespace met {
     });
 
     // Build shader program
+    gl::Program::add_include({{ .path = "resources/shaders/spectrum/spectrum.glsl" }});
+
     m_gamut_program = gl::Program({
       { .type = gl::ShaderType::eVertex, 
         .path = "resources/shaders/viewport_task/gamut_draw.vert",

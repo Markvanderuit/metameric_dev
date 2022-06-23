@@ -5,7 +5,7 @@
     "eigen3",
     "fmt",
     { "name": "glad", 
-      "features": [ "gl-api-latest" ] },
+      "features": [ "extensions", "gl-api-latest" ] },
     "glm",
     { "name" : "imgui", 
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },

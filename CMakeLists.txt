@@ -10,7 +10,7 @@ set(CMAKE_MODULE_PATH
   ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources"
   CACHE STRING "CMake module path")
 
-project(Metameric LANGUAGES CXX CUDA)
+project(Metameric LANGUAGES CXX)
 
 # Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -39,14 +39,6 @@ set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RES
 
 # Include CMake modules
 include(CheckLanguage)
-include(FindAVX)
-
-# Test for and enable CUDA
-check_language(CUDA)
-if (CMAKE_CUDA_COMPILER)
-  enable_language(CUDA)
-endif()
-# set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};--expt-relaxed-constexpr;--extended-lambda;")
 
 # Include third party libraries provided through vcpkg
 find_package(benchmark CONFIG REQUIRED)
@@ -79,6 +71,7 @@ file(GLOB_RECURSE glsl_srcs
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.geom
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.vert
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.comp
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.glsl
 )
 
 # Add commands to copy/compile shader sources
@@ -89,15 +82,15 @@ foreach(glsl_src ${glsl_srcs})
     OUTPUT_VARIABLE relative_path)
   message(STATUS "Found shader : ${relative_path}")
 
-  set(shader_spirv_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}.spv")
+  # set(shader_spirv_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}.spv")
   set(shader_copy_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}")
 
   # Add command to compile SPIR-V binary using glslangValidator if installed
-  add_custom_command(
-    OUTPUT ${shader_spirv_out}
-    COMMAND ${GLSL_VALIDATOR} -G ${glsl_src} -o ${shader_spirv_out}
-    DEPENDS ${glsl_src}
-  )
+  # add_custom_command(
+  #   OUTPUT ${shader_spirv_out}
+  #   COMMAND ${GLSL_VALIDATOR} -G ${glsl_src} -o ${shader_spirv_out}
+  #   DEPENDS ${glsl_src}
+  # )
 
   # Add command to simply copy shader source
   add_custom_command(
@@ -106,12 +99,12 @@ foreach(glsl_src ${glsl_srcs})
     DEPENDS ${glsl_src}
   )
 
-  list(APPEND shader_spirv_list ${shader_spirv_out})
+  # list(APPEND shader_spirv_list ${shader_spirv_out})
   list(APPEND shader_copy_list ${shader_copy_out})
 endforeach()
 
 # Add targets to perform compilation/copy
-add_custom_target(shaders_spirv DEPENDS ${shader_spirv_list})
+# add_custom_target(shaders_spirv DEPENDS ${shader_spirv_list})
 add_custom_target(shaders_copy DEPENDS ${shader_copy_list})
 
 # Add commands to copy resources/misc files
@@ -144,51 +137,12 @@ function(add_library_r target dir)
   add_library(${target} ${srcs})
   target_include_directories(${target} PUBLIC include)
   target_compile_features(${target} PRIVATE cxx_std_23)
-
-  if (CMAKE_CUDA_COMPILER)
-    file(GLOB_RECURSE cu_srcs ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cu) 
-    target_sources(${target} PRIVATE ${cu_srcs})
-    target_compile_features(${target} PRIVATE cuda_std_17)
-    set_target_properties(${target} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    message(STATUS "Target ${target} supports CUDA")
-  endif()
 endfunction()
 
 function(add_executable_r target src)
   add_executable(${target} ${src})
   target_compile_features(${target} PRIVATE cxx_std_20)
-  
-  if(CXX_AVX_FOUND)
-    message(STATUS "Target ${target} supports AVX")
-    target_compile_options(${target} PRIVATE ${CXX_AVX_FLAGS})
-  endif()
-  if(CXX_AVX2_FOUND)
-    message(STATUS "Target ${target} supports AVX2")
-    target_compile_options(${target} PRIVATE ${CXX_AVX2_FLAGS})
-  endif()
-  if(CXX_AVX512_FOUND)
-    message(STATUS "Target ${target} supports AVX512")
-    target_compile_options(${target} PRIVATE ${CXX_AVX512_FLAGS})
-  endif()
-  
-  if (CMAKE_CUDA_COMPILER)
-    message(STATUS "Target ${target} supports CUDA")
-    set_target_properties(${target} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    target_compile_features(${target} PRIVATE cuda_std_17)
-  endif()
 endfunction()
-
-function(add_executable_cu target src)
-  add_executable(${target} ${src})
-  target_compile_features(${target} PRIVATE cxx_std_20)
-  if (CMAKE_CUDA_COMPILER)
-    message(STATUS "Target ${target} supports CUDA")
-    set_target_properties(${target} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    target_compile_features(${target} PRIVATE cuda_std_17)
-    target_compile_options(${target} PUBLIC --extended-lambda --expt-relaxed-constexpr)
-  endif()
-endfunction()
-
 
 # Set up core library
 add_library_r(core core)
@@ -209,7 +163,8 @@ target_link_libraries(gui PUBLIC
   imgui::imgui
   imguizmo::imguizmo
 )
-add_dependencies(gui shaders_copy shaders_spirv misc_copy)
+# add_dependencies(gui shaders_copy shaders_spirv misc_copy)
+add_dependencies(gui shaders_copy misc_copy)
 
 # Set up main executable
 add_executable_r(metameric src/metameric.cpp)
@@ -234,14 +189,5 @@ target_link_libraries(main_playground PRIVATE
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
-  TBB::tbb
-)
-
-# Set up tbb/cu executable
-find_package(Thrust REQUIRED CONFIG)
-thrust_create_target(Thrust)
-add_executable_cu(main_tbb_cu src/main_tbb_cu.cu)
-target_link_libraries(main_tbb_cu PRIVATE
-  Thrust
   TBB::tbb
 )
