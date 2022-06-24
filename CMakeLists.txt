@@ -136,12 +136,12 @@ function(add_library_r target dir)
   )
   add_library(${target} ${srcs})
   target_include_directories(${target} PUBLIC include)
-  target_compile_features(${target} PRIVATE cxx_std_23)
+  target_compile_features(${target} PUBLIC cxx_std_23)
 endfunction()
 
 function(add_executable_r target src)
   add_executable(${target} ${src})
-  target_compile_features(${target} PRIVATE cxx_std_20)
+  target_compile_features(${target} PUBLIC cxx_std_23)
 endfunction()
 
 # Set up core library
@@ -189,5 +189,14 @@ target_link_libraries(main_playground PRIVATE
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
+  TBB::tbb
+)
+
+# Set up glsl parser
+add_executable_r(main_glsl_parser src/main_glsl_parser.cpp)
+target_link_libraries(main_glsl_parser PRIVATE
+  core
+  small_gl
+  fmt::fmt-header-only
   TBB::tbb
 )

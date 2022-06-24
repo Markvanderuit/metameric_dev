@@ -1,3 +1,6 @@
+#ifndef SPECTRUM_GLSL_GUARD
+#define SPECTRUM_GLSL_GUARD
+
 #extension GL_KHR_shader_subgroup_basic      : require
 #extension GL_KHR_shader_subgroup_arithmetic : require
 
@@ -43,3 +46,5 @@ Spectrum div(in Spectrum a, in Spectrum b, in uint i) {
 vec3 test_fun(in vec3 v) {
   return 4 * v;
 }
+
+#endif // SPECTRUM_GLSL_GUARD
