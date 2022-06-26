@@ -10,6 +10,11 @@ set(CMAKE_MODULE_PATH
   ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources"
   CACHE STRING "CMake module path")
 
+# Define Metameric's spectral layout
+set(MET_WAVELENGTH_MIN     400) # nm
+set(MET_WAVELENGTH_MAX     710) # nm
+set(MET_WAVELENGTH_SAMPLES 32)  # discrete bins
+
 project(Metameric LANGUAGES CXX)
 
 # Specify output directories as /bin and /lib
@@ -33,79 +38,76 @@ if(MSVC)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
 
-# Specify resource directory name
-set(MET_RESOURCE_DIRECTORY "resources")
-set(MET_RUNTIME_RESOURCE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${APPL_RESOURCE_DIRECTORY}")
-
-# Include CMake modules
-include(CheckLanguage)
-
-# Include third party libraries provided through vcpkg
-find_package(benchmark CONFIG REQUIRED)
-find_package(Eigen3 CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
-find_package(HighFive CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-find_package(imguizmo CONFIG REQUIRED)
-find_path(STB_INCLUDE_DIRS "stb.h")
-find_package(TBB CONFIG REQUIRED)
-
-# Include third party libraries provided directly
-add_subdirectory(third_party/small_gl)
-
 # Ensure OpenMP is available
 find_package(OpenMP REQUIRED)
 
+# Include third party libraries provided through vcpkg
+find_package(benchmark CONFIG REQUIRED)
+find_package(Eigen3    CONFIG REQUIRED)
+find_package(fmt       CONFIG REQUIRED)
+find_package(glm       CONFIG REQUIRED)
+find_package(HighFive  CONFIG REQUIRED)
+find_package(imgui     CONFIG REQUIRED)
+find_package(imguizmo  CONFIG REQUIRED)
+find_package(TBB       CONFIG REQUIRED)
+find_path(STB_INCLUDE_DIRS "stb.h")
+
+# Include third party libraries provided directly
+add_subdirectory(third_party/small_gl)
+add_subdirectory(third_party/small_glsl_parser)
+
 # Find glslLangValidator program on system
-find_program(GLSL_VALIDATOR glslangValidator HINTS 
-  /usr/bin
-  /usr/local/bin
-  $ENV{VULKAN_SDK}/Bin/
-  $ENV{VULKAN_SDK}/Bin32/
+find_program(glsl_validator_path glslangValidator HINTS 
+  /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/
 )
 
-# Quickly find all shader sources
+# Recursively find all shader files
 file(GLOB_RECURSE glsl_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.frag
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.geom
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.vert
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.comp
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/*.glsl
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.frag
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.geom
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.vert
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.comp
+)
+file(GLOB_RECURSE glsl_includes 
+  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include/*
 )
 
-# Add commands to copy/compile shader sources
+# Add together string arguments for small_glsl_parser_exec
+string(CONCAT glsl_parser_arg
+  "MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN},"
+  "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
+  "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}"
+)
+
+# Process shaders
 foreach(glsl_src ${glsl_srcs})
   # Obtain path, stripped of lead, and filename
   cmake_path(RELATIVE_PATH glsl_src
-    BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src
     OUTPUT_VARIABLE relative_path)
   message(STATUS "Found shader : ${relative_path}")
 
-  # set(shader_spirv_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}.spv")
-  set(shader_copy_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}")
+  set(shader_preprocess_out 
+    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
 
-  # Add command to compile SPIR-V binary using glslangValidator if installed
-  # add_custom_command(
-  #   OUTPUT ${shader_spirv_out}
-  #   COMMAND ${GLSL_VALIDATOR} -G ${glsl_src} -o ${shader_spirv_out}
-  #   DEPENDS ${glsl_src}
-  # )
-
-  # Add command to simply copy shader source
+  # Add command to preprocess shader source using glsl parser and 
+  # then pass it through glslangvalidator, if available
   add_custom_command(
-    OUTPUT ${shader_copy_out}
-    COMMAND ${CMAKE_COMMAND} -E copy ${glsl_src} ${shader_copy_out}
-    DEPENDS ${glsl_src}
+    OUTPUT   ${shader_preprocess_out}
+    COMMAND  small_glsl_parser_exec 
+               ${glsl_src} ${shader_preprocess_out} 
+               -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
+               -s "${glsl_parser_arg}"
+               -v "${glsl_validator_path}"
+    DEPENDS  small_glsl_parser_exec ${glsl_src} ${glsl_includes}
+    VERBATIM
   )
 
-  # list(APPEND shader_spirv_list ${shader_spirv_out})
-  list(APPEND shader_copy_list ${shader_copy_out})
+  list(APPEND shaders_preprocess_list ${shader_preprocess_out})
 endforeach()
 
-# Add targets to perform compilation/copy
-# add_custom_target(shaders_spirv DEPENDS ${shader_spirv_list})
-add_custom_target(shaders_copy DEPENDS ${shader_copy_list})
+# Add targets to perform shader preprocessing/validation
+add_custom_target(shaders_preprocess DEPENDS ${shaders_preprocess_list})
 
 # Add commands to copy resources/misc files
 file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/misc/*)
@@ -126,7 +128,6 @@ foreach(misc_file ${misc_files})
 endforeach()
 add_custom_target(misc_copy DEPENDS ${misc_copy_list})
 
-
 # Simple function to add library with basic settings
 function(add_library_r target dir)
   file(GLOB_RECURSE srcs 
@@ -139,6 +140,7 @@ function(add_library_r target dir)
   target_compile_features(${target} PUBLIC cxx_std_23)
 endfunction()
 
+# Simple function to add executable with basic settings
 function(add_executable_r target src)
   add_executable(${target} ${src})
   target_compile_features(${target} PUBLIC cxx_std_23)
@@ -154,6 +156,11 @@ target_link_libraries(core PUBLIC
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
 )
 target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
+target_compile_definitions(core PUBLIC
+  MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN}
+  MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX}
+  MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
+)
 
 # Set up gui library
 add_library_r(gui gui)
@@ -163,16 +170,15 @@ target_link_libraries(gui PUBLIC
   imgui::imgui
   imguizmo::imguizmo
 )
-# add_dependencies(gui shaders_copy shaders_spirv misc_copy)
-add_dependencies(gui shaders_copy misc_copy)
+add_dependencies(gui shaders_preprocess misc_copy)
 
-# Set up main executable
+# Set up metameric executable
 add_executable_r(metameric src/metameric.cpp)
 target_link_libraries(metameric PRIVATE
   gui
 )
 
-# Set up bench executable
+# Set up benchmark executable
 add_executable_r(benchmark src/main_benchmark.cpp)
 target_link_libraries(benchmark PRIVATE 
   core
@@ -189,14 +195,5 @@ target_link_libraries(main_playground PRIVATE
   fmt::fmt-header-only
   imgui::imgui
   imguizmo::imguizmo
-  TBB::tbb
-)
-
-# Set up glsl parser
-add_executable_r(main_glsl_parser src/main_glsl_parser.cpp)
-target_link_libraries(main_glsl_parser PRIVATE
-  core
-  small_gl
-  fmt::fmt-header-only
   TBB::tbb
 )

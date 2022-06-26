@@ -5,9 +5,9 @@
 
 namespace met {
   /* Define metameric's spectral range layout */
-  constexpr static float  wavelength_min     = 400.f;  
-  constexpr static float  wavelength_max     = 710.f;  
-  constexpr static size_t wavelength_samples = 31;
+  constexpr static float  wavelength_min     = MET_WAVELENGTH_MIN;  
+  constexpr static float  wavelength_max     = MET_WAVELENGTH_MAX;  
+  constexpr static size_t wavelength_samples = MET_WAVELENGTH_SAMPLES;
 
   /* Define derived variables from metameric's spectral range layout */
   constexpr static float wavelength_range           = wavelength_max - wavelength_min;  
