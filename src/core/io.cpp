@@ -5,6 +5,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <algorithm>
+#include <execution>
 #include <ranges>
 
 namespace met::io {
@@ -12,16 +13,17 @@ namespace met::io {
     template <typename T>
     constexpr inline
     std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &v) {
-      std::vector<std::vector<T>> r(v[0].size(), std::vector<T>(v.size()));
+      std::vector<std::vector<T>> wr(v[0].size(), std::vector<T>(v.size()));
 
-      #pragma omp parallel for
-      for (size_t j = 0; j < v.size(); j++) {
-        for (size_t i = 0; i < v[0].size(); i++) {
-            r[i][j] = v[j][i];
+      #pragma omp parallel for // target seq. writes and less thread spawns
+      for (size_t i = 0; i < v[0].size(); ++i) {
+        auto &wri = wr[i];
+        for (size_t j = 0; j < v.size(); ++j) {
+          wri[j] = v[j][i];
         }
       }
 
-      return r;
+      return wr;
     }
   } // namespace detail
 
