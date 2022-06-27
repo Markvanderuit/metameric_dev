@@ -1,0 +1,48 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <spectrum.glsl>
+
+const uint wvls_size = 31;
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0, std430) restrict readonly buffer block_0 {
+  float[wvls_size] wvls_in;
+};
+
+layout(binding = 1, std430) restrict readonly buffer block_1 { 
+  float[wvls_size] values_in[];
+};
+
+layout(binding = 2, std430) restrict writeonly buffer block_2 { 
+  Spectrum spectrum_out[];
+};
+
+layout(location = 0) uniform uint n_spectra;
+
+Spectrum spectrum_from_data(in float[wvls_size] wvls, 
+                            in float[wvls_size] values) {
+  Spectrum s = constr_spectrum(0.f), 
+           n = constr_spectrum(0.f);
+
+  for (uint i = 0; i < wvls_size; ++i) {
+    float wvl = wvls[i];
+    guard_continue(wvl >= wavelength_min && wvl <= wavelength_max);
+
+    uint j = index_at_wavelength(wvl);
+    s[j] += values[i];
+    n[j] += 1.f;
+  }
+
+  return div(s, maxv(n, 1.f));
+}
+
+void main() {
+  const uint i = gl_WorkGroupID.x 
+               * gl_WorkGroupSize.x 
+               + gl_LocalInvocationID.x;
+  guard(i < n_spectra);
+
+  spectrum_out[i] = spectrum_from_data(wvls_in, values_in[i]);
+}
