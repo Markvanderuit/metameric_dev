@@ -51,11 +51,8 @@ namespace met {
       // Get internally shared resources
       auto &i_gamut_buffer_map = info.get_resource<std::span<glm::vec3>>("gamut_buffer_map");
       
-      // Apply test rotation around gamut's center
-     /*  glm::mat4 rotate_around = glm::rotate(glm::radians(2.f), glm::vec3(0, 1, 0));
-      for (auto &v : i_gamut_buffer_map) {
-        v = glm::vec3(rotate_around * glm::vec4(v - m_gamut_center, 1)) + m_gamut_center;
-      } */
+      // Get externally shared resources
+      auto &e_spectral_grid = info.get_resource<std::vector<Spectrum>>("global", "spectral_grid");
 
       // Quick temporary window to modify gamut points
       if (ImGui::Begin("Gamut picker")) {
@@ -67,6 +64,41 @@ namespace met {
           ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("Color 3", glm::value_ptr(i_gamut_buffer_map[3]),
           ImGuiColorEditFlags_Float);
+      }
+      ImGui::End();
+
+      // Quick temporary window to show nearest spectra in the local grid
+      if (ImGui::Begin("Gamut sd viewer")) {
+        const auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
+                                 - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+        
+        constexpr uint grid_size = 64;
+        constexpr auto col_to_grid = [&](const glm::vec3 &v) {
+          return glm::uvec3(glm::clamp(v, 0.f, 1.f) * static_cast<float>(grid_size - 1));
+        };
+        constexpr auto grid_to_idx = [&](const glm::uvec3 &u) {
+          return u.z * std::pow(grid_size, 2) + u.y * grid_size + u.x;
+        };
+
+        // Obtain indices of spectra at gamut's point positions
+        std::vector<uint> indices(4);
+        std::ranges::transform(i_gamut_buffer_map, indices.begin(),
+          [](const glm::vec3 &v) { return grid_to_idx(col_to_grid(v)); });
+
+        // Obtain spectra at gamut's point positions;
+        std::vector<Spectrum> spectra(4);
+        std::ranges::transform(indices, spectra.begin(),
+          [&](uint i) { return e_spectral_grid[i]; });
+
+        // Plot spectra
+        ImGui::PlotLines("reflectance 0", spectra[0].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        ImGui::PlotLines("reflectance 1", spectra[1].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        ImGui::PlotLines("reflectance 2", spectra[2].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+        ImGui::PlotLines("reflectance 3", spectra[3].data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
       }
       ImGui::End();
     }
