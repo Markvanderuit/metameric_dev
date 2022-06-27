@@ -2,6 +2,7 @@
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <metameric/core/io.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/detail/imgui.hpp>
@@ -15,6 +16,7 @@ namespace met {
     // Get externally shared resources 
     auto &e_gamut_buffer = info.get_resource<gl::Buffer>("gamut_picker", "gamut_buffer");
     auto &e_texture_obj = info.get_resource<io::TextureData<float>>("global", "texture_data");
+    auto &e_color_data = info.get_resource<std::vector<Color>>("global", "color_data");
 
     // Element data to draw a tetrahedron from four vertices using a line strip
     std::vector<uint> gamut_elements = {
@@ -57,7 +59,8 @@ namespace met {
     }
 
     // Load texture data into vertex buffer and create array object for upcoming draw
-    auto texture_data = as_typed_span<glm::vec3>(e_texture_obj.data);
+    // auto texture_data = as_typed_span<glm::vec3>(e_texture_obj.data);
+    auto texture_data = as_typed_span<Color>(e_color_data);
     m_point_buffer = gl::Buffer({ .data = convert_span<std::byte>(texture_data) });
     m_point_array = gl::Array({ 
       .buffers = {{ .buffer = &m_point_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
