@@ -45,15 +45,15 @@ namespace met {
     return std::min(i, wavelength_samples - 1);
   }
 
-  // Load a discrete trio of color matching functions from arbitrary wvl/value data
+  // Load a discrete spectral distribution from sequential wvl/value data
+  Spectrum spectrum_from_data(std::span<const float> wvls, 
+                              std::span<const float> values);
+
+  // Load a discrete trio of color matching functions from sequential wvl/value data
   CMFS cmfs_from_data(std::span<const float> wvls, 
                       std::span<const float> values_x,
                       std::span<const float> values_y,
                       std::span<const float> values_z);
-
-  // Load a discrete spectral distribution from arbitrary wvl/value data
-  Spectrum spectrum_from_data(std::span<const float> wvls, 
-                              std::span<const float> values);
   
   // Convert a spectral emission distr. to cie XYZ
   inline
