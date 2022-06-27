@@ -14,7 +14,90 @@
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/application.hpp>
 
+// STL includes: TODO extract
+#include <execution>
+#include <mutex>
+
 namespace met {
+  namespace detail {
+    void init_grid(ApplicationCreateInfo info, detail::LinearScheduler &scheduler) {
+      // Load input data 
+      auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path);
+      fmt::print("Loaded spectral database from {}\n", info.spectral_db_path.string());
+
+      // Input data layout
+      const uint  data_samples = spectral_data.channels;
+      const float data_minv    = 400.f,
+                  data_maxv    = 700.f,
+                  data_ssize   = (data_maxv - data_minv) / static_cast<float>(data_samples);
+      auto idx_to_data = [&](uint i) { return (.5f + static_cast<float>(i)) * data_ssize + data_minv; };
+
+      fmt::print("Database format\n\tmin : {}\n\tmax : {}\n\tbins: {}\n",
+        data_minv, data_maxv, data_samples);
+
+      // Fill list of wavelengths matching data layout for spectrum_from_data(...)
+      std::vector<float> wavelengths(data_samples);
+      std::ranges::copy(std::views::iota(0u, data_samples) 
+        | std::views::transform(idx_to_data), wavelengths.begin());
+
+      // Convert data into metameric's spectral format
+      std::vector<Spectrum> internal_sd(spectral_data.size);
+      std::transform(std::execution::par_unseq, spectral_data.data.begin(), spectral_data.data.end(), 
+        internal_sd.begin(), [&](const auto &v) {  return spectrum_from_data(wavelengths, v); });
+
+      // Convert data to metameric's color format under D65
+      std::vector<Color> internal_color(internal_sd.size());
+      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), 
+        internal_color.begin(), [](const auto &sd) { return xyz_to_srgb(reflectance_to_xyz(sd)); });
+
+      fmt::print("Converted database to Metameric format\n");
+      fmt::print("Metameric format\n\tmin : {}\n\tmax : {}\n\tbins: {}\n",
+        wavelength_min, wavelength_max, wavelength_samples);
+
+      // Initialize a empty 3D spectral grid
+      constexpr uint grid_size = 64;
+      std::vector<Spectrum> grid(std::pow(grid_size, 3), 0.f);
+      constexpr auto color_to_grid = [&](const Color &c) {
+        auto v = (c.min(1.f).max(0.f) * static_cast<float>(grid_size - 1));
+        return v.cast<uint>().eval();
+      };
+
+      // Initialize helper grids for parallel computation
+      std::vector<std::mutex> grid_mutexes(std::pow(grid_size, 3));
+      std::vector<uint>       grid_count(std::pow(grid_size, 3));
+
+      // Reduce spectra into grid based on their color as a position
+      std::vector<uint> grid_indices(internal_color.size());
+      std::iota(grid_indices.begin(), grid_indices.end(), 0);
+      std::for_each(std::execution::par, grid_indices.begin(), grid_indices.end(), [&](uint i) {
+        auto gridv = color_to_grid(internal_color[i]).eval();
+        uint j     = gridv.z() * std::pow(grid_size, 2) 
+                   + gridv.y() * grid_size 
+                   + gridv.x();
+
+        std::lock_guard<std::mutex> lock(grid_mutexes[j]);
+
+        grid[j] += internal_sd[i];
+        grid_count[j]++;
+      });
+      
+      // Normalize grid by number of spectra added per bin
+      grid_indices = std::vector<uint>(grid.size());
+      std::iota(grid_indices.begin(), grid_indices.end(), 0);
+      std::for_each(std::execution::par_unseq, grid_indices.begin(), grid_indices.end(), [&](uint i) {
+        grid[i] /= static_cast<float>(std::max(grid_count[i], 1u));
+      });
+
+      fmt::print("Computed spectral grid ({} x {} x {})\n",
+        grid_size, grid_size, grid_size);
+
+      // Make resources available for other components during runtime
+      scheduler.insert_resource<std::vector<Spectrum>>("spectral_data", std::move(internal_sd));
+      scheduler.insert_resource<std::vector<Spectrum>>("spectral_grid", std::move(grid));
+      scheduler.insert_resource<std::vector<Color>>("color_data", std::move(internal_color));
+    }
+  }
+
   gl::WindowCreateFlags window_flags = gl::WindowCreateFlags::eVisible
   #ifndef NDEBUG                    
                                       | gl::WindowCreateFlags::eDebug 
@@ -137,23 +220,6 @@ namespace met {
     scheduler.insert_resource("texture_data", std::move(texture_data));
     scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
 
-    // Load test spectral database
-    fmt::print("Loading test database: {}\n", info.spectral_db_path.string());
-    auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path);
-    fmt::print("Loaded spectral database\n\tsize: {}\n\tchan: {}\n", 
-      spectral_data.size, spectral_data.channels);
-    
-    // Process subset of test spectral database
-    std::vector<Spectrum> retained_spectra(128, 0.5f);
-    #pragma omp parallel for
-    for (size_t i = 0; i < retained_spectra.size(); ++i) {
-      std::ranges::copy(spectral_data.data[4'500'000 + i], retained_spectra[i].begin());
-    }
-
-    // Clean up test spectral database
-    spectral_data = {};
-    scheduler.insert_resource<std::vector<Spectrum>>("spectral_data", std::move(retained_spectra));
-
     // Initialize OpenGL context and primary window, submit to scheduler
     auto &window = scheduler.emplace_resource<gl::Window, gl::WindowCreateInfo>("window", 
       { .size = { 1280, 800 }, .title = "Metameric", .flags = window_flags });
@@ -167,6 +233,7 @@ namespace met {
     ImGui::Init(window, info);
 
     // Create and run loop
+    init_grid(info, scheduler);
     init_schedule(scheduler, window);
     while (!window.should_close()) { 
       scheduler.run(); 
