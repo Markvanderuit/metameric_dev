@@ -74,7 +74,8 @@ namespace met {
         uint j     = gridv.z() * std::pow(grid_size, 2) 
                    + gridv.y() * grid_size 
                    + gridv.x();
-
+        
+        // Acquire a lock on the current position to ensure reduction remains atomic
         std::lock_guard<std::mutex> lock(grid_mutexes[j]);
 
         grid[j] += internal_sd[i];
