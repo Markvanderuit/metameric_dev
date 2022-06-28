@@ -8,6 +8,43 @@
 #include <numeric>
 
 namespace met {
+  namespace detail {
+    Spectrum eval_grid(uint grid_size, const std::vector<Spectrum> &grid, glm::vec3 pos) {
+      auto eval_grid_u = [&](const glm::uvec3 &u) {
+        uint i = u.z * std::pow<uint>(grid_size, 2) + u.y * grid_size + u.x;
+        return grid[i];
+      };
+      constexpr auto lerp = [](const auto &a, const auto &b, float t) {
+        return a + t * (b - a);
+      };
+
+      // Compute nearest positions and an alpha component for interpolation
+      pos = glm::clamp(pos, 0.f, 1.f) * static_cast<float>(grid_size - 1);
+      glm::uvec3 lower = glm::floor(pos),
+                 upper = glm::ceil(pos);
+      glm::vec3 alpha = pos - glm::vec3(lower); 
+
+      // Sample the eight nearest positions in the grid
+      auto lll = eval_grid_u({ lower.x, lower.y, lower.z }),
+           ull = eval_grid_u({ upper.x, lower.y, lower.z }),
+           lul = eval_grid_u({ lower.x, upper.y, lower.z }),
+           llu = eval_grid_u({ lower.x, lower.y, upper.z }),
+           uul = eval_grid_u({ upper.x, upper.y, lower.z }),
+           luu = eval_grid_u({ lower.x, upper.y, upper.z }),
+           ulu = eval_grid_u({ upper.x, lower.y, upper.z }),
+           uuu = eval_grid_u({ upper.x, upper.y, upper.z });
+
+      // Return trilinear interpolation
+      return lerp(lerp(lerp(lll, ull, alpha.x),
+                       lerp(lul, uul, alpha.x),
+                       alpha.y),
+                  lerp(lerp(llu, ulu, alpha.x),
+                       lerp(luu, uuu, alpha.x),
+                       alpha.y),
+                  alpha.z);
+    }
+  } // namespace detail
+
   class GamutPickerTask : public detail::AbstractTask {
     glm::vec3 m_gamut_center;
 
@@ -77,18 +114,13 @@ namespace met {
           return glm::uvec3(glm::clamp(v, 0.f, 1.f) * static_cast<float>(grid_size - 1));
         };
         constexpr auto grid_to_idx = [&](const glm::uvec3 &u) {
-          return u.z * std::pow(grid_size, 2) + u.y * grid_size + u.x;
+          return u.z * std::pow<uint>(grid_size, 2) + u.y * grid_size + u.x;
         };
-
-        // Obtain indices of spectra at gamut's point positions
-        std::vector<uint> indices(4);
-        std::ranges::transform(i_gamut_buffer_map, indices.begin(),
-          [](const glm::vec3 &v) { return grid_to_idx(col_to_grid(v)); });
 
         // Obtain spectra at gamut's point positions;
         std::vector<Spectrum> spectra(4);
-        std::ranges::transform(indices, spectra.begin(),
-          [&](uint i) { return e_spectral_grid[i]; });
+        std::ranges::transform(i_gamut_buffer_map, spectra.begin(),
+          [&](const auto &v) { return detail::eval_grid(grid_size, e_spectral_grid, v); });
 
         // Plot spectra
         ImGui::PlotLines("reflectance 0", spectra[0].data(), wavelength_samples, 0,
