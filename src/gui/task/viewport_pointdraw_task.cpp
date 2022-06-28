@@ -79,9 +79,9 @@ namespace met {
 
     // Build draw object data for provided array object
     m_point_draw = { .type = gl::PrimitiveType::ePoints,
-                      .vertex_count = (uint) texture_data.size(),
-                      .bindable_array = &m_point_array,
-                      .bindable_program = &m_point_program };
+                     .vertex_count = (uint) texture_data.size(),
+                     .bindable_array = &m_point_array,
+                     .bindable_program = &m_point_program };
   }
 
   void ViewportPointdrawTask::eval(detail::TaskEvalInfo &info) {
@@ -102,7 +102,7 @@ namespace met {
       m_rbuffer_msaa  = {{ .size = e_viewport_texture.size() }};
       m_dbuffer_msaa  = {{ .size = e_viewport_texture.size() }};
       m_fbuffer_msaa  = {{ .type = gl::FramebufferType::eColor, .attachment = &m_rbuffer_msaa },
-                          { .type = gl::FramebufferType::eDepth, .attachment = &m_dbuffer_msaa }};
+                         { .type = gl::FramebufferType::eDepth, .attachment = &m_dbuffer_msaa }};
       m_fbuffer       = {{ .type = gl::FramebufferType::eColor, .attachment = &e_viewport_texture }};
     }
     

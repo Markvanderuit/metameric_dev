@@ -47,8 +47,9 @@ namespace met {
 
       // Convert data to metameric's color format under D65
       std::vector<Color> internal_color(internal_sd.size());
+      auto illum = models::emitter_cie_e;
       std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), 
-        internal_color.begin(), [](const auto &sd) { return xyz_to_srgb(reflectance_to_xyz(sd)); });
+        internal_color.begin(), [&](const auto &sd) { return xyz_to_srgb(reflectance_to_xyz(sd, illum)); });
 
       fmt::print("Converted database to Metameric format\n");
       fmt::print("Metameric format\n\tmin : {}\n\tmax : {}\n\tbins: {}\n",
