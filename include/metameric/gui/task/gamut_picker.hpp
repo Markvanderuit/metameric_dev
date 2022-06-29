@@ -159,7 +159,7 @@ namespace met {
           [](const auto &s) { return xyz_to_srgb(reflectance_to_xyz(s)); });
 
         // Plot spectra
-        ImGui::PlotLines("reflectance 0", spectra[0].data(), wavelength_samples, 0,
+        /* ImGui::PlotLines("reflectance 0", spectra[0].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
         ImGui::ColorEdit3("color 0, coordinates", glm::value_ptr(i_gamut_buffer_map[0]));
         ImGui::ColorEdit3("color 0, conversion", spectra_to_colors[0].data());
@@ -174,7 +174,7 @@ namespace met {
         ImGui::PlotLines("reflectance 3", spectra[3].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
         ImGui::ColorEdit3("color 3, coordinates", glm::value_ptr(i_gamut_buffer_map[3]));
-        ImGui::ColorEdit3("color 3, conversion", spectra_to_colors[3].data());
+        ImGui::ColorEdit3("color 3, conversion", spectra_to_colors[3].data()); */
 
         std::vector<Color> gamut_eigen(4);
         std::ranges::transform(i_gamut_buffer_map, gamut_eigen.begin(),
@@ -189,7 +189,10 @@ namespace met {
         auto recovered_spctr = detail::from_barycentric(spectra, central_coords);
         auto recovered_color = xyz_to_srgb(reflectance_to_xyz(recovered_spctr)); 
 
-        ImGui::PlotLines("reflectance n", recovered_spctr.data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance bar", recovered_spctr.data(), wavelength_samples, 0,
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+          
+        ImGui::PlotLines("reflectance avg", spectrum_average.data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
 
         // fmt::print("rgb: {}\nspectral: {}\n", recovered_color, color_from_spec);
