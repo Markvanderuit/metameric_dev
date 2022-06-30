@@ -60,17 +60,14 @@ namespace met {
     auto &i_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport_texture");
     auto &i_viewport_arcball      = info.get_resource<detail::Arcball>("viewport_arcball");
     auto &i_viewport_model_matrix = info.get_resource<glm::mat4>("viewport_model_matrix");
-    auto &e_gamut_buffer_map      = info.get_resource<std::span<glm::vec3>>("gamut_picker", "gamut_buffer_map");
+    auto &e_gamut_buffer_map      = info.get_resource<std::span<glm::vec3>>("global", "color_gamut_map");
 
     // Begin window draw; declare scoped ImGui style state
     auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
                          ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                          ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
 
-    // Begin ImGui window and retain it for rest of scope
-    if (!ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus)) {
-      ImGui::End();
-    }
+    ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     auto viewport_offs = static_cast<glm::vec2>(ImGui::GetWindowPos()) 
@@ -183,5 +180,7 @@ namespace met {
         std::ranges::for_each(gamut_selection, [&](auto &p) { p += gamut_transl; });
       }
     }
+    
+    ImGui::End();
   }
 } // namespace met

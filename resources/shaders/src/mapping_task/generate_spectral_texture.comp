@@ -1,0 +1,46 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <spectrum.glsl>
+
+const uint n_gamut_vertices = 4;
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0, std430) restrict readonly  buffer b_0 { vec3 color_gamut[n_gamut_vertices];   };
+layout(binding = 1, std430) restrict readonly  buffer b_1 { Spec spectra_gamut[n_gamut_vertices]; };
+layout(binding = 2, std430) restrict readonly  buffer b_2 { vec3 color_texture[];                 };
+layout(binding = 3, std430) restrict writeonly buffer b_3 { Spec spectral_texture[];              };
+
+layout(location = 0) uniform uint u_n;
+
+vec4 to_barycentric(in vec3 p) {
+  // TODO preprocess this matrix+vector and use uniforms instead
+  mat3 t = inverse(mat3(color_gamut[0] - color_gamut[3],
+                        color_gamut[1] - color_gamut[3],
+                        color_gamut[2] - color_gamut[3]));
+  vec3 abc = t * (p - color_gamut[3]);
+  return vec4(abc, 1.f - vsum(abc));
+}
+
+void main() {
+  const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+  guard(i < u_n);
+
+  /*
+    1. Obtain a value at i in the color texture.
+    2. Compute the barycentric coordinates of this value in the color gamut
+    3. Multiply the spectra in the spectral gamut based on the coordinates
+    4. Store the value at i in the spectral texture
+  */
+
+  vec3 color_p = color_texture[i];
+  vec4 abcd = to_barycentric(color_p);
+
+  Spec spectrum_p = constr_spec(0.f);
+  for (uint i = 0; i < n_gamut_vertices; ++i) {
+    spectrum_p = add(spectrum_p, mul(spectra_gamut[i], abcd[i]));
+  }
+
+  spectral_texture[i] = spectrum_p;
+}

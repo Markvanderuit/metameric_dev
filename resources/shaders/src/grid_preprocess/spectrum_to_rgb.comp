@@ -16,15 +16,15 @@ layout(binding = 1, std430) restrict readonly buffer block_1 {
 };
 
 layout(binding = 2, std430) restrict writeonly buffer block_2 { 
-  Spectrum spectrum_out[];
+  Spec spectrum_out[];
 };
 
 layout(location = 0) uniform uint n_spectra;
 
-Spectrum spectrum_from_data(in float[wvls_size] wvls, 
+Spec spectrum_from_data(in float[wvls_size] wvls, 
                             in float[wvls_size] values) {
-  Spectrum s = constr_spectrum(0.f), 
-           n = constr_spectrum(0.f);
+  Spec s = constr_spec(0.f), 
+       n = constr_spec(0.f);
 
   for (uint i = 0; i < wvls_size; ++i) {
     float wvl = wvls[i];

@@ -2,16 +2,17 @@
 
 #include <metameric/core/spectral_mapping.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
-#include <small_gl/buffer.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/dispatch.hpp>
 
 namespace met {
   class MappingTask : public detail::AbstractTask {
-    gl::Buffer m_gamut_vertex_buffer;
-    gl::Buffer m_gamut_spectra_buffer;
+    gl::Program     m_generate_program;
+    gl::ComputeInfo m_generate_dispatch;
 
-    std::span<Color> m_gamut_vertices;
-    std::span<Spec>  m_gamut_spectra;
-    
+    gl::Program     m_mapping_program;
+    gl::ComputeInfo m_mapping_dispatch;
+
   public:
     MappingTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;

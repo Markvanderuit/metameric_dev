@@ -1,0 +1,37 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <spectrum.glsl>
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec spectral_texture[]; };
+layout(binding = 1, std430) restrict readonly  buffer b_1 { 
+  CMFS cmfs;
+  Spec illuminant;
+  uint n_scatterings;
+};
+layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3 color_texture[];    };
+
+layout(location = 0) uniform uint u_n;
+
+vec3 reflectance_to_xyz(in Spec sd) {
+  const float k = 1.f / ssum(mul(cmfs[1], illuminant));
+  return k * mul(cmfs, mul(sd, illuminant));
+}
+
+void main() {
+  const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+  guard(i < u_n);
+
+  /*
+    1. Obtain a value at i in the spectral texture
+    2. Multiply by nr. of scatterings
+    3. ~Multiply by illuminant~
+    4. Apply color matching functions
+    5. Do not forget normalization // TODO pass in precompute
+    // Store resulting vec3 at i in the color texture
+  */
+
+  color_texture[i] = reflectance_to_xyz(spectral_texture[i]);
+}

@@ -11,7 +11,7 @@ namespace met {
 
   void ImageViewerTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_texture_obj = info.get_resource<io::TextureData<float>>("global", "texture_data");
+    auto &e_texture_obj = info.get_resource<io::TextureData<float>>("global", "color_texture_buffer_cpu");
 
     // Load texture data into gl texture
     m_texture = gl::Texture2d3f({ .size = e_texture_obj.size, .data = e_texture_obj.data });

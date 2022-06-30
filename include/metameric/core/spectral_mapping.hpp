@@ -16,7 +16,7 @@ namespace met {
     Spec illuminant = models::emitter_cie_d65;
 
     // Nr. of repeated scatterings of a reflectance
-    uint n_scatterings = 1;
+    uint n_scatterings = 0;
   };
   
   /**

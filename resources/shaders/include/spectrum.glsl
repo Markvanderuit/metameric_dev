@@ -15,55 +15,67 @@ const float wavelength_ssize = wavelength_range / float(wavelength_samples);
 const float wavelength_ssinv = float(wavelength_samples) / wavelength_range;
 
 /* Base Spectrum object */
-#define Spectrum float[wavelength_samples]
-// struct Spectrum {
-//   float values[wavelength_samples];
-// };
+#define Spec float[wavelength_samples]
+#define CMFS float[3][wavelength_samples]
 
-Spectrum constr_spectrum(in float constant) {
-  Spectrum s;
+Spec constr_spec(in float constant) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = constant;
   return s;
 }
 
-Spectrum add(in Spectrum a, in Spectrum b) {
-  Spectrum s;
+Spec add(in Spec a, in Spec b) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = a[i] + b[i];
   return s;
 }
 
-Spectrum div(in Spectrum a, in Spectrum b) {
-  Spectrum s;
+Spec mul(in Spec a, in Spec b) {
+  Spec s;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    s[i] = a[i] * b[i];
+  return s;
+}
+
+Spec mul(in Spec a, in float f) {
+  Spec s;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    s[i] = a[i] * f;
+  return s;
+}
+
+Spec div(in Spec a, in Spec b) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = a[i] / b[i];
   return s;
 }
 
-Spectrum maxv(in Spectrum a, in Spectrum b) {
-  Spectrum s;
+Spec maxv(in Spec a, in Spec b) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = max(a[i], b[i]);
   return s;
 }
 
-Spectrum maxv(in Spectrum a, in float b) {
-  Spectrum s;
+Spec maxv(in Spec a, in float b) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = max(a[i], b);
   return s;
 }
 
-Spectrum minv(in Spectrum a, in Spectrum b) {
-  Spectrum s;
+Spec minv(in Spec a, in Spec b) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = min(a[i], b[i]);
   return s;
 }
 
-Spectrum minv(in Spectrum a, in float b) {
-  Spectrum s;
+Spec minv(in Spec a, in float b) {
+  Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = min(a[i], b);
   return s;
@@ -93,6 +105,40 @@ Spectrum minv(in Spectrum a, in float b) {
 //     f += s.values[i];
 //   return f;
 // }
+
+float vsum(vec3 v) {
+  return v.x + v.y + v.z;
+}
+
+float ssum(in Spec s) {
+  float f = 0.f;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    f += s[i];
+  return f;
+}
+
+float sdot(in Spec a, in Spec b) {
+  float f = 0.f;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    f += a[i] * b[i];
+  return f;
+}
+
+float vmean(vec3 v) {
+  return vsum(v) / float(3);
+}
+
+float smean(in Spec s) {
+  return ssum(s) / float(wavelength_samples);
+}
+
+vec3 mul(in CMFS cmfs, in Spec s) {
+  return vec3(
+    smean(mul(cmfs[0], s)),
+    smean(mul(cmfs[1], s)),
+    smean(mul(cmfs[2], s))
+  );
+}
 
 float wavelength_at_index(uint i) {
   return wavelength_min + wavelength_ssize * (float(i) + .5f);

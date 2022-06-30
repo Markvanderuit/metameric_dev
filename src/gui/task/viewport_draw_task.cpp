@@ -14,9 +14,9 @@ namespace met {
 
   void ViewportDrawTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources 
-    auto &e_gamut_buffer = info.get_resource<gl::Buffer>("gamut_picker", "gamut_buffer");
-    auto &e_texture_obj = info.get_resource<io::TextureData<float>>("global", "texture_data");
-    auto &e_color_data = info.get_resource<std::vector<Color>>("global", "color_data");
+    auto &e_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
+    auto &e_texture_obj  = info.get_resource<io::TextureData<float>>("global", "color_texture_buffer_cpu");
+    auto &e_color_data   = info.get_resource<std::vector<Color>>("global", "color_data");
 
     // Element data to draw a tetrahedron from four vertices using a line strip
     std::vector<uint> gamut_elements = {
@@ -35,18 +35,16 @@ namespace met {
     // Build shader program
     m_gamut_program = gl::Program({
       { .type = gl::ShaderType::eVertex, 
-        .path = "resources/shaders/viewport_task/gamut_draw.vert",
-        .is_spirv_binary = false },
+        .path = "resources/shaders/viewport_task/gamut_draw.vert" },
       { .type = gl::ShaderType::eFragment,  
-        .path = "resources/shaders/viewport_task/gamut_draw.frag",
-        .is_spirv_binary = false }
+        .path = "resources/shaders/viewport_task/gamut_draw.frag" }
     });
     
     // Build draw object data for provided array object
-    m_gamut_draw = { .type              = gl::PrimitiveType::eLineLoop,
-                      .vertex_count     = (uint) gamut_elements.size(),
-                      .bindable_array   = &m_gamut_array,
-                      .bindable_program = &m_gamut_program };
+    m_gamut_draw = { .type             = gl::PrimitiveType::eLineLoop,
+                     .vertex_count     = (uint) gamut_elements.size(),
+                     .bindable_array   = &m_gamut_array,
+                     .bindable_program = &m_gamut_program };
 
     // Specify framebuffer color clear value depending on application style
     switch (info.get_resource<ApplicationCreateInfo>("global", "application_create_info").color_mode) {
@@ -59,8 +57,8 @@ namespace met {
     }
 
     // Load texture data into vertex buffer and create array object for upcoming draw
-    auto texture_data = as_typed_span<glm::vec3>(e_texture_obj.data);
-    // auto texture_data = as_typed_span<Color>(e_color_data);
+    // auto texture_data = as_typed_span<Color>(e_texture_obj.data);
+    auto texture_data = as_typed_span<Color>(e_color_data);
     m_point_buffer = gl::Buffer({ .data = convert_span<std::byte>(texture_data) });
     m_point_array = gl::Array({ 
       .buffers = {{ .buffer = &m_point_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
@@ -70,11 +68,9 @@ namespace met {
     // Build shader program
     m_point_program = gl::Program({
       { .type = gl::ShaderType::eVertex, 
-        .path = "resources/shaders/viewport_task/texture_draw.vert",
-        .is_spirv_binary = false },
+        .path = "resources/shaders/viewport_task/texture_draw.vert" },
       { .type = gl::ShaderType::eFragment,  
-        .path = "resources/shaders/viewport_task/texture_draw.frag",
-        .is_spirv_binary = false }
+        .path = "resources/shaders/viewport_task/texture_draw.frag" }
     });
 
     // Build draw object data for provided array object
