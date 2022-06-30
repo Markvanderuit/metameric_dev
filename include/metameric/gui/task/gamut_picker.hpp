@@ -11,7 +11,7 @@
 
 namespace met {
   namespace detail {
-    Spectrum eval_grid(uint grid_size, const std::vector<Spectrum> &grid, glm::vec3 pos) {
+    Spec eval_grid(uint grid_size, const std::vector<Spec> &grid, glm::vec3 pos) {
       auto eval_grid_u = [&](const glm::uvec3 &u) {
         uint i = u.z * std::pow<uint>(grid_size, 2) + u.y * grid_size + u.x;
         return grid[i];
@@ -56,8 +56,8 @@ namespace met {
     }
 
     // just a dot product over arbitrary types
-    Spectrum from_barycentric(std::span<Spectrum> input, const eig::Vector4f &v) {
-      Spectrum t = 0.f;
+    Spec from_barycentric(std::span<Spec> input, const eig::Vector4f &v) {
+      Spec t = 0.f;
       for (size_t i = 0; i < 4; ++i) {
         t += input[i] * v[i];
       }
@@ -77,8 +77,6 @@ namespace met {
   } // namespace detail
 
   class GamutPickerTask : public detail::AbstractTask {
-    glm::vec3 m_gamut_center;
-
   public:
     GamutPickerTask(const std::string &name)
     : detail::AbstractTask(name) { }
@@ -92,10 +90,6 @@ namespace met {
         glm::vec3(0.33, 0.33, 0.7)
       };
       
-      // Obtain center point over vertices
-      m_gamut_center = std::reduce(gamut_initial_vertices.begin(), gamut_initial_vertices.end())
-                     / (float) gamut_initial_vertices.size();
-
       gl::Buffer gamut_buffer = {{ .data = as_typed_span<std::byte>(gamut_initial_vertices),
                                    .flags = gl::BufferCreateFlags::eMapRead
                                           | gl::BufferCreateFlags::eMapWrite
@@ -120,7 +114,7 @@ namespace met {
       auto &i_gamut_buffer_map = info.get_resource<std::span<glm::vec3>>("gamut_buffer_map");
       
       // Get externally shared resources
-      auto &e_spectral_grid = info.get_resource<std::vector<Spectrum>>("global", "spectral_grid");
+      auto &e_spectral_grid = info.get_resource<std::vector<Spec>>("global", "spectral_grid");
 
       // Quick temporary window to modify gamut points
       if (ImGui::Begin("Gamut picker")) {
@@ -149,7 +143,7 @@ namespace met {
         };
 
         // Obtain spectra at gamut's point positions;
-        std::vector<Spectrum> spectra(4);
+        std::vector<Spec> spectra(4);
         std::ranges::transform(i_gamut_buffer_map, spectra.begin(),
           [&](const auto &v) { return detail::eval_grid(grid_size, e_spectral_grid, v); });
 
@@ -180,7 +174,7 @@ namespace met {
         std::ranges::transform(i_gamut_buffer_map, gamut_eigen.begin(),
           [](const glm::vec3 &c) -> Color { return { c.x, c.y, c.z }; });
         Color gamut_average = std::reduce(gamut_eigen.begin(), gamut_eigen.end(), Color(0.f)) / 4.f;
-        Spectrum spectrum_average = std::reduce(spectra.begin(), spectra.end(), Spectrum(0.f)) / 4.f;
+        Spec spectrum_average = std::reduce(spectra.begin(), spectra.end(), Spec(0.f)) / 4.f;
 
         fmt::print("Colors:\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n",
           gamut_eigen[0], gamut_eigen[1], gamut_eigen[2], gamut_eigen[3], gamut_average);

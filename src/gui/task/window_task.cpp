@@ -1,16 +1,17 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/detail/imgui.hpp>
-#include <metameric/gui/task/viewport_base_task.hpp>
+#include <metameric/gui/task/window_task.hpp>
 
 namespace met {
-  ViewportBaseTask::ViewportBaseTask(const std::string &name)
+  WindowTask::WindowTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void ViewportBaseTask::init(detail::TaskInitInfo &info) {
+  void WindowTask::init(detail::TaskInitInfo &info) {
 
   }
 
-  void ViewportBaseTask::eval(detail::TaskEvalInfo &info) {
+  void WindowTask::eval(detail::TaskEvalInfo &info) {
+    // Set up the menu bar at the top of the window's viewport
     if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("File")) {
         // ...
@@ -35,9 +36,7 @@ namespace met {
       ImGui::EndMainMenuBar();
     }
     
-    auto flags = ImGuiDockNodeFlags_PassthruCentralNode;
-    // auto flags = ImGuiDockNodeFlags_AutoHideTabBar  
-    //            | ImGuiDockNodeFlags_PassthruCentralNode;
-    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), flags);
+    // Create an explicit dock space over the entire window's viewport, excluding the menu bar
+    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
   }
 } // namespace met

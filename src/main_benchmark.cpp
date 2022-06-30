@@ -16,7 +16,7 @@
 using namespace met;
 
 static void bm_eig_addition(benchmark::State &state) {
-  Spectrum a = 5.f,  
+  Spec a = 5.f,  
            b = 1.f,
            c = (a > b).select(a, 5.f);
 

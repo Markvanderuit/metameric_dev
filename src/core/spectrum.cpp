@@ -7,27 +7,39 @@ namespace met {
   // Load color matching functions and SPD models
   namespace models {
     #include <metameric/core/detail/spectrum_models_cie.ext>
+    
+    // Linear color space transformations
+    eig::Matrix3f xyz_to_srgb_transform {{ 3.240479f, -1.537150f,-0.498535f },
+                                         {-0.969256f,  1.875991f, 0.041556f },
+                                         { 0.055648f, -0.204043f, 1.057311f }};
+    eig::Matrix3f srgb_to_xyz_transform {{ 0.412453f, 0.357580f, 0.180423f },
+                                         { 0.212671f, 0.715160f, 0.072169f },
+                                         { 0.019334f, 0.119193f, 0.950227f }};
 
-    Spectrum emitter_cie_d65 = spectrum_from_data(cie_wavelength_values, cie_d65_values);
-    Spectrum emitter_cie_e   = 1.f;
-    CMFS cmfs_cie_xyz        = cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, 
-                                              cie_xyz_values_y, cie_xyz_values_z);
+    // Color matching functions
+    CMFS cmfs_cie_xyz    = cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, 
+                                          cie_xyz_values_y, cie_xyz_values_z);
+    CMFS cmfs_srgb       = xyz_to_srgb_transform * cmfs_cie_xyz;
+
+    // Illuminant spectra
+    Spec emitter_cie_d65 = spectrum_from_data(cie_wavelength_values, cie_d65_values);
+    Spec emitter_cie_e   = 1.f;
   } // namespace models 
 
   // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::eval(...) from libcore/spectrum.cpp
-  Spectrum spectrum_from_data(std::span<const float> wvls,
-                              std::span<const float> values) {
+  Spec spectrum_from_data(std::span<const float> wvls,
+                          std::span<const float> values) {
     float data_wvl_min = wvls[0],
           data_wvl_max = wvls[wvls.size() - 1];
 
-    Spectrum s = 0.f;
+    Spec s = 0.f;
     for (size_t i = 0; i < wavelength_samples; ++i) {
-      float spectrum_wvl_min = i * wavelength_sample_size + wavelength_min,
-            spectrum_wvl_max = spectrum_wvl_min + wavelength_sample_size;
+      float spec_wvl_min = i * wavelength_ssize + wavelength_min,
+            spec_wvl_max = spec_wvl_min + wavelength_ssize;
 
       // Determine accessible range of wavelengths
-      float wvl_min = std::max(spectrum_wvl_min, data_wvl_min),
-            wvl_max = std::min(spectrum_wvl_max, data_wvl_max);
+      float wvl_min = std::max(spec_wvl_min, data_wvl_min),
+            wvl_max = std::min(spec_wvl_max, data_wvl_max);
       guard_continue(wvl_max > wvl_min);
 
       // Find the starting index using binary search (Thanks for the idea, Mitsuba people!)
@@ -50,7 +62,7 @@ namespace met {
 
         s[i] += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
       }
-      s[i] /= wavelength_sample_size;
+      s[i] /= wavelength_ssize;
     }
 
     return s.eval();
@@ -60,12 +72,8 @@ namespace met {
                       std::span<const float> values_x,
                       std::span<const float> values_y,
                       std::span<const float> values_z) {
-    CMFS c;
-
-    c.row(0) = spectrum_from_data(wvls, values_x);
-    c.row(1) = spectrum_from_data(wvls, values_y);
-    c.row(2) = spectrum_from_data(wvls, values_z);
-
-    return c.eval();
+    return (CMFS() << spectrum_from_data(wvls, values_x).transpose(),
+                      spectrum_from_data(wvls, values_y).transpose(),
+                      spectrum_from_data(wvls, values_z).transpose()).finished();
   }
 } // namespace met

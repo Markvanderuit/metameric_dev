@@ -8,10 +8,10 @@
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/scheduler.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
-#include <metameric/gui/task/viewport_base_task.hpp>
-#include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
+#include <metameric/gui/task/viewport_task.hpp>
+#include <metameric/gui/task/window_task.hpp>
 #include <metameric/gui/application.hpp>
 
 // STL includes: TODO extract
@@ -41,7 +41,7 @@ namespace met {
         | std::views::transform(idx_to_data), wavelengths.begin());
 
       // Convert data into metameric's spectral format
-      std::vector<Spectrum> internal_sd(spectral_data.size);
+      std::vector<Spec> internal_sd(spectral_data.size);
       std::transform(std::execution::par_unseq, spectral_data.data.begin(), spectral_data.data.end(), 
         internal_sd.begin(), [&](const auto &v) {  return spectrum_from_data(wavelengths, v); });
 
@@ -56,7 +56,7 @@ namespace met {
 
       // Initialize a empty 3D spectral grid
       constexpr uint grid_size = 64;
-      std::vector<Spectrum> grid(std::pow(grid_size, 3), 0.f);
+      std::vector<Spec> grid(std::pow(grid_size, 3), 0.f);
       constexpr auto color_to_grid = [&](const Color &c) {
         auto v = (c.min(1.f).max(0.f) * static_cast<float>(grid_size - 1));
         return v.cast<uint>().eval();
@@ -93,8 +93,8 @@ namespace met {
         grid_size, grid_size, grid_size);
 
       // Make resources available for other components during runtime
-      scheduler.insert_resource<std::vector<Spectrum>>("spectral_data", std::move(internal_sd));
-      scheduler.insert_resource<std::vector<Spectrum>>("spectral_grid", std::move(grid));
+      scheduler.insert_resource<std::vector<Spec>>("spectral_data", std::move(internal_sd));
+      scheduler.insert_resource<std::vector<Spec>>("spectral_grid", std::move(grid));
       scheduler.insert_resource<std::vector<Color>>("color_data", std::move(internal_color));
     }
   }
@@ -117,9 +117,9 @@ namespace met {
     });
 
     // Third task to run prepares imgui's viewport layout
-    scheduler.emplace_task<ViewportBaseTask>("viewport_base");
+    scheduler.emplace_task<WindowTask>("viewport_base");
 
-    // Next tasks to run define main viewport components and tasks
+    // Next tasks to run define ui components and runtime tasks
     scheduler.emplace_task<GamutPickerTask>("gamut_picker");
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<ImageViewerTask>("image_viewer");
@@ -173,7 +173,7 @@ namespace met {
     
     scheduler.emplace_task<LambdaTask>("plot_spectra", [](auto &info) {
       if (ImGui::Begin("Reflectance plots")) {
-        const auto &spectra = info.get_resource<std::vector<Spectrum>>("global", "spectral_data");
+        const auto &spectra = info.get_resource<std::vector<Spec>>("global", "spectral_data");
         const auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
         

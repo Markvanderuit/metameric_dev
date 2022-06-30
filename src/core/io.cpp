@@ -98,7 +98,7 @@ namespace met::io {
     auto indexed = indices | std::views::transform(ref_i(data));
 
     // Apply srgb->linear transformation to data
-    std::ranges::transform(indexed, indexed.begin(), srgb_to_lrgb<float>);
+    std::ranges::transform(indexed, indexed.begin(), gamma_srgb_to_linear_srgb<float>);
   }
 
   void apply_lrgb_to_srgb(TextureData<float> &obj, bool skip_alpha) {
@@ -114,6 +114,6 @@ namespace met::io {
     auto indexed = indices | std::views::transform(ref_i(data));
 
     // Apply linear->srgb transformation to data
-    std::ranges::transform(indexed, indexed.begin(), lrgb_to_srgb<float>);
+    std::ranges::transform(indexed, indexed.begin(), linear_srgb_to_gamma_srgb<float>);
   }
 } // namespace met::io

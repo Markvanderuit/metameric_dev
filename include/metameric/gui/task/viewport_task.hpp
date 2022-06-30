@@ -8,7 +8,6 @@
 namespace met {
   class ViewportTask : public detail::AbstractTask {
     std::vector<uint> m_gamut_selection_indices;
-    glm::vec3 m_gamut_anchor_pos;
 
   public:
     ViewportTask(const std::string &name);

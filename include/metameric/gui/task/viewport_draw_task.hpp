@@ -9,7 +9,7 @@
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 
 namespace met {
-  class ViewportPointdrawTask : public detail::AbstractTask {
+  class ViewportDrawTask : public detail::AbstractTask {
     // Gamut draw components
     gl::Buffer       m_gamut_elem_buffer;
     gl::Array        m_gamut_array;
@@ -34,7 +34,7 @@ namespace met {
     glm::vec3        m_fbuffer_clear_value;
 
   public:
-    ViewportPointdrawTask(const std::string &name);
+    ViewportDrawTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };

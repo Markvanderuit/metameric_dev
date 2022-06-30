@@ -6,13 +6,13 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/detail/imgui.hpp>
-#include <metameric/gui//task/viewport_pointdraw_task.hpp>
+#include <metameric/gui//task/viewport_draw_task.hpp>
 
 namespace met {
-  ViewportPointdrawTask::ViewportPointdrawTask(const std::string &name)
+  ViewportDrawTask::ViewportDrawTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void ViewportPointdrawTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources 
     auto &e_gamut_buffer = info.get_resource<gl::Buffer>("gamut_picker", "gamut_buffer");
     auto &e_texture_obj = info.get_resource<io::TextureData<float>>("global", "texture_data");
@@ -43,9 +43,9 @@ namespace met {
     });
     
     // Build draw object data for provided array object
-    m_gamut_draw = { .type = gl::PrimitiveType::eLineLoop,
-                      .vertex_count = (uint) gamut_elements.size(),
-                      .bindable_array = &m_gamut_array,
+    m_gamut_draw = { .type              = gl::PrimitiveType::eLineLoop,
+                      .vertex_count     = (uint) gamut_elements.size(),
+                      .bindable_array   = &m_gamut_array,
                       .bindable_program = &m_gamut_program };
 
     // Specify framebuffer color clear value depending on application style
@@ -59,8 +59,8 @@ namespace met {
     }
 
     // Load texture data into vertex buffer and create array object for upcoming draw
-    // auto texture_data = as_typed_span<glm::vec3>(e_texture_obj.data);
-    auto texture_data = as_typed_span<Color>(e_color_data);
+    auto texture_data = as_typed_span<glm::vec3>(e_texture_obj.data);
+    // auto texture_data = as_typed_span<Color>(e_color_data);
     m_point_buffer = gl::Buffer({ .data = convert_span<std::byte>(texture_data) });
     m_point_array = gl::Array({ 
       .buffers = {{ .buffer = &m_point_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
@@ -78,13 +78,13 @@ namespace met {
     });
 
     // Build draw object data for provided array object
-    m_point_draw = { .type = gl::PrimitiveType::ePoints,
-                     .vertex_count = (uint) texture_data.size(),
-                     .bindable_array = &m_point_array,
+    m_point_draw = { .type             = gl::PrimitiveType::ePoints,
+                     .vertex_count     = (uint) texture_data.size(),
+                     .bindable_array   = &m_point_array,
                      .bindable_program = &m_point_program };
   }
 
-  void ViewportPointdrawTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Viewport draw settings")) {
       ImGui::SliderFloat("Line width", &m_gamut_lwidth, 1.f, 16.f, "%.0f");
@@ -93,17 +93,17 @@ namespace met {
     ImGui::End();
                                 
     // Get externally shared resources 
-    auto &e_viewport_texture = info.get_resource<gl::Texture2d3f>("viewport", "viewport_texture");
-    auto &e_viewport_arcball = info.get_resource<detail::Arcball>("viewport", "viewport_arcball");
+    auto &e_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport", "viewport_texture");
+    auto &e_viewport_arcball      = info.get_resource<detail::Arcball>("viewport", "viewport_arcball");
     auto &e_viewport_model_matrix = info.get_resource<glm::mat4>("viewport", "viewport_model_matrix");
 
     // (re-)create framebuffers and renderbuffers if the viewport has resized
     if (!m_fbuffer.is_init() || e_viewport_texture.size() != m_rbuffer_msaa.size()) {
-      m_rbuffer_msaa  = {{ .size = e_viewport_texture.size() }};
-      m_dbuffer_msaa  = {{ .size = e_viewport_texture.size() }};
-      m_fbuffer_msaa  = {{ .type = gl::FramebufferType::eColor, .attachment = &m_rbuffer_msaa },
-                         { .type = gl::FramebufferType::eDepth, .attachment = &m_dbuffer_msaa }};
-      m_fbuffer       = {{ .type = gl::FramebufferType::eColor, .attachment = &e_viewport_texture }};
+      m_rbuffer_msaa = {{ .size = e_viewport_texture.size() }};
+      m_dbuffer_msaa = {{ .size = e_viewport_texture.size() }};
+      m_fbuffer_msaa = {{ .type = gl::FramebufferType::eColor, .attachment = &m_rbuffer_msaa },
+                        { .type = gl::FramebufferType::eDepth, .attachment = &m_dbuffer_msaa }};
+      m_fbuffer      = {{ .type = gl::FramebufferType::eColor, .attachment = &e_viewport_texture }};
     }
     
     // Declare scoped OpenGL state
@@ -116,24 +116,24 @@ namespace met {
     m_fbuffer_msaa.clear(gl::FramebufferType::eColor, m_fbuffer_clear_value);
     m_fbuffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
 
-    // Viewport size equals output texture size
+    // Prepare viewport and other draw settings
     gl::state::set_viewport(e_viewport_texture.size());
     gl::state::set_line_width(m_gamut_lwidth);
     gl::state::set_point_size(m_point_psize);
     
-    // Draw point set
+    // Update program uniforms
     m_point_program.uniform("model_matrix",  e_viewport_model_matrix);
     m_point_program.uniform("camera_matrix", e_viewport_arcball.full());
-    gl::dispatch_draw(m_point_draw);
-
-    // Draw gamut
     m_gamut_program.uniform("camera_matrix", e_viewport_arcball.full());
+
+    // Dispatch draw calls for point set and gamut lines
+    gl::dispatch_draw(m_point_draw);
     gl::dispatch_draw(m_gamut_draw);
 
     // Blit color results into the single-sampled framebuffer with attached viewport texture
     m_fbuffer_msaa.blit_to(m_fbuffer,
-                            e_viewport_texture.size(), { 0, 0 },
-                            e_viewport_texture.size(), { 0, 0 },
-                            gl::FramebufferMaskFlags::eColor);
+                           e_viewport_texture.size(), { 0, 0 },
+                           e_viewport_texture.size(), { 0, 0 },
+                           gl::FramebufferMaskFlags::eColor);
   }
 } // namespace met

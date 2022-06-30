@@ -151,6 +151,7 @@ endfunction()
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC
+  small_gl
   Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb
