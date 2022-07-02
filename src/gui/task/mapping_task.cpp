@@ -65,12 +65,22 @@ namespace met {
     m_generate_dispatch = { .groups_x         = dispatch_n,
                             .bindable_program = &m_generate_program };
 
+    // Temporary object to describe circumstances for spectral to rgb conversion
+    struct MappingType {
+      CMFS cmfs          = models::cmfs_srgb;
+      Spec illuminant    = models::emitter_cie_d65;
+      uint n_scatterings = 0;
+    } mapping;
+    auto mapping_span = std::span { (const std::byte *) &mapping, sizeof(mapping) };
+
     // Initialize objects for color texture gen.
+    m_mapping_buffer = {{ .data = mapping_span }};
     m_mapping_program = {{ .type = gl::ShaderType::eCompute,
                            .path = "resources/shaders/mapping_task/apply_color_mapping.comp" }};
     m_mapping_program.uniform<uint>("u_n", dispatch_n);
     m_mapping_dispatch = { .groups_x         = dispatch_n,
                            .bindable_program = &m_mapping_program };
+    m_mapping_texture = {{ .size = (size_t) glm::prod(color_texture_data.size) * sizeof(glm::vec3) }};
   }
 
   void MappingTask::eval(detail::TaskEvalInfo &info) {
@@ -96,6 +106,9 @@ namespace met {
     gl::dispatch_compute(m_generate_dispatch);
 
     // Generate color texture
-    // TODO: need buffer first
+    i_spectral_texture_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    m_mapping_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    m_mapping_texture.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    gl::dispatch_compute(m_mapping_dispatch);
   }
 } // namespace met
