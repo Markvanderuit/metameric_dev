@@ -5,24 +5,27 @@
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec spectral_texture[]; };
+layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec b_0_spectral_texture[]; };
 layout(binding = 1, std430) restrict readonly  buffer b_1 { 
   CMFS cmfs;
   Spec illuminant;
   uint n_scatterings;
-};
-layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3 color_texture[];    };
+} b_1_mapping;
+layout(binding = 2, std430) restrict writeonly buffer b_2 { vec4 b_2_color_texture[];    };
+layout(binding = 3, std430) restrict writeonly buffer b_3 { Spec b_3_debug_spectrum; };
 
 layout(location = 0) uniform uint u_n;
 
-vec3 reflectance_to_xyz(in Spec sd) {
-  const float k = 1.f / ssum(mul(cmfs[1], illuminant));
-  return k * mul(cmfs, mul(sd, illuminant));
+vec3 apply_cmfs(in Spec sd) {
+  const float k = 1.f / ssum(mul(b_1_mapping.cmfs[1], b_1_mapping.illuminant));
+  return k * mul(b_1_mapping.cmfs, mul(sd, b_1_mapping.illuminant));
 }
 
 void main() {
   const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
   guard(i < u_n);
+
+  b_3_debug_spectrum = b_1_mapping.illuminant;
 
   /*
     1. Obtain a value at i in the spectral texture
@@ -33,5 +36,12 @@ void main() {
     // Store resulting vec3 at i in the color texture
   */
 
-  color_texture[i] = reflectance_to_xyz(spectral_texture[i]);
+  // Spec s = constr_spec(.5f);
+  // vec3 rgb = apply_cmfs(s);
+  // vec3 rgb = xyz_to_srgb(xyz);
+
+  // b_2_color_texture[i] = vec4(rgb, 1);
+  // float v1 = float(i) / float(u_n);
+  // float v2 = float(u_n - i) / float(u_n);
+  b_2_color_texture[i] = vec4(apply_cmfs(b_0_spectral_texture[i]), 1);
 }

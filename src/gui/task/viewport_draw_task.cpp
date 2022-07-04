@@ -16,7 +16,7 @@ namespace met {
     // Get externally shared resources 
     auto &e_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
     auto &e_texture_obj  = info.get_resource<io::TextureData<float>>("global", "color_texture_buffer_cpu");
-    auto &e_color_data   = info.get_resource<std::vector<Color>>("global", "color_data");
+    auto &e_color_data   = info.get_resource<std::vector<ColorAlpha>>("global", "color_data");
 
     // Element data to draw a tetrahedron from four vertices using a line strip
     std::vector<uint> gamut_elements = {
@@ -24,23 +24,17 @@ namespace met {
       3, 1, 3, 2
     };
 
-    // Load gamut data into buffers and create array object for upcoming draw
+    // Setup objects for gamut line draw
     m_gamut_elem_buffer = gl::Buffer({ .data = as_typed_span<std::byte>(gamut_elements) });
     m_gamut_array = gl::Array({
-      .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(glm::vec3) }},
+      .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(glm::vec4) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
       .elements = &m_gamut_elem_buffer
     });
-
-    // Build shader program
-    m_gamut_program = gl::Program({
-      { .type = gl::ShaderType::eVertex, 
-        .path = "resources/shaders/viewport_task/gamut_draw.vert" },
-      { .type = gl::ShaderType::eFragment,  
-        .path = "resources/shaders/viewport_task/gamut_draw.frag" }
-    });
-    
-    // Build draw object data for provided array object
+    m_gamut_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
+                                     .path = "resources/shaders/viewport_task/gamut_draw.vert" },
+                                   { .type = gl::ShaderType::eFragment,  
+                                     .path = "resources/shaders/viewport_task/gamut_draw.frag" }});
     m_gamut_draw = { .type             = gl::PrimitiveType::eLineLoop,
                      .vertex_count     = (uint) gamut_elements.size(),
                      .bindable_array   = &m_gamut_array,
@@ -56,35 +50,45 @@ namespace met {
         break;
     }
 
-    // Load texture data into vertex buffer and create array object for upcoming draw
-    // auto texture_data = as_typed_span<Color>(e_texture_obj.data);
-    auto texture_data = as_typed_span<Color>(e_color_data);
-    m_point_buffer = gl::Buffer({ .data = convert_span<std::byte>(texture_data) });
-    m_point_array = gl::Array({ 
-      .buffers = {{ .buffer = &m_point_buffer, .index = 0, .stride  = sizeof(glm::vec3) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+    // Setup objects for dataset point draw
+    auto dataset_span = as_typed_span<std::byte>(e_color_data);
+    m_data_points_buffer = gl::Buffer({ .data = convert_span<std::byte>(dataset_span) });
+    m_data_points_array = gl::Array({ 
+      .buffers = {{ .buffer = &m_data_points_buffer, .index = 0, .stride = sizeof(ColorAlpha) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }}
     });
+    m_data_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
+                                           .path = "resources/shaders/viewport_task/texture_draw.vert" },
+                                         { .type = gl::ShaderType::eFragment,  
+                                           .path = "resources/shaders/viewport_task/texture_draw.frag" }});
+    m_data_points_draw = { .type             = gl::PrimitiveType::ePoints,
+                           .vertex_count     = (uint) dataset_span.size(),
+                           .bindable_array   = &m_data_points_array,
+                           .bindable_program = &m_data_points_program };
 
-    // Build shader program
-    m_point_program = gl::Program({
-      { .type = gl::ShaderType::eVertex, 
-        .path = "resources/shaders/viewport_task/texture_draw.vert" },
-      { .type = gl::ShaderType::eFragment,  
-        .path = "resources/shaders/viewport_task/texture_draw.frag" }
+    // Setup objects for texture point draw
+    auto texture_span = as_typed_span<ColorAlpha>(e_texture_obj.data);
+    m_texture_points_buffer = gl::Buffer({ .data = convert_span<std::byte>(texture_span) });
+    m_texture_points_array = gl::Array({ 
+      .buffers = {{ .buffer = &m_texture_points_buffer, .index = 0, .stride  = sizeof(ColorAlpha) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }}
     });
-
-    // Build draw object data for provided array object
-    m_point_draw = { .type             = gl::PrimitiveType::ePoints,
-                     .vertex_count     = (uint) texture_data.size(),
-                     .bindable_array   = &m_point_array,
-                     .bindable_program = &m_point_program };
+    m_texture_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
+                                              .path = "resources/shaders/viewport_task/texture_draw.vert" },
+                                            { .type = gl::ShaderType::eFragment,  
+                                              .path = "resources/shaders/viewport_task/texture_draw.frag" }});
+    m_texture_points_draw = { .type             = gl::PrimitiveType::ePoints,
+                              .vertex_count     = (uint) texture_span.size(),
+                              .bindable_array   = &m_texture_points_array,
+                              .bindable_program = &m_texture_points_program };
   }
 
   void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Viewport draw settings")) {
       ImGui::SliderFloat("Line width", &m_gamut_lwidth, 1.f, 16.f, "%.0f");
-      ImGui::SliderFloat("Point size", &m_point_psize, 1.f, 32.f, "%.0f");
+      ImGui::SliderFloat("Dataset point size", &m_data_points_psize, 1.f, 32.f, "%.0f");
+      ImGui::SliderFloat("Texture point size", &m_texture_points_psize, 1.f, 32.f, "%.0f");
     }
     ImGui::End();
                                 
@@ -111,19 +115,21 @@ namespace met {
     m_fbuffer_msaa.bind();
     m_fbuffer_msaa.clear(gl::FramebufferType::eColor, m_fbuffer_clear_value);
     m_fbuffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
-
-    // Prepare viewport and other draw settings
-    gl::state::set_viewport(e_viewport_texture.size());
-    gl::state::set_line_width(m_gamut_lwidth);
-    gl::state::set_point_size(m_point_psize);
     
     // Update program uniforms
-    m_point_program.uniform("model_matrix",  e_viewport_model_matrix);
-    m_point_program.uniform("camera_matrix", e_viewport_arcball.full());
+    m_data_points_program.uniform("model_matrix",  e_viewport_model_matrix);
+    m_data_points_program.uniform("camera_matrix", e_viewport_arcball.full());
+    m_texture_points_program.uniform("model_matrix",  e_viewport_model_matrix);
+    m_texture_points_program.uniform("camera_matrix", e_viewport_arcball.full());
     m_gamut_program.uniform("camera_matrix", e_viewport_arcball.full());
 
-    // Dispatch draw calls for point set and gamut lines
-    gl::dispatch_draw(m_point_draw);
+    // Dispatch draw calls for pointsets and gamut lines
+    gl::state::set_viewport(e_viewport_texture.size());
+    gl::state::set_point_size(m_data_points_psize);
+    gl::dispatch_draw(m_data_points_draw);
+    // gl::state::set_point_size(m_texture_points_psize);
+    // gl::dispatch_draw(m_texture_points_draw);
+    gl::state::set_line_width(m_gamut_lwidth);
     gl::dispatch_draw(m_gamut_draw);
 
     // Blit color results into the single-sampled framebuffer with attached viewport texture

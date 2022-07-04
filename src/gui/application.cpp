@@ -26,6 +26,7 @@ namespace met {
     void init_color_texture(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
       // Load texture from disk
       auto texture_data = io::load_texture_float(info.texture_path);
+      io::apply_channel_conversion(texture_data, 4, 1.f);
       io::apply_srgb_to_lrgb(texture_data, true);
       fmt::print("Loaded startup texture\n\tpath: {}\n\tdims: {}x{}\n", 
         info.texture_path.string(), texture_data.size.x, texture_data.size.y);
@@ -79,15 +80,15 @@ namespace met {
         internal_sd.begin(), [&](const auto &v) {  return spectrum_from_data(wavelengths, v); });
 
       // Convert data to metameric's color format under D65
-      std::vector<Color> internal_color(internal_sd.size());
-      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), 
-        internal_color.begin(), [&](const auto &sd) { return xyz_to_srgb(reflectance_to_xyz(sd)); });
+      std::vector<ColorAlpha> internal_color(internal_sd.size());
+      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), internal_color.begin(), 
+      [&](const auto &sd) { return (ColorAlpha() << xyz_to_srgb(reflectance_to_xyz(sd)), 1.0).finished(); });
 
       // Initialize a empty 3D spectral grid
       constexpr uint grid_size = 64;
       std::vector<Spec> grid(std::pow(grid_size, 3), 0.f);
-      constexpr auto color_to_grid = [&](const Color &c) {
-        auto v = (c.min(1.f).max(0.f) * static_cast<float>(grid_size - 1));
+      constexpr auto color_to_grid = [&](const ColorAlpha &c) {
+        auto v = c.head(3).min(1.f).max(0.f) * static_cast<float>(grid_size - 1);
         return v.cast<uint>().eval();
       };
 
@@ -124,7 +125,7 @@ namespace met {
       // Make resources available for other components during runtime
       scheduler.insert_resource<std::vector<Spec>>("spectral_data", std::move(internal_sd));
       scheduler.insert_resource<std::vector<Spec>>("spectral_grid", std::move(grid));
-      scheduler.insert_resource<std::vector<Color>>("color_data", std::move(internal_color));
+      scheduler.insert_resource<std::vector<ColorAlpha>>("color_data", std::move(internal_color));
     }
 
     void init_schedule(detail::LinearScheduler &scheduler, gl::Window &window) {

@@ -3,23 +3,22 @@
 #include <guard.glsl>
 #include <spectrum.glsl>
 
-const uint n_gamut_vertices = 4;
-
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0, std430) restrict readonly  buffer b_0 { vec3 color_gamut[n_gamut_vertices];   };
-layout(binding = 1, std430) restrict readonly  buffer b_1 { Spec spectra_gamut[n_gamut_vertices]; };
-layout(binding = 2, std430) restrict readonly  buffer b_2 { vec3 color_texture[];                 };
-layout(binding = 3, std430) restrict writeonly buffer b_3 { Spec spectral_texture[];              };
+layout(binding = 0, std430) restrict readonly  buffer b_0 { vec3 b_0_color_gamut[4];      };
+layout(binding = 1, std430) restrict readonly  buffer b_1 { Spec b_1_spectral_gamut[4];   };
+layout(binding = 2, std430) restrict readonly  buffer b_2 { vec3 b_2_color_texture[];     };
+layout(binding = 3, std430) restrict writeonly buffer b_3 { Spec b_3_spectral_texture[];  };
+layout(binding = 4, std430) restrict writeonly buffer b_4 { vec3 b_4_color_texture[];     };
 
 layout(location = 0) uniform uint u_n;
 
 vec4 to_barycentric(in vec3 p) {
   // TODO preprocess this matrix+vector and use uniforms instead
-  mat3 t = inverse(mat3(color_gamut[0] - color_gamut[3],
-                        color_gamut[1] - color_gamut[3],
-                        color_gamut[2] - color_gamut[3]));
-  vec3 abc = t * (p - color_gamut[3]);
+  mat3 t = inverse(mat3(b_0_color_gamut[0] - b_0_color_gamut[3],
+                        b_0_color_gamut[1] - b_0_color_gamut[3],
+                        b_0_color_gamut[2] - b_0_color_gamut[3]));
+  vec3 abc = t * (p - b_0_color_gamut[3]);
   return vec4(abc, 1.f - vsum(abc));
 }
 
@@ -34,13 +33,13 @@ void main() {
     4. Store the value at i in the spectral texture
   */
 
-  vec3 color_p = color_texture[i];
-  vec4 abcd = to_barycentric(color_p);
+  vec3 rgb = b_2_color_texture[i];
+  vec4 abcd = vec4(0.25); // clamp(to_barycentric(rgb), 0.0, 1.0);
 
-  Spec spectrum_p = constr_spec(0.f);
-  for (uint i = 0; i < n_gamut_vertices; ++i) {
-    spectrum_p = add(spectrum_p, mul(spectra_gamut[i], abcd[i]));
-  }
+  Spec sd = mul(b_1_spectral_gamut[0], abcd[0]);
+       sd = add(sd, mul(b_1_spectral_gamut[1], abcd[1]));
+       sd = add(sd, mul(b_1_spectral_gamut[2], abcd[2]));
+       sd = add(sd, mul(b_1_spectral_gamut[3], abcd[3]));
 
-  spectral_texture[i] = spectrum_p;
+  b_3_spectral_texture[i] = sd;
 }

@@ -11,18 +11,27 @@
 namespace met {
   class ViewportDrawTask : public detail::AbstractTask {
     // Gamut draw components
-    gl::Buffer       m_gamut_elem_buffer;
-    gl::Array        m_gamut_array;
-    gl::DrawInfo     m_gamut_draw;
-    gl::Program      m_gamut_program;
-    float            m_gamut_lwidth = 1.f;
+    gl::Buffer   m_gamut_elem_buffer;
+    gl::Array    m_gamut_array;
+    gl::DrawInfo m_gamut_draw;
+    gl::Program  m_gamut_program;
+    float        m_gamut_lwidth = 1.f;
     
-    // Pointset draw components
-    gl::Buffer       m_point_buffer; 
-    gl::Array        m_point_array;
-    gl::DrawInfo     m_point_draw;
-    gl::Program      m_point_program;
-    float            m_point_psize = 1.f;
+    // Spectral pointset draw components
+    gl::Buffer   m_data_points_buffer; 
+    gl::Array    m_data_points_array;
+    gl::DrawInfo m_data_points_draw;
+    gl::Program  m_data_points_program;
+    float        m_data_points_psize = 1.f;
+    float        m_data_points_popaq = 1.f;
+
+    // Texture pointset draw components
+    gl::Buffer   m_texture_points_buffer;
+    gl::Array    m_texture_points_array;
+    gl::DrawInfo m_texture_points_draw;
+    gl::Program  m_texture_points_program;
+    float        m_texture_points_psize = 4.f;
+    float        m_texture_points_popaq = 4.f;
 
     // Framebuffers and attachments
     gl::Renderbuffer<float, 3, gl::RenderbufferType::eMultisample>

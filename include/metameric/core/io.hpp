@@ -29,6 +29,9 @@ namespace met::io {
   // Load raw spectral database from the given hd5 filepath
   SpectralData load_spectral_data_hd5(std::filesystem::path path);
 
+  // Insert/strip channels from srgb texture data
+  void apply_channel_conversion(TextureData<float> &obj, uint new_channels, float new_value);
+
   // Linearize/delinearize srgb texture data
   void apply_srgb_to_lrgb(TextureData<float> &obj, bool skip_alpha = true);
   void apply_lrgb_to_srgb(TextureData<float> &obj, bool skip_alpha = true);

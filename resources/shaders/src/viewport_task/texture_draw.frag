@@ -1,8 +1,8 @@
 #version 460 core
 
-layout (location = 0) in vec3 texture_value_in;
-layout (location = 0) out vec3 color_value_out;
+layout (location = 0) in vec4  value_in;
+layout (location = 0) out vec4 value_out;
 
 void main() {
-  color_value_out = texture_value_in;
+  value_out = value_in;
 }

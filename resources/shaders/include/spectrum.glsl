@@ -111,8 +111,8 @@ float vsum(vec3 v) {
 }
 
 float ssum(in Spec s) {
-  float f = 0.f;
-  for (uint i = 0; i < wavelength_samples; ++i)
+  float f = s[0];
+  for (uint i = 1; i < wavelength_samples; ++i)
     f += s[i];
   return f;
 }
@@ -134,9 +134,9 @@ float smean(in Spec s) {
 
 vec3 mul(in CMFS cmfs, in Spec s) {
   return vec3(
-    smean(mul(cmfs[0], s)),
-    smean(mul(cmfs[1], s)),
-    smean(mul(cmfs[2], s))
+    ssum(mul(cmfs[0], s)),
+    ssum(mul(cmfs[1], s)),
+    ssum(mul(cmfs[2], s))
   );
 }
 

@@ -9,13 +9,20 @@
 
 namespace met {
   class MappingTask : public detail::AbstractTask {
+    gl::Buffer      m_debug_buffer;
+    std::span<Spec> m_debug_map;
+
+    gl::Buffer      m_generate_buffer;
     gl::ComputeInfo m_generate_dispatch;
     gl::Program     m_generate_program;
 
     gl::Buffer      m_mapping_buffer;
+    gl::Buffer      m_mapping_texture;
     gl::ComputeInfo m_mapping_dispatch;
     gl::Program     m_mapping_program;
-    gl::Buffer      m_mapping_texture;
+
+    gl::Program     m_texture_program;
+    gl::ComputeInfo m_texture_dispatch;
 
   public:
     MappingTask(const std::string &name);

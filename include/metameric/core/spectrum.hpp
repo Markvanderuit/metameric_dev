@@ -16,9 +16,10 @@ namespace met {
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
   /* Define program's underlying spectrum/color/cmfs classes as just renamed Eigen objects */
-  using CMFS  = eig::Matrix<float, 3, wavelength_samples>;
-  using Spec  = eig::Array<float, wavelength_samples, 1>;
-  using Color = eig::Array<float, 3, 1>;
+  using CMFS       = eig::Matrix<float, 3, wavelength_samples>;
+  using Spec       = eig::Array<float, wavelength_samples, 1>;
+  using Color      = eig::Array<float, 3, 1>;
+  using ColorAlpha = eig::Array<float, 4, 1>;
 
   /* Define color matching functions, SPD models, and other models */
   namespace models {

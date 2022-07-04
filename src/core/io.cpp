@@ -84,6 +84,20 @@ namespace met::io {
 
     return obj;
   }
+
+  void apply_channel_conversion(TextureData<float> &obj, uint new_channels, float new_value) {
+    std::vector<float> new_data((obj.data.size() / obj.channels) * new_channels, new_value);
+
+    #pragma omp parallel for
+    for (uint i = 0; i < obj.data.size() / obj.channels; ++i) {
+      for (uint j = 0; j < obj.channels; ++j) {
+        new_data[i * new_channels + j] = obj.data[i * obj.channels + j];
+      }
+    }
+
+    obj.data = std::move(new_data);
+    obj.channels = new_channels;
+  }
   
   void apply_srgb_to_lrgb(TextureData<float> &obj, bool skip_alpha) {
     // Wrapper function to obtain a view over a subset of data using indices
@@ -93,7 +107,7 @@ namespace met::io {
     auto skip_i = [&](size_t i) { return (!skip_alpha || obj.channels < 4) || i % 4 == 0ul; };
 
     // Determine data (subset) to operate on, skipping alpha channels
-    auto &data = obj.data;
+    auto &data   = obj.data;
     auto indices = std::views::iota(0ul, data.size()) | std::views::filter(skip_i);
     auto indexed = indices | std::views::transform(ref_i(data));
 

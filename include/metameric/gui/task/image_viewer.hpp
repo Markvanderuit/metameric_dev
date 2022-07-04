@@ -5,7 +5,7 @@
 
 namespace met {
   class ImageViewerTask : public detail::AbstractTask {
-    gl::Texture2d3f m_texture;
+    gl::Texture2d4f m_texture;
     
   public:
     ImageViewerTask(const std::string &name);

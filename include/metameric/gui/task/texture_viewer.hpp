@@ -9,7 +9,7 @@
 namespace met {
   class TextureViewerTask : public detail::AbstractTask {
     gl::Program                  m_program_uplifting;
-    gl::Texture2d3f              m_texture_base;
+    gl::Texture2d4f              m_texture_base;
     std::vector<gl::Texture2d3f> m_texture_uplifting;
     std::vector<gl::Buffer>      m_illuminants;
 

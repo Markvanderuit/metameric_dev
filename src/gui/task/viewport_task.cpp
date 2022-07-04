@@ -177,7 +177,9 @@ namespace met {
 
       // Move selected gamut points by translation distance
       if (ImGuizmo::IsUsing()) {
-        std::ranges::for_each(gamut_selection, [&](auto &p) { p += gamut_transl; });
+        std::ranges::for_each(gamut_selection, [&](auto &p) { 
+          p = glm::clamp(p + gamut_transl, 0.f, 1.f);
+        });
       }
     }
     

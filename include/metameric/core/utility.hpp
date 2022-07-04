@@ -30,7 +30,7 @@ namespace met {
 
   template <typename T, typename T_>
   constexpr inline T ceil_div(T n, T_ div) {
-    return (n + static_cast<T>(div) - 1) / static_cast<T>(div);
+    return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
   }
 
   namespace debug {

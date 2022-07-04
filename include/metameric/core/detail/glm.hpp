@@ -1,8 +1,5 @@
 #pragma once
 
-// #define GLM_FORCE_SIZE_FUNC
-#define GLM_FORCE_MESSAGES 
-
 #include <glm/glm.hpp>
 #include <glm/gtx/scalar_relational.hpp>
 #include <glm/gtc/type_ptr.hpp>

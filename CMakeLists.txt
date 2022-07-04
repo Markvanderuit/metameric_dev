@@ -15,7 +15,7 @@ project(Metameric LANGUAGES CXX)
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN     400)
 set(MET_WAVELENGTH_MAX     700)
-set(MET_WAVELENGTH_SAMPLES  32)
+set(MET_WAVELENGTH_SAMPLES  16)
 
 # Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
