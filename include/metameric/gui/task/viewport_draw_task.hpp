@@ -10,6 +10,13 @@
 
 namespace met {
   class ViewportDrawTask : public detail::AbstractTask {
+    // Cube draw components
+    gl::Buffer   m_cube_vertex_buffer;
+    gl::Buffer   m_cube_elem_buffer;
+    gl::Array    m_cube_array;
+    gl::DrawInfo m_cube_draw;
+    gl::Program  m_cube_program; 
+
     // Gamut draw components
     gl::Buffer   m_gamut_elem_buffer;
     gl::Array    m_gamut_array;

@@ -1,21 +1,25 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/spectral_mapping.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/glm.hpp>
-#include <metameric/gui/detail/imgui.hpp>
-#include <metameric/gui/detail/scheduler.hpp>
+
+#include <metameric/gui/application.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
 #include <metameric/gui/task/mapping_task.hpp>
 #include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/task/window_task.hpp>
-#include <metameric/gui/application.hpp>
+#include <metameric/gui/detail/imgui.hpp>
+#include <metameric/gui/detail/scheduler.hpp>
+
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
+
 #include <algorithm>
 #include <execution>
 #include <mutex>
@@ -80,15 +84,15 @@ namespace met {
         internal_sd.begin(), [&](const auto &v) {  return spectrum_from_data(wavelengths, v); });
 
       // Convert data to metameric's color format under D65
-      std::vector<ColorAlpha> internal_color(internal_sd.size());
-      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), internal_color.begin(), 
-      [&](const auto &sd) { return (ColorAlpha() << xyz_to_srgb(reflectance_to_xyz(sd)), 1.0).finished(); });
+      std::vector<PaddedColor> internal_color(internal_sd.size());
+      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), internal_color.begin(),
+      [&](const Spec &sd) { return padd(xyz_to_srgb(reflectance_to_xyz(sd))); });
 
       // Initialize a empty 3D spectral grid
       constexpr uint grid_size = 64;
       std::vector<Spec> grid(std::pow(grid_size, 3), 0.f);
-      constexpr auto color_to_grid = [&](const ColorAlpha &c) {
-        auto v = c.head(3).min(1.f).max(0.f) * static_cast<float>(grid_size - 1);
+      constexpr auto color_to_grid = [&](const PaddedColor &c) {
+        auto v = unpadd(c).min(1.f).max(0.f) * static_cast<float>(grid_size - 1);
         return v.cast<uint>().eval();
       };
 
@@ -123,9 +127,9 @@ namespace met {
         grid_size, grid_size, grid_size);
 
       // Make resources available for other components during runtime
-      scheduler.insert_resource<std::vector<Spec>>("spectral_data", std::move(internal_sd));
-      scheduler.insert_resource<std::vector<Spec>>("spectral_grid", std::move(grid));
-      scheduler.insert_resource<std::vector<ColorAlpha>>("color_data", std::move(internal_color));
+      scheduler.insert_resource("spectral_data", std::move(internal_sd));
+      scheduler.insert_resource("spectral_grid", std::move(grid));
+      scheduler.insert_resource("color_data",    std::move(internal_color));
     }
 
     void init_schedule(detail::LinearScheduler &scheduler, gl::Window &window) {
@@ -244,12 +248,11 @@ namespace met {
                                       
 
   void create_application(ApplicationCreateInfo info) {
-    fmt::print("Metameric format\n\tmin : {}nm\n\tmax : {}nm\n\tbins: {}nm\n",
+     fmt::print("Metameric format\n\tmin : {}nm\n\tmax : {}nm\n\tbins: {}nm\n",
       wavelength_min, wavelength_max, wavelength_samples);
 
+    // Add copy of application create info to scheduler's resources for later access
     detail::LinearScheduler scheduler;
-
-    // Add copy of application create info to scheduler resources for later access
     scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
 
     // Initialize OpenGL context and primary window, submit to scheduler resourcess
@@ -261,11 +264,9 @@ namespace met {
     gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
-    
-    // Initialize ImGui; non-scoped so destroy it later
-    ImGui::Init(window, info);
 
     // Initialize major application components and set up runtime schedule
+    ImGui::Init(window, info);
     detail::init_color_texture(scheduler, info);
     detail::init_spectral_grid(scheduler, info);
     detail::init_spectral_gamut(scheduler);

@@ -9,6 +9,33 @@
 #include <metameric/gui//task/viewport_draw_task.hpp>
 
 namespace met {
+  constexpr std::array<float, 24> cube_vertices = { 
+    0.f, 0.f, 0.f,
+    0.f, 0.f, 1.f,
+    0.f, 1.f, 0.f,
+    0.f, 1.f, 1.f,
+    1.f, 0.f, 0.f,
+    1.f, 0.f, 1.f,
+    1.f, 1.f, 0.f,
+    1.f, 1.f, 1.f
+  };
+
+  constexpr std::array<uint, 30> cube_elements = {
+    0, 1, 0, 2,
+    1, 3, 2, 3,
+
+    0, 4, 1, 5,
+    2, 6, 3, 7,
+
+    4, 5, 4, 6,
+    5, 7, 6, 7
+  };
+
+  constexpr std::array<uint, 8> gamut_elements = {
+    0, 1, 2, 0,
+    3, 1, 3, 2
+  };
+
   ViewportDrawTask::ViewportDrawTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
@@ -16,18 +43,29 @@ namespace met {
     // Get externally shared resources 
     auto &e_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
     auto &e_texture_obj  = info.get_resource<io::TextureData<float>>("global", "color_texture_buffer_cpu");
-    auto &e_color_data   = info.get_resource<std::vector<ColorAlpha>>("global", "color_data");
+    auto &e_color_data   = info.get_resource<std::vector<PaddedColor>>("global", "color_data");
 
-    // Element data to draw a tetrahedron from four vertices using a line strip
-    std::vector<uint> gamut_elements = {
-      0, 1, 2, 0,
-      3, 1, 3, 2
-    };
+    // Setup objects for cube line draw
+    m_cube_vertex_buffer = {{ .data = as_typed_span<const std::byte>(cube_vertices) }};
+    m_cube_elem_buffer   = {{ .data = as_typed_span<const std::byte>(cube_elements) }};
+    m_cube_array         = {{
+      .buffers = {{ .buffer = &m_cube_vertex_buffer, .index = 0, .stride = sizeof(glm::vec3) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+      .elements = &m_cube_elem_buffer
+    }};
+    m_cube_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
+                                    .path = "resources/shaders/viewport_task/gamut_draw.vert" },
+                                  { .type = gl::ShaderType::eFragment,  
+                                    .path = "resources/shaders/viewport_task/gamut_draw.frag" }});
+    m_cube_draw = { .type             = gl::PrimitiveType::eLines,
+                    .vertex_count     = (uint) cube_elements.size(),
+                    .bindable_array   = &m_cube_array,
+                    .bindable_program = &m_cube_program };
 
     // Setup objects for gamut line draw
-    m_gamut_elem_buffer = gl::Buffer({ .data = as_typed_span<std::byte>(gamut_elements) });
+    m_gamut_elem_buffer = gl::Buffer({ .data = as_typed_span<const std::byte>(gamut_elements) });
     m_gamut_array = gl::Array({
-      .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(glm::vec4) }},
+      .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(glm::vec3) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
       .elements = &m_gamut_elem_buffer
     });
@@ -54,31 +92,31 @@ namespace met {
     auto dataset_span = as_typed_span<std::byte>(e_color_data);
     m_data_points_buffer = gl::Buffer({ .data = convert_span<std::byte>(dataset_span) });
     m_data_points_array = gl::Array({ 
-      .buffers = {{ .buffer = &m_data_points_buffer, .index = 0, .stride = sizeof(ColorAlpha) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }}
+      .buffers = {{ .buffer = &m_data_points_buffer, .index = 0, .stride = sizeof(PaddedColor) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     });
     m_data_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
                                            .path = "resources/shaders/viewport_task/texture_draw.vert" },
                                          { .type = gl::ShaderType::eFragment,  
                                            .path = "resources/shaders/viewport_task/texture_draw.frag" }});
     m_data_points_draw = { .type             = gl::PrimitiveType::ePoints,
-                           .vertex_count     = (uint) dataset_span.size(),
+                           .vertex_count     = (uint) e_color_data.size(),
                            .bindable_array   = &m_data_points_array,
                            .bindable_program = &m_data_points_program };
 
     // Setup objects for texture point draw
-    auto texture_span = as_typed_span<ColorAlpha>(e_texture_obj.data);
+    auto texture_span = as_typed_span<PaddedColor>(e_texture_obj.data);
     m_texture_points_buffer = gl::Buffer({ .data = convert_span<std::byte>(texture_span) });
     m_texture_points_array = gl::Array({ 
-      .buffers = {{ .buffer = &m_texture_points_buffer, .index = 0, .stride  = sizeof(ColorAlpha) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }}
+      .buffers = {{ .buffer = &m_texture_points_buffer, .index = 0, .stride = sizeof(PaddedColor) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     });
     m_texture_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
                                               .path = "resources/shaders/viewport_task/texture_draw.vert" },
                                             { .type = gl::ShaderType::eFragment,  
                                               .path = "resources/shaders/viewport_task/texture_draw.frag" }});
     m_texture_points_draw = { .type             = gl::PrimitiveType::ePoints,
-                              .vertex_count     = (uint) texture_span.size(),
+                              .vertex_count     = (uint) e_texture_obj.data.size() / 3,
                               .bindable_array   = &m_texture_points_array,
                               .bindable_program = &m_texture_points_program };
   }
@@ -117,19 +155,21 @@ namespace met {
     m_fbuffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
     
     // Update program uniforms
-    m_data_points_program.uniform("model_matrix",  e_viewport_model_matrix);
-    m_data_points_program.uniform("camera_matrix", e_viewport_arcball.full());
+    m_data_points_program.uniform("model_matrix",     e_viewport_model_matrix);
+    m_data_points_program.uniform("camera_matrix",    e_viewport_arcball.full());
     m_texture_points_program.uniform("model_matrix",  e_viewport_model_matrix);
     m_texture_points_program.uniform("camera_matrix", e_viewport_arcball.full());
-    m_gamut_program.uniform("camera_matrix", e_viewport_arcball.full());
+    m_gamut_program.uniform("camera_matrix",          e_viewport_arcball.full());
+    m_cube_program.uniform("camera_matrix",           e_viewport_arcball.full());
 
     // Dispatch draw calls for pointsets and gamut lines
     gl::state::set_viewport(e_viewport_texture.size());
-    gl::state::set_point_size(m_data_points_psize);
-    gl::dispatch_draw(m_data_points_draw);
-    // gl::state::set_point_size(m_texture_points_psize);
-    // gl::dispatch_draw(m_texture_points_draw);
+    // gl::state::set_point_size(m_data_points_psize);
+    // gl::dispatch_draw(m_data_points_draw);
+    gl::state::set_point_size(m_texture_points_psize);
     gl::state::set_line_width(m_gamut_lwidth);
+    gl::dispatch_draw(m_texture_points_draw);
+    gl::dispatch_draw(m_cube_draw);
     gl::dispatch_draw(m_gamut_draw);
 
     // Blit color results into the single-sampled framebuffer with attached viewport texture

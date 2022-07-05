@@ -1,20 +1,20 @@
+#define EIGEN_MAX_ALIGN_BYTES 32
+#define EIGEN_MAX_STATIC_ALIGN_BYTES 32
+
 // STL includes
 #include <cstdlib>
-#include <vector>
+#include <exception>
 #include <span>
+#include <string>
+#include <vector>
 
 // Misc includes
 #include <fmt/core.h>
-
-// TBB includes
-// #include <tbb/parallel_for.h>
-// #include <tbb/tbb.h>
-// #include <tbb/flow_graph.h>
+#include <fmt/ranges.h>
 
 // Metameric includes
-#include <metameric/core/define.h>
-#include <metameric/core/math.h>
-#include <metameric/core/exception.h>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/core/utility.hpp>
 
 // GL includes
 #include <small_gl/array.hpp>
@@ -27,188 +27,90 @@
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
 
-/* 
-  Program objects
-*/
+const std::string shader_src = R"GLSL(
+  #version 460 core
 
-gl::WindowFlags flags = gl::WindowFlags::eVisible   | gl::WindowFlags::eDecorated
-                      | gl::WindowFlags::eSRGB      | gl::WindowFlags::eFocused
-                      | gl::WindowFlags::eResizable | gl::WindowFlags::eDebug;
+  // Guard functions
+  #define guard(expr) if (!(expr)) { return; }
 
-// Shared objects
-gl::Buffer vertex_buffer, color_buffer, index_buffer;
-gl::Program program;
+  // Spectrum/color types
+  #define Spec  float[wavelength_samples]
+  #define CMFS  float[3][wavelength_samples]
+  #define Color vec3
 
-// Per-thread objects
-gl::Window primary_window, secondary_window;
-gl::Framebuffer primary_framebuffer, secondary_framebuffer;
-gl::Array primary_array, secondary_array;
-gl::DrawInfo primary_draw, secondary_draw;
+  // Wavelength settings
+  const uint wavelength_samples = 16;
 
-metameric::Vector4f framebuffer_clear = { 0.f, 0.f, 0.f, 0.f };
-std::vector<metameric::Vector3f> triangle_vertices = {{ 1.f, 1.f, 0.f },
-                                                      { -1.f, 1.f, 0.f },
-                                                      { 0.f, -1.f, 0.f }};
-std::vector<metameric::Vector3f> triangle_colors = {{ 1.f, 0.f, 0.f },
-                                                    { 0.f, 1.f, 0.f },
-                                                    { 0.f, 0.f, 1.f }};
-std::vector<metameric::Vector3ui> triangle_indices = {{ 0, 1, 2 }};
+  // Layout specifiers
+  layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+  layout(binding = 0, std430) restrict readonly buffer  b_0 { Color[] b_0_in;  };
+  layout(binding = 1, std430) restrict writeonly buffer b_1 { Color[] b_1_out; };
+  layout(location = 0) uniform uint u_n;
 
-
-/**
- * Program code
- */
-
-void init_windows() {
-  using namespace metameric;
-
-  primary_window = gl::Window({ .size = { 512, 512 }, 
-                                .title = "Primary window",
-                                .flags = flags });
-
-  secondary_window = gl::Window({ .size = { 512, 512 },
-                                  .title = "Secondary window",
-                                  .is_main_context = false,
-                                  .shared_context = &primary_window,
-                                  .flags = flags });
-}
-
-void init_shared() {
-  using namespace metameric;
-  
-  primary_window.attach_context();
-
-  // Upload shader data into program object
-  program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                           .path = "../resources/shaders/triangle.vert.spv" },
-                         { .type = gl::ShaderType::eFragment, 
-                           .path = "../resources/shaders/triangle.frag.spv" }});
-
-  // Upload triangle data into buffer objects
-  vertex_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_vertices)) });
-  color_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_colors)) });
-  index_buffer = gl::Buffer({ .data = std::as_bytes(std::span(triangle_indices)) });
-}
-
-void init_primary() {
-  using namespace metameric;
-
-  primary_window.attach_context();
-                                                      
-  // Setup triangle vertex array object
-  std::vector<gl::VertexBufferInfo> triangle_buffer_info = {
-    { .buffer = &vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
-    { .buffer = &color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
-  std::vector<gl::VertexAttributeInfo> triangle_attrib_info = {
-    { .attribute_binding = 0, .buffer_binding = 0, 
-      .format_type = gl::VertexFormatType::eFloat, 
-      .format_size = gl::VertexFormatSize::e3 },
-    { .attribute_binding = 1, .buffer_binding = 1,
-      .format_type = gl::VertexFormatType::eFloat,
-      .format_size = gl::VertexFormatSize::e3 }};
-  primary_array = gl::Array({ .buffers = triangle_buffer_info,
-                              .attributes = triangle_attrib_info,
-                              .elements = &index_buffer });
-
-  // Setup draw call object
-  primary_draw = { .type = gl::PrimitiveType::eTriangles,
-                   .array = &primary_array,
-                   .vertex_count = (uint) triangle_indices.size() * 3  };
-
-  // Setup framebuffer as default
-  primary_framebuffer = gl::Framebuffer::make_default();
-}
-
-void init_secondary() {
-  using namespace metameric;
-
-  secondary_window.attach_context();
-  
-  // Setup triangle vertex array object
-  std::vector<gl::VertexBufferInfo> triangle_buffer_info = {
-    { .buffer = &vertex_buffer, .binding = 0, .stride = sizeof(Vector3f) },
-    { .buffer = &color_buffer, .binding = 1, .stride = sizeof(Vector3f) }};
-  std::vector<gl::VertexAttributeInfo> triangle_attrib_info = {
-    { .attribute_binding = 0, .buffer_binding = 0, 
-      .format_type = gl::VertexFormatType::eFloat, 
-      .format_size = gl::VertexFormatSize::e3 },
-    { .attribute_binding = 1, .buffer_binding = 1,
-      .format_type = gl::VertexFormatType::eFloat,
-      .format_size = gl::VertexFormatSize::e3 }};
-  secondary_array = gl::Array({ .buffers = triangle_buffer_info,
-                                .attributes = triangle_attrib_info,
-                                .elements = &index_buffer });
-
-  // Setup draw call object
-  secondary_draw = { .type = gl::PrimitiveType::eTriangles,
-                     .array = &secondary_array,
-                     .vertex_count = (uint) triangle_indices.size() * 3  };
-
-  // Setup framebuffer as default
-  secondary_framebuffer = gl::Framebuffer::make_default();
-}
-
-void step(gl::Window &window, gl::Framebuffer &framebuffer, gl::Program &program, gl::DrawInfo &draw, float scalar) {
-  using namespace metameric;
-
-  // Ensure window is active on this thread
-  window.attach_context();
-  window.poll_events();
-
-  // Setup framebuffer
-  gl::state::set_viewport(window.framebuffer_size());
-  framebuffer.bind();
-  framebuffer.clear<Vector4f>(gl::FramebufferType::eColor, framebuffer_clear);
-  
-  // Specify draw capabilities for this scope
-  std::vector<gl::state::ScopedSet> capabilities = {{ gl::DrawCapability::eCullFace, true },
-                                                    { gl::DrawCapability::eDepthTest, true },
-                                                    { gl::DrawCapability::eBlendOp, false }};
-
-  // Bind and configure this thread's program
-  program.bind();
-  program.uniform("scalar", scalar);
-  
-  // Submit draw call
-  gl::dispatch(draw);
-
-  // Finally, swap framebuffers
-  window.swap_buffers();
-
-  gl::debug::check_gl();
-}
-
-void run() {
-  bool should_run = true;
-  while (should_run) {
-    should_run = !primary_window.should_close()
-              || !secondary_window.should_close();
-    
-    if (primary_window.is_init()) {
-      if (primary_window.should_close()) {
-        break;
-      } else {
-        step(primary_window, primary_framebuffer, program, primary_draw, 0.8f);
-      }
-    }
-
-    if (secondary_window.is_init()) {
-      if (secondary_window.should_close()) {
-        secondary_window = { }; // destroy window
-      } else {
-        step(secondary_window, secondary_framebuffer, program, secondary_draw, 0.5f);
-      }
-    }
+  void main() {
+    const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+    guard(i < u_n);
+    b_1_out[i] = b_0_in[i];
   }
-} 
+)GLSL";
+
+const auto window_flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eDecorated
+                        | gl::WindowCreateFlags::eSRGB      | gl::WindowCreateFlags::eFocused
+                        | gl::WindowCreateFlags::eResizable | gl::WindowCreateFlags::eDebug;
+
+// Interpret a container type as a span of type T
+template <class T, class C>
+std::span<T> as_typed_span_aligned(C &c) {
+  auto data = c.data();
+  guard(data, {});
+  return { reinterpret_cast<T*>(data), (c.size() * alignof(typename C::value_type)) / alignof(T) };
+}
+
+// Convert a span over type U to 
+template <class T, class U>
+std::span<T> convert_span_aligned(std::span<U> s) {
+  auto data = s.data();
+  guard(data, {});
+  return { reinterpret_cast<T*>(data), s.size_bytes() / alignof(T) };
+}
 
 int main() {
+  using namespace met;
+  using Color       = eig::Array3f;
+  using PaddedColor = eig::Array4f;
+
   try {
-    init_windows();
-    init_shared();
-    init_primary();
-    init_secondary();
-    run();
+    gl::Window window = {{ .size  = { 512, 512 }, .title = "Playground", .flags = window_flags }};
+
+    // Prepare test data
+    constexpr uint n = 8;
+    const Color init_color = 0.f;
+    const auto test_v = init_color.reshaped(4, 1).eval();
+    std::vector<PaddedColor> data_i(n, padd(init_color)); 
+    std::vector<PaddedColor> data_o(n, padd(init_color)); 
+
+    for (uint i = 0; i < n; ++i) { data_i[i] = float(i); }
+    
+    // Prepare buffer objects
+    gl::Buffer buffer_i = {{ .data = as_typed_span<const std::byte>(data_i) }};
+    gl::Buffer buffer_o = {{ .data = as_typed_span<const std::byte>(data_o) }};
+
+    // Prepare compute shader
+    gl::Program program = {{ .type = gl::ShaderType::eCompute, .data = as_typed_span<const std::byte>(shader_src) }};
+    program.uniform<uint>("u_n", n);
+    gl::ComputeInfo compute_info = { .groups_x = ceil_div(n, 256), .bindable_program = &program };
+
+    // Perform compute call
+    buffer_i.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    buffer_o.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    gl::dispatch_compute(compute_info);
+
+    // Copy back and read data
+    fmt::print("Before\n\ti: {}\n\to: {}\n", data_i, data_o);
+    buffer_o.get(as_typed_span<std::byte>(data_o));
+    std::vector<Color> result(n); 
+    std::ranges::transform(data_o, result.begin(), unpadd<>);
+    fmt::print("After\n\ti: {}\n\to: {}\n", data_i, result);
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;

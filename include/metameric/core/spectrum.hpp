@@ -16,10 +16,10 @@ namespace met {
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
   /* Define program's underlying spectrum/color/cmfs classes as just renamed Eigen objects */
-  using CMFS       = eig::Matrix<float, 3, wavelength_samples>;
-  using Spec       = eig::Array<float, wavelength_samples, 1>;
-  using Color      = eig::Array<float, 3, 1>;
-  using ColorAlpha = eig::Array<float, 4, 1>;
+  using CMFS        = eig::Matrix<float, 3, wavelength_samples>;
+  using Spec        = eig::Array<float, wavelength_samples, 1>;
+  using Color       = eig::Array<float, 3, 1>;
+  using PaddedColor = eig::Array<float, 4, 1>;
 
   /* Define color matching functions, SPD models, and other models */
   namespace models {
@@ -114,5 +114,23 @@ namespace met {
   Color linear_srgb_to_gamma_srgb(Color c) {
     std::ranges::transform(c, c.begin(), linear_srgb_to_gamma_srgb<float>);
     return c;
+  }
+
+  // Add padding to Color type for alpha component or to prevent alignment issues
+  template <typename T = Color>
+  inline
+  PaddedColor padd(const T &c, float padding = 1.f) {
+    if constexpr (std::is_same_v<T, PaddedColor>) {
+      return c;
+    } else {
+      return (PaddedColor() << c, padding).finished();
+    }
+  }
+
+  // Strip padding from Color type
+  template <typename T = PaddedColor>
+  inline
+  Color unpadd(const T &c) {
+    return c.head<3>();
   }
 } // namespace met

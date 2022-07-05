@@ -17,8 +17,8 @@ using namespace met;
 
 static void bm_eig_addition(benchmark::State &state) {
   Spec a = 5.f,  
-           b = 1.f,
-           c = (a > b).select(a, 5.f);
+       b = 1.f,
+       c = (a > b).select(a, 5.f);
 
   for (size_t i = 0; i < a.size(); ++i) {
     a[i] = i;
