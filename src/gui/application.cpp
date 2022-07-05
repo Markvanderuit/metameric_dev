@@ -50,16 +50,12 @@ namespace met {
       constexpr auto create_flags
         = gl::BufferCreateFlags::eMapRead | gl::BufferCreateFlags::eMapWrite 
         | gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapCoherent;
-      constexpr auto map_flags 
-        = gl::BufferAccessFlags::eMapRead | gl::BufferAccessFlags::eMapWrite
-        | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapCoherent;
     
       // Load data into buffer, generate a persistent mapping, and pass both to scheduler
       auto &buff = scheduler.emplace_resource<gl::Buffer, gl::BufferCreateInfo>(
         "color_gamut_buffer", 
         { .data = as_typed_span<const std::byte>(gamut_initial_vertices), .flags = create_flags }
       );
-      // scheduler.insert_resource("color_gamut_map", convert_span<Color>(buff.map(map_flags)));
     }
 
     void init_spectral_grid(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
@@ -176,7 +172,7 @@ namespace met {
       scheduler.emplace_task<LambdaTask>("plot_models", [](auto &) {
         if (ImGui::Begin("Model plots")) {
           auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
-                            - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+                             - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
 
           ImGui::PlotLines("Emitter, d65", models::emitter_cie_d65.data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
@@ -188,39 +184,6 @@ namespace met {
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
           ImGui::PlotLines("CIE XYZ, z()", models::cmfs_cie_xyz.row(2).eval().data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-
-          Color rgb = xyz_to_srgb(reflectance_to_xyz(1.f));
-          ImGui::PlotLines("Color, rgb", rgb.data(), 3);
-          ImGui::ColorEdit3("Test color", rgb.data());
-        }
-        ImGui::End();
-      });
-      
-      scheduler.emplace_task<LambdaTask>("plot_spectra", [](auto &info) {
-        if (ImGui::Begin("Reflectance plots")) {
-          const auto &spectra = info.get_resource<std::vector<Spec>>("global", "spectral_data");
-          const auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
-                                  - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
-          
-          ImGui::PlotLines("reflectance 0", spectra[0].data(), wavelength_samples, 0,
-            nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-          Color rgb_0 = xyz_to_srgb(reflectance_to_xyz(spectra[0]));
-          ImGui::ColorEdit3("Test color ", rgb_0.data());
-
-          ImGui::PlotLines("reflectance 1", spectra[1].data(), wavelength_samples, 0,
-            nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-          Color rgb_1 = xyz_to_srgb(reflectance_to_xyz(spectra[1]));
-          ImGui::ColorEdit3("Test color 1", rgb_1.data());
-
-          ImGui::PlotLines("reflectance 2", spectra[2].data(), wavelength_samples, 0,
-            nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-          Color rgb_2 = xyz_to_srgb(reflectance_to_xyz(spectra[2]));
-          ImGui::ColorEdit3("Test color 2", rgb_2.data());
-
-          ImGui::PlotLines("reflectance 3", spectra[3].data(), wavelength_samples, 0,
-            nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-          Color rgb_3 = xyz_to_srgb(reflectance_to_xyz(spectra[3]));
-          ImGui::ColorEdit3("Test color 3", rgb_3.data());
         }
         ImGui::End();
       });
@@ -274,10 +237,9 @@ namespace met {
     detail::init_schedule(scheduler, window);
     
     // Output task order
-    // scheduler
-    std::ranges::for_each(scheduler.tasks(), [](const auto &t) {
-      fmt::print("{}\n", t->name());
-    });
+    for (const auto &task : scheduler.tasks()) {
+      fmt::print("{}\n", task->name());
+    }
 
     // Main runtime loop
     while (!window.should_close()) { 
