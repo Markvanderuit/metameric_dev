@@ -16,7 +16,7 @@ namespace met {
       };
 
       // Compute nearest positions and an alpha component for interpolation
-      p = p.max(0.f).min(1.f) * static_cast<float>(grid_size - 1);
+      p = (p * static_cast<float>(grid_size - 1) - 0.5f).max(0.f).min(float(grid_size) - 1.f);
       eig::Array3i lo = p.floor().cast<int>(), up = p.ceil().cast<int>();
       eig::Array3f alpha = p - lo.cast<float>();
 
@@ -68,28 +68,25 @@ namespace met {
     // Initialize objects for spectral texture gen.
     m_generate_program = {{ .type = gl::ShaderType::eCompute,
                             .path = "resources/shaders/mapping_task/generate_spectral_texture.comp" }};
-    m_generate_dispatch = { .groups_x         = generate_ndiv,
-                            .bindable_program = &m_generate_program };
-    m_generate_program.uniform<uint>("u_n", generate_n);
+    m_generate_dispatch = { .groups_x = generate_ndiv, .bindable_program = &m_generate_program };
 
     // Temporary object to describe circumstances for spectral to rgb conversion
     struct MappingType {
-      CMFS cmfs          = models::cmfs_srgb.transpose().reshaped(3, wavelength_samples);
+      CMFS cmfs          = models::cmfs_srgb.transpose().reshaped(3, wavelength_samples); // TODO this is a problem
       Spec illuminant    = models::emitter_cie_d65;
       uint n_scatterings = 0;
     } mapping;
+    // const SpectralMapping mapping;
 
     const uint mapping_n    = glm::prod(color_texture_data.size);
     const uint mapping_ndiv = ceil_div(mapping_n, 256u); 
 
     // Initialize objects for color texture gen.
     m_mapping_buffer  = {{ .data = std::span { (const std::byte *) &mapping, sizeof(mapping) }}};
+    m_mapping_texture = {{ .size = (size_t) glm::prod(color_texture_data.size) * sizeof(glm::vec4) }};
     m_mapping_program = {{ .type = gl::ShaderType::eCompute,
                            .path = "resources/shaders/mapping_task/apply_color_mapping.comp" }};
-    m_mapping_texture = {{ .size = (size_t) glm::prod(color_texture_data.size) * sizeof(glm::vec4) }};
-    m_mapping_dispatch = { .groups_x         = mapping_ndiv,
-                           .bindable_program = &m_mapping_program };
-    m_mapping_program.uniform<uint>("u_n", mapping_n);
+    m_mapping_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_mapping_program };
 
     glm::uvec2 texture_n    = color_texture_data.size;
     glm::uvec2 texture_ndiv = ceil_div(texture_n, glm::uvec2(16));
@@ -100,6 +97,10 @@ namespace met {
     m_texture_dispatch = { .groups_x = texture_ndiv.x,
                            .groups_y = texture_ndiv.y,
                            .bindable_program = &m_texture_program };
+
+    // Set these uniforms once
+    m_generate_program.uniform<uint>("u_n", generate_n);
+    m_mapping_program.uniform<uint>("u_n", mapping_n);
     m_texture_program.uniform<glm::uvec2>("u_size", texture_n);
 
     //  Create texture target for this task
@@ -109,15 +110,15 @@ namespace met {
 
   void MappingTask::eval(detail::TaskEvalInfo &info) {
     // Get externally shared resources
-    auto &e_color_gamut_buffer      = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
-    auto &e_color_gamut_map         = info.get_resource<std::span<Color>>("global", "color_gamut_map");
-    auto &e_spectral_grid           = info.get_resource<std::span<Spec>>("global", "spectral_grid");
-    auto &e_color_texture_buffer    = info.get_resource<gl::Buffer>("global", "color_texture_buffer_gpu");
+    auto &e_color_gamut_buffer   = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
+    auto &e_color_gamut_map      = info.get_resource<std::span<Color>>("global", "color_gamut_map");
+    auto &e_spectral_grid        = info.get_resource<std::span<Spec>>("global", "spectral_grid");
+    auto &e_color_texture_buffer = info.get_resource<gl::Buffer>("global", "color_texture_buffer_gpu");
 
     // Get internally shared resources
-    auto &i_spectral_gamut_map      = info.get_resource<std::span<Spec>>("spectral_gamut_map");
-    auto &i_spectral_gamut_buffer   = info.get_resource<gl::Buffer>("spectral_gamut_buffer");
-    auto &i_color_texture           = info.get_resource<gl::Texture2d4f>("color_texture");
+    auto &i_spectral_gamut_map    = info.get_resource<std::span<Spec>>("spectral_gamut_map");
+    auto &i_spectral_gamut_buffer = info.get_resource<gl::Buffer>("spectral_gamut_buffer");
+    auto &i_color_texture         = info.get_resource<gl::Texture2d4f>("color_texture");
 
     // Sample spectra at gamut corner positions
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
@@ -142,7 +143,7 @@ namespace met {
 
     // Render to texture
     m_mapping_texture.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    i_color_texture.bind_image_to(0, gl::TextureImageAccess::eWriteOnly);
+    i_color_texture.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
     gl::dispatch_compute(m_texture_dispatch);
 
     /* // Inspect debug buffer
