@@ -5,6 +5,7 @@
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 #include <small_gl/buffer.hpp>
+#include <small_gl/utility.hpp>
 #include <fmt/ranges.h>
 #include <numeric>
 #include <span>
@@ -50,16 +51,19 @@ namespace met {
 
     void eval(detail::TaskEvalInfo &info) override {
       // Get externally shared resources
-      auto &e_color_gamut_map    = info.get_resource<std::span<Color>>("global", "color_gamut_map");
-      auto &e_spectral_grid      = info.get_resource<std::span<Spec>>("global", "spectral_grid");
+      auto &e_color_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
       auto &e_spectral_gamut_map = info.get_resource<std::span<Spec>>("mapping", "spectral_gamut_map");
+
+      // Generate temporary mapping to color gamut buffer 
+      constexpr auto map_flags = gl::BufferAccessFlags::eMapRead | gl::BufferAccessFlags::eMapWrite;
+      auto color_gamut_map = convert_span<Color>(e_color_gamut_buffer.map(map_flags));
 
       // Quick temporary window to modify gamut points
       if (ImGui::Begin("Gamut picker")) {
-        ImGui::ColorEdit3("Color 0", e_color_gamut_map[0].data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Color 1", e_color_gamut_map[1].data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Color 2", e_color_gamut_map[2].data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Color 3", e_color_gamut_map[3].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color 0", color_gamut_map[0].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color 1", color_gamut_map[1].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color 2", color_gamut_map[2].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color 3", color_gamut_map[3].data(), ImGuiColorEditFlags_Float);
       }
       ImGui::End();
 
@@ -84,28 +88,28 @@ namespace met {
         // Plot spectra
         ImGui::PlotLines("reflectance 0", e_spectral_gamut_map[0].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-        ImGui::ColorEdit3("color 0, coordinates", e_color_gamut_map[0].data());
+        ImGui::ColorEdit3("color 0, coordinates", color_gamut_map[0].data());
         ImGui::ColorEdit3("color 0, conversion", spectra_to_colors[0].data());
         ImGui::PlotLines("reflectance 1", e_spectral_gamut_map[1].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-        ImGui::ColorEdit3("color 1, coordinates", e_color_gamut_map[1].data());
+        ImGui::ColorEdit3("color 1, coordinates", color_gamut_map[1].data());
         ImGui::ColorEdit3("color 1, conversion", spectra_to_colors[1].data());
         ImGui::PlotLines("reflectance 2", e_spectral_gamut_map[2].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-        ImGui::ColorEdit3("color 2, coordinates", e_color_gamut_map[2].data());
+        ImGui::ColorEdit3("color 2, coordinates", color_gamut_map[2].data());
         ImGui::ColorEdit3("color 2, conversion", spectra_to_colors[2].data());
         ImGui::PlotLines("reflectance 3", e_spectral_gamut_map[3].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-        ImGui::ColorEdit3("color 3, coordinates", e_color_gamut_map[3].data());
+        ImGui::ColorEdit3("color 3, coordinates", color_gamut_map[3].data());
         ImGui::ColorEdit3("color 3, conversion", spectra_to_colors[3].data());
 
-        Color gamut_average = std::reduce(e_color_gamut_map.begin(), e_color_gamut_map.end(), Color(0.f)) / 4.f;
+        Color gamut_average = std::reduce(color_gamut_map.begin(), color_gamut_map.end(), Color(0.f)) / 4.f;
         Spec spectrum_average = std::reduce(e_spectral_gamut_map.begin(), e_spectral_gamut_map.end(), Spec(0.f)) / 4.f;
 
         // fmt::print("Colors:\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n",
           // gamut_eigen[0], gamut_eigen[1], gamut_eigen[2], gamut_eigen[3], gamut_average);
         
-        auto central_coords  = detail::to_barycentric(e_color_gamut_map, gamut_average);
+        auto central_coords  = detail::to_barycentric(color_gamut_map, gamut_average);
         auto recovered_spctr = detail::from_barycentric(e_spectral_gamut_map, central_coords);
         auto recovered_color = xyz_to_srgb(reflectance_to_xyz(recovered_spctr)); 
 
@@ -119,6 +123,10 @@ namespace met {
         // fmt::print("rgb: {} recovered through {}\n", recovered_color, central_coords);
       }
       ImGui::End();
+
+      // Close buffer mapping
+      e_color_gamut_buffer.unmap();
+      gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
     }
   };
 } // namespace met

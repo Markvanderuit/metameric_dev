@@ -1,8 +1,6 @@
 #pragma once
 
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
-#include <glm/vec3.hpp>
-#include <ranges>
 #include <vector>
 
 namespace met {

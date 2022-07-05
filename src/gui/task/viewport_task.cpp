@@ -1,11 +1,17 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
 #include <metameric/core/detail/glm.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/task/viewport_draw_task.hpp>
+#include <metameric/gui/task/viewport_draw_grid_task.hpp>
+#include <metameric/gui/task/viewport_draw_begin_task.hpp>
+#include <metameric/gui/task/viewport_draw_end_task.hpp>
 #include <metameric/gui/detail/arcball.hpp>
 #include <metameric/gui/detail/imgui.hpp>
+#include <glm/vec3.hpp>
 #include <ImGuizmo.h>
 #include <iostream>
 #include <functional>
@@ -51,8 +57,11 @@ namespace met {
     info.insert_resource<gl::Texture2d3f>("viewport_texture", gl::Texture2d3f());
     info.insert_resource<glm::mat4>("viewport_model_matrix", glm::mat4(1));
 
-    // Add subtasks
+    // Add subtasks after this task
+    info.emplace_task<ViewportDrawBeginTask>(name() + "_draw_begin");
+    info.emplace_task<ViewportDrawGridTask>(name() + "_draw_grid");
     info.emplace_task<ViewportDrawTask>(name() + "_draw");
+    info.emplace_task<ViewportDrawEndTask>(name() + "_draw_end");
   }
 
   void ViewportTask::eval(detail::TaskEvalInfo &info) {
@@ -60,7 +69,7 @@ namespace met {
     auto &i_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport_texture");
     auto &i_viewport_arcball      = info.get_resource<detail::Arcball>("viewport_arcball");
     auto &i_viewport_model_matrix = info.get_resource<glm::mat4>("viewport_model_matrix");
-    auto &e_gamut_buffer_map      = info.get_resource<std::span<glm::vec3>>("global", "color_gamut_map");
+    auto &e_color_gamut_buffer    = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
 
     // Begin window draw; declare scoped ImGui style state
     auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
@@ -75,11 +84,13 @@ namespace met {
     auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
                        - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
 
-    // Adjust arcball aspect ratio and (re)create viewport texture if necessary
+    // Adjust arcball to viewport's new size
+    i_viewport_arcball.m_aspect = viewport_size.x / viewport_size.y;
+    i_viewport_arcball.update_matrices(); // TODO redundant
+
+    // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
     if (!i_viewport_texture.is_init() || i_viewport_texture.size() != glm::ivec2(viewport_size)) {
       i_viewport_texture = {{ .size = glm::ivec2(viewport_size) }};
-      i_viewport_arcball.m_aspect = viewport_size.x / viewport_size.y;
-      i_viewport_arcball.update_matrices();
     }
 
     // Insert image, applying viewport texture to viewport; texture can be safely drawn 
@@ -87,7 +98,11 @@ namespace met {
     ImGui::Image(ImGui::to_ptr(i_viewport_texture.object()), i_viewport_texture.size(), 
       glm::vec2(0, 1), glm::vec2(1, 0));
 
-    // Handle arcball rotation
+    // Generate temporary mapping to color gamut buffer for selection 
+    constexpr auto map_flags = gl::BufferAccessFlags::eMapRead | gl::BufferAccessFlags::eMapWrite;
+    auto color_gamut_map = convert_span<glm::vec3>(e_color_gamut_buffer.map(map_flags));
+
+    // Handle arcball rotation and gamut selection inside viewport
     auto &io = ImGui::GetIO();
     if (ImGui::IsItemHovered() && !ImGuizmo::IsUsing()) {
       // Apply scroll delta: scroll wheel only for now
@@ -115,14 +130,14 @@ namespace met {
         auto ul = glm::min(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos)),
              br = glm::max(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos));
         auto is_in_rect = std::views::filter([&](uint i) {
-          const glm::vec2 p =  detail::window_space(e_gamut_buffer_map[i], 
+          const glm::vec2 p =  detail::window_space(color_gamut_map[i], 
             i_viewport_arcball.full(), viewport_offs, viewport_size);
           return glm::clamp(p, ul, br) == p;
         });
                  
         // Find and store selected gamut position indices
         m_gamut_selection_indices.clear();
-        std::ranges::copy(std::views::iota(0u, e_gamut_buffer_map.size()) | is_in_rect, 
+        std::ranges::copy(std::views::iota(0u, color_gamut_map.size()) | is_in_rect, 
           std::back_inserter(m_gamut_selection_indices));
       }
 
@@ -130,14 +145,14 @@ namespace met {
       if (io.MouseClicked[0] && !ImGuizmo::IsOver()) {
         // Filter tests if a gamut position is near a clicked position in window space
         auto is_near_click = std::views::filter([&](uint i) {
-          glm::vec2 p = detail::window_space(e_gamut_buffer_map[i], i_viewport_arcball.full(), 
+          glm::vec2 p = detail::window_space(color_gamut_map[i], i_viewport_arcball.full(), 
             viewport_offs, viewport_size);
           return glm::distance(p, glm::vec2(io.MouseClickedPos[0])) <= 8.f;
         });
 
         // Find and store selected gamut position indices
         m_gamut_selection_indices.clear();
-        std::ranges::copy(std::views::iota(0u, e_gamut_buffer_map.size()) | is_near_click,
+        std::ranges::copy(std::views::iota(0u, color_gamut_map.size()) | is_near_click,
           std::back_inserter(m_gamut_selection_indices));
       }
     }
@@ -146,7 +161,7 @@ namespace met {
     if (!m_gamut_selection_indices.empty()) {
       // Range over selected gamut positions
       const auto gamut_selection = m_gamut_selection_indices 
-                                 | std::views::transform(detail::i_get(e_gamut_buffer_map));
+                                 | std::views::transform(detail::i_get(color_gamut_map));
 
       // Gizmo anchor position is mean of selected gamut positions
       auto gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end())
@@ -184,5 +199,9 @@ namespace met {
     }
     
     ImGui::End();
+    
+    // Close buffer mapping
+    e_color_gamut_buffer.unmap();
+    gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
   }
 } // namespace met

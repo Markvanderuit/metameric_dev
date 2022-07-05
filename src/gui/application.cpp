@@ -59,7 +59,7 @@ namespace met {
         "color_gamut_buffer", 
         { .data = as_typed_span<const std::byte>(gamut_initial_vertices), .flags = create_flags }
       );
-      scheduler.insert_resource("color_gamut_map", convert_span<Color>(buff.map(map_flags)));
+      // scheduler.insert_resource("color_gamut_map", convert_span<Color>(buff.map(map_flags)));
     }
 
     void init_spectral_grid(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
@@ -69,7 +69,7 @@ namespace met {
       // Input data layout
       const uint  data_samples = spectral_data.channels;
       const float data_minv    = 400.f,
-                  data_maxv    = 700.f,
+                  data_maxv    = 710.f,
                   data_ssize   = (data_maxv - data_minv) / static_cast<float>(data_samples);
       auto idx_to_data = [&](uint i) { return (.5f + static_cast<float>(i)) * data_ssize + data_minv; };
 
@@ -89,7 +89,7 @@ namespace met {
       [&](const Spec &sd) { return padd(xyz_to_srgb(reflectance_to_xyz(sd))); });
 
       // Initialize a empty 3D spectral grid
-      constexpr uint grid_size = 64;
+      constexpr uint grid_size = 16;
       std::vector<Spec> grid(std::pow(grid_size, 3), 0.f);
       constexpr auto color_to_grid = [&](const PaddedColor &c) {
         auto v = unpadd(c).min(1.f).max(0.f) * static_cast<float>(grid_size - 1);
@@ -129,6 +129,7 @@ namespace met {
       // Make resources available for other components during runtime
       scheduler.insert_resource("spectral_data", std::move(internal_sd));
       scheduler.insert_resource("spectral_grid", std::move(grid));
+      scheduler.insert_resource("spectral_grid_size", std::move(grid_size));
       scheduler.insert_resource("color_data",    std::move(internal_color));
     }
 
@@ -272,6 +273,12 @@ namespace met {
     detail::init_spectral_gamut(scheduler);
     detail::init_schedule(scheduler, window);
     
+    // Output task order
+    // scheduler
+    std::ranges::for_each(scheduler.tasks(), [](const auto &t) {
+      fmt::print("{}\n", t->name());
+    });
+
     // Main runtime loop
     while (!window.should_close()) { 
       scheduler.run(); 

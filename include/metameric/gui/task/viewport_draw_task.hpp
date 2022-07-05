@@ -2,10 +2,8 @@
 
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
-#include <small_gl/framebuffer.hpp>
+#include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
-#include <small_gl/renderbuffer.hpp>
-#include <metameric/gui/detail/arcball.hpp>
 #include <metameric/gui/detail/linear_scheduler/task.hpp>
 
 namespace met {
@@ -39,15 +37,6 @@ namespace met {
     gl::Program  m_texture_points_program;
     float        m_texture_points_psize = 4.f;
     float        m_texture_points_popaq = 4.f;
-
-    // Framebuffers and attachments
-    gl::Renderbuffer<float, 3, gl::RenderbufferType::eMultisample>
-                     m_rbuffer_msaa;
-    gl::Renderbuffer<gl::DepthComponent, 1, gl::RenderbufferType::eMultisample>
-                     m_dbuffer_msaa;
-    gl::Framebuffer  m_fbuffer_msaa;
-    gl::Framebuffer  m_fbuffer;
-    glm::vec3        m_fbuffer_clear_value;
 
   public:
     ViewportDrawTask(const std::string &name);

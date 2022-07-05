@@ -115,7 +115,7 @@ namespace met::detail {
         // Obtain registry for current task
         auto &registry = _resource_registry.at(task->name());
 
-        // Process added/removed resources after task execution
+        // Process added/removed resources **immediately** after task execution
         registry.merge(std::move(eval_info.add_resource_registry));
         for (auto &key : eval_info.remove_resource_registry) {
           registry.erase(key);          
@@ -135,6 +135,12 @@ namespace met::detail {
       for (auto &key : remove_task_registry) {
         remove_task(key);
       }
+    }
+
+    /* miscellaneous */
+
+    std::span<const TaskType> tasks() const {
+      return _task_registry;
     }
   };
 } // met::detail
