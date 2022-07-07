@@ -14,6 +14,7 @@ namespace met {
     gl::Array    m_cube_array;
     gl::DrawInfo m_cube_draw;
     gl::Program  m_cube_program; 
+    float        m_cube_lwidth = 1.f;
 
     // Gamut draw components
     gl::Buffer   m_gamut_elem_buffer;

@@ -55,9 +55,9 @@ namespace met {
       .elements = &m_cube_elem_buffer
     }};
     m_cube_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                    .path = "resources/shaders/viewport_task/gamut_draw.vert" },
+                                    .path = "resources/shaders/viewport_task/uniform_draw.vert" },
                                   { .type = gl::ShaderType::eFragment,  
-                                    .path = "resources/shaders/viewport_task/gamut_draw.frag" }});
+                                    .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
     m_cube_draw = { .type             = gl::PrimitiveType::eLines,
                     .vertex_count     = (uint) cube_elements.size(),
                     .bindable_array   = &m_cube_array,
@@ -71,9 +71,9 @@ namespace met {
       .elements = &m_gamut_elem_buffer
     });
     m_gamut_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                     .path = "resources/shaders/viewport_task/gamut_draw.vert" },
+                                     .path = "resources/shaders/viewport_task/value_draw.vert" },
                                    { .type = gl::ShaderType::eFragment,  
-                                     .path = "resources/shaders/viewport_task/gamut_draw.frag" }});
+                                     .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
     m_gamut_draw = { .type             = gl::PrimitiveType::eLineLoop,
                      .vertex_count     = (uint) gamut_elements.size(),
                      .bindable_array   = &m_gamut_array,
@@ -87,9 +87,9 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     });
     m_data_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                           .path = "resources/shaders/viewport_task/texture_draw.vert" },
+                                           .path = "resources/shaders/viewport_task/value_draw.vert" },
                                          { .type = gl::ShaderType::eFragment,  
-                                           .path = "resources/shaders/viewport_task/texture_draw.frag" }});
+                                           .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
     m_data_points_draw = { .type             = gl::PrimitiveType::ePoints,
                            .vertex_count     = (uint) e_color_data.size(),
                            .bindable_array   = &m_data_points_array,
@@ -103,13 +103,18 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     });
     m_texture_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                              .path = "resources/shaders/viewport_task/texture_draw.vert" },
+                                              .path = "resources/shaders/viewport_task/value_draw.vert" },
                                             { .type = gl::ShaderType::eFragment,  
-                                              .path = "resources/shaders/viewport_task/texture_draw.frag" }});
+                                              .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
     m_texture_points_draw = { .type             = gl::PrimitiveType::ePoints,
                               .vertex_count     = (uint) e_texture_obj.data.size() / 3,
                               .bindable_array   = &m_texture_points_array,
                               .bindable_program = &m_texture_points_program };
+
+    // Set non-changing uniform values
+    m_gamut_program.uniform("u_model_matrix", glm::identity<glm::mat4>());
+    m_cube_program.uniform("u_model_matrix",  glm::identity<glm::mat4>());
+    m_cube_program.uniform("u_value",         glm::vec3(1));
   }
 
   void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
@@ -137,12 +142,13 @@ namespace met {
     e_viewport_fbuffer.bind();
     
     // Update program uniforms
-    m_data_points_program.uniform("model_matrix",     e_viewport_model_matrix);
-    m_data_points_program.uniform("camera_matrix",    e_viewport_arcball.full());
-    m_texture_points_program.uniform("model_matrix",  e_viewport_model_matrix);
-    m_texture_points_program.uniform("camera_matrix", e_viewport_arcball.full());
-    m_gamut_program.uniform("camera_matrix",          e_viewport_arcball.full());
-    m_cube_program.uniform("camera_matrix",           e_viewport_arcball.full());
+    auto camera_matrix = e_viewport_arcball.full();
+    m_data_points_program.uniform("u_camera_matrix",    camera_matrix);
+    m_gamut_program.uniform("u_camera_matrix",          camera_matrix);
+    m_cube_program.uniform("u_camera_matrix",           camera_matrix);
+    m_texture_points_program.uniform("u_camera_matrix", camera_matrix);
+    m_data_points_program.uniform("u_model_matrix",     e_viewport_model_matrix);
+    m_texture_points_program.uniform("u_model_matrix",  e_viewport_model_matrix);
 
     // Dispatch draw for spectral dataset points
     // gl::state::set_point_size(m_data_points_psize);
@@ -153,8 +159,11 @@ namespace met {
     gl::dispatch_draw(m_texture_points_draw);
 
     // Dispatch draws for gamut and bounding box
-    gl::state::set_line_width(m_gamut_lwidth);
+    gl::state::set_line_width(m_cube_lwidth);
     gl::dispatch_draw(m_cube_draw);
+
+    // Dispatch draws for gamut and bounding box
+    gl::state::set_line_width(m_gamut_lwidth);
     gl::dispatch_draw(m_gamut_draw);
   }
 } // namespace met
