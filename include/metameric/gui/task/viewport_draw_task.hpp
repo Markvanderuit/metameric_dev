@@ -21,7 +21,7 @@ namespace met {
     gl::Array    m_gamut_array;
     gl::DrawInfo m_gamut_draw;
     gl::Program  m_gamut_program;
-    float        m_gamut_lwidth = 1.f;
+    float        m_gamut_lwidth = 4.f;
     
     // Spectral pointset draw components
     gl::Buffer   m_data_points_buffer; 

@@ -1,8 +1,11 @@
-#include <metameric/gui/spectral_grid.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/gui/spectral_grid.hpp>
 #include <algorithm>
 #include <execution>
+#include <functional>
 #include <mutex>
+#include <ranges>
 
 namespace met {
   namespace detail {
@@ -13,16 +16,56 @@ namespace met {
     float eucl_dist(const eig::Array3f &a, const eig::Array3f &b) {
       return std::sqrtf(sq_euql_dist(a, b));
     }
+
+    template <typename T>
+    typename KNNGrid<T>::QueryType value_to_query(const typename KNNGrid<T>::ValueType &v, 
+                                                  const eig::Array3f &p) {
+      return { v.position, v.value, eucl_dist(v.position, p) };
+    };
+
+    template <typename T>
+    T lerp(const T &v1, const T &v2, const auto &a) {
+      return v1 + a * (v2 - v1);
+    }
   } // namespace detail
 
   template <typename T>
-  KNNGrid<T>::KNNGrid(VoxelGridCreateInfo<T> info)
+  VoxelGrid<T>::VoxelGrid(VoxelGridCreateInfo<T> info)
   : m_grid(info.grid_size.prod()),
     m_grid_size(info.grid_size),
     m_space_bounds_min(info.space_bounds_min),
-    m_space_bounds_max(info.space_bounds_max),
-    m_value_bounds_min(info.value_bounds_min),
-    m_value_bounds_max(info.value_bounds_max) {
+    m_space_bounds_max(info.space_bounds_max) {
+    // ...
+  }
+
+  template <typename T>
+  T VoxelGrid<T>::query(const eig::Array3f &p) const {
+    auto clamped_p = p.min(m_space_bounds_max).max(m_space_bounds_min);
+    auto grid_p = m_grid_size.cast<float>() * clamped_p;
+    auto l = grid_p.floor().cast<int>().eval(),
+         u = grid_p.ceil().cast<int>().eval();
+    auto a = (grid_p - grid_p.floor()).eval();
+    
+    auto ll_ = detail::lerp(at({ l.x(), l.y(), l.z() }),
+                            at({ l.x(), l.y(), u.z() }), a.z());
+    auto lu_ = detail::lerp(at({ l.x(), u.y(), l.z() }),
+                            at({ l.x(), u.y(), u.z() }), a.z());
+    auto ul_ = detail::lerp(at({ u.x(), l.y(), l.z() }),
+                            at({ u.x(), l.y(), u.z() }), a.z());
+    auto uu_ = detail::lerp(at({ u.x(), u.y(), l.z() }),
+                            at({ u.x(), u.y(), u.z() }), a.z());
+                            
+    return detail::lerp(detail::lerp(ll_, lu_, a.y()), 
+                        detail::lerp(ul_, uu_, a.y()), a.x());
+  }
+
+  template <typename T>
+  KNNGrid<T>::KNNGrid(KNNGridCreateInfo<T> info)
+  : m_grid(info.grid_size.prod()),
+    m_grid_size(info.grid_size),
+    m_space_bounds_min(info.space_bounds_min),
+    m_space_bounds_max(info.space_bounds_max) {
+    // ...
 
     // Insert clamped data into grid if provided
     // if (std::span<T> data = info.data; data.size()) {
@@ -34,49 +77,92 @@ namespace met {
   }
 
   template <typename T>
-  void KNNGrid<T>::insert_multiple(std::span<const T> t, std::span<eig::Array3f> positions) {
+  void KNNGrid<T>::insert_n(std::span<const T> t, std::span<eig::Array3f> p) {
     std::vector<std::mutex> lock_grid(m_grid_size.prod());
-    std::vector<uint> indices(positions.size());
+    std::vector<uint> indices(p.size());
     
     std::for_each(std::execution::par, indices.begin(), indices.end(), [&](uint i) {
-      auto &pos = positions[i];
-      uint j = index_from_pos(pos);
+      auto &p_i = p[i];
+      uint j = nearest_index_from_pos(p_i);
 
       // Obtain a lock on voxel position and push data on to list
       std::lock_guard lock(lock_grid[j]);
-      m_grid[j].push_back({ pos, t[i] });
+      m_grid[j].push_back({ p_i, t[i] });
     });
   }
 
   template <typename T>
-  void KNNGrid<T>::insert_single(const T &t, const eig::Array3f &pos) {
-    uint i = index_from_pos(pos);
-    m_grid[i].push_back({ pos, t });
+  void KNNGrid<T>::insert_1(const T &t, const eig::Array3f &p) {
+    m_grid[nearest_index_from_pos(p)].push_back({ p, t });
+  }
+  
+  template <typename T>
+  KNNGrid<T>::QueryType KNNGrid<T>::query_1_nearest(const eig::Array3f &p) const {
+    // Construct range as search list of points in 8 nearest grid cells
+    auto to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
+    auto query_view = nearest_indices_from_pos(p) 
+                    | std::views::transform([&](uint i) { return m_grid[i]; })
+                    | std::views::join
+                    | std::views::transform(to_query);
+    
+    // Perform linear search for the closest position
+    QueryType query = { eig::Array3f::Zero(), 0.f, FLT_MAX };
+    for (const QueryType &q : query_view) {
+      if (q.distance < query.distance) {
+        query = q;
+      }
+    }
+    
+    return query;
   }
 
   template <typename T>
-  T KNNGrid<T>::query_nearest(const eig::Array3f &pos) const {
-    float min_dist  = FLT_MAX;
-    T     min_value = 0.f;
-    
-    for (uint i : nearest_indices_from_pos(pos)) {
-      auto &voxel = m_grid[i];
-      guard_continue(!voxel.empty());
+  std::vector<typename KNNGrid<T>::QueryType> 
+  KNNGrid<T>::query_k_nearest(const eig::Array3f &p, uint k) {
+    // Stupidity check for k==1 to just return the nearest element
+    guard(k > 1, { query_1_nearest(p) });
 
-      for (const ValueType &pair : voxel) {
-        auto &[new_pos, new_value] = pair;
-        float new_dist = detail::eucl_dist(pos, new_pos);
-        if (new_dist < min_dist) {
-          min_dist  = new_dist;
-          min_value = new_value;
-        }
-      }
-    }
+    // Construct range as search list of points in 8 nearest grid cells
+    auto to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
+    auto query_view = nearest_indices_from_pos(p) 
+                    | std::views::transform([&](uint i) { return m_grid[i]; })
+                    | std::views::join
+                    | std::views::transform(to_query);
 
-    return min_value;
+    // Convert to query objects and sort by distnace
+    std::vector<QueryType> queries;
+    std::ranges::copy(query_view, std::back_inserter(queries));
+    std::ranges::sort(queries, [](const auto &a, const auto &b) { return a.distance < b.distance; });
+
+    // Resize to keep nearest k results
+    queries.resize(std::min<size_t>(k, queries.size()));
+
+    return queries;
   }
 
-  /* Explicit template instantiations of met::KNNGrid<T> */
+  
+  template <typename T>
+  std::vector<typename KNNGrid<T>::QueryType> 
+  KNNGrid<T>::query_n_nearest(const eig::Array3f &p) {
+    // Construct range as search list of points in 8 nearest grid cells
+    auto to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
+    auto query_view = nearest_indices_from_pos(p) 
+                    | std::views::transform([&](uint i) { return m_grid[i]; })
+                    | std::views::join
+                    | std::views::transform(to_query);
 
+    // Convert to query objects and sort by distnace
+    std::vector<QueryType> queries;
+    std::ranges::copy(query_view, std::back_inserter(queries));
+    std::ranges::sort(queries, [](const auto &a, const auto &b) { return a.distance < b.distance; });
+    
+    return queries;
+  }
+
+  /* Explicit template instantiations of met::VoxelGrid<T> and met::KNNGrid<T> */
+
+  template class VoxelGrid<float>;
+  template class VoxelGrid<Spec>;
   template class KNNGrid<float>;
+  template class KNNGrid<Spec>;
 } // namespace met

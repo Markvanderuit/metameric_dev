@@ -5,6 +5,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/gui/application.hpp>
+#include <metameric/gui/spectral_grid.hpp>
 #include <metameric/gui/detail/imgui.hpp>
 #include <metameric/gui/detail/arcball.hpp>
 #include <metameric/gui//task/viewport_draw_grid_task.hpp>
@@ -18,12 +19,18 @@ namespace met {
   void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
     auto &e_spectral_grid      = info.get_resource<std::vector<Spec>>("global", "spectral_grid");
+    auto &e_spectral_vxl_grid  = info.get_resource<VoxelGrid<Spec>>("global", "spectral_voxel_grid");
     auto &e_spectral_grid_size = info.get_resource<uint>("global", "spectral_grid_size");
 
-    // Compute padded D65 color of all voxels in the spectral grid
-    std::vector<PaddedColor> color_grid(e_spectral_grid.size());
-    std::transform(std::execution::par_unseq, e_spectral_grid.begin(), e_spectral_grid.end(),
-      color_grid.begin(), [](const Spec &s) { return padd(xyz_to_srgb(reflectance_to_xyz(s))); });
+    // Obtain padded D65 color of all voxels in the spectral grid
+    std::vector<PaddedColor> color_grid(e_spectral_vxl_grid.data().size());
+    std::transform(std::execution::par_unseq, 
+      e_spectral_vxl_grid.data().begin(), e_spectral_vxl_grid.data().end(), color_grid.begin(), 
+      [](const Spec &s) { return padd(xyz_to_srgb(reflectance_to_xyz(s))); });
+
+    // std::vector<PaddedColor> color_grid(e_spectral_grid.size());
+    // std::transform(std::execution::par_unseq, e_spectral_grid.begin(), e_spectral_grid.end(),
+    //   color_grid.begin(), [](const Spec &s) { return padd(xyz_to_srgb(reflectance_to_xyz(s))); });
     
     // Construct buffer object and draw components
     m_grid_vertex_buffer = {{ .data = as_typed_span<const std::byte>(color_grid) }};
@@ -32,9 +39,9 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
     m_grid_program = {{ .type = gl::ShaderType::eVertex, 
-                        .path = "resources/shaders/viewport_task/texture_draw.vert" },
+                        .path = "resources/shaders/viewport_task/value_draw.vert" },
                       { .type = gl::ShaderType::eFragment,  
-                        .path = "resources/shaders/viewport_task/texture_draw.frag" }};
+                        .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }};
     m_grid_draw = { .type             = gl::PrimitiveType::ePoints,
                     .vertex_count     = (uint) color_grid.size(),
                     .bindable_array   = &m_grid_array,
@@ -54,13 +61,14 @@ namespace met {
 
     // Prepare multisampled framebuffer as draw target
     e_viewport_fbuffer.bind();
+    gl::state::set_viewport(e_viewport_texture.size());
     
     // Update program uniforms
-    m_grid_program.uniform("model_matrix",  e_viewport_model_matrix);
-    m_grid_program.uniform("camera_matrix", e_viewport_arcball.full());    
+    m_grid_program.uniform("u_model_matrix",  e_viewport_model_matrix);
+    m_grid_program.uniform("u_camera_matrix", e_viewport_arcball.full());    
 
     // Dispatch draw call
-    gl::state::set_viewport(e_viewport_texture.size());
+    gl::state::set_point_size(m_grid_psize);
     gl::dispatch_draw(m_grid_draw);
   }
 } // namespace met

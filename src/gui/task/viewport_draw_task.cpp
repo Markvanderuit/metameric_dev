@@ -138,8 +138,8 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, false) };
 
     // Prepare multisampled framebuffer as draw target
-    gl::state::set_viewport(e_viewport_texture.size());
     e_viewport_fbuffer.bind();
+    gl::state::set_viewport(e_viewport_texture.size());
     
     // Update program uniforms
     auto camera_matrix = e_viewport_arcball.full();

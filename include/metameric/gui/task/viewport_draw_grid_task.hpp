@@ -13,6 +13,7 @@ namespace met {
     gl::Array    m_grid_array;
     gl::Program  m_grid_program;
     gl::DrawInfo m_grid_draw;
+    float        m_grid_psize = 1.f;
     
   public:
     ViewportDrawGridTask(const std::string &name);
