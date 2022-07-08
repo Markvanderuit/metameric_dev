@@ -2,10 +2,10 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/spectral_mapping.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/spectral_grid.hpp>
 #include <metameric/core/detail/glm.hpp>
 
 #include <metameric/gui/application.hpp>
-#include <metameric/gui/spectral_grid.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
 #include <metameric/gui/task/mapping_task.hpp>
 #include <metameric/gui/task/gamut_picker.hpp>
@@ -85,24 +85,12 @@ namespace met {
       std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), internal_color.begin(),
       [&](const Spec &sd) { return padd(xyz_to_srgb(reflectance_to_xyz(sd))); });
 
-      // Initialize a empty 3D spectral grid
-      constexpr uint grid_size = 16;
-      std::vector<Spec> grid(std::pow(grid_size, 3), 0.f);
-      constexpr auto color_to_grid = [&](const PaddedColor &c) {
-        auto v = unpadd(c).min(1.f).max(0.f) * static_cast<float>(grid_size - 1);
-        return v.cast<uint>().eval();
-      };
-
-      // Indices over spectra/colour data
-      std::vector<uint> grid_indices(internal_color.size());
-      std::iota(grid_indices.begin(), grid_indices.end(), 0);
-
       // Create a KNN grid over the spectral distributions,based on their color as a position
       fmt::print("Constructing KNN grid\n");
       std::vector<eig::Array3f> knn_positions(internal_sd.size());
       std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), knn_positions.begin(),
       [&](const Spec &sd) { return xyz_to_srgb(reflectance_to_xyz(sd)); });
-      KNNGrid<Spec> knn_grid = {{ .grid_size = 16 }};
+      KNNGrid<Spec> knn_grid = {{ .grid_size = 32 }};
       knn_grid.insert_n(internal_sd, knn_positions);
       fmt::print("Constructed KNN grid\n");
 
@@ -110,54 +98,46 @@ namespace met {
       VoxelGrid<Spec> voxel_grid = {{ .grid_size = 16 }};
 
       // Construct list of voxel grid indices
-      auto grid_view = std::views::iota(0, voxel_grid.size().prod())
+      auto grid_view = std::views::iota(0, (int) voxel_grid.size())
                      | std::views::transform([&](int i) { return voxel_grid.grid_pos_from_index(i); });
-      std::vector<eig::Array3i> grid_pos(voxel_grid.size().prod());
+      std::vector<eig::Array3i> grid_pos(voxel_grid.size());
       std::ranges::copy(grid_view, grid_pos.begin());
-      
+
       // Fill voxel grid by querying KNN grid at each voxel center and averaging, for now
+      constexpr auto kernel = [](float x) {
+        constexpr float stddev = 1.f;
+        constexpr float alpha = -1.f / (2.f * stddev * stddev);
+
+        return std::max(0.f, std::exp(alpha * (x * x)));
+      };
+
       std::for_each(std::execution::par_unseq, grid_pos.begin(), grid_pos.end(), [&](const auto &p_i) {
         auto p = voxel_grid.pos_from_grid_pos(p_i);
-        auto query = knn_grid.query_1_nearest(p);
-        voxel_grid.at(p_i) = Spec(0.f); // query.value;
+        auto query_list = knn_grid.query_k_nearest(p, 16);
+        
+        Spec value = 0.f;
+        float weight = 0.f;
+        for (auto &query : query_list) {
+          float w = kernel(query.distance);
+          value += w * query.value;
+          weight += w;
+        }
+        voxel_grid.at(p_i) = value / std::max(weight, 0.00001f);
+
+        // auto avg = std::reduce(query_list.begin(), query_list.end(), Spec(0.f), [](const auto &a, const auto &b) {
+        //   return a.value + b.value;
+        // }) / float(query_list.size());
+
+        // auto query = knn_grid.query_1_nearest(p);
+        // voxel_grid.at(p_i) = query.value;
       });
       fmt::print("Constructed voxel grid\n");
 
-      // Initialize helper grids for parallel computation
-      std::vector<std::mutex> grid_mutexes(std::pow(grid_size, 3));
-      std::vector<uint>       grid_count(std::pow(grid_size, 3));
-
-      // Reduce spectra into grid based on their color as a position
-      std::for_each(std::execution::par, grid_indices.begin(), grid_indices.end(), [&](uint i) {
-        auto gridv = color_to_grid(internal_color[i]).eval();
-        uint j     = gridv.z() * std::pow(grid_size, 2) 
-                   + gridv.y() * grid_size 
-                   + gridv.x();
-        
-        // Acquire a lock on the current position to ensure reduction remains atomic
-        std::lock_guard<std::mutex> lock(grid_mutexes[j]);
-
-        grid[j] += internal_sd[i];
-        grid_count[j]++;
-      });
-      
-      // Normalize grid by number of spectra added per bin
-      grid_indices = std::vector<uint>(grid.size());
-      std::iota(grid_indices.begin(), grid_indices.end(), 0);
-      std::for_each(std::execution::par_unseq, grid_indices.begin(), grid_indices.end(), [&](uint i) {
-        grid[i] /= static_cast<float>(std::max(grid_count[i], 1u));
-      });
-
-      fmt::print("Loaded spectral grid\n\tdims: {}x{}x{}\n",
-        grid_size, grid_size, grid_size);
-
       // Make resources available for other components during runtime
-      scheduler.insert_resource("spectral_knn_grid", std::move(knn_grid));
+      scheduler.insert_resource("spectral_knn_grid",   std::move(knn_grid));
       scheduler.insert_resource("spectral_voxel_grid", std::move(voxel_grid));
-      scheduler.insert_resource("spectral_data", std::move(internal_sd));
-      scheduler.insert_resource("spectral_grid", std::move(grid));
-      scheduler.insert_resource("spectral_grid_size", std::move(grid_size));
-      scheduler.insert_resource("color_data", std::move(internal_color));
+      scheduler.insert_resource("spectral_data",       std::move(internal_sd));
+      scheduler.insert_resource("color_data",          std::move(internal_color));
     }
 
     void init_schedule(detail::LinearScheduler &scheduler, gl::Window &window) {

@@ -16,9 +16,9 @@ layout(location = 0) uniform uint u_n;
 vec4 to_barycentric(in vec3 p) {
   // TODO preprocess this matrix+vector in uniforms instead
   // TODO to transpose or not to transpose; that is the fucking question
-  mat3 t = inverse(transpose(mat3(b_0_color_gamut[0] - b_0_color_gamut[3],
-                                  b_0_color_gamut[1] - b_0_color_gamut[3],
-                                  b_0_color_gamut[2] - b_0_color_gamut[3])));
+  mat3 t = inverse((mat3(b_0_color_gamut[0] - b_0_color_gamut[3],
+                         b_0_color_gamut[1] - b_0_color_gamut[3],
+                         b_0_color_gamut[2] - b_0_color_gamut[3])));
   vec3 abc = t * (p - b_0_color_gamut[3]);
   return vec4(abc, 1.f - vsum(abc));
 }

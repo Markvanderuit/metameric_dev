@@ -1,4 +1,5 @@
 #include <metameric/core/io.hpp>
+#include <metameric/core/spectral_grid.hpp>
 #include <metameric/gui/task/mapping_task.hpp>
 #include <small_gl/utility.hpp>
 #include <fmt/ranges.h>
@@ -112,8 +113,7 @@ namespace met {
     // Get externally shared resources
     auto &e_color_gamut_buffer   = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
     auto &e_color_texture_buffer = info.get_resource<gl::Buffer>("global", "color_texture_buffer_gpu");
-    auto &e_spectral_grid        = info.get_resource<std::vector<Spec>>("global", "spectral_grid");
-    auto &e_spectral_grid_size   = info.get_resource<uint>("global", "spectral_grid_size");
+    auto &e_spectral_vxl_grid    = info.get_resource<VoxelGrid<Spec>>("global", "spectral_voxel_grid");
 
     // Get internally shared resources
     auto &i_spectral_gamut_map    = info.get_resource<std::span<Spec>>("spectral_gamut_map");
@@ -129,7 +129,10 @@ namespace met {
     // gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
     // e_color_gamut_buffer.flush();
     std::ranges::transform(color_gamut_map, i_spectral_gamut_map.begin(),
-      [&](const auto &p) { return detail::eval_grid(e_spectral_grid_size, e_spectral_grid, p); });
+      [&](const auto &p) { return e_spectral_vxl_grid.query(p); });
+
+    // std::ranges::transform(color_gamut_map, i_spectral_gamut_map.begin(),
+    //   [&](const auto &p) { return detail::eval_grid(e_spectral_grid_size, e_spectral_grid, p); });
     // gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
     // i_spectral_gamut_buffer.flush();
 
