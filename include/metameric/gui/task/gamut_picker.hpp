@@ -43,11 +43,19 @@ namespace met {
   } // namespace detail
 
   class GamutPickerTask : public detail::AbstractTask {
+    glm::vec3 m_gamut_mean;
+    
   public:
     GamutPickerTask(const std::string &name)
     : detail::AbstractTask(name) { }
 
-    void init(detail::TaskInitInfo &info) override { }
+    void init(detail::TaskInitInfo &info) override {
+      // Compute mean to rotate around
+      auto &e_color_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
+      auto gamut_map = convert_span<glm::vec3>(e_color_gamut_buffer.map(gl::BufferAccessFlags::eMapRead));
+      m_gamut_mean = std::reduce(gamut_map.begin(), gamut_map.end()) / static_cast<float>(gamut_map.size());
+      e_color_gamut_buffer.unmap();
+    }
 
     void eval(detail::TaskEvalInfo &info) override {
       // Get externally shared resources
@@ -87,46 +95,42 @@ namespace met {
 
         // Plot spectra
         ImGui::PlotLines("reflectance 0", e_spectral_gamut_map[0].data(), wavelength_samples, 0,
-          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
         ImGui::ColorEdit3("color 0, coordinates", color_gamut_map[0].data());
-        ImGui::ColorEdit3("color 0, conversion", spectra_to_colors[0].data());
+        ImGui::ColorEdit3("color 0, actual", spectra_to_colors[0].data());
         ImGui::PlotLines("reflectance 1", e_spectral_gamut_map[1].data(), wavelength_samples, 0,
-          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
         ImGui::ColorEdit3("color 1, coordinates", color_gamut_map[1].data());
-        ImGui::ColorEdit3("color 1, conversion", spectra_to_colors[1].data());
+        ImGui::ColorEdit3("color 1, actual", spectra_to_colors[1].data());
         ImGui::PlotLines("reflectance 2", e_spectral_gamut_map[2].data(), wavelength_samples, 0,
-          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
         ImGui::ColorEdit3("color 2, coordinates", color_gamut_map[2].data());
-        ImGui::ColorEdit3("color 2, conversion", spectra_to_colors[2].data());
+        ImGui::ColorEdit3("color 2, actual", spectra_to_colors[2].data());
         ImGui::PlotLines("reflectance 3", e_spectral_gamut_map[3].data(), wavelength_samples, 0,
-          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
+          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
         ImGui::ColorEdit3("color 3, coordinates", color_gamut_map[3].data());
-        ImGui::ColorEdit3("color 3, conversion", spectra_to_colors[3].data());
-
-        Color gamut_average = std::reduce(color_gamut_map.begin(), color_gamut_map.end(), Color(0.f)) / 4.f;
-        Spec spectrum_average = std::reduce(e_spectral_gamut_map.begin(), e_spectral_gamut_map.end(), Spec(0.f)) / 4.f;
-
-        // fmt::print("Colors:\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n",
-          // gamut_eigen[0], gamut_eigen[1], gamut_eigen[2], gamut_eigen[3], gamut_average);
-        
-        auto central_coords  = detail::to_barycentric(color_gamut_map, gamut_average);
-        auto recovered_spctr = detail::from_barycentric(e_spectral_gamut_map, central_coords);
-        auto recovered_color = xyz_to_srgb(reflectance_to_xyz(recovered_spctr)); 
-
-        ImGui::PlotLines("reflectance bar", recovered_spctr.data(), wavelength_samples, 0,
-          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-          
-        ImGui::PlotLines("reflectance avg", spectrum_average.data(), wavelength_samples, 0,
-          nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.2f));
-
-        // fmt::print("rgb: {}\nspectral: {}\n", recovered_color, color_from_spec);
-        // fmt::print("rgb: {} recovered through {}\n", recovered_color, central_coords);
+        ImGui::ColorEdit3("color 3, actual", spectra_to_colors[3].data());
       }
       ImGui::End();
 
       // Close buffer mapping
       e_color_gamut_buffer.unmap();
       gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
+    
+      /* // Open buffer mapping as vec3
+      auto vec3_gamut_map = convert_span<glm::vec3>(e_color_gamut_buffer.map(map_flags));
+      
+      // Rotate around mean on Y-axis for shits and giggles
+      auto t_mean = glm::translate(m_gamut_mean) 
+                  * glm::rotate(glm::radians(.5f), glm::vec3(0, 1, 0))
+                  * glm::translate(-m_gamut_mean);
+      for (auto &v : vec3_gamut_map) {
+        v = t_mean * glm::vec4(v, 1);
+      }
+
+      // Close buffer mapping
+      e_color_gamut_buffer.unmap();
+      gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer); */
     }
   };
 } // namespace met
