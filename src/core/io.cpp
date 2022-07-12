@@ -4,6 +4,8 @@
 #include <highfive/H5File.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 #include <algorithm>
 #include <execution>
 #include <ranges>
@@ -65,6 +67,24 @@ namespace met::io {
     return obj;
   }
 
+  void write_texture_float(const TextureData<float> obj, std::filesystem::path path) {
+    const auto ext = path.extension();
+    int ret = 0;
+    if (ext == "png") {
+      ret = stbi_write_png(path.string().c_str(), obj.size.x, obj.size.y, obj.channels,
+        obj.data.data(), 8 * 4 * obj.size.x);
+    } else if (ext == "jpg") {
+      ret = stbi_write_jpg(path.string().c_str(), obj.size.x, obj.size.y, obj.channels,
+        obj.data.data(), 0);
+    } else if (ext == "bmp") {
+      ret = stbi_write_bmp(path.string().c_str(), obj.size.x, obj.size.y, obj.channels,
+        obj.data.data());
+    } else {
+      debug::check_expr(false,
+        fmt::format("unsupported image extension for writing \"{}\"", path.string()));
+    }
+  }
+
   // TODO: Remove once done with testing
   SpectralData load_spectral_data_hd5(std::filesystem::path path) {
     // Check that file path exists
@@ -104,7 +124,7 @@ namespace met::io {
     constexpr auto ref_i = [](auto &v) { return [&v](const auto i) -> float& { return v[i]; }; };
 
     // Wrapper function to selectively skip alpha channels
-    auto skip_i = [&](size_t i) { return (!skip_alpha || obj.channels < 4) || i % 4 == 0ul; };
+    auto skip_i = [&](size_t i) { return !skip_alpha || obj.channels < 4 || (i + 1) % 4 != 0; };
 
     // Determine data (subset) to operate on, skipping alpha channels
     auto &data   = obj.data;
@@ -120,7 +140,7 @@ namespace met::io {
     constexpr auto ref_i = [](auto &v) { return [&v](const auto i) -> float& { return v[i]; }; };
 
     // Wrapper function to selectively skip alpha channels
-    auto skip_i = [&](size_t i) { return (!skip_alpha || obj.channels < 4) || i % 4 == 0ul; };
+    auto skip_i = [&](size_t i) { return !skip_alpha || obj.channels < 4 || (i + 1) % 4 != 0; };
 
     // Determine data (subset) to operate on, skipping alpha channels
     auto &data = obj.data;

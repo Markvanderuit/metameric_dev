@@ -26,6 +26,9 @@ namespace met::io {
   // Load float-scaled texture data from the given filepath
   TextureData<float> load_texture_float(std::filesystem::path path);
 
+  // Write float-scaled texture data to the given filepath
+  void write_texture_float(const TextureData<float> obj, std::filesystem::path path);
+
   // Load raw spectral database from the given hd5 filepath
   SpectralData load_spectral_data_hd5(std::filesystem::path path);
 
