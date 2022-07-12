@@ -32,8 +32,12 @@ namespace met {
     extern CMFS cmfs_srgb;
 
     // Illuminant spectra
-    extern Spec emitter_cie_d65;
     extern Spec emitter_cie_e;
+    extern Spec emitter_cie_d65;
+    extern Spec emitter_cie_fl2;
+    extern Spec emitter_cie_fl11;
+    extern Spec emitter_cie_ledb1;
+    extern Spec emitter_cie_ledrgb1;
   } // namespace models
 
   // Given a spectral bin, obtain the relevant central wavelength
@@ -73,7 +77,7 @@ namespace met {
   inline
   Color reflectance_to_xyz(const Spec &sd, const Spec &illum = models::emitter_cie_d65) {
     const float k = 1.f / (models::cmfs_cie_xyz.row(1).array().transpose() * illum).sum();
-    return k * models::cmfs_cie_xyz * (illum * sd).matrix();
+    return k * models::cmfs_cie_xyz * (sd * illum).matrix();
   }
   
   // Convert a color in cie XYZ to linear sRGB
