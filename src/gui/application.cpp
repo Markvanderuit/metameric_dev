@@ -8,6 +8,7 @@
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
 #include <metameric/gui/task/mapping_task.hpp>
+#include <metameric/gui/task/mapping_cpu_task.hpp>
 #include <metameric/gui/task/gamut_picker.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
@@ -41,13 +42,20 @@ namespace met {
         .data = as_typed_span<std::byte>(texture_data.data)
       });
       scheduler.insert_resource("color_texture_buffer_cpu", std::move(texture_data));
+
+      // Test write back to .bmp
+      // auto texture_copy = texture_data;
+      // io::apply
     }
 
     void init_spectral_gamut(detail::LinearScheduler &scheduler) {
       constexpr std::array<float, 12> gamut_initial_vertices = {
-        0.2f, 0.2f, 0.2f, 0.5f, 0.2f, 0.2f,
-        0.5f, 0.5f, 0.2f, 0.3f, 0.3f, 0.7f
+        .75f, .40f, .25f, 
+        .68f, .49f, .58f,
+        .50f, .58f, .39f, 
+        .35f, .30f, .34f 
       };
+
       constexpr auto create_flags
         = gl::BufferCreateFlags::eMapRead | gl::BufferCreateFlags::eMapWrite 
         | gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapCoherent;
@@ -153,6 +161,7 @@ namespace met {
       // Next tasks to run define ui components and runtime tasks
       scheduler.emplace_task<GamutPickerTask>("gamut_picker");
       scheduler.emplace_task<MappingTask>("mapping");
+      scheduler.emplace_task<MappingCPUTask>("mapping_cpu");
       scheduler.emplace_task<ViewportTask>("viewport");
       scheduler.emplace_task<ImageViewerTask>("image_viewer");
 
@@ -187,7 +196,11 @@ namespace met {
 
           ImGui::PlotLines("Emitter, d65", models::emitter_cie_d65.data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-          ImGui::PlotLines("Emitter, e", models::emitter_cie_e.data(), wavelength_samples, 0,
+          ImGui::PlotLines("Emitter, fl11", models::emitter_cie_fl11.data(), wavelength_samples, 0,
+            nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
+          ImGui::PlotLines("Emitter, ledb1", models::emitter_cie_ledb1.data(), wavelength_samples, 0,
+            nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
+          ImGui::PlotLines("Emitter, ledrgb1", models::emitter_cie_ledrgb1.data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
           ImGui::PlotLines("CIE XYZ, x()", models::cmfs_cie_xyz.row(0).eval().data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
