@@ -36,13 +36,7 @@ namespace met {
     m_output_fl11.resize(texture_size);
 
     // Fill input texture with data 
-    fmt::print("{}\n", color_texture_data.channels);
-    std::span<PaddedColor> color_data = as_typed_span<PaddedColor>(color_texture_data.data);
-    std::ranges::transform(color_data, m_input.begin(), unpadd<>);
-
-    // fmt::print("Channels {}\n", color_texture_data.channels);
-    // fmt::print("Input: {}, output {}\n", color_data.size(), m_input.size());
-    // std::ranges::copy(color_data, m_input.begin());
+    std::ranges::transform(as_typed_span<PaddedColor>(color_texture_data.data), m_input.begin(), unpadd<>);
 
     // Set up view texture on the GPU
     m_input_texture          = {{ .size = color_texture_data.size, .data = as_typed_span<float>(m_input) }};
@@ -55,7 +49,6 @@ namespace met {
   void MappingCPUTask::eval(detail::TaskEvalInfo &info) {
     if (ImGui::Begin("CPU mapping")) {
       // Get externally shared resources
-      auto &e_spectral_vxl_grid  = info.get_resource<VoxelGrid<Spec>>("global", "spectral_voxel_grid");
       auto &e_spectral_knn_grid  = info.get_resource<KNNGrid<Spec>>("global", "spectral_knn_grid");
       auto &e_color_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
 
@@ -77,6 +70,11 @@ namespace met {
       std::ranges::transform(m_input, m_barycentric_texture.begin(),
         [&](const auto &p) { return detail::as_barycentric(color_gamut, p); });
 
+      auto debug_t = (eig::Matrix3f() << color_gamut[0],
+                                         color_gamut[1],
+                                         color_gamut[2]).finished(); //..inverse().eval();
+      fmt::print("cpu - {}\n", as_typed_span<float>(debug_t));
+
       // Generate high-dimensional spectral texture
       std::transform(std::execution::par_unseq, 
         m_barycentric_texture.begin(), m_barycentric_texture.end(), m_spectral_texture.begin(),
@@ -86,8 +84,9 @@ namespace met {
         });
 
       // Generate and output average spectrum
-      Spec test_spectrum = std::reduce(std::execution::par_unseq, m_spectral_texture.begin(), 
-        m_spectral_texture.end()) / static_cast<float>(m_spectral_texture.size());
+      Spec test_spectrum = m_spectral_texture[1024];
+      //  std::reduce(std::execution::par_unseq, m_spectral_texture.begin(), 
+        // m_spectral_texture.end()) / static_cast<float>(m_spectral_texture.size());
       Color test_color = xyz_to_srgb(reflectance_to_xyz(test_spectrum, models::emitter_cie_fl2));
 
       // Generate low-dimensional color texture
