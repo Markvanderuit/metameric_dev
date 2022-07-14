@@ -9,8 +9,8 @@
 
 namespace met {
   class MappingTask : public detail::AbstractTask {
+    // TODO: remove
     gl::Buffer      m_debug_buffer;
-    std::span<Spec> m_debug_map;
 
     gl::Buffer      m_generate_buffer;
     gl::ComputeInfo m_generate_dispatch;
