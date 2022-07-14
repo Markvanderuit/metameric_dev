@@ -9,16 +9,18 @@ layout(binding = 0, std430) restrict readonly  buffer b_0 { vec3 b_0_color_gamut
 layout(binding = 1, std430) restrict readonly  buffer b_1 { Spec b_1_spectral_gamut[4];   };
 layout(binding = 2, std430) restrict readonly  buffer b_2 { vec3 b_2_color_texture[];     };
 layout(binding = 3, std430) restrict writeonly buffer b_3 { Spec b_3_spectral_texture[];  };
-layout(binding = 4, std430) restrict writeonly buffer b_4 { vec3 b_4_color_texture[];     };
+
+// TODO remove
+layout(binding = 4, std430) restrict writeonly buffer b_4 { mat3 b_4_debug_value;         };
 
 layout(location = 0) uniform uint u_n;
 
 vec4 to_barycentric(in vec3 p) {
   // TODO preprocess this matrix+vector in uniforms instead
   // TODO to transpose or not to transpose; that is the fucking question
-  mat3 t = inverse((mat3(b_0_color_gamut[0] - b_0_color_gamut[3],
-                         b_0_color_gamut[1] - b_0_color_gamut[3],
-                         b_0_color_gamut[2] - b_0_color_gamut[3])));
+  mat3 t = inverse(transpose(mat3(b_0_color_gamut[0] - b_0_color_gamut[3],
+                                  b_0_color_gamut[1] - b_0_color_gamut[3],
+                                  b_0_color_gamut[2] - b_0_color_gamut[3])));
   vec3 abc = t * (p - b_0_color_gamut[3]);
   return vec4(abc, 1.f - vsum(abc));
 }
@@ -43,4 +45,10 @@ void main() {
        sd = add(sd, mul(b_1_spectral_gamut[3], abcd[3]));
 
   b_3_spectral_texture[i] = sd;
+
+  if (i == 0) {
+    b_4_debug_value = mat3(b_0_color_gamut[0],
+                           b_0_color_gamut[1],
+                           b_0_color_gamut[2]);
+  }
 }

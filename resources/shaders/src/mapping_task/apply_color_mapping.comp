@@ -12,7 +12,6 @@ layout(binding = 1, std430) restrict readonly  buffer b_1 {
   uint n_scatterings;
 } b_1_mapping;
 layout(binding = 2, std430) restrict writeonly buffer b_2 { vec4 b_2_color_texture[];    };
-layout(binding = 3, std430) restrict writeonly buffer b_3 { Spec b_3_debug_spectrum; };
 
 layout(location = 0) uniform uint u_n;
 
@@ -24,8 +23,6 @@ vec3 apply_cmfs(in Spec sd) {
 void main() {
   const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
   guard(i < u_n);
-
-  b_3_debug_spectrum = b_1_mapping.illuminant;
 
   /*
     1. Obtain a value at i in the spectral texture

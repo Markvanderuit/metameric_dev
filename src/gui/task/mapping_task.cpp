@@ -6,33 +6,6 @@
 #include <ranges>
 
 namespace met {
-  namespace detail {
-    Spec eval_grid(uint grid_size, const std::span<Spec> &grid, Color p) {
-      auto eval_grid_u = [&](const eig::Vector3i &u) {
-        int i = u.z() * std::pow<uint>(grid_size, 2) + u.y() * grid_size + u.x();
-        return grid[i];
-      };
-      constexpr auto lerp = [](const auto &a, const auto &b, float t) {
-        return a + t * (b - a);
-      };
-
-      // Compute nearest positions and an alpha component for interpolation
-      p = (p * static_cast<float>(grid_size - 1)).max(0.f).min(float(grid_size) - 1.f);
-      eig::Array3i lo = p.floor().cast<int>(), up = p.ceil().cast<int>();
-      eig::Array3f alpha = p - lo.cast<float>();
-
-      // Sample the eight nearest positions in the grid
-      auto lll = eval_grid_u({ lo[0], lo[1], lo[2] }), ull = eval_grid_u({ up[0], lo[1], lo[2] }),
-           lul = eval_grid_u({ lo[0], up[1], lo[2] }), llu = eval_grid_u({ lo[0], lo[1], up[2] }),
-           uul = eval_grid_u({ up[0], up[1], lo[2] }), luu = eval_grid_u({ lo[0], up[1], up[2] }),
-           ulu = eval_grid_u({ up[0], lo[1], up[2] }), uuu = eval_grid_u({ up[0], up[1], up[2] });
-
-      // Return trilinear interpolation
-      return lerp(lerp(lerp(lll, ull, alpha[0]), lerp(lul, uul, alpha[0]), alpha[1]),
-                  lerp(lerp(llu, ulu, alpha[0]), lerp(luu, uuu, alpha[0]), alpha[1]), alpha[2]);
-    }
-  } // namespace details
-
   MappingTask::MappingTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
@@ -53,9 +26,9 @@ namespace met {
     m_generate_buffer.clear(std::span { (const std::byte *) &generate_clear_value, sizeof(float) });
 
     // Create debug buffer
-    m_debug_buffer = {{ .size = sizeof(Spec), .flags = create_flags }};
-    m_debug_buffer.clear(std::span { (const std::byte *) &generate_clear_value, sizeof(float) });
-    // m_debug_map = convert_span<Spec>(m_debug_buffer.map(map_flags));
+    float debug_clear_value = .5f;
+    m_debug_buffer = {{ .size = sizeof(eig::Matrix4f), .flags = create_flags }};
+    m_debug_buffer.clear(std::span { (const std::byte *) &debug_clear_value, sizeof(float) });
 
     // Create spectral gamut buffer and map here for now
     gl::Buffer gamut_buffer = {{ .size = sizeof(Spec) * 4, .flags = create_flags }};
@@ -113,7 +86,7 @@ namespace met {
     // Get externally shared resources
     auto &e_color_gamut_buffer   = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
     auto &e_color_texture_buffer = info.get_resource<gl::Buffer>("global", "color_texture_buffer_gpu");
-    auto &e_spectral_vxl_grid    = info.get_resource<VoxelGrid<Spec>>("global", "spectral_voxel_grid");
+    auto &e_spectral_knn_grid  = info.get_resource<KNNGrid<Spec>>("global", "spectral_knn_grid");
 
     // Get internally shared resources
     auto &i_spectral_gamut_map    = info.get_resource<std::span<Spec>>("spectral_gamut_map");
@@ -123,47 +96,40 @@ namespace met {
     // Generate temporary mapping to color gamut buffer 
     constexpr auto map_flags = gl::BufferAccessFlags::eMapRead | gl::BufferAccessFlags::eMapWrite;
     auto color_gamut_map = convert_span<Color>(e_color_gamut_buffer.map(map_flags));
-    // auto &e_color_gamut_map  = info.get_resource<std::span<Color>>("global", "color_gamut_map");
 
     // Sample spectra at gamut corner positions
-    // gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
-    // e_color_gamut_buffer.flush();
     std::ranges::transform(color_gamut_map, i_spectral_gamut_map.begin(),
-      [&](const auto &p) { return e_spectral_vxl_grid.query(p); });
-
-    // std::ranges::transform(color_gamut_map, i_spectral_gamut_map.begin(),
-    //   [&](const auto &p) { return detail::eval_grid(e_spectral_grid_size, e_spectral_grid, p); });
-    // gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
-    // i_spectral_gamut_buffer.flush();
+    [&](const auto &p) { return e_spectral_knn_grid.query_1_nearest(p).value; });
 
     // Close buffer mapping
     e_color_gamut_buffer.unmap();
-    gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
 
     // Generate spectral texture buffer
     e_color_gamut_buffer.bind_to(gl::BufferTargetType::eShaderStorage,    0);
     i_spectral_gamut_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     e_color_texture_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  2);
     m_generate_buffer.bind_to(gl::BufferTargetType::eShaderStorage,       3);
+    m_debug_buffer.bind_to(gl::BufferTargetType::eShaderStorage,          4);
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_generate_dispatch);
 
     // Generate color texture buffer
     m_generate_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     m_mapping_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  1);
     m_mapping_texture.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    m_debug_buffer.bind_to(gl::BufferTargetType::eShaderStorage,    3);
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_mapping_dispatch);
 
     // Render to texture
     m_mapping_texture.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     i_color_texture.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_texture_dispatch);
 
-    /* // Inspect debug buffer
-    gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
-    for (Spec &s : m_debug_map) {
-      fmt::print("CMFS: {}\nSpec: {}\n", models::emitter_cie_d65,  s);
-    } */
-
+    // Inspect debug buffer
+    eig::Matrix4f debug_value = 0.f;
+    m_debug_buffer.get(as_typed_span<std::byte>(debug_value));
+    eig::Matrix3f debug_out = debug_value.topLeftCorner(2, 2);
+    fmt::print("gpu - {}\n", as_typed_span<float>(debug_out));
   }
 } // namespace met
