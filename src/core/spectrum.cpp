@@ -17,17 +17,17 @@ namespace met {
                                          { 0.019334f, 0.119193f, 0.950227f }};
 
     // Color matching functions
-    CMFS cmfs_cie_xyz = cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, 
-                                          cie_xyz_values_y, cie_xyz_values_z);
-    CMFS cmfs_srgb = xyz_to_srgb_transform * cmfs_cie_xyz;
+    CMFS cmfs_cie_xyz = cmfs_from_data(cie_wavelength_values, 
+      cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z);
+    CMFS cmfs_srgb = (xyz_to_srgb_transform * cmfs_cie_xyz.transpose()).transpose();
 
     // Illuminant spectra
     Spec emitter_cie_e    = 1.f;
     Spec emitter_cie_d65  = spectrum_from_data(cie_wavelength_values, cie_d65_values);
     Spec emitter_cie_fl2  = spectrum_from_data(cie_wavelength_values, cie_fl2_values);
     Spec emitter_cie_fl11 = spectrum_from_data(cie_wavelength_values, cie_fl11_values);
-    Spec emitter_cie_ledb1   = 0.05f * spectrum_from_data(cie_wavelength_values, cie_ledb1_values);
-    Spec emitter_cie_ledrgb1 = 0.05f * spectrum_from_data(cie_wavelength_values, cie_ledrgb1_values);
+    Spec emitter_cie_ledb1   = spectrum_from_data(cie_wavelength_values, cie_ledb1_values);
+    Spec emitter_cie_ledrgb1 = spectrum_from_data(cie_wavelength_values, cie_ledrgb1_values);
   } // namespace models 
 
   // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::eval(...) from libcore/spectrum.cpp
@@ -76,8 +76,8 @@ namespace met {
                       std::span<const float> values_x,
                       std::span<const float> values_y,
                       std::span<const float> values_z) {
-    return (CMFS() << spectrum_from_data(wvls, values_x).transpose(),
-                      spectrum_from_data(wvls, values_y).transpose(),
-                      spectrum_from_data(wvls, values_z).transpose()).finished();
+    return (CMFS() << spectrum_from_data(wvls, values_x),
+                      spectrum_from_data(wvls, values_y),
+                      spectrum_from_data(wvls, values_z)).finished();
   }
 } // namespace met

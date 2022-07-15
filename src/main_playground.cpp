@@ -76,8 +76,9 @@ std::span<T> convert_span_aligned(std::span<U> s) {
 
 int main() {
   using namespace met;
-  using Color       = eig::Array3f;
-  using PaddedColor = eig::Array4f;
+  
+  using Color   = eig::Array<float, 3, 1>;
+  using AlColor = eig::AlArray<float, 3, 1>;
 
   try {
     gl::Window window = {{ .size  = { 512, 512 }, .title = "Playground", .flags = window_flags }};
@@ -86,8 +87,8 @@ int main() {
     constexpr uint n = 8;
     const Color init_color = 0.f;
     const auto test_v = init_color.reshaped(4, 1).eval();
-    std::vector<PaddedColor> data_i(n, padd(init_color)); 
-    std::vector<PaddedColor> data_o(n, padd(init_color)); 
+    std::vector<AlColor> data_i(n, init_color); 
+    std::vector<AlColor> data_o(n, init_color); 
 
     for (uint i = 0; i < n; ++i) { data_i[i] = float(i); }
     

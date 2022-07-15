@@ -67,6 +67,35 @@ namespace met::io {
     return obj;
   }
 
+  TextureData<Color> load_texture_color(std::filesystem::path path) {
+    // Check that file path exists
+    debug::check_expr(std::filesystem::exists(path),
+      fmt::format("failed to resolve path \"{}\"", path.string()));
+
+    // Holder object that is returned later
+    TextureData<Color> obj;
+      
+    // Attempt to load texture data, passing size values into holder object
+    float *ptr = stbi_loadf(path.string().c_str(), &obj.size[0], &obj.size[1], &obj.channels, 0);
+    debug::check_expr(ptr, fmt::format("failed to load file \"{}\"", path.string()));
+
+    // Copy loaded data into holder object
+    if (obj.channels == 3) {
+      std::span<eig::Array3f> span((eig::Array3f *) (ptr), 
+                                   (eig::Array3f *) (ptr) + glm::prod(obj.size));
+      obj.data.assign(span.begin(), span.end());
+    } else if (obj.channels == 4) {
+      // Discard alpha channel as padding
+      std::span<eig::AlArray3f> span(reinterpret_cast<eig::AlArray3f*>(ptr), 
+                                     reinterpret_cast<eig::AlArray3f*>(ptr) + glm::prod(obj.size));
+      obj.data.assign(span.begin(), span.end());
+      obj.channels = 3;
+    }
+
+    stbi_image_free(ptr);
+    return obj;
+  }
+
   void write_texture_float(const TextureData<float> obj, std::filesystem::path path) {
     const auto ext = path.extension();
     int ret = 0;
@@ -119,9 +148,9 @@ namespace met::io {
     obj.channels = new_channels;
   }
   
-  void apply_srgb_to_lrgb(TextureData<float> &obj, bool skip_alpha) {
+  void apply_srgb_to_lrgb(TextureData<Color> &obj, bool skip_alpha) {
     // Wrapper function to obtain a view over a subset of data using indices
-    constexpr auto ref_i = [](auto &v) { return [&v](const auto i) -> float& { return v[i]; }; };
+    constexpr auto ref_i = [](auto &v) { return [&v](const auto i) -> Color& { return v[i]; }; };
 
     // Wrapper function to selectively skip alpha channels
     auto skip_i = [&](size_t i) { return !skip_alpha || obj.channels < 4 || (i + 1) % 4 != 0; };
@@ -132,12 +161,12 @@ namespace met::io {
     auto indexed = indices | std::views::transform(ref_i(data));
 
     // Apply srgb->linear transformation to data
-    std::ranges::transform(indexed, indexed.begin(), gamma_srgb_to_linear_srgb<float>);
+    std::ranges::transform(indexed, indexed.begin(), gamma_srgb_to_linear_srgb);
   }
 
-  void apply_lrgb_to_srgb(TextureData<float> &obj, bool skip_alpha) {
+  void apply_lrgb_to_srgb(TextureData<Color> &obj, bool skip_alpha) {
     // Wrapper function to obtain a view over a subset of data using indices
-    constexpr auto ref_i = [](auto &v) { return [&v](const auto i) -> float& { return v[i]; }; };
+    constexpr auto ref_i = [](auto &v) { return [&v](const auto i) -> Color& { return v[i]; }; };
 
     // Wrapper function to selectively skip alpha channels
     auto skip_i = [&](size_t i) { return !skip_alpha || obj.channels < 4 || (i + 1) % 4 != 0; };
@@ -148,6 +177,6 @@ namespace met::io {
     auto indexed = indices | std::views::transform(ref_i(data));
 
     // Apply linear->srgb transformation to data
-    std::ranges::transform(indexed, indexed.begin(), linear_srgb_to_gamma_srgb<float>);
+    std::ranges::transform(indexed, indexed.begin(), linear_srgb_to_gamma_srgb);
   }
 } // namespace met::io

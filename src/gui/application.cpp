@@ -1,15 +1,15 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/spectral_mapping.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/spectral_grid.hpp>
 #include <metameric/core/detail/glm.hpp>
 
 #include <metameric/gui/application.hpp>
 #include <metameric/gui/task/lambda_task.hpp>
+#include <metameric/gui/task/generate_spectral_task.hpp>
 #include <metameric/gui/task/mapping_task.hpp>
 #include <metameric/gui/task/mapping_cpu_task.hpp>
-#include <metameric/gui/task/gamut_picker.hpp>
+#include <metameric/gui/task/gamut_viewer.hpp>
 #include <metameric/gui/task/image_viewer.hpp>
 #include <metameric/gui/task/viewport_task.hpp>
 #include <metameric/gui/task/window_task.hpp>
@@ -31,40 +31,34 @@ namespace met {
   namespace detail {
     void init_color_texture(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
       // Load texture from disk
-      auto texture_data = io::load_texture_float(info.texture_path);
-      io::apply_channel_conversion(texture_data, 4, 1.f);
+      auto texture_data = io::load_texture_color(info.texture_path);
       io::apply_srgb_to_lrgb(texture_data, true);
       fmt::print("Loaded startup texture\n\tpath: {}\n\tdims: {}x{}\n", 
         info.texture_path.string(), texture_data.size.x, texture_data.size.y);
 
-      // Load data into buffer and pass to scheduler
+      // Load aligned data into buffer and pass to scheduler
+      std::vector<eig::AlArray3f> aligned_texture(texture_data.data.begin(), texture_data.data.end());
       scheduler.emplace_resource<gl::Buffer, gl::BufferCreateInfo>("color_texture_buffer_gpu", {
-        .data = as_typed_span<std::byte>(texture_data.data)
+        .data = as_typed_span<std::byte>(aligned_texture)
       });
       scheduler.insert_resource("color_texture_buffer_cpu", std::move(texture_data));
-
-      // Test write back to .bmp
-      // auto texture_copy = texture_data;
-      // io::apply
     }
 
     void init_spectral_gamut(detail::LinearScheduler &scheduler) {
-      constexpr std::array<float, 12> gamut_initial_vertices = {
-        .75f, .40f, .25f, 
-        .68f, .49f, .58f,
-        .50f, .58f, .39f, 
-        .35f, .30f, .34f 
+      std::array<eig::AlArray3f, 4> gamut_initial_vertices = {
+        eig::AlArray3f { .75f, .40f, .25f },
+        eig::AlArray3f { .68f, .49f, .58f },
+        eig::AlArray3f { .50f, .58f, .39f },
+        eig::AlArray3f { .35f, .30f, .34f }
       };
 
+      // Load data into buffer and pass to scheduler; enable persistent mapping if necessary
       constexpr auto create_flags
         = gl::BufferCreateFlags::eMapRead | gl::BufferCreateFlags::eMapWrite 
         | gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapCoherent;
-    
-      // Load data into buffer, generate a persistent mapping, and pass both to scheduler
-      auto &buff = scheduler.emplace_resource<gl::Buffer, gl::BufferCreateInfo>(
-        "color_gamut_buffer", 
-        { .data = as_typed_span<const std::byte>(gamut_initial_vertices), .flags = create_flags }
-      );
+      scheduler.emplace_resource<gl::Buffer, gl::BufferCreateInfo>("color_gamut_buffer",  { 
+        .data = as_typed_span<const std::byte>(gamut_initial_vertices), .flags = create_flags
+      });
     }
 
     void init_spectral_grid(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
@@ -82,22 +76,17 @@ namespace met {
       std::vector<float> wavelengths(data_samples);
       std::ranges::copy(std::views::iota(0u, data_samples) 
         | std::views::transform(idx_to_data), wavelengths.begin());
-
+      
       // Convert data into metameric's spectral format
       std::vector<Spec> internal_sd(spectral_data.size);
       std::transform(std::execution::par_unseq, spectral_data.data.begin(), spectral_data.data.end(), 
         internal_sd.begin(), [&](const auto &v) {  return spectrum_from_data(wavelengths, v); });
 
-      // Convert data to metameric's color format under D65
-      std::vector<PaddedColor> internal_color(internal_sd.size());
-      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), internal_color.begin(),
-      [&](const Spec &sd) { return padd(xyz_to_srgb(reflectance_to_xyz(sd))); });
-
       // Create a KNN grid over the spectral distributions,based on their color as a position
       fmt::print("Constructing KNN grid\n");
       std::vector<eig::Array3f> knn_positions(internal_sd.size());
       std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), knn_positions.begin(),
-      [&](const Spec &sd) { return xyz_to_srgb(reflectance_to_xyz(sd)); });
+        [&](const Spec &sd) { return reflectance_to_color(sd, { .cmfs = models::cmfs_srgb }); });
       KNNGrid<Spec> knn_grid = {{ .grid_size = 32 }};
       knn_grid.insert_n(internal_sd, knn_positions);
       fmt::print("Constructed KNN grid\n");
@@ -121,7 +110,7 @@ namespace met {
 
       std::for_each(std::execution::par_unseq, grid_pos.begin(), grid_pos.end(), [&](const auto &p_i) {
         auto p = voxel_grid.pos_from_grid_pos(p_i);
-        auto query_list = knn_grid.query_k_nearest(p, 16);
+        auto query_list = knn_grid.query_k_nearest(p, 4);
         
         Spec value = 0.f;
         float weight = 0.f;
@@ -145,7 +134,6 @@ namespace met {
       scheduler.insert_resource("spectral_knn_grid",   std::move(knn_grid));
       scheduler.insert_resource("spectral_voxel_grid", std::move(voxel_grid));
       scheduler.insert_resource("spectral_data",       std::move(internal_sd));
-      scheduler.insert_resource("color_data",          std::move(internal_color));
     }
 
     void init_schedule(detail::LinearScheduler &scheduler, gl::Window &window) {
@@ -159,7 +147,8 @@ namespace met {
       scheduler.emplace_task<WindowTask>("viewport_base");
 
       // Next tasks to run define ui components and runtime tasks
-      scheduler.emplace_task<GamutPickerTask>("gamut_picker");
+      scheduler.emplace_task<GenerateSpectralTask>("generate_spectral");
+      scheduler.emplace_task<GamutViewerTask>("gamut_picker");
       scheduler.emplace_task<MappingTask>("mapping");
       scheduler.emplace_task<MappingCPUTask>("mapping_cpu");
       scheduler.emplace_task<ViewportTask>("viewport");
@@ -202,11 +191,11 @@ namespace met {
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
           ImGui::PlotLines("Emitter, ledrgb1", models::emitter_cie_ledrgb1.data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-          ImGui::PlotLines("CIE XYZ, x()", models::cmfs_cie_xyz.row(0).eval().data(), wavelength_samples, 0,
+          ImGui::PlotLines("CIE XYZ, x()", models::cmfs_cie_xyz.col(0).eval().data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-          ImGui::PlotLines("CIE XYZ, y()", models::cmfs_cie_xyz.row(1).eval().data(), wavelength_samples, 0,
+          ImGui::PlotLines("CIE XYZ, y()", models::cmfs_cie_xyz.col(1).eval().data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
-          ImGui::PlotLines("CIE XYZ, z()", models::cmfs_cie_xyz.row(2).eval().data(), wavelength_samples, 0,
+          ImGui::PlotLines("CIE XYZ, z()", models::cmfs_cie_xyz.col(2).eval().data(), wavelength_samples, 0,
             nullptr, FLT_MAX, FLT_MAX, viewport_size * glm::vec2(.67f, 0.3f));
         }
         ImGui::End();

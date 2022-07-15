@@ -2,6 +2,7 @@
 #include <metameric/core/spectral_grid.hpp>
 #include <metameric/gui/task/mapping_cpu_task.hpp>
 #include <metameric/gui/detail/imgui.hpp>
+#include <small_gl/buffer.hpp>
 #include <fmt/ranges.h>
 #include <execution>
 #include <numeric>
@@ -23,11 +24,13 @@ namespace met {
 
   void MappingCPUTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &color_texture_data = info.get_resource<io::TextureData<float>>("global", "color_texture_buffer_cpu");
+    auto &e_texture_obj = info.get_resource<io::TextureData<Color>>("global", "color_texture_buffer_cpu");
     
+    // Fill input texture with data 
+    m_input = std::vector<eig::Array3f>(e_texture_obj.data.begin(), e_texture_obj.data.end());
+
     // Set up processing buffers on the CPU
-    size_t texture_size = glm::prod(color_texture_data.size);
-    m_input.resize(texture_size);
+    size_t texture_size = glm::prod(e_texture_obj.size);
     m_barycentric_texture.resize(texture_size);
     m_spectral_texture.resize(texture_size);
     m_output_d65.resize(texture_size);
@@ -35,15 +38,12 @@ namespace met {
     m_output_fl2.resize(texture_size);
     m_output_fl11.resize(texture_size);
 
-    // Fill input texture with data 
-    std::ranges::transform(as_typed_span<PaddedColor>(color_texture_data.data), m_input.begin(), unpadd<>);
-
     // Set up view texture on the GPU
-    m_input_texture          = {{ .size = color_texture_data.size, .data = as_typed_span<float>(m_input) }};
-    m_output_d65_texture     = {{ .size = color_texture_data.size }};
-    m_output_d65_err_texture = {{ .size = color_texture_data.size }};
-    m_output_fl2_texture     = {{ .size = color_texture_data.size }};
-    m_output_fl11_texture    = {{ .size = color_texture_data.size }};
+    m_input_texture          = {{ .size = e_texture_obj.size, .data = as_typed_span<float>(m_input) }};
+    m_output_d65_texture     = {{ .size = e_texture_obj.size }};
+    m_output_d65_err_texture = {{ .size = e_texture_obj.size }};
+    m_output_fl2_texture     = {{ .size = e_texture_obj.size }};
+    m_output_fl11_texture    = {{ .size = e_texture_obj.size }};
   }
 
   void MappingCPUTask::eval(detail::TaskEvalInfo &info) {
@@ -54,7 +54,7 @@ namespace met {
 
       // Generate temporary mapping to color gamut buffer 
       constexpr auto map_flags = gl::BufferAccessFlags::eMapRead | gl::BufferAccessFlags::eMapWrite;
-      auto color_gamut_map = convert_span<Color>(e_color_gamut_buffer.map(map_flags));
+      auto color_gamut_map = convert_span<eig::AlArray3f>(e_color_gamut_buffer.map(map_flags));
       
       // Sample spectra at gamut corner positions
       std::vector<Spec> spectral_gamut(4);
@@ -70,11 +70,6 @@ namespace met {
       std::ranges::transform(m_input, m_barycentric_texture.begin(),
         [&](const auto &p) { return detail::as_barycentric(color_gamut, p); });
 
-      auto debug_t = (eig::Matrix3f() << color_gamut[0],
-                                         color_gamut[1],
-                                         color_gamut[2]).finished(); //..inverse().eval();
-      fmt::print("cpu - {}\n", as_typed_span<float>(debug_t));
-
       // Generate high-dimensional spectral texture
       std::transform(std::execution::par_unseq, 
         m_barycentric_texture.begin(), m_barycentric_texture.end(), m_spectral_texture.begin(),
@@ -87,18 +82,28 @@ namespace met {
       Spec test_spectrum = m_spectral_texture[1024];
       //  std::reduce(std::execution::par_unseq, m_spectral_texture.begin(), 
         // m_spectral_texture.end()) / static_cast<float>(m_spectral_texture.size());
-      Color test_color = xyz_to_srgb(reflectance_to_xyz(test_spectrum, models::emitter_cie_fl2));
+      Color test_color = reflectance_to_color(test_spectrum, { 
+        .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl2
+      });
+
+      // Specify spectrum-to-color mappings
+      const SpectralMapping mapping_d65  = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65  };
+      const SpectralMapping mapping_fl2  = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl2  };
+      const SpectralMapping mapping_fl11 = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl11 };
 
       // Generate low-dimensional color texture
       std::transform(std::execution::par_unseq, 
         m_spectral_texture.begin(), m_spectral_texture.end(), m_output_d65.begin(), 
-        [&](const Spec &sd) { return xyz_to_srgb(reflectance_to_xyz(sd, models::emitter_cie_d65)); });
+        [&](const Spec &sd) { return mapping_d65.apply(sd); });
       std::transform(std::execution::par_unseq, 
         m_spectral_texture.begin(), m_spectral_texture.end(), m_output_fl2.begin(), 
-        [&](const Spec &sd) { return xyz_to_srgb(reflectance_to_xyz(sd, models::emitter_cie_fl2)); });
+        [&](const Spec &sd) { return mapping_fl2.apply(sd); });
       std::transform(std::execution::par_unseq, 
         m_spectral_texture.begin(), m_spectral_texture.end(), m_output_fl11.begin(), 
-        [&](const Spec &sd) { return xyz_to_srgb(reflectance_to_xyz(sd, models::emitter_cie_fl11)); });
+        [&](const Spec &sd) { return mapping_fl11.apply(sd); });
+      
+      // Debug output
+      fmt::print("cpu - {}\n", as_typed_span<float>(m_output_d65[1024]));
 
       #pragma omp parallel for
       for (uint i = 0; i < m_output_d65.size(); ++i) {

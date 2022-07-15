@@ -15,13 +15,12 @@ namespace met {
   constexpr static float wavelength_ssize = wavelength_range / static_cast<float>(wavelength_samples);  
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
-  /* Define program's underlying spectrum/color/cmfs classes as just renamed Eigen objects */
-  using CMFS        = eig::Matrix<float, 3, wavelength_samples>;
-  using Spec        = eig::Array<float, wavelength_samples, 1>;
-  using Color       = eig::Array<float, 3, 1>;
-  using PaddedColor = eig::Array<float, 4, 1>;
+  /* Define program's underlying spectrum/cmfs/color classes as just renamed Eigen objects */
+  using CMFS  = eig::Matrix<float, wavelength_samples, 3>;
+  using Spec  = eig::Array<float, wavelength_samples, 1>;
+  using Color = eig::Array<float, 3, 1>;
 
-  /* Define color matching functions, SPD models, and other models */
+  /* Define color matching functions, SPD models, etc. */
   namespace models {
     // Linear color space transformations
     extern eig::Matrix3f xyz_to_srgb_transform;
@@ -66,75 +65,65 @@ namespace met {
                       std::span<const float> values_y,
                       std::span<const float> values_z);
   
-  // Convert a spectral emission distr. to cie XYZ
-  inline
-  Color emission_to_xyz(const Spec &sd) {
-    const float k = 1.f / (models::cmfs_cie_xyz.row(1).array().transpose() * sd).sum();
-    return k * models::cmfs_cie_xyz * sd.matrix();
-  }
+  /* Spectral mapping object defines how a reflectance-to-color conversion is performed */
+  struct SpectralMapping {
+    /* Mapping components */
 
-  // Convert a spectral reflectance distr. to cie XYZ under a given illuminant whitepoint
-  inline
-  Color reflectance_to_xyz(const Spec &sd, const Spec &illum = models::emitter_cie_d65) {
-    const float k = 1.f / (models::cmfs_cie_xyz.row(1).array().transpose() * illum).sum();
-    return k * models::cmfs_cie_xyz * (sd * illum).matrix();
-  }
-  
-  // Convert a color in cie XYZ to linear sRGB
-  inline
-  Color xyz_to_srgb(const Color &c) {
-    return models::xyz_to_srgb_transform * c.matrix();
-  }
+    // Color matching or sensor response functions
+    CMFS cmfs       = models::cmfs_cie_xyz;
 
-  // Convert a color in linear sRGB to cie XYZ
+    // Illuminant under which observation is performed
+    Spec illuminant = models::emitter_cie_d65;
+
+    // Nr. of indirect scatterings of reflectance
+    uint n_scatters = 0;
+
+    /* Mapping functions */
+
+    // Given a known reflectance, simplify the CMFS into a single object
+    CMFS simplify(const Spec &sd) const {
+      const Spec power = n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval();
+      return cmfs.array().colwise() * (power * illuminant);
+    }
+
+    Color apply(const Spec &sd) const {
+      const CMFS cmfs = simplify(sd);
+      const float k = 1.f / cmfs.col(1).array().sum();
+      return k * cmfs.transpose() * sd.matrix();
+    }
+  };
+
+  // Convert a spectral reflectance distr. to a color under a given mapping
   inline
-  Color srgb_to_xyz(const Color &c) {
-    return models::srgb_to_xyz_transform * c.matrix();
+  Color reflectance_to_color(const Spec &sd, const SpectralMapping &mapping = SpectralMapping()) {
+    return mapping.apply(sd);
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB
   template <typename Float>
   constexpr inline
-  Float gamma_srgb_to_linear_srgb(Float f) {
+  Float gamma_srgb_to_linear_srgb_f(Float f) {
     return f <= 0.003130 ? f * 12.92 : std::pow<Float>(f, 1.0 / 2.4) * 1.055 - 0.055;
   }
 
   // Convert a linear sRGB value to gamma-corrected sRGB
   template <typename Float>
   constexpr inline
-  Float linear_srgb_to_gamma_srgb(Float f) {
+  Float linear_srgb_to_gamma_srgb_f(Float f) {
     return f <= 0.04045 ? f / 12.92 : std::pow<Float>((f + 0.055) / 1.055, 2.4);
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB
   inline
   Color gamma_srgb_to_linear_srgb(Color c) {
-    std::ranges::transform(c, c.begin(), gamma_srgb_to_linear_srgb<float>);
+    std::ranges::transform(c, c.begin(), gamma_srgb_to_linear_srgb_f<float>);
     return c;
   }
 
   // Convert a linear sRGB value to gamma-corrected sRGB
   inline
   Color linear_srgb_to_gamma_srgb(Color c) {
-    std::ranges::transform(c, c.begin(), linear_srgb_to_gamma_srgb<float>);
+    std::ranges::transform(c, c.begin(), linear_srgb_to_gamma_srgb_f<float>);
     return c;
-  }
-
-  // Add padding to Color type for alpha component or to prevent alignment issues
-  template <typename T = Color>
-  inline
-  PaddedColor padd(const T &c, float padding = 1.f) {
-    if constexpr (std::is_same_v<T, PaddedColor>) {
-      return c;
-    } else {
-      return (PaddedColor() << c, padding).finished();
-    }
-  }
-
-  // Strip padding from Color type
-  template <typename T = PaddedColor>
-  inline
-  Color unpadd(const T &c) {
-    return c.head<3>();
   }
 } // namespace met

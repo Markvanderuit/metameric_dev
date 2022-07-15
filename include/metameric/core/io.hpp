@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/glm.hpp>
 #include <filesystem>
@@ -26,6 +27,9 @@ namespace met::io {
   // Load float-scaled texture data from the given filepath
   TextureData<float> load_texture_float(std::filesystem::path path);
 
+  // Load color object texture data from the given filepath
+  TextureData<Color> load_texture_color(std::filesystem::path path);
+
   // Write float-scaled texture data to the given filepath
   void write_texture_float(const TextureData<float> obj, std::filesystem::path path);
 
@@ -36,6 +40,6 @@ namespace met::io {
   void apply_channel_conversion(TextureData<float> &obj, uint new_channels, float new_value);
 
   // Linearize/delinearize srgb texture data
-  void apply_srgb_to_lrgb(TextureData<float> &obj, bool skip_alpha = true);
-  void apply_lrgb_to_srgb(TextureData<float> &obj, bool skip_alpha = true);
+  void apply_srgb_to_lrgb(TextureData<Color> &obj, bool skip_alpha = true);
+  void apply_lrgb_to_srgb(TextureData<Color> &obj, bool skip_alpha = true);
 } // namespace met::io

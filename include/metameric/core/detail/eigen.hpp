@@ -10,9 +10,13 @@
 #include <Eigen/Dense>
 
 namespace met {
+  namespace eig = Eigen; // namespace shorthand
+} // namespace met
+
+namespace Eigen {
   namespace detail {
-    template <uint D>
-    constexpr uint vector_align() {
+    template <size_t D>
+    constexpr size_t vector_align() {
       static_assert(D > 0 && D <= 4);
       return D == 4 ? 16
            : D == 3 ? 16
@@ -20,8 +24,8 @@ namespace met {
            : 4;
     }
 
-    template <uint D>
-    constexpr uint _matrix_align() {
+    template <size_t D>
+    constexpr size_t _matrix_align() {
       static_assert(D > 0 && D <= 4);
       return D == 4 ? 4
            : D == 3 ? 4
@@ -29,32 +33,29 @@ namespace met {
            : 1;
     }
 
-    template <uint R, uint C>
-    constexpr uint matrix_align() {
+    template <size_t R, size_t C>
+    constexpr size_t matrix_align() {
       return _matrix_align<R>() * vector_align<C>();
     }
   } // namespace detail
-  
-  // namespace shorthand
-  namespace eig = Eigen;
 
   template <class Type, size_t Rows, size_t Cols>
-  class alignas(detail::matrix_align<Rows, Cols>()) AlignedMatrix 
-  : public eig::Matrix<Type, Rows, Cols> {
-    using Base = eig::Matrix<Type, Rows, Cols>;
+  class alignas(detail::matrix_align<Rows, Cols>()) AlMatrix 
+  : public Matrix<Type, Rows, Cols> {
+    using Base = Matrix<Type, Rows, Cols>;
 
   public:
-    AlignedMatrix() : Base() 
+    AlMatrix() : Base() 
     { }
 
     // This constructor allows you to construct MyVectorType from Eigen expressions
     template <typename Other>
-    AlignedMatrix(const eig::MatrixBase<Other>& o)
+    AlMatrix(const MatrixBase<Other>& o)
     : Base(o)
     { }
 
     template<typename Other>
-    AlignedMatrix& operator=(const eig::MatrixBase <Other>& o)
+    AlMatrix& operator=(const MatrixBase <Other>& o)
     {
       this->Base::operator=(o);
       return *this;
@@ -62,24 +63,24 @@ namespace met {
   };
 
   template <class Type, size_t Rows, size_t Cols>
-  class alignas(detail::matrix_align<Rows, Cols>()) AlignedArray 
-  : public eig::Array<Type, Rows, Cols> {
-    using Base = eig::Array<Type, Rows, Cols>;
+  class alignas(detail::matrix_align<Rows, Cols>()) AlArray 
+  : public Array<Type, Rows, Cols> {
+    using Base = Array<Type, Rows, Cols>;
 
   public:
     using Base::Base;
 
-    AlignedArray() : Base() 
+    AlArray() : Base() 
     { }
 
     // This constructor allows you to construct MyVectorType from Eigen expressions
     template <typename Other>
-    AlignedArray(const eig::ArrayBase<Other>& o)
+    AlArray(const ArrayBase<Other>& o)
     : Base(o)
     { }
 
     template<typename Other>
-    AlignedArray& operator=(const eig::ArrayBase <Other>& o)
+    AlArray& operator=(const ArrayBase <Other>& o)
     {
       this->Base::operator=(o);
       return *this;
@@ -88,22 +89,22 @@ namespace met {
 
   
   template <class Type, size_t Size>
-  class alignas(detail::vector_align<Size>()) AlignedVector 
-  : public eig::Vector<Type, Size> {
-    using Base = eig::Vector<Type, Size>;
+  class alignas(detail::vector_align<Size>()) AlVector 
+  : public Vector<Type, Size> {
+    using Base = Vector<Type, Size>;
 
   public:
-    AlignedVector() : Base() 
+    AlVector() : Base() 
     { }
 
     // This constructor allows you to construct MyVectorType from Eigen expressions
     template <typename Other>
-    AlignedVector(const eig::MatrixBase<Other>& o)
+    AlVector(const MatrixBase<Other>& o)
     : Base(o)
     { }
 
     template<typename Other>
-    AlignedVector& operator=(const eig::MatrixBase <Other>& o)
+    AlVector& operator=(const MatrixBase <Other>& o)
     {
       this->Base::operator=(o);
       return *this;
@@ -112,19 +113,19 @@ namespace met {
 
   /* Define common aligned vector/matrix types */
   
-  using AlignedVector2ui = AlignedVector<uint, 2>;
-  using AlignedVector3ui = AlignedVector<uint, 3>;
-  using AlignedVector4ui = AlignedVector<uint, 4>;
+  using AlVector2f = AlVector<float, 2>;
+  using AlVector3f = AlVector<float, 3>;
+  using AlVector4f = AlVector<float, 4>;
 
-  using AlignedVector2i = AlignedVector<int, 2>;
-  using AlignedVector3i = AlignedVector<int, 3>;
-  using AlignedVector4i = AlignedVector<int, 4>;
+  using AlMatrix2f = AlMatrix<float, 2, 2>;
+  using AlMatrix3f = AlMatrix<float, 3, 3>;
+  using AlMatrix4f = AlMatrix<float, 4, 4>;
 
-  using AlignedVector2f = AlignedVector<float, 2>;
-  using AlignedVector3f = AlignedVector<float, 3>;
-  using AlignedVector4f = AlignedVector<float, 4>;
+  using AlArray2f = AlArray<float, 3, 1>;
+  using AlArray3f = AlArray<float, 3, 1>;
+  using AlArray4f = AlArray<float, 3, 1>;
 
-  using AlignedMatrix2f = AlignedMatrix<float, 2, 2>;
-  using AlignedMatrix3f = AlignedMatrix<float, 3, 3>;
-  using AlignedMatrix4f = AlignedMatrix<float, 4, 4>;
-};
+  using AlArray22f = AlArray<float, 3, 2>;
+  using AlArray33f = AlArray<float, 3, 3>;
+  using AlArray44f = AlArray<float, 3, 4>;
+} // namespace Eigen

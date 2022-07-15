@@ -100,7 +100,7 @@ namespace met {
 
     // Generate temporary mapping to color gamut buffer for selection 
     constexpr auto map_flags = gl::BufferAccessFlags::eMapRead | gl::BufferAccessFlags::eMapWrite;
-    auto color_gamut_map = convert_span<glm::vec3>(e_color_gamut_buffer.map(map_flags));
+    auto color_gamut_map = convert_span<eig::AlArray3f>(e_color_gamut_buffer.map(map_flags));
 
     // Handle arcball rotation and gamut selection inside viewport
     auto &io = ImGui::GetIO();
@@ -130,8 +130,9 @@ namespace met {
         auto ul = glm::min(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos)),
              br = glm::max(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos));
         auto is_in_rect = std::views::filter([&](uint i) {
-          const glm::vec2 p =  detail::window_space(color_gamut_map[i], 
-            i_viewport_arcball.full(), viewport_offs, viewport_size);
+          // TODO deprecate
+          const glm::vec3 v = { color_gamut_map[i].x(), color_gamut_map[i].y(), color_gamut_map[i].z() };
+          const glm::vec2 p =  detail::window_space(v, i_viewport_arcball.full(), viewport_offs, viewport_size);
           return glm::clamp(p, ul, br) == p;
         });
                  
@@ -145,8 +146,8 @@ namespace met {
       if (io.MouseClicked[0] && !ImGuizmo::IsOver()) {
         // Filter tests if a gamut position is near a clicked position in window space
         auto is_near_click = std::views::filter([&](uint i) {
-          glm::vec2 p = detail::window_space(color_gamut_map[i], i_viewport_arcball.full(), 
-            viewport_offs, viewport_size);
+          const glm::vec3 v = { color_gamut_map[i].x(), color_gamut_map[i].y(), color_gamut_map[i].z() };
+          const glm::vec2 p = detail::window_space(v, i_viewport_arcball.full(), viewport_offs, viewport_size);
           return glm::distance(p, glm::vec2(io.MouseClickedPos[0])) <= 8.f;
         });
 
@@ -164,12 +165,13 @@ namespace met {
                                  | std::views::transform(detail::i_get(color_gamut_map));
 
       // Gizmo anchor position is mean of selected gamut positions
-      auto gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end())
-                            / static_cast<float>(gamut_selection.size());
-
+      auto gamut_anchor_pos = (std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
+                              / static_cast<float>(gamut_selection.size())).eval();
+      const glm::vec3 v = { gamut_anchor_pos.x(), gamut_anchor_pos.y(), gamut_anchor_pos.z() };
+      
       // ImGuizmo manipulator operates on a transform; to obtain translation
       // distance, we transform a point prior to transformation update
-      glm::mat4 gamut_anchor_trf = glm::translate(gamut_anchor_pos);
+      glm::mat4 gamut_anchor_trf = glm::translate(v);
       glm::vec4 gamut_pre_pos    = gamut_anchor_trf * glm::vec4(0, 0, 0, 1);
 
       // Insert ImGuizmo manipulator at anchor position
@@ -189,11 +191,12 @@ namespace met {
       // translation distance
       glm::vec4 gamut_post_pos = gamut_anchor_trf * glm::vec4(0, 0, 0, 1);
       glm::vec3 gamut_transl = glm::vec4(gamut_post_pos - gamut_pre_pos);
+      eig::Array3f _gamut_transl = { gamut_transl.x, gamut_transl.y, gamut_transl.z };
 
       // Move selected gamut points by translation distance
       if (ImGuizmo::IsUsing()) {
         std::ranges::for_each(gamut_selection, [&](auto &p) { 
-          p = glm::clamp(p + gamut_transl, 0.f, 1.f);
+          p = (p + _gamut_transl).min(1.f).max(0.f);
         });
       }
     }

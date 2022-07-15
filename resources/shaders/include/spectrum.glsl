@@ -14,9 +14,18 @@ const float wavelength_range = wavelength_max - wavelength_min;
 const float wavelength_ssize = wavelength_range / float(wavelength_samples);
 const float wavelength_ssinv = float(wavelength_samples) / wavelength_range;
 
-/* Base Spectrum object */
+/* Base Spectrum objects */
+
 #define Spec float[wavelength_samples]
 #define CMFS float[3][wavelength_samples]
+
+/* Oft-used mapping object */
+
+struct MappingType {
+  CMFS cmfs;
+  Spec illuminant;
+  uint n_scatterings;
+};
 
 Spec constr_spec(in float constant) {
   Spec s;
@@ -147,10 +156,6 @@ float wavelength_at_index(uint i) {
 uint index_at_wavelength(float wvl) {
   uint i = uint((wvl - wavelength_min) * wavelength_ssinv);
   return min(i, wavelength_samples - 1);
-}
-
-vec3 test_fun(in vec3 v) {
-  return 4 * v;
 }
 
 #endif // SPECTRUM_GLSL_GUARD

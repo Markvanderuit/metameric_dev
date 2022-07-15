@@ -20,16 +20,16 @@ namespace met {
     // Get externally shared resources
     auto &e_spectral_vxl_grid  = info.get_resource<VoxelGrid<Spec>>("global", "spectral_voxel_grid");
 
-    // Obtain padded D65 color of all voxels in the spectral grid
-    std::vector<PaddedColor> color_grid(e_spectral_vxl_grid.data().size());
+    // Obtain aligned D65 color of all voxels in the spectral grid
+    std::vector<eig::AlArray3f> color_grid(e_spectral_vxl_grid.data().size());
     std::transform(std::execution::par_unseq, 
       e_spectral_vxl_grid.data().begin(), e_spectral_vxl_grid.data().end(), color_grid.begin(), 
-      [](const Spec &s) { return padd(xyz_to_srgb(reflectance_to_xyz(s))); });
+      [](const Spec &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
 
     // Construct buffer object and draw components
     m_grid_vertex_buffer = {{ .data = as_typed_span<const std::byte>(color_grid) }};
     m_grid_array = {{
-      .buffers = {{ .buffer = &m_grid_vertex_buffer, .index = 0, .stride = sizeof(PaddedColor) }},
+      .buffers = {{ .buffer = &m_grid_vertex_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
     m_grid_program = {{ .type = gl::ShaderType::eVertex, 
