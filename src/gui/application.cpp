@@ -80,7 +80,7 @@ namespace met {
       // Convert data into metameric's spectral format
       std::vector<Spec> internal_sd(spectral_data.size);
       std::transform(std::execution::par_unseq, spectral_data.data.begin(), spectral_data.data.end(), 
-        internal_sd.begin(), [&](const auto &v) {  return spectrum_from_data(wavelengths, v); });
+        internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
 
       // Create a KNN grid over the spectral distributions,based on their color as a position
       fmt::print("Constructing KNN grid\n");
