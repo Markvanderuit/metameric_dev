@@ -1,8 +1,8 @@
 #pragma once
 
+#include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/glm.hpp>
 #include <filesystem>
 
 namespace met::io {

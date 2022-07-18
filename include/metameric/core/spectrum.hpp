@@ -1,8 +1,7 @@
 #pragma once
 
-#include <metameric/core/fwd.hpp>
+#include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/eigen.hpp>
 
 namespace met {
   /* Define metameric's spectral range layout */
@@ -82,9 +81,10 @@ namespace met {
       return cmfs.array().colwise() * (power * illuminant);
     }
 
+    // Obtain a color by applying this spectral mapping
     Color apply(const Spec &sd) const {
       const CMFS cmfs = finalize(sd);
-      const float k = 1.f / cmfs.col(1).array().sum();
+      const float k = 1.f / cmfs.col(1).sum();
       return k * cmfs.transpose() * sd.matrix();
     }
   };

@@ -12,6 +12,5 @@ layout(location = 0) uniform uvec2 u_size;
 void main() {
   const uvec2 v = gl_WorkGroupID.xy * gl_WorkGroupSize.xy + gl_LocalInvocationID.xy;
   guard(min(v, u_size - 1) == v);
-
   imageStore(b_1_color_out, ivec2(v), vec4(b_0_color_in[u_size.x * v.y + v.x], 1));
 }

@@ -6,7 +6,6 @@
 #define EIGEN_ARRAY_PLUGIN      "eigen_array.ext"
 #define EIGEN_MATRIX_PLUGIN     "eigen_matrix.ext"
 
-#include <metameric/core/fwd.hpp>
 #include <Eigen/Dense>
 
 namespace met {

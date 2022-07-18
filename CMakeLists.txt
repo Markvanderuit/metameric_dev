@@ -165,22 +165,30 @@ target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
 )
 
-# Set up gui library
-add_library_r(gui gui)
-target_link_libraries(gui PUBLIC
+# Set up components library
+add_library_r(components components)
+target_link_libraries(components PUBLIC
   core
   small_gl
   imgui::imgui
   imguizmo::imguizmo
 )
-add_dependencies(gui shaders_preprocess misc_copy)
+add_dependencies(components shaders_preprocess misc_copy)
+
+# Set up app library
+add_library_r(app app)
+target_link_libraries(app PUBLIC
+  core
+  components
+  small_gl
+)
 
 # Set up metameric executable
-add_executable_r(metameric src/metameric.cpp)
-target_link_libraries(metameric PRIVATE gui)
+add_executable_r(metameric src/target/main_metameric.cpp)
+target_link_libraries(metameric PRIVATE app)
 
 # Set up benchmark executable
-add_executable_r(benchmark src/main_benchmark.cpp)
+add_executable_r(benchmark src/target/main_benchmark.cpp)
 target_link_libraries(benchmark PRIVATE 
   core
   benchmark::benchmark
@@ -189,8 +197,8 @@ target_link_libraries(benchmark PRIVATE
 )
 
 # Set up playground executable
-add_executable_r(main_playground src/main_playground.cpp)
-target_link_libraries(main_playground PRIVATE
+add_executable_r(playground src/target/main_playground.cpp)
+target_link_libraries(playground PRIVATE
   core
   small_gl
   fmt::fmt-header-only

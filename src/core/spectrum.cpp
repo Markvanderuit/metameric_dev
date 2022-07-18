@@ -55,7 +55,7 @@ namespace met {
   } // namepsace io
 
   namespace models {
-    #include <metameric/core/detail/spectrum_models_cie.ext>
+    #include <metameric/core/detail/spectrum_models.ext>
     
     // Linear color space transformations
     eig::Matrix3f xyz_to_srgb_transform {{ 3.240479f, -1.537150f,-0.498535f },

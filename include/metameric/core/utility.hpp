@@ -1,6 +1,5 @@
 #pragma once
 
-#include <metameric/core/fwd.hpp>
 #include <metameric/core/detail/utility.hpp>
 #include <fmt/format.h>
 #include <source_location>
