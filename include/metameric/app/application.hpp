@@ -8,20 +8,6 @@ namespace met {
     eLight
   };
 
-  struct ProjectLoadInfo {
-    std::filesystem::path project_path; // Path to project data file
-
-    AppliationColorMode color_mode = AppliationColorMode::eDark;
-  };
-
-  struct ProjectCreateInfo {
-    std::filesystem::path texture_path;  // Path to RGB texture
-    std::filesystem::path database_path; // Path to spectral datbase
-
-    AppliationColorMode color_mode = AppliationColorMode::eDark;
-  };
-
-  
 
   struct ApplicationCreateInfo {
     // In case of a new project load
