@@ -48,13 +48,13 @@ namespace met {
   } // namespace detail
 
   namespace io {
-    Project load_project_from_file(const std::filesystem::path &path) {
+    met::Project load_project_from_file(const std::filesystem::path &path) {
       // Load json representation from file, then deserialize
       json j = detail::load_json_from_file(path);
-      return j.get<Project>();
+      return j.get<met::Project>();
     }
 
-    void write_project_to_file(const Project &p, const std::filesystem::path &path) {
+    void write_project_to_file(const met::Project &p, const std::filesystem::path &path) {
       // Serialize to json representation, then write to file
       json j = p;
       detail::write_json_to_file(j, path);
@@ -68,4 +68,4 @@ namespace met {
   Project::Project(ProjectCreateInfo info) {
 
   }
-} // namespace met::io
+} // namespace met

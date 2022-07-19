@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/project.hpp>
 #include <filesystem>
 
 namespace met {
@@ -7,7 +8,6 @@ namespace met {
     eDark,
     eLight
   };
-
 
   struct ApplicationCreateInfo {
     // In case of a new project load

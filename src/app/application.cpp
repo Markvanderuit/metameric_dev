@@ -1,7 +1,6 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/project.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
@@ -293,8 +292,15 @@ namespace met {
       ImGui::PushStyleVar(style_flags, 0.f);
       ImGui::Begin("Welcome to Metameric", 0, window_flags);
 
+      if (ImGui::Button("Create new project")) {
+        // ...
+      }
 
-      if (ImGui::Button("Exit program")) {
+      if (ImGui::Button("Load existing project")) {
+        // ...
+      }
+
+      if (ImGui::Button("Exit")) {
         window.set_should_close();
       }
 
