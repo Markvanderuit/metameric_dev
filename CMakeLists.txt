@@ -49,6 +49,7 @@ find_package(glm       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
@@ -157,6 +158,7 @@ target_link_libraries(core PUBLIC
   TBB::tbb
   glm::glm
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
+  nlohmann_json::nlohmann_json
 )
 target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
 target_compile_definitions(core PUBLIC
@@ -205,4 +207,10 @@ target_link_libraries(playground PRIVATE
   imgui::imgui
   imguizmo::imguizmo
   TBB::tbb
+)
+
+# Set up serialization executable
+add_executable_r(serialization src/target/main_serialization.cpp)
+target_link_libraries(serialization PRIVATE
+  core
 )

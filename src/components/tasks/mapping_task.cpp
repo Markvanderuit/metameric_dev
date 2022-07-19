@@ -2,7 +2,6 @@
 #include <metameric/core/knn.hpp>
 #include <metameric/components/tasks/mapping_task.hpp>
 #include <small_gl/utility.hpp>
-#include <fmt/ranges.h>
 #include <ranges>
 
 namespace met {

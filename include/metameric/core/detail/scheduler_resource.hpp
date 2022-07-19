@@ -7,21 +7,20 @@ namespace met::detail {
 
   struct AbstractResource {
     template <typename T>
-    T & get() {
+    T & get_as() {
       return static_cast<Resource<T> *>(this)->m_object;
     }
 
     template <typename T>
-    const T & get() const {
+    const T & get_as() const {
       return static_cast<Resource<T> *>(this)->m_object;
     }
   };
 
   template <typename T>
   struct Resource : AbstractResource {
-    // Move constructor
     Resource(T &&object)
-    : m_object(std::move(object)) {}
+    : m_object(std::move(object)) { }
 
     T m_object;
   };

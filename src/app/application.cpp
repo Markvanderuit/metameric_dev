@@ -1,9 +1,10 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
+#include <metameric/core/math.hpp>
+#include <metameric/core/project.hpp>
+#include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/scheduler.hpp>
-#include <metameric/core/detail/glm.hpp>
 
 #include <metameric/components/lambda_task.hpp>
 #include <metameric/components/tasks/generate_spectral_task.hpp>
@@ -29,7 +30,7 @@
 
 namespace met {
   namespace detail {
-    void init_color_texture(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
+    void init_color_texture(LinearScheduler &scheduler, ApplicationCreateInfo info) {
       // Load texture from disk
       auto texture_data = io::load_texture_color(info.texture_path);
       io::apply_srgb_to_lrgb(texture_data, true);
@@ -44,7 +45,7 @@ namespace met {
       scheduler.insert_resource("color_texture_buffer_cpu", std::move(texture_data));
     }
 
-    void init_spectral_gamut(detail::LinearScheduler &scheduler) {
+    void init_spectral_gamut(LinearScheduler &scheduler) {
       // Define initial vertex positions; vec3 with 4 byte padding for alignment
       std::array<eig::AlArray3f, 4> gamut_initial_vertices = {
         eig::AlArray3f { .75f, .40f, .25f },
@@ -60,9 +61,9 @@ namespace met {
       });
     }
 
-    void init_spectral_grid(detail::LinearScheduler &scheduler, ApplicationCreateInfo info) {
+    void init_spectral_grid(LinearScheduler &scheduler, ApplicationCreateInfo info) {
       // Load input data 
-      auto spectral_data = io::load_spectral_data_hd5(info.spectral_db_path);
+      auto spectral_data = io::load_spectral_data_hd5(info.database_path);
 
       // Input data layout
       const uint  data_samples = spectral_data.channels;
@@ -125,12 +126,12 @@ namespace met {
       scheduler.insert_resource("spectral_voxel_grid", std::move(voxel_grid));
     }
 
-    void init_schedule_temp(detail::LinearScheduler &scheduler, gl::Window &window) {
+    void init_schedule_temp(LinearScheduler &scheduler, gl::Window &window) {
       scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
       scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
 
       // Temporary window to plot some timings
-      scheduler.emplace_task<LambdaTask>("imgui_delta", [](auto &info) {
+      scheduler.emplace_task<LambdaTask>("imgui_delta", [&](auto &info) {
         if (ImGui::Begin("Imgui timings")) {
           auto &io = ImGui::GetIO();
 
@@ -139,7 +140,6 @@ namespace met {
           ImGui::LabelText("Frame delta, average", "%.3f ms (%.1f fps)", 1000.f / io.Framerate, io.Framerate);
           
           // Report mouse pos
-          const auto &window = info.get_resource<gl::Window>("global", "window");
           const auto &input = window.input_info();
           
           glm::vec2 mouse_pos_2 = input.mouse_position;
@@ -174,10 +174,9 @@ namespace met {
       });
     }
 
-    void init_schedule(detail::LinearScheduler &scheduler, gl::Window &window) {
+    void init_schedule(LinearScheduler &scheduler, gl::Window &window) {
       // First task to run prepares for a new frame
-      scheduler.emplace_task<LambdaTask>("frame_begin", [&] (auto &) {
-        window.poll_events();
+      scheduler.emplace_task<LambdaTask>("frame_begin", [] (auto &) {
         ImGui::BeginFrame();
       });
 
@@ -198,13 +197,17 @@ namespace met {
       init_schedule_temp(scheduler, window);
 
       // Final task to run ends a frame
-      scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &) {
+      scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &info) {
         auto fb = gl::Framebuffer::make_default();
+
         fb.bind();
         fb.clear<glm::vec3>(gl::FramebufferType::eColor);
         fb.clear<float>(gl::FramebufferType::eDepth);
+
         ImGui::DrawFrame();
+
         window.swap_buffers();
+        window.poll_events();
       });
     }
   }
@@ -224,13 +227,8 @@ namespace met {
      fmt::print("Metameric format\n\tmin : {}nm\n\tmax : {}nm\n\tbins: {}nm\n",
       wavelength_min, wavelength_max, wavelength_samples);
 
-    // Add copy of application create info to scheduler's resources for later access
-    detail::LinearScheduler scheduler;
-    scheduler.insert_resource("application_create_info", ApplicationCreateInfo(info));
-
-    // Initialize OpenGL context and primary window, submit to scheduler resourcess
-    auto &window = scheduler.emplace_resource<gl::Window, gl::WindowCreateInfo>("window", 
-      { .size = { 1280, 800 }, .title = "Metameric", .flags = window_flags });
+    // Initialize OpenGL context and primary window
+    gl::Window window = {{ .size = { 1280, 800 }, .title = "Metameric", .flags = window_flags }};
 
     // Enable OpenGL debug messages, ignoring notification-type messages
 #ifndef NDEBUG
@@ -239,6 +237,7 @@ namespace met {
 #endif
 
     // Initialize major application components and set up runtime schedule
+    LinearScheduler scheduler;
     ImGui::Init(window, info.color_mode == AppliationColorMode::eDark);
     detail::init_color_texture(scheduler, info);
     detail::init_spectral_grid(scheduler, info);
@@ -256,5 +255,81 @@ namespace met {
     } 
     
     ImGui::Destr();
+  }
+
+  void run_application_empty() {
+    // Initialize OpenGL context and primary window
+    gl::Window window = {{ .size = { 300, 300 }, .title = "Metameric", .flags = window_flags }};
+
+    // Enable OpenGL debug messages, ignoring notification-type messages
+#ifndef NDEBUG
+    gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
+    gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
+#endif
+
+    ImGui::Init(window, true);
+
+    // Begin schedule construction
+    LinearScheduler scheduler;
+
+    // First task to run prepares for a new frame
+    scheduler.emplace_task<LambdaTask>("frame_begin", [&] (auto &) {
+      ImGui::BeginFrame();
+    });
+
+    // Second task to run presents a default window
+    scheduler.emplace_task<LambdaTask>("main_window", [&] (auto &info) {
+      const auto style_flags  = ImGuiStyleVar_WindowRounding;
+      const auto window_flags = ImGuiWindowFlags_NoDecoration;
+
+      // Prepare for a fullscreen window
+      // Src: https://github.com/ocornut/imgui/issues/3541
+      ImGuiViewport* viewport = ImGui::GetMainViewport();
+      ImGui::SetNextWindowPos(ImVec2(0.f, 0.f));
+      ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+      ImGui::SetNextWindowViewport(viewport->ID);
+
+      // Begin window draw
+      ImGui::PushStyleVar(style_flags, 0.f);
+      ImGui::Begin("Welcome to Metameric", 0, window_flags);
+
+
+      if (ImGui::Button("Exit program")) {
+        window.set_should_close();
+      }
+
+      // End window draw
+      ImGui::End();
+      ImGui::PopStyleVar();
+    });
+
+    // Final task to run ends a frame
+    scheduler.emplace_task<LambdaTask>("frame_end", [&] (auto &info) {
+      auto fb = gl::Framebuffer::make_default();
+      
+      fb.bind();
+      fb.clear<glm::vec3>(gl::FramebufferType::eColor);
+      fb.clear<float>(gl::FramebufferType::eDepth);
+
+      ImGui::DrawFrame();
+      
+      window.swap_buffers();
+      window.poll_events();
+    });
+
+    // Main runtime loop
+    while (!window.should_close()) { 
+      scheduler.run(); 
+    } 
+
+    ImGui::Destr();
+  }
+
+  void run_application(ProjectCreateInfo info) {
+
+  }
+
+  void run_application(ProjectLoadInfo info) {
+
   }
 } // namespace met

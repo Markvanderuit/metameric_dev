@@ -12,6 +12,9 @@ namespace met::detail {
   class TaskEvalInfo;
   class TaskDstrInfo;
 
+  // Global key for resources with no managing task
+  const std::string resource_global_key = "global";
+
   /**
    * Abstract base class for application tasks.
    */
@@ -37,8 +40,8 @@ namespace met::detail {
   class AbstractTaskInfo {
   protected:
     using KeyType         = std::string;
-    using RsrcType        = std::unique_ptr<AbstractResource>;
-    using TaskType        = std::unique_ptr<AbstractTask>;
+    using RsrcType        = std::shared_ptr<AbstractResource>;
+    using TaskType        = std::shared_ptr<AbstractTask>;
     using RsrcMapType     = std::unordered_map<KeyType, RsrcType>;
     using ApplRsrcMapType = std::unordered_map<KeyType, RsrcMapType>;
 
@@ -62,12 +65,12 @@ namespace met::detail {
 
     template <typename Ty, typename InfoTy>
     void emplace_resource(const KeyType &key, InfoTy info) {
-      add_resource_registry.emplace(key, std::make_unique<detail::Resource<Ty>>(Ty(info)));
+      add_resource_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
     }
   
     template <typename Ty>
     void insert_resource(const KeyType &key, Ty &&rsrc) {
-      add_resource_registry.emplace(key, std::make_unique<detail::Resource<Ty>>(std::move(rsrc)));
+      add_resource_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
     }
 
     void erase_resource(const KeyType &key) {
@@ -79,25 +82,25 @@ namespace met::detail {
     template <typename Ty, typename... Args>
     void emplace_task(const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back("", std::make_unique<Ty>(key, args...));
+      add_task_registry.emplace_back("", std::make_shared<Ty>(key, args...));
     }
 
     template <typename Ty>
     void insert_task(const KeyType &key, Ty &&task) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back("", std::make_unique<Ty>(std::move(task)));
+      add_task_registry.emplace_back("", std::make_shared<Ty>(std::move(task)));
     }
     
     template <typename Ty, typename... Args>
     void emplace_task_after(const KeyType &prev, const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back(prev, std::make_unique<Ty>(key, args...));
+      add_task_registry.emplace_back(prev, std::make_shared<Ty>(key, args...));
     }
 
     template <typename Ty>
     void insert_task_after(const KeyType &prev, const KeyType &key, Ty &&task) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back(prev, std::make_unique<Ty>(std::move(task)));
+      add_task_registry.emplace_back(prev, std::make_shared<Ty>(std::move(task)));
     }
 
     void remove_task(const KeyType &key) {
@@ -108,12 +111,16 @@ namespace met::detail {
 
     template <typename T>
     T & get_resource(const KeyType &key) {
-      return _task_resource_registry.at(key)->get<T>();
+      if (auto i = _task_resource_registry.find(key); i != _task_resource_registry.end()) {
+        return i->second->get_as<T>();
+      } else {
+        return get_resource<T>(std::string(resource_global_key), key);
+      }
     }
 
     template <typename T>
     T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      return _appl_resource_registry.at(task_key).at(rsrc_key)->get<T>();
+      return _appl_resource_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
   };
 

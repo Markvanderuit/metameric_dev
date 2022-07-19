@@ -21,6 +21,7 @@ namespace met {
     eig::Array3i m_grid_size;
     eig::Array3f m_space_bounds_min, m_space_bounds_max;
 
+    AbstractGrid() = default;
     AbstractGrid(GridCreateInfo info);
 
   public:

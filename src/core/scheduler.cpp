@@ -2,10 +2,10 @@
 #include <algorithm>
 #include <list>
 
-namespace met::detail {
+namespace met {
   void LinearScheduler::register_task(const KeyType &prev, TaskType &&task) {
     // Parse task info object by consuming task
-    TaskInitInfo info(_resource_registry, *task.get());
+    detail::TaskInitInfo info(_resource_registry, *task.get());
     
     // Update resource registry; add/remove task resources
     auto &local_registry = _resource_registry[task->name()];
@@ -29,7 +29,7 @@ namespace met::detail {
   
   void LinearScheduler::deregister_task(TaskType &task) {
     // Parse task info object by consuming task
-    TaskDstrInfo info(_resource_registry, *task.get());
+    detail::TaskDstrInfo info(_resource_registry, *task.get());
 
     // Update resource registry; remove task resources
     _resource_registry.erase(task->name());
@@ -46,7 +46,7 @@ namespace met::detail {
     // Run all tasks in vector inserted order
     for (auto &task : _task_registry) {
       // Parse task info object by consuming task::eval()
-      TaskEvalInfo info(_resource_registry, *task.get());
+      detail::TaskEvalInfo info(_resource_registry, *task.get());
 
       // Process added/removed resources **immediately** after task execution
       auto &local_registry = _resource_registry[task->name()];
@@ -76,4 +76,4 @@ namespace met::detail {
   void LinearScheduler::erase_resource(const KeyType &key) {
     _resource_registry["global"].erase(key);
   }
-} // namespace met::detail
+} // namespace met

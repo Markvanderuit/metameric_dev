@@ -3,7 +3,6 @@
 #include <metameric/components/tasks/mapping_cpu_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
-#include <fmt/ranges.h>
 #include <execution>
 #include <numeric>
 #include <ranges>

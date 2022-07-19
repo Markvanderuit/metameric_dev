@@ -10,9 +10,10 @@
 
 int main() {
   try {
-    met::create_application({ .texture_path     = "texture.jpg", 
-                              .spectral_db_path = "database.mat",
-                              .color_mode       = met::AppliationColorMode::eDark });
+    met::run_application_empty();
+    met::create_application({ .texture_path  = "texture.png", 
+                              .database_path = "database.mat",
+                              .color_mode    = met::AppliationColorMode::eDark });
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;

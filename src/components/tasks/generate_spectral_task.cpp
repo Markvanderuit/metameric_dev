@@ -3,7 +3,6 @@
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <small_gl/utility.hpp>
-#include <fmt/ranges.h>
 #include <ranges>
 
 namespace met {

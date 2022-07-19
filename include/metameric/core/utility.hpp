@@ -1,7 +1,6 @@
 #pragma once
 
 #include <metameric/core/detail/utility.hpp>
-#include <fmt/format.h>
 #include <source_location>
 #include <span>
 

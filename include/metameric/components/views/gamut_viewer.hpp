@@ -6,7 +6,6 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
-#include <fmt/ranges.h>
 #include <numeric>
 #include <span>
 

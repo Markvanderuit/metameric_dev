@@ -3,6 +3,7 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <fmt/compile.h>
+#include <fmt/ranges.h>
 #include <exception>
 #include <iterator>
 #include <string>

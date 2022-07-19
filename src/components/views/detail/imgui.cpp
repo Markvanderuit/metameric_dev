@@ -46,15 +46,16 @@ namespace ImGui {
     style.ScaleAllSizes(content_scale);
 
     // Initialize ImGui platform specific bindings
-    ImGui_ImplGlfw_InitForOpenGL((GLFWwindow *) window.object(), true);
     ImGui_ImplOpenGL3_Init();
+    ImGui_ImplGlfw_InitForOpenGL((GLFWwindow *) window.object(), true);
   }
 
   void Destr() {
     guard(appl_imgui_init);
+    appl_imgui_init = false;
     
-    ImGui_ImplGlfw_Shutdown();
     ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
   }
 

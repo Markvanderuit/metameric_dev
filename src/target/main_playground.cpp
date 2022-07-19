@@ -8,10 +8,6 @@
 #include <string>
 #include <vector>
 
-// Misc includes
-#include <fmt/core.h>
-#include <fmt/ranges.h>
-
 // Metameric includes
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
