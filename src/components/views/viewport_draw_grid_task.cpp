@@ -17,10 +17,9 @@ namespace met {
 
   void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_application_data  = info.get_resource<ApplicationData>("global", "application_data");
+    auto &e_vox_grid = info.get_resource<ApplicationData>(global_key, "app_data").spec_vox_grid;
 
     // Obtain aligned D65 color of all voxels in the spectral grid
-    auto &e_vox_grid = e_application_data.spec_vox_grid;
     std::vector<eig::AlArray3f> color_grid(e_vox_grid.data().size());
     std::transform(std::execution::par_unseq, 
       e_vox_grid.data().begin(), e_vox_grid.data().end(), color_grid.begin(), 

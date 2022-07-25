@@ -1,6 +1,6 @@
 #pragma once
 
-#include <filesystem>
+#include <metameric/core/io.hpp>
 
 namespace met {
   enum class AppliationColorMode {
@@ -10,11 +10,11 @@ namespace met {
 
   struct ApplicationCreateInfo {
     // In case of a new project load
-    std::filesystem::path texture_path  = "";
-    std::filesystem::path database_path = "";
+    fs::path texture_path  = "";
+    fs::path database_path = "";
 
     // In case of a existing project load
-    std::filesystem::path project_path = "";
+    fs::path project_path = "";
 
     // Application color theme
     AppliationColorMode color_mode = AppliationColorMode::eDark;

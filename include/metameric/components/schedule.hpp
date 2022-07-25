@@ -13,6 +13,7 @@
 #include <metameric/components/tasks/mapping_cpu_task.hpp>
 #include <metameric/components/views/gamut_viewer.hpp>
 #include <metameric/components/views/image_viewer.hpp>
+#include <metameric/components/views/mapping_viewer.hpp>
 #include <metameric/components/views/viewport_task.hpp>
 #include <metameric/components/views/window_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -26,7 +27,7 @@ namespace met {
     // Temporary window to plot some timings
     scheduler.emplace_task<LambdaTask>("imgui_delta", [](auto &info) {
       if (ImGui::Begin("Imgui timings")) {
-        auto &e_window = info.get_resource<gl::Window>("global", "window");
+        auto &e_window = info.get_resource<gl::Window>(global_key, "window");
         auto &io = ImGui::GetIO();
 
         // Report frame times
@@ -83,6 +84,7 @@ namespace met {
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
     scheduler.emplace_task<ImageViewerTask>("image_viewer");
+    scheduler.emplace_task<MappingViewer>("mapping_viewer");
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);

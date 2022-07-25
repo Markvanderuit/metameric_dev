@@ -6,12 +6,12 @@
 
 namespace met {
   namespace io {
-    ProjectData load_project(const std::filesystem::path &path) {
+    ProjectData load_project(const fs::path &path) {
       json js = load_json(path);
       return js.get<ProjectData>();
     }
 
-    void save_project(const std::filesystem::path &path, const ProjectData &data) {
+    void save_project(const fs::path &path, const ProjectData &data) {
       json js = data;
       save_json(path, js);
     }
@@ -35,17 +35,17 @@ namespace met {
                           { "FL11", models::emitter_cie_fl11 }};
   }
 
-  void ApplicationData::load(const std::filesystem::path &path) {
+  void ApplicationData::load(const fs::path &path) {
     project_path  = path;
     project_data  = io::load_project(path);
-    rgb_texture   = Texture2d3f {{ .path = project_path.replace_extension(".bmp") }};
+    rgb_texture   = io::load_texture2d<Color>(io::path_with_ext(project_path,".bmp"));
     project_state = ProjectState::eSaved;
   }
   
-  void ApplicationData::save(const std::filesystem::path &path) {
+  void ApplicationData::save(const fs::path &path) {
     project_path = path;
     io::save_project(project_path, project_data);
-    io::save_texture2d(project_path.replace_extension(".bmp"), rgb_texture);
+    io::save_texture2d(io::path_with_ext(project_path, ".bmp"), rgb_texture);
     project_state = ProjectState::eSaved;
   }
 

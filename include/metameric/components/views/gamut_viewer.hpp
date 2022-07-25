@@ -19,7 +19,7 @@ class GamutViewerTask : public detail::AbstractTask {
 
     void eval(detail::TaskEvalInfo &info) override {
       // Get externally shared resources
-      auto &e_app_data          = info.get_resource<ApplicationData>("global", "application_data");
+      auto &e_app_data          = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_spec_gamut_buffer = info.get_resource<gl::Buffer>("generate_gamut", "spectral_gamut_buffer");
 
       // Get relevant application data

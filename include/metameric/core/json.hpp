@@ -10,8 +10,8 @@ namespace met {
 
   namespace io {
     /* json load/save to/from file */
-    json load_json(const std::filesystem::path &path);
-    void save_json(const std::filesystem::path &path, const json &js, uint indent = 2);
+    json load_json(const fs::path &path);
+    void save_json(const fs::path &path, const json &js, uint indent = 2);
   }
 
   /* json (de)serializations for SpectralMapping type */

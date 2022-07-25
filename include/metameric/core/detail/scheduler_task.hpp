@@ -7,14 +7,16 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/detail/scheduler_resource.hpp>
 
+namespace met {
+  // Global key for resources with no managing task
+  const std::string global_key = "global";
+} // namespace met
+
 namespace met::detail {
   // fwd
   class TaskInitInfo;
   class TaskEvalInfo;
   class TaskDstrInfo;
-
-  // Global key for resources with no managing task
-  const std::string resource_global_key = "global";
 
   /**
    * Abstract base class for application tasks.
@@ -138,7 +140,7 @@ namespace met::detail {
       if (auto i = _task_resource_registry.find(key); i != _task_resource_registry.end()) {
         return i->second->get_as<T>();
       } else {
-        return get_resource<T>(std::string(resource_global_key), key);
+        return get_resource<T>(global_key, key);
       }
     }
 

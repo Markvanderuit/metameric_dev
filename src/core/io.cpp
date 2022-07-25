@@ -31,9 +31,9 @@ namespace met::io {
     }
   } // namespace detail
 
-  HD5Data load_hd5(const std::filesystem::path &path, const std::string &name) {
+  HD5Data load_hd5(const fs::path &path, const std::string &name) {
     // Check that file path exists
-    debug::check_expr(std::filesystem::exists(path),
+    debug::check_expr(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
 
     // Attempt to open file and extract forcibly named dataset from file
@@ -50,9 +50,9 @@ namespace met::io {
     return obj;
   }
 
-  std::string load_string(const std::filesystem::path &path) {
+  std::string load_string(const fs::path &path) {
     // Check that file path exists
-    debug::check_expr(std::filesystem::exists(path),
+    debug::check_expr(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
       
     // Attempt to open file stream
@@ -72,7 +72,7 @@ namespace met::io {
     return str;
   }
 
-  void save_string(const std::filesystem::path &path, const std::string &str) {
+  void save_string(const fs::path &path, const std::string &str) {
     // Attempt to open output file stream in text mode
     std::ofstream ofs(path, std::ios::out);
     debug::check_expr(ofs.is_open(),

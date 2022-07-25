@@ -56,14 +56,14 @@ namespace met {
 
     template <typename Ty, typename InfoTy = Ty::InfoType>
     Ty& emplace_resource(const KeyType &key, InfoTy info) {
-      _resource_registry[detail::resource_global_key].emplace(key, 
+      _resource_registry[global_key].emplace(key, 
         std::make_shared<detail::Resource<Ty>>(Ty(info)));
-      return _resource_registry.at(detail::resource_global_key).at(key)->get_as<Ty>();
+      return _resource_registry.at(global_key).at(key)->get_as<Ty>();
     }
   
     template <typename Ty>
     void insert_resource(const KeyType &key, Ty &&rsrc) {
-      _resource_registry[detail::resource_global_key].emplace(key, 
+      _resource_registry[global_key].emplace(key, 
         std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
     }
 

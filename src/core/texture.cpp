@@ -23,9 +23,9 @@ namespace met {
 
   namespace io {
     template <typename T>
-    Texture2d<T> load_texture2d(const std::filesystem::path &path) {
+    Texture2d<T> load_texture2d(const fs::path &path) {
       // Check that file path exists
-      debug::check_expr(std::filesystem::exists(path),
+      debug::check_expr(fs::exists(path),
         fmt::format("failed to resolve path \"{}\"", path.string()));
 
       // Load image float data from disk
@@ -77,7 +77,7 @@ namespace met {
     }
 
     template <typename T>
-    void save_texture2d(const std::filesystem::path &path, const Texture2d<T> &texture) {
+    void save_texture2d(const fs::path &path, const Texture2d<T> &texture) {
       const char *pstr = path.string().c_str();
       auto size = texture.size();
       auto c    = Texture2d<T>::dims();
@@ -184,10 +184,10 @@ namespace met {
     template Texture2d<eig::Array4f> as_lrgb<eig::Array4f>(const Texture2d<eig::Array4f> &);
     template Texture2d<eig::AlArray3f> as_lrgb<eig::AlArray3f>(const Texture2d<eig::AlArray3f> &);
 
-    template Texture2d<eig::Array3f>   load_texture2d<eig::Array3f>(const std::filesystem::path &);
-    template Texture2d<eig::Array4f>   load_texture2d<eig::Array4f>(const std::filesystem::path &);
+    template Texture2d<eig::Array3f>   load_texture2d<eig::Array3f>(const fs::path &);
+    template Texture2d<eig::Array4f>   load_texture2d<eig::Array4f>(const fs::path &);
     
-    template void save_texture2d<eig::Array3f>(const std::filesystem::path &, const Texture2d<eig::Array3f> &);
-    template void save_texture2d<eig::Array4f>(const std::filesystem::path &, const Texture2d<eig::Array4f> &);
+    template void save_texture2d<eig::Array3f>(const fs::path &, const Texture2d<eig::Array3f> &);
+    template void save_texture2d<eig::Array4f>(const fs::path &, const Texture2d<eig::Array4f> &);
   } // namespace io
 } // namespace met

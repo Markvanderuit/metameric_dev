@@ -28,7 +28,7 @@ namespace met {
       } else {
         state.clear();
       }
-      scheduler.insert_resource("application_data", std::move(state));
+      scheduler.insert_resource("app_data", std::move(state));
     }
 
     void init_spectral_grid(LinearScheduler &scheduler, ApplicationCreateInfo info) {
@@ -93,9 +93,9 @@ namespace met {
       fmt::print("Constructed voxel grid\n");
 
       // Make resources available through application data object
-      auto &data = scheduler.get_resource<ApplicationData>("global", "application_data");
-      data.spec_knn_grid = std::move(knn_grid);
-      data.spec_vox_grid = std::move(voxel_grid);
+      auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
+      app_data.spec_knn_grid = std::move(knn_grid);
+      app_data.spec_vox_grid = std::move(voxel_grid);
     }
   } // namespace detail                          
 

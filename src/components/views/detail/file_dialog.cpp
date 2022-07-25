@@ -3,27 +3,29 @@
 #include <fmt/core.h>
 
 namespace met::detail {
-  FileDialogResultType open_file_dialog(std::filesystem::path &path, const std::string &type_filter) {
+  bool load_dialog(fs::path &path, const std::string &type_filter) {
     nfdchar_t  *out = nullptr;
     nfdresult_t res = NFD_OpenDialog(type_filter.c_str(), nullptr, &out);
 
     if (res == NFD_OKAY) {
       path = out;
       free(out);
+      return true;
     }
-
-    return FileDialogResultType(res);
+    
+    return false;
   }
 
-  FileDialogResultType save_file_dialog(std::filesystem::path &path, const std::string &type_filter) {
+  bool save_dialog(fs::path &path, const std::string &type_filter) {
     nfdchar_t  *out = nullptr;
     nfdresult_t res = NFD_SaveDialog(type_filter.c_str(), nullptr, &out);
 
     if (res == NFD_OKAY) {
       path = out;
       free(out);
+      return true;
     }
-
-    return FileDialogResultType(res);
+    
+    return false;
   }
 } // namespace met::detail

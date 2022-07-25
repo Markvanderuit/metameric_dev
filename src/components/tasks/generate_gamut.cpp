@@ -24,7 +24,7 @@ namespace met {
   
   void GenerateGamutTask::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
-    auto &e_app_data          = info.get_resource<ApplicationData>("global", "application_data");
+    auto &e_app_data          = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &i_colr_gamut_buffer = info.get_resource<gl::Buffer>("color_gamut_buffer");
     auto &i_spec_gamut_buffer = info.get_resource<gl::Buffer>("spectral_gamut_buffer");
 

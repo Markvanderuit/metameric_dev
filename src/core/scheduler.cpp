@@ -86,12 +86,12 @@ namespace met {
   }
   
   void LinearScheduler::erase_resource(const KeyType &key) {
-    _resource_registry["global"].erase(key);
+    _resource_registry[global_key].erase(key);
   }
 
   void LinearScheduler::clear_tasks() {
     std::erase_if(_resource_registry, [&](const auto &p) {
-      return p.first != detail::resource_global_key;
+      return p.first != global_key;
     });
     _task_registry.clear();
   }

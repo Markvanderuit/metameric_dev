@@ -11,8 +11,8 @@ namespace met {
   struct ApplicationData;
 
   namespace io {
-    ProjectData load_project(const std::filesystem::path &path);
-    void        save_project(const std::filesystem::path &path, const ProjectData &data);
+    ProjectData load_project(const fs::path &path);
+    void        save_project(const fs::path &path, const ProjectData &data);
   } // namespace io
 
   /* Load states in which a project can exist */
@@ -45,7 +45,7 @@ namespace met {
   struct ApplicationData {
     /* Project components */
 
-    std::filesystem::path project_path;
+    fs::path project_path;
     ProjectData           project_data;
     ProjectState          project_state = ProjectState::eUnloaded; 
 
@@ -57,8 +57,8 @@ namespace met {
 
     /* Project state handling */
 
-    void save(const std::filesystem::path &path);
-    void load(const std::filesystem::path &path);
+    void save(const fs::path &path);
+    void load(const fs::path &path);
     void clear();
   };
 } // namespace met

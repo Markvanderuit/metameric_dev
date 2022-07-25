@@ -4,11 +4,11 @@
 
 namespace met {
   namespace io {
-    json load_json(const std::filesystem::path &path) {
+    json load_json(const fs::path &path) {
       return json::parse(load_string(path));
     }
 
-    void save_json(const std::filesystem::path &path, const json &js, uint indent) {
+    void save_json(const fs::path &path, const json &js, uint indent) {
       save_string(path, js.dump(indent));
     }
   } // namespace io

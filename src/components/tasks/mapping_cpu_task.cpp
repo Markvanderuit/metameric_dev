@@ -24,7 +24,7 @@ namespace met {
 
   void MappingCPUTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>("global", "application_data").rgb_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").rgb_texture;
     
     // Fill input texture with data 
     m_input = std::vector<eig::Array3f>(e_rgb_texture.data().begin(), e_rgb_texture.data().end());
@@ -50,7 +50,7 @@ namespace met {
   void MappingCPUTask::eval(detail::TaskEvalInfo &info) {
     if (ImGui::Begin("CPU mapping")) {
       // Get externally shared resources
-      auto &e_app_data = info.get_resource<ApplicationData>("global", "application_data");
+      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
 
       // Get relevant application data
       std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;

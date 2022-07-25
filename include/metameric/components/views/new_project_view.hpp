@@ -15,11 +15,12 @@ namespace met {
     void insert_progress_warning(detail::TaskEvalInfo &info) {
       if (ImGui::BeginPopupModal("Warning: unsaved progress")) {
         ImGui::Text("If you continue, you may lose unsaved progress.");
-        ImGui::Separator();
+        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         if (ImGui::Button("Continue")) {
           create_project(info);
           ImGui::CloseCurrentPopup();
         }
+        ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
           ImGui::CloseCurrentPopup();
         }
@@ -29,7 +30,7 @@ namespace met {
     void insert_file_warning() {
       if (ImGui::BeginPopup("Warning: file not found", 0)) {
         ImGui::Text("The following file could not be found: %s", m_input_path.c_str());
-        ImGui::Separator();
+        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
         if (ImGui::Button("Continue")) {
           ImGui::CloseCurrentPopup();
         }
@@ -37,22 +38,14 @@ namespace met {
       }
     }
 
-    void call_progress_warning() {
-      ImGui::OpenPopup("Warning: unsaved progress", 0);
-    }
-
-    void call_file_warning() {
-      ImGui::OpenPopup("Warning: file not found", 0);
-    }
-    
     bool create_project_safe(detail::TaskEvalInfo &info) {
-      auto &app_data = info.get_resource<ApplicationData>("global", "application_data");
-      if (app_data.project_state == ProjectState::eModified 
-       || app_data.project_state == ProjectState::eUnsaved) {
-        call_progress_warning();
+      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      if (e_app_data.project_state == ProjectState::eModified 
+       || e_app_data.project_state == ProjectState::eUnsaved) {
+        ImGui::OpenPopup("Warning: unsaved progress", 0);
         return false;
-      } if (!std::filesystem::exists(m_input_path)) {
-        call_file_warning();
+      } if (!fs::exists(m_input_path)) {
+        ImGui::OpenPopup("Warning: file not found", 0);
         return false;
       } else {
         return create_project(info);
@@ -61,16 +54,15 @@ namespace met {
 
     bool create_project(detail::TaskEvalInfo &info) {
       // Get shared resources
-      auto &app_data = info.get_resource<ApplicationData>("global", "application_data");
+      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
 
       // Initialize new unsaved project
-      app_data.project_state = ProjectState::eUnsaved;
-      app_data.project_data  = ProjectData();
-      app_data.project_path  = "";
+      e_app_data.project_state = ProjectState::eUnsaved;
+      e_app_data.project_data  = ProjectData();
+      e_app_data.project_path  = "";
 
       // Load linearized rgb texture into application
-      app_data.rgb_texture = Texture2d3f {{ .path = m_input_path }};
-      // app_data.rgb_texture = io::as_lrgb(Texture2d3f {{ .path = m_input_path }});
+      e_app_data.rgb_texture = Texture2d3f {{ .path = m_input_path }};
 
       // Signal schedule re-creation and submit new task schedule
       info.signal_flags = detail::TaskSignalFlags::eClearTasks;
@@ -89,29 +81,16 @@ namespace met {
         ImGui::Text("Path to input texture...");
         ImGui::InputText("##NewProjectPathInputs", &m_input_path);
         ImGui::SameLine();
-
-        if (ImGui::Button("...")) {
-          std::filesystem::path path;
-          if (detail::open_file_dialog(path) == detail::FileDialogResultType::eOkay) {
-            m_input_path = path.string();
-          }
-        }
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        if (ImGui::Button("Create")) {
-          if (create_project_safe(info)) {
-            ImGui::CloseCurrentPopup();
-          }
-        }
         
+        if (fs::path path; ImGui::Button("...") &&  detail::load_dialog(path)) {
+          m_input_path = path.string();
+        }
+
+        ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+      
+        if (ImGui::Button("Create") && create_project_safe(info)) { ImGui::CloseCurrentPopup(); }
         ImGui::SameLine();      
-        
-        if (ImGui::Button("Cancel")) {
-          ImGui::CloseCurrentPopup();
-        }
+        if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
 
         // Insert modals
         insert_file_warning();

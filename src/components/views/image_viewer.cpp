@@ -12,7 +12,7 @@ namespace met {
 
   void ImageViewerTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>("global", "application_data").rgb_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").rgb_texture;
 
     // TODO nix glm dependency!!!
     glm::ivec2 size = { e_rgb_texture.size().x(), e_rgb_texture.size().y() };

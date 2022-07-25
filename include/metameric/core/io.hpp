@@ -4,18 +4,28 @@
 #include <filesystem>
 #include <string>
 
-namespace met::io {
-  /* Wrapper object for two-dimensional HD5 data files */
-  struct HD5Data {
-    std::vector<std::vector<float>> data;
-    size_t size; // nr. of vectors
-    size_t dims; // dimensionality of vectors
-  };
+namespace met {
+  namespace fs = std::filesystem;
 
-  // HD5 file load from file
-  HD5Data load_hd5(const std::filesystem::path &path, const std::string &name = "TotalRefs");
+  namespace io {
+    // Return a copy of a provided path with a given extension (re)-placed
+    inline
+    fs::path path_with_ext(fs::path path, std::string_view ext) {
+      return path.replace_extension(ext);
+    }
 
-  // String load/save to/from file
-  std::string load_string(const std::filesystem::path &path);
-  void        save_string(const std::filesystem::path &path, const std::string &string);
-} // namespace met::io
+    /* Wrapper object for two-dimensional HD5 data files */
+    struct HD5Data {
+      std::vector<std::vector<float>> data;
+      size_t size; // nr. of vectors
+      size_t dims; // dimensionality of vectors
+    };
+
+    // HD5 file load from file
+    HD5Data load_hd5(const fs::path &path, const std::string &name = "TotalRefs");
+
+    // String load/save to/from file
+    std::string load_string(const fs::path &path);
+    void        save_string(const fs::path &path, const std::string &string);
+  } // namespace io
+} // namespace met

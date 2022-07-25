@@ -70,7 +70,7 @@ namespace met {
     auto &i_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport_texture");
     auto &i_viewport_arcball      = info.get_resource<detail::Arcball>("viewport_arcball");
     auto &i_viewport_model_matrix = info.get_resource<glm::mat4>("viewport_model_matrix");
-    auto &e_app_data              = info.get_resource<ApplicationData>("global", "application_data");
+    auto &e_app_data              = info.get_resource<ApplicationData>(global_key, "app_data");
 
     // Get relevant application data
     std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;

@@ -11,7 +11,7 @@ namespace met {
 
   void MappingTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>("global", "application_data");
+    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
 
     // Temporary object to describe circumstances for spectral to rgb conversion
     struct MappingType {

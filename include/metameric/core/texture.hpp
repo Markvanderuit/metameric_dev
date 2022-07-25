@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <filesystem>
@@ -25,11 +26,11 @@ namespace met {
   namespace io {
     // Load 2d rgb(a) texture from disk
     template <typename T>
-    Texture2d<T> load_texture2d(const std::filesystem::path &path);
+    Texture2d<T> load_texture2d(const fs::path &path);
 
     // Write 2d rgb/a texture to disk
     template <typename T>
-    void save_texture2d(const std::filesystem::path &path, const Texture2d<T> &texture);
+    void save_texture2d(const fs::path &path, const Texture2d<T> &texture);
 
     // Convert to aligned/unaligned backed types
     Texture2d3f    as_unaligned(const Texture2d3f_al &aligned);
@@ -62,7 +63,7 @@ namespace met {
    * Helper object to load texture object from disk.
    */
   struct TextureLoadInfo {
-    std::filesystem::path path;
+    fs::path path;
   };
   
   /**
