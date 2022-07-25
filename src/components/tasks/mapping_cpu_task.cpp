@@ -1,5 +1,6 @@
-#include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
+#include <metameric/core/state.hpp>
+#include <metameric/core/texture.hpp>
 #include <metameric/components/tasks/mapping_cpu_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
@@ -23,13 +24,13 @@ namespace met {
 
   void MappingCPUTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_texture_obj = info.get_resource<io::TextureData<Color>>("global", "color_texture_buffer_cpu");
+    auto &e_rgb_texture = info.get_resource<ApplicationData>("global", "application_data").rgb_texture;
     
     // Fill input texture with data 
-    m_input = std::vector<eig::Array3f>(e_texture_obj.data.begin(), e_texture_obj.data.end());
+    m_input = std::vector<eig::Array3f>(e_rgb_texture.data().begin(), e_rgb_texture.data().end());
 
     // Set up processing buffers on the CPU
-    size_t texture_size = glm::prod(e_texture_obj.size);
+    size_t texture_size = e_rgb_texture.size().prod();
     m_barycentric_texture.resize(texture_size);
     m_spectral_texture.resize(texture_size);
     m_output_d65.resize(texture_size);
@@ -38,42 +39,33 @@ namespace met {
     m_output_fl11.resize(texture_size);
 
     // Set up view texture on the GPU
-    m_input_texture          = {{ .size = e_texture_obj.size, .data = as_typed_span<float>(m_input) }};
-    m_output_d65_texture     = {{ .size = e_texture_obj.size }};
-    m_output_d65_err_texture = {{ .size = e_texture_obj.size }};
-    m_output_fl2_texture     = {{ .size = e_texture_obj.size }};
-    m_output_fl11_texture    = {{ .size = e_texture_obj.size }};
+    auto to_ivec2 = [](const eig::Array2i &v) -> glm::ivec2 { return { v.x(), v.y() }; };
+    m_input_texture          = {{ .size = to_ivec2(e_rgb_texture.size()), .data = cast_span<float>(e_rgb_texture.data()) }};
+    m_output_d65_texture     = {{ .size = to_ivec2(e_rgb_texture.size()) }};
+    m_output_d65_err_texture = {{ .size = to_ivec2(e_rgb_texture.size()) }};
+    m_output_fl2_texture     = {{ .size = to_ivec2(e_rgb_texture.size()) }};
+    m_output_fl11_texture    = {{ .size = to_ivec2(e_rgb_texture.size()) }};
   }
 
   void MappingCPUTask::eval(detail::TaskEvalInfo &info) {
     if (ImGui::Begin("CPU mapping")) {
       // Get externally shared resources
-      auto &e_spectral_knn_grid  = info.get_resource<KNNGrid<Spec>>("global", "spectral_knn_grid");
-      auto &e_color_gamut_buffer = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
+      auto &e_app_data = info.get_resource<ApplicationData>("global", "application_data");
 
-      // Generate temporary mapping to color gamut buffer 
-      auto color_gamut_map = convert_span<eig::AlArray3f>(e_color_gamut_buffer.map(gl::BufferAccessFlags::eMapReadWrite));
-      
-      // Sample spectra at gamut corner positions
-      std::vector<Spec> spectral_gamut(4);
-      std::vector<Color> color_gamut(4);
-      std::ranges::copy(color_gamut_map, color_gamut.begin());
-      std::ranges::transform(color_gamut, spectral_gamut.begin(),
-      [&](const auto &p) { return e_spectral_knn_grid.query_1_nearest(p).value; });
-        
-      // Close buffer mapping (should wrap this in a scoped object)
-      e_color_gamut_buffer.unmap();
+      // Get relevant application data
+      std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;
+      std::array<Spec, 4> &spec_gamut = e_app_data.project_data.spec_gamut;
       
       // Generate barycentric coordinate for all colors
       std::ranges::transform(m_input, m_barycentric_texture.begin(),
-        [&](const auto &p) { return detail::as_barycentric(color_gamut, p); });
+        [&](const auto &p) { return detail::as_barycentric(rgb_gamut, p); });
 
       // Generate high-dimensional spectral texture
       std::transform(std::execution::par_unseq, 
         m_barycentric_texture.begin(), m_barycentric_texture.end(), m_spectral_texture.begin(),
         [&](const eig::Vector4f &abcd) {
-          return spectral_gamut[0] * abcd.x() + spectral_gamut[1] * abcd.y()
-               + spectral_gamut[2] * abcd.z() + spectral_gamut[3] * abcd.w();
+          return spec_gamut[0] * abcd.x() + spec_gamut[1] * abcd.y()
+               + spec_gamut[2] * abcd.z() + spec_gamut[3] * abcd.w();
         });
 
       // Generate and output average spectrum
@@ -110,10 +102,10 @@ namespace met {
                            / static_cast<float>(m_output_d65_err.size());
 
       // Copy data into view texture
-      m_output_d65_texture.set(as_typed_span<float>(m_output_d65));
-      m_output_d65_err_texture.set(as_typed_span<float>(m_output_d65_err));
-      m_output_fl2_texture.set(as_typed_span<float>(m_output_fl2));
-      m_output_fl11_texture.set(as_typed_span<float>(m_output_fl11));
+      m_output_d65_texture.set(as_span<float>(m_output_d65));
+      m_output_d65_err_texture.set(as_span<float>(m_output_d65_err));
+      m_output_fl2_texture.set(as_span<float>(m_output_fl2));
+      m_output_fl11_texture.set(as_span<float>(m_output_fl11));
 
       // Show texture
       auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax().x)

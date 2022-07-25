@@ -1,9 +1,9 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
-#include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/viewport_draw_grid_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -17,16 +17,17 @@ namespace met {
 
   void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_spectral_vxl_grid  = info.get_resource<VoxelGrid<Spec>>("global", "spectral_voxel_grid");
+    auto &e_application_data  = info.get_resource<ApplicationData>("global", "application_data");
 
     // Obtain aligned D65 color of all voxels in the spectral grid
-    std::vector<eig::AlArray3f> color_grid(e_spectral_vxl_grid.data().size());
+    auto &e_vox_grid = e_application_data.spec_vox_grid;
+    std::vector<eig::AlArray3f> color_grid(e_vox_grid.data().size());
     std::transform(std::execution::par_unseq, 
-      e_spectral_vxl_grid.data().begin(), e_spectral_vxl_grid.data().end(), color_grid.begin(), 
+      e_vox_grid.data().begin(), e_vox_grid.data().end(), color_grid.begin(), 
       [](const Spec &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
 
     // Construct buffer object and draw components
-    m_grid_vertex_buffer = {{ .data = as_typed_span<const std::byte>(color_grid) }};
+    m_grid_vertex_buffer = {{ .data = as_span<const std::byte>(color_grid) }};
     m_grid_array = {{
       .buffers = {{ .buffer = &m_grid_vertex_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}

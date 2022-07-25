@@ -6,8 +6,6 @@
 #include <span>
 #include <string>
 
-#include <iostream>
-
 namespace met {
   class LinearScheduler {
     using KeyType  = std::string;
@@ -56,7 +54,7 @@ namespace met {
 
     /* create/add/remove global resources */
 
-    template <typename Ty, typename InfoTy>
+    template <typename Ty, typename InfoTy = Ty::InfoType>
     Ty& emplace_resource(const KeyType &key, InfoTy info) {
       _resource_registry[detail::resource_global_key].emplace(key, 
         std::make_shared<detail::Resource<Ty>>(Ty(info)));
@@ -71,12 +69,20 @@ namespace met {
 
     void erase_resource(const KeyType &key);
 
+    /* Access existing resources */
+    
+    template <typename T>
+    T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
+      return _resource_registry.at(task_key).at(rsrc_key)->get_as<T>();
+    }
+
     /* miscellaneous */
 
-    void clear() {
-      _resource_registry.clear();
-      _task_registry.clear();
-    }
+    // Clear tasks and owned resources; retain global resources
+    void clear_tasks();
+
+    // Clear tasks and all resources 
+    void clear_all();
 
     std::span<const TaskType> tasks() const {
       return _task_registry;

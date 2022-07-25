@@ -12,7 +12,7 @@
 namespace met {
   // Interpret a container type as a span of type T
   template <class T, class C>
-  std::span<T> as_typed_span(C &c) {
+  std::span<T> as_span(C &c) {
     auto data = c.data();
     guard(data, {});
     return { reinterpret_cast<T*>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
@@ -20,7 +20,7 @@ namespace met {
 
   // Convert a span over type U to 
   template <class T, class U>
-  std::span<T> convert_span(std::span<U> s) {
+  std::span<T> cast_span(std::span<U> s) {
     auto data = s.data();
     guard(data, {});
     return { reinterpret_cast<T*>(data), s.size_bytes() / sizeof(T) };

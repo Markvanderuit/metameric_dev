@@ -1,5 +1,6 @@
-#include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
+#include <metameric/core/state.hpp>
+#include <metameric/core/texture.hpp>
 #include <metameric/components/tasks/mapping_task.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
@@ -10,7 +11,7 @@ namespace met {
 
   void MappingTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_texture_obj = info.get_resource<io::TextureData<Color>>("global", "color_texture_buffer_cpu");
+    auto &e_app_data = info.get_resource<ApplicationData>("global", "application_data");
 
     // Temporary object to describe circumstances for spectral to rgb conversion
     struct MappingType {
@@ -19,7 +20,7 @@ namespace met {
       uint n_scatterings = 0;
     } mapping;
 
-    const uint mapping_n    = glm::prod(e_texture_obj.size);
+    const uint mapping_n    = e_app_data.rgb_texture.size().prod();
     const uint mapping_ndiv = ceil_div(mapping_n, 256u); 
 
     // Initialize objects for color texture gen.
@@ -28,7 +29,7 @@ namespace met {
                            .path = "resources/shaders/mapping_task/apply_color_mapping.comp" }};
     m_mapping_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_mapping_program };
 
-    glm::uvec2 texture_n    = e_texture_obj.size;
+    glm::uvec2 texture_n    = { e_app_data.rgb_texture.size().x(), e_app_data.rgb_texture.size().y() };
     glm::uvec2 texture_ndiv = ceil_div(texture_n, glm::uvec2(16));
 
     // Initialize objects for buffer-to-texture conversion
@@ -43,11 +44,11 @@ namespace met {
     m_texture_program.uniform<glm::uvec2>("u_size", texture_n);
 
     // Create buffer target for this task
-    gl::Buffer color_buffer = {{ .size = (size_t) glm::prod(e_texture_obj.size) * sizeof(eig::AlArray3f) }};
+    gl::Buffer color_buffer = {{ .size = (size_t) mapping_n * sizeof(eig::AlArray3f) }};
     info.insert_resource("color_buffer", std::move(color_buffer));
 
     // Create texture target for this task
-    gl::Texture2d4f color_texture = {{ .size = e_texture_obj.size }};
+    gl::Texture2d4f color_texture = {{ .size = texture_n }};
     info.insert_resource("color_texture", std::move(color_texture));
   }
 

@@ -50,6 +50,7 @@ find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
@@ -174,6 +175,7 @@ target_link_libraries(components PUBLIC
   small_gl
   imgui::imgui
   imguizmo::imguizmo
+  unofficial::nativefiledialog::nfd
 )
 add_dependencies(components shaders_preprocess misc_copy)
 

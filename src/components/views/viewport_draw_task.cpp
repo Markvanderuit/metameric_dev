@@ -1,8 +1,8 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
-#include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/viewport_draw_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -41,13 +41,12 @@ namespace met {
 
   void ViewportDrawTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources 
-    auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
-    auto &e_texture_obj    = info.get_resource<io::TextureData<Color>>("global", "color_texture_buffer_cpu");
-    auto &e_texture_buffer = info.get_resource<gl::Buffer>("global", "color_texture_buffer_gpu");
+    auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("generate_gamut", "color_gamut_buffer");
+    auto &e_texture_buffer = info.get_resource<gl::Buffer>("generate_spectral", "color_texture_buffer");
 
     // Setup objects for cube line draw
-    m_cube_vertex_buffer = {{ .data = as_typed_span<const std::byte>(cube_vertices) }};
-    m_cube_elem_buffer   = {{ .data = as_typed_span<const std::byte>(cube_elements) }};
+    m_cube_vertex_buffer = {{ .data = as_span<const std::byte>(cube_vertices) }};
+    m_cube_elem_buffer   = {{ .data = as_span<const std::byte>(cube_elements) }};
     m_cube_array         = {{
       .buffers = {{ .buffer = &m_cube_vertex_buffer, .index = 0, .stride = sizeof(eig::Vector3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
@@ -63,7 +62,7 @@ namespace met {
                     .bindable_program = &m_cube_program };
 
     // Setup objects for gamut line draw
-    m_gamut_elem_buffer = gl::Buffer({ .data = as_typed_span<const std::byte>(gamut_elements) });
+    m_gamut_elem_buffer = gl::Buffer({ .data = as_span<const std::byte>(gamut_elements) });
     m_gamut_array = gl::Array({
       .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
@@ -88,7 +87,7 @@ namespace met {
                                             { .type = gl::ShaderType::eFragment,  
                                               .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
     m_texture_points_draw = { .type             = gl::PrimitiveType::ePoints,
-                              .vertex_count     = (uint) e_texture_obj.data.size() / 3,
+                              .vertex_count     = (uint) e_texture_buffer.size() / sizeof(std::byte) / 3,
                               .bindable_array   = &m_texture_points_array,
                               .bindable_program = &m_texture_points_program };
 
@@ -107,10 +106,10 @@ namespace met {
     ImGui::End();
                                 
     // Get externally shared resources 
-    auto &e_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport", "viewport_texture");
-    auto &e_viewport_arcball      = info.get_resource<detail::Arcball>("viewport", "viewport_arcball");
-    auto &e_viewport_model_matrix = info.get_resource<glm::mat4>("viewport", "viewport_model_matrix");
-    auto &e_viewport_fbuffer      = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "viewport_fbuffer_msaa");
+    auto &e_viewport_texture   = info.get_resource<gl::Texture2d3f>("viewport", "viewport_texture");
+    auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport", "viewport_arcball");
+    auto &e_viewport_mdlmatrix = info.get_resource<glm::mat4>("viewport", "viewport_model_matrix");
+    auto &e_viewport_fbuffer   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "viewport_fbuffer_msaa");
     
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
@@ -126,7 +125,7 @@ namespace met {
     m_gamut_program.uniform("u_camera_matrix",          camera_matrix);
     m_cube_program.uniform("u_camera_matrix",           camera_matrix);
     m_texture_points_program.uniform("u_camera_matrix", camera_matrix);
-    m_texture_points_program.uniform("u_model_matrix",  e_viewport_model_matrix);
+    m_texture_points_program.uniform("u_model_matrix",  e_viewport_mdlmatrix);
 
     // Dispatch draw for loaded texture points
     gl::state::set_point_size(m_texture_points_psize);

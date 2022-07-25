@@ -10,8 +10,7 @@
 
 int main() {
   try {
-    met::run_application_empty();
-    met::create_application({ .texture_path  = "texture.png", 
+    met::create_application({ .texture_path  = "texture.jpg", 
                               .database_path = "database.mat",
                               .color_mode    = met::AppliationColorMode::eDark });
   } catch (const std::exception &e) {

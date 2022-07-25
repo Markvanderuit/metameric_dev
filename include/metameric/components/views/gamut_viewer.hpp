@@ -1,11 +1,13 @@
 #pragma once
 
 #include <metameric/core/detail/glm.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
+#include <array>
 #include <numeric>
 #include <span>
 
@@ -17,12 +19,12 @@ class GamutViewerTask : public detail::AbstractTask {
 
     void eval(detail::TaskEvalInfo &info) override {
       // Get externally shared resources
-      auto &e_spectral_gamut_buffer = info.get_resource<gl::Buffer>("generate_spectral", "spectral_gamut_buffer");
-      auto &e_color_gamut_buffer    = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
+      auto &e_app_data          = info.get_resource<ApplicationData>("global", "application_data");
+      auto &e_spec_gamut_buffer = info.get_resource<gl::Buffer>("generate_gamut", "spectral_gamut_buffer");
 
-      // Open temporary mappings to color/spectral gamut buffer 
-      auto color_gamut_map    = convert_span<eig::AlArray3f>(e_color_gamut_buffer.map(gl::BufferAccessFlags::eMapReadWrite));
-      auto spectral_gamut_map = convert_span<Spec>(e_spectral_gamut_buffer.map(gl::BufferAccessFlags::eMapReadWrite));
+      // Get relevant application data
+      std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;
+      std::array<Spec, 4> &spec_gamut = e_app_data.project_data.spec_gamut;
 
       // Quick temporary window to show nearest spectra in the local grid
       if (ImGui::Begin("Gamut viewer")) {
@@ -31,33 +33,28 @@ class GamutViewerTask : public detail::AbstractTask {
                                  
         // Obtain colors at gamut's point positions
         std::vector<Color> spectra_to_colors(4);
-        std::ranges::transform(spectral_gamut_map, spectra_to_colors.begin(),
+        std::ranges::transform(spec_gamut, spectra_to_colors.begin(),
           [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
-
-
+        
         // Plot spectra
-        ImGui::PlotLines("reflectance 0", spectral_gamut_map[0].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 0", spec_gamut[0].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
-        ImGui::ColorEdit3("color 0, coordinates", color_gamut_map[0].data());
+        ImGui::ColorEdit3("color 0, coordinates", rgb_gamut[0].data());
         ImGui::ColorEdit3("color 0, actual", spectra_to_colors[0].data());
-        ImGui::PlotLines("reflectance 1", spectral_gamut_map[1].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 1", spec_gamut[1].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
-        ImGui::ColorEdit3("color 1, coordinates", color_gamut_map[1].data());
+        ImGui::ColorEdit3("color 1, coordinates", rgb_gamut[1].data());
         ImGui::ColorEdit3("color 1, actual", spectra_to_colors[1].data());
-        ImGui::PlotLines("reflectance 2", spectral_gamut_map[2].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 2", spec_gamut[2].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
-        ImGui::ColorEdit3("color 2, coordinates", color_gamut_map[2].data());
+        ImGui::ColorEdit3("color 2, coordinates", rgb_gamut[2].data());
         ImGui::ColorEdit3("color 2, actual", spectra_to_colors[2].data());
-        ImGui::PlotLines("reflectance 3", spectral_gamut_map[3].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 3", spec_gamut[3].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, viewport_size * glm::vec2(.67f, 0.125f));
-        ImGui::ColorEdit3("color 3, coordinates", color_gamut_map[3].data());
+        ImGui::ColorEdit3("color 3, coordinates", rgb_gamut[3].data());
         ImGui::ColorEdit3("color 3, actual", spectra_to_colors[3].data());
       }
       ImGui::End();
-
-      // Close temporary mappings
-      e_color_gamut_buffer.unmap();
-      e_spectral_gamut_buffer.unmap();
     }
   };
 } // namespace met

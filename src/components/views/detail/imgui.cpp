@@ -7,14 +7,12 @@
 
 namespace ImGui {
   static bool appl_imgui_init = false;
-  static std::string appl_imgui_ini_path;
-  static std::string appl_imgui_font_path;
+  static std::string appl_imgui_ini_path  = "resources/misc/imgui.ini";
+  static std::string appl_imgui_font_path = "resources/misc/atkinson_hyperlegible.ttf";
   
   void Init(const gl::Window &window, bool dark_mode) {
     guard(!appl_imgui_init);
     appl_imgui_init = true;
-    appl_imgui_ini_path = "resources/misc/imgui.ini";
-    appl_imgui_font_path = "resources/misc/atkinson_hyperlegible.ttf";
 
     // Initialize ImGui context
     IMGUI_CHECKVERSION();
@@ -22,17 +20,15 @@ namespace ImGui {
 
     // Apply requested application color scheme
     if (dark_mode) {
-        ImGui::StyleColorsDark();
+      ImGui::StyleColorsDark();
     } else {
-        ImGui::StyleColorsLight();
+      ImGui::StyleColorsLight();
     }
 
     // Pass context to ImGuizmo as they are separate libraries
     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 
     auto &io = ImGui::GetIO();
-    auto &style = ImGui::GetStyle();
-    auto content_scale = window.content_scale();
 
     // Set ini location
     io.IniFilename = appl_imgui_ini_path.c_str();
@@ -42,8 +38,9 @@ namespace ImGui {
     io.ConfigWindowsMoveFromTitleBarOnly = true;
 
     // Handle font loading/dpi scaling
+    auto content_scale = window.content_scale();
     io.Fonts->AddFontFromFileTTF(appl_imgui_font_path.c_str(), 12 * content_scale , 0, 0);
-    style.ScaleAllSizes(content_scale);
+    ImGui::GetStyle().ScaleAllSizes(content_scale);
 
     // Initialize ImGui platform specific bindings
     ImGui_ImplOpenGL3_Init();
@@ -69,5 +66,66 @@ namespace ImGui {
   void DrawFrame() {
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  }
+
+  struct InputTextCallback_UserData
+{
+    std::string*            Str;
+    ImGuiInputTextCallback  ChainCallback;
+    void*                   ChainCallbackUserData;
+};
+
+static int InputTextCallback(ImGuiInputTextCallbackData* data)
+{
+    InputTextCallback_UserData* user_data = (InputTextCallback_UserData*)data->UserData;
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+    {
+        // Resize string callback
+        // If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
+        std::string* str = user_data->Str;
+        IM_ASSERT(data->Buf == str->c_str());
+        str->resize(data->BufTextLen);
+        data->Buf = (char*)str->c_str();
+    }
+    else if (user_data->ChainCallback)
+    {
+        // Forward to user callback, if any
+        data->UserData = user_data->ChainCallbackUserData;
+        return user_data->ChainCallback(data);
+    }
+    return 0;
+}
+
+  bool InputText(const char* label, std::string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
+    IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+    flags |= ImGuiInputTextFlags_CallbackResize;
+
+    InputTextCallback_UserData cb_user_data;
+    cb_user_data.Str = str;
+    cb_user_data.ChainCallback = callback;
+    cb_user_data.ChainCallbackUserData = user_data;
+    return InputText(label, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
+  }
+
+  bool InputTextMultiline(const char* label, std::string* str, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
+    IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+    flags |= ImGuiInputTextFlags_CallbackResize;
+
+    InputTextCallback_UserData cb_user_data;
+    cb_user_data.Str = str;
+    cb_user_data.ChainCallback = callback;
+    cb_user_data.ChainCallbackUserData = user_data;
+    return InputTextMultiline(label, (char*)str->c_str(), str->capacity() + 1, size, flags, InputTextCallback, &cb_user_data);
+  }
+
+  bool InputTextWithHint(const char* label, const char* hint, std::string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
+    IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+    flags |= ImGuiInputTextFlags_CallbackResize;
+
+    InputTextCallback_UserData cb_user_data;
+    cb_user_data.Str = str;
+    cb_user_data.ChainCallback = callback;
+    cb_user_data.ChainCallbackUserData = user_data;
+    return InputTextWithHint(label, hint, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
   }
 } // namespace ImGui

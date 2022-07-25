@@ -1,5 +1,6 @@
 #include <metameric/core/detail/glm.hpp>
-#include <metameric/core/io.hpp>
+#include <metameric/core/state.hpp>
+#include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/image_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -11,10 +12,13 @@ namespace met {
 
   void ImageViewerTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_texture_obj = info.get_resource<io::TextureData<Color>>("global", "color_texture_buffer_cpu");
+    auto &e_rgb_texture = info.get_resource<ApplicationData>("global", "application_data").rgb_texture;
+
+    // TODO nix glm dependency!!!
+    glm::ivec2 size = { e_rgb_texture.size().x(), e_rgb_texture.size().y() };
 
     // Load texture data into gl texture
-    m_texture = gl::Texture2d3f({ .size = e_texture_obj.size, .data = as_typed_span<float>(e_texture_obj.data) });
+    m_texture = gl::Texture2d3f({ .size = size, .data = cast_span<float>(e_rgb_texture.data()) });
   }
   
   void ImageViewerTask::eval(detail::TaskEvalInfo &info) {
@@ -30,7 +34,6 @@ namespace met {
     if (ImGui::Begin("Mapped")) {
       // Get external resources
       auto &e_color_texture = info.get_resource<gl::Texture2d4f>("mapping", "color_texture");
-      // auto &e_color_texture = info.get_resource<gl::Texture2d4f>("mapping", "color_texture");
 
       auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax().x)
                          - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin().x);

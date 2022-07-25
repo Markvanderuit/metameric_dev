@@ -1,0 +1,72 @@
+#include <metameric/core/io.hpp>
+#include <metameric/core/json.hpp>
+#include <nlohmann/json.hpp>
+
+namespace met {
+  namespace io {
+    json load_json(const std::filesystem::path &path) {
+      return json::parse(load_string(path));
+    }
+
+    void save_json(const std::filesystem::path &path, const json &js, uint indent) {
+      save_string(path, js.dump(indent));
+    }
+  } // namespace io
+
+  void from_json(const json &js, SpectralMapping &v) {
+    v.cmfs       = js.at("cmfs").get<CMFS>();
+    v.illuminant = js.at("illuminant").get<Spec>();
+    v.n_scatters = js.at("n_scatters").get<uint>();
+  }
+
+  void to_json(json &js, const SpectralMapping &v) {
+    js["cmfs"]       = v.cmfs;
+    js["illuminant"] = v.illuminant;
+    js["n_scatters"] = v.n_scatters;
+  }
+
+  void from_json(const json &js, ProjectData &v) {
+    v.rgb_mapping  = js.at("rgb_mapping").get<SpectralMapping>();
+    v.rgb_gamut    = js.at("rgb_gamut").get<std::array<Color, 4>>();
+    v.spec_gamut   = js.at("rgb_gamut").get<std::array<Spec, 4>>();
+    v.spectral_mappings  = js.at("spectral_mappings").get<std::unordered_map<std::string, SpectralMapping>>();
+    v.loaded_cmfs        = js.at("loaded_cmfs").get<std::unordered_map<std::string, CMFS>>();
+    v.loaded_illuminants = js.at("loaded_illuminants").get<std::unordered_map<std::string, Spec>>();
+  }
+
+  void to_json(json &js, const ProjectData &v) {
+    js["rgb_mapping"]  = v.rgb_mapping;
+    js["rgb_gamut"]    = v.rgb_gamut;
+    js["spec_gamut"]   = v.spec_gamut;
+    js["spectral_mappings"]  = v.spectral_mappings;
+    js["loaded_cmfs"]        = v.loaded_cmfs;
+    js["loaded_illuminants"] = v.loaded_illuminants;
+  }
+} // namespace met
+
+namespace Eigen {
+  void from_json(const met::json& js, met::Spec &v) {
+    std::ranges::copy(js, v.begin());
+  }
+
+  void to_json(met::json &js, const met::Spec &v) {
+    js = std::vector<met::Spec::value_type>(v.begin(), v.end());
+  }
+  
+  void from_json(const met::json& js, met::Color &v) {
+    std::ranges::copy(js, v.begin());
+  }
+
+  void to_json(met::json &js, const met::Color &v) {
+    js = std::vector<met::Spec::value_type>(v.begin(), v.end());
+  }
+  
+  void from_json(const met::json& js, met::CMFS &v) {
+    std::ranges::copy(js, v.reshaped().begin());
+  }
+
+  void to_json(met::json &js, const met::CMFS &v) {
+    auto r = v.reshaped();
+    js = std::vector<met::Color::value_type>(r.begin(), r.end());
+  }
+} // namespace Eigen

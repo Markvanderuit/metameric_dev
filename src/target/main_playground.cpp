@@ -89,11 +89,11 @@ int main() {
     for (uint i = 0; i < n; ++i) { data_i[i] = float(i); }
     
     // Prepare buffer objects
-    gl::Buffer buffer_i = {{ .data = as_typed_span<const std::byte>(data_i) }};
-    gl::Buffer buffer_o = {{ .data = as_typed_span<const std::byte>(data_o) }};
+    gl::Buffer buffer_i = {{ .data = as_span<const std::byte>(data_i) }};
+    gl::Buffer buffer_o = {{ .data = as_span<const std::byte>(data_o) }};
 
     // Prepare compute shader
-    gl::Program program = {{ .type = gl::ShaderType::eCompute, .data = as_typed_span<const std::byte>(shader_src) }};
+    gl::Program program = {{ .type = gl::ShaderType::eCompute, .data = as_span<const std::byte>(shader_src) }};
     program.uniform<uint>("u_n", n);
     gl::ComputeInfo compute_info = { .groups_x = ceil_div(n, 256), .bindable_program = &program };
 
@@ -104,7 +104,7 @@ int main() {
 
     // Copy back and read data
     fmt::print("Before\n\ti: {}\n\to: {}\n", data_i, data_o);
-    buffer_o.get(as_typed_span<std::byte>(data_o));
+    buffer_o.get(as_span<std::byte>(data_o));
     std::vector<Color> result(n); 
     std::ranges::transform(data_o, result.begin(), unpadd<>);
     fmt::print("After\n\ti: {}\n\to: {}\n", data_i, result);

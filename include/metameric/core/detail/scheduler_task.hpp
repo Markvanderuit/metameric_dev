@@ -4,6 +4,7 @@
 #include <list>
 #include <string>
 #include <unordered_map>
+#include <metameric/core/math.hpp>
 #include <metameric/core/detail/scheduler_resource.hpp>
 
 namespace met::detail {
@@ -33,6 +34,28 @@ namespace met::detail {
     virtual void dstr(TaskDstrInfo &) { };
   };
 
+  // For enum class T, declare bitflag operators and has_flag(T, T) boolean operator
+  #define met_declare_bitflag(T)\
+    constexpr T operator~(T a) { return (T) (~ (uint) a); }\
+    constexpr T operator|(T a, T b) { return (T) ((uint) a | (uint) b); }\
+    constexpr T operator&(T a, T b) { return (T) ((uint) a & (uint) b); }\
+    constexpr T operator^(T a, T b) { return (T) ((uint) a ^ (uint) b); }\
+    constexpr T& operator|=(T &a, T b) { return a = a | b; }\
+    constexpr T& operator&=(T &a, T b) { return a = a & b; }\
+    constexpr T& operator^=(T &a, T b) { return a = a ^ b; }\
+    constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
+
+  enum class TaskSignalFlags : uint {
+    eNone       = 0x000u,
+
+    // Signal that tasks and owned resources are to be destroyed after run
+    eClearTasks = 0x001u,
+
+    // Signal that tasks and all resources are to be destroyed after run
+    eClearAll   = 0x002u,
+  };
+  met_declare_bitflag(TaskSignalFlags);
+
   /**
    * Abstract base class that consumes application tasks and updates the environment
    * in which they exist.
@@ -60,10 +83,11 @@ namespace met::detail {
     std::list<std::pair<KeyType, TaskType>> add_task_registry;
     std::list<KeyType>                      remove_resource_registry;
     std::list<KeyType>                      remove_task_registry;
+    TaskSignalFlags                         signal_flags = TaskSignalFlags::eNone;
 
     /* Create, add, remove resources */
 
-    template <typename Ty, typename InfoTy>
+    template <typename Ty, typename InfoTy = Ty::InfoType>
     void emplace_resource(const KeyType &key, InfoTy info) {
       add_resource_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
     }

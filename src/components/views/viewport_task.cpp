@@ -1,8 +1,6 @@
-#include <small_gl/buffer.hpp>
-#include <small_gl/texture.hpp>
-#include <small_gl/utility.hpp>
-#include <metameric/core/detail/glm.hpp>
+#include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/viewport_task.hpp>
 #include <metameric/components/views/viewport_draw_begin_task.hpp>
@@ -11,6 +9,9 @@
 #include <metameric/components/views/viewport_draw_grid_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
 #include <glm/vec3.hpp>
 #include <ImGuizmo.h>
 #include <iostream>
@@ -69,7 +70,10 @@ namespace met {
     auto &i_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport_texture");
     auto &i_viewport_arcball      = info.get_resource<detail::Arcball>("viewport_arcball");
     auto &i_viewport_model_matrix = info.get_resource<glm::mat4>("viewport_model_matrix");
-    auto &e_color_gamut_buffer    = info.get_resource<gl::Buffer>("global", "color_gamut_buffer");
+    auto &e_app_data              = info.get_resource<ApplicationData>("global", "application_data");
+
+    // Get relevant application data
+    std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;
 
     // Begin window draw; declare scoped ImGui style state
     auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
@@ -97,10 +101,7 @@ namespace met {
     // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
     ImGui::Image(ImGui::to_ptr(i_viewport_texture.object()), i_viewport_texture.size(), 
       glm::vec2(0, 1), glm::vec2(1, 0));
-
-    // Generate temporary mapping to color gamut buffer for selection 
-    auto color_gamut_map = convert_span<eig::AlArray3f>(e_color_gamut_buffer.map(gl::BufferAccessFlags::eMapReadWrite));
-
+    
     // Handle arcball rotation and gamut selection inside viewport
     auto &io = ImGui::GetIO();
     if (ImGui::IsItemHovered() && !ImGuizmo::IsUsing()) {
@@ -130,14 +131,14 @@ namespace met {
              br = glm::max(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos));
         auto is_in_rect = std::views::filter([&](uint i) {
           // TODO deprecate
-          const glm::vec3 v = { color_gamut_map[i].x(), color_gamut_map[i].y(), color_gamut_map[i].z() };
+          const glm::vec3 v = { rgb_gamut[i].x(), rgb_gamut[i].y(), rgb_gamut[i].z() };
           const glm::vec2 p =  detail::window_space(v, i_viewport_arcball.full(), viewport_offs, viewport_size);
           return glm::clamp(p, ul, br) == p;
         });
                  
         // Find and store selected gamut position indices
         m_gamut_selection_indices.clear();
-        std::ranges::copy(std::views::iota(0u, color_gamut_map.size()) | is_in_rect, 
+        std::ranges::copy(std::views::iota(0u, rgb_gamut.size()) | is_in_rect, 
           std::back_inserter(m_gamut_selection_indices));
       }
 
@@ -145,14 +146,14 @@ namespace met {
       if (io.MouseClicked[0] && !ImGuizmo::IsOver()) {
         // Filter tests if a gamut position is near a clicked position in window space
         auto is_near_click = std::views::filter([&](uint i) {
-          const glm::vec3 v = { color_gamut_map[i].x(), color_gamut_map[i].y(), color_gamut_map[i].z() };
+          const glm::vec3 v = { rgb_gamut[i].x(), rgb_gamut[i].y(), rgb_gamut[i].z() };
           const glm::vec2 p = detail::window_space(v, i_viewport_arcball.full(), viewport_offs, viewport_size);
           return glm::distance(p, glm::vec2(io.MouseClickedPos[0])) <= 8.f;
         });
 
         // Find and store selected gamut position indices
         m_gamut_selection_indices.clear();
-        std::ranges::copy(std::views::iota(0u, color_gamut_map.size()) | is_near_click,
+        std::ranges::copy(std::views::iota(0u, rgb_gamut.size()) | is_near_click,
           std::back_inserter(m_gamut_selection_indices));
       }
     }
@@ -161,7 +162,7 @@ namespace met {
     if (!m_gamut_selection_indices.empty()) {
       // Range over selected gamut positions
       const auto gamut_selection = m_gamut_selection_indices 
-                                 | std::views::transform(detail::i_get(color_gamut_map));
+                                 | std::views::transform(detail::i_get(rgb_gamut));
 
       // Gizmo anchor position is mean of selected gamut positions
       auto gamut_anchor_pos = (std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
@@ -201,9 +202,5 @@ namespace met {
     }
     
     ImGui::End();
-    
-    // Close buffer mapping
-    e_color_gamut_buffer.unmap();
-    gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
   }
 } // namespace met

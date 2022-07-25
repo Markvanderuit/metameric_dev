@@ -1,4 +1,4 @@
-#include <metameric/core/serialization.hpp>
+#include <metameric/core/json.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <string.h>

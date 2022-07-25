@@ -16,7 +16,7 @@ namespace met {
     m_output_texture_key(output_texture_key),
     m_output_texture_info(output_texture_info) { }
 
-  template <class TextureTy, class InfoTy>
+  template <class TextureTy, class InfoTy = TextureTy::InfoType>
   void BufferToTextureTask<TextureTy, InfoTy>::init(detail::TaskInitInfo &info) {
     // Emplace texture resource using provided info object
     info.emplace_resource<TextureTy, InfoTy>(m_output_texture_key, m_output_texture_info);
