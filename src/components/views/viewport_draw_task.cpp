@@ -106,10 +106,10 @@ namespace met {
     ImGui::End();
                                 
     // Get externally shared resources 
-    auto &e_viewport_texture   = info.get_resource<gl::Texture2d3f>("viewport", "viewport_texture");
-    auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport", "viewport_arcball");
-    auto &e_viewport_mdlmatrix = info.get_resource<glm::mat4>("viewport", "viewport_model_matrix");
-    auto &e_viewport_fbuffer   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "viewport_fbuffer_msaa");
+    auto &e_viewport_texture   = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+    auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_viewport_mdlmatrix = info.get_resource<glm::mat4>("viewport", "model_matrix");
+    auto &e_viewport_fbuffer   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
     
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),

@@ -9,11 +9,11 @@
 namespace met {
   class ViewportDrawGridTask : public detail::AbstractTask {
     // Draw components
-    gl::Buffer   m_grid_vertex_buffer;
-    gl::Array    m_grid_array;
-    gl::Program  m_grid_program;
-    gl::DrawInfo m_grid_draw;
-    float        m_grid_psize = 1.f;
+    gl::Buffer   m_vertex_buffer;
+    gl::Array    m_vertex_array;
+    gl::Program  m_program;
+    gl::DrawInfo m_draw;
+    float        m_psize = 1.f;
     
   public:
     ViewportDrawGridTask(const std::string &name);

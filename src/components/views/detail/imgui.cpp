@@ -68,11 +68,21 @@ namespace ImGui {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   }
 
-  struct InputTextCallback_UserData
-{
-    std::string*            Str;
-    ImGuiInputTextCallback  ChainCallback;
-    void*                   ChainCallbackUserData;
+  void SpacedSeparator() {
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+  }
+
+  void CloseAnyPopupIfOpen() {
+    guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
+    ImGui::CloseCurrentPopup();
+  }
+
+struct InputTextCallback_UserData{
+  std::string*            Str;
+  ImGuiInputTextCallback  ChainCallback;
+  void*                   ChainCallbackUserData;
 };
 
 static int InputTextCallback(ImGuiInputTextCallbackData* data)

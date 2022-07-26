@@ -6,15 +6,15 @@
 namespace met {
   class WindowTask : public detail::AbstractTask {
     /* Local state for handling modals */
-    bool m_open_save_close_modal; 
-    bool m_open_save_exit_modal; 
-    bool m_open_new_project_modal; 
+    bool m_open_close_modal; 
+    bool m_open_exit_modal; 
+    bool m_open_create_modal; 
 
     /* Special handlers */
 
-    void handle_open(detail::TaskEvalInfo &info);
-    void handle_save(detail::TaskEvalInfo &info);
-    void handle_save_as(detail::TaskEvalInfo &info);
+    bool handle_open(detail::TaskEvalInfo &info);
+    bool handle_save(detail::TaskEvalInfo &info);
+    bool handle_save_as(detail::TaskEvalInfo &info);
 
     void handle_close_safe(detail::TaskEvalInfo &info);
     void handle_close(detail::TaskEvalInfo &info);

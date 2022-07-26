@@ -26,7 +26,7 @@ namespace met {
       if (!info.project_path.empty()) {
         state.load(info.project_path);
       } else {
-        state.clear();
+        state.unload();
       }
       scheduler.insert_resource("app_data", std::move(state));
     }

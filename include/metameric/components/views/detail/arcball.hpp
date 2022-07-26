@@ -28,6 +28,9 @@ namespace met::detail {
     glm::mat4 m_full;
 
   public:
+    using InfoType = ArcballCreateInfo;
+
+
     /* constr */
     Arcball(ArcballCreateInfo info = {})
     : m_fov_y(info.fov_y), m_near_z(info.near_z), m_far_z(info.far_z), 

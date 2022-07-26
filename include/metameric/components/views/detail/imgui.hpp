@@ -50,6 +50,12 @@ namespace ImGui {
     }
   };
 
+  /* Useful shorthands */
+
+  void SpacedSeparator();
+
+void CloseAnyPopupIfOpen();
+
   /* Wrappers for std::string STL types.
      Src: https://github.com/ocornut/imgui/blob/master/misc/cpp/imgui_stdlib.h
      and  https://github.com/ocornut/imgui/blob/master/misc/cpp/imgui_stdlib.cpp 

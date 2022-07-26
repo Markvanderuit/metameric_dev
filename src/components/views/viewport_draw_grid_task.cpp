@@ -26,48 +26,48 @@ namespace met {
       [](const Spec &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
 
     // Construct buffer object and draw components
-    m_grid_vertex_buffer = {{ .data = as_span<const std::byte>(color_grid) }};
-    m_grid_array = {{
-      .buffers = {{ .buffer = &m_grid_vertex_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
+    m_vertex_buffer = {{ .data = as_span<const std::byte>(color_grid) }};
+    m_vertex_array = {{
+      .buffers = {{ .buffer = &m_vertex_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
-    m_grid_program = {{ .type = gl::ShaderType::eVertex, 
-                        .path = "resources/shaders/viewport_task/value_draw.vert" },
-                      { .type = gl::ShaderType::eFragment,  
-                        .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }};
-    m_grid_draw = { .type             = gl::PrimitiveType::ePoints,
-                    .vertex_count     = (uint) color_grid.size(),
-                    .bindable_array   = &m_grid_array,
-                    .bindable_program = &m_grid_program };
+    m_program = {{ .type = gl::ShaderType::eVertex, 
+                   .path = "resources/shaders/viewport_task/value_draw.vert" },
+                 { .type = gl::ShaderType::eFragment,  
+                   .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }};
+    m_draw = { .type             = gl::PrimitiveType::ePoints,
+               .vertex_count     = (uint) color_grid.size(),
+               .bindable_array   = &m_vertex_array,
+               .bindable_program = &m_program };
   }
 
   void ViewportDrawGridTask::eval(detail::TaskEvalInfo &info) {
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Grid draw settings")) {
-      ImGui::SliderFloat("Grid point size", &m_grid_psize, 1.f, 32.f, "%.0f");
+      ImGui::SliderFloat("Grid point size", &m_psize, 1.f, 32.f, "%.0f");
     }
     ImGui::End();
 
     // Get externally shared resources 
-    auto &e_viewport_texture      = info.get_resource<gl::Texture2d3f>("viewport", "viewport_texture");
-    auto &e_viewport_arcball      = info.get_resource<detail::Arcball>("viewport", "viewport_arcball");
-    auto &e_viewport_model_matrix = info.get_resource<glm::mat4>("viewport", "viewport_model_matrix");
-    auto &e_viewport_fbuffer      = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "viewport_fbuffer_msaa");
+    auto &e_frame_buffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
+    auto &e_draw_texture = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+    auto &e_arcball      = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_model_matrix = info.get_resource<glm::mat4>("viewport", "model_matrix");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
 
-    // Prepare multisampled framebuffer as draw target
-    e_viewport_fbuffer.bind();
-    gl::state::set_viewport(e_viewport_texture.size());
+    // Prepare framebuffer as draw target
+    e_frame_buffer.bind();
+    gl::state::set_viewport(e_draw_texture.size());
     
     // Update program uniforms
-    m_grid_program.uniform("u_model_matrix",  e_viewport_model_matrix);
-    m_grid_program.uniform("u_camera_matrix", e_viewport_arcball.full());    
+    m_program.uniform("u_model_matrix",  e_model_matrix);
+    m_program.uniform("u_camera_matrix", e_arcball.full());    
 
     // Dispatch draw call
-    gl::state::set_point_size(m_grid_psize);
-    gl::dispatch_draw(m_grid_draw);
+    gl::state::set_point_size(m_psize);
+    gl::dispatch_draw(m_draw);
   }
 } // namespace met
