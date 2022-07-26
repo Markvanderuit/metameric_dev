@@ -145,7 +145,8 @@ namespace met {
       if (ImGui::BeginMenu("File")) {
         auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
         const bool is_loaded   = e_app_data.project_state != ProjectState::eUnloaded;
-        const bool is_saveable = e_app_data.project_state != ProjectState::eNew && is_loaded;
+        const bool enable_save = e_app_data.project_state != ProjectState::eSaved 
+          && e_app_data.project_state != ProjectState::eNew && is_loaded;
         
         /* Main section follows */
 
@@ -157,7 +158,7 @@ namespace met {
 
         /* Save section follows */
 
-        if (ImGui::MenuItem("Save", nullptr, nullptr, is_saveable))     { handle_save(info);    }
+        if (ImGui::MenuItem("Save", nullptr, nullptr, enable_save))     { handle_save(info);    }
         if (ImGui::MenuItem("Save as...", nullptr, nullptr, is_loaded)) { handle_save_as(info); }
 
         ImGui::Separator(); 

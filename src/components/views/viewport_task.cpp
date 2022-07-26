@@ -146,8 +146,8 @@ namespace met {
                                | std::views::transform(detail::i_get(e_rgb_gamut));
 
     // Gizmo anchor position is mean of selected gamut positions
-    auto gamut_anchor_pos = (std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
-                            / static_cast<float>(gamut_selection.size())).eval();
+    eig::Array3f gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
+                                  / static_cast<float>(gamut_selection.size());
     const glm::vec3 v = { gamut_anchor_pos.x(), gamut_anchor_pos.y(), gamut_anchor_pos.z() };
     
     // ImGuizmo manipulator operates on a transform; to obtain translation
@@ -156,10 +156,8 @@ namespace met {
     glm::vec4 gamut_pre_pos    = gamut_anchor_trf * glm::vec4(0, 0, 0, 1);
 
     // Insert ImGuizmo manipulator at anchor position
-    auto rmin = glm::vec2(ImGui::GetWindowPos())
-              + glm::vec2(ImGui::GetWindowContentRegionMin()), 
-         rmax = glm::vec2(ImGui::GetWindowSize())
-              - glm::vec2(ImGui::GetWindowContentRegionMin());
+    auto rmin = glm::vec2(ImGui::GetWindowPos()) + glm::vec2(ImGui::GetWindowContentRegionMin()), 
+         rmax = glm::vec2(ImGui::GetWindowSize()) - glm::vec2(ImGui::GetWindowContentRegionMin());
     ImGuizmo::SetRect(rmin.x, rmin.y, rmax.x, rmax.y);
     ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
     ImGuizmo::Manipulate(glm::value_ptr(i_arcball.view()), 
@@ -176,14 +174,12 @@ namespace met {
 
     // Start gizmo drag
     if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-      fmt::print("Begin!\n");
       m_is_gizmo_used = true;
       m_gamut_prev = e_rgb_gamut;
     }
 
     // Halfway gizmo drag
     if (ImGuizmo::IsUsing()) {
-      fmt::print("Using!\n");
       const auto move_selection = m_gamut_selection_indices 
                                 | std::views::transform(detail::i_get(e_rgb_gamut));
       std::ranges::for_each(move_selection, [&](auto &p) { 
@@ -193,14 +189,12 @@ namespace met {
 
     // End gizmo drag
     if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
-      fmt::print("End!\n");
       m_is_gizmo_used = false;
       
       // Register data edit as drag finishes
       e_app_data.touch(ProjectMod { "Move gamut points", [redo_cp = e_rgb_gamut](auto &data) {
         data.rgb_gamut = redo_cp;
       }, [undo_cp = m_gamut_prev](auto &data) {
-        fmt::print("{}\n", undo_cp);
         data.rgb_gamut = undo_cp;
       }});
     }
@@ -248,30 +242,29 @@ namespace met {
                          ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                          ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
 
-    ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
-
-    // Compute viewport size minus ImGui's tab bars etc
-    auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
-                       - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
-    
-
-    // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
-    if (!i_draw_texture.is_init() || i_draw_texture.size() != glm::ivec2(viewport_size)) {
-      i_draw_texture = {{ .size = glm::ivec2(viewport_size) }};
-    }
-
-    // Insert image, applying viewport texture to viewport; texture can be safely drawn 
-    // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-    ImGui::Image(ImGui::to_ptr(i_draw_texture.object()), i_draw_texture.size(), glm::vec2(0, 1), glm::vec2(1, 0));
-
-    if (ImGui::IsItemHovered()) {
-      if (!ImGuizmo::IsUsing()) {
-        eval_camera(info);
-        eval_select(info);
+    if (ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus)) {
+      // Compute viewport size minus ImGui's tab bars etc
+      // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
+      auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
+                        - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+      if (!i_draw_texture.is_init() || i_draw_texture.size() != glm::ivec2(viewport_size)) {
+        i_draw_texture = {{ .size = glm::ivec2(viewport_size) }};
       }
 
-      if (!m_gamut_selection_indices.empty()) {
-        eval_gizmo(info);
+      // Insert image, applying viewport texture to viewport; texture can be safely drawn 
+      // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
+      ImGui::Image(ImGui::to_ptr(i_draw_texture.object()), i_draw_texture.size(), glm::vec2(0, 1), glm::vec2(1, 0));
+
+      // Handle input
+      if (ImGui::IsItemHovered()) {
+        if (!ImGuizmo::IsUsing()) {
+          eval_camera(info);
+          eval_select(info);
+        }
+
+        if (!m_gamut_selection_indices.empty()) {
+          eval_gizmo(info);
+        }
       }
     }
     

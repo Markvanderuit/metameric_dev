@@ -69,20 +69,15 @@ namespace met {
   }
 
   void ApplicationData::touch(ProjectMod &&mod) {
-    int n_mods = std::clamp(mod_i + 1, 0, 128);
-    mod_i = n_mods;
-
+    // Apply change
     mod.redo(project_data);
-    mods.resize(mod_i);
-    mods.push_back(mod);   
 
     // Ensure mod list doesn't exceed fixed length
     // and set the current mod to its end
-    // mods.resize(std::min(mods.size(), 127ull));
-    // mods.push_back(mod);   
-    // mod_i = int(mods.size()) - 1;
-
-    fmt::print("touch {}\n", mod_i);
+    int n_mods = std::clamp(mod_i + 1, 0, 128);
+    mod_i = n_mods;
+    mods.resize(mod_i);
+    mods.push_back(mod);   
     
     if (project_state == ProjectState::eSaved) {
       project_state = ProjectState::eUnsaved;
