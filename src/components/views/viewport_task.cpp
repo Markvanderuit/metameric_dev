@@ -192,11 +192,11 @@ namespace met {
       m_is_gizmo_used = false;
       
       // Register data edit as drag finishes
-      e_app_data.touch(ProjectMod { "Move gamut points", [redo_cp = e_rgb_gamut](auto &data) {
-        data.rgb_gamut = redo_cp;
-      }, [undo_cp = m_gamut_prev](auto &data) {
-        data.rgb_gamut = undo_cp;
-      }});
+      e_app_data.touch({ 
+        .name = "Move gamut points", 
+        .redo = [edit = e_rgb_gamut](auto &data) { data.rgb_gamut = edit; }, 
+        .undo = [edit = m_gamut_prev](auto &data) { data.rgb_gamut = edit; }
+      });
     }
   }
 
