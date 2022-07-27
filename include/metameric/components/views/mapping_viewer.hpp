@@ -11,8 +11,10 @@ namespace met {
     std::string m_selected_key;
     MappingData m_selected_mapping;
     
-    void handle_add_mapping(detail::TaskEvalInfo &);
-    void handle_remove_mapping(detail::TaskEvalInfo &);
+    void add_mapping(detail::TaskEvalInfo &);
+    void remove_mapping(detail::TaskEvalInfo &);
+    void change_mapping(detail::TaskEvalInfo &);
+    void reset_mapping(detail::TaskEvalInfo &);
 
     void draw_list(detail::TaskEvalInfo &);
     void draw_selection(detail::TaskEvalInfo &);

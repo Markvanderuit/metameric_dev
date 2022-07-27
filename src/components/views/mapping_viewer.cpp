@@ -3,12 +3,12 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  constexpr float  list_width           = 128.f;
+  constexpr float  list_width           = 150.f;
   constexpr float  select_right_padding = 16.f;
   const static ImVec2      add_button_size       = { 28.f, 28.f };
   const static std::string default_mapping_title = "mapping_";
   
-  void MappingViewer::handle_add_mapping(detail::TaskEvalInfo &info) {
+  void MappingViewer::add_mapping(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.loaded_mappings;
@@ -33,7 +33,7 @@ namespace met {
     m_selected_mapping   = mapping;
   }
 
-  void MappingViewer::handle_remove_mapping(detail::TaskEvalInfo &info) {
+  void MappingViewer::remove_mapping(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.loaded_mappings;
@@ -53,6 +53,33 @@ namespace met {
     m_selected_i       = -1;
     m_selected_key     = "";
     m_selected_mapping = {};
+  }
+
+  void MappingViewer::change_mapping(detail::TaskEvalInfo &info) {
+    // Get external shared resources
+    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings = e_app_data.project_data.loaded_mappings;
+
+    // Define data before/after edit
+    auto redo_pair = std::pair<std::string, MappingData> { m_selected_key, m_selected_mapping };
+    auto undo_pair = e_mappings[m_selected_i];
+    
+    // Register data edit
+    e_app_data.touch({ 
+      .name = "Change mapping",
+      .redo = [i = m_selected_i, edit = redo_pair](auto &data) { data.loaded_mappings[i] = edit; },
+      .undo = [i = m_selected_i, edit = undo_pair](auto &data) { data.loaded_mappings[i] = edit; }
+    });
+  }
+  
+  void MappingViewer::reset_mapping(detail::TaskEvalInfo &info) {
+    // Get external shared resources
+    auto &e_mappings = info.get_resource<ApplicationData>(global_key, "app_data").project_data.loaded_mappings;
+
+    // Reset to stored data of selected mapping
+    auto &[key, mapping] = e_mappings[m_selected_i];
+    m_selected_key      = key;
+    m_selected_mapping  = mapping;
   }
 
   void MappingViewer::draw_list(detail::TaskEvalInfo &info) {
@@ -86,9 +113,9 @@ namespace met {
     // Add-mapping button and remove-mapping button; show remove only if a
     // mapping is selected and n_mappings > 1
     const bool show_remove   = m_selected_i != -1 && e_mappings.size() > 1;
-    if (ImGui::Button("+", add_button_size)) { handle_add_mapping(info); }
+    if (ImGui::Button("+", add_button_size)) { add_mapping(info); }
     ImGui::SameLine();
-    if (show_remove && ImGui::Button("-", add_button_size)) { handle_remove_mapping(info); }
+    if (show_remove && ImGui::Button("-", add_button_size)) { remove_mapping(info); }
 
     // End list draw group
     ImGui::PopItemWidth();
@@ -105,10 +132,13 @@ namespace met {
     ImGui::BeginGroup();
     ImGui::PushItemWidth(-list_width - select_right_padding);
 
-    // Draw list title, properly aligned 
+    // Draw edit title, properly aligned 
     ImGui::AlignTextToFramePadding();
-    ImGui::InputText("Name", &m_selected_key);
+    ImGui::Text("Edit selected");
     ImGui::Spacing();
+
+    // Draw mapping name edit widget
+    ImGui::InputText("Name", &m_selected_key);
 
     // Draw CMFS selector widget
     if (ImGui::BeginCombo("CMFS", m_selected_mapping.cmfs.c_str())) {
@@ -135,27 +165,10 @@ namespace met {
     ImGui::SliderScalar("Nr. of scatterings", ImGuiDataType_U32,
       &(m_selected_mapping.n_scatters), &scatter_min, &scatter_max);
 
-    // Button to apply changes to stored mapping
-    if (ImGui::Button("Apply")) {
-      auto redo_pair = std::pair<std::string, MappingData> { m_selected_key, m_selected_mapping };
-      auto undo_pair = e_mappings[m_selected_i];
-
-      // Register data edit
-      e_app_data.touch({ 
-        .name = "Change mapping",
-        .redo = [i = m_selected_i, edit = redo_pair](auto &data) { data.loaded_mappings[i] = edit; },
-        .undo = [i = m_selected_i, edit = undo_pair](auto &data) { data.loaded_mappings[i] = edit; }
-      });
-    }
-
+    // Draw buttons to apply/reset changes to stored mapping
+    if (ImGui::Button("Apply")) { change_mapping(info); }
     ImGui::SameLine();
-
-    // Button to reset state to stored mapping
-    if (ImGui::Button("Reset")) {
-      auto &[key, mapping] = e_mappings[m_selected_i];
-      m_selected_key = key;
-      m_selected_mapping     = mapping;
-    }
+    if (ImGui::Button("Reset")) { reset_mapping(info); }
 
     // End selection draw group
     ImGui::PopItemWidth();
