@@ -24,14 +24,61 @@ namespace met {
                   Color { .35f, .30f, .34f }};
     spec_gamut = { 1.f, 1.f, 1.f, 1.f }; // TODO replace with sensible initialization
 
-    // Instantiate loaeded components with sensible values
+    // TODO delete
     spectral_mappings = {{ "default", SpectralMapping() }};
-    loaded_cmfs = {{ "CIE XYZ",         models::cmfs_cie_xyz },
-                   { "CIE XYZ -> sRGB", models::cmfs_srgb}};
-    loaded_illuminants = {{ "D65", models::emitter_cie_d65 },
-                          { "E", models::emitter_cie_e },
-                          { "FL2", models::emitter_cie_fl2 },
+
+    // Instantiate loaded components with sensible default values
+    loaded_mappings = {{" default", { 
+      .cmfs       = "CIE XYZ->sRGB",
+      .illuminant = "D65",
+      .n_scatters = 0 
+    }}};
+    loaded_cmfs = {{ "CIE XYZ",       models::cmfs_cie_xyz },
+                   { "CIE XYZ->sRGB", models::cmfs_srgb    }};
+    loaded_illuminants = {{ "D65",  models::emitter_cie_d65  },
+                          { "E",    models::emitter_cie_e    },
+                          { "FL2",  models::emitter_cie_fl2  },
                           { "FL11", models::emitter_cie_fl11 }};
+  }
+
+  Spec ProjectData::load_illuminant(const std::string &key) const {
+    const auto pred = [&key](auto &p) { return key == p.first; };
+    if (auto i = std::ranges::find_if(loaded_illuminants, pred); i != loaded_illuminants.end()) {
+      return i->second;
+    } else {
+      // TODO: output a warning or something?
+      return models::emitter_cie_d65;
+    }
+  }
+
+  CMFS ProjectData::load_cmfs(const std::string &key) const {
+    const auto pred = [&key](auto &p) { return key == p.first; };
+    if (auto i = std::ranges::find_if(loaded_cmfs, pred); i != loaded_cmfs.end()) {
+      return i->second;
+    } else {
+      // TODO: output a warning or something?
+      return models::cmfs_srgb;
+    }
+  }
+
+  SpectralMapping ProjectData::load_mapping(const std::string &key) const {
+    const auto pred = [&key](auto &p) { return key == p.first; };
+    if (auto i = std::ranges::find_if(loaded_mappings, pred); i != loaded_mappings.end()) {
+      auto &mapping = i->second;
+      return { 
+        .cmfs       = load_cmfs(mapping.cmfs),
+        .illuminant = load_illuminant(mapping.illuminant),
+        .n_scatters = mapping.n_scatters
+      };
+    } else {
+      // TODO: output a warning or something?
+      return SpectralMapping();
+    }
+  }
+
+  void ApplicationData::create(const fs::path &texture_path) {
+    // Forward loaded texture to ApplicationData::create(Texture2d3f &&)
+    create(Texture2d3f {{ .path = texture_path }});
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
@@ -41,15 +88,8 @@ namespace met {
     rgb_texture   = texture;
     mods          = { };
     mod_i         = -1;
-  }
 
-  void ApplicationData::create(const fs::path &texture_path) {
-    project_state = ProjectState::eNew;
-    project_path  = ""; // TBD on first save
-    project_data  = ProjectData();
-    rgb_texture   = Texture2d3f {{ .path = texture_path }};
-    mods          = { };
-    mod_i         = -1;
+    load_mappings();
   }
   
   void ApplicationData::save(const fs::path &save_path) {
@@ -66,6 +106,8 @@ namespace met {
     rgb_texture   = io::load_texture2d<Color>(io::path_with_ext(project_path,".bmp"));
     mods          = { };
     mod_i         = -1;
+    
+    load_mappings();
   }
 
   void ApplicationData::touch(ProjectMod &&mod) {
@@ -109,11 +151,21 @@ namespace met {
   }
 
   void ApplicationData::unload() {
-    project_state = ProjectState::eUnloaded;
-    project_path  = "";
-    project_data  = { };
-    rgb_texture   = { };
-    mods          = { };
-    mod_i         = -1;
+    project_state   = ProjectState::eUnloaded;
+    project_path    = "";
+    project_data    = { };
+    rgb_texture     = { };
+    mods            = { };
+    mod_i           = -1;
+    loaded_mappings = { };
+  }
+
+  void ApplicationData::load_mappings() {
+    loaded_mappings = { };
+    std::ranges::transform(project_data.loaded_mappings, 
+                          std::back_inserter(loaded_mappings), 
+                          [&](auto &p) {
+      return project_data.load_mapping(p.first);
+    });
   }
 } // namespace met

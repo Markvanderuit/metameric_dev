@@ -18,6 +18,10 @@ namespace met {
   void from_json(const json &js, SpectralMapping &v);
   void to_json(json &js, const SpectralMapping &v);
 
+  /* json (de)serializations for MappingData type */
+  void from_json(const json &js, MappingData &v);
+  void to_json(json &js, const MappingData &v);
+
   /* json (de)serializations for ProjectData type */
   void from_json(const json &js, ProjectData &v);
   void to_json(json &js, const ProjectData &v);

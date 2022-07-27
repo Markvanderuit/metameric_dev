@@ -26,23 +26,39 @@ namespace met {
     eUnsaved,  // Project has previous save, but has been modified
   };
 
+  /* Wrapper data to hold spectral mapping keys */
+  struct MappingData {
+    std::string cmfs;
+    std::string illuminant;
+    uint        n_scatters;
+  };
+
   /* Wrapper object to hold saveable project data */
   struct ProjectData {
+    template <typename T>
+    using StrPair = std::pair<std::string, T>;
+
+  public:
     // Default constr. provides sensible default values
     ProjectData();
 
+    // Given a mapping key, gather loaded data into a SpectralMapping object
+    SpectralMapping load_mapping(const std::string &key) const;
+    CMFS            load_cmfs(const std::string &key) const;
+    Spec            load_illuminant(const std::string &key) const;
+
     // Current mapping and gamut used for rgb->spectral conversion
-    SpectralMapping      rgb_mapping;
+    // SpectralMapping      rgb_mapping;
     std::array<Color, 4> rgb_gamut;
     std::array<Spec, 4>  spec_gamut;
 
     // List of named mappings for spectral->rgb conversion to be performed at runtime
     std::unordered_map<std::string, SpectralMapping> spectral_mappings;
-    // std::vector<std::pair<std::string, SpectralMapping>> spectral_mappings;
 
-    // List of named user-loaded or program-provided illuminants
-    std::unordered_map<std::string, CMFS> loaded_cmfs;
-    std::unordered_map<std::string, Spec> loaded_illuminants;
+    // List of named user-loaded or program-provided illuminants, cmfs, and spectral->rgb mappings
+    std::vector<StrPair<MappingData>> loaded_mappings;
+    std::vector<StrPair<CMFS>>        loaded_cmfs;
+    std::vector<StrPair<Spec>>        loaded_illuminants;
   };
 
   /* Wrapper object to hold a modification to project data */
@@ -70,11 +86,12 @@ namespace met {
     std::vector<ProjectMod> mods;
     int                     mod_i = -1;
 
-    /* Data components */
+    /* Miscellaneous components */
 
-    Texture2d3f     rgb_texture;
-    KNNGrid<Spec>   spec_knn_grid;
-    VoxelGrid<Spec> spec_vox_grid;
+    Texture2d3f                  rgb_texture;
+    KNNGrid<Spec>                spec_knn_grid;
+    VoxelGrid<Spec>              spec_vox_grid;
+    std::vector<SpectralMapping> loaded_mappings;
 
     /* Project state handling */
     
@@ -96,10 +113,12 @@ namespace met {
     // Apply a modification and set state to 'unsaved'
     void touch(ProjectMod &&mod);
 
-    // Redo the modification after mod_i
+    // Step through the modification at mod_i
     void redo();
-
-    // Undo the modification at mod_i
     void undo();
+
+    /* Spectral mapping handling */
+
+    void load_mappings();
   };
 } // namespace met

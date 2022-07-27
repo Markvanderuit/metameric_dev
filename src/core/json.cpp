@@ -3,6 +3,11 @@
 #include <nlohmann/json.hpp>
 
 namespace met {
+  namespace detail {
+    template <typename T>
+    using StrPair = std::pair<std::string, T>;
+  } // namespace detail
+
   namespace io {
     json load_json(const fs::path &path) {
       return json::parse(load_string(path));
@@ -25,20 +30,34 @@ namespace met {
     js["n_scatters"] = v.n_scatters;
   }
 
+  void from_json(const json &js, MappingData &v) {
+    v.cmfs       = js.at("cmfs").get<std::string>();
+    v.illuminant = js.at("illuminant").get<std::string>();
+    v.n_scatters = js.at("n_scatters").get<uint>();
+  }
+
+  void to_json(json &js, const MappingData &v) {
+    js["cmfs"]       = v.cmfs;
+    js["illuminant"] = v.illuminant;
+    js["n_scatters"] = v.n_scatters;
+  }
+
   void from_json(const json &js, ProjectData &v) {
-    v.rgb_mapping  = js.at("rgb_mapping").get<SpectralMapping>();
+    // v.rgb_mapping  = js.at("rgb_mapping").get<SpectralMapping>();
     v.rgb_gamut    = js.at("rgb_gamut").get<std::array<Color, 4>>();
     v.spec_gamut   = js.at("rgb_gamut").get<std::array<Spec, 4>>();
-    v.spectral_mappings  = js.at("spectral_mappings").get<std::unordered_map<std::string, SpectralMapping>>();
-    v.loaded_cmfs        = js.at("loaded_cmfs").get<std::unordered_map<std::string, CMFS>>();
-    v.loaded_illuminants = js.at("loaded_illuminants").get<std::unordered_map<std::string, Spec>>();
+
+    v.loaded_mappings    = js.at("loaded_mappings").get<std::vector<detail::StrPair<MappingData>>>();
+    v.loaded_cmfs        = js.at("loaded_cmfs").get<std::vector<detail::StrPair<CMFS>>>();
+    v.loaded_illuminants = js.at("loaded_illuminants").get<std::vector<detail::StrPair<Spec>>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
-    js["rgb_mapping"]  = v.rgb_mapping;
+    // js["rgb_mapping"]  = v.rgb_mapping;
     js["rgb_gamut"]    = v.rgb_gamut;
     js["spec_gamut"]   = v.spec_gamut;
-    js["spectral_mappings"]  = v.spectral_mappings;
+
+    js["loaded_mappings"]    = v.loaded_mappings;
     js["loaded_cmfs"]        = v.loaded_cmfs;
     js["loaded_illuminants"] = v.loaded_illuminants;
   }
