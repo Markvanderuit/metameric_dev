@@ -7,10 +7,16 @@
 
 namespace met {
   class MappingViewer : public detail::AbstractTask {
-    std::string m_selected_mapping_key;
-    MappingData m_selected_mapping_edit;
-    uint        m_selected_mapping_i;
+    int         m_selected_i;
+    std::string m_selected_key;
+    MappingData m_selected_mapping;
     
+    void handle_add_mapping(detail::TaskEvalInfo &);
+    void handle_remove_mapping(detail::TaskEvalInfo &);
+
+    void draw_list(detail::TaskEvalInfo &);
+    void draw_selection(detail::TaskEvalInfo &);
+
   public:
     MappingViewer(const std::string &name);
     void init(detail::TaskInitInfo &) override;
