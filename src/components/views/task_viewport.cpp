@@ -1,11 +1,11 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/views/viewport_task.hpp>
-#include <metameric/components/views/viewport_draw_begin_task.hpp>
-#include <metameric/components/views/viewport_draw_end_task.hpp>
-#include <metameric/components/views/viewport_draw_task.hpp>
-#include <metameric/components/views/viewport_draw_grid_task.hpp>
+#include <metameric/components/views/task_viewport.hpp>
+#include <metameric/components/views/viewport/task_draw_begin.hpp>
+#include <metameric/components/views/viewport/task_draw_end.hpp>
+#include <metameric/components/views/viewport/task_draw.hpp>
+#include <metameric/components/views/viewport/task_draw_grid.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/buffer.hpp>

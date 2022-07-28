@@ -6,7 +6,7 @@
 #include <string>
 
 namespace met {
-  class MappingViewer : public detail::AbstractTask {
+  class MappingsEditorTask : public detail::AbstractTask {
     int         m_selected_i;
     std::string m_selected_key;
     MappingData m_selected_mapping;
@@ -20,7 +20,7 @@ namespace met {
     void draw_selection(detail::TaskEvalInfo &);
 
   public:
-    MappingViewer(const std::string &name);
+    MappingsEditorTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };

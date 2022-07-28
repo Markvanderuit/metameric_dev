@@ -1,5 +1,5 @@
 #include <metameric/core/state.hpp>
-#include <metameric/components/views/mapping_viewer.hpp>
+#include <metameric/components/views/task_mappings_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
@@ -8,7 +8,7 @@ namespace met {
   const static ImVec2      add_button_size       = { 28.f, 28.f };
   const static std::string default_mapping_title = "mapping_";
   
-  void MappingViewer::add_mapping(detail::TaskEvalInfo &info) {
+  void MappingsEditorTask::add_mapping(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.loaded_mappings;
@@ -33,7 +33,7 @@ namespace met {
     m_selected_mapping   = mapping;
   }
 
-  void MappingViewer::remove_mapping(detail::TaskEvalInfo &info) {
+  void MappingsEditorTask::remove_mapping(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.loaded_mappings;
@@ -55,7 +55,7 @@ namespace met {
     m_selected_mapping = {};
   }
 
-  void MappingViewer::change_mapping(detail::TaskEvalInfo &info) {
+  void MappingsEditorTask::change_mapping(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.loaded_mappings;
@@ -72,7 +72,7 @@ namespace met {
     });
   }
   
-  void MappingViewer::reset_mapping(detail::TaskEvalInfo &info) {
+  void MappingsEditorTask::reset_mapping(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_mappings = info.get_resource<ApplicationData>(global_key, "app_data").project_data.loaded_mappings;
 
@@ -82,7 +82,7 @@ namespace met {
     m_selected_mapping  = mapping;
   }
 
-  void MappingViewer::draw_list(detail::TaskEvalInfo &info) {
+  void MappingsEditorTask::draw_list(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.loaded_mappings;
@@ -122,7 +122,7 @@ namespace met {
     ImGui::EndGroup();
   }
 
-  void MappingViewer::draw_selection(detail::TaskEvalInfo &info) {
+  void MappingsEditorTask::draw_selection(detail::TaskEvalInfo &info) {
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_data = e_app_data.project_data;
@@ -175,15 +175,15 @@ namespace met {
     ImGui::EndGroup();
   }
 
-  MappingViewer::MappingViewer(const std::string &name)
+  MappingsEditorTask::MappingsEditorTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void MappingViewer::init(detail::TaskInitInfo &info) {
+  void MappingsEditorTask::init(detail::TaskInitInfo &info) {
     m_selected_i = -1;
   }
 
-  void MappingViewer::eval(detail::TaskEvalInfo &info) {
-    if (ImGui::Begin("Spectral mappings")) {      
+  void MappingsEditorTask::eval(detail::TaskEvalInfo &info) {
+    if (ImGui::Begin("Mappings editor")) {      
       draw_list(info);
       if (m_selected_i != -1) {
         ImGui::SameLine();

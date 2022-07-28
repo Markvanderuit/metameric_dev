@@ -5,7 +5,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/views/viewport_draw_grid_task.hpp>
+#include <metameric/components/views/viewport/task_draw_grid.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <execution>

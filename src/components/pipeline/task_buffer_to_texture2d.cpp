@@ -1,4 +1,4 @@
-#include <metameric/components/tasks/buffer_to_texture_task.hpp>
+#include <metameric/components/tasks/task_buffer_to_texture2d.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>

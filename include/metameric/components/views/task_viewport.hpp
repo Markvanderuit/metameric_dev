@@ -2,8 +2,8 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <vector>
 #include <array>
+#include <vector>
 
 namespace met {
   class ViewportTask : public detail::AbstractTask {

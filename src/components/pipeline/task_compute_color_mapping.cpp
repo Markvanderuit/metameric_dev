@@ -1,15 +1,15 @@
 #include <metameric/core/knn.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/components/tasks/mapping_task.hpp>
+#include <metameric/components/tasks/task_compute_color_mapping.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
 
 namespace met {
-  MappingTask::MappingTask(const std::string &name)
+  ComputeColorMappingTask::ComputeColorMappingTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void MappingTask::init(detail::TaskInitInfo &info) {
+  void ComputeColorMappingTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
 
@@ -52,7 +52,7 @@ namespace met {
     info.insert_resource("color_texture", std::move(color_texture));
   }
 
-  void MappingTask::eval(detail::TaskEvalInfo &info) {
+  void ComputeColorMappingTask::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
     auto &e_spectral_texture_buffer = info.get_resource<gl::Buffer>("generate_spectral", 
                                                                     "spectral_texture_buffer");

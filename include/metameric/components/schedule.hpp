@@ -1,22 +1,31 @@
 #pragma once
 
+// Metameric includes
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/misc/lambda_task.hpp>
-#include <metameric/components/misc/frame_begin_task.hpp>
-#include <metameric/components/misc/frame_end_task.hpp>
-#include <metameric/components/tasks/generate_gamut.hpp>
-#include <metameric/components/tasks/generate_spectral_texture.hpp>
-#include <metameric/components/tasks/mapping_task.hpp>
-#include <metameric/components/tasks/mapping_cpu_task.hpp>
-#include <metameric/components/views/gamut_viewer.hpp>
-#include <metameric/components/views/image_viewer.hpp>
-#include <metameric/components/views/mapping_viewer.hpp>
-#include <metameric/components/views/viewport_task.hpp>
-#include <metameric/components/views/window_task.hpp>
+
+// Miscellaneous
+#include <metameric/components/misc/task_lambda.hpp>
+#include <metameric/components/misc/task_frame_begin.hpp>
+#include <metameric/components/misc/task_frame_end.hpp>
+
+// Pipeline tasks
+#include <metameric/components/tasks/task_generate_spectral_gamut.hpp>
+#include <metameric/components/tasks/task_generate_spectral_texture.hpp>
+#include <metameric/components/tasks/task_compute_color_mapping.hpp>
+
+// View tasks
+#include <metameric/components/views/task_gamut_viewer.hpp>
+#include <metameric/components/views/task_mappings_editor.hpp>
+#include <metameric/components/views/task_viewport.hpp>
+#include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+
+// TODO remove
+#include <metameric/components/tasks/mapping_cpu_task.hpp>
+#include <metameric/components/views/image_viewer.hpp>
 
 namespace met {
   template <typename Scheduler>
@@ -75,16 +84,20 @@ namespace met {
     scheduler.emplace_task<WindowTask>("window");
 
     // The following tasks define the uplifting pipeline
-    scheduler.emplace_task<GenerateGamutTask>("generate_gamut");
-    scheduler.emplace_task<GenerateSpectralTask>("generate_spectral");
-    scheduler.emplace_task<MappingTask>("mapping");
+    scheduler.emplace_task<GenerateSpectralGamutTask>("generate_gamut");
+    scheduler.emplace_task<GenerateSpectralTextureTask>("generate_spectral");
+    scheduler.emplace_task<ComputeColorMappingTask>("mapping");
+
+    // TODO remove
     scheduler.emplace_task<MappingCPUTask>("mapping_cpu");
 
     // The following tasks define UI components and windows
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
+    scheduler.emplace_task<MappingsEditorTask>("mapping_viewer");
+
+    // TODO remove
     scheduler.emplace_task<ImageViewerTask>("image_viewer");
-    scheduler.emplace_task<MappingViewer>("mapping_viewer");
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);

@@ -1,8 +1,8 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
-#include <metameric/components/misc/lambda_task.hpp>
-#include <metameric/components/views/window_task.hpp>
-#include <metameric/components/views/new_project_view.hpp>
+#include <metameric/components/misc/task_lambda.hpp>
+#include <metameric/components/views/task_window.hpp>
+#include <metameric/components/views/task_create_project.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/window.hpp>
@@ -22,7 +22,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void WindowTask::init(detail::TaskInitInfo &info) {
-    info.emplace_task_after<NewProjectView>(name(), name() + create_modal_name, create_modal_title);
+    info.emplace_task_after<CreateProjectTask>(name(), name() + create_modal_name, create_modal_title);
 
     // Modal subtask to handle safe exiting of program
     info.emplace_task_after<LambdaTask>(name(), name() + close_modal_name, [&](auto &info) {

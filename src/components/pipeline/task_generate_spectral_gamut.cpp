@@ -1,4 +1,4 @@
-#include <metameric/components/tasks/generate_gamut.hpp>
+#include <metameric/components/tasks/task_generate_spectral_gamut.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
@@ -7,10 +7,10 @@
 #include <ranges>
 
 namespace met {
-  GenerateGamutTask::GenerateGamutTask(const std::string &name)
+  GenerateSpectralGamutTask::GenerateSpectralGamutTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
-  void GenerateGamutTask::init(detail::TaskInitInfo &info) {
+  void GenerateSpectralGamutTask::init(detail::TaskInitInfo &info) {
     // Submit resources: buffers storing the four colours/spectra forming a tetrahedron
     info.emplace_resource<gl::Buffer>("color_gamut_buffer", {
       .size  = sizeof(eig::AlArray3f) * 4, 
@@ -22,7 +22,7 @@ namespace met {
     });
   }
   
-  void GenerateGamutTask::eval(detail::TaskEvalInfo &info) {
+  void GenerateSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
     auto &e_app_data          = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &i_colr_gamut_buffer = info.get_resource<gl::Buffer>("color_gamut_buffer");

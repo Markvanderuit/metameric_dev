@@ -1,4 +1,4 @@
-#include <metameric/components/tasks/generate_spectral_texture.hpp>
+#include <metameric/components/tasks/task_generate_spectral_texture.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
@@ -7,10 +7,10 @@
 #include <ranges>
 
 namespace met {
-  GenerateSpectralTask::GenerateSpectralTask(const std::string &name)
+  GenerateSpectralTextureTask::GenerateSpectralTextureTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenerateSpectralTask::init(detail::TaskInitInfo &info) {
+  void GenerateSpectralTextureTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").rgb_texture;
 
@@ -37,7 +37,7 @@ namespace met {
     });
   }
 
-  void GenerateSpectralTask::eval(detail::TaskEvalInfo &info) {
+  void GenerateSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
     auto &e_spectral_gamut_buffer   = info.get_resource<gl::Buffer>("generate_gamut", "spectral_gamut_buffer");
     auto &e_color_gamut_buffer      = info.get_resource<gl::Buffer>("generate_gamut", "color_gamut_buffer");

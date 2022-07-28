@@ -4,7 +4,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/views/viewport_draw_task.hpp>
+#include <metameric/components/views/viewport/task_draw.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 

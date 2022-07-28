@@ -7,7 +7,7 @@
 #include <string>
 
 namespace met {
-  class NewProjectView : public detail::AbstractTask {
+  class CreateProjectTask : public detail::AbstractTask {
     std::string m_input_path;
     std::string m_progr_path;
     std::string m_view_title;
@@ -60,7 +60,7 @@ namespace met {
     }
 
   public:
-    NewProjectView(const std::string &name, const std::string &view_title)
+    CreateProjectTask(const std::string &name, const std::string &view_title)
     : detail::AbstractTask(name),
       m_view_title(view_title) { }
 
