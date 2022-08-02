@@ -8,7 +8,7 @@
 
 namespace met {
   template <class TextureTy, class InfoTy>
-  class BufferToTextureTask : public detail::AbstractTask {
+  class ConvBufferToTexture2dTask : public detail::AbstractTask {
     using RefType = std::pair<std::string, std::string>;
     
     std::string m_input_task_key;
@@ -20,7 +20,7 @@ namespace met {
     gl::ComputeInfo m_dispatch;
 
   public:
-    BufferToTextureTask(const std::string &task_name,
+    ConvBufferToTexture2dTask(const std::string &task_name,
                         const std::string &input_task_key,
                         const std::string &input_buffer_key,
                         InfoTy             output_texture_info,

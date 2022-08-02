@@ -7,29 +7,24 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
-#include <array>
-// #include <numeric>
 
 namespace met {
-class GamutViewerTask : public detail::AbstractTask {
+  class GamutViewerTask : public detail::AbstractTask {
   public:
     GamutViewerTask(const std::string &name)
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
       // Get externally shared resources
-      auto &e_app_data          = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_spec_gamut_buffer = info.get_resource<gl::Buffer>("generate_gamut", "spectral_gamut_buffer");
-
-      // Get relevant application data
-      std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;
-      std::array<Spec, 4> &spec_gamut = e_app_data.project_data.spec_gamut;
+      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &rgb_gamut  = e_app_data.project_data.rgb_gamut;
+      auto &spec_gamut = e_app_data.project_data.spec_gamut;
 
       // Quick temporary window to show nearest spectra in the local grid
       if (ImGui::Begin("Gamut viewer")) {
         const auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
-                                 
+                                  
         // Obtain colors at gamut's point positions
         std::vector<Color> spectra_to_colors(4);
         std::ranges::transform(spec_gamut, spectra_to_colors.begin(),

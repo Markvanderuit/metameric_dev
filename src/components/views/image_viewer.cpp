@@ -33,7 +33,7 @@ namespace met {
 
     if (ImGui::Begin("Mapped")) {
       // Get external resources
-      auto &e_color_texture = info.get_resource<gl::Texture2d4f>("mapping", "color_texture");
+      auto &e_color_texture = info.get_resource<gl::Texture2d4f>("comp_color_mapping", "color_texture");
 
       auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax().x)
                          - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin().x);

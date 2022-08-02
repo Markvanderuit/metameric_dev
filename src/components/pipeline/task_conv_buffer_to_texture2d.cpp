@@ -1,11 +1,11 @@
-#include <metameric/components/tasks/task_buffer_to_texture2d.hpp>
+#include <metameric/components/tasks/task_conv_buffer_to_texture2d.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 
 namespace met {
   template <class TextureTy, class InfoTy>
-  BufferToTextureTask<TextureTy, InfoTy>::BufferToTextureTask(const std::string &task_name,
+  ConvBufferToTexture2dTask<TextureTy, InfoTy>::ConvBufferToTexture2dTask(const std::string &task_name,
                                                               const std::string &input_task_key,
                                                               const std::string &input_buffer_key,
                                                               InfoTy             output_texture_info,
@@ -17,7 +17,7 @@ namespace met {
     m_output_texture_info(output_texture_info) { }
 
   template <class TextureTy, class InfoTy = TextureTy::InfoType>
-  void BufferToTextureTask<TextureTy, InfoTy>::init(detail::TaskInitInfo &info) {
+  void ConvBufferToTexture2dTask<TextureTy, InfoTy>::init(detail::TaskInitInfo &info) {
     // Emplace texture resource using provided info object
     info.emplace_resource<TextureTy, InfoTy>(m_output_texture_key, m_output_texture_info);
 
@@ -37,7 +37,7 @@ namespace met {
   }
   
   template <class TextureTy, class InfoTy>
-  void BufferToTextureTask<TextureTy, InfoTy>::eval(detail::TaskEvalInfo &info) {
+  void ConvBufferToTexture2dTask<TextureTy, InfoTy>::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
     auto &e_buffer  = info.get_resource<gl::Buffer>(m_input_task_key, m_input_buffer_key);
     auto &i_texture = info.get_resource<TextureTy>(m_output_texture_key);

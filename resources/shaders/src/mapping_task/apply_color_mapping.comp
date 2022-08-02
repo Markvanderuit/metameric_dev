@@ -1,25 +1,30 @@
 #version 460 core
 
 #include <guard.glsl>
-#include <spectrum.glsl>
+#include <mapping.glsl>
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec b_0_spectral_texture[]; };
-layout(binding = 1, std430) restrict readonly  buffer b_1 { MappingType b_1_mapping;     };
-layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3 b_2_color_texture[];    };
+layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec b_0_spectral_buffer[]; };
+layout(binding = 1, std430) restrict readonly  buffer b_1 { MappingType b_1_mappings[];  };
+layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3 b_2_color_buffer[];    };
 
 layout(location = 0) uniform uint u_n;
+layout(location = 1) uniform uint u_mapping_i;
 
-vec3 apply_cmfs(in Spec sd) {
-  // TODO: Preproc?
-  const float k = 1.f / ssum(mul(b_1_mapping.cmfs[1], b_1_mapping.illuminant));
-  return k * mul(b_1_mapping.cmfs, mul(sd, b_1_mapping.illuminant));
+vec3 apply_mapping(in MappingType mapping, in Spec sd) {
+  CMFS cs = finalize_mapping(mapping, sd);
+  return matmul(cs, sd);
 }
 
 void main() {
   const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
   guard(i < u_n);
+  
+  // Query objects from buffers
+  Spec sd             = b_0_spectral_buffer[i];
+  MappingType mapping = b_1_mappings[u_mapping_i];
 
-  b_2_color_texture[i] = apply_cmfs(b_0_spectral_texture[i]);
+  // Compute output color and store to buffer
+  b_2_color_buffer[i] = apply_mapping(mapping, sd);
 }

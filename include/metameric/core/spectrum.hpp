@@ -91,7 +91,8 @@ namespace met {
 
   // Convert a spectral reflectance distr. to a color under a given mapping
   inline
-  Color reflectance_to_color(const Spec &sd, const SpectralMapping &mapping = SpectralMapping()) {
+  Color reflectance_to_color(const Spec &sd, 
+                             const SpectralMapping &mapping = SpectralMapping()) {
     return mapping.apply(sd);
   }
 

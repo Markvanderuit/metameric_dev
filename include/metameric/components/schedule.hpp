@@ -12,13 +12,15 @@
 #include <metameric/components/misc/task_frame_end.hpp>
 
 // Pipeline tasks
-#include <metameric/components/tasks/task_generate_spectral_gamut.hpp>
-#include <metameric/components/tasks/task_generate_spectral_texture.hpp>
-#include <metameric/components/tasks/task_compute_color_mapping.hpp>
+#include <metameric/components/tasks/task_gen_spectral_mappings.hpp>
+#include <metameric/components/tasks/task_gen_spectral_gamut.hpp>
+#include <metameric/components/tasks/task_gen_spectral_texture.hpp>
+#include <metameric/components/tasks/task_comp_color_mapping.hpp>
 
 // View tasks
 #include <metameric/components/views/task_gamut_viewer.hpp>
 #include <metameric/components/views/task_mappings_editor.hpp>
+#include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -84,9 +86,10 @@ namespace met {
     scheduler.emplace_task<WindowTask>("window");
 
     // The following tasks define the uplifting pipeline
-    scheduler.emplace_task<GenerateSpectralGamutTask>("generate_gamut");
-    scheduler.emplace_task<GenerateSpectralTextureTask>("generate_spectral");
-    scheduler.emplace_task<ComputeColorMappingTask>("mapping");
+    scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");
+    scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");
+    scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
+    scheduler.emplace_task<CompColorMappingTask>("comp_color_mapping");
 
     // TODO remove
     scheduler.emplace_task<MappingCPUTask>("mapping_cpu");
@@ -94,7 +97,8 @@ namespace met {
     // The following tasks define UI components and windows
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
-    scheduler.emplace_task<MappingsEditorTask>("mapping_viewer");
+    scheduler.emplace_task<SpectraEditorTask>("spectra_editor");
+    scheduler.emplace_task<MappingsEditorTask>("mappings_editor");
 
     // TODO remove
     scheduler.emplace_task<ImageViewerTask>("image_viewer");

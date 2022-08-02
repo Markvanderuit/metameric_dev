@@ -108,7 +108,7 @@ namespace met {
 
     // Initialize OpenGL context (and primary window) and submit to scheduler
     gl::Window &window = scheduler.emplace_resource<gl::Window>("window", { 
-      .size  = { 1280, 800 }, 
+      .size  = { 1680, 1024 }, 
       .title = "Metameric", 
       .flags = gl::WindowCreateFlags::eVisible
              | gl::WindowCreateFlags::eFocused   

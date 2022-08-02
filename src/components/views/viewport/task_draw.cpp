@@ -1,12 +1,12 @@
-#include <small_gl/framebuffer.hpp>
-#include <small_gl/texture.hpp>
-#include <small_gl/utility.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/viewport/task_draw.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <small_gl/framebuffer.hpp>
+#include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
 
 namespace met {
   constexpr std::array<float, 24> cube_vertices = { 
@@ -41,8 +41,8 @@ namespace met {
 
   void ViewportDrawTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources 
-    auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("generate_gamut", "color_gamut_buffer");
-    auto &e_texture_buffer = info.get_resource<gl::Buffer>("generate_spectral", "color_texture_buffer");
+    auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "color_buffer");
+    auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
 
     // Setup objects for cube line draw
     m_cube_vertex_buffer = {{ .data = as_span<const std::byte>(cube_vertices) }};

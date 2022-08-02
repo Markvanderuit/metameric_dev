@@ -7,8 +7,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class ComputeColorMappingTask : public detail::AbstractTask {
-    gl::Buffer      m_mapping_buffer;
+  class CompColorMappingTask : public detail::AbstractTask {
     gl::ComputeInfo m_mapping_dispatch;
     gl::Program     m_mapping_program;
 
@@ -16,7 +15,7 @@ namespace met {
     gl::ComputeInfo m_texture_dispatch;
 
   public:
-    ComputeColorMappingTask(const std::string &name);
+    CompColorMappingTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };

@@ -1,4 +1,3 @@
-#include <metameric/core/state.hpp>
 #include <metameric/components/views/task_mappings_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
@@ -16,14 +15,20 @@ namespace met {
     // Make a copy of the mapping data and add a new default mapping
     auto cp_mappings = e_mappings;
     cp_mappings.push_back({ default_mapping_title + std::to_string(cp_mappings.size()), {
-      .cmfs       = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 
+      .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 
     }});
 
     // Register data edit
     e_app_data.touch({ 
       .name = "Add mapping",
-      .redo = [edit = cp_mappings](auto &data) { data.loaded_mappings = edit; }, 
-      .undo = [edit = e_mappings](auto &data) { data.loaded_mappings = edit; }
+      .redo = [&e_app_data, edit = cp_mappings](auto &data) { 
+        data.loaded_mappings = edit; 
+        e_app_data.load_mappings();
+      }, 
+      .undo = [&e_app_data, edit = e_mappings](auto &data) { 
+        data.loaded_mappings = edit; 
+        e_app_data.load_mappings();
+      }
     });
 
     // Set selection to newly added item
@@ -45,8 +50,14 @@ namespace met {
     // Register data edit
     e_app_data.touch({ 
       .name = "Remove mapping",
-      .redo = [edit = cp_mappings](auto &data) { data.loaded_mappings = edit; }, 
-      .undo = [edit = e_mappings](auto &data) { data.loaded_mappings = edit; }
+      .redo = [&e_app_data, edit = cp_mappings](auto &data) {
+        data.loaded_mappings = edit;
+        e_app_data.load_mappings();
+      }, 
+      .undo = [&e_app_data, edit = e_mappings](auto &data) {
+        data.loaded_mappings = edit;
+        e_app_data.load_mappings();
+      }
     });
 
     // Clear selection
@@ -63,12 +74,18 @@ namespace met {
     // Define data before/after edit
     auto redo_pair = std::pair<std::string, MappingData> { m_selected_key, m_selected_mapping };
     auto undo_pair = e_mappings[m_selected_i];
-    
+
     // Register data edit
     e_app_data.touch({ 
       .name = "Change mapping",
-      .redo = [i = m_selected_i, edit = redo_pair](auto &data) { data.loaded_mappings[i] = edit; },
-      .undo = [i = m_selected_i, edit = undo_pair](auto &data) { data.loaded_mappings[i] = edit; }
+      .redo = [&e_app_data, i = m_selected_i, edit = redo_pair](auto &data) { 
+        data.loaded_mappings[i] = edit;
+        e_app_data.load_mappings(); 
+      },
+      .undo = [&e_app_data, i = m_selected_i, edit = undo_pair](auto &data) { 
+        data.loaded_mappings[i] = edit;
+        e_app_data.load_mappings(); 
+      }
     });
   }
   
