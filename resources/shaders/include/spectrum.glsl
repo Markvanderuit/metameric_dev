@@ -116,14 +116,7 @@ Spec minv(in Spec a, in Spec b) {
   return s;
 }
 
-/* Miscellaneous */
-
-Spec powv(in Spec v, in uint p) {
-  Spec s = v;
-  for (uint i = 0; i < p; ++i)
-    s = mul(s, v);
-  return s;
-}
+/* Reductions */
 
 float vsum(vec3 v) {
   return v.x + v.y + v.z;
@@ -149,6 +142,15 @@ float vmean(vec3 v) {
 
 float smean(in Spec s) {
   return ssum(s) / float(wavelength_samples);
+}
+
+/* Miscellaneous */
+
+Spec powv(in Spec v, in uint p) {
+  Spec s = v;
+  for (uint i = 0; i < p; ++i)
+    s = mul(s, v);
+  return s;
 }
 
 float wavelength_at_index(uint i) {

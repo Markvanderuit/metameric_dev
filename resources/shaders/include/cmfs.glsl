@@ -10,11 +10,8 @@
 /* Constructors */
 
 CMFS constr_cmfs(in float f) {
-  return CMFS(
-    constr_spec(f),
-    constr_spec(f),
-    constr_spec(f)
-  );
+  Spec s = constr_spec(f);
+  return CMFS(s, s, s);
 }
 
 /* Component-wise math operators */
