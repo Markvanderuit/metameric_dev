@@ -77,9 +77,9 @@ namespace met {
       });
 
       // Specify spectrum-to-color mappings
-      const SpectralMapping mapping_d65  = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65  };
-      const SpectralMapping mapping_fl2  = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl2  };
-      const SpectralMapping mapping_fl11 = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl11 };
+      const SpectralMapping mapping_d65  = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65,  .n_scatters = 0 };
+      const SpectralMapping mapping_fl2  = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl2,  .n_scatters = 1 };
+      const SpectralMapping mapping_fl11 = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
 
       // Generate low-dimensional color texture
       std::transform(std::execution::par_unseq, 

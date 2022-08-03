@@ -1,7 +1,7 @@
 #version 460 core
 
 #include <guard.glsl>
-#include <spectrum.glsl>
+#include <spectrum_invoc.glsl>
 
 const uint wvls_size = 31;
 
@@ -22,9 +22,9 @@ layout(binding = 2, std430) restrict writeonly buffer block_2 {
 layout(location = 0) uniform uint n_spectra;
 
 Spec spectrum_from_data(in float[wvls_size] wvls, 
-                            in float[wvls_size] values) {
-  Spec s = constr_spec(0.f), 
-       n = constr_spec(0.f);
+                        in float[wvls_size] values) {
+  Spec s = in_spectrum(0.f), 
+       n = in_spectrum(0.f);
 
   for (uint i = 0; i < wvls_size; ++i) {
     float wvl = wvls[i];
@@ -35,7 +35,7 @@ Spec spectrum_from_data(in float[wvls_size] wvls,
     n[j] += 1.f;
   }
 
-  return div(s, maxv(n, 1.f));
+  return in_div(s, in_max(n, 1.f));
 }
 
 void main() {

@@ -14,15 +14,14 @@ namespace met {
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_data = e_app_data.project_data;
 
-
-    /* struct MappingType {
-      CMFS cmfs          = models::cmfs_srgb;
-      Spec illuminant    = models::emitter_cie_fl11;
-      uint n_scatterings = 0;
-    } mapping; */
-
     const uint mapping_n    = e_app_data.rgb_texture.size().prod();
     const uint mapping_ndiv = ceil_div(mapping_n, 256u); 
+    const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / 32u);
+
+    // Initialize objects for color texture gen. through subgroups
+    m_mapping_program_sg = {{ .type = gl::ShaderType::eCompute,
+                              .path = "resources/shaders/task_comp_color_mapping/task_comp_color_mapping.comp" }};
+    m_mapping_dispatch_sg = { .groups_x = mapping_ndiv_sg, .bindable_program = &m_mapping_program_sg };
 
     // Initialize objects for color texture gen.
     m_mapping_program = {{ .type = gl::ShaderType::eCompute,
@@ -42,6 +41,8 @@ namespace met {
     // Set these uniforms once
     m_mapping_program.uniform<uint>("u_n", mapping_n);
     m_mapping_program.uniform<uint>("u_mapping_i", 0);
+    m_mapping_program_sg.uniform<uint>("u_n", mapping_n);
+    m_mapping_program_sg.uniform<uint>("u_mapping_i", 0);
     m_texture_program.uniform<glm::uvec2>("u_size", texture_n);
 
     // Create buffer target for this task
@@ -67,7 +68,7 @@ namespace met {
 
     // Dispatch shader to generate color-mapped buffer
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::dispatch_compute(m_mapping_dispatch);
+    gl::dispatch_compute(m_mapping_dispatch_sg);
 
     // Bind resources to buffer targets
     i_color_buffer.bind_to(gl::BufferTargetType::eShaderStorage,    0);

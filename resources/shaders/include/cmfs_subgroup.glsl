@@ -3,75 +3,75 @@
 
 #include <spectrum_subgroup.glsl>
 
-/* Base CMFS object */
+/* Subgroup color matching functions object */
 
-#define CMFS float[3][sg_iters];
+#define SgCMFS float[3][sg_iters]
 
 /* Constructors */
 
-CMFS c_constr(in float f) {
-  Spec s = s_constr(f);
-  return CMFS(s, s, s);
+SgCMFS sg_cmfs(in float f) {
+  SgSpec s = sg_spectrum(f);
+  return SgCMFS(s, s, s);
 }
 
 /* Component-wise math operators */
 
-CMFS c_mul(in CMFS cmfs, in float f) {
-  return CMFS(s_mul(cmfs[0], f),
-              s_mul(cmfs[1], f),
-              s_mul(cmfs[2], f));
+SgCMFS sg_mul(in SgCMFS cmfs, in float f) {
+  return SgCMFS(sg_mul(cmfs[0], f),
+                sg_mul(cmfs[1], f),
+                sg_mul(cmfs[2], f));
 }
 
-CMFS c_div(in CMFS cmfs, in float f) {
-  return CMFS(s_div(cmfs[0], f),
-              s_div(cmfs[1], f),
-              s_div(cmfs[2], f));
+SgCMFS sg_div(in SgCMFS cmfs, in float f) {
+  return SgCMFS(sg_div(cmfs[0], f),
+                sg_div(cmfs[1], f),
+                sg_div(cmfs[2], f));
 }
 
-CMFS c_add(in CMFS cmfs, in float f) {
-  return CMFS(s_add(cmfs[0], f),
-              s_add(cmfs[1], f),
-              s_add(cmfs[2], f));
+SgCMFS sg_add(in SgCMFS cmfs, in float f) {
+  return SgCMFS(sg_add(cmfs[0], f),
+                sg_add(cmfs[1], f),
+                sg_add(cmfs[2], f));
 }
 
-CMFS c_sub(in CMFS cmfs, in float f) {
-  return CMFS(s_sub(cmfs[0], f),
-              s_sub(cmfs[1], f),
-              s_sub(cmfs[2], f));
+SgCMFS sg_sub(in SgCMFS cmfs, in float f) {
+  return SgCMFS(sg_sub(cmfs[0], f),
+                sg_sub(cmfs[1], f),
+                sg_sub(cmfs[2], f));
 }
 
 /* Column-wise math operators */
 
-CMFS c_mul(in CMFS cmfs, in Spec s) {
-  return CMFS(s_mul(cmfs[0], s),
-              s_mul(cmfs[1], s),
-              s_mul(cmfs[2], s));
+SgCMFS sg_mul(in SgCMFS cmfs, in SgSpec s) {
+  return SgCMFS(sg_mul(cmfs[0], s),
+                sg_mul(cmfs[1], s),
+                sg_mul(cmfs[2], s));
 }
 
-CMFS c_div(in CMFS cmfs, in Spec s) {
-  return CMFS(s_div(cmfs[0], s),
-              s_div(cmfs[1], s),
-              s_div(cmfs[2], s));
+SgCMFS sg_div(in SgCMFS cmfs, in SgSpec s) {
+  return SgCMFS(sg_div(cmfs[0], s),
+                sg_div(cmfs[1], s),
+                sg_div(cmfs[2], s));
 }
 
-CMFS c_add(in CMFS cmfs, in Spec s) {
-  return CMFS(s_add(cmfs[0], s),
-              s_add(cmfs[1], s),
-              s_add(cmfs[2], s));
+SgCMFS sg_add(in SgCMFS cmfs, in SgSpec s) {
+  return SgCMFS(sg_add(cmfs[0], s),
+                sg_add(cmfs[1], s),
+                sg_add(cmfs[2], s));
 }
 
-CMFS c_sub(in CMFS cmfs, in Spec s) {
-  return CMFS(s_sub(cmfs[0], s),
-              s_sub(cmfs[1], s),
-              s_sub(cmfs[2], s));
+SgCMFS sg_sub(in SgCMFS cmfs, in SgSpec s) {
+  return SgCMFS(sg_sub(cmfs[0], s),
+                sg_sub(cmfs[1], s),
+                sg_sub(cmfs[2], s));
 }
 
 /* Matrix math operators */
 
-vec3 c_matmul(in CMFS cmfs, in Spec s) {
-  return vec3(s_hsum(s_mul(cmfs[0], s)),
-              s_hsum(s_mul(cmfs[1], s)),
-              s_hsum(s_mul(cmfs[2], s)));
+vec3 sg_matmul(in SgCMFS cmfs, in SgSpec s) {
+  return vec3(sg_hsum(sg_mul(cmfs[0], s)),
+              sg_hsum(sg_mul(cmfs[1], s)),
+              sg_hsum(sg_mul(cmfs[2], s)));
 }
 
 #endif // CMFS_SUBGROUP_GLSL_GUARD

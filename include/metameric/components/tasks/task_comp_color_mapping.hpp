@@ -8,8 +8,10 @@
 
 namespace met {
   class CompColorMappingTask : public detail::AbstractTask {
-    gl::ComputeInfo m_mapping_dispatch;
     gl::Program     m_mapping_program;
+    gl::ComputeInfo m_mapping_dispatch;
+    gl::Program     m_mapping_program_sg;
+    gl::ComputeInfo m_mapping_dispatch_sg;
 
     gl::Program     m_texture_program;
     gl::ComputeInfo m_texture_dispatch;

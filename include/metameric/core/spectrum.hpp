@@ -77,15 +77,21 @@ namespace met {
 
     // Given a known reflectance, simplify the CMFS/illuminant/indirections into a single object
     CMFS finalize(const Spec &sd) const {
-      const Spec power = n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval();
-      return cmfs.array().colwise() * (power * illuminant);
+      auto cmfs_col = cmfs.array().colwise();
+
+      // If n_scatters > 0, multiply illuminant by reflectance to simulate
+      // repeated scattering of indirect lighting
+      Spec e = illuminant * (n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval());
+
+      // Normalization factor is applied over the unscattered illuminant
+      float k = 1.f / (cmfs_col * illuminant).col(1).sum();
+
+      return k * (cmfs_col * e);
     }
 
     // Obtain a color by applying this spectral mapping
     Color apply(const Spec &sd) const {
-      const CMFS cmfs = finalize(sd);
-      const float k = 1.f / cmfs.col(1).sum();
-      return k * cmfs.transpose() * sd.matrix();
+      return finalize(sd).transpose() * sd.matrix();
     }
   };
 

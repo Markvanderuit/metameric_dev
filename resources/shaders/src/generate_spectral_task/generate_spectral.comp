@@ -1,7 +1,7 @@
 #version 460 core
 
 #include <guard.glsl>
-#include <spectrum.glsl>
+#include <spectrum_invoc.glsl>
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
@@ -19,7 +19,7 @@ vec4 to_barycentric(in vec3 p) {
                         b_0_color_gamut[1] - b_0_color_gamut[3],
                         b_0_color_gamut[2] - b_0_color_gamut[3]));
   vec3 abc = t * (p - b_0_color_gamut[3]);
-  return vec4(abc, 1.f - vsum(abc));
+  return vec4(abc, 1.f - in_hsum(abc));
 }
 
 void main() {
@@ -35,13 +35,10 @@ void main() {
 
   vec4 abcd = to_barycentric(b_2_color_texture[i]);
 
-  // vec3 abc = u_barycentric_transform * (b_2_color_texture[i] - b_0_color_gamut[3]);
-  // vec4 abcd = vec4(abc, 1.f - vsum(abc));
-
-  Spec sd = mul(b_1_spectral_gamut[0], abcd[0]);
-       sd = add(sd, mul(b_1_spectral_gamut[1], abcd[1]));
-       sd = add(sd, mul(b_1_spectral_gamut[2], abcd[2]));
-       sd = add(sd, mul(b_1_spectral_gamut[3], abcd[3]));
+  Spec sd = in_mul(b_1_spectral_gamut[0], abcd[0]);
+       sd = in_add(sd, in_mul(b_1_spectral_gamut[1], abcd[1]));
+       sd = in_add(sd, in_mul(b_1_spectral_gamut[2], abcd[2]));
+       sd = in_add(sd, in_mul(b_1_spectral_gamut[3], abcd[3]));
 
   b_3_spectral_texture[i] = sd;
 }
