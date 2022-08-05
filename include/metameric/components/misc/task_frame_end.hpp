@@ -3,6 +3,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/framebuffer.hpp>
+#include <small_gl/window.hpp>
 
 namespace met {
   struct FrameEndTask : public detail::AbstractTask {

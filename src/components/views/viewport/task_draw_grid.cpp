@@ -52,7 +52,6 @@ namespace met {
     auto &e_frame_buffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
     auto &e_draw_texture = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
     auto &e_arcball      = info.get_resource<detail::Arcball>("viewport", "arcball");
-    auto &e_model_matrix = info.get_resource<glm::mat4>("viewport", "model_matrix");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
@@ -63,7 +62,7 @@ namespace met {
     gl::state::set_viewport(e_draw_texture.size());
     
     // Update program uniforms
-    m_program.uniform("u_model_matrix",  e_model_matrix);
+    m_program.uniform("u_model_matrix",  glm::mat4(1));
     m_program.uniform("u_camera_matrix", e_arcball.full());    
 
     // Dispatch draw call

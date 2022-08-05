@@ -15,7 +15,6 @@ namespace met {
 
     void eval_camera(detail::TaskEvalInfo &);
     void eval_select(detail::TaskEvalInfo &);
-    void draw_gizmo(detail::TaskEvalInfo &);
     void eval_gizmo(detail::TaskEvalInfo &);
 
   public:

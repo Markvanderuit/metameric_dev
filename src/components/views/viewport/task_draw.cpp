@@ -108,7 +108,6 @@ namespace met {
     // Get externally shared resources 
     auto &e_viewport_texture   = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
     auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport", "arcball");
-    auto &e_viewport_mdlmatrix = info.get_resource<glm::mat4>("viewport", "model_matrix");
     auto &e_viewport_fbuffer   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
     
     // Declare scoped OpenGL state
@@ -125,7 +124,7 @@ namespace met {
     m_gamut_program.uniform("u_camera_matrix",          camera_matrix);
     m_cube_program.uniform("u_camera_matrix",           camera_matrix);
     m_texture_points_program.uniform("u_camera_matrix", camera_matrix);
-    m_texture_points_program.uniform("u_model_matrix",  e_viewport_mdlmatrix);
+    m_texture_points_program.uniform("u_model_matrix",  glm::mat4(1));
 
     // Dispatch draw for loaded texture points
     gl::state::set_point_size(m_texture_points_psize);
