@@ -56,7 +56,6 @@ find_path(STB_INCLUDE_DIRS "stb.h")
 
 # Include third party libraries provided directly
 add_subdirectory(third_party/small_gl)
-add_subdirectory(third_party/small_glsl_parser)
 
 # Find glslLangValidator program on system
 find_program(glsl_validator_path glslangValidator HINTS 
@@ -81,6 +80,14 @@ string(CONCAT glsl_parser_arg_string
   "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}"
 )
 
+# Add together placeholder args to pass into glsl parser;
+# replaced at runtime with the correct values
+string(CONCAT glsl_parser_placeholder_string
+  "MET_SUBGROUP_SIZE=32"
+)
+
+# Define build target for query_wg_size
+
 # Process shaders
 foreach(glsl_src ${glsl_srcs})
   # Obtain path, stripped of lead, and filename
@@ -96,12 +103,13 @@ foreach(glsl_src ${glsl_srcs})
   # then pass it through glslangvalidator, if available
   add_custom_command(
     OUTPUT   ${shader_preprocess_out}
-    COMMAND  small_glsl_parser_exec 
+    COMMAND  small_gl_parser_exec 
                ${glsl_src} ${shader_preprocess_out} 
                -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
                -s "${glsl_parser_arg_string}"
+               -d "${glsl_parser_placeholder_string}"
                -v "${glsl_validator_path}"
-    DEPENDS  small_glsl_parser_exec ${glsl_src} ${glsl_includes}
+    DEPENDS  small_gl_parser_exec ${glsl_src} ${glsl_includes}
     VERBATIM
   )
 
@@ -154,6 +162,7 @@ endfunction()
 add_library_r(core core)
 target_link_libraries(core PUBLIC
   small_gl
+  small_gl_parser_lib
   Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb

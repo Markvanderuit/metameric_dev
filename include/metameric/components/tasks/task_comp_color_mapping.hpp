@@ -1,10 +1,8 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
-#include <small_gl/texture.hpp>
 
 namespace met {
   class CompColorMappingTask : public detail::AbstractTask {
@@ -12,7 +10,6 @@ namespace met {
     gl::ComputeInfo m_mapping_dispatch;
     gl::Program     m_mapping_program_sg;
     gl::ComputeInfo m_mapping_dispatch_sg;
-
     gl::Program     m_texture_program;
     gl::ComputeInfo m_texture_dispatch;
 

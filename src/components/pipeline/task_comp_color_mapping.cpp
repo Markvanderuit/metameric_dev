@@ -2,7 +2,10 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/components/tasks/task_comp_color_mapping.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
+#include <small_gl_parser/parser.hpp>
 #include <ranges>
 
 namespace met {
@@ -13,14 +16,16 @@ namespace met {
     // Get externally shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_data = e_app_data.project_data;
+    auto &e_parser   = info.get_resource<glp::Parser>(global_key, "glsl_parser");
 
     const uint mapping_n    = e_app_data.rgb_texture.size().prod();
     const uint mapping_ndiv = ceil_div(mapping_n, 256u); 
     const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / 32u);
 
     // Initialize objects for color texture gen. through subgroups
-    m_mapping_program_sg = {{ .type = gl::ShaderType::eCompute,
-                              .path = "resources/shaders/task_comp_color_mapping/task_comp_color_mapping.comp" }};
+    m_mapping_program_sg = {{ .type   = gl::ShaderType::eCompute,
+                              .path   = "resources/shaders/task_comp_color_mapping/task_comp_color_mapping.comp",
+                              .parser = &e_parser }};
     m_mapping_dispatch_sg = { .groups_x = mapping_ndiv_sg, .bindable_program = &m_mapping_program_sg };
 
     // Initialize objects for color texture gen.
@@ -56,21 +61,21 @@ namespace met {
 
   void CompColorMappingTask::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
-    auto &e_spect_buffer  = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
-    auto &e_mappi_buffer  = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mappings_buffer");
-    auto &i_color_buffer  = info.get_resource<gl::Buffer>("color_buffer");
-    auto &i_color_texture = info.get_resource<gl::Texture2d4f>("color_texture");
+    auto &e_spec_buffer    = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
+    auto &e_mapping_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mappings_buffer");
+    auto &i_color_buffer   = info.get_resource<gl::Buffer>("color_buffer");
+    auto &i_color_texture  = info.get_resource<gl::Texture2d4f>("color_texture");
 
-    // Bind resources to buffer targets
-    e_spect_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_mappi_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    // Bind buffer resources to ssbo targets
+    e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_mapping_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_color_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
 
     // Dispatch shader to generate color-mapped buffer
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_mapping_dispatch_sg);
 
-    // Bind resources to buffer targets
+    // Bind buffer resources to ssbo targets
     i_color_buffer.bind_to(gl::BufferTargetType::eShaderStorage,    0);
     i_color_texture.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
 

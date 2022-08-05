@@ -11,9 +11,10 @@
 
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
-#include <small_gl/utility.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
+#include <small_gl_parser/parser.hpp>
 
 #include <algorithm>
 #include <execution>
@@ -29,6 +30,13 @@ namespace met {
         state.unload();
       }
       scheduler.insert_resource("app_data", std::move(state));
+    }
+
+    void init_parser(LinearScheduler &scheduler) {
+      glp::Parser parser;
+      parser.add_string("MET_SUBGROUP_SIZE", 
+        std::to_string(gl::state::get_variable_int(gl::VariableName::eSubgroupSize)));
+      scheduler.insert_resource("glsl_parser", std::move(parser));
     }
 
     void init_spectral_grid(LinearScheduler &scheduler, ApplicationCreateInfo info) {
@@ -130,6 +138,7 @@ namespace met {
     ImGui::Init(window, info.color_mode == AppliationColorMode::eDark);
     
     // Initialize major application components on startup
+    detail::init_parser(scheduler);
     detail::init_state(scheduler, info);
     detail::init_spectral_grid(scheduler, info);
     submit_schedule_empty(scheduler);
