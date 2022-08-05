@@ -1,7 +1,7 @@
 #ifndef SPECTRUM_INVOC_GLSL_GUARD
 #define SPECTRUM_INVOC_GLSL_GUARD
 
-#include <spectrum_layout.glsl>
+#include <constants_spectrum.glsl>
 
 /* Per-invocation Spectrum object */
 

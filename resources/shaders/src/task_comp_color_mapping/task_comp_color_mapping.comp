@@ -5,12 +5,12 @@
 #extension GL_KHR_shader_subgroup_arithmetic : require
 
 // Set NVidia-CG specific flags
-// #pragma optionNV(fastmath on)
+#pragma optionNV(fastmath on)
+#pragma optionNV(inline   all)
+#pragma optionNV(unroll   all)
+#pragma optionNV(strict   on)
 // #pragma optionNV(fastprecision on)
-// #pragma optionNV(inline all)
-// #pragma optionNV(unroll all)
-// #pragma optionNV(ifcvt all)
-// #pragma optionNV(strict on)
+// #pragma optionNV(ifcvt         all)
 
 layout(local_size_x = 256) in;
 
@@ -18,34 +18,22 @@ layout(local_size_x = 256) in;
 #include <mapping_invoc.glsl>
 #include <mapping_subgroup.glsl>
 
-layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec    b_0_spectral_buffer[]; };
-layout(binding = 1, std430) restrict readonly  buffer b_1 { Mapping b_1_mappings[];        };
-layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3    b_2_color_buffer[];    };
+layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec    b_0_spectra[];  };
+layout(binding = 1, std430) restrict readonly  buffer b_1 { Mapping b_1_mappings[]; };
+layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3    b_2_colors[];   };
 
 layout(location = 0) uniform uint u_n;
 layout(location = 1) uniform uint u_mapping_i;
-
-#define sg_scatter(dst, src, scatter_mask)                  \
-  for (uint i = 0; i < scatter_mask; ++i) {                 \
-    uint j = i * gl_SubgroupSize + gl_SubgroupInvocationID; \
-    dst[i] = src[j];                                        \
-  }                                                         \
 
 void main() {
   const uint wg = gl_WorkGroupID.x * gl_NumSubgroups.x + gl_SubgroupID.x;
   guard(wg < u_n);
 
-  // Load reflectance from buffer into subgroup format
+  // Load reflectance and mapping data into subgroup format
   SgSpec sd;
-  sg_scatter(sd, b_0_spectral_buffer[wg], wavelength_samples_mask);
-
-  // Load mapping data from buffer into subgroup format
   SgMapping m;
-  sg_scatter(m.cmfs[0],    b_1_mappings[u_mapping_i].cmfs[0],    wavelength_samples_mask);
-  sg_scatter(m.cmfs[1],    b_1_mappings[u_mapping_i].cmfs[1],    wavelength_samples_mask);
-  sg_scatter(m.cmfs[2],    b_1_mappings[u_mapping_i].cmfs[2],    wavelength_samples_mask);
-  sg_scatter(m.illuminant, b_1_mappings[u_mapping_i].illuminant, wavelength_samples_mask);
-  m.n_scatters = b_1_mappings[wg].n_scatters;
+  sg_scatter_spec(sd, b_0_spectra[wg]);
+  sg_scatter_mapp(m, b_1_mappings[u_mapping_i]);
 
   // Compute and apply color mapping
   SgCMFS cs = finalize_mapping(m, sd);
@@ -53,6 +41,6 @@ void main() {
 
   // Store result using elected invoc of subgroup
   if (subgroupElect()) {
-    b_2_color_buffer[wg] = v;
+    b_2_colors[wg] = v;
   }
 }

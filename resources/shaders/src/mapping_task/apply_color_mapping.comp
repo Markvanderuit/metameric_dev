@@ -3,7 +3,7 @@
 #include <guard.glsl>
 #include <mapping_invoc.glsl>
 
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 256) in;
 
 layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec    b_0_spectral_buffer[]; };
 layout(binding = 1, std430) restrict readonly  buffer b_1 { Mapping b_1_mappings[];        };

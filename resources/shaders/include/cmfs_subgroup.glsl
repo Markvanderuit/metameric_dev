@@ -5,7 +5,7 @@
 
 /* Subgroup color matching functions object */
 
-#define SgCMFS float[3][sg_iters]
+#define SgCMFS float[3][sg_wavelength_samples]
 
 /* Constructors */
 
@@ -13,6 +13,12 @@ SgCMFS sg_cmfs(in float f) {
   SgSpec s = sg_spectrum(f);
   return SgCMFS(s, s, s);
 }
+
+// Scatter CMFS to SgCMFS
+#define sg_scatter_cmfs(dst, src)     \
+  { sg_scatter_spec(dst[0], src[0])   \
+    sg_scatter_spec(dst[1], src[1])   \
+    sg_scatter_spec(dst[2], src[2]) } \
 
 /* Component-wise math operators */
 
