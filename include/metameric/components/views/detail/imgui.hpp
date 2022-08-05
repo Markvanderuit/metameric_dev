@@ -1,6 +1,16 @@
 #pragma once
 
-#define IM_VEC2_CLASS_EXTRA                                   \
+#define IM_VEC2_CLASS_EXTRA                                        \
+  ImVec2(const met::eig::Vector2f &v) : x(v[0]), y(v[1]) { }       \
+  ImVec2(const met::eig::Vector2i &v) : x(v[0]), y(v[1]) { }       \
+  ImVec2(const met::eig::Array2f &v)  : x(v[0]), y(v[1]) { }       \
+  ImVec2(const met::eig::Array2i &v)  : x(v[0]), y(v[1]) { }       \
+  operator met::eig::Vector2f() const { return { x, y }; }         \
+  operator met::eig::Vector2i() const { return {                   \
+    static_cast<int>(x), static_cast<int>(y) }; }                  \
+  operator met::eig::Array2f() const { return { x, y }; }          \
+  operator met::eig::Array2i() const { return {                    \
+    static_cast<int>(x), static_cast<int>(y) }; }                  \
   ImVec2(const glm::ivec2 &v) : x(v[0]), y(v[1]) { }          \
   ImVec2(const glm::vec2 &v) : x(v[0]), y(v[1]) { }           \
   operator glm::vec2() const { return { x, y }; }             \
@@ -17,9 +27,8 @@
     static_cast<int>(x), static_cast<int>(y),                 \
     static_cast<int>(z), static_cast<int>(w)}; }
 
-#include <small_gl/window.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
+#include <metameric/core/math.hpp>
+#include <small_gl/fwd.hpp>
 #include <imgui.h>
 #include <string>
 

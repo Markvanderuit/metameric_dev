@@ -11,36 +11,35 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
-#include <glm/vec3.hpp>
 #include <ImGuizmo.h>
-#include <iostream>
+#include <algorithm>
 #include <functional>
+#include <iostream>
 #include <numeric>
 #include <ranges>
-#include <fmt/ranges.h>
 
 namespace met {
   namespace detail {
     // Convert a world-space vector to screen space in [0, 1]
-    glm::vec2 screen_space(const glm::vec3 &v,        // world-space vector
-                           const glm::mat4 &mat) {    // camera view/proj matrix
-      glm::vec4 trf = mat * glm::vec4(v, 1);
-      return glm::vec2(trf) / trf.w * .5f + .5f;
+    eig::Vector2f screen_space(const eig::Vector3f     &v,      // world-space vector
+                               const eig::Projective3f &mat) {  // camera view/proj matrix
+      eig::Array4f trf = mat * (eig::Vector4f() << v, 1).finished();
+      return trf.head<2>() / trf.w() * .5f + .5f;
     }
 
     // Convert a screen-space vector in [0, 1] to window space
-    glm::vec2 window_space(const glm::vec2 &v,        // screen-space vector
-                           const glm::vec2 &offset,   // window offset
-                           const glm::vec2 &size) {   // window size
-      return offset + glm::vec2(v.x, 1.f - v.y) * size;
+    eig::Vector2f window_space(const eig::Array2f &v,      // screen-space vector
+                               const eig::Array2f &offs,   // window offset
+                               const eig::Array2f &size) { // window size
+      return offs + size * eig::Array2f(v.x(), 1.f - v.y());
     }
 
     // Convert a world-space vector to window space
-    glm::vec2 window_space(const glm::vec3 &v,        // world-space vector
-                           const glm::mat4 &mat,      // camera view/proj matrix
-                           const glm::vec2 &offset,   // window offset
-                           const glm::vec2 &size) {   // window size
-      return window_space(screen_space(v, mat), offset, size);
+    eig::Vector2f window_space(const eig::Vector3f     &v,      // world-space vector
+                               const eig::Projective3f &mat,    // camera view/proj matrix
+                               const eig::Vector2f     &offs,   // window offset
+                               const eig::Vector2f     &size) { // window size
+      return window_space(screen_space(v, mat), offs, size);
     }
     
     constexpr auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
@@ -57,18 +56,19 @@ namespace met {
     auto &io        = ImGui::GetIO();
 
     // Compute viewport size minus ImGui's tab bars etc
-    auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
-                       - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+    auto viewport_size = static_cast<eig::Vector2f>(ImGui::GetWindowContentRegionMax())
+                       - static_cast<eig::Vector2f>(ImGui::GetWindowContentRegionMin());
     
     // Adjust arcball to viewport's new size
-    i_arcball.m_aspect = viewport_size.x / viewport_size.y;
+    i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
 
     // Apply scroll delta: scroll wheel only for now
     i_arcball.update_dist_delta(-0.5f * io.MouseWheel);
 
     // Apply move delta: middle mouse OR left mouse + ctrl
     if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl)) {
-      i_arcball.update_pos_delta(static_cast<glm::vec2>(io.MouseDelta) / viewport_size);
+      i_arcball.update_pos_delta(static_cast<glm::vec2>(io.MouseDelta) / glm::vec2(viewport_size.x(), viewport_size.y()));
+      i_arcball.e_update_pos_delta(static_cast<eig::Array2f>(io.MouseDelta) / viewport_size.array());
     }
     
     i_arcball.update_matrices();
@@ -82,14 +82,14 @@ namespace met {
     auto &io          = ImGui::GetIO();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
-    auto viewport_offs = static_cast<glm::vec2>(ImGui::GetWindowPos()) 
-                       + static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
-    auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
-                       - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin());
+    auto viewport_offs = (static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                       + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())).eval();
+    auto viewport_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                       - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())).eval();
 
     // Apply selection area: right mouse OR left mouse + shift
     if (io.MouseDown[1]) {
-      glm::vec2 ul = io.MouseClickedPos[1], br = io.MousePos, bl(ul.x, br.y), ur(bl.x, ul.y);
+      eig::Array2f ul = io.MouseClickedPos[1], br = io.MousePos;
       auto col = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_DockingPreview));
       ImGui::GetWindowDrawList()->AddRect(ul, br, col);
       ImGui::GetWindowDrawList()->AddRectFilled(ul, br, col);
@@ -98,13 +98,12 @@ namespace met {
     // Right-click-release fixes the selection area; then determine selected gamut position idxs
     if (io.MouseReleased[1]) {
       // Filter tests if a gamut position is inside the selection rectangle in window space
-      auto ul = glm::min(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos)),
-            br = glm::max(glm::vec2(io.MouseClickedPos[1]), glm::vec2(io.MousePos));
+      auto ul = eig::Array2f(io.MouseClickedPos[1]).min(eig::Array2f(io.MousePos)).eval();
+      auto br = eig::Array2f(io.MouseClickedPos[1]).max(eig::Array2f(io.MousePos)).eval();
+
       auto is_in_rect = std::views::filter([&](uint i) {
-        // TODO deprecate
-        const glm::vec3 v = { e_rgb_gamut[i].x(), e_rgb_gamut[i].y(), e_rgb_gamut[i].z() };
-        const glm::vec2 p =  detail::window_space(v, i_arcball.full(), viewport_offs, viewport_size);
-        return glm::clamp(p, ul, br) == p;
+        eig::Array2f p = detail::window_space(e_rgb_gamut[i], i_arcball.e_full(), viewport_offs, viewport_size);
+        return p.max(ul).min(br).isApprox(p);
       });
                 
       // Find and store selected gamut position indices
@@ -117,9 +116,8 @@ namespace met {
     if (io.MouseClicked[0] && !ImGuizmo::IsOver()) {
       // Filter tests if a gamut position is near a clicked position in window space
       auto is_near_click = std::views::filter([&](uint i) {
-        const glm::vec3 v = { e_rgb_gamut[i].x(), e_rgb_gamut[i].y(), e_rgb_gamut[i].z() };
-        const glm::vec2 p = detail::window_space(v, i_arcball.full(), viewport_offs, viewport_size);
-        return glm::distance(p, glm::vec2(io.MouseClickedPos[0])) <= 8.f;
+        eig::Array2f p = detail::window_space(e_rgb_gamut[i], i_arcball.e_full(), viewport_offs, viewport_size);
+        return (p.matrix() - eig::Vector2f(io.MouseClickedPos[0])).norm() < 8.f;
       });
 
       // Find and store selected gamut position indices
@@ -127,11 +125,6 @@ namespace met {
       std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_near_click,
         std::back_inserter(m_gamut_selection_indices));
     }
-  }
-
-  void ViewportTask::draw_gizmo(detail::TaskEvalInfo &info) {
-    auto &io = ImGui::GetIO();
-
   }
 
   void ViewportTask::eval_gizmo(detail::TaskEvalInfo &info) {
@@ -146,31 +139,29 @@ namespace met {
                                | std::views::transform(detail::i_get(e_rgb_gamut));
 
     // Gizmo anchor position is mean of selected gamut positions
-    eig::Array3f gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
-                                  / static_cast<float>(gamut_selection.size());
-    const glm::vec3 v = { gamut_anchor_pos.x(), gamut_anchor_pos.y(), gamut_anchor_pos.z() };
+    eig::Vector3f gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
+                                   / static_cast<float>(gamut_selection.size());
     
     // ImGuizmo manipulator operates on a transform; to obtain translation
     // distance, we transform a point prior to transformation update
-    glm::mat4 gamut_anchor_trf = glm::translate(v);
-    glm::vec4 gamut_pre_pos    = gamut_anchor_trf * glm::vec4(0, 0, 0, 1);
+    auto gamut_anchor_trf = eig::Affine3f(eig::Translation3f(gamut_anchor_pos));
+    auto gamut_pre_pos    = gamut_anchor_trf * eig::Vector3f(0, 0, 0);
 
     // Insert ImGuizmo manipulator at anchor position
-    auto rmin = glm::vec2(ImGui::GetWindowPos()) + glm::vec2(ImGui::GetWindowContentRegionMin()), 
-         rmax = glm::vec2(ImGui::GetWindowSize()) - glm::vec2(ImGui::GetWindowContentRegionMin());
-    ImGuizmo::SetRect(rmin.x, rmin.y, rmax.x, rmax.y);
+    auto rmin = eig::Vector2f(ImGui::GetWindowPos())  + eig::Vector2f(ImGui::GetWindowContentRegionMin()); 
+    auto rmax = eig::Vector2f(ImGui::GetWindowSize()) - eig::Vector2f(ImGui::GetWindowContentRegionMin());
+    ImGuizmo::SetRect(rmin.x(), rmin.y(), rmax.x(), rmax.y());
     ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-    ImGuizmo::Manipulate(glm::value_ptr(i_arcball.view()), 
-                        glm::value_ptr(i_arcball.proj()),
-                        ImGuizmo::OPERATION::TRANSLATE, 
-                        ImGuizmo::MODE::LOCAL, 
-                        glm::value_ptr(gamut_anchor_trf));
+    ImGuizmo::Manipulate(i_arcball.e_view().data(), 
+                         i_arcball.e_proj().data(),
+                         ImGuizmo::OPERATION::TRANSLATE, 
+                         ImGuizmo::MODE::LOCAL, 
+                         gamut_anchor_trf.data());
     
     // After transformation update, we transform a second point to obtain
     // translation distance
-    glm::vec4 gamut_post_pos = gamut_anchor_trf * glm::vec4(0, 0, 0, 1);
-    glm::vec3 gamut_transl = glm::vec4(gamut_post_pos - gamut_pre_pos);
-    eig::Array3f _gamut_transl = { gamut_transl.x, gamut_transl.y, gamut_transl.z };
+    auto gamut_post_pos = gamut_anchor_trf * eig::Vector3f(0, 0, 0);
+    auto gamut_transl   = gamut_post_pos - gamut_pre_pos;
 
     // Start gizmo drag
     if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
@@ -180,11 +171,12 @@ namespace met {
 
     // Halfway gizmo drag
     if (ImGuizmo::IsUsing()) {
+      // Get range view over gamut components affected by the translation;
+      // then apply translation
       const auto move_selection = m_gamut_selection_indices 
                                 | std::views::transform(detail::i_get(e_rgb_gamut));
-      std::ranges::for_each(move_selection, [&](auto &p) { 
-        p = (p + _gamut_transl).min(1.f).max(0.f);
-      });
+      std::ranges::for_each(move_selection, 
+        [&](auto &p) { p = (p + gamut_transl.array()).min(1.f).max(0.f); });
     }
 
     // End gizmo drag
@@ -214,9 +206,9 @@ namespace met {
     m_is_gizmo_used = false;
 
     // Share resources
-    info.emplace_resource<detail::Arcball>("arcball", { .eye = glm::vec3(1.5), .center = glm::vec3(0.5) });
+    info.emplace_resource<detail::Arcball>("arcball", { .eye = glm::vec3(1.5), .center = glm::vec3(0.5),
+                                                        .e_eye = 1.5f, .e_center = 0.5f });
     info.emplace_resource<gl::Texture2d3f>("draw_texture", { });
-    info.insert_resource<glm::mat4>("model_matrix", glm::mat4(1));
 
     // Add subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),   name() + draw_end_name);
@@ -253,7 +245,7 @@ namespace met {
 
       // Insert image, applying viewport texture to viewport; texture can be safely drawn 
       // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-      ImGui::Image(ImGui::to_ptr(i_draw_texture.object()), i_draw_texture.size(), glm::vec2(0, 1), glm::vec2(1, 0));
+      ImGui::Image(ImGui::to_ptr(i_draw_texture.object()), i_draw_texture.size(), eig::Vector2f(0, 1), eig::Vector2f(1, 0));
 
       // Handle input
       if (ImGui::IsItemHovered()) {

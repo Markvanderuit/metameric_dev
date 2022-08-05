@@ -1,7 +1,8 @@
 #pragma once
 
+#include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/glm.hpp>
+#include <numbers>
 
 namespace met::detail {
   struct ArcballCreateInfo {
@@ -13,6 +14,10 @@ namespace met::detail {
     glm::vec3 eye     = glm::vec3(1, 0, 0);
     glm::vec3 center  = glm::vec3(0, 0, 0);
     glm::vec3 up      = glm::vec3(0, 1, 0);
+
+    eig::Array3f e_eye    = { 1, 0, 0 };
+    eig::Array3f e_center = { 0, 0, 0 };
+    eig::Array3f e_up     = { 0, 1, 0 };
   };
 
   /* 
@@ -27,6 +32,10 @@ namespace met::detail {
     glm::mat4 m_proj;
     glm::mat4 m_full;
 
+    eig::Affine3f     m_e_view;
+    eig::Projective3f m_e_proj;
+    eig::Projective3f m_e_full;
+
   public:
     using InfoType = ArcballCreateInfo;
 
@@ -35,7 +44,8 @@ namespace met::detail {
     Arcball(ArcballCreateInfo info = {})
     : m_fov_y(info.fov_y), m_near_z(info.near_z), m_far_z(info.far_z), 
       m_aspect(info.aspect), m_dist(info.dist), m_eye(info.eye),
-      m_center(info.center), m_up(info.up) {
+      m_center(info.center), m_up(info.up),
+      m_e_eye(info.e_eye), m_e_center(info.e_center), m_e_up(info.e_up) {
       update_matrices();
     }
 
@@ -44,6 +54,11 @@ namespace met::detail {
     glm::vec3 m_eye;
     glm::vec3 m_center;
     glm::vec3 m_up;
+
+    eig::Array3f m_e_eye;
+    eig::Array3f m_e_center;
+    eig::Array3f m_e_up;
+
     float m_fov_y;
     float m_near_z;
     float m_far_z;
@@ -61,18 +76,55 @@ namespace met::detail {
     // Obtain full camera matrix
     glm::mat4 & full() { return m_full; }
 
+    eig::Affine3f     & e_view() { return m_e_view; }
+    eig::Projective3f & e_proj() { return m_e_proj; }
+    eig::Projective3f & e_full() { return m_e_full; }
+
     void update_matrices() {
       m_view = glm::lookAt(m_dist * (m_eye - m_center) + m_center, 
                            m_center, 
                            m_up);
+      m_e_view = eig::lookat_rh(m_dist * (m_e_eye - m_e_center) + m_e_center,
+                                m_e_center,
+                                m_e_up);
+      
       m_proj = glm::perspective(m_fov_y, m_aspect, m_near_z, m_far_z);
+      m_e_proj = eig::perspective_rh_no(m_fov_y, m_aspect, m_near_z, m_far_z);
+
       m_full = m_proj * m_view;
+      m_e_full = m_e_proj * m_e_view;
     }
 
     void update_dist_delta(float dist_delta) {
       if (m_dist + dist_delta > 0.01f) {
         m_dist += dist_delta;
       }
+    }
+
+    void e_update_pos_delta(eig::Array2f pos_delta) {
+      guard(!pos_delta.isZero());
+
+      eig::Array2f delta_angle = pos_delta 
+                               * eig::Array2f(-2, 1) 
+                               * std::numbers::pi_v<float>;
+      
+      // Extract required vectors
+      eig::Vector3f view_v  =  m_e_view.matrix().transpose().col(2).head<3>();
+      eig::Vector3f right_v = -m_e_view.matrix().transpose().col(0).head<3>();
+
+      // Handle view=up edgecase
+      if (view_v.dot(m_e_up.matrix()) * delta_angle.sign().y() >= 0.99f) {
+        delta_angle.y() = 0.f;
+      }
+
+      // Describe camera rotation around pivot on _separate_ axes
+      eig::Affine3f rot;
+      rot = eig::AngleAxisf(delta_angle.y(), right_v.matrix())
+          * eig::AngleAxisf(delta_angle.x(), m_e_up.matrix());
+      
+      // Apply rotation
+      m_e_eye = m_e_center + rot * (m_e_eye - m_e_center);
+      fmt::print("eig {}\n", m_e_eye);
     }
 
     // Update trackball internal information with new mouse delta, expected [-1, 1]
@@ -101,6 +153,7 @@ namespace met::detail {
 
       // Apply rotation and recompute matrices
       m_eye = glm::vec3(cen_hom + rot * (eye_hom - cen_hom));
+      fmt::print("glm {}\n", glm::to_string(m_eye));
     }
   };
 } // namespace met::detail
