@@ -13,8 +13,8 @@ namespace met {
     void eval(detail::TaskEvalInfo &info) override {
       auto fb = gl::Framebuffer::make_default();
       fb.bind();
-      fb.clear<glm::vec3>(gl::FramebufferType::eColor);
-      fb.clear<float>(gl::FramebufferType::eDepth);
+      fb.clear(gl::FramebufferType::eColor, eig::Array3f(0));
+      fb.clear(gl::FramebufferType::eDepth, 0.f);
 
       ImGui::DrawFrame();
 

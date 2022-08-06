@@ -47,11 +47,9 @@ namespace met {
         
         // Report mouse pos
         const auto &input = e_window.input_info();
-        
-        glm::vec2 mouse_pos_2 = input.mouse_position;
         ImGui::LabelText("Mouse delta", "%.1f, %.1f", io.MouseDelta.x, io.MouseDelta.y);
         ImGui::LabelText("Mouse position", "%.1f, %.1f", io.MousePos.x, io.MousePos.y);
-        ImGui::LabelText("Mouse position (glfw)", "%.1f, %.1f", mouse_pos_2.x, mouse_pos_2.y);
+        ImGui::LabelText("Mouse position (glfw)", "%.1f, %.1f", input.mouse_position.x(), input.mouse_position.y());
       }
       ImGui::End();
     });
@@ -59,8 +57,9 @@ namespace met {
     // Temporary window to plot some distributions
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &) {
       if (ImGui::Begin("Model plots")) {
-        auto plot_size = (static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax())
-                        - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin())) * glm::vec2(.67f, 0.3f);
+        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
+                               * eig::Array2f(.67f, 0.3f);
         ImGui::PlotLines("Emitter, d65", models::emitter_cie_d65.data(), 
           wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         ImGui::PlotLines("Emitter, fl11", models::emitter_cie_fl11.data(), 
@@ -68,7 +67,7 @@ namespace met {
         ImGui::PlotLines("Emitter, ledb1", models::emitter_cie_ledb1.data(), 
           wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         ImGui::PlotLines("Emitter, ledrgb1", models::emitter_cie_ledrgb1.data(), 
-          wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
+          wavelength_samples, 03, nullptr, FLT_MAX, FLT_MAX, plot_size);
         ImGui::PlotLines("CIE XYZ, x()", models::cmfs_cie_xyz.col(0).data(), 
           wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         ImGui::PlotLines("CIE XYZ, y()", models::cmfs_cie_xyz.col(1).data(), 

@@ -39,6 +39,9 @@ namespace met {
                .vertex_count     = (uint) color_grid.size(),
                .bindable_array   = &m_vertex_array,
                .bindable_program = &m_program };
+
+    // Set non-changing uniform values
+    m_program.uniform("u_model_matrix",  eig::Matrix4f::Identity().eval());
   }
 
   void ViewportDrawGridTask::eval(detail::TaskEvalInfo &info) {
@@ -62,8 +65,7 @@ namespace met {
     gl::state::set_viewport(e_draw_texture.size());
     
     // Update program uniforms
-    m_program.uniform("u_model_matrix",  glm::mat4(1));
-    m_program.uniform("u_camera_matrix", e_arcball.full());    
+    m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
     // Dispatch draw call
     gl::state::set_point_size(m_psize);

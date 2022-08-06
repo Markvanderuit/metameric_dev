@@ -23,7 +23,7 @@ namespace met {
     m_generate_dispatch = { .groups_x = generate_ndiv, .bindable_program = &m_generate_program };
 
     // Set these uniforms once
-    m_generate_program.uniform<uint>("u_n", generate_n);
+    m_generate_program.uniform("u_n", generate_n);
 
     // Initialize main color texture buffer
     // auto rgb_texture_al = io::as_aligned((e_rgb_texture));

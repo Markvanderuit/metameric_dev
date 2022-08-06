@@ -31,7 +31,7 @@ namespace met {
       auto &i_frame_buffer_msaa = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
-      if (!i_frame_buffer.is_init() || e_draw_texture.size() != m_color_buffer_msaa.size()) {
+      if (!i_frame_buffer.is_init() || (e_draw_texture.size() != m_color_buffer_msaa.size()).any()) {
         m_color_buffer_msaa = {{ .size = e_draw_texture.size() }};
         m_depth_buffer_msaa = {{ .size = e_draw_texture.size() }};
         i_frame_buffer_msaa = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_msaa },
@@ -40,7 +40,7 @@ namespace met {
       }
 
       // Clear framebuffer targets
-      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, glm::vec3(0.f));
+      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array3f(0));
       i_frame_buffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
     }
   };

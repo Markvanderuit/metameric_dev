@@ -52,7 +52,7 @@ namespace met {
    */
   template <typename T, uint D>
   struct TextureCreateInfo {
-    using vect = eig::Array<int, D, 1>;
+    using vect = eig::Array<uint, D, 1>;
 
   public:
     vect size;
@@ -72,7 +72,7 @@ namespace met {
   template <typename T, uint D>
   struct TextureBlock {
   protected:
-    using vect              = eig::Array<int, D, 1>;
+    using vect              = eig::Array<uint, D, 1>;
     using TextureCreateInfo = TextureCreateInfo<T, D>;
 
     /* block data */

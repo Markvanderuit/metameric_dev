@@ -41,7 +41,7 @@ namespace met {
         fmt::format("failed to load file \"{}\"", path.string()));
 
       // Initialize texture object with correct size and requested channel layout
-      Texture2d<T> texture = {{ .size = v }};
+      Texture2d<T> texture      = {{ .size = v.cast<uint>() }};
       std::span<T> texture_span = texture.data();
 
       // Convert data to floats

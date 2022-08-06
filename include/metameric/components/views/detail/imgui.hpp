@@ -1,23 +1,18 @@
 #pragma once
 
 #define IM_VEC2_CLASS_EXTRA                                        \
-  ImVec2(const met::eig::Vector2f &v) : x(v[0]), y(v[1]) { }       \
-  ImVec2(const met::eig::Vector2i &v) : x(v[0]), y(v[1]) { }       \
-  ImVec2(const met::eig::Array2f &v)  : x(v[0]), y(v[1]) { }       \
-  ImVec2(const met::eig::Array2i &v)  : x(v[0]), y(v[1]) { }       \
+  ImVec2(const met::eig::Vector2f &v) : x(v.x()), y(v.y()) { }     \
+  ImVec2(const met::eig::Vector2i &v) : x(v.x()), y(v.y()) { }     \
+  ImVec2(const met::eig::Array2f &v)  : x(v.x()), y(v.y()) { }     \
+  ImVec2(const met::eig::Array2i &v)  : x(v.x()), y(v.y()) { }     \
   operator met::eig::Vector2f() const { return { x, y }; }         \
   operator met::eig::Vector2i() const { return {                   \
     static_cast<int>(x), static_cast<int>(y) }; }                  \
   operator met::eig::Array2f() const { return { x, y }; }          \
   operator met::eig::Array2i() const { return {                    \
-    static_cast<int>(x), static_cast<int>(y) }; }                  \
-  ImVec2(const glm::ivec2 &v) : x(v[0]), y(v[1]) { }          \
-  ImVec2(const glm::vec2 &v) : x(v[0]), y(v[1]) { }           \
-  operator glm::vec2() const { return { x, y }; }             \
-  operator glm::ivec2() const { return {                      \
     static_cast<int>(x), static_cast<int>(y) }; }
 
-#define IM_VEC4_CLASS_EXTRA                                   \
+/* #define IM_VEC4_CLASS_EXTRA                                   \
   ImVec4(const glm::ivec4 &v) :                               \
   x(v[0]), y(v[1]), z(v[2]), w(v[3]) { }                      \
   ImVec4(const glm::vec4 &v)                                  \
@@ -25,7 +20,7 @@
   operator glm::vec4() const { return { x, y, z, w }; }       \
   operator glm::ivec4() const { return {                      \
     static_cast<int>(x), static_cast<int>(y),                 \
-    static_cast<int>(z), static_cast<int>(w)}; }
+    static_cast<int>(z), static_cast<int>(w)}; } */
 
 #include <metameric/core/math.hpp>
 #include <small_gl/fwd.hpp>
@@ -50,7 +45,7 @@ namespace ImGui {
       PushStyleVar(var, f);
     }
 
-    ScopedStyleVar(ImGuiStyleVar var, const glm::ivec2 &v) {
+    ScopedStyleVar(ImGuiStyleVar var, const met::eig::Array2f &v) {
       PushStyleVar(var, v);
     }
 

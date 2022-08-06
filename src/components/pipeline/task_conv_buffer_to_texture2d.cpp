@@ -22,18 +22,18 @@ namespace met {
     info.emplace_resource<TextureTy, InfoTy>(m_output_texture_key, m_output_texture_info);
 
     // Compute nr. of workgroups as nearest upper divide of n
-    glm::uvec2 dispatch_n    = m_output_texture_info.size;
-    glm::uvec2 dispatch_ndiv = ceil_div(dispatch_n, glm::uvec2(16));
+    eig::Array2u dispatch_n    = m_output_texture_info.size;
+    eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
 
     // Initialize objects for buffer-to-texture conversion
     m_program = {{ .type = gl::ShaderType::eCompute,
                    .path = "resources/shaders/misc/buffer_to_texture_rgba32f.comp" }};
-    m_dispatch = { .groups_x = dispatch_ndiv.x,
-                   .groups_y = dispatch_ndiv.y,
+    m_dispatch = { .groups_x = dispatch_ndiv.x(),
+                   .groups_y = dispatch_ndiv.y(),
                    .bindable_program = &m_program };
                    
     // Set these uniforms once
-    m_program.uniform<glm::uvec2>("u_size", dispatch_n);
+    m_program.uniform("u_size", dispatch_n);
   }
   
   template <class TextureTy, class InfoTy>

@@ -39,12 +39,11 @@ namespace met {
     m_output_fl11.resize(texture_size);
 
     // Set up view texture on the GPU
-    auto to_ivec2 = [](const eig::Array2i &v) -> glm::ivec2 { return { v.x(), v.y() }; };
-    m_input_texture          = {{ .size = to_ivec2(e_rgb_texture.size()), .data = cast_span<float>(e_rgb_texture.data()) }};
-    m_output_d65_texture     = {{ .size = to_ivec2(e_rgb_texture.size()) }};
-    m_output_d65_err_texture = {{ .size = to_ivec2(e_rgb_texture.size()) }};
-    m_output_fl2_texture     = {{ .size = to_ivec2(e_rgb_texture.size()) }};
-    m_output_fl11_texture    = {{ .size = to_ivec2(e_rgb_texture.size()) }};
+    m_input_texture          = {{ .size = e_rgb_texture.size(), .data = cast_span<float>(e_rgb_texture.data()) }};
+    m_output_d65_texture     = {{ .size = e_rgb_texture.size() }};
+    m_output_d65_err_texture = {{ .size = e_rgb_texture.size() }};
+    m_output_fl2_texture     = {{ .size = e_rgb_texture.size() }};
+    m_output_fl11_texture    = {{ .size = e_rgb_texture.size() }};
   }
 
   void MappingCPUTask::eval(detail::TaskEvalInfo &info) {
@@ -108,15 +107,15 @@ namespace met {
       m_output_fl11_texture.set(as_span<float>(m_output_fl11));
 
       // Show texture
-      auto viewport_size = static_cast<glm::vec2>(ImGui::GetWindowContentRegionMax().x)
-                         - static_cast<glm::vec2>(ImGui::GetWindowContentRegionMin().x);
-      auto texture_aspect = static_cast<float>(m_output_d65_texture.size().y) 
-                          / static_cast<float>(m_output_d65_texture.size().x);
+      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
+                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
+      auto texture_aspect = static_cast<float>(m_output_d65_texture.size().y()) 
+                          / static_cast<float>(m_output_d65_texture.size().x());
       
       // Draw RGB texture
       ImGui::BeginGroup();
       ImGui::Text("RGB input");
-      ImGui::Image(ImGui::to_ptr(m_input_texture.object()), viewport_size * glm::vec2(0.45, 0.45 * texture_aspect));
+      ImGui::Image(ImGui::to_ptr(m_input_texture.object()), (viewport_size * eig::Array2f(0.45, 0.45 * texture_aspect)).eval());
       ImGui::EndGroup();
 
       ImGui::SameLine();
@@ -124,7 +123,7 @@ namespace met {
       // Draw D65 uplifted texture
       ImGui::BeginGroup();
       ImGui::Text("D65 output");
-      ImGui::Image(ImGui::to_ptr(m_output_d65_texture.object()), viewport_size * glm::vec2(0.45, 0.45 * texture_aspect));
+      ImGui::Image(ImGui::to_ptr(m_output_d65_texture.object()), (viewport_size * eig::Array2f(0.45, 0.45 * texture_aspect)).eval());
       ImGui::EndGroup();
 
       /* Begin new line */
@@ -133,14 +132,14 @@ namespace met {
       ImGui::BeginGroup();
       ImGui::Text("Mean reflectance");
       ImGui::PlotLines("", test_spectrum.data(), wavelength_samples, 0,
-        nullptr, 0.f, 1.f, viewport_size * glm::vec2(0.45, 0.45 * texture_aspect));
+        nullptr, 0.f, 1.f, (viewport_size * eig::Array2f(0.45, 0.45 * texture_aspect)).eval());
       ImGui::EndGroup();
 
       ImGui::SameLine();
 
       ImGui::BeginGroup();
       ImGui::Text("D65, squared err.");
-      ImGui::Image(ImGui::to_ptr(m_output_d65_err_texture.object()), viewport_size * glm::vec2(0.45, 0.45 * texture_aspect));
+      ImGui::Image(ImGui::to_ptr(m_output_d65_err_texture.object()), (viewport_size * eig::Array2f(0.45, 0.45 * texture_aspect)).eval());
       ImGui::Value("D65, mean squared err.", output_d65_mse.x(), "%.5f");
       ImGui::EndGroup();
       
@@ -149,14 +148,14 @@ namespace met {
 
       ImGui::BeginGroup();
       ImGui::Text("FL2 output");
-      ImGui::Image(ImGui::to_ptr(m_output_fl2_texture.object()), viewport_size * glm::vec2(0.45, 0.45 * texture_aspect));
+      ImGui::Image(ImGui::to_ptr(m_output_fl2_texture.object()), (viewport_size * eig::Array2f(0.45, 0.45 * texture_aspect)).eval());
       ImGui::EndGroup();
 
       ImGui::SameLine();
 
       ImGui::BeginGroup();
       ImGui::Text("FL11 output");
-      ImGui::Image(ImGui::to_ptr(m_output_fl11_texture.object()), viewport_size * glm::vec2(0.45, 0.45 * texture_aspect));
+      ImGui::Image(ImGui::to_ptr(m_output_fl11_texture.object()), (viewport_size * eig::Array2f(0.45, 0.45 * texture_aspect)).eval());
       ImGui::EndGroup();
     }
     ImGui::End();

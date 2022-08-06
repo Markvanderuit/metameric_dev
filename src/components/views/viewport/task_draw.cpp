@@ -92,9 +92,10 @@ namespace met {
                               .bindable_program = &m_texture_points_program };
 
     // Set non-changing uniform values
-    m_gamut_program.uniform("u_model_matrix", glm::identity<glm::mat4>());
-    m_cube_program.uniform("u_model_matrix",  glm::identity<glm::mat4>());
-    m_cube_program.uniform("u_value",         glm::vec3(1));
+    m_texture_points_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
+    m_gamut_program.uniform("u_model_matrix",          eig::Matrix4f::Identity().eval());
+    m_cube_program.uniform("u_model_matrix",           eig::Matrix4f::Identity().eval());
+    m_cube_program.uniform("u_value",                  eig::Array3f(1.f));
   }
 
   void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
@@ -120,11 +121,10 @@ namespace met {
     gl::state::set_viewport(e_viewport_texture.size());
     
     // Update program uniforms
-    auto camera_matrix = e_viewport_arcball.full();
+    auto camera_matrix = e_viewport_arcball.full().matrix();
     m_gamut_program.uniform("u_camera_matrix",          camera_matrix);
     m_cube_program.uniform("u_camera_matrix",           camera_matrix);
     m_texture_points_program.uniform("u_camera_matrix", camera_matrix);
-    m_texture_points_program.uniform("u_model_matrix",  glm::mat4(1));
 
     // Dispatch draw for loaded texture points
     gl::state::set_point_size(m_texture_points_psize);

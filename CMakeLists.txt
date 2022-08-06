@@ -45,7 +45,6 @@ find_package(OpenMP REQUIRED)
 find_package(benchmark CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
-find_package(glm       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
@@ -166,7 +165,6 @@ target_link_libraries(core PUBLIC
   Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb
-  glm::glm
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   nlohmann_json::nlohmann_json
 )

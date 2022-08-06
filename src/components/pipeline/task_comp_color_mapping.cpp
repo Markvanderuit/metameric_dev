@@ -33,22 +33,22 @@ namespace met {
                            .path = "resources/shaders/mapping_task/apply_color_mapping.comp" }};
     m_mapping_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_mapping_program };
 
-    glm::uvec2 texture_n    = { e_app_data.rgb_texture.size().x(), e_app_data.rgb_texture.size().y() };
-    glm::uvec2 texture_ndiv = ceil_div(texture_n, glm::uvec2(16));
+    eig::Array2u texture_n    = e_app_data.rgb_texture.size();
+    eig::Array2u texture_ndiv = ceil_div(texture_n, 16u);
 
     // Initialize objects for buffer-to-texture conversion
     m_texture_program = {{ .type = gl::ShaderType::eCompute,
                            .path = "resources/shaders/mapping_task/buffer_to_texture.comp" }};
-    m_texture_dispatch = { .groups_x = texture_ndiv.x,
-                           .groups_y = texture_ndiv.y,
+    m_texture_dispatch = { .groups_x = texture_ndiv.x(),
+                           .groups_y = texture_ndiv.y(),
                            .bindable_program = &m_texture_program };
 
     // Set these uniforms once
-    m_mapping_program.uniform<uint>("u_n", mapping_n);
-    m_mapping_program.uniform<uint>("u_mapping_i", 0);
-    m_mapping_program_sg.uniform<uint>("u_n", mapping_n);
-    m_mapping_program_sg.uniform<uint>("u_mapping_i", 0);
-    m_texture_program.uniform<glm::uvec2>("u_size", texture_n);
+    m_mapping_program_sg.uniform("u_n",         mapping_n);
+    m_mapping_program.uniform("u_n",            mapping_n);
+    m_mapping_program_sg.uniform("u_mapping_i", 0);
+    m_mapping_program.uniform("u_mapping_i",    0);
+    m_texture_program.uniform("u_size",         texture_n);
 
     // Create buffer target for this task
     gl::Buffer color_buffer = {{ .size = (size_t) mapping_n * sizeof(eig::AlArray3f) }};
