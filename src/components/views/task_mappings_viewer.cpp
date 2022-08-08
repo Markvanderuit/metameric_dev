@@ -4,6 +4,7 @@
 #include <metameric/core/texture.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/task_mapping_popout.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 
@@ -18,7 +19,7 @@ namespace met {
     auto &e_tex_data        = e_app_data.loaded_texture;
     auto &e_mapping         = e_app_data.loaded_mappings[texture_i];
 
-    // Compute sample position in texture
+    // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos = (static_cast<eig::Array2f>(ImGui::GetMousePos()) 
                             - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
                             / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
@@ -33,7 +34,7 @@ namespace met {
     Spec power      = e_mapping.apply_power(reflectance);
     Color power_rgb = e_mapping.apply_color(reflectance);
 
-    // Draw simple tooltip showing reflectance, power, rgb values, etc.
+    // Spawn a simple tooltip showing reflectance, power, rgb values, etc.
     ImGui::BeginTooltip();
     ImGui::Text("Inspecting pixel (%i, %i)", sample_pos.x(), sample_pos.y());
     ImGui::Separator();
