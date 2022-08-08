@@ -90,8 +90,13 @@ namespace met {
     }
 
     // Obtain a color by applying this spectral mapping
-    Color apply(const Spec &sd) const {
+    Color apply_color(const Spec &sd) const {
       return finalize(sd).transpose() * sd.matrix();
+    }
+
+    Spec apply_power(const Spec &sd) const {
+      Spec e = illuminant * (n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval());
+      return e * sd;
     }
   };
 
@@ -99,7 +104,13 @@ namespace met {
   inline
   Color reflectance_to_color(const Spec &sd, 
                              const SpectralMapping &mapping = SpectralMapping()) {
-    return mapping.apply(sd);
+    return mapping.apply_color(sd);
+  }
+
+  inline
+  Spec reflectance_to_power(const Spec &sd,
+                            const SpectralMapping &mapping = SpectralMapping()) {
+    return mapping.apply_power(sd);
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB

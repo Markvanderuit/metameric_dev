@@ -138,6 +138,11 @@ namespace met::detail {
     T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
       return _appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
+
+    bool has_resource(const KeyType &task_key, const KeyType &rsrc_key) {
+      return _appl_rsrc_registry.contains(task_key)
+          && _appl_rsrc_registry.at(task_key).contains(rsrc_key);
+    }
   };
 
   struct TaskInitInfo : public AbstractTaskInfo {
