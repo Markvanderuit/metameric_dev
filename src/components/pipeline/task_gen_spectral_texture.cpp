@@ -12,7 +12,7 @@ namespace met {
 
   void GenSpectralTextureTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").rgb_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     const uint generate_n    = e_rgb_texture.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u);

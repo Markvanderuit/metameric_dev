@@ -1,7 +1,8 @@
 #include <metameric/core/knn.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/components/tasks/task_comp_color_mapping.hpp>
+#include <metameric/components/tasks/task_gen_color_mapping.hpp>
+#include <metameric/components/tasks/detail/task_buffer_to_texture2d.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
@@ -9,16 +10,16 @@
 #include <ranges>
 
 namespace met {
-  CompColorMappingTask::CompColorMappingTask(const std::string &name)
-  : detail::AbstractTask(name) { }
+  GenColorMappingTask::GenColorMappingTask(const std::string &name, uint mapping_i)
+  : detail::AbstractTask(name),
+    m_mapping_i(mapping_i) { }
 
-  void CompColorMappingTask::init(detail::TaskInitInfo &info) {
+  void GenColorMappingTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data = e_app_data.project_data;
     auto &e_parser   = info.get_resource<glp::Parser>(global_key, "glsl_parser");
 
-    const uint mapping_n    = e_app_data.rgb_texture.size().prod();
+    const uint mapping_n    = e_app_data.loaded_texture.size().prod();
     const uint mapping_ndiv = ceil_div(mapping_n, 256u); 
     const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / 32u);
 
@@ -33,54 +34,40 @@ namespace met {
                            .path = "resources/shaders/mapping_task/apply_color_mapping.comp" }};
     m_mapping_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_mapping_program };
 
-    eig::Array2u texture_n    = e_app_data.rgb_texture.size();
-    eig::Array2u texture_ndiv = ceil_div(texture_n, 16u);
-
-    // Initialize objects for buffer-to-texture conversion
-    m_texture_program = {{ .type = gl::ShaderType::eCompute,
-                           .path = "resources/shaders/mapping_task/buffer_to_texture.comp" }};
-    m_texture_dispatch = { .groups_x = texture_ndiv.x(),
-                           .groups_y = texture_ndiv.y(),
-                           .bindable_program = &m_texture_program };
-
     // Set these uniforms once
     m_mapping_program_sg.uniform("u_n",         mapping_n);
+    m_mapping_program_sg.uniform("u_mapping_i", m_mapping_i);
     m_mapping_program.uniform("u_n",            mapping_n);
-    m_mapping_program_sg.uniform("u_mapping_i", 0);
-    m_mapping_program.uniform("u_mapping_i",    0);
-    m_texture_program.uniform("u_size",         texture_n);
+    m_mapping_program.uniform("u_mapping_i",    m_mapping_i);
 
     // Create buffer target for this task
     gl::Buffer color_buffer = {{ .size = (size_t) mapping_n * sizeof(eig::AlArray3f) }};
     info.insert_resource("color_buffer", std::move(color_buffer));
 
-    // Create texture target for this task
-    gl::Texture2d4f color_texture = {{ .size = texture_n }};
-    info.insert_resource("color_texture", std::move(color_texture));
+    // Spawn subtask to create texture from computed buffer object
+    gl::Texture2d4f::InfoType ty = { .size = e_app_data.loaded_texture.size() };
+    info.emplace_task_after<BufferToTexture2dTask<gl::Texture2d4f>>(
+      name(), fmt::format("{}_texture", name()), name(), "color_buffer", ty, "texture");
   }
 
-  void CompColorMappingTask::eval(detail::TaskEvalInfo &info) {
+  void GenColorMappingTask::dstr(detail::TaskDstrInfo &info) {
+    // Destroy subtask
+    info.remove_task(fmt::format("{}_texture", name()));
+  }
+
+  void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {  
     // Get shared resources
     auto &e_spec_buffer    = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
     auto &e_mapping_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mappings_buffer");
     auto &i_color_buffer   = info.get_resource<gl::Buffer>("color_buffer");
-    auto &i_color_texture  = info.get_resource<gl::Texture2d4f>("color_texture");
 
     // Bind buffer resources to ssbo targets
-    e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage,    0);
     e_mapping_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_color_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    i_color_buffer.bind_to(gl::BufferTargetType::eShaderStorage,   2);
 
     // Dispatch shader to generate color-mapped buffer
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_mapping_dispatch_sg);
-
-    // Bind buffer resources to ssbo targets
-    i_color_buffer.bind_to(gl::BufferTargetType::eShaderStorage,    0);
-    i_color_texture.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
-
-    // Dispatch shader to copy color-mapped data into texture image
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::dispatch_compute(m_texture_dispatch);
   }
 } // namespace met

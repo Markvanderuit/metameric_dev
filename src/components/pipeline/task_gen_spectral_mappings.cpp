@@ -19,6 +19,7 @@ namespace met {
     auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &i_mappings_buffer = info.get_resource<gl::Buffer>("mappings_buffer");
 
+    // Check if mappings data is stale
     if (m_mapping_count != e_app_data.loaded_mappings.size()) {
       m_mapping_count = e_app_data.loaded_mappings.size();
 
@@ -32,5 +33,7 @@ namespace met {
       // Upload new data to the stored mapping buffer if stale
       i_mappings_buffer.set(as_span<const std::byte>(e_app_data.loaded_mappings));
     }
+
+    
   }
 } // namespace met

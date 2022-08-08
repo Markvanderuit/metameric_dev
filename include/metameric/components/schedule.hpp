@@ -15,7 +15,7 @@
 #include <metameric/components/tasks/task_gen_spectral_mappings.hpp>
 #include <metameric/components/tasks/task_gen_spectral_gamut.hpp>
 #include <metameric/components/tasks/task_gen_spectral_texture.hpp>
-#include <metameric/components/tasks/task_comp_color_mapping.hpp>
+#include <metameric/components/tasks/task_spawn_color_mappings.hpp>
 
 // View tasks
 #include <metameric/components/views/task_gamut_viewer.hpp>
@@ -84,11 +84,13 @@ namespace met {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
     scheduler.emplace_task<WindowTask>("window");
 
-    // The following tasks define the uplifting pipeline
+    // The following tasks define the color->spectrum uplifting pipeline
     scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");
     scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
-    scheduler.emplace_task<CompColorMappingTask>("comp_color_mapping");
+
+    // The following task defines the spectrum->color output pipeline
+    scheduler.emplace_task<SpawnColorMappingsTask>("spawn_color_mappings");
 
     // TODO remove
     scheduler.emplace_task<MappingCPUTask>("mapping_cpu");

@@ -3,11 +3,6 @@
 #include <nlohmann/json.hpp>
 
 namespace met {
-  namespace detail {
-    template <typename T>
-    using StrPair = std::pair<std::string, T>;
-  } // namespace detail
-
   namespace io {
     json load_json(const fs::path &path) {
       return json::parse(load_string(path));
@@ -30,36 +25,32 @@ namespace met {
     js["n_scatters"] = v.n_scatters;
   }
 
-  void from_json(const json &js, MappingData &v) {
+  void from_json(const json &js, ProjectData::Mapping &v) {
     v.cmfs       = js.at("cmfs").get<std::string>();
     v.illuminant = js.at("illuminant").get<std::string>();
     v.n_scatters = js.at("n_scatters").get<uint>();
   }
 
-  void to_json(json &js, const MappingData &v) {
+  void to_json(json &js, const ProjectData::Mapping &v) {
     js["cmfs"]       = v.cmfs;
     js["illuminant"] = v.illuminant;
     js["n_scatters"] = v.n_scatters;
   }
 
   void from_json(const json &js, ProjectData &v) {
-    // v.rgb_mapping  = js.at("rgb_mapping").get<SpectralMapping>();
-    v.rgb_gamut    = js.at("rgb_gamut").get<std::array<Color, 4>>();
-    v.spec_gamut   = js.at("rgb_gamut").get<std::array<Spec, 4>>();
-
-    v.loaded_mappings    = js.at("loaded_mappings").get<std::vector<detail::StrPair<MappingData>>>();
-    v.loaded_cmfs        = js.at("loaded_cmfs").get<std::vector<detail::StrPair<CMFS>>>();
-    v.loaded_illuminants = js.at("loaded_illuminants").get<std::vector<detail::StrPair<Spec>>>();
+    v.rgb_gamut   = js.at("rgb_gamut").get<std::array<Color, 4>>();
+    v.spec_gamut  = js.at("spec_gamut").get<std::array<Spec, 4>>();
+    v.mappings    = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapping>>>();
+    v.cmfs        = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
+    v.illuminants = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
-    // js["rgb_mapping"]  = v.rgb_mapping;
-    js["rgb_gamut"]    = v.rgb_gamut;
-    js["spec_gamut"]   = v.spec_gamut;
-
-    js["loaded_mappings"]    = v.loaded_mappings;
-    js["loaded_cmfs"]        = v.loaded_cmfs;
-    js["loaded_illuminants"] = v.loaded_illuminants;
+    js["rgb_gamut"]   = v.rgb_gamut;
+    js["spec_gamut"]  = v.spec_gamut;
+    js["mappings"]    = v.mappings;
+    js["cmfs"]        = v.cmfs;
+    js["illuminants"] = v.illuminants;
   }
 } // namespace met
 

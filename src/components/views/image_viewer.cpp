@@ -10,7 +10,7 @@ namespace met {
 
   void ImageViewerTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").rgb_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     // Load texture data into gl texture
     m_texture = gl::Texture2d3f({ .size = e_rgb_texture.size(), .data = cast_span<float>(e_rgb_texture.data()) });
@@ -28,12 +28,12 @@ namespace met {
 
     if (ImGui::Begin("Mapped")) {
       // Get external resources
-      auto &e_color_texture = info.get_resource<gl::Texture2d4f>("comp_color_mapping", "color_texture");
+      auto &e_color_texture = info.get_resource<gl::Texture2d4f>("gen_color_mapping_0_texture", "texture");
 
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
-      auto texture_aspect = static_cast<float>(m_texture.size().y()) 
-                          / static_cast<float>(m_texture.size().x());
+      auto texture_aspect = static_cast<float>(e_color_texture.size().y()) 
+                          / static_cast<float>(e_color_texture.size().x());
                           
       ImGui::Image(ImGui::to_ptr(e_color_texture.object()), (viewport_size * eig::Array2f(1, texture_aspect)).eval());
     }

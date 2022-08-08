@@ -24,7 +24,7 @@ namespace met {
 
   void MappingCPUTask::init(detail::TaskInitInfo &info) {
     // Get externally shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").rgb_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
     
     // Fill input texture with data 
     m_input = std::vector<eig::Array3f>(e_rgb_texture.data().begin(), e_rgb_texture.data().end());

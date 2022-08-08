@@ -18,7 +18,7 @@ namespace met {
       auto &e_prj_data = e_app_data.project_data;
 
       if (ImGui::BeginListBox("Illuminant spectra")) {
-        auto &e_illuminants = e_prj_data.loaded_illuminants;
+        auto &e_illuminants = e_prj_data.illuminants;
         for (uint i = 0; i < e_illuminants.size(); ++i) {
           auto &[key, illuminant] = e_illuminants[i];
           if (ImGui::Selectable(key.c_str(), false)) {
@@ -29,7 +29,7 @@ namespace met {
       }
 
       if (ImGui::BeginListBox("Color matching functions")) {
-        auto &e_cmfs = e_prj_data.loaded_cmfs;
+        auto &e_cmfs = e_prj_data.cmfs;
         for (uint i = 0; i < e_cmfs.size(); ++i) {
           auto &[key, cmfs] = e_cmfs[i];
           if (ImGui::Selectable(key.c_str(), false)) {

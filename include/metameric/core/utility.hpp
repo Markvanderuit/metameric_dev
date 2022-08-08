@@ -9,6 +9,17 @@
 #define guard_continue(expr) if (!(expr)) { continue; }
 #define guard_break(expr) if (!(expr)) { break; }
 
+// For enum class T, declare bitflag operators and has_flag(T, T) boolean operator
+#define met_declare_bitflag(T)\
+  constexpr T operator~(T a) { return (T) (~ (uint) a); }\
+  constexpr T operator|(T a, T b) { return (T) ((uint) a | (uint) b); }\
+  constexpr T operator&(T a, T b) { return (T) ((uint) a & (uint) b); }\
+  constexpr T operator^(T a, T b) { return (T) ((uint) a ^ (uint) b); }\
+  constexpr T& operator|=(T &a, T b) { return a = a | b; }\
+  constexpr T& operator&=(T &a, T b) { return a = a & b; }\
+  constexpr T& operator^=(T &a, T b) { return a = a ^ b; }\
+  constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
+
 namespace met {
   // Interpret a container type as a span of type T
   template <class T, class C>

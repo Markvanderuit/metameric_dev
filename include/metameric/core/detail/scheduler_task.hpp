@@ -1,11 +1,12 @@
 #pragma once
 
+#include <metameric/core/math.hpp>
+#include <metameric/core/utility.hpp>
+#include <metameric/core/detail/scheduler_resource.hpp>
 #include <memory>
 #include <list>
 #include <string>
 #include <unordered_map>
-#include <metameric/core/math.hpp>
-#include <metameric/core/detail/scheduler_resource.hpp>
 
 namespace met {
   // Global key for resources with no managing task
@@ -36,17 +37,6 @@ namespace met::detail {
     virtual void dstr(TaskDstrInfo &) { };
   };
 
-  // For enum class T, declare bitflag operators and has_flag(T, T) boolean operator
-  #define met_declare_bitflag(T)\
-    constexpr T operator~(T a) { return (T) (~ (uint) a); }\
-    constexpr T operator|(T a, T b) { return (T) ((uint) a | (uint) b); }\
-    constexpr T operator&(T a, T b) { return (T) ((uint) a & (uint) b); }\
-    constexpr T operator^(T a, T b) { return (T) ((uint) a ^ (uint) b); }\
-    constexpr T& operator|=(T &a, T b) { return a = a | b; }\
-    constexpr T& operator&=(T &a, T b) { return a = a & b; }\
-    constexpr T& operator^=(T &a, T b) { return a = a ^ b; }\
-    constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
-
   enum class TaskSignalFlags : uint {
     eNone       = 0x000u,
 
@@ -70,37 +60,37 @@ namespace met::detail {
     using RsrcMapType     = std::unordered_map<KeyType, RsrcType>;
     using ApplRsrcMapType = std::unordered_map<KeyType, RsrcMapType>;
 
-    RsrcMapType     &_task_resource_registry;
-    ApplRsrcMapType &_appl_resource_registry;
+    RsrcMapType     &_task_rsrc_registry;
+    ApplRsrcMapType &_appl_rsrc_registry;
 
-    AbstractTaskInfo(ApplRsrcMapType &appl_resource_registry, const AbstractTask &task)
-    : _appl_resource_registry(appl_resource_registry),
-      _task_resource_registry(appl_resource_registry[task.name()]) { };
+    AbstractTaskInfo(ApplRsrcMapType &appl_rsrc_registry, const AbstractTask &task)
+    : _appl_rsrc_registry(appl_rsrc_registry),
+      _task_rsrc_registry(appl_rsrc_registry[task.name()]) { };
     
   public:
 
     /* Public data registries */
 
-    std::unordered_map<KeyType, RsrcType>   add_resource_registry;
+    std::unordered_map<KeyType, RsrcType>   add_rsrc_registry;
     std::list<std::pair<KeyType, TaskType>> add_task_registry;
-    std::list<KeyType>                      remove_resource_registry;
-    std::list<KeyType>                      remove_task_registry;
+    std::list<KeyType>                      rem_rsrc_registry;
+    std::list<KeyType>                      rem_task_registry;
     TaskSignalFlags                         signal_flags = TaskSignalFlags::eNone;
 
     /* Create, add, remove resources */
 
     template <typename Ty, typename InfoTy = Ty::InfoType>
     void emplace_resource(const KeyType &key, InfoTy info) {
-      add_resource_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
+      add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
     }
   
     template <typename Ty>
     void insert_resource(const KeyType &key, Ty &&rsrc) {
-      add_resource_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
+      add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
     }
 
-    void erase_resource(const KeyType &key) {
-      remove_resource_registry.push_back(key);
+    void remove_resource(const KeyType &key) {
+      rem_rsrc_registry.push_back(key);
     }
 
     /* Create, add, remove subtasks */
@@ -111,16 +101,16 @@ namespace met::detail {
       add_task_registry.emplace_back("", std::make_shared<Ty>(key, args...));
     }
 
-    template <typename Ty>
-    void insert_task(const KeyType &key, Ty &&task) {
-      static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      add_task_registry.emplace_back("", std::make_shared<Ty>(std::move(task)));
-    }
-    
     template <typename Ty, typename... Args>
     void emplace_task_after(const KeyType &prev, const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
       add_task_registry.emplace_back(prev, std::make_shared<Ty>(key, args...));
+    }
+
+    template <typename Ty>
+    void insert_task(const KeyType &key, Ty &&task) {
+      static_assert(std::is_base_of_v<AbstractTask, Ty>);
+      add_task_registry.emplace_back("", std::make_shared<Ty>(std::move(task)));
     }
 
     template <typename Ty>
@@ -130,14 +120,14 @@ namespace met::detail {
     }
 
     void remove_task(const KeyType &key) {
-      remove_task_registry.push_back(key);
+      rem_task_registry.push_back(key);
     }
 
     /* Access existing resources */
 
     template <typename T>
     T & get_resource(const KeyType &key) {
-      if (auto i = _task_resource_registry.find(key); i != _task_resource_registry.end()) {
+      if (auto i = _task_rsrc_registry.find(key); i != _task_rsrc_registry.end()) {
         return i->second->get_as<T>();
       } else {
         return get_resource<T>(global_key, key);
@@ -146,30 +136,30 @@ namespace met::detail {
 
     template <typename T>
     T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      return _appl_resource_registry.at(task_key).at(rsrc_key)->get_as<T>();
+      return _appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
   };
 
   struct TaskInitInfo : public AbstractTaskInfo {
     // By consuming the task in this object, we initialize the task
-    TaskInitInfo(ApplRsrcMapType &appl_resource_registry, AbstractTask &task)
-    : AbstractTaskInfo(appl_resource_registry, task) {
+    TaskInitInfo(ApplRsrcMapType &appl_rsrc_registry, AbstractTask &task)
+    : AbstractTaskInfo(appl_rsrc_registry, task) {
       task.init(*this);
     }
   };
 
   struct TaskEvalInfo : public AbstractTaskInfo {
     // By consuming the task in this object, we eval/run the task
-    TaskEvalInfo(ApplRsrcMapType &appl_resource_registry, AbstractTask &task)
-    : AbstractTaskInfo(appl_resource_registry, task) {
+    TaskEvalInfo(ApplRsrcMapType &appl_rsrc_registry, AbstractTask &task)
+    : AbstractTaskInfo(appl_rsrc_registry, task) {
       task.eval(*this);
     }
   };
 
   struct TaskDstrInfo : public AbstractTaskInfo {
     // By consuming the task in this object, we eval/run the task
-    TaskDstrInfo(ApplRsrcMapType &appl_resource_registry, AbstractTask &task)
-    : AbstractTaskInfo(appl_resource_registry, task) {
+    TaskDstrInfo(ApplRsrcMapType &appl_rsrc_registry, AbstractTask &task)
+    : AbstractTaskInfo(appl_rsrc_registry, task) {
       task.dstr(*this);
     }
   };
