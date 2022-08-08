@@ -20,6 +20,7 @@
 // View tasks
 #include <metameric/components/views/task_gamut_viewer.hpp>
 #include <metameric/components/views/task_mappings_editor.hpp>
+#include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
@@ -90,19 +91,15 @@ namespace met {
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
 
     // The following task defines the spectrum->color output pipeline
+    // (though it mostly spawns subtasks to do so)
     scheduler.emplace_task<SpawnColorMappingsTask>("spawn_color_mappings");
-
-    // TODO remove
-    scheduler.emplace_task<MappingCPUTask>("mapping_cpu");
 
     // The following tasks define UI components and windows
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
     scheduler.emplace_task<SpectraEditorTask>("spectra_editor");
     scheduler.emplace_task<MappingsEditorTask>("mappings_editor");
-
-    // TODO remove
-    scheduler.emplace_task<ImageViewerTask>("image_viewer");
+    scheduler.emplace_task<MappingsViewerTask>("mappings_viewer");
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);

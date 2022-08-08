@@ -33,7 +33,8 @@ namespace met {
 
     // Initialize main spectral texture buffer
     info.emplace_resource<gl::Buffer>("spectrum_buffer", {
-      .size = sizeof(Spec) * generate_n
+      .size  = sizeof(Spec) * generate_n,
+      .flags = gl::BufferCreateFlags::eMapRead 
     });
   }
 

@@ -41,7 +41,8 @@ namespace met {
     m_mapping_program.uniform("u_mapping_i",    m_mapping_i);
 
     // Create buffer target for this task
-    gl::Buffer color_buffer = {{ .size = (size_t) mapping_n * sizeof(eig::AlArray3f) }};
+    gl::Buffer color_buffer = {{ .size  = (size_t) mapping_n * sizeof(eig::AlArray3f),
+                                 .flags = gl::BufferCreateFlags::eMapRead }};
     info.insert_resource("color_buffer", std::move(color_buffer));
 
     // Spawn subtask to create texture from computed buffer object
