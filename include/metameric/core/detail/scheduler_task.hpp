@@ -59,12 +59,17 @@ namespace met::detail {
     using TaskType        = std::shared_ptr<AbstractTask>;
     using RsrcMapType     = std::unordered_map<KeyType, RsrcType>;
     using ApplRsrcMapType = std::unordered_map<KeyType, RsrcMapType>;
+    using ApplTaskVecType = const std::vector<TaskType>; 
 
     RsrcMapType     &_task_rsrc_registry;
     ApplRsrcMapType &_appl_rsrc_registry;
+    ApplTaskVecType &_appl_task_registry;
 
-    AbstractTaskInfo(ApplRsrcMapType &appl_rsrc_registry, const AbstractTask &task)
+    AbstractTaskInfo(ApplRsrcMapType &appl_rsrc_registry,
+                     ApplTaskVecType &appl_task_registry,
+                     const AbstractTask &task)
     : _appl_rsrc_registry(appl_rsrc_registry),
+      _appl_task_registry(appl_task_registry),
       _task_rsrc_registry(appl_rsrc_registry[task.name()]) { };
     
   public:
@@ -83,7 +88,7 @@ namespace met::detail {
     void emplace_resource(const KeyType &key, InfoTy info) {
       add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
     }
-  
+
     template <typename Ty>
     void insert_resource(const KeyType &key, Ty &&rsrc) {
       add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
@@ -143,28 +148,43 @@ namespace met::detail {
       return _appl_rsrc_registry.contains(task_key)
           && _appl_rsrc_registry.at(task_key).contains(rsrc_key);
     }
+
+    /* miscellaneous, debug info */
+
+    // String output of current task schedule
+    std::vector<KeyType> schedule_list() const {
+      std::vector<std::string> v(_appl_task_registry.size());
+      std::ranges::transform(_appl_task_registry, v.begin(), [](const auto &t) { return t->name(); });
+      return v;
+    }
   };
 
   struct TaskInitInfo : public AbstractTaskInfo {
     // By consuming the task in this object, we initialize the task
-    TaskInitInfo(ApplRsrcMapType &appl_rsrc_registry, AbstractTask &task)
-    : AbstractTaskInfo(appl_rsrc_registry, task) {
+    TaskInitInfo(ApplRsrcMapType &appl_rsrc_registry,
+                 ApplTaskVecType &appl_task_registry,
+                 AbstractTask &task)
+    : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
       task.init(*this);
     }
   };
 
   struct TaskEvalInfo : public AbstractTaskInfo {
     // By consuming the task in this object, we eval/run the task
-    TaskEvalInfo(ApplRsrcMapType &appl_rsrc_registry, AbstractTask &task)
-    : AbstractTaskInfo(appl_rsrc_registry, task) {
+    TaskEvalInfo(ApplRsrcMapType &appl_rsrc_registry,
+                 ApplTaskVecType &appl_task_registry,
+                 AbstractTask &task)
+    : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
       task.eval(*this);
     }
   };
 
   struct TaskDstrInfo : public AbstractTaskInfo {
     // By consuming the task in this object, we eval/run the task
-    TaskDstrInfo(ApplRsrcMapType &appl_rsrc_registry, AbstractTask &task)
-    : AbstractTaskInfo(appl_rsrc_registry, task) {
+    TaskDstrInfo(ApplRsrcMapType &appl_rsrc_registry,
+                 ApplTaskVecType &appl_task_registry,
+                 AbstractTask &task)
+    : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
       task.dstr(*this);
     }
   };

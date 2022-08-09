@@ -79,21 +79,17 @@ namespace met {
       return _rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
 
-    /* miscellaneous */
+    /* miscellaneous, dbeug info */
 
     void clear_tasks();  // Clear tasks and owned resources; retain global resources
     void clear_global(); // Clear global resources
     void clear_all();    // Clear tasks and resources 
     
     // String output of current task schedule
-    std::string to_string() const {
-      std::stringstream ss;
-      ss << "[";
-      for (auto &task : _task_registry) {
-        ss << task->name() << ", ";
-      }
-      ss << "]";
-      return ss.str();
+    std::vector<std::string> schedule_list() const {
+      std::vector<std::string> v(_task_registry.size());
+      std::ranges::transform(_task_registry, v.begin(), [](const auto &task) { return task->name(); });
+      return v;
     }
   };
 } // namespace met

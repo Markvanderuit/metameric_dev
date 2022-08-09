@@ -6,7 +6,7 @@
 namespace met {
   void LinearScheduler::register_task(const KeyType &prev, TaskType &&task) {
     // Parse task info object by consuming task
-    detail::TaskInitInfo info(_rsrc_registry, *task.get());
+    detail::TaskInitInfo info(_rsrc_registry, _task_registry, *task.get());
     
     // Update resource registry; add/remove task resources
     auto &local_registry = _rsrc_registry[task->name()];
@@ -30,11 +30,12 @@ namespace met {
   
   void LinearScheduler::deregister_task(const KeyType &key) {
     // Find existing task
-    auto i     = std::ranges::find_if(_task_registry, [&](auto &task) { return task->name() == key; });
+    auto i = std::ranges::find_if(_task_registry, [&](auto &task) { return task->name() == key; });
+    guard(i != _task_registry.end());
     auto &task = *i;
 
     // Parse task info object by consuming task
-    detail::TaskDstrInfo info(_rsrc_registry, *task.get());
+    detail::TaskDstrInfo info(_rsrc_registry, _task_registry, *task.get());
     
     // Update registries; remove task and resources
     _rsrc_registry.erase(task->name());
@@ -53,7 +54,7 @@ namespace met {
     // Run all tasks in vector inserted order
     for (auto &task : _task_registry) {
       // Parse task info object by consuming task::eval()
-      detail::TaskEvalInfo info(_rsrc_registry, *task.get());
+      detail::TaskEvalInfo info(_rsrc_registry, _task_registry, *task.get());
 
       // Process task/resource editing signals later
       signal_flags |= info.signal_flags; 
@@ -67,8 +68,8 @@ namespace met {
 
       // Defer added/removed task update until after all tasks have completed
       if (!info.add_task_registry.empty() || !info.rem_task_registry.empty()) {
-        add_task_registry.splice(add_task_registry.end(), info.add_task_registry);
         rem_task_registry.splice(rem_task_registry.end(), info.rem_task_registry);
+        add_task_registry.splice(add_task_registry.end(), info.add_task_registry);
       }
     }
 

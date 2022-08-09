@@ -36,6 +36,16 @@ namespace met {
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
     scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
 
+    // Temporary window to show schedule
+    scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
+      if (ImGui::Begin("Schedule")) {
+        for (auto &s : scheduler.schedule_list()) {
+          ImGui::Text(s.c_str());
+        }
+      }
+      ImGui::End();
+    });
+
     // Temporary window to plot some timings
     scheduler.emplace_task<LambdaTask>("imgui_delta", [](auto &info) {
       if (ImGui::Begin("Imgui timings")) {
