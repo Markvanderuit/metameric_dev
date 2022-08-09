@@ -24,12 +24,10 @@ namespace met {
     float        m_gamut_lwidth = 4.f;
     
     // Texture pointset draw components
-    // gl::Buffer   m_texture_points_buffer;
     gl::Array    m_texture_points_array;
     gl::DrawInfo m_texture_points_draw;
     gl::Program  m_texture_points_program;
-    float        m_texture_points_psize = 4.f;
-    float        m_texture_points_popaq = 4.f;
+    float        m_texture_points_psize = 1.f;
 
   public:
     ViewportDrawTask(const std::string &name);
