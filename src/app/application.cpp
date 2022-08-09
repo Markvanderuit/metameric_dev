@@ -146,7 +146,6 @@ namespace met {
     // Main runtime loop
     while (!window.should_close()) { 
       scheduler.run();
-      fmt::print("{}\n", scheduler.to_string());
     } 
     
     ImGui::Destr();
