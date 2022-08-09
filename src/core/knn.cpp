@@ -20,7 +20,7 @@ namespace met {
     template <typename T>
     typename KNNGrid<T>::QueryType value_to_query(const typename KNNGrid<T>::ValueType &v, 
                                                   const eig::Array3f &p) {
-      return { v.position, v.value, eucl_dist(v.position, p) };
+      return { v.position, v.value, sq_euql_dist(v.position, p) };
     };
 
     template <typename T>
@@ -89,22 +89,20 @@ namespace met {
   
   template <typename T>
   KNNGrid<T>::QueryType KNNGrid<T>::query_1_nearest(const eig::Array3f &p) const {
-    // Construct range as search list of points in 8 nearest grid cells
-    auto to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
+    // Construct search list of points in nearest grid cells
+    auto to_query   = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
     auto query_view = nearest_indices_from_pos(p) 
                     | std::views::transform([&](uint i) { return m_grid[i]; })
-                    | std::views::join
-                    | std::views::transform(to_query);
+                    | std::views::join | std::views::transform(to_query);
 
-    // Perform linear search for the closest position
-    QueryType query = { eig::Array3f::Zero(), 0.f, FLT_MAX };
-    for (const QueryType &q : query_view) {
-      if (q.distance < query.distance) {
-        query = q;
-      }
-    }
-    
-    return query;
+    // Gather transformed queries from search list
+    std::vector<QueryType> query_list;
+    std::ranges::copy(query_view, std::back_inserter(query_list));
+
+    // Perform search for the closest query
+    guard(query_list.size(), { 0.f, 0.f, FLT_MAX }); // Return a false query on an empty list
+    constexpr auto dist_compare = [](auto a, auto b) { return a.distance < b.distance; };
+    return *std::min_element(std::execution::par_unseq, range_iter(query_list), dist_compare);
   }
 
   template <typename T>

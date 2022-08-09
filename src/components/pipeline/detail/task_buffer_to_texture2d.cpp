@@ -39,7 +39,8 @@ namespace met {
   template <class TextureTy, class InfoTy>
   void BufferToTexture2dTask<TextureTy, InfoTy>::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
-    auto &e_rsrc  = info.get_resource<gl::Buffer>(m_inp_task_key, m_inp_rsrc_key);
+    guard(info.has_resource(m_inp_task_key, m_inp_rsrc_key));
+    auto &e_rsrc = info.get_resource<gl::Buffer>(m_inp_task_key, m_inp_rsrc_key);
     auto &i_rsrc = info.get_resource<TextureTy>(m_out_rsrc_key);
 
     // Bind resources to correct buffer/image targets
@@ -49,7 +50,6 @@ namespace met {
 
     // Dispatch shader, copying buffer into texture object
     gl::dispatch_compute(m_dispatch);
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess);
   }
 
   /* Explicit template instantiations for common types */

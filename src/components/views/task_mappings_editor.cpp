@@ -3,8 +3,9 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  constexpr float  list_width           = 150.f;
-  constexpr float  select_right_padding = 16.f;
+  constexpr float list_width_relative  = 0.33f;
+  constexpr float list_width_max       = 150.f;
+  constexpr float select_right_padding = -32.f;
   const static ImVec2      add_button_size       = { 28.f, 28.f };
   const static std::string default_mapping_title = "mapping_";
   
@@ -105,6 +106,11 @@ namespace met {
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.mappings;
 
+    // Content area width determines list width
+    float window_width = ImGui::GetWindowContentRegionMax().x 
+                       - ImGui::GetWindowContentRegionMin().x;
+    float list_width   = std::min(list_width_relative * window_width, list_width_max);
+
     // Begin list draw group
     ImGui::BeginGroup();
     ImGui::PushItemWidth(list_width);
@@ -146,6 +152,11 @@ namespace met {
     auto &e_prj_data = e_app_data.project_data;
     auto &e_mappings = e_prj_data.mappings;
 
+    // Content area width determines selection width as remaining space
+    float window_width = ImGui::GetWindowContentRegionMax().x 
+                       - ImGui::GetWindowContentRegionMin().x;
+    float list_width   = std::min(list_width_relative * window_width, list_width_max);
+
     // Begin selection draw group
     ImGui::BeginGroup();
     ImGui::PushItemWidth(-list_width - select_right_padding);
@@ -161,7 +172,7 @@ namespace met {
     // Draw CMFS selector widget
     if (ImGui::BeginCombo("CMFS", m_selected_mapping.cmfs.c_str())) {
       for (auto &[key, _] : e_prj_data.cmfs) {
-        if (ImGui::Selectable(key.c_str(), false)) {
+        if (ImGui::Selectable(key.c_str(), m_selected_mapping.cmfs == key)) {
           m_selected_mapping.cmfs = key;
         }
       }
@@ -171,7 +182,7 @@ namespace met {
     // Draw illuminant selector widget
     if (ImGui::BeginCombo("Illuminant", m_selected_mapping.illuminant.c_str())) {
       for (auto &[key, _] : e_prj_data.illuminants) {
-        if (ImGui::Selectable(key.c_str(), false)) {
+        if (ImGui::Selectable(key.c_str(), m_selected_mapping.illuminant == key)) {
           m_selected_mapping.illuminant = key;
         }
       }
@@ -180,7 +191,7 @@ namespace met {
 
     // Scattering depth selector slider; between 0 and 8 should suffice?
     uint scatter_min = 0, scatter_max = 8;
-    ImGui::SliderScalar("Nr. of scatterings", ImGuiDataType_U32,
+    ImGui::SliderScalar("Scatters", ImGuiDataType_U32,
       &(m_selected_mapping.n_scatters), &scatter_min, &scatter_max);
 
     // Draw buttons to apply/reset changes to stored mapping
@@ -198,10 +209,24 @@ namespace met {
 
   void MappingsEditorTask::init(detail::TaskInitInfo &info) {
     m_selected_i = -1;
+
+    // Share a selection key that can be set from the outside, and is then reset, so
+    // other parts of the program can influence selection
+    info.insert_resource<int>("selected_i", -1);
   }
 
   void MappingsEditorTask::eval(detail::TaskEvalInfo &info) {
     if (ImGui::Begin("Mappings editor")) {      
+      // Get shared resources
+      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &selected_i = info.get_resource<int>("selected_i");
+
+      // Handle external selection key
+      if (selected_i != -1 && selected_i < e_app_data.loaded_mappings.size()) {
+        m_selected_i = selected_i;
+      }
+      selected_i = -1;
+
       draw_list(info);
       if (m_selected_i != -1) {
         ImGui::SameLine();

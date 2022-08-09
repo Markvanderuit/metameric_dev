@@ -11,22 +11,46 @@ namespace met {
   : detail::AbstractTask(name) { }
   
   void GenSpectralGamutTask::init(detail::TaskInitInfo &info) {
-    // Submit resources: buffers storing the four colours/spectra forming a tetrahedron
-    info.emplace_resource<gl::Buffer>("color_buffer", {
-      .size  = 4 * sizeof(eig::AlArray3f),
-      .flags = gl::BufferCreateFlags::eMapReadWrite | gl::BufferCreateFlags::eStorageDynamic
-    });
-    info.emplace_resource<gl::Buffer>("spectrum_buffer", {
-      .size  = 4 * sizeof(Spec),
-      .flags = gl::BufferCreateFlags::eMapReadWrite | gl::BufferCreateFlags::eStorageDynamic
-    });
+    // Define flags for creation of a persistent, write-only flushable buffer map
+    auto create_flags = gl::BufferCreateFlags::eMapWrite 
+                      | gl::BufferCreateFlags::eMapPersistent
+                      | gl::BufferCreateFlags::eStorageDynamic;
+    auto map_flags    = gl::BufferAccessFlags::eMapWrite 
+                      | gl::BufferAccessFlags::eMapPersistent
+                      | gl::BufferAccessFlags::eMapFlush;
+    
+    // Define color and spectral gamut buffers
+    gl::Buffer color_buffer = {{ .size  = 4 * sizeof(eig::AlArray3f), .flags = create_flags }};
+    gl::Buffer spect_buffer = {{ .size  = 4 * sizeof(Spec), .flags = create_flags }};
+
+    // Prepare buffer maps which are written to **every** frame
+    auto color_buffer_map = cast_span<eig::AlArray3f>(color_buffer.map(map_flags));
+    auto spect_buffer_map = cast_span<Spec>(spect_buffer.map(map_flags));
+
+    // Submit resources 
+    info.insert_resource("color_buffer", std::move(color_buffer));
+    info.insert_resource("spectrum_buffer", std::move(spect_buffer));
+    info.insert_resource("color_buffer_map", std::move(color_buffer_map));
+    info.insert_resource("spectrum_buffer_map", std::move(spect_buffer_map));
+  }
+
+  void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
+    // Get shared resources
+    auto &i_color_buffer = info.get_resource<gl::Buffer>("color_buffer");
+    auto &i_spect_buffer = info.get_resource<gl::Buffer>("spectrum_buffer");
+
+    // Unmap buffers
+    i_color_buffer.unmap();
+    i_spect_buffer.unmap();
   }
   
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
     // Get shared resources
-    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &i_color_buffer = info.get_resource<gl::Buffer>("color_buffer");
-    auto &i_spect_buffer = info.get_resource<gl::Buffer>("spectrum_buffer");
+    auto &e_app_data         = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &i_color_buffer     = info.get_resource<gl::Buffer>("color_buffer");
+    auto &i_spect_buffer     = info.get_resource<gl::Buffer>("spectrum_buffer");
+    auto &i_color_buffer_map = info.get_resource<std::span<eig::AlArray3f>>("color_buffer_map");
+    auto &i_spect_buffer_map = info.get_resource<std::span<Spec>>("spectrum_buffer_map");
 
     // Get relevant application/project data
     auto &knn_grid    = e_app_data.spec_knn_grid;
@@ -37,12 +61,20 @@ namespace met {
     std::ranges::transform(color_gamut, spect_gamut.begin(),
       [&](const auto &p) { return knn_grid.query_1_nearest(p).value; });
     
-    // Copy over gamut data to aligned type
+    // Copy data to gpu buffer maps
+    std::ranges::copy(color_gamut, i_color_buffer_map.begin());
+    std::ranges::copy(spect_gamut, i_spect_buffer_map.begin());
+
+    // Flush buffers after pushing new data 
+    i_color_buffer.flush();
+    i_spect_buffer.flush();
+
+    /* // Copy over gamut data to aligned type
     std::array<eig::AlArray3f, 4> al_color_gamut;
     std::ranges::copy(color_gamut, al_color_gamut.begin());
 
     // Copy data to gpu buffers
     i_color_buffer.set(as_span<std::byte>(al_color_gamut));
-    i_spect_buffer.set(as_span<std::byte>(spect_gamut));
+    i_spect_buffer.set(as_span<std::byte>(spect_gamut)); */
   }
 } // namespace met

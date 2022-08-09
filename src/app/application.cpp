@@ -108,7 +108,7 @@ namespace met {
   } // namespace detail                          
 
   void create_application(ApplicationCreateInfo info) {
-    fmt::print("Metameric format\n\tmin : {} nm\n\tmax : {} nm\n\tsamples: {}\n",
+    fmt::print("Metameric format\n  min : {} nm\n  max : {} nm\n  samples: {}\n",
       wavelength_min, wavelength_max, wavelength_samples);
 
     // Scheduler is responsible for handling application tasks and resources

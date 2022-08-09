@@ -22,16 +22,21 @@ namespace met {
 
       // Quick temporary window to show nearest spectra in the local grid
       if (ImGui::Begin("Gamut viewer")) {
-        auto viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                           - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-                                  
+        eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                                   - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+
         // Obtain colors at gamut's point positions
         std::vector<Color> spectra_to_colors(4);
         std::ranges::transform(spec_gamut, spectra_to_colors.begin(),
-          [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
+          [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }).eval(); });
         
-        // Plot spectra
         eig::Array2f plot_size = viewport_size * eig::Array2f(.67f, .125f);
+        
+        // for (auto &s : spec_gamut) {
+        //   fmt::print("{}\n", s);
+        // }
+
+        // Plot spectra
         ImGui::PlotLines("reflectance 0", spec_gamut[0].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, plot_size);
         ImGui::ColorEdit3("color 0, coordinates", rgb_gamut[0].data());
