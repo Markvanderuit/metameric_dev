@@ -22,6 +22,8 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void WindowTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+    
     info.emplace_task_after<CreateProjectTask>(name(), name() + create_modal_name, create_modal_title);
 
     // Modal subtask to handle safe exiting of program
@@ -54,6 +56,8 @@ namespace met {
   }
 
   void WindowTask::dstr(detail::TaskDstrInfo &info) {
+    met_declare_trace_zone();
+    
     // Remove modal subtasks
     info.remove_task(name() + create_modal_name);
     info.remove_task(name() + close_modal_name);
@@ -61,6 +65,8 @@ namespace met {
   }
   
   bool WindowTask::handle_open(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     // Open a file picker
     if (fs::path path; detail::load_dialog(path, "json")) {
       // Initialize existing project
@@ -76,6 +82,8 @@ namespace met {
   }
 
   bool WindowTask::handle_save(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_state == ProjectState::eNew) {
       return handle_save_as(info);
@@ -86,6 +94,8 @@ namespace met {
   }
 
   bool WindowTask::handle_save_as(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     if (fs::path path; detail::save_dialog(path, "json")) {
       info.get_resource<ApplicationData>(global_key, "app_data").save(io::path_with_ext(path, ".json"));
       return true;
@@ -94,6 +104,8 @@ namespace met {
   }
   
   void WindowTask::handle_close_safe(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_state == ProjectState::eUnsaved 
      || e_app_data.project_state == ProjectState::eNew) {
@@ -104,6 +116,8 @@ namespace met {
   }
 
   void WindowTask::handle_close(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     ImGui::CloseAnyPopupIfOpen();
 
     // Empty application data as project is closed
@@ -115,6 +129,8 @@ namespace met {
   }
   
   void WindowTask::handle_exit_safe(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_state == ProjectState::eUnsaved 
      || e_app_data.project_state == ProjectState::eNew) {
@@ -125,6 +141,8 @@ namespace met {
   }
 
   void WindowTask::handle_exit(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     ImGui::CloseAnyPopupIfOpen();
     
     // Signal to window that it should close itself
@@ -132,6 +150,8 @@ namespace met {
   }
 
   void WindowTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     // Modals/popups have to be on the same level of stack as OpenPopup(), so track this state
     // and call OpenPopup() at the end if true
     m_open_close_modal  = false;

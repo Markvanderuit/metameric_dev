@@ -47,6 +47,8 @@ namespace met {
   }
 
   void LinearScheduler::run() {
+    met_declare_trace_zone();
+
     std::list<std::pair<KeyType, TaskType>> add_task_registry;
     std::list<KeyType>                      rem_task_registry;
     detail::TaskSignalFlags                 signal_flags = detail::TaskSignalFlags::eNone;

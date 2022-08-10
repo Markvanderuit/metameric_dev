@@ -129,6 +129,8 @@ namespace met {
 #endif
     });
 
+    TracyGpuContext
+
     // Enable OpenGL debug messages, ignoring notification-type messages
 #ifndef NDEBUG
     gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);

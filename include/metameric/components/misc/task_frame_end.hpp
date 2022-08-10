@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/window.hpp>
@@ -11,6 +12,8 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
+      met_declare_trace_zone();
+      
       auto fb = gl::Framebuffer::make_default();
       fb.bind();
       fb.clear(gl::FramebufferType::eColor, eig::Array3f(0));
@@ -21,6 +24,8 @@ namespace met {
       auto &e_window = info.get_resource<gl::Window>(global_key, "window");
       e_window.swap_buffers();
       e_window.poll_events();
+
+      met_declare_trace_frame()
     }
   };
 } // namespace met

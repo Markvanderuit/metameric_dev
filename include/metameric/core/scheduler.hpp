@@ -59,7 +59,7 @@ namespace met {
     Ty& emplace_resource(const KeyType &key, InfoTy info) {
       using ResourceType = detail::Resource<Ty>;
       auto [it, r] = _rsrc_registry[global_key].emplace(key, std::make_shared<ResourceType>(Ty(info)));
-      debug::check_expr(r, fmt::format("could not emplace resource with key: {}", key));
+      debug::check_expr_dbg(r, fmt::format("could not emplace resource with key: {}", key));
       return it->second->get_as<Ty>();
     }
   
@@ -67,7 +67,7 @@ namespace met {
     void insert_resource(const KeyType &key, Ty &&rsrc) {
       using ResourceType = detail::Resource<Ty>;
       auto [it, r] = _rsrc_registry[global_key].emplace(key, std::make_shared<ResourceType>(std::move(rsrc)));
-      debug::check_expr(r, fmt::format("could not insert resource with key: {}", key));
+      debug::check_expr_dbg(r, fmt::format("could not insert resource with key: {}", key));
     }
 
     void remove_resource(const KeyType &key);
@@ -84,6 +84,11 @@ namespace met {
     void clear_tasks();  // Clear tasks and owned resources; retain global resources
     void clear_global(); // Clear global resources
     void clear_all();    // Clear tasks and resources 
+
+    // Return const list of current tasks
+    const std::vector<TaskType>& tasks() const {
+      return _task_registry;
+    }
     
     // String output of current task schedule
     std::vector<std::string> schedule_list() const {

@@ -37,9 +37,11 @@ namespace met {
   };
 
   ViewportDrawTask::ViewportDrawTask(const std::string &name)
-  : detail::AbstractTask(name) { }
+  : detail::AbstractTask(name, true) { }
 
   void ViewportDrawTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+    
     // Get externally shared resources 
     auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "color_buffer");
     auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
@@ -53,9 +55,9 @@ namespace met {
       .elements = &m_cube_elem_buffer
     }};
     m_cube_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                    .path = "resources/shaders/viewport_task/uniform_draw.vert" },
+                                    .path = "resources/shaders/viewport/draw_color_uniform.vert" },
                                   { .type = gl::ShaderType::eFragment,  
-                                    .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
+                                    .path = "resources/shaders/viewport/draw_color.frag" }});
     m_cube_draw = { .type             = gl::PrimitiveType::eLines,
                     .vertex_count     = (uint) cube_elements.size(),
                     .bindable_array   = &m_cube_array,
@@ -69,9 +71,9 @@ namespace met {
       .elements = &m_gamut_elem_buffer
     });
     m_gamut_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                     .path = "resources/shaders/viewport_task/value_draw.vert" },
+                                     .path = "resources/shaders/viewport/draw_color_array.vert" },
                                    { .type = gl::ShaderType::eFragment,  
-                                     .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
+                                     .path = "resources/shaders/viewport/draw_color.frag" }});
     m_gamut_draw = { .type             = gl::PrimitiveType::eLineLoop,
                      .vertex_count     = (uint) gamut_elements.size(),
                      .bindable_array   = &m_gamut_array,
@@ -83,9 +85,9 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     });
     m_texture_points_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
-                                              .path = "resources/shaders/viewport_task/value_draw.vert" },
+                                              .path = "resources/shaders/viewport/draw_color_array.vert" },
                                             { .type = gl::ShaderType::eFragment,  
-                                              .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }});
+                                              .path = "resources/shaders/viewport/draw_color.frag" }});
     m_texture_points_draw = { .type             = gl::PrimitiveType::ePoints,
                               .vertex_count     = (uint) e_texture_buffer.size() / sizeof(std::byte) / 3,
                               .bindable_array   = &m_texture_points_array,
@@ -99,6 +101,8 @@ namespace met {
   }
 
   void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Viewport draw settings")) {
       ImGui::SliderFloat("Line width", &m_gamut_lwidth, 1.f, 16.f, "%.0f");

@@ -25,7 +25,7 @@ namespace met {
     template <typename T>
     Texture2d<T> load_texture2d(const fs::path &path) {
       // Check that file path exists
-      debug::check_expr(fs::exists(path),
+      debug::check_expr_dbg(fs::exists(path),
         fmt::format("failed to resolve path \"{}\"", path.string()));
 
       // Load image float data from disk
@@ -37,7 +37,7 @@ namespace met {
       size_t     data_size = v.prod() * c;
 
       // Test if data was loaded
-      debug::check_expr(data_ptr, 
+      debug::check_expr_dbg(data_ptr, 
         fmt::format("failed to load file \"{}\"", path.string()));
 
       // Initialize texture object with correct size and requested channel layout
@@ -98,11 +98,11 @@ namespace met {
       } else if (ext == ".bmp") {
         ret = stbi_write_bmp(pstr, size.x(), size.y(), c, byte_data.data());
       } else {
-        debug::check_expr(false,
+        debug::check_expr_dbg(false,
           fmt::format("unsupported image extension for writing \"{}\"", path.string()));
       }
 
-      debug::check_expr(ret != 0,
+      debug::check_expr_dbg(ret != 0,
         fmt::format("could not save file to \"{}\", code was {}", path.string(), ret));
     }
     

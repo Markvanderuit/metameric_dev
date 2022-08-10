@@ -6,10 +6,12 @@ namespace met {
   constexpr float list_width_relative  = 0.33f;
   constexpr float list_width_max       = 150.f;
   constexpr float select_right_padding = -32.f;
-  const static ImVec2      add_button_size       = { 28.f, 28.f };
+  const static ImVec2      add_button_size       = { 16.f, 16.f };
   const static std::string default_mapping_title = "mapping_";
   
   void MappingsEditorTask::add_mapping(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.mappings;
@@ -41,6 +43,8 @@ namespace met {
   }
 
   void MappingsEditorTask::remove_mapping(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.mappings;
@@ -69,6 +73,8 @@ namespace met {
   }
 
   void MappingsEditorTask::change_mapping(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.mappings;
@@ -92,6 +98,8 @@ namespace met {
   }
   
   void MappingsEditorTask::reset_mapping(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get external shared resources
     auto &e_mappings = info.get_resource<ApplicationData>(global_key, "app_data").project_data.mappings;
 
@@ -102,6 +110,8 @@ namespace met {
   }
 
   void MappingsEditorTask::draw_list(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mappings = e_app_data.project_data.mappings;
@@ -147,6 +157,8 @@ namespace met {
   }
 
   void MappingsEditorTask::draw_selection(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_data = e_app_data.project_data;
@@ -208,6 +220,8 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void MappingsEditorTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+
     m_selected_i = -1;
 
     // Share a selection key that can be set from the outside, and is then reset, so
@@ -216,6 +230,8 @@ namespace met {
   }
 
   void MappingsEditorTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     if (ImGui::Begin("Mappings editor")) {      
       // Get shared resources
       auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");

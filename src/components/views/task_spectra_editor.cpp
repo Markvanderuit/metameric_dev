@@ -1,5 +1,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
@@ -7,11 +8,9 @@ namespace met {
   SpectraEditorTask::SpectraEditorTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void SpectraEditorTask::init(detail::TaskInitInfo &info) {
-    // ...
-  }
-
   void SpectraEditorTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     if (ImGui::Begin("Spectra editor")) {
       // Get external shared resources
       auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");

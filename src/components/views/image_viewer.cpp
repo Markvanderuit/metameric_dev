@@ -9,6 +9,8 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void ImageViewerTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+
     // Get externally shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
@@ -17,6 +19,8 @@ namespace met {
   }
   
   void ImageViewerTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     if (ImGui::Begin("Input")) {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
@@ -28,7 +32,7 @@ namespace met {
 
     if (ImGui::Begin("Mapped")) {
       // Get external resources
-      auto &e_color_texture = info.get_resource<gl::Texture2d4f>("gen_color_mapping_0_texture", "texture");
+      auto &e_color_texture = info.get_resource<gl::Texture2d4f>("gen_color_mapping_texture_0", "texture");
 
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);

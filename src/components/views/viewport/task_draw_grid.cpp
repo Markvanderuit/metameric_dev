@@ -13,9 +13,11 @@
 namespace met {
   
   ViewportDrawGridTask::ViewportDrawGridTask(const std::string &name)
-  : detail::AbstractTask(name) { }
+  : detail::AbstractTask(name, true) { }
 
   void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+    
     // Get externally shared resources
     auto &e_vox_grid = info.get_resource<ApplicationData>(global_key, "app_data").spec_vox_grid;
 
@@ -32,9 +34,9 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
     m_program = {{ .type = gl::ShaderType::eVertex, 
-                   .path = "resources/shaders/viewport_task/value_draw.vert" },
+                   .path = "resources/shaders/viewport/draw_color_array.vert" },
                  { .type = gl::ShaderType::eFragment,  
-                   .path = "resources/shaders/viewport_task/vec3_passthrough.frag" }};
+                   .path = "resources/shaders/viewport/draw_color.frag" }};
     m_draw = { .type             = gl::PrimitiveType::ePoints,
                .vertex_count     = (uint) color_grid.size(),
                .bindable_array   = &m_vertex_array,
@@ -45,6 +47,8 @@ namespace met {
   }
 
   void ViewportDrawGridTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Grid draw settings")) {
       ImGui::SliderFloat("Grid point size", &m_psize, 1.f, 32.f, "%.0f");

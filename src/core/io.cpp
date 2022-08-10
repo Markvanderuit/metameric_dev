@@ -33,7 +33,7 @@ namespace met::io {
 
   HD5Data load_hd5(const fs::path &path, const std::string &name) {
     // Check that file path exists
-    debug::check_expr(fs::exists(path),
+    debug::check_expr_dbg(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
 
     // Attempt to open file and extract forcibly named dataset from file
@@ -52,12 +52,12 @@ namespace met::io {
 
   std::string load_string(const fs::path &path) {
     // Check that file path exists
-    debug::check_expr(fs::exists(path),
+    debug::check_expr_dbg(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
       
     // Attempt to open file stream
     std::ifstream ifs(path, std::ios::ate);
-    debug::check_expr(ifs.is_open(),
+    debug::check_expr_dbg(ifs.is_open(),
       fmt::format("failed to open file \"{}\"", path.string()));
       
     // Read file size and construct string to hold data
@@ -75,7 +75,7 @@ namespace met::io {
   void save_string(const fs::path &path, const std::string &str) {
     // Attempt to open output file stream in text mode
     std::ofstream ofs(path, std::ios::out);
-    debug::check_expr(ofs.is_open(),
+    debug::check_expr_dbg(ofs.is_open(),
       fmt::format("failed to open file \"{}\"", path.string()));
 
     // Write string directly to file in text mode

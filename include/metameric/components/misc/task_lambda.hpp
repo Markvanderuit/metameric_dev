@@ -1,7 +1,8 @@
 #pragma once
 
-#include <functional>
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/utility.hpp>
+#include <functional>
 
 namespace met {
   class LambdaTask : public detail::AbstractTask {
@@ -27,15 +28,21 @@ namespace met {
       _init(init), _eval(eval), _dstr(dstr) { }
 
     void init(detail::TaskInitInfo &init_info) override {
+      met_declare_trace_zone();
+
       if (_init)
         _init(init_info);
     }
 
     void eval(detail::TaskEvalInfo &eval_info) override {
+      met_declare_trace_zone();
+
       _eval(eval_info);
     }
 
     void dstr(detail::TaskDstrInfo &dstr_info) override {
+      met_declare_trace_zone();
+
       if (_dstr)
         _dstr(dstr_info);
     }

@@ -1,15 +1,18 @@
 #pragma once
 
+#include <metameric/core/utility.hpp>
+#include <metameric/core/detail/scheduler_task.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
-#include <metameric/core/detail/scheduler_task.hpp>
 
 namespace met {
   struct ViewportDrawEndTask : public detail::AbstractTask {
     ViewportDrawEndTask(const std::string &name)
-    : detail::AbstractTask(name) { }
+    : detail::AbstractTask(name, true) { }
 
     void eval(detail::TaskEvalInfo &info) override {
+      met_declare_trace_zone();
+    
       // Get shared resources 
       auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
       auto &e_frame_buffer      = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");

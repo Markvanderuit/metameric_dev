@@ -1,9 +1,10 @@
 #pragma once
 
+#include <metameric/core/utility.hpp>
+#include <metameric/core/detail/scheduler_task.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/renderbuffer.hpp>
 #include <small_gl/texture.hpp>
-#include <metameric/core/detail/scheduler_task.hpp>
 
 namespace met {
   class ViewportDrawBeginTask : public detail::AbstractTask {
@@ -16,15 +17,19 @@ namespace met {
     
   public:
     ViewportDrawBeginTask(const std::string &name)
-    : detail::AbstractTask(name) { }
+    : detail::AbstractTask(name, true) { }
 
     void init(detail::TaskInitInfo &info) override {
+      met_declare_trace_zone();
+    
       // Share uninitialized framebuffer objects; initialized during eval()
       info.insert_resource("frame_buffer", gl::Framebuffer());
       info.insert_resource("frame_buffer_msaa", gl::Framebuffer());
     }
 
     void eval(detail::TaskEvalInfo &info) override {
+      met_declare_trace_zone();
+    
       // Get shared resources 
       auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
       auto &i_frame_buffer      = info.get_resource<gl::Framebuffer>("frame_buffer");

@@ -11,6 +11,8 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenSpectralTextureTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+
     // Get externally shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
@@ -19,7 +21,7 @@ namespace met {
 
     // Initialize objects for shader call
     m_generate_program = {{ .type = gl::ShaderType::eCompute,
-                            .path = "resources/shaders/generate_spectral_task/generate_spectral.comp" }};
+                            .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp" }};
     m_generate_dispatch = { .groups_x = generate_ndiv, .bindable_program = &m_generate_program };
 
     // Set these uniforms once
@@ -32,10 +34,15 @@ namespace met {
     });
 
     // Initialize main spectral texture buffer
-    info.emplace_resource<gl::Buffer>("spectrum_buffer", { .size  = sizeof(Spec) * generate_n });
+    info.emplace_resource<gl::Buffer>("spectrum_buffer", { 
+      .size  = sizeof(Spec) * generate_n,
+      .flags = gl::BufferCreateFlags::eMapRead
+    });
   }
 
   void GenSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get shared resources
     auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "color_buffer");
     auto &e_spect_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spectrum_buffer");

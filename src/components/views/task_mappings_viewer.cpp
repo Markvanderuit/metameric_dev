@@ -1,20 +1,38 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/mappings_viewer/task_mapping_popout.hpp>
-#include <metameric/components/tasks/detail/task_texture_resample.hpp>
 #include <small_gl/buffer.hpp>
 
 namespace met {
   constexpr auto gen_subtask_fmt      = FMT_COMPILE("gen_color_mapping_{}");
-  constexpr auto gen_subtask_tex_fmt  = FMT_COMPILE("gen_color_mapping_{}_texture");
+  constexpr auto gen_subtask_tex_fmt  = FMT_COMPILE("gen_color_mapping_texture_{}");
   constexpr auto resample_subtask_fmt = FMT_COMPILE("mappings_viewer_resample_{}");
 
-  using ResampleTaskType = TextureResampleTask<gl::Texture2d4f>;
+  // Lambda captures of texture_size parameter and outputs
+  // capture to add a resample task
+  constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
+    return [=](detail::AbstractTaskInfo &, uint i) {
+      using ResampleTaskType = detail::TextureResampleTask<gl::Texture2d4f>;
+      return ResampleTaskType({ fmt::format(gen_subtask_tex_fmt, i), "texture"  }, 
+                              { fmt::format(resample_subtask_fmt, i), "texture" },
+                              { .size = texture_size                            }, 
+                              { .min_filter = gl::SamplerMinFilter::eLinear,
+                                .mag_filter = gl::SamplerMagFilter::eLinear     });
+    };
+  };
+
+  // Lambda capture to remove a resample task
+  constexpr auto resample_subtask_rmv = [](detail::AbstractTaskInfo &, uint i) {
+    return fmt::format(resample_subtask_fmt, i);
+  };
 
   void MappingsViewerTask::handle_tooltip(detail::TaskEvalInfo &info, uint texture_i) {
+    met_declare_trace_zone();
+
     // Get shared resources
     auto &e_spectrum_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
     auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -22,18 +40,22 @@ namespace met {
     auto &e_mapping         = e_app_data.loaded_mappings[texture_i];
 
     // Compute sample position in texture dependent on mouse position in image
-    eig::Array2f mouse_pos = (static_cast<eig::Array2f>(ImGui::GetMousePos()) 
+    eig::Array2f mouse_pos  =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
                             - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
                             / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
     eig::Array2i sample_pos = (mouse_pos * e_tex_data.size().cast<float>()).cast<int>();
     const size_t sample_i   = e_tex_data.size().x() * sample_pos.y() + sample_pos.x();
 
     // Copy reflectance data at sample position from gpu buffer
-    Spec reflectance;// m_spectrum_buffer_map[sample_i];
-    e_spectrum_buffer.get(as_span<std::byte>(reflectance), sizeof(Spec), sizeof(Spec) * sample_i);
+    Spec reflectance = cast_span<Spec>(e_spectrum_buffer.map(gl::BufferAccessFlags::eMapRead,
+      sizeof(Spec), sizeof(Spec) * sample_i))[0];
+    e_spectrum_buffer.unmap();
+
+    // Spec reflectance;// m_spectrum_buffer_map[sample_i];
+    // e_spectrum_buffer.get(as_span<std::byte>(reflectance), sizeof(Spec), sizeof(Spec) * sample_i);
 
     // Compute output on the fly for said data
-    Spec power      = e_mapping.apply_power(reflectance);
+    Spec  power     = e_mapping.apply_power(reflectance);
     Color power_rgb = e_mapping.apply_color(reflectance);
 
     // Spawn a simple tooltip showing reflectance, power, rgb values, etc.
@@ -56,49 +78,16 @@ namespace met {
 
   MappingsViewerTask::MappingsViewerTask(const std::string &name)
   : detail::AbstractTask(name) { }
-
-  void MappingsViewerTask::init_resample_subtasks(detail::AbstractTaskInfo &info, uint n) {
-    for (uint i = 0; i < n; ++i) {
-      add_resample_subtask(info, i);
-    }
-  }
-
-  void MappingsViewerTask::dstr_resample_subtasks(detail::AbstractTaskInfo &info, uint n) {
-    for (uint i = 0; i < n; ++i) {
-      rmv_resample_subtask(info, i);
-    }
-  }
-
-  void MappingsViewerTask::add_resample_subtask(detail::AbstractTaskInfo &info, uint i) {
-    auto inpt_name = fmt::format(gen_subtask_tex_fmt, i);
-    auto curr_name = fmt::format(resample_subtask_fmt, i);
-    ResampleTaskType task({ inpt_name, "texture" }, { curr_name, "texture" },
-                          { .size = m_texture_size}, 
-                          { .min_filter = gl::SamplerMinFilter::eLinear,
-                            .mag_filter = gl::SamplerMagFilter::eLinear });
-    info.insert_task_after(name(), curr_name, std::move(task));
-  }
-
-  void MappingsViewerTask::rmv_resample_subtask(detail::AbstractTaskInfo &info, uint i) {
-    auto curr_name = fmt::format(resample_subtask_fmt, i);
-    info.remove_task(curr_name);
-  } 
-
-  void MappingsViewerTask::init(detail::TaskInitInfo &info) {
-    // Get shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    
-    // Set initial sensible value for nr. of subtasks, and keep this nr. around
-    uint i_resample_tasks_n = e_app_data.loaded_mappings.size();
-    init_resample_subtasks(info, i_resample_tasks_n);
-    info.insert_resource("resample_tasks_n", std::move(i_resample_tasks_n));
-  }
-
+  
   void MappingsViewerTask::dstr(detail::TaskDstrInfo &info) {
-    dstr_resample_subtasks(info, info.get_resource<uint>("resample_tasks_n"));
+    met_declare_trace_zone();
+    
+    m_resample_subtasks.dstr(info);
   }
 
   void MappingsViewerTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+    
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
       auto &e_spectrum_buffer  = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
@@ -106,7 +95,6 @@ namespace met {
       auto &e_tex_data         = e_app_data.loaded_texture;
       auto &e_prj_data         = e_app_data.project_data;
       auto &e_mappings         = e_prj_data.mappings;
-      auto &i_resample_tasks_n = info.get_resource<uint>("resample_tasks_n");
       uint e_mappings_n        = e_app_data.loaded_mappings.size();
 
       // Set up drawing a nr. of textures in a column-based layout; determine texture res.
@@ -117,22 +105,16 @@ namespace met {
                                  * e_app_data.loaded_texture.size().y()
                                  / e_app_data.loaded_texture.size().x()
                                  * 0.95f / static_cast<float>(n_cols);
-      eig::Array2u texture_size  = texture_scale.cast<uint>();
-
-      // If texture res changed, respawn texture resample tasks
-      if (!m_texture_size.isApprox(texture_size)) {
+                                 
+      // If texture size has changed, respawn texture resample tasks
+      if (auto texture_size = texture_scale.cast<uint>(); !m_texture_size.isApprox(texture_size)) {
+        // Reinitialize resample subtasks on texture size change
         m_texture_size = texture_size;
-        dstr_resample_subtasks(info, i_resample_tasks_n);
-        init_resample_subtasks(info, e_mappings_n);
-        i_resample_tasks_n = e_mappings_n;
+        m_resample_subtasks.init(name(), info, e_mappings_n, 
+          resample_subtask_add(m_texture_size), resample_subtask_rmv);
       } else {
         // Adjust nr. of spawned tasks to correct number
-        for (; i_resample_tasks_n < e_mappings_n; ++i_resample_tasks_n) {
-          add_resample_subtask(info, i_resample_tasks_n);
-        }
-        for (; i_resample_tasks_n > e_mappings_n; --i_resample_tasks_n) {
-          rmv_resample_subtask(info, i_resample_tasks_n - 1);
-        }
+        m_resample_subtasks.eval(info, e_mappings_n);
       }
       
       // Iterate n_cols, n_rows, and n_mappings

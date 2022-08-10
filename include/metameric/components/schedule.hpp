@@ -15,7 +15,7 @@
 #include <metameric/components/tasks/task_gen_spectral_mappings.hpp>
 #include <metameric/components/tasks/task_gen_spectral_gamut.hpp>
 #include <metameric/components/tasks/task_gen_spectral_texture.hpp>
-#include <metameric/components/tasks/task_spawn_color_mappings.hpp>
+#include <metameric/components/tasks/task_gen_color_mappings.hpp>
 
 // View tasks
 #include <metameric/components/views/task_gamut_viewer.hpp>
@@ -26,21 +26,19 @@
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
-// TODO remove
-#include <metameric/components/tasks/mapping_cpu_task.hpp>
-#include <metameric/components/views/image_viewer.hpp>
-
 namespace met {
   template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
     scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
 
-    // Temporary window to show schedule
+    // Temporary window to show runtime schedule
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
       if (ImGui::Begin("Schedule")) {
-        for (auto &s : scheduler.schedule_list()) {
-          ImGui::Text(s.c_str());
+        for (auto &t : scheduler.tasks()) {
+          if (t->is_subtask()) ImGui::Indent();
+          ImGui::Text(t->name().c_str());
+          if (t->is_subtask()) ImGui::Unindent();
         }
       }
       ImGui::End();
@@ -102,7 +100,7 @@ namespace met {
 
     // The following task defines the spectrum->color output pipeline
     // (though it mostly spawns subtasks to do so)
-    scheduler.emplace_task<SpawnColorMappingsTask>("spawn_color_mappings");
+    scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
 
     // The following tasks define UI components and windows
     scheduler.emplace_task<ViewportTask>("viewport");

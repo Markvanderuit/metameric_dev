@@ -9,12 +9,16 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenSpectralMappingsTask::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+
     // Specify a default mappings buffer and store the nr. of mappings
     m_mapping_count = 0;
     info.insert_resource("mappings_buffer", gl::Buffer());
   }
   
   void GenSpectralMappingsTask::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get shared resources
     auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &i_mappings_buffer = info.get_resource<gl::Buffer>("mappings_buffer");
@@ -32,8 +36,6 @@ namespace met {
       // TODO this should be improved to only happen ONCE
       // Upload new data to the stored mapping buffer if stale
       i_mappings_buffer.set(as_span<const std::byte>(e_app_data.loaded_mappings));
-    }
-
-    
+    }   
   }
 } // namespace met

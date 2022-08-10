@@ -53,14 +53,14 @@ namespace met {
   // Given a spectral bin, obtain the relevant central wavelength
   constexpr inline
   float wavelength_at_index(size_t i) {
-    debug::check_expr(i >= 0 && i < wavelength_samples, fmt::format("index {} out of range", i));
+    debug::check_expr_dbg(i >= 0 && i < wavelength_samples, fmt::format("index {} out of range", i));
     return wavelength_min + wavelength_ssize * (static_cast<float>(i) + .5f);
   }
 
   // Given a wavelength, obtain the relevant spectral bin's index
   constexpr inline
   size_t index_at_wavelength(float wvl) {
-    debug::check_expr(wvl >= wavelength_min && wvl <= wavelength_max, fmt::format("wavelength {} out of range", wvl));
+    debug::check_expr_dbg(wvl >= wavelength_min && wvl <= wavelength_max, fmt::format("wavelength {} out of range", wvl));
     const uint i = static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv);
     return std::min(i, wavelength_samples - 1);
   }

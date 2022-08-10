@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
@@ -9,6 +10,8 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
+      met_declare_trace_zone();
+
       ImGui::BeginFrame();
     }
   };

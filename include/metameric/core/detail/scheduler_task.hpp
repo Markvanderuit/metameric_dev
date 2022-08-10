@@ -23,13 +23,15 @@ namespace met::detail {
    * Abstract base class for application tasks.
    */
   class AbstractTask {
-    std::string _name;
+    std::string m_name;
+    bool        m_is_subtask;
 
   public:
-    const std::string &name() const { return _name; } 
-    void set_name(const std::string &name) { _name = name; } 
+    const std::string &name()       const { return m_name; } 
+    const bool        &is_subtask() const { return m_is_subtask; }
 
-    AbstractTask(const std::string &name) : _name(name) { }
+    AbstractTask(const std::string &name, bool is_subtask = false) 
+    : m_name(name), m_is_subtask(is_subtask) { }
 
     // Override and implement
     virtual void init(TaskInitInfo &) { };
@@ -61,16 +63,16 @@ namespace met::detail {
     using ApplRsrcMapType = std::unordered_map<KeyType, RsrcMapType>;
     using ApplTaskVecType = const std::vector<TaskType>; 
 
-    RsrcMapType     &_task_rsrc_registry;
-    ApplRsrcMapType &_appl_rsrc_registry;
-    ApplTaskVecType &_appl_task_registry;
+    RsrcMapType     &m_task_rsrc_registry;
+    ApplRsrcMapType &m_appl_rsrc_registry;
+    ApplTaskVecType &m_appl_task_registry;
 
     AbstractTaskInfo(ApplRsrcMapType &appl_rsrc_registry,
                      ApplTaskVecType &appl_task_registry,
                      const AbstractTask &task)
-    : _appl_rsrc_registry(appl_rsrc_registry),
-      _appl_task_registry(appl_task_registry),
-      _task_rsrc_registry(appl_rsrc_registry[task.name()]) { };
+    : m_appl_rsrc_registry(appl_rsrc_registry),
+      m_appl_task_registry(appl_task_registry),
+      m_task_rsrc_registry(appl_rsrc_registry[task.name()]) { };
     
   public:
 
@@ -132,7 +134,7 @@ namespace met::detail {
 
     template <typename T>
     T & get_resource(const KeyType &key) {
-      if (auto i = _task_rsrc_registry.find(key); i != _task_rsrc_registry.end()) {
+      if (auto i = m_task_rsrc_registry.find(key); i != m_task_rsrc_registry.end()) {
         return i->second->get_as<T>();
       } else {
         return get_resource<T>(global_key, key);
@@ -141,20 +143,25 @@ namespace met::detail {
 
     template <typename T>
     T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      return _appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
+      return m_appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
 
     bool has_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      return _appl_rsrc_registry.contains(task_key)
-          && _appl_rsrc_registry.at(task_key).contains(rsrc_key);
+      return m_appl_rsrc_registry.contains(task_key)
+          && m_appl_rsrc_registry.at(task_key).contains(rsrc_key);
     }
 
     /* miscellaneous, debug info */
 
+    // Return const list of current tasks
+    const std::vector<TaskType>& tasks() const {
+      return m_appl_task_registry;
+    }
+
     // String output of current task schedule
     std::vector<KeyType> schedule_list() const {
-      std::vector<std::string> v(_appl_task_registry.size());
-      std::ranges::transform(_appl_task_registry, v.begin(), [](const auto &t) { return t->name(); });
+      std::vector<std::string> v(m_appl_task_registry.size());
+      std::ranges::transform(m_appl_task_registry, v.begin(), [](const auto &t) { return t->name(); });
       return v;
     }
   };

@@ -18,6 +18,8 @@ namespace met {
 
   template <class TextureTy, class InfoTy>
   void BufferToTexture2dTask<TextureTy, InfoTy>::init(detail::TaskInitInfo &info) {
+    met_declare_trace_zone();
+
     // Emplace texture resource using provided info object
     info.emplace_resource<TextureTy, InfoTy>(m_out_rsrc_key, m_out_rsrc_info);
 
@@ -38,6 +40,8 @@ namespace met {
   
   template <class TextureTy, class InfoTy>
   void BufferToTexture2dTask<TextureTy, InfoTy>::eval(detail::TaskEvalInfo &info) {
+    met_declare_trace_zone();
+
     // Get shared resources
     guard(info.has_resource(m_inp_task_key, m_inp_rsrc_key));
     auto &e_rsrc = info.get_resource<gl::Buffer>(m_inp_task_key, m_inp_rsrc_key);
