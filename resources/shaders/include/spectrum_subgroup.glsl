@@ -132,6 +132,13 @@ SgSpec sg_min(in SgSpec a, in float b) {
   return s;
 }
 
+SgSpec sg_clamp(in SgSpec a, in float b, in float c) {
+  SgSpec s;
+  for (uint i = 0; i < sg_wavelength_iters; ++i)
+    s[i] = clamp(a[i], b, c);
+  return s;
+}
+
 /* Column-wise comparators */
 
 SgSpec sg_max(in SgSpec a, in SgSpec b) {
@@ -145,6 +152,13 @@ SgSpec sg_min(in SgSpec a, in SgSpec b) {
   SgSpec s;
   for (uint i = 0; i < sg_wavelength_iters; ++i)
     s[i] = min(a[i], b[i]);
+  return s;
+}
+
+SgSpec sg_clamp(in SgSpec a, in SgSpec b, in SgSpec c) {
+  SgSpec s;
+  for (uint i = 0; i < sg_wavelength_iters; ++i)
+    s[i] = clamp(a[i], b[i], c[i]);
   return s;
 }
 

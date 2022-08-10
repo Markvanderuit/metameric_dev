@@ -112,6 +112,13 @@ Spec in_min(in Spec a, in float b) {
   return s;
 }
 
+Spec in_clamp(in Spec a, in float b, in float c) {
+  Spec s;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    s[i] = clamp(a[i], b, c);
+  return s;
+}
+
 /* Column-wise comparators */
 
 Spec in_max(in Spec a, in Spec b) {
@@ -125,6 +132,13 @@ Spec in_min(in Spec a, in Spec b) {
   Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)
     s[i] = min(a[i], b[i]);
+  return s;
+}
+
+Spec in_clamp(in Spec a, in Spec b, in Spec c) {
+  Spec s;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    s[i] = clamp(a[i], b[i], c[i]);
   return s;
 }
 

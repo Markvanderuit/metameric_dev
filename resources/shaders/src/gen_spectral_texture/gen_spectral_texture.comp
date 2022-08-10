@@ -40,5 +40,5 @@ void main() {
        sd = in_add(sd, in_mul(b_1_spectral_gamut[2], abcd[2]));
        sd = in_add(sd, in_mul(b_1_spectral_gamut[3], abcd[3]));
 
-  b_3_spectral_texture[i] = sd;
+  b_3_spectral_texture[i] = in_clamp(sd, 0.f, 1.f);
 }
