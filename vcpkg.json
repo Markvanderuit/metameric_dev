@@ -2,6 +2,7 @@
   "name" : "spectral-uplifting",
   "version-string" : "0.1.0",
   "dependencies" : [
+    "benchmark",
     "cxxopts",
     "eigen3",
     "fmt",
@@ -15,7 +16,7 @@
     "nlohmann-json",
     "stb",
     "tbb",
-    "benchmark"
+    "tracy"
   ],
   "features" : { }
 }

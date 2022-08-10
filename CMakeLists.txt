@@ -51,6 +51,7 @@ find_package(imguizmo  CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
+find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
 # Include third party libraries provided directly
@@ -165,6 +166,7 @@ target_link_libraries(core PUBLIC
   Eigen3::Eigen
   fmt::fmt-header-only
   TBB::tbb
+  Tracy::TracyClient
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   nlohmann_json::nlohmann_json
 )
