@@ -27,7 +27,7 @@ namespace met::detail {
                      key, 
                      message);
     }
-
+    
     std::string get() const {
       return _buffer;
     }

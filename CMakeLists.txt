@@ -12,6 +12,10 @@ set(CMAKE_MODULE_PATH
 
 project(Metameric LANGUAGES CXX)
 
+# Build options
+option(met_enable_dbg_exceptions "Enable debug exceptions on release" ON)
+option(met_enable_tracy          "Enable Tracy support"               ON)
+
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN    400)
 set(MET_WAVELENGTH_MAX    700)
@@ -38,6 +42,7 @@ if(MSVC)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
 
+
 # Ensure OpenMP is available
 find_package(OpenMP REQUIRED)
 
@@ -55,7 +60,16 @@ find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
 # Include third party libraries provided directly
+option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
+option(gl_enable_tracy          "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
+
+# Configuration output info
+message(STATUS "Metameric : debug exceptions   = ${met_enable_dbg_exceptions}")
+message(STATUS "Metameric : Tracy support      = ${met_enable_tracy}")
+message(STATUS "Metameric : Wavelength min.    = ${MET_WAVELENGTH_MIN}")
+message(STATUS "Metameric : Wavelength max.    = ${MET_WAVELENGTH_MAX}")
+message(STATUS "Metameric : Wavelength samples = ${MET_WAVELENGTH_SAMPLES}")
 
 # Find glslLangValidator program on system
 find_program(glsl_validator_path glslangValidator HINTS 
@@ -200,28 +214,42 @@ target_link_libraries(app PUBLIC
 add_executable_r(metameric src/target/main_metameric.cpp)
 target_link_libraries(metameric PRIVATE app)
 
+# Configure build options
+if (met_enable_dbg_exceptions)
+  target_compile_definitions(core       PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
+  target_compile_definitions(components PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
+  target_compile_definitions(app        PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
+  target_compile_definitions(metameric  PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
+endif()
+if (met_enable_tracy)
+  target_compile_definitions(core       PUBLIC MET_ENABLE_TRACY)
+  target_compile_definitions(components PUBLIC MET_ENABLE_TRACY)
+  target_compile_definitions(app        PUBLIC MET_ENABLE_TRACY)
+  target_compile_definitions(metameric  PUBLIC MET_ENABLE_TRACY)
+endif()
+
 # Set up benchmark executable
-add_executable_r(benchmark src/target/main_benchmark.cpp)
-target_link_libraries(benchmark PRIVATE 
-  core
-  benchmark::benchmark
-  benchmark::benchmark_main
-  Eigen3::Eigen
-)
+# add_executable_r(benchmark src/target/main_benchmark.cpp)
+# target_link_libraries(benchmark PRIVATE 
+#   core
+#   benchmark::benchmark
+#   benchmark::benchmark_main
+#   Eigen3::Eigen
+# )
 
 # Set up playground executable
-add_executable_r(playground src/target/main_playground.cpp)
-target_link_libraries(playground PRIVATE
-  core
-  small_gl
-  fmt::fmt-header-only
-  imgui::imgui
-  imguizmo::imguizmo
-  TBB::tbb
-)
+# add_executable_r(playground src/target/main_playground.cpp)
+# target_link_libraries(playground PRIVATE
+#   core
+#   small_gl
+#   fmt::fmt-header-only
+#   imgui::imgui
+#   imguizmo::imguizmo
+#   TBB::tbb
+# )
 
 # Set up serialization executable
-add_executable_r(serialization src/target/main_serialization.cpp)
-target_link_libraries(serialization PRIVATE
-  core
-)
+# add_executable_r(serialization src/target/main_serialization.cpp)
+# target_link_libraries(serialization PRIVATE
+#   core
+# )

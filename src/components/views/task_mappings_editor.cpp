@@ -147,9 +147,9 @@ namespace met {
     // Add-mapping button and remove-mapping button; show remove only if a
     // mapping is selected and n_mappings > 1
     const bool show_remove   = m_selected_i != -1 && e_mappings.size() > 1;
-    if (ImGui::Button("+", add_button_size)) { add_mapping(info); }
+    if (ImGui::Button("+")) { add_mapping(info); }
     ImGui::SameLine();
-    if (show_remove && ImGui::Button("-", add_button_size)) { remove_mapping(info); }
+    if (show_remove && ImGui::Button("-")) { remove_mapping(info); }
 
     // End list draw group
     ImGui::PopItemWidth();

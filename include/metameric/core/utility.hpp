@@ -72,6 +72,8 @@ namespace met {
   }
 
   namespace debug {
+    // Evaluate a boolean expression, throwing a detailed exception pointing
+    // to the expression's origin if said expression fails
     constexpr inline
     void check_expr_rel(bool expr,
                         const std::string_view &msg = "",
@@ -87,12 +89,12 @@ namespace met {
 
     // Evaluate a boolean expression, throwing a detailed exception pointing
     // to the expression's origin if said expression fails
+    // Note: removed on release builds
+  #if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
     constexpr inline
     void check_expr_dbg(bool expr,
                         const std::string_view &msg = "",
                         const std::source_location sl = std::source_location::current()) {
-  #ifdef NDEBUG
-  #else
       guard(!expr);
 
       detail::Exception e;
@@ -100,7 +102,9 @@ namespace met {
       e.put("message", msg);
       e.put("in file", fmt::format("{}({}:{})", sl.file_name(), sl.line(), sl.column()));
       throw e;
-  #endif
     }
+  #else
+  #define check_expr_dbg(expr, msg, sl)
+  #endif
   } // namespace debug
 } // namespace met
