@@ -9,7 +9,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void ImageViewerTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get externally shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
@@ -19,7 +19,7 @@ namespace met {
   }
   
   void ImageViewerTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     if (ImGui::Begin("Input")) {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)

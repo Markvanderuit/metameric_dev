@@ -11,7 +11,7 @@ namespace met {
   : detail::AbstractTask(name) { }
   
   void GenSpectralGamutTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Define flags for creation of a persistent, write-only flushable buffer map
     auto create_flags = gl::BufferCreateFlags::eMapWrite 
@@ -37,7 +37,7 @@ namespace met {
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &i_color_buffer = info.get_resource<gl::Buffer>("color_buffer");
@@ -49,7 +49,7 @@ namespace met {
   }
   
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &e_app_data         = info.get_resource<ApplicationData>(global_key, "app_data");

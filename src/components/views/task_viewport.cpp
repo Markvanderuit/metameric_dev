@@ -51,7 +51,7 @@ namespace met {
   const static std::string draw_end_name   = "_draw_end";
 
   void ViewportTask::eval_camera(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Get shared resources
     auto &i_arcball = info.get_resource<detail::Arcball>("arcball");
@@ -76,7 +76,7 @@ namespace met {
   }
 
   void ViewportTask::eval_select(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Get shared resources
     auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
@@ -131,7 +131,7 @@ namespace met {
   }
 
   void ViewportTask::eval_gizmo(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Get shared resources
     auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
@@ -201,7 +201,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void ViewportTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Get shared resources
     auto &e_rgb_gamut  = info.get_resource<ApplicationData>(global_key, "app_data").project_data.rgb_gamut;
@@ -224,7 +224,7 @@ namespace met {
   }
 
   void ViewportTask::dstr(detail::TaskDstrInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Remove subtasks
     info.remove_task(name() + draw_begin_name);
@@ -234,8 +234,8 @@ namespace met {
   }
 
   void ViewportTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
-    met_declare_trace_zone_gpu("ViewportTask");
+    met_trace();
+    met_trace_gpu("ViewportTask");
     
     // Get shared resources
     auto &i_draw_texture = info.get_resource<gl::Texture2d3f>("draw_texture");

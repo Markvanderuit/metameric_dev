@@ -28,20 +28,20 @@ namespace met {
       _init(init), _eval(eval), _dstr(dstr) { }
 
     void init(detail::TaskInitInfo &init_info) override {
-      met_declare_trace_zone();
+      met_trace();
 
       if (_init)
         _init(init_info);
     }
 
     void eval(detail::TaskEvalInfo &eval_info) override {
-      met_declare_trace_zone();
+      met_trace();
 
       _eval(eval_info);
     }
 
     void dstr(detail::TaskDstrInfo &dstr_info) override {
-      met_declare_trace_zone();
+      met_trace();
 
       if (_dstr)
         _dstr(dstr_info);

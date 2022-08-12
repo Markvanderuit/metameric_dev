@@ -11,7 +11,7 @@ namespace met {
     : detail::AbstractTask(name, true) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
     
       // Get shared resources 
       auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");

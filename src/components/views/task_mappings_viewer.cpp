@@ -31,7 +31,7 @@ namespace met {
   };
 
   void MappingsViewerTask::handle_tooltip(detail::TaskEvalInfo &info, uint texture_i) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &e_spectrum_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
@@ -80,13 +80,13 @@ namespace met {
   : detail::AbstractTask(name) { }
   
   void MappingsViewerTask::dstr(detail::TaskDstrInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     m_resample_subtasks.dstr(info);
   }
 
   void MappingsViewerTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources

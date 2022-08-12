@@ -10,7 +10,7 @@ namespace met {
     m_mapping_i(mapping_i) { }
 
   void GenColorMappingTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -46,7 +46,7 @@ namespace met {
   }
 
   void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
@@ -67,7 +67,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenColorMappingsTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -88,7 +88,7 @@ namespace met {
   }
 
   void GenColorMappingsTask::dstr(detail::TaskDstrInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Remove subtasks
     m_texture_subtasks.dstr(info);
@@ -96,7 +96,7 @@ namespace met {
   }
 
   void GenColorMappingsTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Get shared resources
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");

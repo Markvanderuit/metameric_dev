@@ -9,7 +9,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void SpectraEditorTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     if (ImGui::Begin("Spectra editor")) {
       // Get external shared resources

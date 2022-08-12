@@ -47,7 +47,7 @@ namespace met {
   }
 
   void LinearScheduler::run() {
-    met_declare_trace_zone();
+    met_trace();
 
     std::list<std::pair<KeyType, TaskType>> add_task_registry;
     std::list<KeyType>                      rem_task_registry;

@@ -12,7 +12,7 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
       
       auto fb = gl::Framebuffer::make_default();
       fb.bind();
@@ -25,7 +25,7 @@ namespace met {
       e_window.swap_buffers();
       e_window.poll_events();
 
-      met_declare_trace_frame()
+      met_trace_frame()
     }
   };
 } // namespace met

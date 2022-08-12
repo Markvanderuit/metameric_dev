@@ -31,7 +31,7 @@ namespace met::detail {
       m_sampler(sampler_info) { }
                         
     void init(detail::TaskInitInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
 
       // Emplace texture resource using provided info object
       info.emplace_resource<TextureTy, InfoTy>(m_output_key.second, m_texture_info);
@@ -53,7 +53,7 @@ namespace met::detail {
     }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
 
       // Get shared resources
       guard(info.has_resource(m_input_key.first, m_input_key.second));

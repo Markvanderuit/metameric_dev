@@ -9,7 +9,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenSpectralMappingsTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Specify a default mappings buffer and store the nr. of mappings
     m_mapping_count = 0;
@@ -17,7 +17,7 @@ namespace met {
   }
   
   void GenSpectralMappingsTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
 
     // Get shared resources
     auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");

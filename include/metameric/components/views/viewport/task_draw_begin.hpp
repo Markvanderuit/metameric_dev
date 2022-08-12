@@ -20,7 +20,7 @@ namespace met {
     : detail::AbstractTask(name, true) { }
 
     void init(detail::TaskInitInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
     
       // Share uninitialized framebuffer objects; initialized during eval()
       info.insert_resource("frame_buffer", gl::Framebuffer());
@@ -28,7 +28,7 @@ namespace met {
     }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
     
       // Get shared resources 
       auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");

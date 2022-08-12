@@ -10,7 +10,7 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_declare_trace_zone();
+      met_trace();
 
       ImGui::BeginFrame();
     }

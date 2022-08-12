@@ -1,15 +1,14 @@
 #pragma once
 
-#define MET_TRACY_ENABLED // Settings for now
-#ifdef  MET_TRACY_ENABLED
-#include <small_gl/utility.hpp>
-#include <Tracy.hpp>
-#include <TracyOpenGL.hpp>
-#endif // MET_TRACY_ENABLED
-
 #include <metameric/core/detail/utility.hpp>
 #include <span>
 #include <source_location>
+
+#ifdef  MET_ENABLE_TRACY
+#include <small_gl/utility.hpp>
+#include <Tracy.hpp>
+#include <TracyOpenGL.hpp>
+#endif // MET_ENABLE_TRACY
 
 // Simple guard statement syntactic sugar
 #define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
@@ -31,23 +30,26 @@
   constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
 
 // Insert Tracy scope statements if tracing is enabled
-#ifndef MET_TRACY_ENABLED
-  #define met_declare_trace_text(str_ptr)
-  #define met_declare_trace_zone(name_ptr)
-  #define met_declare_trace_zone()
-  #define met_declare_trace_frame()
-#else // MET_TRACY_ENABLED
-  #define met_declare_trace_text(str)      ZoneText(str, std::char_traits<char>::length(str))
-  #define met_declare_trace_named(name)    ZoneScopedN(name)
-  #define met_declare_trace_zone()         ZoneScoped
-  #define met_declare_trace_zone_gpu(name) TracyGpuZone(name)      
-  #define met_declare_trace_frame()        TracyGpuCollect; FrameMark;
+#ifndef MET_ENABLE_TRACY
+  #define met_trace_text(str)
+  #define met_trace_name(name)
+  #define met_trace()
+  #define met_trace_gpu(name)
+  #define met_trace_frame()
+#else // MET_ENABLE_TRACY
+  #define met_trace_text(str)  ZoneText(str, std::char_traits<char>::length(str))
+  #define met_trace_name(name) ZoneScopedN(name)
+  #define met_trace()          ZoneScoped;
+  #define met_trace_gpu(name)  TracyGpuZone(name)      
+  #define met_trace_frame()    TracyGpuCollect; FrameMark;
 
   #ifndef TRACY_ENABLE
     #define TRACY_ENABLE
   #endif // TRACY_ENABLE
+  #ifndef TRACY_ON_DEMAND
   #define TRACY_ON_DEMAND
-#endif // MET_TRACY_ENABLED
+  #endif // TRACY_ON_DEMAND
+#endif // MET_ENABLE_TRACY
 
 namespace met {
   // Interpret a container type as a span of type T

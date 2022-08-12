@@ -16,7 +16,7 @@ namespace met {
   : detail::AbstractTask(name, true) { }
 
   void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Get externally shared resources
     auto &e_vox_grid = info.get_resource<ApplicationData>(global_key, "app_data").spec_vox_grid;
@@ -47,7 +47,7 @@ namespace met {
   }
 
   void ViewportDrawGridTask::eval(detail::TaskEvalInfo &info) {
-    met_declare_trace_zone();
+    met_trace();
     
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Grid draw settings")) {
