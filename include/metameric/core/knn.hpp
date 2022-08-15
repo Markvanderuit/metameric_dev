@@ -1,10 +1,12 @@
 #pragma once
 
+#include <metameric/core/math.hpp>
+#include <metameric/core/utility.hpp>
+#include <array>
 #include <list>
 #include <span>
 #include <unordered_set>
 #include <vector>
-#include <metameric/core/math.hpp>
 
 namespace met {
   struct GridCreateInfo {
@@ -26,8 +28,9 @@ namespace met {
 
   public:
     uint index_from_grid_pos(const eig::Array3i &p) const {
-      return p.z() * m_grid_size.y() * m_grid_size.x() 
-           + p.y() * m_grid_size.x() + p.x();
+      return p.z() * m_grid_size.head<2>().prod() 
+           + p.y() * m_grid_size.x() 
+           + p.x();
     }
 
     eig::Array3i grid_pos_from_index(uint i) const {
@@ -54,6 +57,13 @@ namespace met {
     size_t size() const {
       return m_grid_size.prod();
     }
+
+    inline void swap(AbstractGrid &o) {
+      using std::swap;
+      swap(m_grid_size, o.m_grid_size);
+      swap(m_space_bounds_min, o.m_space_bounds_min);
+      swap(m_space_bounds_max, o.m_space_bounds_max);
+    }
   };
 
   template <typename T>
@@ -77,21 +87,24 @@ namespace met {
       return index_from_grid_pos(grid_pos_from_pos(p).cast<int>());
     }
 
-    std::unordered_set<uint> nearest_indices_from_pos(const eig::Array3f &p) const {
-      auto grid_p = grid_pos_from_pos(p);
+    std::array<uint, 8> nearest_indices_from_pos(const eig::Array3f &p) const {
+      met_trace();
 
       // Lower, upper coords determine block of eight nearest grid coordinates
-      auto l = grid_p.floor().cast<int>().max(0).eval(),
-           u = grid_p.ceil().cast<int>().min(m_grid_size - 1).eval();
+      auto g = grid_pos_from_pos(p);
+      auto l = g.floor().cast<int>().max(0).eval(),
+           u = g.ceil().cast<int>().min(m_grid_size - 1).eval();
 
       // Gather list of all indices possible with these coordinates
-      auto idx = { index_from_grid_pos({ l.x(), l.y(), l.z() }), index_from_grid_pos({ l.x(), l.y(), u.z() }),
-                   index_from_grid_pos({ l.x(), u.y(), l.z() }), index_from_grid_pos({ l.x(), u.y(), u.z() }),
-                   index_from_grid_pos({ u.x(), l.y(), l.z() }), index_from_grid_pos({ u.x(), l.y(), u.z() }),
-                   index_from_grid_pos({ u.x(), u.y(), l.z() }), index_from_grid_pos({ u.x(), u.y(), u.z() }) };
-
-      return std::unordered_set(std::make_move_iterator(idx.begin()),
-                                std::make_move_iterator(idx.end()));
+      // Ignore duplicates in favor of predictable return type size
+      return { index_from_grid_pos({ l.x(), l.y(), l.z() }), 
+               index_from_grid_pos({ l.x(), l.y(), u.z() }),
+               index_from_grid_pos({ l.x(), u.y(), l.z() }), 
+               index_from_grid_pos({ l.x(), u.y(), u.z() }),
+               index_from_grid_pos({ u.x(), l.y(), l.z() }), 
+               index_from_grid_pos({ u.x(), l.y(), u.z() }),
+               index_from_grid_pos({ u.x(), u.y(), l.z() }), 
+               index_from_grid_pos({ u.x(), u.y(), u.z() }) };
     }
 
   public:
@@ -99,6 +112,7 @@ namespace met {
 
     KNNGrid() = default;
     KNNGrid(GridCreateInfo info);
+    ~KNNGrid();
 
     /* insertion functions */
 
@@ -110,6 +124,18 @@ namespace met {
     QueryType              query_1_nearest(const eig::Array3f &p) const;
     std::vector<QueryType> query_k_nearest(const eig::Array3f &p, uint k);
     std::vector<QueryType> query_n_nearest(const eig::Array3f &p);
+
+    /* miscellaneous */
+
+    void retrace_size();
+
+    inline void swap(KNNGrid &o) {
+      using std::swap;
+      AbstractGrid::swap(o);
+      swap(m_grid, o.m_grid);
+    }
+
+    met_declare_noncopyable(KNNGrid);
   };
 
   template <typename T>
@@ -122,6 +148,7 @@ namespace met {
 
     VoxelGrid() = default;
     VoxelGrid(GridCreateInfo info);
+    ~VoxelGrid();
 
     /* direct accessors */
 
@@ -138,5 +165,15 @@ namespace met {
     /* query functions */
 
     T query(const eig::Array3f &p) const;
+
+    /* miscellaneous */
+
+    inline void swap(VoxelGrid &o) {
+      using std::swap;
+      AbstractGrid::swap(o);
+      swap(m_grid, o.m_grid);
+    }
+
+    met_declare_noncopyable(VoxelGrid);
   };
 } // namespace met
