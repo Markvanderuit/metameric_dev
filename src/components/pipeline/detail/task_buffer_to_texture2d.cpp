@@ -1,3 +1,4 @@
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/tasks/detail/task_buffer_to_texture2d.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
@@ -18,7 +19,7 @@ namespace met {
 
   template <class TextureTy, class InfoTy>
   void BufferToTexture2dTask<TextureTy, InfoTy>::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Emplace texture resource using provided info object
     info.emplace_resource<TextureTy, InfoTy>(m_out_rsrc_key, m_out_rsrc_info);
@@ -40,7 +41,7 @@ namespace met {
   
   template <class TextureTy, class InfoTy>
   void BufferToTexture2dTask<TextureTy, InfoTy>::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     guard(info.has_resource(m_inp_task_key, m_inp_rsrc_key));

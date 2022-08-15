@@ -2,6 +2,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/mappings_viewer/task_mapping_popout.hpp>
@@ -31,7 +32,7 @@ namespace met {
   };
 
   void MappingsViewerTask::handle_tooltip(detail::TaskEvalInfo &info, uint texture_i) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_spectrum_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
@@ -80,13 +81,13 @@ namespace met {
   : detail::AbstractTask(name) { }
   
   void MappingsViewerTask::dstr(detail::TaskDstrInfo &info) {
-    met_trace();
+    met_trace_full();
     
     m_resample_subtasks.dstr(info);
   }
 
   void MappingsViewerTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources

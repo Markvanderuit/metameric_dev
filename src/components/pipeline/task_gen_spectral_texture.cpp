@@ -1,4 +1,5 @@
 #include <metameric/components/tasks/task_gen_spectral_texture.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
@@ -11,7 +12,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenSpectralTextureTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get externally shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
@@ -41,7 +42,7 @@ namespace met {
   }
 
   void GenSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "color_buffer");

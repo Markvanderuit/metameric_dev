@@ -2,6 +2,7 @@
 
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
 
@@ -11,7 +12,7 @@ namespace met {
     : detail::AbstractTask(name, true) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_trace();
+      met_trace_full();
     
       // Get shared resources 
       auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");

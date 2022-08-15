@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/renderbuffer.hpp>
@@ -20,7 +21,7 @@ namespace met {
     : detail::AbstractTask(name, true) { }
 
     void init(detail::TaskInitInfo &info) override {
-      met_trace();
+      met_trace_full();
     
       // Share uninitialized framebuffer objects; initialized during eval()
       info.insert_resource("frame_buffer", gl::Framebuffer());
@@ -28,7 +29,7 @@ namespace met {
     }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_trace();
+      met_trace_full();
     
       // Get shared resources 
       auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");

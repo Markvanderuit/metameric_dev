@@ -1,6 +1,7 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
@@ -16,7 +17,7 @@ namespace met {
   : detail::AbstractTask(name, true) { }
 
   void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
     
     // Get externally shared resources
     auto &e_vox_grid = info.get_resource<ApplicationData>(global_key, "app_data").spec_vox_grid;
@@ -47,7 +48,7 @@ namespace met {
   }
 
   void ViewportDrawGridTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
     
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Grid draw settings")) {
@@ -61,7 +62,7 @@ namespace met {
     auto &e_arcball      = info.get_resource<detail::Arcball>("viewport", "arcball");
 
     // Declare scoped OpenGL state
-    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
+    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
 
     // Prepare framebuffer as draw target

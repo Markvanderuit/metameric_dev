@@ -2,6 +2,7 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/window.hpp>
@@ -12,7 +13,7 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_trace();
+      met_trace_full();
       
       auto fb = gl::Framebuffer::make_default();
       fb.bind();

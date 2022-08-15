@@ -1,14 +1,9 @@
 #pragma once
 
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/utility.hpp>
 #include <span>
 #include <source_location>
-
-#ifdef  MET_ENABLE_TRACY
-#include <small_gl/utility.hpp>
-#include <Tracy.hpp>
-#include <TracyOpenGL.hpp>
-#endif // MET_ENABLE_TRACY
 
 // Simple guard statement syntactic sugar
 #define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
@@ -29,27 +24,13 @@
   constexpr T& operator^=(T &a, T b) { return a = a ^ b; }                   \
   constexpr bool has_flag(T flags, T t) { return (uint) (flags & t) != 0u; }
 
-// Insert Tracy scope statements if tracing is enabled
-#ifndef MET_ENABLE_TRACY
-  #define met_trace_text(str)
-  #define met_trace_name(name)
-  #define met_trace()
-  #define met_trace_gpu(name)
-  #define met_trace_frame()
-#else // MET_ENABLE_TRACY
-  #define met_trace_text(str)  ZoneText(str, std::char_traits<char>::length(str))
-  #define met_trace_name(name) ZoneScopedN(name)
-  #define met_trace()          ZoneScoped;
-  #define met_trace_gpu(name)  TracyGpuZone(name)      
-  #define met_trace_frame()    TracyGpuCollect; FrameMark;
-
-  #ifndef TRACY_ENABLE
-    #define TRACY_ENABLE
-  #endif // TRACY_ENABLE
-  #ifndef TRACY_ON_DEMAND
-  #define TRACY_ON_DEMAND
-  #endif // TRACY_ON_DEMAND
-#endif // MET_ENABLE_TRACY
+// For class T, declare swap-based move constr/operator
+// and delete copy constr/operators, making T non-copyable
+#define met_declare_noncopyable(T)                                            \
+  T(const T &) = delete;                                                      \
+  T & operator= (const T &) = delete;                                         \
+  T(T &&o) noexcept { met_trace(); swap(o); }                                 \
+  inline T & operator= (T &&o) noexcept { met_trace(); swap(o); return *this; }
 
 namespace met {
   // Interpret a container type as a span of type T

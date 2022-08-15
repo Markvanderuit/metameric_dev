@@ -2,6 +2,7 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
@@ -10,7 +11,7 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_trace();
+      met_trace_full();
 
       ImGui::BeginFrame();
     }

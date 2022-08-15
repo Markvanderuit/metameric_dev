@@ -2,6 +2,7 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 
 // Third party includes
 #include <highfive/H5File.hpp>
@@ -17,6 +18,8 @@ namespace met::io {
     template <typename T>
     constexpr inline
     std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &v) {
+      met_trace();
+
       std::vector<std::vector<T>> wr(v[0].size(), std::vector<T>(v.size()));
 
       #pragma omp parallel for // target seq. writes and less thread spawns
@@ -32,6 +35,8 @@ namespace met::io {
   } // namespace detail
 
   HD5Data load_hd5(const fs::path &path, const std::string &name) {
+    met_trace();
+
     // Check that file path exists
     debug::check_expr_dbg(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
@@ -51,6 +56,8 @@ namespace met::io {
   }
 
   std::string load_string(const fs::path &path) {
+    met_trace();
+
     // Check that file path exists
     debug::check_expr_dbg(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
@@ -73,6 +80,8 @@ namespace met::io {
   }
 
   void save_string(const fs::path &path, const std::string &str) {
+    met_trace();
+    
     // Attempt to open output file stream in text mode
     std::ofstream ofs(path, std::ios::out);
     debug::check_expr_dbg(ofs.is_open(),

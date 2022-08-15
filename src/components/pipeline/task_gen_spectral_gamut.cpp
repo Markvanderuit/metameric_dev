@@ -1,4 +1,5 @@
 #include <metameric/components/tasks/task_gen_spectral_gamut.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
@@ -11,7 +12,7 @@ namespace met {
   : detail::AbstractTask(name) { }
   
   void GenSpectralGamutTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Define flags for creation of a persistent, write-only flushable buffer map
     auto create_flags = gl::BufferCreateFlags::eMapWrite 
@@ -37,7 +38,7 @@ namespace met {
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &i_color_buffer = info.get_resource<gl::Buffer>("color_buffer");
@@ -49,7 +50,7 @@ namespace met {
   }
   
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_app_data         = info.get_resource<ApplicationData>(global_key, "app_data");

@@ -2,6 +2,7 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_resource.hpp>
 #include <memory>
 #include <list>
@@ -88,15 +89,18 @@ namespace met::detail {
 
     template <typename Ty, typename InfoTy = Ty::InfoType>
     void emplace_resource(const KeyType &key, InfoTy info) {
+      met_trace();
       add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
     }
 
     template <typename Ty>
     void insert_resource(const KeyType &key, Ty &&rsrc) {
+      met_trace();
       add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
     }
 
     void remove_resource(const KeyType &key) {
+      met_trace();
       rem_rsrc_registry.push_back(key);
     }
 
@@ -105,28 +109,33 @@ namespace met::detail {
     template <typename Ty, typename... Args>
     void emplace_task(const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
+      met_trace();
       add_task_registry.emplace_back("", std::make_shared<Ty>(key, args...));
     }
 
     template <typename Ty, typename... Args>
     void emplace_task_after(const KeyType &prev, const KeyType &key, Args... args) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
+      met_trace();
       add_task_registry.emplace_back(prev, std::make_shared<Ty>(key, args...));
     }
 
     template <typename Ty>
     void insert_task(const KeyType &key, Ty &&task) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
+      met_trace();
       add_task_registry.emplace_back("", std::make_shared<Ty>(std::move(task)));
     }
 
     template <typename Ty>
     void insert_task_after(const KeyType &prev, const KeyType &key, Ty &&task) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
+      met_trace();
       add_task_registry.emplace_back(prev, std::make_shared<Ty>(std::move(task)));
     }
 
     void remove_task(const KeyType &key) {
+      met_trace();
       rem_task_registry.push_back(key);
     }
 
@@ -134,6 +143,7 @@ namespace met::detail {
 
     template <typename T>
     T & get_resource(const KeyType &key) {
+      met_trace();
       if (auto i = m_task_rsrc_registry.find(key); i != m_task_rsrc_registry.end()) {
         return i->second->get_as<T>();
       } else {
@@ -143,10 +153,12 @@ namespace met::detail {
 
     template <typename T>
     T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
+      met_trace();
       return m_appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
 
     bool has_resource(const KeyType &task_key, const KeyType &rsrc_key) {
+      met_trace();
       return m_appl_rsrc_registry.contains(task_key)
           && m_appl_rsrc_registry.at(task_key).contains(rsrc_key);
     }
@@ -172,6 +184,7 @@ namespace met::detail {
                  ApplTaskVecType &appl_task_registry,
                  AbstractTask &task)
     : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
+      met_trace();
       task.init(*this);
     }
   };
@@ -182,6 +195,7 @@ namespace met::detail {
                  ApplTaskVecType &appl_task_registry,
                  AbstractTask &task)
     : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
+      met_trace();
       task.eval(*this);
     }
   };
@@ -192,6 +206,7 @@ namespace met::detail {
                  ApplTaskVecType &appl_task_registry,
                  AbstractTask &task)
     : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
+      met_trace();
       task.dstr(*this);
     }
   };

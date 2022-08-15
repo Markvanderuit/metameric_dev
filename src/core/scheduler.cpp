@@ -1,10 +1,13 @@
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <algorithm>
 #include <list>
 #include <fmt/core.h>
 
 namespace met {
   void LinearScheduler::register_task(const KeyType &prev, TaskType &&task) {
+    met_trace();
+
     // Parse task info object by consuming task
     detail::TaskInitInfo info(_rsrc_registry, _task_registry, *task.get());
     
@@ -29,6 +32,8 @@ namespace met {
   }
   
   void LinearScheduler::deregister_task(const KeyType &key) {
+    met_trace();
+
     // Find existing task
     auto i = std::ranges::find_if(_task_registry, [&](auto &task) { return task->name() == key; });
     guard(i != _task_registry.end());
@@ -85,23 +90,28 @@ namespace met {
   }
   
   void LinearScheduler::remove_task(const KeyType &key) {
+    met_trace();
     deregister_task(key);
   }
   
   void LinearScheduler::remove_resource(const KeyType &key) {
+    met_trace();
     _rsrc_registry[global_key].erase(key);
   }
 
   void LinearScheduler::clear_tasks() {
+    met_trace();
     std::erase_if(_rsrc_registry, [&](const auto &p) { return p.first != global_key; });
     _task_registry.clear();
   }
 
   void LinearScheduler::clear_global() {
+    met_trace();
     _rsrc_registry.erase(global_key);
   }
 
   void LinearScheduler::clear_all() {
+    met_trace();
     _rsrc_registry.clear();
     _task_registry.clear();
   }

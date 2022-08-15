@@ -1,4 +1,5 @@
 #include <metameric/core/state.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/tasks/task_gen_color_mappings.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
@@ -10,7 +11,7 @@ namespace met {
     m_mapping_i(mapping_i) { }
 
   void GenColorMappingTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -37,7 +38,7 @@ namespace met {
     m_program_sg.uniform("u_mapping_i", m_mapping_i);
     m_program.uniform("u_n",            mapping_n);
     m_program.uniform("u_mapping_i",    m_mapping_i);
-
+    
     // Create color buffer output for this task
     info.emplace_resource<gl::Buffer>("color_buffer", {
       .size  = (size_t) mapping_n * sizeof(eig::AlArray3f),
@@ -46,7 +47,7 @@ namespace met {
   }
 
   void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
@@ -67,7 +68,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenColorMappingsTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -88,7 +89,7 @@ namespace met {
   }
 
   void GenColorMappingsTask::dstr(detail::TaskDstrInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Remove subtasks
     m_texture_subtasks.dstr(info);
@@ -96,7 +97,7 @@ namespace met {
   }
 
   void GenColorMappingsTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
     
     // Get shared resources
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");

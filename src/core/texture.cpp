@@ -1,5 +1,6 @@
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -17,6 +18,7 @@ namespace met {
   template <typename T, uint D>
   TextureBlock<T, D>::TextureBlock(TextureCreateInfo info) 
   : m_size(info.size), m_data(info.size.prod()) {
+    met_trace();
     guard(!info.data.empty());
     std::copy(std::execution::par_unseq, info.data.begin(), info.data.end(), m_data.begin());
   }
@@ -24,6 +26,8 @@ namespace met {
   namespace io {
     template <typename T>
     Texture2d<T> load_texture2d(const fs::path &path) {
+      met_trace();
+
       // Check that file path exists
       debug::check_expr_dbg(fs::exists(path),
         fmt::format("failed to resolve path \"{}\"", path.string()));
@@ -78,6 +82,8 @@ namespace met {
 
     template <typename T>
     void save_texture2d(const fs::path &path, const Texture2d<T> &texture) {
+      met_trace();
+
       const char *pstr = path.string().c_str();
       auto size = texture.size();
       auto c    = Texture2d<T>::dims();
@@ -107,12 +113,14 @@ namespace met {
     }
     
     Texture2d3f as_unaligned(const Texture2d3f_al &in) {
+      met_trace();
       Texture2d3f out = {{ .size = in.size() }};
       std::copy(std::execution::par_unseq, in.data().begin(), in.data().end(), out.data().begin());
       return out;
     }
 
     Texture2d3f_al as_aligned(const Texture2d3f &in) {
+      met_trace();
       Texture2d3f_al out = {{ .size = in.size() }};
       std::copy(std::execution::par_unseq, in.data().begin(), in.data().end(), out.data().begin());
       return out;
@@ -120,6 +128,7 @@ namespace met {
     
     template <typename T>
     void to_srgb(Texture2d<T> &lrgb) {
+      met_trace();
       auto d = lrgb.data();
       std::transform(std::execution::par_unseq,
           d.begin(), d.end(), d.begin(), linear_srgb_to_gamma_srgb);
@@ -127,6 +136,7 @@ namespace met {
 
     template <typename T>
     void to_lrgb(Texture2d<T> &srgb) {
+      met_trace();
       auto d = srgb.data();
       std::transform(std::execution::par_unseq,
           d.begin(), d.end(), d.begin(), gamma_srgb_to_linear_srgb);
@@ -135,6 +145,7 @@ namespace met {
     // Explicit instantiation skipping alpha channels
     template <>
     void to_srgb(Texture2d<eig::Array4f> &lrgb) {
+      met_trace();
       auto d = lrgb.data();
       std::transform(std::execution::par_unseq, 
         d.begin(), d.end(), d.begin(), [](eig::Array4f v) {
@@ -146,6 +157,7 @@ namespace met {
     // Explicit instantiation skipping alpha channels
     template <>
     void to_lrgb(Texture2d<eig::Array4f> &srgb) {
+      met_trace();
       auto d = srgb.data();
       std::transform(std::execution::par_unseq, 
         d.begin(), d.end(), d.begin(), [](eig::Array4f v) {
@@ -156,6 +168,7 @@ namespace met {
     
     template <typename T>
     Texture2d<T> as_srgb(const Texture2d<T> &lrgb) {
+      met_trace();
       Texture2d<T> obj(lrgb);
       to_srgb(obj);
       return obj;
@@ -163,6 +176,7 @@ namespace met {
     
     template <typename T>
     Texture2d<T> as_lrgb(const Texture2d<T> &srgb) {
+      met_trace();
       Texture2d<T> obj(srgb);
       to_lrgb(obj);
       return obj;

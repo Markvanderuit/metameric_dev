@@ -1,4 +1,5 @@
 #include <metameric/components/tasks/task_gen_spectral_mappings.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <small_gl/buffer.hpp>
@@ -9,7 +10,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void GenSpectralMappingsTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Specify a default mappings buffer and store the nr. of mappings
     m_mapping_count = 0;
@@ -17,7 +18,7 @@ namespace met {
   }
   
   void GenSpectralMappingsTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get shared resources
     auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");

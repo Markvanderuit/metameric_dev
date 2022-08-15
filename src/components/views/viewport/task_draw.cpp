@@ -1,6 +1,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/viewport/task_draw.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -40,7 +41,7 @@ namespace met {
   : detail::AbstractTask(name, true) { }
 
   void ViewportDrawTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
     
     // Get externally shared resources 
     auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "color_buffer");
@@ -101,7 +102,7 @@ namespace met {
   }
 
   void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
     
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Viewport draw settings")) {

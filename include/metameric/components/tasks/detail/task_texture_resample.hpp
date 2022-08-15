@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/sampler.hpp>
@@ -31,7 +32,7 @@ namespace met::detail {
       m_sampler(sampler_info) { }
                         
     void init(detail::TaskInitInfo &info) override {
-      met_trace();
+      met_trace_full();
 
       // Emplace texture resource using provided info object
       info.emplace_resource<TextureTy, InfoTy>(m_output_key.second, m_texture_info);
@@ -53,7 +54,7 @@ namespace met::detail {
     }
 
     void eval(detail::TaskEvalInfo &info) override {
-      met_trace();
+      met_trace_full();
 
       // Get shared resources
       guard(info.has_resource(m_input_key.first, m_input_key.second));

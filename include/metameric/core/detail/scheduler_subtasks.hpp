@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
 #include <functional>
 
@@ -18,6 +19,8 @@ namespace met::detail {
     RmvType m_rmv;
 
     void adjust_to(InfType &info, uint n_tasks) {
+      met_trace_full();
+
       // Adjust nr. of subtasks upwards if necessary
       for (; m_n_tasks < n_tasks; ++m_n_tasks) {
         auto task = m_add(info, m_n_tasks);
@@ -33,6 +36,8 @@ namespace met::detail {
 
   public:
     void init(const KeyType &prev, InfType &info, uint n_tasks, AddType add, RmvType rmv) {
+      met_trace_full();
+
       // Clear out remaining tasks
       adjust_to(info, 0);
       
@@ -45,10 +50,12 @@ namespace met::detail {
     }
 
     void eval(InfType &info, uint n_tasks) {
+      met_trace_full();
       adjust_to(info, n_tasks);
     }
 
     void dstr(detail::AbstractTaskInfo &info) {
+      met_trace_full();
       adjust_to(info, 0);
     }
   };

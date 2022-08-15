@@ -1,4 +1,5 @@
 #include <metameric/core/math.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_mappings_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
@@ -10,7 +11,7 @@ namespace met {
   const static std::string default_mapping_title = "mapping_";
   
   void MappingsEditorTask::add_mapping(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -43,7 +44,7 @@ namespace met {
   }
 
   void MappingsEditorTask::remove_mapping(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -73,7 +74,7 @@ namespace met {
   }
 
   void MappingsEditorTask::change_mapping(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -98,7 +99,7 @@ namespace met {
   }
   
   void MappingsEditorTask::reset_mapping(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get external shared resources
     auto &e_mappings = info.get_resource<ApplicationData>(global_key, "app_data").project_data.mappings;
@@ -110,7 +111,7 @@ namespace met {
   }
 
   void MappingsEditorTask::draw_list(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -157,7 +158,7 @@ namespace met {
   }
 
   void MappingsEditorTask::draw_selection(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     // Get external shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -220,7 +221,7 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void MappingsEditorTask::init(detail::TaskInitInfo &info) {
-    met_trace();
+    met_trace_full();
 
     m_selected_i = -1;
 
@@ -230,7 +231,7 @@ namespace met {
   }
 
   void MappingsEditorTask::eval(detail::TaskEvalInfo &info) {
-    met_trace();
+    met_trace_full();
 
     if (ImGui::Begin("Mappings editor")) {      
       // Get shared resources

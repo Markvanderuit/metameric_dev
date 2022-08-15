@@ -23,6 +23,8 @@
 namespace met {
   namespace detail {
     void init_state(LinearScheduler &scheduler, ApplicationCreateInfo info) {
+      met_trace();
+      
       ApplicationData state;      
       if (!info.project_path.empty()) {
         state.load(info.project_path);
@@ -40,6 +42,8 @@ namespace met {
     }
 
     void init_spectral_grid(LinearScheduler &scheduler, ApplicationCreateInfo info) {
+      met_trace();
+
       // Load input data 
       auto hd5_data = io::load_hd5(info.database_path, "TotalRefs");
 
@@ -66,6 +70,7 @@ namespace met {
         [&](const Spec &sd) { return reflectance_to_color(sd, { .cmfs = models::cmfs_srgb }); });
       KNNGrid<Spec> knn_grid = {{ .grid_size = 32 }};
       knn_grid.insert_n(internal_sd, knn_positions);
+      knn_grid.retrace_size();
       fmt::print("Constructed KNN grid\n");
 
       fmt::print("Constructing voxel grid\n");
@@ -128,8 +133,6 @@ namespace met {
              | gl::WindowCreateFlags::eDebug 
 #endif
     });
-
-    TracyGpuContext
 
     // Enable OpenGL debug messages, ignoring notification-type messages
 #ifndef NDEBUG
