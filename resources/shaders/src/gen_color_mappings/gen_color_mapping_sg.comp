@@ -4,23 +4,22 @@
 #extension GL_KHR_shader_subgroup_basic      : require
 #extension GL_KHR_shader_subgroup_arithmetic : require
 
-// Set NVidia-CG specific flags
+// Set NVidia-CG flags
 #pragma optionNV(fastmath on)
 #pragma optionNV(inline   all)
 #pragma optionNV(unroll   all)
 #pragma optionNV(strict   on)
-// #pragma optionNV(fastprecision on)
-// #pragma optionNV(ifcvt         all)
 
 layout(local_size_x = 256) in;
+layout(std430)             buffer;
 
 #include <guard.glsl>
 #include <mapping_invoc.glsl>
 #include <mapping_subgroup.glsl>
 
-layout(binding = 0, std430) restrict readonly  buffer b_0 { Spec    b_0_spectra[];  };
-layout(binding = 1, std430) restrict readonly  buffer b_1 { Mapping b_1_mappings[]; };
-layout(binding = 2, std430) restrict writeonly buffer b_2 { vec3    b_2_colors[];   };
+layout(binding = 0) restrict readonly  buffer b_0 { Spec data[]; } b_spec;
+layout(binding = 1) restrict readonly  buffer b_1 { Mapp data[]; } b_mapp;
+layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_colr;
 
 layout(location = 0) uniform uint u_n;
 layout(location = 1) uniform uint u_mapping_i;
@@ -31,9 +30,9 @@ void main() {
 
   // Load reflectance and mapping data into subgroup format
   SgSpec sd;
-  SgMapping m;
-  sg_scatter_spec(sd, b_0_spectra[wg]);
-  sg_scatter_mapp(m, b_1_mappings[u_mapping_i]);
+  SgMapp m;
+  sg_scatter_spec(sd, b_spec.data[wg]);
+  sg_scatter_mapp(m, b_mapp.data[u_mapping_i]);
 
   // Compute and apply color mapping
   SgCMFS cs = finalize_mapping(m, sd);
@@ -41,6 +40,6 @@ void main() {
 
   // Store result using elected invoc of subgroup
   if (subgroupElect()) {
-    b_2_colors[wg] = v;
+    b_colr.data[wg] = v;
   }
 }

@@ -5,7 +5,7 @@
 
 /* Per-invocation mapping object */
 
-struct Mapping {
+struct Mapp {
   CMFS cmfs;
   Spec illuminant;
   uint n_scatters;
@@ -13,7 +13,7 @@ struct Mapping {
 
 /* Mapping functions */
 
-CMFS finalize_mapping(in Mapping m) {
+CMFS finalize_mapping(in Mapp m) {
   // Normalization factor is applied over the illuminant
   // TODO extract and precompute
   float k = 1.f / in_hsum(in_mul(m.cmfs[1], m.illuminant));
@@ -22,7 +22,7 @@ CMFS finalize_mapping(in Mapping m) {
   return in_mul(in_mul(m.cmfs, m.illuminant), k);
 }
 
-CMFS finalize_mapping(in Mapping m, in Spec sd) {
+CMFS finalize_mapping(in Mapp m, in Spec sd) {
   // If n_scatters > 0, multiply illuminant by reflectance to simulate
   // repeated scattering of indirect lighting
   Spec e = in_mul(m.illuminant, 
