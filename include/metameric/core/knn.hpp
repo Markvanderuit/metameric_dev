@@ -16,12 +16,16 @@ namespace met {
     // Boundaries to which positions are clamped
     eig::Array3f space_bounds_min = 0.f;
     eig::Array3f space_bounds_max = 1.f;
+
+    // Maximum cell size in case of a necessitated limit
+    int max_cell_size = -1; 
   };
 
   class AbstractGrid {
   protected:
     eig::Array3i m_grid_size;
     eig::Array3f m_space_bounds_min, m_space_bounds_max;
+    int          m_max_cell_size;
 
     AbstractGrid() = default;
     AbstractGrid(GridCreateInfo info);
@@ -63,6 +67,7 @@ namespace met {
       swap(m_grid_size, o.m_grid_size);
       swap(m_space_bounds_min, o.m_space_bounds_min);
       swap(m_space_bounds_max, o.m_space_bounds_max);
+      swap(m_max_cell_size, o.m_max_cell_size);
     }
   };
 
@@ -81,7 +86,7 @@ namespace met {
     };
 
   private:
-    std::vector<std::list<ValueType>>  m_grid;
+    std::vector<std::vector<ValueType>>  m_grid;
 
     uint nearest_index_from_pos(const eig::Array3f &p) const {
       return index_from_grid_pos(grid_pos_from_pos(p).cast<int>());

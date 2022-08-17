@@ -39,7 +39,8 @@ namespace met {
   AbstractGrid::AbstractGrid(GridCreateInfo info)
   : m_grid_size(info.grid_size),
     m_space_bounds_min(info.space_bounds_min),
-    m_space_bounds_max(info.space_bounds_max) { }
+    m_space_bounds_max(info.space_bounds_max),
+    m_max_cell_size(info.max_cell_size) { }
 
   template <typename T>
   VoxelGrid<T>::VoxelGrid(GridCreateInfo info)
@@ -94,20 +95,22 @@ namespace met {
 
     // Generate indices to iterate both t and p
     std::vector<uint> indices(p.size());
-    std::iota(indices.begin(), indices.end(), 0);
+    std::iota(range_iter(indices), 0);
 
     // Generate grid of mutex locks to perform parallel list insertion
     std::vector<std::mutex> lock_grid(m_grid_size.prod());
 
     // Perform parallel iteration
-    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](uint i) {
+    std::for_each(std::execution::par, range_iter(indices), [&](uint i) {
       const auto &p_i = p[i];
       const auto &t_i = t[i];
       uint j = nearest_index_from_pos(p_i);
 
       // Obtain a lock on voxel position and push data on to list
       std::lock_guard lock(lock_grid[j]);
-      m_grid[j].push_back({ p_i, t_i });
+      if (m_max_cell_size == -1 || m_grid[j].size() < m_max_cell_size) {
+        m_grid[j].push_back({ p_i, t_i });
+      }
     });
   }
 
@@ -125,22 +128,20 @@ namespace met {
     // Construct search list of points in nearest grid cells
     auto v_to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
     auto query_view = nearest_indices_from_pos(p) 
-                    | std::views::transform([&](uint i) -> const std::list<ValueType>& { return m_grid[i]; })
+                    | std::views::transform([&](uint i) -> const std::vector<ValueType>& { return m_grid[i]; })
                     | std::views::join 
                     | std::views::transform(v_to_query);
 
     // Gather transformed queries from search list
     std::vector<QueryType> query_list;
-    query_list.reserve(128ul);
+    query_list.reserve(m_max_cell_size == -1 ? 128ul : m_max_cell_size * 8);
     std::ranges::copy(query_view, std::back_inserter(query_list));
 
     // Return a false query on an empty list
     guard(query_list.size(), { 0.f, 0.f, FLT_MAX });
 
-    // Perform search for the closest query
-    return *std::min_element(std::execution::par, 
-                             range_iter(query_list), 
-                             detail::query_comp<T>);
+    // Perform search for the closest query and return it
+    return *std::min_element(std::execution::par, range_iter(query_list), detail::query_comp<T>);
   }
 
   template <typename T>
@@ -151,40 +152,41 @@ namespace met {
     // Stupidity check for k==1 to just return the nearest element
     guard(k > 1, { query_1_nearest(p) });
 
-    // Construct range as search list of points in 8 nearest grid cells
+    // Construct search list of points in nearest grid cells
     auto v_to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
     auto query_view = nearest_indices_from_pos(p) 
-                    | std::views::transform([&](uint i) { return m_grid[i]; })
-                    | std::views::join
+                    | std::views::transform([&](uint i) -> const std::vector<ValueType>& { return m_grid[i]; })
+                    | std::views::join 
                     | std::views::transform(v_to_query);
 
     // Convert to query objects and sort by distnace
-    std::vector<QueryType> queries;
-    std::ranges::copy(query_view, std::back_inserter(queries));
-    std::ranges::sort(queries, [](const auto &a, const auto &b) { return a.distance < b.distance; });
+    std::vector<QueryType> query_list;
+    query_list.reserve(m_max_cell_size == -1 ? 128ul : m_max_cell_size * 8);
+    std::ranges::copy(query_view, std::back_inserter(query_list));
+    std::ranges::sort(query_list,  detail::query_comp<T>);
 
     // Resize to keep nearest k results
-    queries.resize(std::min<size_t>(k, queries.size()));
+    query_list.resize(std::min<size_t>(k, query_list.size()));
 
-    return queries;
+    return query_list;
   }
 
   template <typename T>
   std::vector<typename KNNGrid<T>::QueryType> 
   KNNGrid<T>::query_n_nearest(const eig::Array3f &p) {
     met_trace();
-    
-    // Construct range as search list of points in 8 nearest grid cells
+
+    // Construct search list of points in nearest grid cells
     auto v_to_query = std::bind(detail::value_to_query<T>, std::placeholders::_1, std::cref(p));
     auto query_view = nearest_indices_from_pos(p) 
-                    | std::views::transform([&](uint i) { return m_grid[i]; })
-                    | std::views::join
+                    | std::views::transform([&](uint i) -> const std::vector<ValueType>& { return m_grid[i]; })
+                    | std::views::join 
                     | std::views::transform(v_to_query);
 
     // Convert to query objects and sort by distnace
     std::vector<QueryType> queries;
     std::ranges::copy(query_view, std::back_inserter(queries));
-    std::ranges::sort(queries, [](const auto &a, const auto &b) { return a.distance < b.distance; });
+    std::ranges::sort(queries,  detail::query_comp<T>);
     
     return queries;
   }
