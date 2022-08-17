@@ -63,9 +63,6 @@ namespace met {
       // Parse task info object by consuming task::eval()
       detail::TaskEvalInfo info(_rsrc_registry, _task_registry, *task.get());
 
-      // Process task/resource editing signals later
-      signal_flags |= info.signal_flags; 
-
       // Process added/removed resources **immediately** after task execution
       if (!info.add_rsrc_registry.empty() || !info.rem_rsrc_registry.empty()) {
         auto &local_registry = _rsrc_registry[task->name()];
@@ -78,9 +75,13 @@ namespace met {
         rem_task_registry.splice(rem_task_registry.end(), info.rem_task_registry);
         add_task_registry.splice(add_task_registry.end(), info.add_task_registry);
       }
+
+      // Signal flag received; should kill loop
+      signal_flags |= info.signal_flags; 
+      if ((uint) signal_flags) { break; }
     }
 
-    // Process signal flags; clear existing tasks
+    // Process signal flags; clear existing tasks/resources
     if (detail::has_flag(signal_flags, detail::TaskSignalFlags::eClearTasks)) { clear_tasks(); }
     if (detail::has_flag(signal_flags, detail::TaskSignalFlags::eClearAll))   { clear_all(); }
 
