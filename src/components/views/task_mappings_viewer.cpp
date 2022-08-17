@@ -134,6 +134,9 @@ namespace met {
         m_resample_tasks.eval(info, e_mappings_n);
       }
 
+      // Reset state for tooltip
+      m_tooltip_i = -1;
+      
       // Iterate n_cols, n_rows, and n_mappings
       for (uint i = 0, i_col = 0; i < e_mappings.size(); ++i) {
         // Generate name of task holding texture data
@@ -150,7 +153,8 @@ namespace met {
         ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
         
         // Set id for tooltip after loop is over, and schedule copy of data
-        if (m_tooltip_i = ImGui::IsItemHovered() ? i : -1; m_tooltip_i != -1) { 
+        if (ImGui::IsItemHovered()) {
+          m_tooltip_i = i;
           eval_tooltip_copy(info, m_tooltip_i); 
         }
 

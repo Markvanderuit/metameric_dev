@@ -5,6 +5,8 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <small_gl/buffer.hpp>
+#include <algorithm>
+#include <execution>
 #include <ranges>
 
 namespace met {
@@ -65,12 +67,15 @@ namespace met {
     auto &spect_gamut = e_app_data.project_data.spec_gamut;
       
     // Sample spectra at gamut color positions from the KNN object
+    // std::transform(std::execution::par_unseq, range_iter(color_gamut), spect_gamut.begin(),
     std::ranges::transform(color_gamut, spect_gamut.begin(),
       [&](const auto &p) { return knn_grid.query_1_nearest(p).value; });
     
     // Copy data to gpu buffer maps
     std::ranges::copy(color_gamut, i_color_buffer_map.begin());
     std::ranges::copy(spect_gamut, i_spect_buffer_map.begin());
+
+    // Submit fence and barrier
 
     // Flush buffers after pushing new data 
     i_color_buffer.flush();

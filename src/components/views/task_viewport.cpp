@@ -145,7 +145,7 @@ namespace met {
                                | std::views::transform(detail::i_get(e_rgb_gamut));
 
     // Gizmo anchor position is mean of selected gamut positions
-    eig::Vector3f gamut_anchor_pos = std::reduce(gamut_selection.begin(), gamut_selection.end(), Color(0.f))
+    eig::Vector3f gamut_anchor_pos = std::reduce(range_iter(gamut_selection), Color(0.f))
                                    / static_cast<float>(gamut_selection.size());
     
     // ImGuizmo manipulator operates on a transform; to obtain translation

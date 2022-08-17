@@ -60,15 +60,15 @@ namespace met {
       
       // Convert data into metameric's spectral format
       std::vector<Spec> internal_sd(hd5_data.size);
-      std::transform(std::execution::par_unseq, hd5_data.data.begin(), hd5_data.data.end(), 
+      std::transform(std::execution::par_unseq, range_iter(hd5_data.data), 
         internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
 
       // Create a KNN grid over the spectral distributions,based on their color as a position
       fmt::print("Constructing KNN grid\n");
       std::vector<eig::Array3f> knn_positions(internal_sd.size());
-      std::transform(std::execution::par_unseq, internal_sd.begin(), internal_sd.end(), knn_positions.begin(),
+      std::transform(std::execution::par_unseq, range_iter(internal_sd), knn_positions.begin(),
         [&](const Spec &sd) { return reflectance_to_color(sd, { .cmfs = models::cmfs_srgb }); });
-      KNNGrid<Spec> knn_grid = {{ .grid_size = 32 }};
+      KNNGrid<Spec> knn_grid = {{ .grid_size = 32, .max_cell_size = 128 }};
       knn_grid.insert_n(internal_sd, knn_positions);
       knn_grid.retrace_size();
       fmt::print("Constructed KNN grid\n");
@@ -88,20 +88,19 @@ namespace met {
         constexpr float alpha = -1.f / (2.f * stddev * stddev);
         return std::max(0.f, std::exp(alpha * (x * x)));
       };
-      std::for_each(std::execution::par_unseq, 
-        grid_pos.begin(), grid_pos.end(), 
-        [&](const auto &p_i) {
-          auto p = voxel_grid.pos_from_grid_pos(p_i);
-          auto query_list = knn_grid.query_k_nearest(p, 4);
+      std::for_each(std::execution::par_unseq, range_iter(grid_pos), [&](const auto &p_i) {
+          auto query_list = knn_grid.query_k_nearest(voxel_grid.pos_from_grid_pos(p_i), 4);
           
-          Spec value = 0.f;
-          float weight = 0.f;
+          Spec v = 0.f;
+          float w = 0.f;
+
           for (auto &query : query_list) {
-            float w = kernel(query.distance);
-            value += w * query.value;
-            weight += w;
+            float f = kernel(query.distance);
+            v += f * query.value;
+            w += f;
           }
-          voxel_grid.at(p_i) = value / std::max(weight, 0.00001f);
+
+          voxel_grid.at(p_i) = v / std::max(w, 0.00001f);
       });
       fmt::print("Constructed voxel grid\n");
 
@@ -122,20 +121,20 @@ namespace met {
     // Initialize OpenGL context (and primary window) and submit to scheduler
     gl::Window &window = scheduler.emplace_resource<gl::Window>("window", { 
       .size  = { 1680, 1024 }, 
-      .title = "Metameric", 
+      .title = "Metameric",
       .flags = gl::WindowCreateFlags::eVisible
              | gl::WindowCreateFlags::eFocused   
              | gl::WindowCreateFlags::eDecorated
              | gl::WindowCreateFlags::eResizable
              | gl::WindowCreateFlags::eSRGB
              | gl::WindowCreateFlags::eMSAA
-#ifndef NDEBUG                    
+#if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
              | gl::WindowCreateFlags::eDebug 
 #endif
     });
 
     // Enable OpenGL debug messages, ignoring notification-type messages
-#ifndef NDEBUG
+#if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
     gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif

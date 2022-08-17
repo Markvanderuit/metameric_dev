@@ -27,7 +27,7 @@ namespace met {
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
     
     // Fill input texture with data 
-    m_input = std::vector<eig::Array3f>(e_rgb_texture.data().begin(), e_rgb_texture.data().end());
+    m_input = std::vector<eig::Array3f>(range_iter(e_rgb_texture.data()));
 
     // Set up processing buffers on the CPU
     size_t texture_size = e_rgb_texture.size().prod();

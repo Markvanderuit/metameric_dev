@@ -73,6 +73,9 @@ namespace met {
       // Initialize existing project
       info.get_resource<ApplicationData>(global_key, "app_data").load(path);
 
+      // Clear OpenGL state
+      gl::Program::unbind_all();
+
       // Signal schedule re-creation and submit new schedule for main view
       info.signal_flags = detail::TaskSignalFlags::eClearTasks;
       submit_schedule_main(info);
@@ -119,7 +122,9 @@ namespace met {
   void WindowTask::handle_close(detail::TaskEvalInfo &info) {
     met_trace_full();
     
+    // Clear OpenGL state
     ImGui::CloseAnyPopupIfOpen();
+    gl::Program::unbind_all();
 
     // Empty application data as project is closed
     info.get_resource<ApplicationData>(global_key, "app_data").unload();
