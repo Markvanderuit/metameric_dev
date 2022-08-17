@@ -74,4 +74,11 @@ vec3 in_matmul(in CMFS cmfs, in Spec s) {
               in_hsum(in_mul(cmfs[2], s)));
 }
 
+Spec in_matmul(in vec3 v, in CMFS cmfs) {
+  return in_add(in_add(
+    in_mul(cmfs[0], v.x), 
+    in_mul(cmfs[1], v.y)), 
+    in_mul(cmfs[2], v.z));
+}
+
 #endif // CMFS_INVOC_GLSL_GUARD

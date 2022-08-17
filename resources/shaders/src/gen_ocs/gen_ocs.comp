@@ -1,0 +1,43 @@
+#version 460 core
+
+// Set NVidia-CG flags
+#pragma optionNV(fastmath on)
+#pragma optionNV(inline   all)
+#pragma optionNV(unroll   all)
+#pragma optionNV(strict   on)
+
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+
+#include <guard.glsl>
+#include <random.glsl>
+#include <mapping_invoc.glsl>
+
+layout(binding = 0) restrict readonly  buffer b_0 { Mapp data[]; } b_mapp;
+layout(binding = 1) restrict writeonly buffer b_1 { Spec data[]; } b_oopt;
+layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_ovec;
+
+layout(location = 0) uniform uint u_n;
+layout(location = 1) uniform uint u_mapping_i;
+
+void main() {
+  const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+  guard(i < u_n);
+  float rand_f = float(u_n * 256);
+
+  // Load color system spectra from buffers
+  CMFS cs = finalize_mapping(b_mapp.data[u_mapping_i]);
+
+  // Generate non-importance sampled unit vector
+  vec3 unit_v = normalize(random_next_3d(rand_f));
+  
+  // Generate resulting matrix A_ij, and optimal spectrum R_ij
+  Spec a_ij = in_matmul(unit_v, cs);
+  Spec r_ij = in_select(in_ge(a_ij, 0.f), 
+                        in_spectrum(0.f), 
+                        in_spectrum(1.f));
+
+  // Store results
+  b_oopt.data[i] = r_ij;
+  b_ovec.data[i] = in_matmul(cs, r_ij);
+}
