@@ -15,6 +15,7 @@
 #include <metameric/components/tasks/task_gen_spectral_mappings.hpp>
 #include <metameric/components/tasks/task_gen_spectral_gamut.hpp>
 #include <metameric/components/tasks/task_gen_spectral_texture.hpp>
+#include <metameric/components/tasks/task_gen_ocs.hpp>
 #include <metameric/components/tasks/task_gen_color_mappings.hpp>
 
 // View tasks
@@ -97,6 +98,9 @@ namespace met {
     scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");
     scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
+
+    // The following tasks define the metamer set necessities
+    scheduler.emplace_task<GeOCSTask>("gen_ocs");
 
     // The following task defines the spectrum->color output pipeline
     // (though it mostly spawns subtasks to do so)

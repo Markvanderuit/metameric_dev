@@ -91,28 +91,56 @@ vec4 random_4d(vec4 xyzw) {
   return fract((xyzw.xxyz + xyzw.yzzw) * xyzw.zywx);
 }
 
-float random_next_1d(inout float i) {
-  float s = random_1d(i);
-  i += 1;
-  return s;
+float next_1d(inout float x) {
+  return random_1d(x++);
 }
 
-vec2 random_next_2d(inout float i) {
-  vec2 s = random_2d(vec2(i, i + 1));
-  i += 2;
-  return s;
+float next_1d(inout vec2 x) {
+  return random_1d(x++);
 }
 
-vec3 random_next_3d(inout float i) {
-  vec3 s = random_3d(vec3(i, i + 1, i + 2));
-  i += 3;
-  return s;
+float next_1d(inout vec3 x) {
+  return random_1d(x++);
 }
 
-vec4 random_next_4d(inout float i) {
-  vec4 s = random_4d(vec4(i, i + 1, i + 2, i + 3));
-  i += 4;
-  return s;
+float next_1d(inout vec4 x) {
+  return random_1d(x++);
 }
 
-#endif // RANDOM_GLSL_GUARD
+vec2 next_2d(inout float x) {
+  return random_2d(x++);
+}
+
+vec2 next_2d(inout vec2 x) {
+  return random_2d(x++);
+}
+
+vec3 next_3d(inout float x) {
+  return random_3d(x++);
+}
+
+vec3 next_3d(inout vec2 x) {
+  return random_3d(x++);
+}
+
+vec3 next_3d(inout vec3 x) {
+  return random_3d(x++);
+}
+
+vec4 next_4d(inout float x) {
+  return random_4d(x++);
+}
+
+vec4 next_4d(inout vec2 x) {
+  return random_4d(x++);
+}
+
+vec4 next_4d(inout vec3 x) {
+  return random_4d(x++);
+}
+
+vec4 next_4d(inout vec4 x) {
+  return random_4d(x++);
+}
+
+#endif // RANDOM_GLSL_GUARDj

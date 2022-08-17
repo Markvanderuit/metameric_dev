@@ -1,3 +1,12 @@
+/*
+  This shader implements an algorithm for sampling-based generation
+  of the Object Color Solid, following the formulation provided by
+  Mackiewicz, M., Rivertz, H. J., and Finlayson, G. in  "Spherical
+  sampling methods for the calculation of metamer mismatch volumes".
+    
+  Src: https://opg.optica.org/abstract.cfm?uri=josaa-36-1-96
+ */
+
 #version 460 core
 
 // Set NVidia-CG flags
@@ -6,12 +15,14 @@
 #pragma optionNV(unroll   all)
 #pragma optionNV(strict   on)
 
-layout(local_size_x = 256) in;
-layout(std430)             buffer;
+#define PI 3.1415926538
 
 #include <guard.glsl>
 #include <random.glsl>
 #include <mapping_invoc.glsl>
+
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
 
 layout(binding = 0) restrict readonly  buffer b_0 { Mapp data[]; } b_mapp;
 layout(binding = 1) restrict writeonly buffer b_1 { Spec data[]; } b_oopt;
@@ -20,24 +31,34 @@ layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_ovec;
 layout(location = 0) uniform uint u_n;
 layout(location = 1) uniform uint u_mapping_i;
 
+vec3 sample_uniform_spherical(inout float seed) {
+  vec2 sv = next_2d(seed);
+  float t = 2.f * PI * sv.x;
+  float o = acos(1.f - 2.f * sv.y);
+  return vec3(sin(o) * cos(t), sin(o) * sin(t), cos(o));
+}
+
+/* vec3 sample_nonuniform(inout float seed) {
+
+}*/
+
 void main() {
   const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
   guard(i < u_n);
-  float rand_f = float(u_n * 256);
 
-  // Load color system spectra from buffers
+  // Generate a random unit vector
+  float seed = float(i);
+  vec3 v = sample_uniform_spherical(seed);
+
+  // Obtain color system (spectra) from mapping data
   CMFS cs = finalize_mapping(b_mapp.data[u_mapping_i]);
-
-  // Generate non-importance sampled unit vector
-  vec3 unit_v = normalize(random_next_3d(rand_f));
   
-  // Generate resulting matrix A_ij, and optimal spectrum R_ij
-  Spec a_ij = in_matmul(unit_v, cs);
-  Spec r_ij = in_select(in_ge(a_ij, 0.f), 
-                        in_spectrum(0.f), 
-                        in_spectrum(1.f));
+  // Generate the algorithm's matrix A_ij, and then the optimal spectrum R_ij and its mapped color
+  Spec a_ij = in_matmul(v, cs);
+  Spec r_ij = in_select(in_ge(a_ij, 0.f), 1.f, 0.f);
+  vec3 c_ij = in_matmul(cs, r_ij);
 
-  // Store results
+  // Store results to buffers
   b_oopt.data[i] = r_ij;
-  b_ovec.data[i] = in_matmul(cs, r_ij);
+  b_ovec.data[i] = c_ij;
 }

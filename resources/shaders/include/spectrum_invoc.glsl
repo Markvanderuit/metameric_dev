@@ -162,6 +162,13 @@ Spec in_clamp(in Spec a, in float b, in float c) {
   return s;
 }
 
+Spec in_select(in Mask m, in float a, in float b) {
+  Spec s;
+  for (uint i = 0; i < wavelength_samples; ++i)
+    s[i] = m[i] ? a : b;
+  return s;
+}
+
 Spec in_select(in Mask m, in float a, in Spec b) {
   Spec s;
   for (uint i = 0; i < wavelength_samples; ++i)

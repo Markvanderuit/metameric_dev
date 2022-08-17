@@ -1,37 +1,29 @@
-#include <small_gl/framebuffer.hpp>
-#include <small_gl/texture.hpp>
-#include <small_gl/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/views/viewport/task_draw_grid.hpp>
+#include <metameric/components/views/viewport/task_draw_points.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <small_gl/framebuffer.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
 #include <execution>
 
 namespace met {
-  
-  ViewportDrawGridTask::ViewportDrawGridTask(const std::string &name)
+  ViewportDrawPointsTask::ViewportDrawPointsTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportDrawGridTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawPointsTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
     
     // Get externally shared resources
-    auto &e_vox_grid = info.get_resource<ApplicationData>(global_key, "app_data").spec_vox_grid;
-
-    // Obtain aligned D65 color of all voxels in the spectral grid
-    std::vector<eig::AlArray3f> color_grid(e_vox_grid.data().size());
-    std::transform(std::execution::par_unseq, 
-      range_iter(e_vox_grid.data()), color_grid.begin(), 
-      [](const Spec &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
+    auto &e_point_buffer = info.get_resource<gl::Buffer>("gen_ocs", "color_buffer");
 
     // Construct buffer object and draw components
-    m_vertex_buffer = {{ .data = as_span<const std::byte>(color_grid) }};
-    m_vertex_array = {{
-      .buffers = {{ .buffer = &m_vertex_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
+    m_array = {{
+      .buffers = {{ .buffer = &e_point_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
     m_program = {{ .type = gl::ShaderType::eVertex, 
@@ -39,20 +31,20 @@ namespace met {
                  { .type = gl::ShaderType::eFragment,  
                    .path = "resources/shaders/viewport/draw_color.frag" }};
     m_draw = { .type             = gl::PrimitiveType::ePoints,
-               .vertex_count     = (uint) color_grid.size(),
-               .bindable_array   = &m_vertex_array,
+               .vertex_count     = (uint) (e_point_buffer.size() / sizeof(eig::AlArray3f)),
+               .bindable_array   = &m_array,
                .bindable_program = &m_program };
 
     // Set non-changing uniform values
     m_program.uniform("u_model_matrix",  eig::Matrix4f::Identity().eval());
   }
 
-  void ViewportDrawGridTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawPointsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
     
     // Insert temporary window to modify draw settings
-    if (ImGui::Begin("Grid draw settings")) {
-      ImGui::SliderFloat("Grid point size", &m_psize, 1.f, 32.f, "%.0f");
+    if (ImGui::Begin("Point draw settings")) {
+      ImGui::SliderFloat("Point size", &m_psize, 1.f, 32.f, "%.0f");
     }
     ImGui::End();
 
