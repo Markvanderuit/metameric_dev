@@ -150,9 +150,15 @@ namespace met {
     met_trace_full();
     
     ImGui::CloseAnyPopupIfOpen();
-    
+
+    // Empty application data as project is closed
+    info.get_resource<ApplicationData>(global_key, "app_data").unload();
+
     // Signal to window that it should close itself
     info.get_resource<gl::Window>(global_key, "window").set_should_close();
+    
+    // Signal schedule dump
+    info.signal_flags = detail::TaskSignalFlags::eClearTasks;
   }
 
   void WindowTask::eval(detail::TaskEvalInfo &info) {

@@ -80,7 +80,7 @@ namespace met {
     project_state  = ProjectState::eNew;
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
-    loaded_texture = texture;
+    loaded_texture = std::move(texture);
     mods  = { };
     mod_i = -1;
 

@@ -19,8 +19,14 @@ namespace met {
   TextureBlock<T, D>::TextureBlock(TextureCreateInfo info) 
   : m_size(info.size), m_data(info.size.prod()) {
     met_trace();
+    met_trace_alloc(m_data.data(), m_data.size() * sizeof(T));
     guard(!info.data.empty());
-    std::copy(std::execution::par_unseq, info.data.begin(), info.data.end(), m_data.begin());
+    std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
+  }
+
+  template <typename T, uint D>
+  TextureBlock<T, D>::~TextureBlock() {
+    met_trace_free(m_data.data());
   }
 
   namespace io {
@@ -169,7 +175,7 @@ namespace met {
     template <typename T>
     Texture2d<T> as_srgb(const Texture2d<T> &lrgb) {
       met_trace();
-      Texture2d<T> obj(lrgb);
+      Texture2d<T> obj({ .size = lrgb.size(), .data = lrgb.data() });
       to_srgb(obj);
       return obj;
     }
@@ -177,7 +183,7 @@ namespace met {
     template <typename T>
     Texture2d<T> as_lrgb(const Texture2d<T> &srgb) {
       met_trace();
-      Texture2d<T> obj(srgb);
+      Texture2d<T> obj({ .size = srgb.size(), .data = srgb.data() });
       to_lrgb(obj);
       return obj;
     }

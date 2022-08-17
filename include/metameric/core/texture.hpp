@@ -52,11 +52,8 @@ namespace met {
    */
   template <typename T, uint D>
   struct TextureCreateInfo {
-    using vect = eig::Array<uint, D, 1>;
-
-  public:
-    vect size;
-    std::span<T> data = { };
+    eig::Array<uint, D, 1> size;
+    std::span<const T>     data = { };
   };
   
   /**
@@ -84,6 +81,7 @@ namespace met {
 
     TextureBlock() = default;
     TextureBlock(TextureCreateInfo info);
+    ~TextureBlock();
 
   public:
     /* data accessors */
@@ -96,7 +94,23 @@ namespace met {
     /* size accessors */
 
     const vect size() const { return m_size; }
-    constexpr static uint dims() { return detail::texture_dims<T>(); }
+    static constexpr uint dims() { return detail::texture_dims<T>(); }
+
+    /* miscellaneous */
+
+    inline void swap(TextureBlock &o) {
+      met_trace();
+      using std::swap;
+      swap(m_data, o.m_data);
+      swap(m_size, o.m_size);
+    }
+
+    inline
+    bool operator==(const TextureBlock &o) const {
+      return m_data == o.m_data && (m_size == o.m_size).all();
+    }
+
+    met_declare_noncopyable(TextureBlock);
   };
 
   /**
@@ -110,7 +124,8 @@ namespace met {
   public:
     /* constrs */
 
-    Texture2d() = default;
+    Texture2d()  = default;
+    ~Texture2d() = default;
 
     Texture2d(TextureCreateInfo info) 
     : Base(info) { }
@@ -139,5 +154,20 @@ namespace met {
     T &operator()(uint i, uint j) {
       return this->m_data[j * this->m_size.x() + i];
     }
+
+    /* miscellaneous */
+
+    inline void swap(Texture2d &o) {
+      met_trace();
+      using std::swap;
+      Base::swap(o);
+    }
+
+    inline
+    bool operator==(const Texture2d &o) const {
+      return Base::operator==(o);
+    }
+
+    met_declare_noncopyable(Texture2d);
   };
 } // namespace met

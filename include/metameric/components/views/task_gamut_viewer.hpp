@@ -7,6 +7,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
+#include <array>
 
 namespace met {
   class GamutViewerTask : public detail::AbstractTask {
@@ -26,16 +27,12 @@ namespace met {
                                    - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
         // Obtain colors at gamut's point positions
-        std::vector<Color> spectra_to_colors(4);
+        std::array<Color, 4> spectra_to_colors;
         std::ranges::transform(spec_gamut, spectra_to_colors.begin(),
           [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }).eval(); });
         
         eig::Array2f plot_size = viewport_size * eig::Array2f(.67f, .125f);
         
-        // for (auto &s : spec_gamut) {
-        //   fmt::print("{}\n", s);
-        // }
-
         // Plot spectra
         ImGui::PlotLines("reflectance 0", spec_gamut[0].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, plot_size);

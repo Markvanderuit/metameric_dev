@@ -194,10 +194,9 @@ namespace met {
   template <typename T>
   void KNNGrid<T>::retrace_size() {
 #ifdef MET_ENABLE_TRACY
-    met_trace_free(m_grid.data());
     auto size_v = m_grid | std::views::transform([](auto &v) { return v.size() * sizeof(T); });
     size_t size = std::reduce(range_iter(size_v));
-    met_trace_alloc(m_grid.data(), size);
+    met_trace_realloc(m_grid.data(), size);
 #endif // MET_ENABLE_TRACY
   }
 
