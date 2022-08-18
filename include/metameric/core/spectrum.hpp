@@ -75,6 +75,12 @@ namespace met {
 
     /* Mapping functions */
 
+    CMFS finalize() const {
+      auto cmfs_col = cmfs.array().colwise();
+      float k = 1.f / (cmfs_col * illuminant).col(1).sum();
+      return k * (cmfs_col * illuminant);
+    }
+
     // Given a known reflectance, simplify the CMFS/illuminant/indirections into a single object
     CMFS finalize(const Spec &sd) const {
       auto cmfs_col = cmfs.array().colwise();
