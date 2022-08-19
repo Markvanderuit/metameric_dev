@@ -1,0 +1,6 @@
+#ifndef NOISE_GLSL_GUARD
+#define NOISE_GLSL_GUARD
+
+
+
+#endif // NOISE_GLSL_GUARD

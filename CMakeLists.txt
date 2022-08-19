@@ -48,11 +48,13 @@ find_package(OpenMP REQUIRED)
 
 # Include third party libraries provided through vcpkg
 find_package(benchmark CONFIG REQUIRED)
+find_package(CGAL      CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
+find_package(libigl    CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
@@ -199,6 +201,9 @@ target_link_libraries(components PUBLIC
   imgui::imgui
   imguizmo::imguizmo
   unofficial::nativefiledialog::nfd
+  igl::core
+  igl::common
+  CGAL::CGAL
 )
 add_dependencies(components shaders_preprocess misc_copy)
 
@@ -214,13 +219,23 @@ target_link_libraries(app PUBLIC
 add_executable_r(metameric src/target/main_metameric.cpp)
 target_link_libraries(metameric PRIVATE app)
 
-# Configure build options
+# Configure OpenMP
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(core       PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(components PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(app        PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(metameric  PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+# Configure debug output options
 if (met_enable_dbg_exceptions)
   target_compile_definitions(core       PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
   target_compile_definitions(components PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
   target_compile_definitions(app        PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
 endif()
+
+# Configure tracy integration options
 if (met_enable_tracy)
   target_compile_definitions(core       PUBLIC MET_ENABLE_TRACY)
   target_compile_definitions(components PUBLIC MET_ENABLE_TRACY)

@@ -19,28 +19,49 @@ namespace met {
     met_trace_full();
     
     // Get externally shared resources
-    auto &e_point_buffer = info.get_resource<gl::Buffer>("gen_ocs", "color_buffer");
+    // auto &e_point_buffesr = info.get_resource<gl::Buffer>("gen_ocs", "color_buffer");
 
     // Construct buffer object and draw components
-    m_array = {{
-      .buffers = {{ .buffer = &e_point_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
-    }};
     m_program = {{ .type = gl::ShaderType::eVertex, 
                    .path = "resources/shaders/viewport/draw_color_array.vert" },
                  { .type = gl::ShaderType::eFragment,  
                    .path = "resources/shaders/viewport/draw_color.frag" }};
-    m_draw = { .type             = gl::PrimitiveType::ePoints,
+    /* m_array = {{
+      .buffers = {{ .buffer = &e_point_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+    }}; */
+    /* m_draw = { .type             = gl::PrimitiveType::ePoints,
                .vertex_count     = (uint) (e_point_buffer.size() / sizeof(eig::AlArray3f)),
                .bindable_array   = &m_array,
-               .bindable_program = &m_program };
+               .bindable_program = &m_program }; */
 
     // Set non-changing uniform values
     m_program.uniform("u_model_matrix",  eig::Matrix4f::Identity().eval());
+    
+    m_stale = true;
   }
 
   void ViewportDrawPointsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
+
+    if (m_stale) {
+      if (info.has_resource("gen_ocs", "ocs_verts")) {
+        auto &e_verts_buffer = info.get_resource<gl::Buffer>("gen_ocs", "ocs_verts");
+        auto &e_elems_buffer = info.get_resource<gl::Buffer>("gen_ocs", "ocs_elems");
+        m_array = {{
+          .buffers  = {{ .buffer = &e_verts_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
+          .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+          .elements = &e_elems_buffer
+        }};
+        m_draw = { .type             = gl::PrimitiveType::eTriangles,
+                   .vertex_count     = (uint) (3 * e_elems_buffer.size() / sizeof(eig::Array3u)), // 3 * 64, // (uint) (e_elems_buffer.size() / sizeof()),
+                   .bindable_array   = &m_array,
+                   .bindable_program = &m_program };
+        m_stale = false;
+      } else {
+        return;
+      }
+    }
     
     // Insert temporary window to modify draw settings
     if (ImGui::Begin("Point draw settings")) {
@@ -61,7 +82,7 @@ namespace met {
     e_frame_buffer.bind();
     gl::state::set_viewport(e_draw_texture.size());
     
-    // Update program uniforms
+    // Update program uniforms  
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
     // Dispatch draw call

@@ -23,7 +23,8 @@ namespace met::io {
       std::vector<std::vector<T>> wr(v[0].size(), std::vector<T>(v.size()));
 
       #pragma omp parallel for // target seq. writes and less thread spawns
-      for (size_t i = 0; i < v[0].size(); ++i) {
+      // TODO sequence out for TBB
+      for (int i = 0; i < static_cast<int>(v[0].size()); ++i) {
         auto &wri = wr[i];
         for (size_t j = 0; j < v.size(); ++j) {
           wri[j] = v[j][i];

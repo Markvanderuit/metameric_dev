@@ -120,11 +120,15 @@ namespace Eigen {
   using AlMatrix3f = AlMatrix<float, 3, 3>;
   using AlMatrix4f = AlMatrix<float, 4, 4>;
 
-  using AlArray2f = AlArray<float, 3, 1>;
+  using AlArray2f = AlArray<float, 2, 1>;
   using AlArray3f = AlArray<float, 3, 1>;
-  using AlArray4f = AlArray<float, 3, 1>;
+  using AlArray4f = AlArray<float, 4, 1>;
 
-  using AlArray22f = AlArray<float, 3, 2>;
+  using AlArray22f = AlArray<float, 2, 2>;
   using AlArray33f = AlArray<float, 3, 3>;
-  using AlArray44f = AlArray<float, 3, 4>;
+  using AlArray44f = AlArray<float, 4, 4>;
+
+  using AlArray2u = AlArray<unsigned int, 2, 1>;
+  using AlArray3u = AlArray<unsigned int, 3, 1>;
+  using AlArray4u = AlArray<unsigned int, 4, 1>;
 } // namespace Eigen

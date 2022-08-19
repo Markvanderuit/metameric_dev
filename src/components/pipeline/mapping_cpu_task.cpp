@@ -92,7 +92,7 @@ namespace met {
         [&](const Spec &sd) { return mapping_fl11.apply_color(sd); });
 
       #pragma omp parallel for
-      for (uint i = 0; i < m_output_d65.size(); ++i) {
+      for (int i = 0; i < static_cast<int>(m_output_d65.size()); ++i) {
         Color a = m_output_d65[i], 
               b = m_input[i];
         m_output_d65_err[i] = Color((b - a).square().sum()); // squared error
@@ -106,9 +106,9 @@ namespace met {
       m_output_fl2_texture.set(as_span<float>(m_output_fl2));
       m_output_fl11_texture.set(as_span<float>(m_output_fl11));
 
-        // Show texture
-        eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
-                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
+      // Show texture
+      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
+                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       auto texture_aspect = static_cast<float>(m_output_d65_texture.size().y()) 
                           / static_cast<float>(m_output_d65_texture.size().x());
       

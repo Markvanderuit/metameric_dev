@@ -24,12 +24,14 @@
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
 
-layout(binding = 0) restrict readonly  buffer b_0 { Mapp data[]; } b_mapp;
-layout(binding = 1) restrict writeonly buffer b_1 { Spec data[]; } b_oopt;
-layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_ovec;
+layout(binding = 0) restrict readonly  buffer b_0 { float data[]; } b_rand;
+layout(binding = 1) restrict readonly  buffer b_1 { Mapp  data[]; } b_mapp;
+layout(binding = 2) restrict writeonly buffer b_2 { Spec  data[]; } b_oopt;
+layout(binding = 3) restrict writeonly buffer b_3 { vec3  data[]; } b_ovec;
 
-layout(location = 0) uniform uint u_n;
-layout(location = 1) uniform uint u_mapping_i;
+layout(location = 0) uniform uint  u_n;
+layout(location = 1) uniform uint  u_mapping_i;
+layout(location = 2) uniform float u_time;
 
 /* float inverse_transform(in Spec cdf, in float u) {
 
@@ -51,8 +53,9 @@ void main() {
   guard(i < u_n);
 
   // Sample a random unit vector
-  float seed = float(i * 256);
-  vec3 u = next_uniform_spherical(seed);
+  // vec2 seed = random_2d(vec2(gl_LocalInvocationID.x, gl_WorkGroupID.x) + u_time);
+  float seed = float(i) + b_rand.data[i]; // vec2(b_rand.data[i], float(i) / float(u_n));
+  vec3  u    = next_uniform_spherical(seed);
 
   // Obtain color system (spectra) from mapping data
   CMFS cs = finalize_mapping(b_mapp.data[u_mapping_i]);

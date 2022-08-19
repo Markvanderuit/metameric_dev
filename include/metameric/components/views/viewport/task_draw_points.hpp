@@ -11,7 +11,8 @@ namespace met {
     gl::Program  m_program;
     gl::DrawInfo m_draw;
     float        m_psize = 1.f;
-    
+    bool         m_stale;
+
   public:
     ViewportDrawPointsTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;

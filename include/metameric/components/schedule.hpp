@@ -100,7 +100,7 @@ namespace met {
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
 
     // The following tasks define the metamer set necessities
-    scheduler.emplace_task<GeOCSTask>("gen_ocs");
+    scheduler.emplace_task<GenOCSTask>("gen_ocs");
 
     // The following task defines the spectrum->color output pipeline
     // (though it mostly spawns subtasks to do so)
