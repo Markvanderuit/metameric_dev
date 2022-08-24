@@ -61,7 +61,7 @@ namespace met {
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
 
     // Dispatch shader to generate color-mapped buffer
-    gl::dispatch_compute(m_dispatch);
+    gl::dispatch_compute(m_dispatch_sg);
   }
 
   GenColorMappingsTask::GenColorMappingsTask(const std::string &name)

@@ -19,14 +19,23 @@ namespace met {
 
     const uint generate_n    = e_rgb_texture.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u);
+    const uint generate_ndiv_sg = ceil_div(generate_n, 256u / 4u);
 
-    // Initialize objects for shader call
-    m_generate_program = {{ .type = gl::ShaderType::eCompute,
-                            .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp" }};
-    m_generate_dispatch = { .groups_x = generate_ndiv, .bindable_program = &m_generate_program };
+    // Initialize objects for clustered shader call
+    m_program_sg = {{ .type = gl::ShaderType::eCompute,
+                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_cluster.comp" }};
+    m_dispatch_sg = { .groups_x = generate_ndiv_sg, 
+                      .bindable_program = &m_program_sg }; 
+
+    /* // Initialize objects for shader call
+    m_program = {{ .type = gl::ShaderType::eCompute,
+                   .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp" }};
+    m_dispatch = { .groups_x = generate_ndiv, 
+                   .bindable_program = &m_program }; */
 
     // Set these uniforms once
-    m_generate_program.uniform("u_n", generate_n);
+    // m_program.uniform("u_n", generate_n);
+    m_program_sg.uniform("u_n", generate_n);
 
     // Initialize main color texture buffer
     // auto rgb_texture_al = io::as_aligned((e_rgb_texture));
@@ -58,6 +67,6 @@ namespace met {
 
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::dispatch_compute(m_generate_dispatch);
+    gl::dispatch_compute(m_dispatch_sg);
   }
 } // namespace met

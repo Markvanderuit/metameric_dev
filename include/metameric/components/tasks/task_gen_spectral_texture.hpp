@@ -7,8 +7,10 @@
 
 namespace met {
   class GenSpectralTextureTask : public detail::AbstractTask {
-    gl::ComputeInfo m_generate_dispatch;
-    gl::Program     m_generate_program;
+    gl::ComputeInfo m_dispatch;
+    gl::Program     m_program;
+    gl::ComputeInfo m_dispatch_sg;
+    gl::Program     m_program_sg;
 
   public:
     GenSpectralTextureTask(const std::string &name);

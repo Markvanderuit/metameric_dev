@@ -21,7 +21,7 @@ namespace met {
     gl::Array    m_gamut_array;
     gl::DrawInfo m_gamut_draw;
     gl::Program  m_gamut_program;
-    float        m_gamut_lwidth = 4.f;
+    float        m_gamut_lwidth = 1.f;
     
     // Texture pointset draw components
     gl::Array    m_texture_points_array;
