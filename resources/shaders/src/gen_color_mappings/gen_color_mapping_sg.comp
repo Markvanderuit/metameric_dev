@@ -10,8 +10,8 @@
 #pragma optionNV(unroll   all)
 #pragma optionNV(strict   on)
 
-layout(local_size_x = 256) in;
-layout(std430)             buffer;
+layout(local_size_x = 1024) in;
+layout(std430)              buffer;
 
 #include <guard.glsl>
 #include <mapping_invoc.glsl>
@@ -28,7 +28,7 @@ void main() {
   const uint wg = gl_WorkGroupID.x * gl_NumSubgroups.x + gl_SubgroupID.x;
   guard(wg < u_n);
 
-  // Load reflectance and mapping data into subgroup format
+  // Loads reflectance and mapping data into subgroup format
   SgSpec sd;
   SgMapp m;
   sg_scatter_spec(sd, b_spec.data[wg]);

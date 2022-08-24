@@ -176,11 +176,11 @@ float sg_hmean(in SgSpec s) {
 }
 
 float sg_dot(in SgSpec a, in SgSpec b) {
-  return sg_hsum(sg_add(a, b));
+  return sg_hsum(sg_mul(a, b));
 }
 
 float sg_dot(in SgSpec a) {
-  return sg_hsum(sg_add(a, a));
+  return sg_hsum(sg_mul(a, a));
 }
 
 float sg_max_value(in SgSpec a) {

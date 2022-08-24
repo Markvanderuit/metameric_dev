@@ -90,7 +90,7 @@ namespace met {
                                             { .type = gl::ShaderType::eFragment,  
                                               .path = "resources/shaders/viewport/draw_color.frag" }});
     m_texture_points_draw = { .type             = gl::PrimitiveType::ePoints,
-                              .vertex_count     = (uint) e_texture_buffer.size() / sizeof(std::byte) / 3,
+                              .vertex_count     = (uint) (e_texture_buffer.size() / sizeof(eig::AlArray3f)),
                               .bindable_array   = &m_texture_points_array,
                               .bindable_program = &m_texture_points_program };
 
@@ -112,18 +112,18 @@ namespace met {
     ImGui::End();
                                 
     // Get externally shared resources 
-    auto &e_viewport_texture   = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
-    auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport", "arcball");
-    auto &e_viewport_fbuffer   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
+    auto &e_viewport_texture = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+    auto &e_viewport_arcball = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_viewport_fbuffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
     
     // Declare scoped OpenGL state
-    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA, true),
-                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
-                               gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, false) };
+    gl::state::set_viewport(e_viewport_texture.size());
+    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
+                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true),
+                               gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, true) };
 
     // Prepare multisampled framebuffer as draw target
     e_viewport_fbuffer.bind();
-    gl::state::set_viewport(e_viewport_texture.size());
     
     // Update program uniforms
     auto camera_matrix = e_viewport_arcball.full().matrix();

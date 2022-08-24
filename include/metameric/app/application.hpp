@@ -10,7 +10,6 @@ namespace met {
 
   struct ApplicationCreateInfo {
     // In case of a new project load
-    fs::path texture_path  = "";
     fs::path database_path = "";
 
     // In case of a existing project load

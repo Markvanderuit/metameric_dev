@@ -79,7 +79,6 @@ namespace met {
       // Signal schedule re-creation and submit new schedule for main view
       info.signal_flags = detail::TaskSignalFlags::eClearTasks;
       submit_schedule_main(info);
-
       return true;
     }
     return false;
@@ -223,5 +222,9 @@ namespace met {
     if (m_open_create_modal) { ImGui::OpenPopup(create_modal_title.c_str()); }
     if (m_open_close_modal)  { ImGui::OpenPopup(close_modal_title.c_str()); }
     if (m_open_exit_modal)   { ImGui::OpenPopup(exit_modal_title.c_str()); }
+
+    if ((uint) info.signal_flags) {
+      ImGui::DrawFrame();
+    }
   }
 } // namespace met

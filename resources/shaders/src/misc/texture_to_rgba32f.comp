@@ -10,7 +10,7 @@ layout(location = 0) uniform uvec2     u_size;
 layout(location = 1) uniform sampler2D u_sampler;
 
 void main() {
-  const uvec2 v = gl_WorkGroupID.xy * gl_WorkGroupSize.xy + gl_LocalInvocationID.xy;
+  const uvec2 v = gl_GlobalInvocationID.xy;
   guard(min(v, u_size - 1) == v);
 
   const vec2 p = (vec2(v) + vec2(0.5)) / vec2(u_size);

@@ -1,0 +1,64 @@
+#version 460 core
+
+// Set NVidia-CG flags
+#pragma optionNV(fastmath on)
+#pragma optionNV(inline   all)
+#pragma optionNV(unroll   all)
+#pragma optionNV(strict   on)
+
+#include <guard.glsl>
+#include <random_uniform.glsl>
+
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
+
+layout(binding = 0) restrict readonly  buffer b_0 { float data[]; } b_rand_in;
+layout(binding = 1) restrict writeonly buffer b_1 { float data[]; } b_rand_out;
+
+layout(location = 0) uniform uint u_n;
+
+float hash(in float f) {
+  return fract(sin(f) * 1e4);
+}
+
+float hash(in vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.13); 
+  p3 += dot(p3, p3.yzx + 3.333); 
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float rand(in float x) {
+	float i = floor(x);
+	float f = fract(x);
+	float u = f * f * (3.0 - 2.0 * f);
+	return mix(hash(i), hash(i + 1.0), u);
+}
+
+float noise(vec2 x) {
+  vec2 i = floor(x);
+  vec2 f = fract(x);
+
+	// Four corners in 2D of a tile
+	float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+
+  // Simple 2D lerp using smoothstep envelope between the values.
+	// return vec3(mix(mix(a, b, smoothstep(0.0, 1.0, f.x)),
+	//			mix(c, d, smoothstep(0.0, 1.0, f.x)),
+	//			smoothstep(0.0, 1.0, f.y)));
+
+	// Same code, with the clamps in smoothstep and common subexpressions
+	// optimized away.
+    vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+void main() {
+  const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+  guard(i < u_n);
+
+
+}

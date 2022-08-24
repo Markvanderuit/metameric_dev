@@ -18,7 +18,8 @@
     "nlohmann-json",
     "stb",
     "tbb",
-    "tracy"
+    "tracy",
+    "qhull"
   ],
   "features" : { }
 }

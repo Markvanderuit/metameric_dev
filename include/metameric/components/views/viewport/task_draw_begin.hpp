@@ -9,7 +9,7 @@
 
 namespace met {
   class ViewportDrawBeginTask : public detail::AbstractTask {
-    using Colorbuffer = gl::Renderbuffer<float, 3, gl::RenderbufferType::eMultisample>;
+    using Colorbuffer = gl::Renderbuffer<float, 4, gl::RenderbufferType::eMultisample>;
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1, gl::RenderbufferType::eMultisample>;
 
     // Framebuffer attachments
@@ -46,7 +46,7 @@ namespace met {
       }
 
       // Clear framebuffer targets
-      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array3f(0));
+      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array4f(0.f));
       i_frame_buffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
     }
   };

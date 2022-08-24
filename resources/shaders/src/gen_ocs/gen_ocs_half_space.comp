@@ -1,0 +1,72 @@
+/*
+  This shader implements an algorithm for sampling-based generation
+  of the 6D Object Color Solid, following the formulation provided by
+  Mackiewicz, M., Rivertz, H. J., and Finlayson, G. in  "Spherical
+  sampling methods for the calculation of metamer mismatch volumes".
+    
+  Src: https://opg.optica.org/abstract.cfm?uri=josaa-36-1-96
+ */
+
+#version 460 core
+
+// Set NVidia-CG flags
+#pragma optionNV(fastmath on)
+#pragma optionNV(inline   all)
+#pragma optionNV(unroll   all)
+#pragma optionNV(strict   on)
+
+#include <guard.glsl>
+#include <random_normal.glsl>
+#include <mapping_invoc.glsl>
+#include <vec6.glsl>
+
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+
+layout(binding = 0) restrict readonly  buffer b_0 { float data[]; } b_rand;
+layout(binding = 1) restrict readonly  buffer b_1 { Mapp  data[]; } b_mapp;
+layout(binding = 2) restrict writeonly buffer b_2 { vec6  data[]; } b_ovec;
+
+layout(location = 0) uniform uint  u_n;
+layout(location = 1) uniform uint  u_mapping_i;
+layout(location = 2) uniform uint  u_mapping_j;
+
+vec6 next_6d_normal(inout uint state) {
+  vec6 v;
+  for (uint i = 0; i < 6; ++i)
+    v.v[i] = next_1d_normal(state);
+  return v;
+}
+
+void main() {
+  const uint i = gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
+  guard(i < u_n);
+
+  // Sample a random unit vector:  gaussian distr maps to a uniform distribution 
+  // over the surface of an N-dimensional hypersphere
+  uint state = i;
+  vec3 u = normalize(next_3d_normal(state));
+
+  vec6 c;
+    
+  // Compute first three components of 6d OCS vector
+  {
+    CMFS cs_i = finalize_mapping(b_mapp.data[u_mapping_i]);
+    Spec a_i = in_matmul(u, cs_i);
+    Spec r_i = in_select(in_ge(a_i, 0.f), 1.f, 0.f);
+    vec3 c_i = in_matmul(cs_i, r_i);
+    store_first(c, c_i);
+  }
+
+  // Compute last three components of 6d OCS vector
+  {
+    CMFS cs_j = finalize_mapping(b_mapp.data[u_mapping_j]);
+    Spec a_j = in_matmul(u, cs_j);
+    Spec r_j = in_select(in_ge(a_j, 0.f), 1.f, 0.f);
+    vec3 c_j = in_matmul(cs_j, r_j);
+    store_second(c, c_j);
+  }
+
+  // Store result to buffer
+  b_ovec.data[i] = c;
+}

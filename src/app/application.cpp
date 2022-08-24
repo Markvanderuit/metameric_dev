@@ -41,6 +41,15 @@ namespace met {
       scheduler.insert_resource("glsl_parser", std::move(parser));
     }
 
+    void init_schedule(LinearScheduler &scheduler) {
+      auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
+      if (app_data.project_state == ProjectState::eSaved) {
+        submit_schedule_main(scheduler);
+      } else {
+        submit_schedule_empty(scheduler);
+      }
+    }
+
     void init_spectral_grid(LinearScheduler &scheduler, ApplicationCreateInfo info) {
       met_trace();
 
@@ -145,7 +154,7 @@ namespace met {
     detail::init_parser(scheduler);
     detail::init_state(scheduler, info);
     detail::init_spectral_grid(scheduler, info);
-    submit_schedule_empty(scheduler);
+    detail::init_schedule(scheduler);
 
     // Main runtime loop
     while (!window.should_close()) { 

@@ -42,7 +42,6 @@ if(MSVC)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
 
-
 # Ensure OpenMP is available
 find_package(OpenMP REQUIRED)
 
@@ -56,10 +55,11 @@ find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(libigl    CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_package(unofficial-nativefiledialog CONFIG REQUIRED)
+find_package(Qhull     CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
+find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 
 # Include third party libraries provided directly
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
@@ -204,6 +204,7 @@ target_link_libraries(components PUBLIC
   igl::core
   igl::common
   CGAL::CGAL
+  Qhull::qhullcpp
 )
 add_dependencies(components shaders_preprocess misc_copy)
 

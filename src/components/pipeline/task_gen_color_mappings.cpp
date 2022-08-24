@@ -20,7 +20,7 @@ namespace met {
     // Determine dispatch group size
     const uint mapping_n       = e_app_data.loaded_texture.size().prod();
     const uint mapping_ndiv    = ceil_div(mapping_n, 256u); 
-    const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / 32u);
+    const uint mapping_ndiv_sg = ceil_div(mapping_n, 1024u / 32u);
 
     // Initialize objects for mapping through subgroup path
     m_program_sg = {{ .type   = gl::ShaderType::eCompute,

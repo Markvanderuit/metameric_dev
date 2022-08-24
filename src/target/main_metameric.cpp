@@ -9,13 +9,13 @@
 #include <metameric/app/application.hpp>
 
 int main() {
-  /* try { */
-    met::create_application({ .texture_path  = "texture.jpg", 
-                              .database_path = "database.mat",
+  try {
+    met::create_application({ .database_path = "database.mat",
+                              .project_path  = "C:/Users/markv/Desktop/Testproject/bricks.json",
                               .color_mode    = met::AppliationColorMode::eDark });
-  /* } catch (const std::exception &e) {
+  } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  } */
+  }
   return EXIT_SUCCESS;
 }
