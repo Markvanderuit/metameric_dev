@@ -1,5 +1,5 @@
-#ifndef SPECTRUM_SUBGROUP_PART_GLSL_GUARD
-#define SPECTRUM_SUBGROUP_PART_GLSL_GUARD
+#ifndef SPECTRUM_CLUSTER_GLSL_GUARD
+#define SPECTRUM_CLUSTER_GLSL_GUARD
 #if defined(GL_KHR_shader_subgroup_basic)      \
  && defined(GL_KHR_shader_subgroup_arithmetic) \
  && defined(GL_KHR_shader_subgroup_clustered)
@@ -14,8 +14,27 @@ const uint sg_spectrum_nbins = (wavelength_samples + (sg_spectrum_ninvc - 1))
 // Remainder dealt with by last invoc
 const uint sg_spectrum_mod = wavelength_samples - sg_spectrum_ninvc * (sg_spectrum_nbins - 1);
 
+// Index of current spectrum in n, and invoc in spectrum
+uint sg_spectrum_global_i = gl_GlobalInvocationID.x / sg_spectrum_ninvc;
+uint sg_spectrum_local_i  = gl_GlobalInvocationID.x % sg_spectrum_ninvc;
+
 #define sg_bin_iter(i)           for (uint i = 0; i < sg_spectrum_nbins; ++i)
 #define sg_bin_iter_apply(i, op) for (uint i = 0; i < sg_spectrum_nbins; ++i) { s.v[i] = op; }
+
+// Scatter large array 'src' to smaller array 'dst' over a cluster
+/* #define sg_bin_scatter(dst, src)                                 \
+  for (uint j = 0; j < sg_spectrum_nbins; ++j) {                 \
+    dst.v[j] = src[sg_spectrum_local_i * sg_spectrum_nbins + j]; \
+  }       
+
+#define sg_bin_gather(dst, src)                                  \                    
+  for (uint j = 0; j < sg_spectrum_nbins; ++j) {                 \
+    dst[sg_spectrum_local_i * sg_spectrum_nbins + j] = src.v[j]; \
+  } */
+
+// Scatter large array 'src' to smaller array 'dst' over a cluster
+#define sg_bin_scatter(dst, src) sg_bin_iter(j) { dst.v[j] = src[sg_spectrum_local_i * sg_spectrum_nbins + j]; }       
+#define sg_bin_gather(dst, src) sg_bin_iter(j) { dst[sg_spectrum_local_i * sg_spectrum_nbins + j] = src.v[j]; }
 
 /* END OF DEFINE FILE */
 
@@ -159,4 +178,4 @@ float sg_max_value(in SgSpec s) {
 /* END OF OBJECT FILE */
 
 #endif // EXTENSIONS
-#endif // SPECTRUM_SUBGROUP_PART_GLSL_GUARD
+#endif // SPECTRUM_CLUSTER_GLSL_GUARD
