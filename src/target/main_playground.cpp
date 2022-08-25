@@ -74,7 +74,7 @@ int main() {
   using namespace met;
   
   using Color   = eig::Array<float, 3, 1>;
-  using AlColor = eig::AlArray<float, 3, 1>;
+  using AlColor = eig::AlArray<float, 3>;
 
   try {
     gl::Window window = {{ .size  = { 512, 512 }, .title = "Playground", .flags = window_flags }};

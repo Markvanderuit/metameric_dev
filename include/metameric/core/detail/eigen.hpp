@@ -22,49 +22,12 @@ namespace Eigen {
            : D == 2 ? 8
            : 4;
     }
-
-    template <size_t D>
-    constexpr size_t _matrix_align() {
-      static_assert(D > 0 && D <= 4);
-      return D == 4 ? 4
-           : D == 3 ? 4
-           : D == 2 ? 2
-           : 1;
-    }
-
-    template <size_t R, size_t C>
-    constexpr size_t matrix_align() {
-      return _matrix_align<R>() * vector_align<C>();
-    }
   } // namespace detail
 
-  template <class Type, size_t Rows, size_t Cols>
-  class alignas(detail::matrix_align<Rows, Cols>()) AlMatrix 
-  : public Matrix<Type, Rows, Cols> {
-    using Base = Matrix<Type, Rows, Cols>;
-
-  public:
-    AlMatrix() : Base() 
-    { }
-
-    // This constructor allows you to construct MyVectorType from Eigen expressions
-    template <typename Other>
-    AlMatrix(const MatrixBase<Other>& o)
-    : Base(o)
-    { }
-
-    template<typename Other>
-    AlMatrix& operator=(const MatrixBase <Other>& o)
-    {
-      this->Base::operator=(o);
-      return *this;
-    }
-  };
-
-  template <class Type, size_t Rows, size_t Cols>
-  class alignas(detail::matrix_align<Rows, Cols>()) AlArray 
-  : public Array<Type, Rows, Cols> {
-    using Base = Array<Type, Rows, Cols>;
+  template <class Type, size_t Size>
+  class alignas(detail::vector_align<Size>()) AlArray 
+  : public Array<Type, Size, 1> {
+    using Base = Array<Type, Size, 1>;
 
   public:
     using Base::Base;
@@ -110,25 +73,17 @@ namespace Eigen {
     }
   };
 
-  /* Define common aligned vector/matrix types */
+  /* Define common aligned vector types */
   
   using AlVector2f = AlVector<float, 2>;
   using AlVector3f = AlVector<float, 3>;
   using AlVector4f = AlVector<float, 4>;
 
-  using AlMatrix2f = AlMatrix<float, 2, 2>;
-  using AlMatrix3f = AlMatrix<float, 3, 3>;
-  using AlMatrix4f = AlMatrix<float, 4, 4>;
+  using AlArray2f = AlArray<float, 2>;
+  using AlArray3f = AlArray<float, 3>;
+  using AlArray4f = AlArray<float, 4>;
 
-  using AlArray2f = AlArray<float, 2, 1>;
-  using AlArray3f = AlArray<float, 3, 1>;
-  using AlArray4f = AlArray<float, 4, 1>;
-
-  using AlArray22f = AlArray<float, 2, 2>;
-  using AlArray33f = AlArray<float, 3, 3>;
-  using AlArray44f = AlArray<float, 4, 4>;
-
-  using AlArray2u = AlArray<unsigned int, 2, 1>;
-  using AlArray3u = AlArray<unsigned int, 3, 1>;
-  using AlArray4u = AlArray<unsigned int, 4, 1>;
+  using AlArray2u = AlArray<unsigned int, 2>;
+  using AlArray3u = AlArray<unsigned int, 3>;
+  using AlArray4u = AlArray<unsigned int, 4>;
 } // namespace Eigen
