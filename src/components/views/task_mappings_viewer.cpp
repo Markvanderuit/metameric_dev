@@ -36,16 +36,18 @@ namespace met {
     auto &e_tex_data        = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     // Compute sample position in texture dependent on mouse position in image
-    eig::Array2f mouse_pos  =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
-                            - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
-                            / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
-    m_tooltip_pixel   = (mouse_pos * e_tex_data.size().cast<float>()).cast<int>();
+    eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
+                           - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
+                           / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
+    m_tooltip_pixel = (mouse_pos * e_tex_data.size().cast<float>()).cast<int>();
     const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
-    // Perform copy of relevant reflectance data to mapped buffer, then submit a fence
-    e_spectrum_buffer.copy_to(m_tooltip_buffer, sizeof(Spec), sample_i * sizeof(Spec));
+    // Perform copy of relevant reflectance data to current available buffer
+    e_spectrum_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(Spec), sample_i * sizeof(Spec));
+
+    // Submit a fence for current available buffer as it affects mapped memory
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
-    m_tooltip_fence = gl::sync::Fence(gl::sync::time_s(1));
+    m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   }
 
   void MappingsViewerTask::eval_tooltip(detail::TaskEvalInfo &info, uint texture_i) {
@@ -60,9 +62,15 @@ namespace met {
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
     ImGui::Separator();
 
-    // Compute output for reflectance data once it is available; no choice but to wait here
-    m_tooltip_fence.cpu_wait();
-    Spec& reflectance = m_tooltip_map[0];
+    // Compute output for reflectance data, which should by now be copied into the next buffer
+    // Wait on fence for this buffer, however
+    m_tooltip_cycle_i = (m_tooltip_cycle_i + 1) % m_tooltip_buffers.size();
+    if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init()) {
+      fence.cpu_wait();
+    }
+    
+    // m_tooltip_fence.cpu_wait();
+    Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
     Spec  power       = e_mapping.apply_power(reflectance);
     Color power_rgb   = e_mapping.apply_color(reflectance);
     
@@ -89,17 +97,24 @@ namespace met {
 
     m_resample_size = 1;
 
-    // Initialize a buffer of size Spec, and map it for reading
-    m_tooltip_buffer = {{ .size = sizeof(Spec),
-                          .flags = gl::BufferCreateFlags::eMapPersistent
-                                 | gl::BufferCreateFlags::eMapRead }};
-    m_tooltip_map = cast_span<Spec>(m_tooltip_buffer.map(
-      gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapRead));
+    // Initialize a set of rolling buffers of size Spec, and map these for reading
+    constexpr auto create_flags = gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapRead;
+    constexpr auto map_flags    = gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapRead;
+    for (uint i = 0; i < m_tooltip_buffers.size(); ++i) {
+      auto &buffer = m_tooltip_buffers[i];
+      auto &map    = m_tooltip_maps[i];
+
+      buffer = {{ .size = sizeof(Spec), .flags = create_flags }};
+      map = cast_span<Spec>(buffer.map(map_flags));
+    }
+    m_tooltip_cycle_i = 0;
   }
   
   void MappingsViewerTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
-    
+    for (auto &buffer : m_tooltip_buffers) {
+      buffer.unmap();
+    }
     m_resample_tasks.dstr(info);
   }
 
@@ -135,7 +150,7 @@ namespace met {
       }
 
       // Reset state for tooltip
-      m_tooltip_i = -1;
+      m_tooltip_mapping_i = -1;
       
       // Iterate n_cols, n_rows, and n_mappings
       for (uint i = 0, i_col = 0; i < e_mappings.size(); ++i) {
@@ -154,8 +169,8 @@ namespace met {
         
         // Set id for tooltip after loop is over, and schedule copy of data
         if (ImGui::IsItemHovered()) {
-          m_tooltip_i = i;
-          eval_tooltip_copy(info, m_tooltip_i); 
+          m_tooltip_mapping_i = i;
+          eval_tooltip_copy(info, m_tooltip_mapping_i); 
         }
 
         // Do pop-out if image is double clicked
@@ -173,7 +188,7 @@ namespace met {
       }
 
       // Handle tooltip after copy is hopefully completed
-      if (m_tooltip_i != -1) { eval_tooltip(info, m_tooltip_i); }
+      if (m_tooltip_mapping_i != -1) { eval_tooltip(info, m_tooltip_mapping_i); }
     }
     ImGui::End();
   }
