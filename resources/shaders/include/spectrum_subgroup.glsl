@@ -1,7 +1,8 @@
 #ifndef SPECTRUM_SUBGROUP_GLSL_GUARD
 #define SPECTRUM_SUBGROUP_GLSL_GUARD
 
-#if defined(GL_KHR_shader_subgroup_basic) && defined(GL_KHR_shader_subgroup_arithmetic)
+#if defined(GL_KHR_shader_subgroup_basic)     \
+ && defined(GL_KHR_shader_subgroup_arithmetic)
 
 #include <constants_spectrum.glsl>
 #include <constants_subgroup.glsl>
@@ -24,8 +25,8 @@ uint sg_wavelength_iters = (sg_wavelength_samples - 1)
 #define SgSpec float[sg_wavelength_samples]
 
 // Scatter Spec to SgSpec
-#define sg_scatter_spec(dst, src)                 \
-  { sg_scatter(dst, src, sg_wavelength_iters) } \
+#define sg_spec_scatter(dst, src)             \
+  { sg_scatter(dst, src, sg_wavelength_iters) }
 
 /* Constructors */
 
@@ -38,127 +39,107 @@ SgSpec sg_spectrum(in float f) {
 
 /* Component-wise math operators */
 
-SgSpec sg_mul(in SgSpec a, in float f) {
-  SgSpec s;
+SgSpec sg_mul(in SgSpec s, in float f) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] * f;
+    s[i] *= f;
   return s;
 }
 
-SgSpec sg_div(in SgSpec a, in float f) {
-  SgSpec s;
+SgSpec sg_div(in SgSpec s, in float f) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] / f;
+    s[i] /= f;
   return s;
 }
 
-SgSpec sg_add(in SgSpec a, in float f) {
-  SgSpec s;
+SgSpec sg_add(in SgSpec s, in float f) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] + f;
+    s[i] += f;
   return s;
 }
 
-SgSpec sg_sub(in SgSpec a, in float f) {
-  SgSpec s;
+SgSpec sg_sub(in SgSpec s, in float f) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] - f;
+    s[i] -= f;
   return s;
 }
 
-SgSpec sg_pow(in SgSpec v, in float p) {
-  SgSpec s = v;
-
+SgSpec sg_pow(in SgSpec s, in float p) {
   if (p > 1.f)
     for (uint i = 0; i < sg_wavelength_iters; ++i)
       s[i] = pow(s[i], p);
-
   return s;
 }
 
 /* Column-wise math operators */
 
-SgSpec sg_mul(in SgSpec a, in SgSpec b) {
-  SgSpec s;
+SgSpec sg_mul(in SgSpec s, in SgSpec o) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] * b[i];
+    s[i] *= o[i];
   return s;
 }
 
-SgSpec sg_div(in SgSpec a, in SgSpec b) {
-  SgSpec s;
+SgSpec sg_div(in SgSpec s, in SgSpec o) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] / b[i];
+    s[i] /= o[i];
   return s;
 }
 
-SgSpec sg_add(in SgSpec a, in SgSpec b) {
-  SgSpec s;
+SgSpec sg_add(in SgSpec s, in SgSpec o) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] + b[i];
+    s[i] += o[i];
   return s;
 }
 
-SgSpec sg_sub(in SgSpec a, in SgSpec b) {
-  SgSpec s;
+SgSpec sg_sub(in SgSpec s, in SgSpec o) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = a[i] - b[i];
+    s[i] -= o[i];
   return s;
 }
 
-SgSpec sg_pow(in SgSpec v, in SgSpec p) {
-  SgSpec s = v;
-
+SgSpec sg_pow(in SgSpec s, in SgSpec p) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
     if (p[i] > 1.f)
       s[i] = pow(s[i], p[i]);
-
   return s;
 }
 
 /* Component-wise comparators */
 
-SgSpec sg_max(in SgSpec a, in float b) {
-  SgSpec s;
+SgSpec sg_max(in SgSpec s, in float b) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = max(a[i], b);
+    s[i] = max(s[i], b);
   return s;
 }
 
-SgSpec sg_min(in SgSpec a, in float b) {
-  SgSpec s;
+SgSpec sg_min(in SgSpec s, in float b) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = min(a[i], b);
+    s[i] = min(s[i], b);
   return s;
 }
 
-SgSpec sg_clamp(in SgSpec a, in float b, in float c) {
-  SgSpec s;
+SgSpec sg_clamp(in SgSpec s, in float minv, in float maxv) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = clamp(a[i], b, c);
+    s[i] = clamp(s[i], minv, maxv);
   return s;
 }
 
 /* Column-wise comparators */
 
-SgSpec sg_max(in SgSpec a, in SgSpec b) {
-  SgSpec s;
+SgSpec sg_max(in SgSpec s, in SgSpec o) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = max(a[i], b[i]);
+    s[i] = max(s[i], o[i]);
   return s;
 }
 
-SgSpec sg_min(in SgSpec a, in SgSpec b) {
-  SgSpec s;
+SgSpec sg_min(in SgSpec s, in SgSpec o) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = min(a[i], b[i]);
+    s[i] = min(s[i], o[i]);
   return s;
 }
 
-SgSpec sg_clamp(in SgSpec a, in SgSpec b, in SgSpec c) {
-  SgSpec s;
+SgSpec sg_clamp(in SgSpec s, in SgSpec minv, in SgSpec maxv) {
   for (uint i = 0; i < sg_wavelength_iters; ++i)
-    s[i] = clamp(a[i], b[i], c[i]);
+    s[i] = clamp(s[i], minv[i], maxv[i]);
   return s;
 }
 

@@ -12,10 +12,10 @@ struct SgMapp {
 };
 
 // Scatter Mapping to SgMapp
-#define sg_scatter_mapp(dst, src)                                \
- { sg_scatter_cmfs(dst.cmfs, src.cmfs)                           \
-   sg_scatter_spec(dst.illuminant, src.illuminant)               \
-   dst.n_scatters = src.n_scatters; }                            \
+#define sg_mapp_scatter(dst, src)                  \
+ { sg_cmfs_scatter(dst.cmfs, src.cmfs)             \
+   sg_spec_scatter(dst.illuminant, src.illuminant) \
+   dst.n_scatters = src.n_scatters;                }
 
 /* Mapping functions */
 
