@@ -6,6 +6,7 @@
 #include <metameric/components/views/task_create_project.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <small_gl/program.hpp>
 #include <small_gl/window.hpp>
 
 namespace met {

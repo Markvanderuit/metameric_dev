@@ -7,6 +7,7 @@
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/app/application.hpp>
 
 #include <small_gl/buffer.hpp>
