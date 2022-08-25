@@ -27,6 +27,9 @@
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
+// State changes
+#include <small_gl/framebuffer.hpp>
+
 namespace met {
   template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
@@ -64,7 +67,7 @@ namespace met {
       ImGui::End();
     });
     
-    // Temporary window to plot some distributions
+    /* // Temporary window to plot some distributions
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &) {
       if (ImGui::Begin("Model plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -86,7 +89,7 @@ namespace met {
           wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
       }
       ImGui::End();
-    });
+    }); */
   }
 
   template <typename Scheduler>
@@ -116,13 +119,14 @@ namespace met {
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);
     
-    scheduler.emplace_task<FrameEndTask>("frame_end");
+    scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }
   
   template <typename Scheduler>
   void submit_schedule_empty(Scheduler &scheduler) {
+    gl::Framebuffer::make_default().bind();
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
     scheduler.emplace_task<WindowTask>("window");
-    scheduler.emplace_task<FrameEndTask>("frame_end");
+    scheduler.emplace_task<FrameEndTask>("frame_end", false);
   }
 } // namespace met

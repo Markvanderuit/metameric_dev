@@ -66,8 +66,8 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
 
     // Prepare framebuffer as draw target
-    e_frame_buffer.bind();
-    gl::state::set_viewport(e_draw_texture.size());
+    // e_frame_buffer.bind();
+    // gl::state::set_viewport(e_draw_texture.size());
     
     // Update program uniforms
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    

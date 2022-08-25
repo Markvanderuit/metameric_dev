@@ -117,13 +117,9 @@ namespace met {
     auto &e_viewport_fbuffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
     
     // Declare scoped OpenGL state
-    gl::state::set_viewport(e_viewport_texture.size());
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true),
                                gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, true) };
-
-    // Prepare multisampled framebuffer as draw target
-    e_viewport_fbuffer.bind();
     
     // Update program uniforms
     auto camera_matrix = e_viewport_arcball.full().matrix();

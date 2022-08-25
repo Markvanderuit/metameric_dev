@@ -9,16 +9,18 @@
 
 namespace met {
   struct FrameEndTask : public detail::AbstractTask {
-    FrameEndTask(const std::string &name)
-    : detail::AbstractTask(name) { }
+    bool m_bind_default_fbo;
+
+    FrameEndTask(const std::string &name, bool bind_default_fbo = true)
+    : detail::AbstractTask(name), m_bind_default_fbo(bind_default_fbo) { }
 
     void eval(detail::TaskEvalInfo &info) override {
       met_trace_full();
       
       auto fb = gl::Framebuffer::make_default();
-      fb.bind();
       fb.clear(gl::FramebufferType::eColor, eig::Array3f(0));
       fb.clear(gl::FramebufferType::eDepth, 0.f);
+      if (m_bind_default_fbo) fb.bind();
 
       ImGui::DrawFrame();
 

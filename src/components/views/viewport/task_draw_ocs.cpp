@@ -76,7 +76,7 @@ namespace met {
     auto &e_viewport_fbuffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
 
     // Declare scoped OpenGL state
-    gl::state::set_viewport(e_viewport_texture.size());
+    // gl::state::set_viewport(e_viewport_texture.size());
     gl::state::set_op(gl::CullOp::eFront);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,    true),
@@ -84,7 +84,7 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eCullOp,  true) };
 
     // Prepare framebuffer as draw target
-    e_viewport_fbuffer.bind();
+    // e_viewport_fbuffer.bind();
     
     // Prepare program and update program uniforms  
     m_program.bind();

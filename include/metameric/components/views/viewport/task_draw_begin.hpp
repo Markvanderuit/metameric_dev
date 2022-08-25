@@ -45,9 +45,14 @@ namespace met {
         i_frame_buffer      = {{ .type = gl::FramebufferType::eColor, .attachment = &e_draw_texture }};
       }
 
-      // Clear framebuffer targets
+      // Clear framebuffer target for next subtasks
       i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array4f(0.f));
       i_frame_buffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
+      i_frame_buffer_msaa.bind();
+
+      // Specify viewport for next subtasks
+      gl::state::set_viewport(e_draw_texture.size());
+
     }
   };
 } // namespace met

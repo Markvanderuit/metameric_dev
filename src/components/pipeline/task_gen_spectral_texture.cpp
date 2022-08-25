@@ -19,7 +19,7 @@ namespace met {
 
     const uint generate_n    = e_rgb_texture.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u);
-    const uint generate_ndiv_sg = ceil_div(generate_n, 256u / 4u);
+    const uint generate_ndiv_sg = ceil_div(generate_n, 256u / 8u);
 
     // Initialize objects for clustered shader call
     m_program_sg = {{ .type = gl::ShaderType::eCompute,
@@ -45,8 +45,8 @@ namespace met {
 
     // Initialize main spectral texture buffer
     info.emplace_resource<gl::Buffer>("spectrum_buffer", { 
-      .size  = sizeof(Spec) * generate_n,
-      .flags = gl::BufferCreateFlags::eMapRead
+      .size  = sizeof(Spec) * generate_n
+      // .flags = gl::BufferCreateFlags::eMapRead
     });
   }
 
@@ -54,17 +54,27 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "color_buffer");
-    auto &e_spect_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spectrum_buffer");
+    auto &e_app_data      = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_color_gamut_c = e_app_data.project_data.rgb_gamut;
+    auto &e_spect_gamut_s = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spectrum_buffer");
     auto &i_color_texture = info.get_resource<gl::Buffer>("color_buffer");
     auto &i_spect_texture = info.get_resource<gl::Buffer>("spectrum_buffer");
 
-    // Bind resources to buffer targets
-    e_color_gamut.bind_to(gl::BufferTargetType::eShaderStorage,   0);
-    e_spect_gamut.bind_to(gl::BufferTargetType::eShaderStorage,   1);
-    i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 3);
+    // Compute barycentric coordinate inverse matrix
+    auto bary_sub = e_color_gamut_c[3];
+    auto bary_inv = (eig::Matrix3f() << e_color_gamut_c[0] - bary_sub, 
+                                        e_color_gamut_c[1] - bary_sub, 
+                                        e_color_gamut_c[2] - bary_sub).finished().inverse().eval();
 
+    // Set program uniforms
+    m_program_sg.uniform("u_bary_sub", bary_sub);
+    m_program_sg.uniform("u_bary_inv", bary_inv);
+
+    // Bind resources to buffer targets
+    e_spect_gamut_s.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_dispatch_sg);
