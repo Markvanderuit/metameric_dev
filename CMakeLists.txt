@@ -244,28 +244,6 @@ if (met_enable_tracy)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_TRACY)
 endif()
 
-# Set up benchmark executable
-# add_executable_r(benchmark src/target/main_benchmark.cpp)
-# target_link_libraries(benchmark PRIVATE 
-#   core
-#   benchmark::benchmark
-#   benchmark::benchmark_main
-#   Eigen3::Eigen
-# )
-
 # Set up playground executable
-# add_executable_r(playground src/target/main_playground.cpp)
-# target_link_libraries(playground PRIVATE
-#   core
-#   small_gl
-#   fmt::fmt-header-only
-#   imgui::imgui
-#   imguizmo::imguizmo
-#   TBB::tbb
-# )
-
-# Set up serialization executable
-# add_executable_r(serialization src/target/main_serialization.cpp)
-# target_link_libraries(serialization PRIVATE
-#   core
-# )
+add_executable_r(playground src/target/main_playground.cpp)
+target_link_libraries(playground PRIVATE core small_gl small_gl_parser_lib)
