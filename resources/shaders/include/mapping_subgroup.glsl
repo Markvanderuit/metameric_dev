@@ -19,7 +19,7 @@ struct SgMapp {
 
 /* Mapping functions */
 
-SgCMFS finalize_mapping(in SgMapp m) {
+SgCMFS finalize_mapp(in SgMapp m) {
   // Normalization factor is applied over the illuminant
   // TODO extract and precompute
   float k = 1.f / sg_hsum(sg_mul(m.cmfs[1], m.illuminant));
@@ -28,7 +28,7 @@ SgCMFS finalize_mapping(in SgMapp m) {
   return sg_mul(sg_mul(m.cmfs, m.illuminant), k);
 }
 
-SgCMFS finalize_mapping(in SgMapp m, in SgSpec sd) {
+SgCMFS finalize_mapp(in SgMapp m, in SgSpec sd) {
   SgSpec refl_mul = m.n_scatters == 0
                   ? sg_spectrum(1.f)
                   : sg_pow(sd, float(m.n_scatters));

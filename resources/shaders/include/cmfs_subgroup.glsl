@@ -5,7 +5,7 @@
 
 /* Subgroup color matching functions object */
 
-#define SgCMFS float[3][sg_wavelength_samples]
+#define SgCMFS float[3][sg_spectrum_bins_n]
 
 /* Constructors */
 

@@ -23,9 +23,9 @@
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
 
-layout(binding = 0) restrict readonly  buffer b_0 { float data[]; } b_rand;
-layout(binding = 1) restrict readonly  buffer b_1 { Mapp  data[]; } b_mapp;
-layout(binding = 2) restrict writeonly buffer b_2 { vec6  data[]; } b_ovec;
+layout(binding = 0) restrict readonly  buffer b_0 { float  data[]; } b_rand;
+layout(binding = 1) restrict readonly  buffer b_1 { InMapp data[]; } b_mapp;
+layout(binding = 2) restrict writeonly buffer b_2 { vec6   data[]; } b_ovec;
 
 layout(location = 0) uniform uint  u_n;
 layout(location = 1) uniform uint  u_mapping_i;
@@ -51,19 +51,19 @@ void main() {
     
   // Compute first three components of 6d OCS vector
   {
-    CMFS cs_i = finalize_mapping(b_mapp.data[u_mapping_i]);
-    Spec a_i = in_matmul(u, cs_i);
-    Spec r_i = in_select(in_ge(a_i, 0.f), 1.f, 0.f);
-    vec3 c_i = in_matmul(cs_i, r_i);
+    InCMFS cs_i = finalize_mapp(b_mapp.data[u_mapping_i]);
+    InSpec a_i = in_mmul(u, cs_i);
+    InSpec r_i = in_select(in_ge(a_i, 0.f), 1.f, 0.f);
+    vec3 c_i = in_mmul(cs_i, r_i);
     store_first(c, c_i);
   }
 
   // Compute last three components of 6d OCS vector
   {
-    CMFS cs_j = finalize_mapping(b_mapp.data[u_mapping_j]);
-    Spec a_j = in_matmul(u, cs_j);
-    Spec r_j = in_select(in_ge(a_j, 0.f), 1.f, 0.f);
-    vec3 c_j = in_matmul(cs_j, r_j);
+    InCMFS cs_j = finalize_mapp(b_mapp.data[u_mapping_j]);
+    InSpec a_j = in_mmul(u, cs_j);
+    InSpec r_j = in_select(in_ge(a_j, 0.f), 1.f, 0.f);
+    vec3 c_j = in_mmul(cs_j, r_j);
     store_second(c, c_j);
   }
 

@@ -9,15 +9,26 @@
 
 #version 460 core
 
+// Enable necessary subgroup extensions
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_clustered  : require
+
 // Set NVidia-CG flags
 #pragma optionNV(fastmath on)
 #pragma optionNV(inline   all)
 #pragma optionNV(unroll   all)
 #pragma optionNV(strict   on)
 
+// Use shorthand for clustered types
+#define Spec ClSpec
+#define CMFS ClCMFS
+#define Mapp ClMapp
+
 #include <guard.glsl>
 #include <random_normal.glsl>
 #include <mapping_invoc.glsl>
+#include <mapping_cluster.glsl>
 
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
@@ -32,14 +43,26 @@ layout(location = 2) uniform float u_time;
  
 shared InMapp s_mapping;
 
-// Gaussian variables map to a uniform distribution over
-// the surface of an N-dimensional hypersphere
-vec3 next_uniform_spherical_3(inout uint state) {
-  return normalize(next_3d_normal(state)); 
+// Load clustered mapping from shared memory
+Mapp load_mapp_shared() {
+  Mapp s;
+  cl_mapp_scatter(s, s_mapping);
+  return s;
+}
+
+// Store custered spectrum to b_oopt buffer
+void store_oopt(in Spec s, uint i) {
+  cl_spec_gather(b_oopt.data[i], s);
+}
+
+// Store clustered vector to b_ovec buffer
+void store_ovec(in vec3 v, uint i) {
+  guard(cl_bin_elect());
+  b_ovec.data[i] = v;
 }
 
 void main() {
-  const uint i = gl_GlobalInvocationID.x;
+  const uint i = gl_GlobalInvocationID.x / cl_spectrum_invc_n;
   guard(i < u_n);
 
   // Load mapping data into shared memory
@@ -49,20 +72,20 @@ void main() {
   memoryBarrierShared();
   barrier();
 
-  // Sample a random unit vector:  gaussian distr maps to a uniform distribution 
-  // over the surface of an N-dimensional hypersphere
+  // Sample a random unit vector; a normalized point in an N-D gaussian distr. maps 
+  // to a uniform distribution over the surface of an N-D hypersphere
   uint state = i;
   vec3 u = normalize(next_3d_normal(state));
 
-  // Obtain color system (spectra) from mapping data
-  InCMFS cs = finalize_mapp(s_mapping);
+  // Obtain color system (spectra) from the mapping currently in shared memory
+  CMFS cs = finalize_mapp(load_mapp_shared());
 
-  // Generate the algorithm's matrix A_ij, and then the optimal spectrum R_ij and its mapped color
-  InSpec a_ij = in_mmul(u, cs);
-  InSpec r_ij = in_select(in_ge(a_ij, 0.f), 1.f, 0.f);
-  vec3   c_ij = in_mmul(cs, r_ij);
+  // Generate the algorithm's matrix a_ij, followed by optimal spectrum r_ij and color c_ij
+  Spec a_ij = cl_mmul(u, cs);
+  Spec r_ij = mix(Spec(0.f), Spec(1.f), greaterThan(a_ij, Spec(0.f)));
+  vec3 c_ij = cl_mmul(cs, r_ij);
 
   // Store results to buffers
-  b_oopt.data[i] = r_ij;
-  b_ovec.data[i] = c_ij;
+  store_oopt(r_ij, i);
+  store_ovec(c_ij, i);
 }
