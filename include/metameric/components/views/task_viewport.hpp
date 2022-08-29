@@ -9,8 +9,8 @@ namespace met {
   class ViewportTask : public detail::AbstractTask {
     
     bool                 m_is_gizmo_used;
-    std::array<Color, 4> m_gamut_prev;
-    Color                m_gamut_average;
+    std::array<Colr, 4>  m_gamut_prev;
+    Colr                 m_gamut_average;
     std::vector<uint>    m_gamut_selection_indices;
 
     void eval_camera(detail::TaskEvalInfo &);

@@ -18,9 +18,10 @@ namespace met {
     auto &e_parser   = info.get_resource<glp::Parser>(global_key, "glsl_parser");
 
     // Determine dispatch group size
+    const uint mapping_cl      = ceil_div(wavelength_samples, 4u);
     const uint mapping_n       = e_app_data.loaded_texture.size().prod();
-    // const uint mapping_ndiv    = ceil_div(mapping_n, 256u); 
-    const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / 8u);
+    const uint mapping_ndiv    = ceil_div(mapping_n,  256u); 
+    const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / mapping_cl);
 
     // Initialize objects for mapping through subgroup path
     m_program_sg = {{ .type   = gl::ShaderType::eCompute,
@@ -29,15 +30,15 @@ namespace met {
     m_dispatch_sg = { .groups_x = mapping_ndiv_sg, .bindable_program = &m_program_sg };
 
     // Initialize objects for mapping through per-invoc path
-    // m_program = {{ .type = gl::ShaderType::eCompute,
-    //                .path = "resources/shaders/gen_color_mappings/gen_color_mapping_in.comp" }};
-    // m_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_program };
+    m_program = {{ .type = gl::ShaderType::eCompute,
+                   .path = "resources/shaders/gen_color_mappings/gen_color_mapping_in.comp" }};
+    m_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_program };
 
     // Set these uniforms once
     m_program_sg.uniform("u_n",         mapping_n);
     m_program_sg.uniform("u_mapping_i", m_mapping_i);
-    // m_program.uniform("u_n",            mapping_n);
-    // m_program.uniform("u_mapping_i",    m_mapping_i);
+    m_program.uniform("u_n",            mapping_n);
+    m_program.uniform("u_mapping_i",    m_mapping_i);
     
     // Create color buffer output for this task
     info.emplace_resource<gl::Buffer>("color_buffer", {
@@ -62,6 +63,7 @@ namespace met {
 
     // Dispatch shader to generate color-mapped buffer
     gl::dispatch_compute(m_dispatch_sg);
+    // gl::dispatch_compute(m_dispatch);
   }
 
   GenColorMappingsTask::GenColorMappingsTask(const std::string &name)
