@@ -77,7 +77,7 @@ InSpec in_pow(in InSpec s, in InSpec p) {
   return s;
 }
 
-/* Component-wise comparators */
+/* Component-wise logic comparators */
 
 InMask in_eq(in InSpec a, in float b) {
   InMask m;

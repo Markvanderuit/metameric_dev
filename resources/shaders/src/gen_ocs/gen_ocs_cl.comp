@@ -82,7 +82,7 @@ void main() {
 
   // Generate the algorithm's matrix a_ij, followed by optimal spectrum r_ij and color c_ij
   Spec a_ij = cl_mmul(u, cs);
-  Spec r_ij = mix(Spec(0.f), Spec(1.f), greaterThan(a_ij, Spec(0.f)));
+  Spec r_ij = cl_select(cl_gr(a_ij, 0.f), 1.f, 0.f);
   vec3 c_ij = cl_mmul(cs, r_ij);
 
   // Store results to buffers

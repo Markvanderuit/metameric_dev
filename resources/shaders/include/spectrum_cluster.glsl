@@ -33,6 +33,7 @@ bool cl_bin_elect() { return cl_spectrum_invc_i == 0; }
 /* Per-cluster Spectrum object is just a vec4 of wavelengths */
 
 #define ClSpec vec4
+#define ClMask bvec4
 
 /* Reductions */
 
@@ -61,6 +62,36 @@ float cl_hmin(in ClSpec s) {
   cl_bin_iter_remainder(i) s[i] = FLT_MAX;
   return subgroupClusteredMin(hmin(s), cl_spectrum_invc_n);
 }
+
+/* Logic comparators */
+
+ClMask cl_eq(in ClSpec s, in float f) { return equal(s, ClSpec(f)); }
+ClMask cl_neq(in ClSpec s, in float f) { return notEqual(s, ClSpec(f)); }
+ClMask cl_gr(in ClSpec s, in float f) { return greaterThan(s, ClSpec(f)); }
+ClMask cl_ge(in ClSpec s, in float f) { return greaterThanEqual(s, ClSpec(f)); }
+ClMask cl_lr(in ClSpec s, in float f) { return lessThan(s, ClSpec(f)); }
+ClMask cl_le(in ClSpec s, in float f) { return lessThanEqual(s, ClSpec(f)); }
+
+ClMask cl_eq(in ClSpec s, in ClSpec o) { return equal(s, o); }
+ClMask cl_neq(in ClSpec s, in ClSpec o) { return notEqual(s, o); }
+ClMask cl_gr(in ClSpec s, in ClSpec o) { return greaterThan(s, o); }
+ClMask cl_ge(in ClSpec s, in ClSpec o) { return greaterThanEqual(s, o);}
+ClMask cl_lr(in ClSpec s, in ClSpec o) { return lessThan(s, o); }
+ClMask cl_le(in ClSpec s, in ClSpec o) { return lessThanEqual(s, o); }
+
+ClMask cl_eq(in float f, in ClSpec o) { return equal(ClSpec(f), o); }
+ClMask cl_neq(in float f, in ClSpec o) { return notEqual(ClSpec(f), o); }
+ClMask cl_gr(in float f, in ClSpec o) { return greaterThan(ClSpec(f), o); }
+ClMask cl_ge(in float f, in ClSpec o) { return greaterThanEqual(ClSpec(f), o); }
+ClMask cl_lr(in float f, in ClSpec o) { return lessThan(ClSpec(f), o); }
+ClMask cl_le(in float f, in ClSpec o) { return lessThanEqual(ClSpec(f), o); }
+
+/* Mask operations */
+
+ClSpec cl_select(in ClMask m, in ClSpec x, in ClSpec y) { return mix(y, x, m); }
+ClSpec cl_select(in ClMask m, in ClSpec x, in float y) { return mix(ClSpec(y), x, m); }
+ClSpec cl_select(in ClMask m, in float x, in ClSpec y) { return mix(y, ClSpec(x), m); }
+ClSpec cl_select(in ClMask m, in float x, in float y) { return mix(ClSpec(y), ClSpec(x), m); }
 
 #endif // EXTENSIONS
 #endif // SPECTRUM_CLUSTER_GLSL_GUARD
