@@ -20,8 +20,8 @@ namespace met {
   }
 
   void to_json(json &js, const SpectralMapping &v) {
-    js["cmfs"]       = v.cmfs;
-    js["illuminant"] = v.illuminant;
+    js["cmfs"]       = CMFS(v.cmfs);
+    js["illuminant"] = Spec(v.illuminant);
     js["n_scatters"] = v.n_scatters;
   }
 
@@ -38,7 +38,7 @@ namespace met {
   }
 
   void from_json(const json &js, ProjectData &v) {
-    v.rgb_gamut   = js.at("rgb_gamut").get<std::array<Color, 4>>();
+    v.rgb_gamut   = js.at("rgb_gamut").get<std::array<Colr, 4>>();
     v.spec_gamut  = js.at("spec_gamut").get<std::array<Spec, 4>>();
     v.mappings    = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapping>>>();
     v.cmfs        = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
@@ -63,11 +63,11 @@ namespace Eigen {
     js = std::vector<met::Spec::value_type>(v.begin(), v.end());
   }
   
-  void from_json(const met::json& js, met::Color &v) {
+  void from_json(const met::json& js, met::Colr &v) {
     std::ranges::copy(js, v.begin());
   }
 
-  void to_json(met::json &js, const met::Color &v) {
+  void to_json(met::json &js, const met::Colr &v) {
     js = std::vector<met::Spec::value_type>(v.begin(), v.end());
   }
   
@@ -77,6 +77,6 @@ namespace Eigen {
 
   void to_json(met::json &js, const met::CMFS &v) {
     auto r = v.reshaped();
-    js = std::vector<met::Color::value_type>(r.begin(), r.end());
+    js = std::vector<met::Colr::value_type>(r.begin(), r.end());
   }
 } // namespace Eigen
