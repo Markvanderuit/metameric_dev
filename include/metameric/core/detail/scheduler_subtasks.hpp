@@ -24,8 +24,7 @@ namespace met::detail {
       // Adjust nr. of subtasks upwards if necessary
       for (; m_n_tasks < n_tasks; ++m_n_tasks) {
         auto task = m_add(info, m_n_tasks);
-        auto key  = task.name();
-        info.insert_task_after(m_prev, key, std::move(task));
+        info.insert_task_after(m_prev, std::move(task));
       }
 
       // Adjust nr. of subtasks downwards if necessary

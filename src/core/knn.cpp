@@ -141,7 +141,8 @@ namespace met {
     guard(query_list.size(), { 0.f, 0.f, FLT_MAX });
 
     // Perform search for the closest query and return it
-    return *std::min_element(std::execution::par, range_iter(query_list), detail::query_comp<T>);
+    return *std::min_element(std::execution::par_unseq, 
+      range_iter(query_list), detail::query_comp<T>);
   }
 
   template <typename T>

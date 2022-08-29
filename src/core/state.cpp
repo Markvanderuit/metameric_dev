@@ -18,10 +18,10 @@ namespace met {
 
   ProjectData::ProjectData() {
     // Provide an initial example gamut for now
-    rgb_gamut = { Color { .75f, .40f, .25f },
-                  Color { .68f, .49f, .58f },
-                  Color { .50f, .58f, .39f },
-                  Color { .35f, .30f, .34f }};
+    rgb_gamut = { Colr { .75f, .40f, .25f },
+                  Colr { .68f, .49f, .58f },
+                  Colr { .50f, .58f, .39f },
+                  Colr { .35f, .30f, .34f }};
     spec_gamut = { 1.f, 1.f, 1.f, 1.f }; // TODO replace with sensible initialization
 
     // Instantiate loaded components with sensible default values
@@ -98,7 +98,7 @@ namespace met {
     project_state  = ProjectState::eSaved;
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
-    loaded_texture = io::load_texture2d<Color>(io::path_with_ext(project_path,".bmp"));
+    loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"));
     mods  = { };
     mod_i = -1;
     

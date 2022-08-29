@@ -40,13 +40,13 @@ namespace met {
     }
 
     template <typename Ty>
-    void insert_task(const KeyType &key, Ty &&task) {
+    void insert_task(Ty &&task) {
       static_assert(std::is_base_of_v<detail::AbstractTask, Ty>);
       register_task("", std::make_shared<Ty>(std::move(task)));
     }
 
     template <typename Ty>
-    void insert_task_after(const KeyType &prev, const KeyType &key, Ty &&task) {
+    void insert_task_after(const KeyType &prev, Ty &&task) {
       static_assert(std::is_base_of_v<detail::AbstractTask, Ty>);
       register_task(prev, std::make_shared<Ty>(std::move(task)));
     }

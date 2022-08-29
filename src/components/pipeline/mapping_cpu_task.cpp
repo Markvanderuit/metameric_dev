@@ -10,7 +10,7 @@
 
 namespace met {
   namespace detail {
-    eig::Vector4f as_barycentric(std::span<Color> gamut, const Color &p) {
+    eig::Vector4f as_barycentric(std::span<Colr> gamut, const Colr &p) {
       auto t = (eig::Matrix3f() << (gamut[0] - gamut[3]),
                                    (gamut[1] - gamut[3]),
                                    (gamut[2] - gamut[3])).finished();
@@ -52,7 +52,7 @@ namespace met {
       auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
 
       // Get relevant application data
-      std::array<Color, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;
+      std::array<Colr, 4> &rgb_gamut = e_app_data.project_data.rgb_gamut;
       std::array<Spec, 4> &spec_gamut = e_app_data.project_data.spec_gamut;
       
       // Generate barycentric coordinate for all colors
@@ -71,7 +71,7 @@ namespace met {
       Spec test_spectrum = m_spectral_texture[1024];
       //  std::reduce(std::execution::par_unseq, m_spectral_texture.begin(), 
         // m_spectral_texture.end()) / static_cast<float>(m_spectral_texture.size());
-      Color test_color = reflectance_to_color(test_spectrum, { 
+      Colr test_color = reflectance_to_color(test_spectrum, { 
         .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_fl2
       });
 
@@ -93,11 +93,10 @@ namespace met {
 
       #pragma omp parallel for
       for (int i = 0; i < static_cast<int>(m_output_d65.size()); ++i) {
-        Color a = m_output_d65[i], 
-              b = m_input[i];
-        m_output_d65_err[i] = Color((b - a).square().sum()); // squared error
+        Colr a = m_output_d65[i], b = m_input[i];
+        m_output_d65_err[i] = Colr((b - a).square().sum()); // squared error
       }
-      Color output_d65_mse = std::reduce(m_output_d65_err.begin(), m_output_d65_err.end())
+      Colr output_d65_mse = std::reduce(m_output_d65_err.begin(), m_output_d65_err.end())
                            / static_cast<float>(m_output_d65_err.size());
 
       // Copy data into view texture
