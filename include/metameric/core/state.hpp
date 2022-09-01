@@ -27,7 +27,7 @@ namespace met {
     ProjectData();
 
     // Current mapping and gamut used for rgb->spectral conversion
-    std::array<Color, 4> rgb_gamut;
+    std::array<Colr, 4> rgb_gamut;
     std::array<Spec, 4>  spec_gamut;
 
     /* Set of names of cmfs/illuminants that together form a spectral mapping */

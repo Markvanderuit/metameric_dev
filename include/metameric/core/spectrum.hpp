@@ -15,9 +15,18 @@ namespace met {
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
   /* Define program's underlying spectrum/cmfs/color classes as just renamed Eigen objects */
-  using CMFS  = eig::Matrix<float, wavelength_samples, 3>;
-  using Spec  = eig::Array<float, wavelength_samples, 1>;
-  using Color = eig::Array<float, 3, 1>;
+  using CMFS = eig::Matrix<float, wavelength_samples, 3>;
+  using Spec = eig::Array<float, wavelength_samples, 1>;
+  using Colr = eig::Array<float, 3, 1>;
+
+  /* Forcibly unaligned types */
+  using UnalCMFS = eig::Matrix<float, wavelength_samples, 3, eig::DontAlign>;
+  using UnalSpec = eig::Array<float, wavelength_samples, 1, eig::DontAlign>;
+  using UnalColr = eig::Array<float, 3, 1, eig::DontAlign>;
+
+  /* 16-byte aligned types */
+  using AlSpec = eig::AlArray<float, wavelength_samples>;
+  using AlColr = eig::AlArray<float, 3>;
 
   namespace io {
     // Load a discrete spectral distribution from sequentially increasing wvl/value data
@@ -69,9 +78,9 @@ namespace met {
   struct SpectralMapping {
     /* Mapping components */
 
-    CMFS cmfs       = models::cmfs_cie_xyz;    // Color matching or sensor response functions
-    Spec illuminant = models::emitter_cie_d65; // Illuminant under which observation is performed
-    uint n_scatters = 0;                       // Nr. of indirect scatterings of reflectance
+    UnalCMFS cmfs       = models::cmfs_cie_xyz;    // Color matching or sensor response functions
+    UnalSpec illuminant = models::emitter_cie_d65; // Illuminant under which observation is performed
+    uint n_scatters     = 0;                       // Nr. of indirect scatterings of reflectance
 
     /* Mapping functions */
 
@@ -96,7 +105,7 @@ namespace met {
     }
 
     // Obtain a color by applying this spectral mapping
-    Color apply_color(const Spec &sd) const {
+    Colr apply_color(const Spec &sd) const {
       return finalize(sd).transpose() * sd.matrix();
     }
 
@@ -108,7 +117,7 @@ namespace met {
 
   // Convert a spectral reflectance distr. to a color under a given mapping
   inline
-  Color reflectance_to_color(const Spec &sd, 
+  Colr reflectance_to_color(const Spec &sd, 
                              const SpectralMapping &mapping = SpectralMapping()) {
     return mapping.apply_color(sd);
   }
@@ -135,14 +144,14 @@ namespace met {
 
   // Convert a gamma-corrected sRGB value to linear sRGB
   inline
-  Color gamma_srgb_to_linear_srgb(Color c) {
+  Colr gamma_srgb_to_linear_srgb(Colr c) {
     std::ranges::transform(c, c.begin(), gamma_srgb_to_linear_srgb_f<float>);
     return c;
   }
 
   // Convert a linear sRGB value to gamma-corrected sRGB
   inline
-  Color linear_srgb_to_gamma_srgb(Color c) {
+  Colr linear_srgb_to_gamma_srgb(Colr c) {
     std::ranges::transform(c, c.begin(), linear_srgb_to_gamma_srgb_f<float>);
     return c;
   }

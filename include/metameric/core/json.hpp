@@ -32,8 +32,8 @@ namespace Eigen {
   void from_json(const met::json& js, met::Spec &v);
   void to_json(met::json &js, const met::Spec &v);
   
-  void from_json(const met::json& js, met::Color &v);
-  void to_json(met::json &js, const met::Color &v);
+  void from_json(const met::json& js, met::Colr &v);
+  void to_json(met::json &js, const met::Colr &v);
   
   void from_json(const met::json& js, met::CMFS &v);
   void to_json(met::json &js, const met::CMFS &v);

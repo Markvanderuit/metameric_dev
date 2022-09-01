@@ -6,7 +6,6 @@
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <metameric/components/tasks/detail/task_texture_resample.hpp>
 #include <small_gl/buffer.hpp>
-#include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <array>
 

@@ -85,8 +85,8 @@ namespace met {
 
     // Initialize objects for shader call
     m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_ocs/gen_ocs.comp" }};
-    m_dispatch = { .groups_x = ceil_div(n_samples, 256u), 
+                   .path = "resources/shaders/gen_ocs/gen_ocs_cl.comp" }};
+    m_dispatch = { .groups_x = ceil_div(n_samples, 256u / ceil_div(wavelength_samples, 4u)), 
                    .bindable_program = &m_program };
 
     // Set these uniforms once
@@ -139,6 +139,8 @@ namespace met {
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spectrum_buffer");
     auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mappings_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
+
+    fmt::print("sizeof mapping = {}\n", sizeof(SpectralMapping));
 
     // Bind buffer resources to ssbo targets
     e_mapp_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);

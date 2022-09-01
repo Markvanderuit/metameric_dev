@@ -17,9 +17,9 @@ layout(std430)             buffer;
 #include <mapping_invoc.glsl>
 #include <mapping_subgroup.glsl>
 
-layout(binding = 0) restrict readonly  buffer b_0 { Spec data[]; } b_spec;
-layout(binding = 1) restrict readonly  buffer b_1 { Mapp data[]; } b_mapp;
-layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_colr;
+layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[]; } b_spec;
+layout(binding = 1) restrict readonly  buffer b_1 { InMapp data[]; } b_mapp;
+layout(binding = 2) restrict writeonly buffer b_2 { vec3   data[]; } b_colr;
 
 layout(location = 0) uniform uint u_n;
 layout(location = 1) uniform uint u_mapping_i;
@@ -45,7 +45,7 @@ void main() {
   SgMapp m  = load_mapp(u_mapping_i);
 
   // Compute and apply color mapping
-  SgCMFS cs = finalize_mapping(m, sd);
+  SgCMFS cs = finalize_mapp(m, sd);
   vec3   v  = sg_matmul(cs, sd);
 
   // Store result using elected invoc of subgroup

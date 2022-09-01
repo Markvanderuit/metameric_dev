@@ -4,19 +4,19 @@
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/mappings_viewer/task_mapping_popout.hpp>
-#include <small_gl/buffer.hpp>
+#include <small_gl/texture.hpp>
 
 namespace met {
-  constexpr auto gen_subtask_tex_fmt  = FMT_COMPILE("gen_color_mapping_texture_{}");
-  constexpr auto resample_subtask_fmt = FMT_COMPILE("mappings_viewer_resample_{}");
+  constexpr auto mapping_subtask_fmt  = FMT_COMPILE("gen_color_mapping_texture_{}");
+  constexpr auto resample_fmt = FMT_COMPILE("mappings_viewer_resample_{}");
 
   // Lambda captures of texture_size parameter and outputs
   // capture to add a resample task
   constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
     return [=](detail::AbstractTaskInfo &, uint i) {
       using ResampleTaskType = detail::TextureResampleTask<gl::Texture2d4f>;
-      return ResampleTaskType({ fmt::format(gen_subtask_tex_fmt, i), "texture"  }, 
-                              { fmt::format(resample_subtask_fmt, i), "texture" },
+      return ResampleTaskType({ fmt::format(mapping_subtask_fmt, i), "texture"  }, 
+                              { fmt::format(resample_fmt, i), "texture" },
                               { .size = texture_size                            }, 
                               { .min_filter = gl::SamplerMinFilter::eLinear,
                                 .mag_filter = gl::SamplerMagFilter::eLinear     });
@@ -25,7 +25,7 @@ namespace met {
 
   // Lambda capture to remove a resample task
   constexpr auto resample_subtask_rmv = [](detail::AbstractTaskInfo &, uint i) {
-    return fmt::format(resample_subtask_fmt, i);
+    return fmt::format(resample_fmt, i);
   };
 
   void MappingsViewerTask::eval_tooltip_copy(detail::TaskEvalInfo &info, uint texture_i) {
@@ -43,7 +43,7 @@ namespace met {
     const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant reflectance data to current available buffer
-    e_spectrum_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(Spec), sample_i * sizeof(Spec));
+    e_spectrum_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(Spec), sizeof(Spec) * sample_i);
 
     // Submit a fence for current available buffer as it affects mapped memory
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
@@ -62,23 +62,22 @@ namespace met {
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
     ImGui::Separator();
 
-    // Compute output for reflectance data, which should by now be copied into the next buffer
-    // Wait on fence for this buffer, however
+    // Acquire output reflectance data, which should by now be copied into the a buffer
+    // Check fence for this buffer, however, in case this is not the case
     m_tooltip_cycle_i = (m_tooltip_cycle_i + 1) % m_tooltip_buffers.size();
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init()) {
       fence.cpu_wait();
     }
     
-    // m_tooltip_fence.cpu_wait();
     Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
-    Spec  power       = e_mapping.apply_power(reflectance);
-    Color power_rgb   = e_mapping.apply_color(reflectance);
-    
+    Spec power       = e_mapping.apply_power(reflectance);
+    Colr power_rgb   = e_mapping.apply_color(reflectance);
+
     // Plot rest of tooltip
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-      nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
+      nullptr, 0.f, e_mapping.illuminant.maxCoeff(), { 0.f, 64.f });
     ImGui::ColorEdit3("Power (rgb)", power_rgb.data(), ImGuiColorEditFlags_Float);
     ImGui::Separator();
     ImGui::Text("Hint: double-click image to show it in a window");
@@ -95,7 +94,8 @@ namespace met {
   void MappingsViewerTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
-    m_resample_size = 1;
+    m_resample_size   = 1;
+    m_tooltip_cycle_i = 0;
 
     // Initialize a set of rolling buffers of size Spec, and map these for reading
     constexpr auto create_flags = gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapRead;
@@ -107,7 +107,6 @@ namespace met {
       buffer = {{ .size = sizeof(Spec), .flags = create_flags }};
       map = cast_span<Spec>(buffer.map(map_flags));
     }
-    m_tooltip_cycle_i = 0;
   }
   
   void MappingsViewerTask::dstr(detail::TaskDstrInfo &info) {
@@ -142,8 +141,7 @@ namespace met {
       if (auto resample_size = texture_size.cast<uint>(); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
-        m_resample_tasks.init(name(), info, e_mappings_n, 
-          resample_subtask_add(m_resample_size), resample_subtask_rmv);
+        m_resample_tasks.init(name(), info, e_mappings_n, resample_subtask_add(m_resample_size), resample_subtask_rmv);
       } else {
         // Adjust nr. of spawned tasks to correct number
         m_resample_tasks.eval(info, e_mappings_n);
@@ -155,7 +153,7 @@ namespace met {
       // Iterate n_cols, n_rows, and n_mappings
       for (uint i = 0, i_col = 0; i < e_mappings.size(); ++i) {
         // Generate name of task holding texture data
-        auto subtask_tex_key = fmt::format(resample_subtask_fmt, i);
+        auto subtask_tex_key = fmt::format(resample_fmt, i);
         
         // Get externally shared resources; note, resources may not be created yet as tasks are
         // added into the schedule at the end of a loop, not during
@@ -167,7 +165,7 @@ namespace met {
         ImGui::Text(e_mappings[i].first.c_str());
         ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
         
-        // Set id for tooltip after loop is over, and schedule copy of data
+        // Set id for tooltip after loop is over, and start data copy
         if (ImGui::IsItemHovered()) {
           m_tooltip_mapping_i = i;
           eval_tooltip_copy(info, m_tooltip_mapping_i); 
@@ -187,8 +185,10 @@ namespace met {
         }
       }
 
-      // Handle tooltip after copy is hopefully completed
-      if (m_tooltip_mapping_i != -1) { eval_tooltip(info, m_tooltip_mapping_i); }
+      // Handle tooltip after data copy is hopefully completed
+      if (m_tooltip_mapping_i != -1) {
+        eval_tooltip(info, m_tooltip_mapping_i);
+      }
     }
     ImGui::End();
   }

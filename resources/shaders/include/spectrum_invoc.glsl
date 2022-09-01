@@ -1,301 +1,238 @@
 #ifndef SPECTRUM_INVOC_GLSL_GUARD
 #define SPECTRUM_INVOC_GLSL_GUARD
 
-#include <constants_spectrum.glsl>
+#include <math.glsl>
+#include <spectrum.glsl>
 
 /* Per-invocation Spectrum object */
 
-#define Spec float[wavelength_samples]
-#define Mask bool[wavelength_samples]
+#define InSpec float[wavelength_samples]
+#define InMask bool[wavelength_samples]
+
+// Define to perform commonly occuring iteration
+#define in_bin_iter(__b) for (uint __b = 0; __b < wavelength_samples; ++__b)
 
 /* Constructors */
 
-Spec in_spectrum(in float f) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = f;
+InSpec in_spectrum(in float f) {
+  InSpec s;
+  in_bin_iter(i) s[i] = f;
   return s;
 }
 
 /* Component-wise math operators */
 
-Spec in_mul(in Spec a, in float f) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] * f;
+InSpec in_mul(in InSpec s, in float f) {
+  in_bin_iter(i) s[i] *= f;
   return s;
 }
 
-Spec in_div(in Spec a, in float f) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] / f;
+InSpec in_div(in InSpec s, in float f) {
+  in_bin_iter(i) s[i] /= f;
   return s;
 }
 
-Spec in_add(in Spec a, in float f) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] + f;
+InSpec in_add(in InSpec s, in float f) {
+  in_bin_iter(i) s[i] += f;
   return s;
 }
 
-Spec in_sub(in Spec a, in float f) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] - f;
+InSpec in_sub(in InSpec s, in float f) {
+  in_bin_iter(i) s[i] -= f;
   return s;
 }
 
-Spec in_pow(in Spec v, in float p) {
-  Spec s = v;
-
+InSpec in_pow(in InSpec s, in float p) {
   if (p > 1.f)
-    for (uint i = 0; i < wavelength_samples; ++i)
-      s[i] = pow(s[i], p);
-
+    in_bin_iter(i) s[i] = pow(s[i], p);
   return s;
 }
 
 /* Column-wise math operators */
 
-Spec in_mul(in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] * b[i];
+InSpec in_mul(in InSpec s, in InSpec b) {
+  in_bin_iter(i) s[i] *= b[i];
   return s;
 }
 
-Spec in_div(in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] / b[i];
+InSpec in_div(in InSpec s, in InSpec b) {
+  in_bin_iter(i) s[i] /= b[i];
   return s;
 }
 
-Spec in_add(in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] + b[i];
+InSpec in_add(in InSpec s, in InSpec b) {
+  in_bin_iter(i) s[i] += b[i];
   return s;
 }
 
-Spec in_sub(in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = a[i] - b[i];
+InSpec in_sub(in InSpec s, in InSpec b) {
+  in_bin_iter(i) s[i] -= b[i];
   return s;
 }
 
-Spec in_pow(in Spec v, in Spec p) {
-  Spec s = v;
-
-  for (uint i = 0; i < wavelength_samples; ++i)
+InSpec in_pow(in InSpec s, in InSpec p) {
+  in_bin_iter(i) 
     if (p[i] > 1.f)
       s[i] = pow(s[i], p[i]);
-
   return s;
 }
 
-/* Component-wise comparators */
+/* Component-wise logic comparators */
 
-Mask in_eq(in Spec a, in float b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] == b;
+InMask in_eq(in InSpec a, in float b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] == b;
   return m;
 }
 
-Mask in_neq(in Spec a, in float b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] != b;
+InMask in_neq(in InSpec a, in float b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] != b;
   return m;
 }
 
-Mask in_gr(in Spec a, in float b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] > b;
+InMask in_gr(in InSpec a, in float b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] > b;
   return m;
 }
 
-Mask in_ge(in Spec a, in float b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] >= b;
+InMask in_ge(in InSpec a, in float b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] >= b;
   return m;
 }
 
-Mask in_lr(in Spec a, in float b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] < b;
+InMask in_lr(in InSpec a, in float b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] < b;
   return m;
 }
 
-Mask in_le(in Spec a, in float b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] <= b;
+InMask in_le(in InSpec a, in float b) {
+  InMask m;
+  in_bin_iter(i)  m[i] = a[i] <= b;
   return m;
 }
 
-Spec in_max(in Spec a, in float b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = max(a[i], b);
+InSpec in_max(in InSpec s, in float b) {
+  in_bin_iter(i) s[i] = max(s[i], b);
   return s;
 }
 
-Spec in_min(in Spec a, in float b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = min(a[i], b);
+InSpec in_min(in InSpec s, in float b) {
+  in_bin_iter(i) s[i] = min(s[i], b);
   return s;
 }
 
-Spec in_clamp(in Spec a, in float b, in float c) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = clamp(a[i], b, c);
+InSpec in_clamp(in InSpec s, in float minv, in float maxv) {
+  in_bin_iter(i)  s[i] = clamp(s[i], minv, maxv);
   return s;
 }
 
-Spec in_select(in Mask m, in float a, in float b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = m[i] ? a : b;
+InSpec in_select(in InMask m, in float a, in float b) {
+  InSpec s;
+  in_bin_iter(i) s[i] = m[i] ? a : b;
   return s;
 }
 
-Spec in_select(in Mask m, in float a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = m[i] ? a : b[i];
+InSpec in_select(in InMask m, in float a, in InSpec s) {
+  in_bin_iter(i) s[i] = m[i] ? a : s[i];
   return s;
 }
 
-Spec in_select(in Mask m, in Spec a, in float b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = m[i] ? a[i] : b;
+InSpec in_select(in InMask m, in InSpec s, in float b) {
+  in_bin_iter(i) s[i] = m[i] ? s[i] : b;
   return s;
 }
 
 /* Column-wise comparators */
 
-Mask in_eq(in Spec a, in Spec b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] == b[i];
+InMask in_eq(in InSpec a, in InSpec b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] == b[i];
   return m;
 }
 
-Mask in_neq(in Spec a, in Spec b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] != b[i];
+InMask in_neq(in InSpec a, in InSpec b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] != b[i];
   return m;
 }
 
-Mask in_gr(in Spec a, in Spec b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] > b[i];
+InMask in_gr(in InSpec a, in InSpec b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] > b[i];
   return m;
 }
 
-Mask in_ge(in Spec a, in Spec b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] >= b[i];
+InMask in_ge(in InSpec a, in InSpec b) {
+  InMask m;
+  in_bin_iter(i)  m[i] = a[i] >= b[i];
   return m;
 }
 
-Mask in_lr(in Spec a, in Spec b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] < b[i];
+InMask in_lr(in InSpec a, in InSpec b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] < b[i];
   return m;
 }
 
-Mask in_le(in Spec a, in Spec b) {
-  Mask m;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    m[i] = a[i] <= b[i];
+InMask in_le(in InSpec a, in InSpec b) {
+  InMask m;
+  in_bin_iter(i) m[i] = a[i] <= b[i];
   return m;
 }
 
-Spec in_max(in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = max(a[i], b[i]);
+InSpec in_max(in InSpec s, in InSpec o) {
+  in_bin_iter(i) s[i] = max(s[i], o[i]);
   return s;
 }
 
-Spec in_min(in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = min(a[i], b[i]);
+InSpec in_min(in InSpec s, in InSpec o) {
+  in_bin_iter(i) s[i] = min(s[i], o[i]);
   return s;
 }
 
-Spec in_clamp(in Spec a, in Spec b, in Spec c) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = clamp(a[i], b[i], c[i]);
+InSpec in_clamp(in InSpec s, in InSpec minv, in InSpec maxv) {
+  in_bin_iter(i) s[i] = clamp(s[i], minv[i], maxv[i]);
   return s;
 }
 
-Spec in_select(in Mask m, in Spec a, in Spec b) {
-  Spec s;
-  for (uint i = 0; i < wavelength_samples; ++i)
-    s[i] = m[i] ? a[i] : b[i];
+InSpec in_select(in InMask m, in InSpec s, in InSpec o) {
+  in_bin_iter(i) s[i] = m[i] ? s[i] : o[i];
   return s;
 }
 
 /* Reductions */
 
-// TODO extract to unrelated shader
-float in_hsum(vec3 v) {
-  return v.x + v.y + v.z;
-}
-
-float in_hsum(in Spec s) {
-  float f = s[0];
-  for (uint i = 1; i < wavelength_samples; ++i)
-    f += s[i];
+float in_hsum(in InSpec s) {
+  float f = 0.f;
+  in_bin_iter(i) f += s[i];
   return f;
 }
 
-float in_hmean(vec3 v) {
-  return in_hsum(v) / float(3);
+float in_hmean(in InSpec s) {
+  return wavelength_samples_inv * in_hsum(s);
 }
 
-float in_hmean(in Spec s) {
-  return in_hsum(s) * wavelength_samples_inv;
-}
-
-float in_dot(in Spec a, in Spec b) {
+float in_dot(in InSpec a, in InSpec b) {
   return in_hsum(in_add(a, b));
 }
 
-float in_dot(in Spec a) {
+float in_dot(in InSpec a) {
   return in_hsum(in_add(a, a));
 }
 
-float in_max_value(in Spec a) {
-  float f = a[0];
-  for (uint i = 1; i < wavelength_samples; ++i)
-    f = max(f, a[i]);
+float in_max_value(in InSpec a) {
+  float f = FLT_MIN;
+  in_bin_iter(i) f = max(f, a[i]);
   return f;
 }
 
-float in_min_value(in Spec a) {
-  float f = a[0];
-  for (uint i = 1; i < wavelength_samples; ++i)
-    f = min(f, a[i]);
+float in_min_value(in InSpec a) {
+  float f = FLT_MAX;
+  in_bin_iter(i) f = min(f, a[i]);
   return f;
 }
 

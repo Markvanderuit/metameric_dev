@@ -16,9 +16,7 @@ namespace Eigen {
   namespace detail {
     template <size_t D>
     constexpr size_t vector_align() {
-      static_assert(D > 0 && D <= 4);
-      return D == 4 ? 16
-           : D == 3 ? 16
+      return D >= 3 ? 16
            : D == 2 ? 8
            : 4;
     }

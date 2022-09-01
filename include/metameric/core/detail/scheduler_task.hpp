@@ -121,14 +121,14 @@ namespace met::detail {
     }
 
     template <typename Ty>
-    void insert_task(const KeyType &key, Ty &&task) {
+    void insert_task(Ty &&task) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
       met_trace();
       add_task_registry.emplace_back("", std::make_shared<Ty>(std::move(task)));
     }
 
     template <typename Ty>
-    void insert_task_after(const KeyType &prev, const KeyType &key, Ty &&task) {
+    void insert_task_after(const KeyType &prev, Ty &&task) {
       static_assert(std::is_base_of_v<AbstractTask, Ty>);
       met_trace();
       add_task_registry.emplace_back(prev, std::make_shared<Ty>(std::move(task)));

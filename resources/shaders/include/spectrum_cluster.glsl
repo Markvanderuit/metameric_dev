@@ -1,78 +1,97 @@
 #ifndef SPECTRUM_CLUSTER_GLSL_GUARD
 #define SPECTRUM_CLUSTER_GLSL_GUARD
+
 #if defined(GL_KHR_shader_subgroup_basic)      \
  && defined(GL_KHR_shader_subgroup_arithmetic) \
  && defined(GL_KHR_shader_subgroup_clustered)
 
-#define SgSpec vec4
+#include <math.glsl>
+#include <spectrum.glsl>
 
-// Nr. of bins per invocation
-const uint sg_spectrum_nbins = 4;
+// Nr. of wavelength bins per invocation
+const uint cl_spectrum_bins_n = 4;
 
-// Nr of invocations per spectrum
-const uint sg_spectrum_ninvc = (wavelength_samples + (sg_spectrum_nbins - 1)) / sg_spectrum_nbins;
+// Nr of invocations and index of current invocation in spectrum
+const uint cl_spectrum_invc_n = CEIL_DIV(wavelength_samples, cl_spectrum_bins_n);
+uint       cl_spectrum_invc_i = gl_GlobalInvocationID.x % cl_spectrum_invc_n;
 
-// Remainder dealt with by last invoc
-const uint sg_spectrum_mod = wavelength_samples - sg_spectrum_nbins * (sg_spectrum_ninvc - 1);
+// Offset and size of wavelength bins for current invocation
+uint cl_spectrum_bin_offs = cl_spectrum_invc_i * cl_spectrum_bins_n;
+uint cl_spectrum_bin_size = min(cl_spectrum_bin_offs + cl_spectrum_bins_n, wavelength_samples) - cl_spectrum_bin_offs;
 
-// Index of current spectrum in n, and invoc in spectrum
-uint sg_spectrum_global_i = gl_GlobalInvocationID.x / sg_spectrum_ninvc;
-uint sg_spectrum_local_i  = gl_GlobalInvocationID.x % sg_spectrum_ninvc;
+// Define to perform commonly occuring iteration
+#define cl_bin_iter(__b) for (uint __b = 0; __b < cl_spectrum_bin_size; ++__b)
+#define cl_bin_iter_remainder(__b) for (uint __b = cl_spectrum_bin_size; __b < cl_spectrum_bins_n; ++__b)
 
-#define sg_bin_iter(i) for (uint i = 0; i < sg_spectrum_nbins; ++i)
+// Scatter/gather spectrum data into/from clustered representation
+#define cl_spec_scatter(dst, src) { cl_bin_iter(j) dst[j] = src[cl_spectrum_bin_offs + j];       \
+                                    cl_bin_iter_remainder(j) dst[j] = 0.f; /* mask remainder */  }
+#define cl_spec_gather(dst, src)  { cl_bin_iter(j) dst[cl_spectrum_bin_offs + j] = src[j]; }
 
-// Scatter large array 'src' to smaller array 'dst' over a cluster
-#define sg_bin_scatter(dst, src) sg_bin_iter(j) dst[j] = src[sg_spectrum_local_i * sg_spectrum_nbins + j];
+bool cl_bin_elect() { return cl_spectrum_invc_i == 0; }
 
-// Gather small array 'src' to larger array 'dst' over a cluster
-#define sg_bin_gather(dst, src) sg_bin_iter(j) dst[sg_spectrum_local_i * sg_spectrum_nbins + j] = src[j];
+/* Per-cluster Spectrum object is just a vec4 of wavelengths */
 
-#define sg_spec_scatter(dst, src) { sg_bin_scatter(dst, src) }
-#define sg_spec_gather(dst, src)  { sg_bin_gather(dst, src)  }
-
-bool sg_bin_elect() { return sg_spectrum_local_i == 0; }
-
-/* END OF DEFINE FILE */
-
-/* BEGIN OF OBJECT FILE */
-
-// Define max/min single precision float constants for masked components
-#define FLT_MAX 3.402823466e+38
-#define FLT_MIN 1.175494351e-38
+#define ClSpec vec4
+#define ClMask bvec4
 
 /* Reductions */
 
-float sg_hsum(in SgSpec s) {
-  float f = 0.f;
-  sg_bin_iter(i) f += s[i];
-  return subgroupClusteredAdd(f, sg_spectrum_ninvc);
+float cl_hsum(in ClSpec s) {
+  return subgroupClusteredAdd(hsum(s), cl_spectrum_invc_n);
 }
 
-float sg_hmean(in SgSpec s) {
-  return sg_hsum(s) * wavelength_samples_inv;
+float cl_hdot(in ClSpec s, in ClSpec o) {
+  return subgroupClusteredAdd(dot(s, o), cl_spectrum_invc_n);
 }
 
-float sg_hdot(in SgSpec s, in SgSpec o) {
-  return sg_hsum(s * o);
+float cl_hdot(in ClSpec s) {
+  return subgroupClusteredAdd(dot(s, s), cl_spectrum_invc_n);
 }
 
-float sg_hdot(in SgSpec s) {
-  return sg_hsum(s * s);
+float cl_hmean(in ClSpec s) {
+  return wavelength_samples_inv * cl_hsum(s);
 }
 
-float sg_max_value(in SgSpec s) {
-  float f = FLT_MIN;
-  sg_bin_iter(i) f = max(f, s[i]);
-  return subgroupClusteredMax(f, sg_spectrum_ninvc);
+float cl_hmax(in ClSpec s) {
+  cl_bin_iter_remainder(i) s[i] = FLT_MIN;
+  return subgroupClusteredMax(hmax(s), cl_spectrum_invc_n);
 }
 
-float sg_min_value(in SgSpec s) {
-  float f = FLT_MAX;
-  sg_bin_iter(i) f = min(f, s[i]);
-  return subgroupClusteredMin(f, sg_spectrum_ninvc);
+float cl_hmin(in ClSpec s) {
+  cl_bin_iter_remainder(i) s[i] = FLT_MAX;
+  return subgroupClusteredMin(hmin(s), cl_spectrum_invc_n);
 }
 
-/* END OF OBJECT FILE */
+/* Logic comparators */
+
+ClMask cl_eq(in ClSpec s, in float f) { return equal(s, ClSpec(f)); }
+ClMask cl_neq(in ClSpec s, in float f) { return notEqual(s, ClSpec(f)); }
+ClMask cl_gr(in ClSpec s, in float f) { return greaterThan(s, ClSpec(f)); }
+ClMask cl_ge(in ClSpec s, in float f) { return greaterThanEqual(s, ClSpec(f)); }
+ClMask cl_lr(in ClSpec s, in float f) { return lessThan(s, ClSpec(f)); }
+ClMask cl_le(in ClSpec s, in float f) { return lessThanEqual(s, ClSpec(f)); }
+
+ClMask cl_eq(in ClSpec s, in ClSpec o) { return equal(s, o); }
+ClMask cl_neq(in ClSpec s, in ClSpec o) { return notEqual(s, o); }
+ClMask cl_gr(in ClSpec s, in ClSpec o) { return greaterThan(s, o); }
+ClMask cl_ge(in ClSpec s, in ClSpec o) { return greaterThanEqual(s, o);}
+ClMask cl_lr(in ClSpec s, in ClSpec o) { return lessThan(s, o); }
+ClMask cl_le(in ClSpec s, in ClSpec o) { return lessThanEqual(s, o); }
+
+ClMask cl_eq(in float f, in ClSpec o) { return equal(ClSpec(f), o); }
+ClMask cl_neq(in float f, in ClSpec o) { return notEqual(ClSpec(f), o); }
+ClMask cl_gr(in float f, in ClSpec o) { return greaterThan(ClSpec(f), o); }
+ClMask cl_ge(in float f, in ClSpec o) { return greaterThanEqual(ClSpec(f), o); }
+ClMask cl_lr(in float f, in ClSpec o) { return lessThan(ClSpec(f), o); }
+ClMask cl_le(in float f, in ClSpec o) { return lessThanEqual(ClSpec(f), o); }
+
+/* Mask operations */
+
+ClSpec cl_select(in ClMask m, in ClSpec x, in ClSpec y) { return mix(y, x, m); }
+ClSpec cl_select(in ClMask m, in ClSpec x, in float y) { return mix(ClSpec(y), x, m); }
+ClSpec cl_select(in ClMask m, in float x, in ClSpec y) { return mix(y, ClSpec(x), m); }
+ClSpec cl_select(in ClMask m, in float x, in float y) { return mix(ClSpec(y), ClSpec(x), m); }
 
 #endif // EXTENSIONS
 #endif // SPECTRUM_CLUSTER_GLSL_GUARD

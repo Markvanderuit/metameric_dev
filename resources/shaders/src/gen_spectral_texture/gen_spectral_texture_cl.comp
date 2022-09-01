@@ -1,0 +1,66 @@
+#version 460 core
+
+// Enable necessary subgroup extensions
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_clustered  : require
+
+// Set NVidia-CG flags
+#pragma optionNV(fastmath on)
+#pragma optionNV(inline   all)
+#pragma optionNV(unroll   all)
+#pragma optionNV(strict   on)
+
+#include <guard.glsl>
+#include <spectrum_invoc.glsl>
+#include <spectrum_cluster.glsl>
+
+#define Spec ClSpec           // Use shorthand for clustered types
+const uint n_gamut_verts = 4; // Nr. of tetrahedron vertices 
+
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+
+layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[n_gamut_verts]; } b_spec_gamut;
+layout(binding = 1) restrict readonly  buffer b_1 { vec3   data[];              } b_colr_texture;
+layout(binding = 2) restrict writeonly buffer b_2 { InSpec data[];              } b_spec_texture;
+
+layout(location = 0) uniform uint u_n;
+layout(location = 1) uniform vec3 u_bary_sub;
+layout(location = 2) uniform mat3 u_bary_inv;
+
+shared InSpec s_spectral_gamut[4];
+
+Spec load_spec_gamut(uint i) {
+  Spec s;
+  cl_spec_scatter(s, s_spectral_gamut[i]);
+  return s;
+}
+
+void store_spec_texture(in Spec s, uint i) {
+  cl_spec_gather(b_spec_texture.data[i], s);
+}
+
+void main() {
+  const uint i = gl_GlobalInvocationID.x / cl_spectrum_invc_n;
+  guard(i < u_n);
+
+  // Load spectral gamut data into shared memory
+  if (gl_LocalInvocationID.x == 0)
+    s_spectral_gamut = b_spec_gamut.data;
+  barrier();
+  memoryBarrierShared();
+
+  // Obtain barycentric coordinates for positions in the color texture
+  vec4 bary;
+  bary.xyz = u_bary_inv * (b_colr_texture.data[i] - u_bary_sub);
+  bary.w   = 1.f - hsum(bary.xyz);
+  
+  // Perform gamut mapping by applying barycentric coordinates to spectral gamut
+  Spec sd = Spec(0.f);
+  for (uint i = 0; i < n_gamut_verts; ++i)
+    sd += bary[i] * load_spec_gamut(i);
+
+  // Store results to buffer
+  store_spec_texture(clamp(sd, 0.f, 1.f), i);
+}

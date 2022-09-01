@@ -3,88 +3,54 @@
 
 #include <spectrum_cluster.glsl>
 
-struct SgCMFS {
-  SgSpec x;
-  SgSpec y;
-  SgSpec z;
-};
+#define ClCMFS mat3x4
 
-#define sg_cmfs_scatter(dst, src) \
-  { sg_spec_scatter(dst.x, src[0]) \
-    sg_spec_scatter(dst.y, src[1]) \
-    sg_spec_scatter(dst.z, src[2]) }
+#define cl_cmfs_scatter(dst, src) \
+  { cl_spec_scatter(dst[0], src[0]) \
+    cl_spec_scatter(dst[1], src[1]) \
+    cl_spec_scatter(dst[2], src[2]) }
 
-#define sg_cmfs_gather(dst, src) \
-  { sg_spec_gather(dst.x, src[0]) \
-    sg_spec_gather(dst.y, src[1]) \
-    sg_spec_gather(dst.z, src[2]) }
+#define cl_cmfs_gather(dst, src) \
+  { cl_spec_gather(dst[0], src[0]) \
+    cl_spec_gather(dst[1], src[1]) \
+    cl_spec_gather(dst[2], src[2]) }
 
 /* Constructors */
 
-SgCMFS sg_cmfs(in float f) {
-  SgSpec s = SgSpec(f);
-  return SgCMFS(s, s, s);
+ClCMFS cl_cmfs(in float f) {
+  return ClCMFS(ClSpec(f), ClSpec(f), ClSpec(f));
 }
+
+#define cl_cmfs_colw_comp(mat, op) ClCMFS(mat[0] op, mat[1] op, mat[2] op)
+#define cl_cmfs_colw_mat(mat, op)  ClCMFS(mat[0] op[0], mat[1] op[1], mat[2] op[2])
 
 /* Component-wise math operators */
 
-SgCMFS sg_add(in SgCMFS s, in float f) {
-  return SgCMFS(s.x + f, s.y + f, s.z + f);
-}
-
-SgCMFS sg_sub(in SgCMFS s, in float f) {
-  return SgCMFS(s.x - f, s.y - f, s.z - f);
-}
-
-SgCMFS sg_mul(in SgCMFS s, in float f) {
-  return SgCMFS(s.x * f, s.y * f, s.z * f);
-}
-
-SgCMFS sg_div(in SgCMFS s, in float f) {
-  return SgCMFS(s.x / f, s.y / f, s.z / f);
-}
+ClCMFS cl_add(in ClCMFS s, in float f) { return cl_cmfs_colw_comp(s, + f); }
+ClCMFS cl_sub(in ClCMFS s, in float f) { return cl_cmfs_colw_comp(s, - f); }
+ClCMFS cl_mul(in ClCMFS s, in float f) { return cl_cmfs_colw_comp(s, * f); }
+ClCMFS cl_div(in ClCMFS s, in float f) { return cl_cmfs_colw_comp(s, / f); }
 
 /* Column-wise math operators */
 
-SgCMFS sg_add(in SgCMFS s, in SgCMFS o) {
-  return SgCMFS(s.x + o.x, s.y + o.y, s.z + o.z);
-}
+ClCMFS cl_add(in ClCMFS s, in ClCMFS o) { return cl_cmfs_colw_mat(s, + o); }
+ClCMFS cl_sub(in ClCMFS s, in ClCMFS o) { return cl_cmfs_colw_mat(s, - o); }
+ClCMFS cl_mul(in ClCMFS s, in ClCMFS o) { return cl_cmfs_colw_mat(s, * o); }
+ClCMFS cl_div(in ClCMFS s, in ClCMFS o) { return cl_cmfs_colw_mat(s, / o); }
 
-SgCMFS sg_sub(in SgCMFS s, in SgCMFS o) {
-  return SgCMFS(s.x - o.x, s.y - o.y, s.z - o.z);
-}
+ClCMFS cl_add(in ClCMFS s, in ClSpec o) { return cl_cmfs_colw_comp(s, + o);}
+ClCMFS cl_sub(in ClCMFS s, in ClSpec o) { return cl_cmfs_colw_comp(s, - o);}
+ClCMFS cl_mul(in ClCMFS s, in ClSpec o) { return cl_cmfs_colw_comp(s, * o);}
+ClCMFS cl_div(in ClCMFS s, in ClSpec o) { return cl_cmfs_colw_comp(s, / o);}
 
-SgCMFS sg_mul(in SgCMFS s, in SgCMFS o) {
-  return SgCMFS(s.x * o.x, s.y * o.y, s.z * o.z);
-}
-
-SgCMFS sg_div(in SgCMFS s, in SgCMFS o) {
-  return SgCMFS(s.x / o.x, s.y / o.y, s.z / o.z);
-}
-
-SgCMFS sg_add(in SgCMFS s, in SgSpec o) {
-  return SgCMFS(s.x + o, s.y + o, s.z + o);
-}
-
-SgCMFS sg_sub(in SgCMFS s, in SgSpec o) {
-  return SgCMFS(s.x - o, s.y - o, s.z - o);
-}
-
-SgCMFS sg_mul(in SgCMFS s, in SgSpec o) {
-  return SgCMFS(s.x * o, s.y * o, s.z * o);
-}
-
-SgCMFS sg_div(in SgCMFS s, in SgSpec o) {
-  return SgCMFS(s.x / o, s.y / o, s.z / o);
-}
 /* Special matrix math operators */
 
-vec3 sg_matmul(in SgCMFS s, in SgSpec o) {
-  return vec3(sg_hsum(s.x * o), sg_hsum(s.y * o), sg_hsum(s.z * o));
+vec3 cl_mmul(in ClCMFS s, in ClSpec o) {
+  return subgroupClusteredAdd(transpose(s) * o, cl_spectrum_invc_n);
 }
 
-SgSpec sg_matmul(in vec3 v, in SgCMFS s) {
-  return v.x * s.x + v.y * s.y + v.z * s.z;
+ClSpec cl_mmul(in vec3 v, in ClCMFS s) {
+  return v.x * s[0] + v.y * s[1] + v.z * s[2];
 }
 
 #endif // CMFS_CLUSTER_GLSL_GUARD
