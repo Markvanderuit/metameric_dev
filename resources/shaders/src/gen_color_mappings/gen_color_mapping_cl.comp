@@ -61,7 +61,7 @@ void main() {
 
   // Compute and apply color mapping
   CMFS cs = finalize_mapp(mp, sd);
-  vec3   v  = cl_mmul(cs, sd);
+  vec3 v  = cl_mmul(cs, sd);
 
   // Sture results using first invocation 
   if (cl_bin_elect()) {
