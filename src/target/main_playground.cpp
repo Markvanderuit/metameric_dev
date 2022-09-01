@@ -26,7 +26,6 @@
 #include <string>
 #include <vector>
 
-
 const std::string shader_src = R"GLSL(
   #version 460 core
 
@@ -139,36 +138,16 @@ int main() {
               a.i == b.i; };
     fmt::print("equal : {}\n", std::equal(range_iter(data), range_iter(result), data_eq));
     fmt::print("bytes : {}\n", sizeof(DataObject));
-    
-    /* // Prepare test data
-    constexpr uint n = 8;
-    const Colr init_color = 0.f;
-    const auto test_v = init_color.reshaped(4, 1).eval();
-    std::vector<AlColr> data_i(n, init_color); 
-    std::vector<AlColr> data_o(n, init_color); 
 
-    for (uint i = 0; i < n; ++i) { data_i[i] = float(i); }
-    
-    // Prepare buffer objects
-    gl::Buffer buffer_i = {{ .data = as_span<const std::byte>(data_i) }};
-    gl::Buffer buffer_o = {{ .data = as_span<const std::byte>(data_o) }};
 
-    // Prepare compute shader
-    gl::Program program = {{ .type = gl::ShaderType::eCompute, .data = as_span<const std::byte>(shader_src) }};
-    program.uniform<uint>("u_n", n);
-    gl::ComputeInfo compute_info = { .groups_x = ceil_div(n, 256), .bindable_program = &program };
+    eig::Matrix3f A;
+    eig::Vector3f b;
+    A << 1, 2, 3,  4, 5, 6,  7, 8, 10;
+    b << 3, 3, 4;
 
-    // Perform compute call
-    buffer_i.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    buffer_o.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    gl::dispatch_compute(compute_info);
+    eig::Vector3f x = A.llt().solve(b);
+    fmt::print("{}\n", x);
 
-    // Copy back and read data
-    fmt::print("Before\n\ti: {}\n\to: {}\n", data_i, data_o);
-    buffer_o.get(as_span<std::byte>(data_o));
-    std::vector<Colr> result(n); 
-    std::ranges::transform(data_o, result.begin(), unpadd<>);
-    fmt::print("After\n\ti: {}\n\to: {}\n", data_i, result); */
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;

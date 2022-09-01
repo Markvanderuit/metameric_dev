@@ -61,7 +61,7 @@ find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 
-# Include third party libraries provided directly
+# Include third party small_gl library directly
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
 option(gl_enable_tracy          "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
@@ -247,3 +247,7 @@ endif()
 # Set up playground executable
 add_executable_r(playground src/target/main_playground.cpp)
 target_link_libraries(playground PRIVATE core small_gl small_gl_parser_lib)
+
+# Set up solve executable
+add_executable_r(solve src/target/main_solve.cpp)
+target_link_libraries(solve PRIVATE core small_gl small_gl_parser_lib)
