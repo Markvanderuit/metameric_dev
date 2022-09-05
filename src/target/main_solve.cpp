@@ -37,76 +37,141 @@ eig::Array3f inv_gaussian_cdf(const eig::Array3f &x) {
 }
 
 eig::Array3f sample_unit_sphere() {
-  return inv_gaussian_cdf(eig::Array3f::Random()).matrix().normalized();
+  // return eig::Array3f(1, 1, 1).matrix().normalized();
+  return eig::Array3f(0.58869953, 0.12827836, -0.79810872).matrix().normalized();
+  // return inv_gaussian_cdf(eig::Array3f::Random()).matrix().normalized();
 } 
 
-int main() {
-  try { 
-    // program and solution types
-    // using Program = CGAL::Quadratic_program<int>;
-    // using Solution = CGAL::Quadratic_program_solution<CGAL::MP_Float>;
-
-    // Program lp(CGAL::SMALLER, true, 0, false, 0);
-    // const int X = 0;
-    // const int Y = 1;
-    // lp.set_a(X, 0, -1); lp.set_a(Y, 0, 1); lp.set_b(0, 7); //  x + y  <= 7
-    // lp.set_a(X, 1, -1); lp.set_a(Y, 1, 2); lp.set_b(1, 4); // -x + 2y <= 4
-    // lp.set_u(Y, true, 4);                                  //       y <= 4
-    // lp.set_c(Y, -32);                                      // -32y
-    // lp.set_c0(64);                                         // +64
-    
-/*     // by default, we have a nonnegative LP with Ax <= b
-    Program lp (CGAL::SMALLER, true, 0, false, 0);
-    // now set the non-default entries
-    const int X = 0;
-    const int Y = 1;
-    
-                                                            // min
-    lp.set_c(Y, -32);                                       // -32y
-    lp.set_c0(64);                                          // + 64
-                                                            // w.r.t.
-    lp.set_a(X, 0,  1); lp.set_a(Y, 0, 1); lp.set_b(0, 7);  //  1x + 1y <= 7
-    lp.set_a(X, 1, -1); lp.set_a(Y, 1, 2); lp.set_b(1, 4);  // -1x + 2y <= 4
-    // lp.set_u(Y, true, 4);                                   // y <= 4 */
-
-    // CGAL::solve_nonnegative_linear_program
-    // Solution s = CGAL::solve_nonnegative_linear_program(lp, CGAL::MP_Float());
-    // if (s.solves_linear_program(lp)) {
-    //   std::cout << s << '\n';
-    // }
-  
+void solve_color_system() {
   using ET = CGAL::MP_Float;
   using VT = float;
   using CT = CGAL::Comparison_result;
 
-  // A * x (r) b
-  eig::Matrix<VT, 3, 2> A;
-  A << 2, 3,
-       1, 5,
-       1, 0;
-  eig::Vector<VT, 3> b = { 34, 45, 15 };
-  std::array<CT, 3>  r = { CGAL::SMALLER, CGAL::SMALLER, CGAL::SMALLER };
+  // Declare color systems i and j
+  SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+  SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_e };
+  CMFS cs_i = mapp_i.finalize(); // mapp_i.cmfs.array().colwise() * mapp_i.illuminant;
+  CMFS cs_j = mapp_j.finalize(); // mapp_j.cmfs.array().colwise() * mapp_j.illuminant;
+
+  // Declare observer color signal under i
+  Colr sig_i = mapp_i.apply_color(Spec(0.5));
+
+  // Sample a random direction vector in R3
+  auto dirv = sample_unit_sphere();
+
+  // compose the direction functional R3 -> R, with the color signal map to produce
+  // a new functional R31 -> R. 
+  Spec f = (cs_j.col(0) * dirv.x() + cs_j.col(1) * dirv.y() + cs_j.col(2) * dirv.z()).array();
   
-  // min C^T @ x + c0
-  eig::Vector<VT, 2> C = { -1, -2 };
-  VT                c0 = 0;
-  
-  // Get the correct iterable format for A
-  std::array<VT*, 2> A_;
-  std::ranges::transform(A.colwise(), A_.begin(), [](auto v) { return v.data(); });
-  
+  // Get the correct format for r
+  // r is an m-sized vector of relations
+  std::array<CT, 3> r = { CGAL::EQUAL, CGAL::EQUAL, CGAL::EQUAL };
+
+  // Get the correct format for C
+  // C is an n-sized vector of constraints
+  Spec C   = f;
+  float c0 = 0.f;
+
+  fmt::print("C: {}\n", C);
+
+  // Get the correct format for A
+  // A is an m x n (3 x 31) matrix of constraints, where n is the number
+  // of pointers to columns of size m
+  std::array<VT*, wavelength_samples> A;
+  eig::Matrix<float, 3, wavelength_samples> A_ = cs_i.transpose().eval();
+  std::ranges::transform(A_.colwise(), A.begin(), [](auto v) { return v.data(); });
+
+  // Get the correct format for b
+  // b is an m-sized vector of values
+  Colr b = sig_i;
+
+  // Get the correct formats for u, l, and their bounds
+  Spec l = Spec::Zero();
+  Spec u = Spec::Ones();
+  std::array<bool, wavelength_samples> fl, fu;
+  std::ranges::fill(fl, true);
+  std::ranges::fill(fu, true);
+
   // Linear program type shorthands
   using Solution = CGAL::Quadratic_program_solution<ET>;
   typedef CGAL::Nonnegative_linear_program_from_iterators
-  <decltype(A_)::value_type*, 
-   decltype(b)::value_type*, 
+  <decltype(A)::value_type*,
+   decltype(b)::value_type*,
    decltype(r)::value_type*,
-   decltype(C)::value_type*> Program;
+   decltype(C)::value_type*> NNLinearProgram;
+  typedef CGAL::Linear_program_from_iterators
+  <decltype(A)::value_type*,
+   decltype(b)::value_type*,
+   decltype(r)::value_type*,
+   decltype(fl)::value_type*,
+   decltype(l)::value_type*,
+   decltype(fu)::value_type*,
+   decltype(u)::value_type*,
+   decltype(C)::value_type*> LinearProgram;
+
+  // NNLinearProgram nnlp(wavelength_samples, 3, A.data(), b.data(), r.data(), C.data(), c0);
+  LinearProgram lp(wavelength_samples, 3, A.data(), b.data(), r.data(),
+    fl.data(), l.data(), fu.data(), u.data(), C.data(), c0);
 
   // Construct and solve a linear program
-  Program lp(2, 3, A_.data(), b.data(), r.data(), C.data(), c0);
-  Solution s = CGAL::solve_nonnegative_linear_program(lp, ET());
-  if (s.solves_linear_program(lp)) std::cout << s << '\n';
+  auto s = CGAL::solve_linear_program(lp, ET());
+  Spec refl;
+  for (uint i = 0; i < wavelength_samples; ++i) {
+    auto f = *(s.variable_values_begin() + i);
+    refl[i] = static_cast<float>(CGAL::to_double(f));
+  }
+
+  std::cout << s << '\n';
+  fmt::print("x  {}\n", refl);
+  fmt::print("si {}\n", mapp_i.apply_color(refl));
+  fmt::print("sj {}\n", mapp_j.apply_color(refl));
+  fmt::print("l  {}\n", l);
+  fmt::print("fl {}\n", fl);
+  fmt::print("u  {}\n", u);
+  fmt::print("fu {}\n", fu);
+  fmt::print("b  {}\n", b);
+  fmt::print("r  {}\n", r);
+  fmt::print("C  {}\n", C);
+}
+
+int main() {
+  try { 
+    using ET = CGAL::MP_Float;
+    using VT = float;
+    using CT = CGAL::Comparison_result;
+
+    // N = 2, M = 3
+
+    // A * x (r) b
+    eig::Matrix<VT, 3, 2> A;
+    A << 2, 3,
+         1, 5,
+         1, 0;
+    eig::Vector<VT, 3> b = { 34, 45, 15 };
+    std::array<CT, 3>  r = { CGAL::SMALLER, CGAL::SMALLER, CGAL::SMALLER };
+    
+    // min/max C^T @ x + c0
+    eig::Vector<VT, 2> C = { -1, -2 };
+    VT                c0 = 0;
+    
+    // Get the correct iterable format for A
+    std::array<VT*, 2> A_;
+    std::ranges::transform(A.colwise(), A_.begin(), [](auto v) { return v.data(); });
+    
+    // Linear program type shorthands
+    using Solution = CGAL::Quadratic_program_solution<ET>;
+    typedef CGAL::Nonnegative_linear_program_from_iterators
+    <decltype(A_)::value_type*, 
+    decltype(b)::value_type*, 
+    decltype(r)::value_type*,
+    decltype(C)::value_type*> Program;
+
+    // Construct and solve a linear program
+    Program lp(2, 3, A_.data(), b.data(), r.data(), C.data(), c0);
+    Solution s = CGAL::solve_nonnegative_linear_program(lp, ET());
+    if (s.solves_linear_program(lp)) std::cout << s << '\n';
+    
+    solve_color_system();
 
     /* 
     // Declare constraints in format Ax <= b
