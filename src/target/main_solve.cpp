@@ -72,8 +72,6 @@ void solve_color_system() {
   Spec C   = f;
   float c0 = 0.f;
 
-  fmt::print("C: {}\n", C);
-
   // Get the correct format for A
   // A is an m x n (3 x 31) matrix of constraints, where n is the number
   // of pointers to columns of size m
