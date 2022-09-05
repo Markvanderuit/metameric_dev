@@ -48,8 +48,8 @@ namespace met {
     auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
 
     // Setup objects for cube line draw
-    m_cube_vertex_buffer = {{ .data = as_span<const std::byte>(cube_vertices) }};
-    m_cube_elem_buffer   = {{ .data = as_span<const std::byte>(cube_elements) }};
+    m_cube_vertex_buffer = {{ .data = cnt_span<const std::byte>(cube_vertices) }};
+    m_cube_elem_buffer   = {{ .data = cnt_span<const std::byte>(cube_elements) }};
     m_cube_array         = {{
       .buffers = {{ .buffer = &m_cube_vertex_buffer, .index = 0, .stride = sizeof(eig::Vector3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
@@ -65,7 +65,7 @@ namespace met {
                     .bindable_program = &m_cube_program };
 
     // Setup objects for gamut line draw
-    m_gamut_elem_buffer = gl::Buffer({ .data = as_span<const std::byte>(gamut_elements) });
+    m_gamut_elem_buffer = gl::Buffer({ .data = cnt_span<const std::byte>(gamut_elements) });
     m_gamut_array = gl::Array({
       .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},

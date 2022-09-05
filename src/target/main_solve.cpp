@@ -18,7 +18,9 @@
 // #include <igl/linprog.h>
 // #include <ClpSimplex.hpp>
 // #include <metameric/core/simplex_solver.hpp>
-
+#include <CGAL/QP_models.h>
+#include <CGAL/QP_functions.h>
+#include <CGAL/MP_Float.h>
 
 using namespace met;
 
@@ -39,7 +41,73 @@ eig::Array3f sample_unit_sphere() {
 } 
 
 int main() {
-  try {
+  try { 
+    // program and solution types
+    // using Program = CGAL::Quadratic_program<int>;
+    // using Solution = CGAL::Quadratic_program_solution<CGAL::MP_Float>;
+
+    // Program lp(CGAL::SMALLER, true, 0, false, 0);
+    // const int X = 0;
+    // const int Y = 1;
+    // lp.set_a(X, 0, -1); lp.set_a(Y, 0, 1); lp.set_b(0, 7); //  x + y  <= 7
+    // lp.set_a(X, 1, -1); lp.set_a(Y, 1, 2); lp.set_b(1, 4); // -x + 2y <= 4
+    // lp.set_u(Y, true, 4);                                  //       y <= 4
+    // lp.set_c(Y, -32);                                      // -32y
+    // lp.set_c0(64);                                         // +64
+    
+/*     // by default, we have a nonnegative LP with Ax <= b
+    Program lp (CGAL::SMALLER, true, 0, false, 0);
+    // now set the non-default entries
+    const int X = 0;
+    const int Y = 1;
+    
+                                                            // min
+    lp.set_c(Y, -32);                                       // -32y
+    lp.set_c0(64);                                          // + 64
+                                                            // w.r.t.
+    lp.set_a(X, 0,  1); lp.set_a(Y, 0, 1); lp.set_b(0, 7);  //  1x + 1y <= 7
+    lp.set_a(X, 1, -1); lp.set_a(Y, 1, 2); lp.set_b(1, 4);  // -1x + 2y <= 4
+    // lp.set_u(Y, true, 4);                                   // y <= 4 */
+
+    // CGAL::solve_nonnegative_linear_program
+    // Solution s = CGAL::solve_nonnegative_linear_program(lp, CGAL::MP_Float());
+    // if (s.solves_linear_program(lp)) {
+    //   std::cout << s << '\n';
+    // }
+  
+  using ET = CGAL::MP_Float;
+  using VT = float;
+  using CT = CGAL::Comparison_result;
+
+  // A * x (r) b
+  eig::Matrix<VT, 3, 2> A;
+  A << 2, 3,
+       1, 5,
+       1, 0;
+  eig::Vector<VT, 3> b = { 34, 45, 15 };
+  std::array<CT, 3>  r = { CGAL::SMALLER, CGAL::SMALLER, CGAL::SMALLER };
+  
+  // min C^T @ x + c0
+  eig::Vector<VT, 2> C = { -1, -2 };
+  VT                c0 = 0;
+  
+  // Get the correct iterable format for A
+  std::array<VT*, 2> A_;
+  std::ranges::transform(A.colwise(), A_.begin(), [](auto v) { return v.data(); });
+  
+  // Linear program type shorthands
+  using Solution = CGAL::Quadratic_program_solution<ET>;
+  typedef CGAL::Nonnegative_linear_program_from_iterators
+  <decltype(A_)::value_type*, 
+   decltype(b)::value_type*, 
+   decltype(r)::value_type*,
+   decltype(C)::value_type*> Program;
+
+  // Construct and solve a linear program
+  Program lp(2, 3, A_.data(), b.data(), r.data(), C.data(), c0);
+  Solution s = CGAL::solve_nonnegative_linear_program(lp, ET());
+  if (s.solves_linear_program(lp)) std::cout << s << '\n';
+
     /* 
     // Declare constraints in format Ax <= b
     eig::Matrix<double, 3, 2> A;

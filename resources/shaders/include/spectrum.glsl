@@ -12,4 +12,7 @@ const float wavelength_ssize       = wavelength_range / float(wavelength_samples
 const float wavelength_ssinv       = float(wavelength_samples) / wavelength_range;
 const float wavelength_samples_inv = 1.f / float(wavelength_samples);
 
+// Define derived variables for better aligned operations
+const uint wavelength_samples_al = uint(pow(2, ceil(log2(float(wavelength_samples)))));
+
 #endif // SPECTRUM_CONSTANTS_GLSL_GUARD

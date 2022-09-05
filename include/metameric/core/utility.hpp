@@ -35,10 +35,17 @@
 namespace met {
   // Interpret a container type as a span of type T
   template <class T, class C>
-  std::span<T> as_span(C &c) {
+  constexpr
+  std::span<T> cnt_span(C &c) {
     auto data = c.data();
     guard(data, {});
     return { reinterpret_cast<T*>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
+  }
+
+  template <class T, class O>
+  constexpr
+  std::span<T> obj_span(O &o) {
+    return { reinterpret_cast<T*>(&o), sizeof(O) / sizeof(T) };
   }
 
   // Convert a span over type U to 

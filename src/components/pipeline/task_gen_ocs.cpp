@@ -84,14 +84,16 @@ namespace met {
     met_trace_full();
 
     // Initialize objects for shader call
+    constexpr uint wvl_div = ceil_div(wavelength_samples, 4u);
     m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_ocs/gen_ocs_cl.comp" }};
-    m_dispatch = { .groups_x = ceil_div(n_samples, 256u / ceil_div(wavelength_samples, 4u)), 
+                   .path = "resources/shaders/gen_ocs/gen_ocs_cl.comp.spv_opt",
+                   .is_spirv_binary = true }};
+    m_dispatch = { .groups_x = ceil_div(n_samples, 256u / wvl_div), 
                    .bindable_program = &m_program };
 
-    // Set these uniforms once
-    m_program.uniform("u_n", n_samples);
-    m_program.uniform("u_mapping_i", 0u);
+    // Set up uniform buffer
+    std::array<uint, 2> uniform_data = { n_samples, 0u };
+    m_uniform_buffer = {{ .data = obj_span<std::byte>(uniform_data) }};
 
     // Initialize main buffers
     info.emplace_resource<gl::Buffer>("color_buffer", {
@@ -100,28 +102,6 @@ namespace met {
     info.emplace_resource<gl::Buffer>("spectrum_buffer", {
       .size = static_cast<size_t>(n_samples) * sizeof(Spec)
     });
-
-    // Generate a buffer of random noise
-    /* std::vector<float> rand_buffer(n_samples);
-    #pragma omp parallel
-    {
-      // Set up random distribution across threads
-      std::random_device device;
-      std::mt19937 eng(device());
-      eng.seed(2 * omp_get_thread_num() + 3);
-      std::uniform_real_distribution<float> dist(0.f, 1.f);
-
-      // fill buffer
-      #pragma omp for
-      for (int i = 0; i < static_cast<int>(rand_buffer.size()); ++i) {
-        rand_buffer[i] = dist(eng);
-      }
-    }
-
-    // Pass buffer to gpu
-    info.emplace_resource<gl::Buffer>("rand_buffer", {
-      .data = as_span<const std::byte>(rand_buffer)
-    }); */
 
     m_stale = true;
   }
@@ -143,6 +123,7 @@ namespace met {
     fmt::print("sizeof mapping = {}\n", sizeof(SpectralMapping));
 
     // Bind buffer resources to ssbo targets
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
     e_mapp_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     i_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
@@ -186,7 +167,7 @@ namespace met {
     fmt::print("Generated convex hull ({} verts, {} elems)\n", mesh.vertices.size(), mesh.elements.size());
 
     // Submit data to buffer resources
-    info.emplace_resource<gl::Buffer>("ocs_verts", { .data = as_span<const std::byte>(mesh.vertices) });
-    info.emplace_resource<gl::Buffer>("ocs_elems", { .data = as_span<const std::byte>(mesh.elements) });
+    info.emplace_resource<gl::Buffer>("ocs_verts", { .data = cnt_span<const std::byte>(mesh.vertices) });
+    info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
   }
 }

@@ -63,7 +63,7 @@ namespace met {
 
       // Perform channel-correct copy/transform into texture data
       if (c == 3) {
-        auto arr_span = as_span<const eig::Array3f>(data_float);
+        auto arr_span = cnt_span<const eig::Array3f>(data_float);
         if constexpr (std::is_same_v<T, eig::Array4f>) {
           std::transform(std::execution::par_unseq, 
             arr_span.begin(), arr_span.end(), texture_span.begin(), detail::v3_to_v4);
@@ -72,7 +72,7 @@ namespace met {
             arr_span.begin(), arr_span.end(), texture_span.begin());
         }
       } else if (c == 4) {
-        auto arr_span = as_span<const eig::Array4f>(data_float);
+        auto arr_span = cnt_span<const eig::Array4f>(data_float);
         if constexpr (std::is_same_v<T, eig::Array4f>) {
           std::copy(std::execution::par_unseq,
             arr_span.begin(), arr_span.end(), texture_span.begin());

@@ -1,11 +1,13 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 
 namespace met {
   class GenOCSTask : public detail::AbstractTask {
+    gl::Buffer      m_uniform_buffer;
     gl::Program     m_program;    
     gl::ComputeInfo m_dispatch;    
     bool            m_stale;

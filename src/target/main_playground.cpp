@@ -100,8 +100,8 @@ int main() {
     std::vector<DataObject> data(8, data_v);
 
     // Prepare buffer objects
-    gl::Buffer buffer_in  = {{ .data = as_span<const std::byte>(data)              }};
-    gl::Buffer buffer_out = {{ .size = as_span<const std::byte>(data).size_bytes() }};
+    gl::Buffer buffer_in  = {{ .data = cnt_span<const std::byte>(data)              }};
+    gl::Buffer buffer_out = {{ .size = cnt_span<const std::byte>(data).size_bytes() }};
 
     // Prepare shader parser
     glp::Parser parser;
@@ -109,7 +109,7 @@ int main() {
 
     // Prepare compute shader
     gl::Program program = {{ .type   = gl::ShaderType::eCompute, 
-                             .data   = as_span<const std::byte>(shader_src),
+                             .data   = cnt_span<const std::byte>(shader_src),
                              .parser = &parser }};
     program.uniform("u_n", static_cast<uint>(data.size()));
     gl::ComputeInfo dispatch = { .groups_x = ceil_div(static_cast<uint>(data.size()), 256u), .bindable_program = &program };
@@ -121,7 +121,7 @@ int main() {
 
     // Copy back and read data
     std::vector<DataObject> result(data.size());
-    buffer_out.get(as_span<std::byte>(result));
+    buffer_out.get(cnt_span<std::byte>(result));
     
     
     for (uint i = 0; i < data.size(); ++i) {

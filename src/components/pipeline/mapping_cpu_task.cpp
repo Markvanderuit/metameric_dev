@@ -100,10 +100,10 @@ namespace met {
                            / static_cast<float>(m_output_d65_err.size());
 
       // Copy data into view texture
-      m_output_d65_texture.set(as_span<float>(m_output_d65));
-      m_output_d65_err_texture.set(as_span<float>(m_output_d65_err));
-      m_output_fl2_texture.set(as_span<float>(m_output_fl2));
-      m_output_fl11_texture.set(as_span<float>(m_output_fl11));
+      m_output_d65_texture.set(cnt_span<float>(m_output_d65));
+      m_output_d65_err_texture.set(cnt_span<float>(m_output_d65_err));
+      m_output_fl2_texture.set(cnt_span<float>(m_output_fl2));
+      m_output_fl11_texture.set(cnt_span<float>(m_output_fl11));
 
       // Show texture
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)

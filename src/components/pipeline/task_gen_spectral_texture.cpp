@@ -19,34 +19,25 @@ namespace met {
 
     const uint generate_cl   = ceil_div(wavelength_samples, 4u);
     const uint generate_n    = e_rgb_texture.size().prod();
-    const uint generate_ndiv = ceil_div(generate_n, 256u);
-    const uint generate_ndiv_sg = ceil_div(generate_n, 256u / generate_cl);
+    const uint generate_ndiv_cl = ceil_div(generate_n, 256u / generate_cl);
 
     // Initialize objects for clustered shader call
     m_program_cl = {{ .type = gl::ShaderType::eCompute,
-                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_cl.comp" }};
-    m_dispatch_cl = { .groups_x = generate_ndiv_sg, 
+                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_cl.comp.spv_opt",
+                      .is_spirv_binary = true }};
+    m_dispatch_cl = { .groups_x = generate_ndiv_cl, 
                       .bindable_program = &m_program_cl }; 
 
-    // Initialize objects for shader call
-    m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp" }};
-    m_dispatch = { .groups_x = generate_ndiv, 
-                   .bindable_program = &m_program };
+    // Initialize uniform buffers
+    const auto create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
+    const auto map_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+    m_uniform_buffer = {{ .data = obj_span<const std::byte>(generate_n) }};
+    m_bary_buffer = {{ .size = sizeof(BarycentricBuffer), .flags = create_flags}};
+    m_bary_map = &m_bary_buffer.map_as<BarycentricBuffer>(map_flags)[0];
 
-    // Set these uniforms once
-    m_program.uniform("u_n", generate_n);
-    m_program_cl.uniform("u_n", generate_n);
-
-    // Initialize main color texture buffer
-    info.emplace_resource<gl::Buffer>("color_buffer", {
-      .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data())
-    });
-
-    // Initialize main spectral texture buffer
-    info.emplace_resource<gl::Buffer>("spectrum_buffer", { 
-      .size  = sizeof(Spec) * generate_n
-    });
+    // Initialize main color and spectral texture buffers
+    info.emplace_resource<gl::Buffer>("color_buffer", {  .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
+    info.emplace_resource<gl::Buffer>("spectrum_buffer", { .size  = sizeof(Spec) * generate_n });
   }
 
   void GenSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
@@ -59,21 +50,20 @@ namespace met {
     auto &i_color_texture = info.get_resource<gl::Buffer>("color_buffer");
     auto &i_spect_texture = info.get_resource<gl::Buffer>("spectrum_buffer");
 
-    // Compute barycentric coordinate inverse matrix
-    auto bary_sub = e_color_gamut_c[3];
-    auto bary_inv = (eig::Matrix3f() 
-      << e_color_gamut_c[0] - bary_sub, 
-         e_color_gamut_c[1] - bary_sub, 
-         e_color_gamut_c[2] - bary_sub).finished().inverse().eval();
-
-    // Set program uniforms
-    m_program_cl.uniform("u_bary_sub", bary_sub);
-    m_program_cl.uniform("u_bary_inv", bary_inv);
+    // Update barycentric coordinate inverse matrix in mapped buffer
+    m_bary_map->sub = e_color_gamut_c[3];
+    m_bary_map->inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
+      << e_color_gamut_c[0] - e_color_gamut_c[3], 
+         e_color_gamut_c[1] - e_color_gamut_c[3], 
+         e_color_gamut_c[2] - e_color_gamut_c[3]).finished().inverse().eval();
+    m_bary_buffer.flush();
 
     // Bind resources to buffer targets
     e_spect_gamut_s.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
+    m_bary_buffer.bind_to(gl::BufferTargetType::eUniform,    1);
     
     // Dispatch shader to generate spectral datas
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);

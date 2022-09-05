@@ -5,12 +5,6 @@
 #extension GL_KHR_shader_subgroup_arithmetic : require
 #extension GL_KHR_shader_subgroup_clustered  : require
 
-// Set NVidia-CG flags
-#pragma optionNV(fastmath on)
-#pragma optionNV(inline   all)
-#pragma optionNV(unroll   all)
-#pragma optionNV(strict   on)
-
 // Use shorthand for clustered types
 #define Spec ClSpec
 #define CMFS ClCMFS
@@ -21,50 +15,63 @@
 #include <mapping_cluster.glsl>
 
 layout(local_size_x = 256) in;
+layout(std140)             uniform;
 layout(std430)             buffer;
 
 layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[]; } b_spec;
 layout(binding = 1) restrict readonly  buffer b_1 { InMapp data[]; } b_mapp;
 layout(binding = 2) restrict writeonly buffer b_2 { vec3   data[]; } b_colr;
-
-layout(location = 0) uniform uint u_n;
-layout(location = 1) uniform uint u_mapping_i;
+layout(binding = 0) uniform u_0 {
+  uint n;
+  uint mapping_i;
+} b_unif;
 
 shared InMapp s_mapping;
 
+// Load mapping data into shar    ed memory
+void load_mapp_shared_in() {
+  const uint mapping_i = b_unif.mapping_i;
+  const uint i = gl_LocalInvocationID.x % wavelength_samples_al;
+  const uint j = gl_LocalInvocationID.x / wavelength_samples_al;
+
+  if (j < 3 && i < wavelength_samples) 
+    s_mapping.cmfs[j][i] = b_mapp.data[mapping_i].cmfs[j][i];
+  if (j == 0 && i < wavelength_samples) 
+    s_mapping.illuminant[i] = b_mapp.data[mapping_i].illuminant[i];
+  if (j == 0 && i == 0) 
+    s_mapping.n_scatters = b_mapp.data[mapping_i].n_scatters;
+  
+  memoryBarrierShared();
+  barrier();
+}
+
+// Load clustered mapping from shared memory
+Mapp load_mapp_shared_cl() {
+  Mapp s;
+  cl_mapp_scatter(s, s_mapping);
+  return s;
+}
+
+// Load clustered spectrum from buffer
 Spec load_spec(uint i) {
   Spec s;
   cl_spec_scatter(s, b_spec.data[i]);
   return s;
 }
 
-Mapp load_mapp_shared() {
-  Mapp s;
-  cl_mapp_scatter(s, s_mapping);
-  return s;
-}
-
 void main() {
   const uint i =  gl_GlobalInvocationID.x / cl_spectrum_invc_n;
-  guard(i < u_n);
+  guard(i < b_unif.n);
 
   // Load mapping data into shared memory
-  if (gl_LocalInvocationID.x == 0) {
-    s_mapping = b_mapp.data[u_mapping_i];
-  }
-  memoryBarrierShared();
-  barrier();
+  load_mapp_shared_in();
 
-  // Load reflectance and mapping data into clustered format
+  // Load reflectance and color system, then apply to obtain color signal
   Spec sd = load_spec(i);
-  Mapp mp = load_mapp_shared();
-
-  // Compute and apply color mapping
-  CMFS cs = finalize_mapp(mp, sd);
+  CMFS cs = finalize_mapp(load_mapp_shared_cl(), sd);
   vec3 v  = cl_mmul(cs, sd);
 
   // Sture results using first invocation 
-  if (cl_bin_elect()) {
+  if (cl_bin_elect())
     b_colr.data[i] = v;
-  }
 }

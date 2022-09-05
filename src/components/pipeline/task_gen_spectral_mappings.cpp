@@ -30,13 +30,13 @@ namespace met {
 
       // (Re-)generate the stored mapping buffer
       i_mappings_buffer = {{
-        .data = as_span<const std::byte>(e_app_data.loaded_mappings),
+        .data = cnt_span<const std::byte>(e_app_data.loaded_mappings),
         .flags = gl::BufferCreateFlags::eStorageDynamic
       }};
     } else {
       // TODO this should be improved to only happen ONCE
       // Upload new data to the stored mapping buffer if stale
-      i_mappings_buffer.set(as_span<const std::byte>(e_app_data.loaded_mappings));
+      i_mappings_buffer.set(cnt_span<const std::byte>(e_app_data.loaded_mappings));
     }   
   }
 } // namespace met

@@ -1,7 +1,6 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/tasks/task_gen_color_mappings.hpp>
-#include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl_parser/parser.hpp>
 
@@ -16,30 +15,22 @@ namespace met {
     // Get shared resources
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_parser   = info.get_resource<glp::Parser>(global_key, "glsl_parser");
-
+    
     // Determine dispatch group size
     const uint mapping_cl      = ceil_div(wavelength_samples, 4u);
     const uint mapping_n       = e_app_data.loaded_texture.size().prod();
-    const uint mapping_ndiv    = ceil_div(mapping_n,  256u); 
     const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / mapping_cl);
 
+    // Set up uniform buffer
+    std::array<uint, 2> uniform_data = { mapping_n, m_mapping_i };
+    m_uniform_buffer = {{ .data = cnt_span<std::byte>(uniform_data) }};
+
     // Initialize objects for mapping through subgroup path
-    m_program_sg = {{ .type   = gl::ShaderType::eCompute,
-                      .path   = "resources/shaders/gen_color_mappings/gen_color_mapping_cl.comp",
-                      .parser = &e_parser }};
-    m_dispatch_sg = { .groups_x = mapping_ndiv_sg, .bindable_program = &m_program_sg };
+    m_program_cl = {{ .type   = gl::ShaderType::eCompute,
+                      .path   = "resources/shaders/gen_color_mappings/gen_color_mapping_cl.comp.spv_opt",
+                      .is_spirv_binary = true }};
+    m_dispatch_cl = { .groups_x = mapping_ndiv_sg, .bindable_program = &m_program_cl };
 
-    // Initialize objects for mapping through per-invoc path
-    m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_color_mappings/gen_color_mapping_in.comp" }};
-    m_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_program };
-
-    // Set these uniforms once
-    m_program_sg.uniform("u_n",         mapping_n);
-    m_program_sg.uniform("u_mapping_i", m_mapping_i);
-    m_program.uniform("u_n",            mapping_n);
-    m_program.uniform("u_mapping_i",    m_mapping_i);
-    
     // Create color buffer output for this task
     info.emplace_resource<gl::Buffer>("color_buffer", {
       .size  = (size_t) mapping_n * sizeof(eig::AlArray3f),
@@ -56,14 +47,14 @@ namespace met {
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
 
     // Bind buffer resources to ssbo targets
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
     e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_mapp_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
 
     // Dispatch shader to generate color-mapped buffer
-    gl::dispatch_compute(m_dispatch_sg);
-    // gl::dispatch_compute(m_dispatch);
+    gl::dispatch_compute(m_dispatch_cl);
   }
 
   GenColorMappingsTask::GenColorMappingsTask(const std::string &name)

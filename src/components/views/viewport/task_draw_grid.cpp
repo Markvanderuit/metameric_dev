@@ -29,7 +29,7 @@ namespace met {
       [](const Spec &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }); });
 
     // Construct buffer object and draw components
-    m_vertex_buffer = {{ .data = as_span<const std::byte>(color_grid) }};
+    m_vertex_buffer = {{ .data = cnt_span<const std::byte>(color_grid) }};
     m_vertex_array = {{
       .buffers = {{ .buffer = &m_vertex_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}

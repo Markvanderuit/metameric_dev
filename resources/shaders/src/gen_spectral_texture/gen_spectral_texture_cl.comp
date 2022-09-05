@@ -5,12 +5,6 @@
 #extension GL_KHR_shader_subgroup_arithmetic : require
 #extension GL_KHR_shader_subgroup_clustered  : require
 
-// Set NVidia-CG flags
-#pragma optionNV(fastmath on)
-#pragma optionNV(inline   all)
-#pragma optionNV(unroll   all)
-#pragma optionNV(strict   on)
-
 #include <guard.glsl>
 #include <spectrum_invoc.glsl>
 #include <spectrum_cluster.glsl>
@@ -20,18 +14,33 @@ const uint n_gamut_verts = 4; // Nr. of tetrahedron vertices
 
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
+layout(std140)             uniform;
 
 layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[n_gamut_verts]; } b_spec_gamut;
 layout(binding = 1) restrict readonly  buffer b_1 { vec3   data[];              } b_colr_texture;
 layout(binding = 2) restrict writeonly buffer b_2 { InSpec data[];              } b_spec_texture;
+layout(binding = 0) uniform u_0 {
+  uint n;
+} b_size;
+layout(binding = 1) uniform u_1 {
+  vec3 sub;
+  mat3 inv;
+} b_bary;
 
-layout(location = 0) uniform uint u_n;
-layout(location = 1) uniform vec3 u_bary_sub;
-layout(location = 2) uniform mat3 u_bary_inv;
+shared InSpec s_spectral_gamut[n_gamut_verts];
 
-shared InSpec s_spectral_gamut[4];
+void load_gamut_shared_in() {
+  const uint i = gl_LocalInvocationID.x / wavelength_samples_al;
+  const uint j = gl_LocalInvocationID.x % wavelength_samples_al;
+  
+  if (i < n_gamut_verts && j < wavelength_samples)
+    s_spectral_gamut[i][j] = b_spec_gamut.data[i][j];
 
-Spec load_spec_gamut(uint i) {
+  barrier();
+  memoryBarrierShared();
+}
+
+Spec load_gamut_shared_cl(uint i) {
   Spec s;
   cl_spec_scatter(s, s_spectral_gamut[i]);
   return s;
@@ -43,23 +52,20 @@ void store_spec_texture(in Spec s, uint i) {
 
 void main() {
   const uint i = gl_GlobalInvocationID.x / cl_spectrum_invc_n;
-  guard(i < u_n);
+  guard(i < b_size.n);
 
   // Load spectral gamut data into shared memory
-  if (gl_LocalInvocationID.x == 0)
-    s_spectral_gamut = b_spec_gamut.data;
-  barrier();
-  memoryBarrierShared();
+  load_gamut_shared_in();
 
   // Obtain barycentric coordinates for positions in the color texture
   vec4 bary;
-  bary.xyz = u_bary_inv * (b_colr_texture.data[i] - u_bary_sub);
+  bary.xyz = b_bary.inv * (b_colr_texture.data[i] - b_bary.sub);
   bary.w   = 1.f - hsum(bary.xyz);
   
   // Perform gamut mapping by applying barycentric coordinates to spectral gamut
   Spec sd = Spec(0.f);
   for (uint i = 0; i < n_gamut_verts; ++i)
-    sd += bary[i] * load_spec_gamut(i);
+    sd += bary[i] * load_gamut_shared_cl(i);
 
   // Store results to buffer
   store_spec_texture(clamp(sd, 0.f, 1.f), i);
