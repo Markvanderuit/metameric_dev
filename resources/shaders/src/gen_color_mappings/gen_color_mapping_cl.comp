@@ -28,7 +28,7 @@ layout(binding = 0) uniform u_0 {
 
 shared InMapp s_mapping;
 
-// Load mapping data into shar    ed memory
+// Load mapping data into shared memory
 void load_mapp_shared_in() {
   const uint mapping_i = b_unif.mapping_i;
   const uint i = gl_LocalInvocationID.x % wavelength_samples_al;
