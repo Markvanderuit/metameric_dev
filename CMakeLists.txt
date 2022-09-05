@@ -53,13 +53,20 @@ find_package(fmt       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
-find_package(libigl    CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_package(Qhull     CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
+
+# Include third party shader-related libraries provided through vcpkg
+find_package(glslang             CONFIG REQUIRED)
+find_package(spirv_cross_core    CONFIG REQUIRED)
+find_package(spirv_cross_glsl    CONFIG REQUIRED)
+find_package(spirv_cross_util    CONFIG REQUIRED)
+find_package(spirv_cross_reflect CONFIG REQUIRED)
+find_package(SPIRV-Tools         CONFIG REQUIRED)
+find_package(SPIRV-Tools-opt     CONFIG REQUIRED)
 
 # Include third party small_gl library directly
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
@@ -114,22 +121,65 @@ foreach(glsl_src ${glsl_srcs})
 
   set(shader_preprocess_out 
     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
-
-  # Add command to preprocess shader source using glsl parser and 
-  # then pass it through glslangvalidator, if available
+  set(shader_binary_out 
+    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv")
+  set(shader_binary_opt_out 
+    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv_opt")
+  set(shader_reflect_out
+    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
+  
+  # Preprocess shader includes and preprocess strings
   add_custom_command(
-    OUTPUT   ${shader_preprocess_out}
-    COMMAND  small_gl_parser_exec 
-               ${glsl_src} ${shader_preprocess_out} 
-               -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
-               -s "${glsl_parser_arg_string}"
-               -d "${glsl_parser_placeholder_string}"
-               -v "${glsl_validator_path}"
-    DEPENDS  small_gl_parser_exec ${glsl_src} ${glsl_includes}
+    OUTPUT  ${shader_preprocess_out}
+    COMMAND small_gl_parser_exec 
+            ${glsl_src} ${shader_preprocess_out} 
+            -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
+            -s "${glsl_parser_arg_string}"
+            -d "${glsl_parser_placeholder_string}"
+    DEPENDS small_gl_parser_exec ${glsl_src} ${glsl_includes}
     VERBATIM
   )
 
-  list(APPEND shaders_preprocess_list ${shader_preprocess_out})
+  # Generate spir-v binary using glslangValidator
+  add_custom_command(
+    OUTPUT  ${shader_binary_out}
+    COMMAND glslangValidator
+            ${shader_preprocess_out}
+            -o ${shader_binary_out}
+            --client opengl100 --target-env spirv1.5 -l
+    DEPENDS glslangValidator ${shader_preprocess_out}
+    VERBATIM
+  )
+
+  # Generate optimized spir-v binary using spirv-opt from spirv-tools
+  add_custom_command(
+    OUTPUT  ${shader_binary_opt_out}
+    COMMAND spirv-opt
+            ${shader_binary_out}
+            -o ${shader_binary_opt_out}
+            -O --strength-reduction --combine-access-chains
+    DEPENDS SPIRV-Tools-opt ${shader_binary_out}
+    VERBATIM
+  )
+
+  # Generate spir-v reflection information using spirv-cross
+  add_custom_command(
+    OUTPUT  ${shader_reflect_out}
+    COMMAND spirv-cross
+            ${shader_binary_out}
+            --output ${shader_reflect_out}
+            --reflect
+    DEPENDS spirv-cross-core ${shader_binary_out}
+    VERBATIM
+  )
+
+  # Set uo list of dependency commands
+  list(APPEND shaders_preprocess_list 
+    ${shader_preprocess_out} 
+    ${shader_binary_out} 
+    ${shader_binary_opt_out}
+    ${shader_reflect_out}
+  )
 endforeach()
 
 # Add single target to perform all shader preprocessing/validation
@@ -201,10 +251,7 @@ target_link_libraries(components PUBLIC
   imgui::imgui
   imguizmo::imguizmo
   unofficial::nativefiledialog::nfd
-  igl::core
-  igl::common
   CGAL::CGAL
-  Qhull::qhullcpp
 )
 add_dependencies(components shaders_preprocess misc_copy)
 
@@ -247,6 +294,22 @@ endif()
 # Set up playground executable
 add_executable_r(playground src/target/main_playground.cpp)
 target_link_libraries(playground PRIVATE core small_gl small_gl_parser_lib)
+
+# Set up playground spv executable
+add_executable_r(playground_spv src/target/main_playground_spv.cpp)
+# set_target_properties(SPIRV-Tools-static PROPERTIES SUFFIX "")
+target_link_libraries(playground_spv PRIVATE 
+  core small_gl small_gl_parser_lib
+  # glslang SPIRV OGLCompiler OSDependent
+
+  # SPIRV-Tools-shared SPIRV-Tools-static SPIRV-Tools-opt
+  # unofficial::shaderc_util::shaderc_util
+  # unofficial::shaderc::shaderc
+  spirv-cross-core
+  spirv-cross-glsl
+  spirv-cross-util
+  spirv-cross-reflect
+)
 
 # Set up solve executable
 add_executable_r(solve src/target/main_solve.cpp)

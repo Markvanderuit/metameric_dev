@@ -6,6 +6,11 @@
     "cgal",
     "cxxopts",
     "eigen3",
+    "glslang",
+    
+    "spirv-cross",
+    "spirv-tools",
+
     "fmt",
     { "name": "glad", 
       "features": [ "extensions", "gl-api-latest" ] },
@@ -13,13 +18,11 @@
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
     "highfive",
     "imguizmo",
-    "libigl",
     "nativefiledialog",
     "nlohmann-json",
     "stb",
     "tbb",
-    "tracy",
-    "qhull"
+    "tracy"
   ],
   "features" : { }
 }
