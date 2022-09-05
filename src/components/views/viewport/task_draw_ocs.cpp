@@ -39,29 +39,45 @@ namespace met {
     m_program.uniform("u_alpha", 0.33f);
 
     m_stale = true;
+    m_stale_metset = true;
   }
 
   void ViewportDrawOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    if (m_stale) {
-      if (info.has_resource("gen_ocs", "ocs_verts")) {
-        // Get shared resources
-        auto &e_verts_buffer = info.get_resource<gl::Buffer>("gen_ocs", "ocs_verts");
-        auto &e_elems_buffer = info.get_resource<gl::Buffer>("gen_ocs", "ocs_elems");
-        
-        // Create vertex array and draw command
-        m_array_hull = {{
-          .buffers  = {{ .buffer = &e_verts_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
-          .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-          .elements = &e_elems_buffer
-        }};
-        m_draw_hull = { .type           = gl::PrimitiveType::eTriangles,
-                        .vertex_count   = (uint) (e_elems_buffer.size() / sizeof(uint)),
-                        .bindable_array = &m_array_hull };
-                        
-        m_stale = false;
-      }
+    if (m_stale && info.has_resource("gen_ocs", "ocs_verts")) {
+      // Get shared resources
+      auto &e_verts_buffer = info.get_resource<gl::Buffer>("gen_ocs", "ocs_verts");
+      auto &e_elems_buffer = info.get_resource<gl::Buffer>("gen_ocs", "ocs_elems");
+      
+      // Create vertex array and draw command
+      m_array_hull = {{
+        .buffers  = {{ .buffer = &e_verts_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
+        .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+        .elements = &e_elems_buffer
+      }};
+      m_draw_hull = { .type           = gl::PrimitiveType::eTriangles,
+                      .vertex_count   = (uint) (e_elems_buffer.size() / sizeof(uint)),
+                      .bindable_array = &m_array_hull };
+                      
+      m_stale = false;
+    }
+
+    if (m_stale_metset && info.has_resource("gen_ocs", "metset_verts")) {
+        auto &e_verts_buffer = info.get_resource<gl::Buffer>("gen_ocs", "metset_verts");
+        auto &e_elems_buffer = info.get_resource<gl::Buffer>("gen_ocs", "metset_elems");
+       
+      // Create vertex array and draw command
+      m_array_metset = {{
+        .buffers = {{ .buffer = &e_verts_buffer, .index = 0, .stride = sizeof(AlColr) }},
+        .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+        .elements = &e_elems_buffer
+      }};
+      m_draw_metset = { .type = gl::PrimitiveType::eTriangles,
+                        .vertex_count = (uint) (e_elems_buffer.size() / sizeof(uint)),
+                        .bindable_array = &m_array_metset };
+
+      m_stale_metset = false;
     }
     
     // Insert temporary window to modify draw settings
@@ -91,16 +107,22 @@ namespace met {
     m_program.uniform("u_camera_matrix", e_viewport_arcball.full().matrix());    
 
     // Dispatch draw calls
-    if (m_draw_hull.bindable_array) {
+    /* if (m_draw_hull.bindable_array) {
       m_program.uniform("u_alpha", .33f);
       gl::dispatch_draw(m_draw_hull);
-    }
+    } */
 
-    if (m_draw_points.bindable_array) {
+    /* if (m_draw_points.bindable_array) {
       m_program.uniform("u_alpha", 1.f);
       gl::state::ScopedSet scope_set(gl::DrawCapability::eDepthTest, true);
       gl::state::set_point_size(m_psize);
       gl::dispatch_draw(m_draw_points);
+    } */
+
+    if (m_draw_metset.bindable_array) {
+      m_program.uniform("u_alpha", .33f);
+      // gl::state::ScopedSet scope_set(gl::DrawCapability::eDepthTest, true);
+      gl::dispatch_draw(m_draw_metset);
     }
   }
 } // namespace met

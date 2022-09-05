@@ -231,10 +231,11 @@ target_link_libraries(core PUBLIC
   small_gl_parser_lib
   Eigen3::Eigen
   fmt::fmt-header-only
-  TBB::tbb
+  CGAL::CGAL
   Tracy::TracyClient
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   nlohmann_json::nlohmann_json
+  TBB::tbb
 )
 target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
 target_compile_definitions(core PUBLIC
@@ -251,7 +252,6 @@ target_link_libraries(components PUBLIC
   imgui::imgui
   imguizmo::imguizmo
   unofficial::nativefiledialog::nfd
-  CGAL::CGAL
 )
 add_dependencies(components shaders_preprocess misc_copy)
 

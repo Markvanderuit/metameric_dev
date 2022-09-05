@@ -1,6 +1,9 @@
+#define TRACY_NO_EXIT 1
+
 // Metameric includes
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/linprog.hpp>
 #include <metameric/core/utility.hpp>
 
 // STL includes
@@ -54,6 +57,8 @@ void solve_color_system() {
   CMFS cs_j = mapp_j.finalize();
   Colr sig_i = mapp_i.apply_color(Spec(0.5));
 
+  // generate_metamer_boundary(mapp_i, mapp_j, sig_i, 256);
+
   // Cmpose the direction functional R31 -> R, with the color signal map to produce
   // a new functional R31 -> R, based on a random direction vector in R3
   auto dirv = sample_unit_sphere();
@@ -67,7 +72,6 @@ void solve_color_system() {
   // Get the correct format for C
   // C is an n-sized vector of constraints
   Spec C   = f;
-  float c0 = 0.f;
 
   // Get the correct format for A
   // A is an m x n (3 x 31) matrix of constraints, where n is the number
@@ -129,6 +133,7 @@ void solve_color_system() {
 }
 
 int main() {
+
   try { 
     using ET = CGAL::MP_Float;
     using VT = float;
@@ -164,8 +169,15 @@ int main() {
     Program lp(2, 3, A_.data(), b.data(), r.data(), C.data(), c0);
     Solution s = CGAL::solve_nonnegative_linear_program(lp, ET());
     if (s.solves_linear_program(lp)) std::cout << s << '\n';
-    
-    solve_color_system();
+
+        // 
+    SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+    SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_e };
+    Spec refl = 0.5f;
+    std::vector<Spec> X = generate_metamer_boundary(mapp_i, mapp_j, refl, 256);
+    for (auto &x : X) {
+      fmt::print("{}\n", x);
+    }
 
     /* 
     // Declare constraints in format Ax <= b

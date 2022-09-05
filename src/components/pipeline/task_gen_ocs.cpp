@@ -1,6 +1,7 @@
 #include <metameric/components/tasks/task_gen_ocs.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/linprog.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <small_gl/buffer.hpp>
@@ -169,5 +170,22 @@ namespace met {
     // Submit data to buffer resources
     info.emplace_resource<gl::Buffer>("ocs_verts", { .data = cnt_span<const std::byte>(mesh.vertices) });
     info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
+
+    // Be cool and generate a metamer set boundary just once
+    SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_e };
+    SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+    Spec refl = 0.5f;
+    std::vector<Spec>   X = generate_metamer_boundary(mapp_i, mapp_j, refl, 4096);
+    std::vector<AlColr> X_signal(X.size());
+    std::transform(std::execution::par_unseq, range_iter(X), X_signal.begin(),
+      [&](const Spec &x) { return mapp_j.apply_color(x); });
+
+    // Generate convex hull over metamer set points
+    auto mesh2 = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(X_signal));
+    fmt::print("Generated convex hull ({} verts, {} elems)\n", mesh2.vertices.size(), mesh2.elements.size());
+
+    // Submit data to buffer resources
+    info.emplace_resource<gl::Buffer>("metset_verts", { .data = cnt_span<const std::byte>(mesh2.vertices) });
+    info.emplace_resource<gl::Buffer>("metset_elems", { .data = cnt_span<const std::byte>(mesh2.elements) });
   }
 }

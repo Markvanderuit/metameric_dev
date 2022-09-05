@@ -14,6 +14,9 @@ namespace met {
     gl::DrawInfo m_draw_hull;
     float        m_psize = 1.f;
     bool         m_stale;
+    gl::Array    m_array_metset;
+    gl::DrawInfo m_draw_metset;
+    bool         m_stale_metset;
 
   public:
     ViewportDrawOCSTask(const std::string &name);
