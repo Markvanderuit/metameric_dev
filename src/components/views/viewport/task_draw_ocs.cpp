@@ -120,8 +120,7 @@ namespace met {
     } */
 
     if (m_draw_metset.bindable_array) {
-      m_program.uniform("u_alpha", .33f);
-      // gl::state::ScopedSet scope_set(gl::DrawCapability::eDepthTest, true);
+      m_program.uniform("u_alpha", .66f);
       gl::dispatch_draw(m_draw_metset);
     }
   }

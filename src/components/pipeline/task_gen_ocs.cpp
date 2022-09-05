@@ -172,8 +172,8 @@ namespace met {
     info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
 
     // Be cool and generate a metamer set boundary just once
-    SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_e };
-    SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+    SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+    SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65, .n_scatters = 3 };
     Spec refl = 0.5f;
     std::vector<Spec>   X = generate_metamer_boundary(mapp_i, mapp_j, refl, 4096);
     std::vector<AlColr> X_signal(X.size());
