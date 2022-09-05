@@ -43,29 +43,26 @@ eig::Array3f sample_unit_sphere() {
 } 
 
 void solve_color_system() {
+  using VT = Spec::value_type;
   using ET = CGAL::MP_Float;
-  using VT = float;
-  using CT = CGAL::Comparison_result;
 
   // Declare color systems i and j
+  // and obtain color signal under i
   SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
   SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_e };
-  CMFS cs_i = mapp_i.finalize(); // mapp_i.cmfs.array().colwise() * mapp_i.illuminant;
-  CMFS cs_j = mapp_j.finalize(); // mapp_j.cmfs.array().colwise() * mapp_j.illuminant;
-
-  // Declare observer color signal under i
+  CMFS cs_i = mapp_i.finalize();
+  CMFS cs_j = mapp_j.finalize();
   Colr sig_i = mapp_i.apply_color(Spec(0.5));
 
-  // Sample a random direction vector in R3
+  // Cmpose the direction functional R31 -> R, with the color signal map to produce
+  // a new functional R31 -> R, based on a random direction vector in R3
   auto dirv = sample_unit_sphere();
-
-  // compose the direction functional R3 -> R, with the color signal map to produce
-  // a new functional R31 -> R. 
   Spec f = (cs_j.col(0) * dirv.x() + cs_j.col(1) * dirv.y() + cs_j.col(2) * dirv.z()).array();
   
   // Get the correct format for r
   // r is an m-sized vector of relations
-  std::array<CT, 3> r = { CGAL::EQUAL, CGAL::EQUAL, CGAL::EQUAL };
+  std::array<CGAL::Comparison_result, 3> r;
+  std::ranges::fill(r, CGAL::EQUAL);
 
   // Get the correct format for C
   // C is an n-sized vector of constraints
@@ -83,50 +80,49 @@ void solve_color_system() {
   // b is an m-sized vector of values
   Colr b = sig_i;
 
-  // Get the correct formats for u, l, and their bounds
+  // Get the correct bounds for u, l, and a mask for activating these
   Spec l = Spec::Zero();
   Spec u = Spec::Ones();
-  std::array<bool, wavelength_samples> fl, fu;
-  std::ranges::fill(fl, true);
-  std::ranges::fill(fu, true);
+  std::array<bool, wavelength_samples> m;
+  std::ranges::fill(m, true);
 
   // Linear program type shorthands
-  using Solution = CGAL::Quadratic_program_solution<ET>;
-  typedef CGAL::Nonnegative_linear_program_from_iterators
+  using LinearSolution = CGAL::Quadratic_program_solution<ET>;
+  using LinearProgram  = CGAL::Linear_program_from_iterators
   <decltype(A)::value_type*,
    decltype(b)::value_type*,
    decltype(r)::value_type*,
-   decltype(C)::value_type*> NNLinearProgram;
-  typedef CGAL::Linear_program_from_iterators
-  <decltype(A)::value_type*,
-   decltype(b)::value_type*,
-   decltype(r)::value_type*,
-   decltype(fl)::value_type*,
+   decltype(m)::value_type*,
    decltype(l)::value_type*,
-   decltype(fu)::value_type*,
+   decltype(m)::value_type*,
    decltype(u)::value_type*,
-   decltype(C)::value_type*> LinearProgram;
-
-  // NNLinearProgram nnlp(wavelength_samples, 3, A.data(), b.data(), r.data(), C.data(), c0);
-  LinearProgram lp(wavelength_samples, 3, A.data(), b.data(), r.data(),
-    fl.data(), l.data(), fu.data(), u.data(), C.data(), c0);
+   decltype(C)::value_type*>;
 
   // Construct and solve a linear program
-  auto s = CGAL::solve_linear_program(lp, ET());
-  Spec refl;
-  for (uint i = 0; i < wavelength_samples; ++i) {
-    auto f = *(s.variable_values_begin() + i);
-    refl[i] = static_cast<float>(CGAL::to_double(f));
-  }
+  LinearProgram lp(wavelength_samples, /* <-- n */
+                   3,                  /* <-- m */
+                   A.data(),           /* n x m */
+                   b.data(),           /* m x 1 */ 
+                   r.data(),           /* m x 1 */
+                   m.data(),           /* n x 1 */
+                   l.data(),           /* n x 1 */ 
+                   m.data(),           /* n x 1 */
+                   u.data(),           /* n x 1 */
+                   C.data(),           /* n x 1 */
+                   0.f);               /* 1 x 1 */
+  LinearSolution s = CGAL::solve_linear_program(lp, ET());
+
+  // Obtain resulting variable in inaccurate spectral format
+  Spec x;
+  std::transform(s.variable_values_begin(), s.variable_values_end(),
+    x.begin(), [](const auto &f) { return static_cast<float>(CGAL::to_double(f)); });
 
   std::cout << s << '\n';
-  fmt::print("x  {}\n", refl);
-  fmt::print("si {}\n", mapp_i.apply_color(refl));
-  fmt::print("sj {}\n", mapp_j.apply_color(refl));
+  fmt::print("x  {}\n", x);
+  fmt::print("si {}\n", mapp_i.apply_color(x));
+  fmt::print("sj {}\n", mapp_j.apply_color(x));
   fmt::print("l  {}\n", l);
-  fmt::print("fl {}\n", fl);
   fmt::print("u  {}\n", u);
-  fmt::print("fu {}\n", fu);
   fmt::print("b  {}\n", b);
   fmt::print("r  {}\n", r);
   fmt::print("C  {}\n", C);
