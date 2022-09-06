@@ -172,16 +172,17 @@ namespace met {
     info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
 
     // Be cool and generate a metamer set boundary just once
-    SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
-    SpectralMapping mapp_j { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65, .n_scatters = 3 };
-    Spec refl = 0.5f;
-    std::vector<Spec>   X = generate_metamer_boundary(mapp_i, mapp_j, refl, 4096);
-    std::vector<AlColr> X_signal(X.size());
-    std::transform(std::execution::par_unseq, range_iter(X), X_signal.begin(),
-      [&](const Spec &x) { return mapp_j.apply_color(x); });
+    SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
+    SpectralMapping mapp_j { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2 };
+    Colr signal = 0.5;
+
+    std::vector<Colr> boundary = generate_metamer_boundary_c(mapp_i.finalize(),
+                                                             mapp_j.finalize(),
+                                                             signal, 256);   
+    std::vector<AlColr> boundary_al(boundary.begin(), boundary.end());
 
     // Generate convex hull over metamer set points
-    auto mesh2 = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(X_signal));
+    auto mesh2 = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(boundary_al));
     fmt::print("Generated convex hull ({} verts, {} elems)\n", mesh2.vertices.size(), mesh2.elements.size());
 
     // Submit data to buffer resources
