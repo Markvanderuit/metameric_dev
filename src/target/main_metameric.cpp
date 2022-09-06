@@ -11,8 +11,8 @@
 int main() {
   /* try { */
     met::create_application({ .database_path = "database.mat",
-                              .project_path  = "",
-                              // .project_path  = "C:/Users/markv/Desktop/Testproject/bricks.json",
+                              // .project_path  = "",
+                              .project_path  = "C:/Users/markv/Desktop/Testproject/bricks.json",
                               .color_mode    = met::AppliationColorMode::eDark });
   /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());

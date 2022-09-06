@@ -172,21 +172,29 @@ namespace met {
     info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
 
     // Be cool and generate a metamer set boundary just once
-    SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
-    SpectralMapping mapp_j { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2 };
-    Colr signal = 0.5;
+    SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65  };
+    SpectralMapping mapp_j { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
+    SpectralMapping mapp_k { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2 };
+    
+    auto met_samples  = detail::generate_unit_dirs(128);
+    auto met_boundary = generate_metamer_boundary_c(mapp_i.finalize(), mapp_j.finalize(), 0.5f, met_samples); 
 
-    std::vector<Colr> boundary = generate_metamer_boundary_c(mapp_i.finalize(),
-                                                             mapp_j.finalize(),
-                                                             signal, 256);   
-    std::vector<AlColr> boundary_al(boundary.begin(), boundary.end());
+
+    // std::set<eig::AlArray3f, decltype(eig_compare)> unique_bounds(range_iter(met_boundary), eig_compare);
+    // std::vector<eig::Array3f> unique_samples;
+   
+    
+    auto met_boundary_= generate_metamer_boundary_c(mapp_i.finalize(), mapp_k.finalize(), 0.5f, met_samples); 
+
+    auto met_mesh = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(met_boundary))));
+    auto met_mesh_= detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(met_boundary_))));
+
 
     // Generate convex hull over metamer set points
-    auto mesh2 = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(boundary_al));
-    fmt::print("Generated convex hull ({} verts, {} elems)\n", mesh2.vertices.size(), mesh2.elements.size());
+    fmt::print("Generated convex hull ({} verts, {} elems)\n", met_mesh.vertices.size(), met_mesh.elements.size());
 
     // Submit data to buffer resources
-    info.emplace_resource<gl::Buffer>("metset_verts", { .data = cnt_span<const std::byte>(mesh2.vertices) });
-    info.emplace_resource<gl::Buffer>("metset_elems", { .data = cnt_span<const std::byte>(mesh2.elements) });
+    info.emplace_resource<gl::Buffer>("metset_verts", { .data = cnt_span<const std::byte>(met_mesh.vertices) });
+    info.emplace_resource<gl::Buffer>("metset_elems", { .data = cnt_span<const std::byte>(met_mesh.elements) });
   }
 }

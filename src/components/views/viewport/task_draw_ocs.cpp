@@ -73,7 +73,7 @@ namespace met {
         .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         .elements = &e_elems_buffer
       }};
-      m_draw_metset = { .type = gl::PrimitiveType::ePoints,
+      m_draw_metset = { .type = gl::PrimitiveType::eTriangles,
                         .vertex_count = (uint) (e_elems_buffer.size() / sizeof(uint)),
                         .bindable_array = &m_array_metset };
 
