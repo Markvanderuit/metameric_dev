@@ -23,7 +23,10 @@ namespace met {
       constexpr auto blit_flags = gl::FramebufferMaskFlags::eColor | gl::FramebufferMaskFlags::eDepth;
 
       // Blit color results into the single-sampled framebuffer with attached viewport texture
-      e_frame_buffer_msaa.blit_to(e_frame_buffer, blit_size, { 0, 0 }, blit_size, { 0, 0 }, blit_flags);
+      e_frame_buffer_msaa.blit_to(e_frame_buffer, 
+                                  blit_size, eig::Array2u(0u), 
+                                  blit_size, eig::Array2u(0u), 
+                                  blit_flags);
     }
   };
 } // namespace met
