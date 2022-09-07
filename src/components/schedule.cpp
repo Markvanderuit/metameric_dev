@@ -91,6 +91,21 @@ namespace met {
       }
       ImGui::End();
     });
+
+    // Temporary window to plot pca components
+    scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
+      if (ImGui::Begin("PCA} plots")) {
+        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
+                               * eig::Array2f(.67f, 0.3f);
+        auto pca = info.get_resource<std::vector<Spec>>("global", "pca");
+        for (uint i = 0; i < pca.size(); ++i) {
+          ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca[i].data(), 
+            wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
+        }
+      }
+      ImGui::End();
+    });
   }
 
   template <typename Scheduler>

@@ -1,6 +1,7 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/pca.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
@@ -72,6 +73,12 @@ namespace met {
       std::vector<Spec> internal_sd(hd5_data.size);
       std::transform(std::execution::par_unseq, range_iter(hd5_data.data), 
         internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
+
+      // Test PCA generation using a bunch of randomly chosen vectors
+      std::vector<Spec> pca_input(1024);
+      for (uint i = 0; i < pca_input.size(); ++i)
+        pca_input[i] = internal_sd[1024 * i];
+      scheduler.insert_resource<std::vector<Spec>>("pca", derive_pca(pca_input));
 
       // Create a KNN grid over the spectral distributions,based on their color as a position
       fmt::print("Constructing KNN grid\n");

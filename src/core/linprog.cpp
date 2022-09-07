@@ -20,30 +20,36 @@ namespace met {
 
     // Given a random vector in R3 bounded to [-1, 1], return a vector
     // distributed over a gaussian distribution
-    eig::Array3f inv_gaussian_cdf(const eig::Array3f &x) {
+    template <uint N>
+    eig::Array<float, N, 1> inv_gaussian_cdf(const eig::Array<float, N, 1> &x) {
+      using ArrayNf = eig::Array<float, N, 1>;
       met_trace();
-      auto y = (eig::Array3f::Ones() - x * x).max(gaussian_epsilon).log().eval();
-      auto z = (eig::Array3f(gaussian_k) + 0.5f * y).eval();
+
+      auto y = (ArrayNf(1.f) - x * x).max(gaussian_epsilon).log().eval();
+      auto z = (ArrayNf(gaussian_k) + 0.5f * y).eval();
       return (((z * z - y * gaussian_alpha_inv).sqrt() - z).sqrt() * x.sign()).eval();
     }
     
     // Given a random vector in R3 bounded to [-1, 1], return a uniformly
     // distributed point on the unit sphere
-    eig::Array3f inv_unit_sphere_cdf(const eig::Array3f &x) {
+    template <uint N>
+    eig::Array<float, N, 1> inv_unit_sphere_cdf(const eig::Array<float, N, 1> &x) {
       met_trace();
-      auto y = inv_gaussian_cdf(x);
-      return y.matrix().normalized();
+      return inv_gaussian_cdf<N>(x).matrix().normalized().eval();
     }
 
-    std::vector<eig::Array3f> generate_unit_dirs(uint n_samples) {
+    template <uint N>
+    std::vector<eig::Array<float, N, 1>> generate_unit_dirs(uint n_samples) {
+      using ArrayNf = eig::Array<float, N, 1>;
       met_trace();
-      std::vector<eig::Array3f> unit_dirs(n_samples);
 
+      // Generate separate seeds for each thread's rng
       std::random_device rd;
       using SeedTy = std::random_device::result_type;
       std::vector<SeedTy> seeds(omp_get_max_threads());
-      std::ranges::for_each(seeds, [&rd](auto &s) { s = rd(); });
+      for (auto &s : seeds) s = rd();
 
+      std::vector<ArrayNf> unit_dirs(n_samples);
       #pragma omp parallel
       {
         // Initialize separate random number generator per thread
@@ -53,7 +59,10 @@ namespace met {
         // Draw samples for this thread's range
         #pragma omp for
         for (int i = 0; i < unit_dirs.size(); ++i) {
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(eig::Array3f { distr(eng), distr(eng), distr(eng) });
+          ArrayNf v;
+          for (auto &f : v) f = distr(eng);
+
+          unit_dirs[i] = detail::inv_unit_sphere_cdf<N>(v);
         }
       }
 
@@ -62,15 +71,16 @@ namespace met {
 
     template <typename Ty, uint N, uint M>
     struct LinprogParams {
-      // Components for defining "min C^T x, w.r. Ax <=> b"
+      // Components for defining "min C^T x + c0, w.r.t. Ax <=> b"
       eig::Array<Ty, N, 1> C;
       eig::Array<Ty, M, N> A;
       eig::Array<Ty, M, 1> b;
+      Ty                   c0;
 
       // Relation for Ax <=> b (<=, ==, >=)
       eig::Array<CGAL::Sign, M, 1> r = CGAL::EQUAL;
 
-      // Upper/lower limits to x, and masks to activate them
+      // Upper/lower limits to x, and masks to activate/deactivate them
       eig::Array<Ty, N, 1> l     = std::numeric_limits<Ty>::min();
       eig::Array<Ty, N, 1> u     = std::numeric_limits<Ty>::max();
       eig::Array<bool, N, 1> m_l = false;
@@ -94,9 +104,8 @@ namespace met {
       std::ranges::transform(params.A.colwise(), A.begin(), [](auto v) { return v.data(); });
 
       // Construct and solve linear programs for minimization/maximization
-      LinearProgram lp(N, M,
-        A.data(), params.b.data(), params.r.data(), params.m_l.data(), 
-        params.l.data(), params.m_u.data(), params.u.data(), params.C.data(), 0.f);
+      LinearProgram lp(N, M, A.data(), params.b.data(), params.r.data(), params.m_l.data(), 
+        params.l.data(), params.m_u.data(), params.u.data(), params.C.data(), params.c0);
       LinearSolution s = CGAL::solve_linear_program(lp, LinearFloat());
       
       // Obtain and return result
@@ -123,11 +132,17 @@ namespace met {
   std::vector<Spec> generate_metamer_boundary(const CMFS &csys_i,
                                               const CMFS &csys_j,
                                               const Colr &csig_i,
-                                              const std::vector<eig::Array3f> &samples) {
+                                              const std::vector<eig::Array<float, 6, 1>> &samples) {
+    using SMatrixTy = eig::Matrix<float, wavelength_samples, 6>;
     met_trace();
 
     // Return object
     std::vector<Spec> spectra(samples.size());
+
+    // Obtain orthogonal spectra through SVD of dual color system matrix
+    SMatrixTy S = (SMatrixTy() << csys_i, csys_j).finished();
+    eig::JacobiSVD<SMatrixTy> svd(S, eig::ComputeThinU | eig::ComputeThinV);
+    SMatrixTy U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
     
     #pragma omp parallel
     {
@@ -139,7 +154,7 @@ namespace met {
 
       #pragma omp for
       for (int i = 0; i < spectra.size(); ++i) {
-        params.C = (csys_j * samples[i].matrix()).eval();
+        params.C = (U * samples[i].matrix()).eval();
         spectra[i] = detail::linprog<float, wavelength_samples, 3>(params);
       }
     }
@@ -152,16 +167,14 @@ namespace met {
                                               const Colr &csig_i,
                                               uint n_samples) {
     met_trace();
-    // Obtain N/2 randomly sampled unit vectors from the unit sphere
-    std::vector<eig::Array3f> unit_dirs = detail::generate_unit_dirs(n_samples);
-    return generate_metamer_boundary(csys_i, csys_j, csig_i, unit_dirs);
+    return generate_metamer_boundary(csys_i, csys_j, csig_i, detail::generate_unit_dirs<6>(n_samples));
   }
   
   
   std::vector<Colr> generate_metamer_boundary_c(const CMFS &csys_i,
                                                 const CMFS &csys_j,
                                                 const Colr &csig_i,
-                                                const std::vector<eig::Array3f> &samples) {
+                                                const std::vector<eig::Array<float, 6, 1>> &samples) {
     met_trace();
 
     // Generate boundary spectra
@@ -190,5 +203,13 @@ namespace met {
       [&](const Spec &s) { return csys_j.transpose() * s.matrix(); });
       
     return sig;
+  }
+
+  Spec generate_spectrum(const CMFS &csys, const Colr &csig) {
+    detail::LinprogParams<float, wavelength_samples, 3> params = {
+      .C = 0.f, .A = csys.transpose().eval(), .b = csig,
+      .l = 0.f, .u = 1.f, .m_l = true, .m_u = true
+    };
+    return detail::linprog<float, wavelength_samples, 3>(params);
   }
 } // namespace met

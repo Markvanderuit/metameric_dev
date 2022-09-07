@@ -171,24 +171,42 @@ namespace met {
     info.emplace_resource<gl::Buffer>("ocs_verts", { .data = cnt_span<const std::byte>(mesh.vertices) });
     info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
 
-    // Be cool and generate a metamer set boundary just once
-    SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65  };
-    SpectralMapping mapp_j { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
-    SpectralMapping mapp_k { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2 };
-    
-    auto met_samples  = detail::generate_unit_dirs(128);
-    auto met_boundary = generate_metamer_boundary_c(mapp_i.finalize(), mapp_j.finalize(), 0.5f, met_samples); 
+    // Mappings for metamer set generation
+    SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
+    SpectralMapping mapp_j { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
 
+    // Be cool and generate a metamer set boundary on the fly just once
+    // Spec met_input_s = 0.5f;
+    Colr met_input_c = { 0.35f, 0.6f, 0.2f }; /// mapp_i.apply_color(met_input_s);
+    auto met_samples = detail::generate_unit_dirs<6>(10000);
+    auto met_spectra = generate_metamer_boundary(mapp_i.finalize(), mapp_j.finalize(), met_input_c, met_samples); 
 
-    // std::set<eig::AlArray3f, decltype(eig_compare)> unique_bounds(range_iter(met_boundary), eig_compare);
-    // std::vector<eig::Array3f> unique_samples;
-   
-    
-    auto met_boundary_= generate_metamer_boundary_c(mapp_i.finalize(), mapp_k.finalize(), 0.5f, met_samples); 
-
+    std::vector<Colr> met_boundary(met_spectra.size());
+    std::transform(std::execution::par_unseq, range_iter(met_spectra), met_boundary.begin(),
+      [&](const auto &s) { return mapp_j.apply_color(s); });
     auto met_mesh = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(met_boundary))));
-    auto met_mesh_= detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(met_boundary_))));
 
+/*     Colr pos = (met_boundary[32] + met_boundary[1024]) * 0.5f;
+    std::vector<float> weights(met_spectra.size());
+    std::transform(range_iter(met_boundary), weights.begin(),
+      [&](const auto &c) { return std::sqrtf((c - pos).pow(2.f).sum()); });
+    
+    Spec spec_mean = 0.f;
+    for (uint i = 0; i < met_spectra.size(); ++i) {
+      spec_mean += weights[i] * met_spectra[i];
+    }
+    spec_mean /= static_cast<float>(met_spectra.size());
+    fmt::print("Mean: {}\n", spec_mean);
+    fmt::print("Err: {} -> {}\n", pos, mapp_j.apply_color(spec_mean)); */
+
+    Spec spec_mean = std::reduce(std::execution::par_unseq, range_iter(met_spectra), Spec(0.f),
+      [](const auto &a, const auto &b) { return (a + b).eval(); }) / static_cast<float>(met_spectra.size());
+    fmt::print("Generated: {}\n", spec_mean);
+    fmt::print("Producing: {} -> {}\n", mapp_i.apply_color(spec_mean), mapp_j.apply_color(spec_mean));
+
+    /* Spec gen_spec = generate_spectrum(mapp_i.finalize(), 0.5f);
+    Colr gen_colr = mapp_i.apply_color(gen_spec);
+    fmt::print("Generated: {}\n", gen_colr); */
 
     // Generate convex hull over metamer set points
     fmt::print("Generated convex hull ({} verts, {} elems)\n", met_mesh.vertices.size(), met_mesh.elements.size());
@@ -196,5 +214,12 @@ namespace met {
     // Submit data to buffer resources
     info.emplace_resource<gl::Buffer>("metset_verts", { .data = cnt_span<const std::byte>(met_mesh.vertices) });
     info.emplace_resource<gl::Buffer>("metset_elems", { .data = cnt_span<const std::byte>(met_mesh.elements) });
+
+    // Do some stuff with the PCA code
+    auto &ortho = info.get_resource<std::vector<Spec>>(global_key, "pca");
+    for (Spec &v : ortho) {
+      Colr c = mapp_i.apply_color(v);
+      fmt::print("{}\n", c);
+    }
   }
 }
