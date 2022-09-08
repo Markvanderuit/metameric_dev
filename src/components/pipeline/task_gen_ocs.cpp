@@ -2,6 +2,7 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
+#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <small_gl/buffer.hpp>
@@ -204,9 +205,7 @@ namespace met {
     fmt::print("Generated: {}\n", spec_mean);
     fmt::print("Producing: {} -> {}\n", mapp_i.apply_color(spec_mean), mapp_j.apply_color(spec_mean));
 
-    /* Spec gen_spec = generate_spectrum(mapp_i.finalize(), 0.5f);
-    Colr gen_colr = mapp_i.apply_color(gen_spec);
-    fmt::print("Generated: {}\n", gen_colr); */
+
 
     // Generate convex hull over metamer set points
     fmt::print("Generated convex hull ({} verts, {} elems)\n", met_mesh.vertices.size(), met_mesh.elements.size());
@@ -214,12 +213,5 @@ namespace met {
     // Submit data to buffer resources
     info.emplace_resource<gl::Buffer>("metset_verts", { .data = cnt_span<const std::byte>(met_mesh.vertices) });
     info.emplace_resource<gl::Buffer>("metset_elems", { .data = cnt_span<const std::byte>(met_mesh.elements) });
-
-    // Do some stuff with the PCA code
-    auto &ortho = info.get_resource<std::vector<Spec>>(global_key, "pca");
-    for (Spec &v : ortho) {
-      Colr c = mapp_i.apply_color(v);
-      fmt::print("{}\n", c);
-    }
   }
 }

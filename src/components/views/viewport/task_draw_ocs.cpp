@@ -112,12 +112,12 @@ namespace met {
       gl::dispatch_draw(m_draw_hull);
     } */
 
-    /* if (m_draw_points.bindable_array) {
+    if (m_draw_points.bindable_array) {
       m_program.uniform("u_alpha", 1.f);
       gl::state::ScopedSet scope_set(gl::DrawCapability::eDepthTest, true);
       gl::state::set_point_size(m_psize);
       gl::dispatch_draw(m_draw_points);
-    } */
+    }
 
     if (m_draw_metset.bindable_array) {
       m_program.uniform("u_alpha", .66f);

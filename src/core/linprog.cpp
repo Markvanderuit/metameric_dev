@@ -108,6 +108,9 @@ namespace met {
         params.l.data(), params.m_u.data(), params.u.data(), params.C.data(), params.c0);
       LinearSolution s = CGAL::solve_linear_program(lp, LinearFloat());
       
+      // fmt::print("linprog solution: valid={}, optimal={}, unbounded={}\n", 
+        // s.is_valid(), s.is_optimal(), s.is_unbounded());
+
       // Obtain and return result
       eig::Matrix<Ty, N, 1> v;
       std::transform(s.variable_values_begin(), s.variable_values_end(), v.begin(), 
@@ -203,6 +206,59 @@ namespace met {
       [&](const Spec &s) { return csys_j.transpose() * s.matrix(); });
       
     return sig;
+  }
+  
+  Spec generate_spectrum_from_basis(const BMatrixType &eigen_vectors, 
+                                    const CMFS &csys, 
+                                    const Colr &csig) {
+    met_trace();
+    constexpr uint N = 16;                         // Nr. of basis functions used
+    constexpr uint M = 3 + 2 * wavelength_samples; // Nr. of constraints used
+
+    // Use right-most eigenvectors as basis functions
+    eig::Matrix<float, wavelength_samples, N> basis = eigen_vectors.rightCols(N);
+
+    /* // Set up constraints Ax = b
+    eig::Matrix<float,      M, N> A_;
+    eig::Matrix<CGAL::Sign, M, 1> r_;
+    eig::Matrix<float,      M, 1> b_;
+    A_ << (csys.transpose() * basis).eval(), 
+           basis, 
+           basis;
+    r_ << eig::Matrix<CGAL::Sign, 3,                  1>(CGAL::EQUAL),
+          eig::Matrix<CGAL::Sign, wavelength_samples, 1>(CGAL::SMALLER),
+          eig::Matrix<CGAL::Sign, wavelength_samples, 1>(CGAL::LARGER);
+    b_ << csig,
+          eig::Matrix<float, wavelength_samples, 1>(1.f),
+          eig::Matrix<float, wavelength_samples, 1>(0.f);
+
+    // Run solver to determine basis function weights
+    detail::LinprogParams<float, N, M> params = {
+      .C = 0.f, .A = A_, .b = b_, .r = r_
+    };
+    eig::Matrix<float, N, 1> rho = detail::linprog<float, N, M>(params); */
+    
+    auto Gamma = (csys.transpose() * basis).eval();
+    eig::Matrix<float, N, 1> rho_ = Gamma.transpose() 
+                                  * (Gamma * Gamma.transpose()).inverse() 
+                                  * csig.matrix();
+
+    // Return resulting clamped spectrum
+    return (basis * rho_).cwiseMin(1.f).cwiseMax(0.f).eval();
+  }
+
+  Spec generate_metameric_black_from_basis(const BMatrixType &eigen_vectors, 
+                                           const CMFS &csys) {
+    met_trace();
+    constexpr uint N = 16;                         // Nr. of basis functions used
+    
+    // Use right-most eigenvectors as basis functions
+    eig::Matrix<float, wavelength_samples, N> basis = eigen_vectors.rightCols(N);
+
+    // auto Gamma  = (csys.transpose() * basis).eval();
+    // auto Gamma_ = BMatrixType::Identity() - (Gamma * (Gamma.transpose() * Gamma).inverse() * Gamma.transpose()).eval();
+
+    return 0.f;
   }
 
   Spec generate_spectrum(const CMFS &csys, const Colr &csig) {

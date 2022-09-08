@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <vector>
 
@@ -29,6 +30,10 @@ namespace met {
                                                 const CMFS &csystem_j,
                                                 const Colr &csignal_i,
                                                 uint n_samples = 256);
+
+  Spec generate_spectrum_from_basis(const BMatrixType &basis, 
+                                    const CMFS &csystem, 
+                                    const Colr &csignal);
 
   Spec generate_spectrum(const CMFS &csystem, const Colr &csignal);
 } // namespace met

@@ -75,10 +75,15 @@ namespace met {
         internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
 
       // Test PCA generation using a bunch of randomly chosen vectors
-      std::vector<Spec> pca_input(1024);
+      SpectralMapping mapp = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+      std::vector<Spec> pca_input(256);
       for (uint i = 0; i < pca_input.size(); ++i)
-        pca_input[i] = internal_sd[1024 * i];
-      scheduler.insert_resource<std::vector<Spec>>("pca", derive_pca(pca_input));
+        pca_input[i] = internal_sd[256 * i];
+      auto pca_basis = pca(pca_input);
+      auto pca_orth  = orthogonal_complement(mapp.finalize(), pca_basis);
+      scheduler.insert_resource<decltype(pca_orth)>("pca_orth", std::move(pca_orth));
+      scheduler.insert_resource<BMatrixType>("pca_basis", std::move(pca_basis));
+      scheduler.insert_resource<std::vector<Spec>>("pca_input", std::move(pca_input));
 
       // Create a KNN grid over the spectral distributions,based on their color as a position
       fmt::print("Constructing KNN grid\n");

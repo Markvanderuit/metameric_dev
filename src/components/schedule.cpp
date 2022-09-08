@@ -1,6 +1,8 @@
 
 // Metameric includes
+#include <metameric/core/linprog.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/pca.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
@@ -94,14 +96,63 @@ namespace met {
 
     // Temporary window to plot pca components
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
-      if (ImGui::Begin("PCA} plots")) {
+
+      if (ImGui::Begin("PCA results")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
                                * eig::Array2f(.67f, 0.3f);
-        auto pca = info.get_resource<std::vector<Spec>>("global", "pca");
-        for (uint i = 0; i < pca.size(); ++i) {
-          ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca[i].data(), 
+        
+        // Do some stuff with the PCA code
+        SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
+        auto &pca_basis = info.get_resource<BMatrixType>(global_key, "pca_basis");
+        Spec gen_spec = generate_spectrum_from_basis(pca_basis, mapp_i.finalize(), 0.5f);
+        Colr gen_colr = mapp_i.finalize().transpose() * gen_spec.matrix();
+        
+        ImGui::PlotLines("Spectrum", gen_spec.data(), 
+          wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
+        ImGui::ColorEdit3("Signal", gen_colr.data(), ImGuiColorEditFlags_Float);
+      }
+      ImGui::End();
+      
+      if (ImGui::Begin("PCA inputs")) {
+        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
+                               * eig::Array2f(.67f, 0.3f);
+
+        // Do some stuff with the PCA bases
+        auto &spectra = info.get_resource<std::vector<Spec>>(global_key, "pca_input");
+        for (uint i = 0; i < spectra.size(); ++i) {
+          ImGui::PlotLines(fmt::format("Input {}", i).c_str(), spectra[i].data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
+        }
+      }
+      ImGui::End();
+      
+      if (ImGui::Begin("PCA plots")) {
+        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
+                               * eig::Array2f(.67f, 0.3f);
+
+        // Do some stuff with the PCA bases
+        auto &pca = info.get_resource<BMatrixType>(global_key, "pca_basis");
+        for (uint i = 0; i < pca.cols(); ++i) {
+          ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
+            wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
+        }
+      }
+      
+      if (ImGui::Begin("PCA orths")) {
+        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
+                               * eig::Array2f(.67f, 0.3f);
+
+        // Do some stuff with the PCA bases
+        auto &orth = info.get_resource<eig::Matrix<float, 3, 16>>(global_key, "pca_orth");
+        // auto _orth = orth.transpose().eval();
+
+        for (uint i = 0; i < orth.rows(); ++i) {
+          ImGui::PlotLines(fmt::format("Component {}", i).c_str(), orth.row(i).data(), 
+            orth.cols(), 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         }
       }
       ImGui::End();
