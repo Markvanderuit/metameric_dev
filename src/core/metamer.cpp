@@ -16,6 +16,14 @@ namespace met {
     BSpec r_fundm = g * (g.transpose() * g).inverse() * color_i.matrix();
     Spec  s_fundm = basis_funcs * r_fundm;
 
+    // Given a specific color A under I
+    // and a requested color B under J
+    // and constraints that 0 <= gen(r_fundm + r_black) <= 1
+    // and known r_fundm
+    // solve for r_black
+    
+
+
     auto A_lu = (basis_funcs * black_funcs).eval();
     auto b_l  = (-(basis_funcs * r_fundm)).eval();
     auto b_u  = (Spec(1.f).matrix() - (basis_funcs * r_fundm)).eval();
