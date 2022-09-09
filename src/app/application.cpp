@@ -76,10 +76,10 @@ namespace met {
 
       // Test PCA generation using a bunch of randomly chosen vectors
       SpectralMapping mapp = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
-      std::vector<Spec> pca_input(256);
+      std::vector<Spec> pca_input(16384);
       for (uint i = 0; i < pca_input.size(); ++i)
         pca_input[i] = internal_sd[256 * i];
-      auto pca_basis = pca(pca_input);
+      auto pca_basis = eigen_vectors(covariance_matrix(pca_input));
       auto pca_orth  = orthogonal_complement(mapp.finalize(), pca_basis);
       scheduler.insert_resource<decltype(pca_orth)>("pca_orth", std::move(pca_orth));
       scheduler.insert_resource<BMatrixType>("pca_basis", std::move(pca_basis));

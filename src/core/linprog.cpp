@@ -68,69 +68,55 @@ namespace met {
 
       return unit_dirs;
     }
-
-    template <typename Ty, uint N, uint M>
-    struct LinprogParams {
-      // Components for defining "min C^T x + c0, w.r.t. Ax <=> b"
-      eig::Array<Ty, N, 1> C;
-      eig::Array<Ty, M, N> A;
-      eig::Array<Ty, M, 1> b;
-      Ty                   c0;
-
-      // Relation for Ax <=> b (<=, ==, >=)
-      eig::Array<CGAL::Sign, M, 1> r = CGAL::EQUAL;
-
-      // Upper/lower limits to x, and masks to activate/deactivate them
-      eig::Array<Ty, N, 1> l     = std::numeric_limits<Ty>::min();
-      eig::Array<Ty, N, 1> u     = std::numeric_limits<Ty>::max();
-      eig::Array<bool, N, 1> m_l = false;
-      eig::Array<bool, N, 1> m_u = false;
-    };
-
-    template <typename Ty, uint N, uint M>
-    eig::Matrix<Ty, N, 1> linprog(LinprogParams<Ty, N, M> &params) {
-      met_trace();
-
-      // Linear program type shorthands
-      using LinearCompr    = CGAL::Comparison_result;
-      using LinearFloat    = double; //CGAL::MP_Float; // grumble grumble
-      using LinearOptions  = CGAL::Quadratic_program_options;
-      using LinearSolution = CGAL::Quadratic_program_solution<LinearFloat>;
-      using LinearProgram  = CGAL::Linear_program_from_iterators
-        <Ty**, Ty*, LinearCompr*, bool*, Ty*, bool*, Ty*, Ty*>;
-
-      // Create solver component A in the correct iterable format
-      std::array<Ty*, N> A;
-      std::ranges::transform(params.A.colwise(), A.begin(), [](auto v) { return v.data(); });
-
-      // Construct and solve linear programs for minimization/maximization
-      LinearProgram lp(N, M, A.data(), params.b.data(), params.r.data(), params.m_l.data(), 
-        params.l.data(), params.m_u.data(), params.u.data(), params.C.data(), params.c0);
-      LinearSolution s = CGAL::solve_linear_program(lp, LinearFloat());
-      
-      // fmt::print("linprog solution: valid={}, optimal={}, unbounded={}\n", 
-        // s.is_valid(), s.is_optimal(), s.is_unbounded());
-
-      // Obtain and return result
-      eig::Matrix<Ty, N, 1> v;
-      std::transform(s.variable_values_begin(), s.variable_values_end(), v.begin(), 
-        [](auto f) { return static_cast<Ty>(CGAL::to_double(f)); });
-      return v;
-    }
-
-    template <typename Ty, uint N, uint M>
-    eig::Matrix<Ty, N, 1> linprog(const eig::Array<Ty, N, 1> &C,
-                                  const eig::Array<Ty, M, N> &A,
-                                  const eig::Array<Ty, M, 1> &b,
-                                  const eig::Array<Ty, N, 1> &l = std::numeric_limits<Ty>::min(),
-                                  const eig::Array<Ty, N, 1> &u = std::numeric_limits<Ty>::max()) {
-      met_trace();
-      LinprogParams<Ty, N, M> params = { .C = C, .A = A, .b = b, .l = l, .u = u };
-      params.m_l = (params.l != std::numeric_limits<Ty>::min());
-      params.m_u = (params.u != std::numeric_limits<Ty>::max());
-      return linprog<Ty, N, M>(params);
-    }
   } // namespace detail
+
+  template <typename Ty, uint N, uint M>
+  eig::Matrix<Ty, N, 1> linprog(LPParams<Ty, N, M> &params) {
+    met_trace();
+
+    // Linear program type shorthands
+    using CGComp     = CGAL::Comparison_result;
+    using CGFloat    = double; //CGAL::MP_Float; // grumble grumble
+    using CGOptions  = CGAL::Quadratic_program_options;
+    using CGSolution = CGAL::Quadratic_program_solution<CGFloat>;
+    using CGProgram  = CGAL::Linear_program_from_iterators
+      <Ty**, Ty*, CGComp*, bool*, Ty*, bool*, Ty*, Ty*>;
+    
+    // Create solver components in the correct iterable format
+    std::array<Ty*, N> A;
+    std::ranges::transform(params.A.colwise(), A.begin(), [](auto v) { return v.data(); });
+    auto m_l = (params.l != std::numeric_limits<Ty>::min()).eval();
+    auto m_u = (params.u != std::numeric_limits<Ty>::max()).eval();
+
+    // Construct and solve linear programs for minimization/maximization
+    CGProgram lp(N, M, 
+      A.data(),   params.b.data(), 
+      (CGComp *)  params.r.data(), 
+      m_l.data(), params.l.data(), 
+      m_u.data(), params.u.data(), 
+      params.C.data(), 
+      params.c0);
+    CGSolution s = CGAL::solve_linear_program(lp, CGFloat());
+      
+    // Obtain and return result
+    eig::Matrix<Ty, N, 1> v;
+    std::transform(s.variable_values_begin(), s.variable_values_end(), v.begin(), 
+      [](auto f) { return static_cast<Ty>(CGAL::to_double(f)); });
+    return v;
+  }
+
+  template <typename Ty, uint N, uint M>
+  eig::Matrix<Ty, N, 1> linprog(const eig::Array<Ty, N, 1> &C,
+                                const eig::Array<Ty, M, N> &A,
+                                const eig::Array<Ty, M, 1> &b,
+                                const eig::Array<LPComp, M, 1>
+                                                           &r,
+                                const eig::Array<Ty, N, 1> &l,
+                                const eig::Array<Ty, N, 1> &u) {
+    met_trace();
+    LPParams<Ty, N, M> params = { .C = C, .A = A, .b = b, .r = r, .l = l, .u = u };
+    return linprog<Ty, N, M>(params);
+  }
 
   std::vector<Spec> generate_metamer_boundary(const CMFS &csys_i,
                                               const CMFS &csys_j,
@@ -150,15 +136,15 @@ namespace met {
     #pragma omp parallel
     {
       // Set all linear programming parameters (except C, which depends on our input sample)
-      detail::LinprogParams<float, wavelength_samples, 3> params = {
+      LPParams<float, wavelength_samples, 3> params = {
         .A = csys_i.transpose().eval(), .b = csig_i, 
-        .l = 0.f, .u = 1.f, .m_l = true, .m_u = true
+        .l = 0.f, .u = 1.f
       };
 
       #pragma omp for
       for (int i = 0; i < spectra.size(); ++i) {
         params.C = (U * samples[i].matrix()).eval();
-        spectra[i] = detail::linprog<float, wavelength_samples, 3>(params);
+        spectra[i] = linprog<float, wavelength_samples, 3>(params);
       }
     }
                                                 
@@ -212,11 +198,11 @@ namespace met {
                                     const CMFS &csys, 
                                     const Colr &csig) {
     met_trace();
-    constexpr uint N = 16;                         // Nr. of basis functions used
+    constexpr uint K = 16;                         // Nr. of basis functions used
     constexpr uint M = 3 + 2 * wavelength_samples; // Nr. of constraints used
 
     // Use right-most eigenvectors as basis functions
-    eig::Matrix<float, wavelength_samples, N> basis = eigen_vectors.rightCols(N);
+    eig::Matrix<float, wavelength_samples, K> basis = eigen_vectors.rightCols(K);
 
     /* // Set up constraints Ax = b
     eig::Matrix<float,      M, N> A_;
@@ -233,13 +219,13 @@ namespace met {
           eig::Matrix<float, wavelength_samples, 1>(0.f);
 
     // Run solver to determine basis function weights
-    detail::LinprogParams<float, N, M> params = {
+    detail::LPParams<float, N, M> params = {
       .C = 0.f, .A = A_, .b = b_, .r = r_
     };
     eig::Matrix<float, N, 1> rho = detail::linprog<float, N, M>(params); */
     
     auto Gamma = (csys.transpose() * basis).eval();
-    eig::Matrix<float, N, 1> rho_ = Gamma.transpose() 
+    eig::Matrix<float, K, 1> rho_ = Gamma.transpose() 
                                   * (Gamma * Gamma.transpose()).inverse() 
                                   * csig.matrix();
 
@@ -262,10 +248,15 @@ namespace met {
   }
 
   Spec generate_spectrum(const CMFS &csys, const Colr &csig) {
-    detail::LinprogParams<float, wavelength_samples, 3> params = {
+    LPParams<float, wavelength_samples, 3> params = {
       .C = 0.f, .A = csys.transpose().eval(), .b = csig,
-      .l = 0.f, .u = 1.f, .m_l = true, .m_u = true
+      .l = 0.f, .u = 1.f
     };
-    return detail::linprog<float, wavelength_samples, 3>(params);
+    return linprog<float, wavelength_samples, 3>(params);
   }
+
+  /* Forward declarations */
+
+  template
+  eig::Matrix<float, 9, 1> linprog<float, 9, 3>(LPParams<float, 9, 3>&);
 } // namespace met

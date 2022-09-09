@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/linprog.hpp>
+#include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
@@ -62,6 +63,7 @@ namespace met {
     auto &i_spect_buffer     = info.get_resource<gl::Buffer>("spectrum_buffer");
     auto &i_color_buffer_map = info.get_resource<std::span<AlColr>>("color_buffer_map");
     auto &i_spect_buffer_map = info.get_resource<std::span<Spec>>("spectrum_buffer_map");
+    auto &e_metamer_mapping  = info.get_resource<MetamerMapping>("gen_spectral_mappings", "metamer_mapping");
 
     // Get relevant application/project data
     auto &knn_grid    = e_app_data.spec_knn_grid;
@@ -69,12 +71,13 @@ namespace met {
     auto &spect_gamut = e_app_data.project_data.spec_gamut;
     auto &mapping     = e_app_data.loaded_mappings.at(0);
     
-    // Spec gen_spec = generate_spectrum_from_basis(pca_basis, mapp_i.finalize(), 0.5f);
-    // Colr gen_colr = mapp_i.finalize().transpose() * gen_spec.matrix();
-      
     // Sample spectra at gamut color positions through a PCA solver stel
+    // std::transform(std::execution::par_unseq, range_iter(color_gamut), spect_gamut.begin(),
+    //   [&](const auto &p) { return generate_spectrum_from_basis(e_pca_bases, mapping.finalize(), p); });
+
     std::transform(std::execution::par_unseq, range_iter(color_gamut), spect_gamut.begin(),
-      [&](const auto &p) { return generate_spectrum_from_basis(e_pca_bases, mapping.finalize(), p); });
+      [&](const auto &p) { return e_metamer_mapping.generate(p, Colr(0.5f)); });
+
 
     // Sample spectra at gamut color positions from the KNN object
     // std::transform(std::execution::par_unseq, range_iter(color_gamut), spect_gamut.begin(),
