@@ -11,45 +11,74 @@ namespace met {
     CMFS csys_i = mapping_i.finalize();
     CMFS csys_j = mapping_j.finalize();
 
+    BCMFS G_i = (csys_i.transpose() * basis_funcs).transpose().eval();
+    BCMFS G_j = (csys_j.transpose() * basis_funcs).transpose().eval();
+
     // Generate fundamental basis function weights
-    BCMFS g = (csys_i.transpose() * basis_funcs).transpose().eval();
-    BSpec r_fundm = g * (g.transpose() * g).inverse() * color_i.matrix();
-    Spec  s_fundm = basis_funcs * r_fundm;
+    BSpec r_fundm;
+    {
+      // r_fundm = G_i * (G_i.transpose() * G_i).inverse() * color_i.matrix();
 
-    // Given a specific color A under I
-    // and a requested color B under J
-    // and constraints that 0 <= gen(r_fundm + r_black) <= 1
-    // and known r_fundm
-    // solve for r_black
-    
+      // Generate color constraints
+      /* 3 x K */ auto A_i = (csys_i.transpose() * basis_funcs).eval();
+      /* 3 x 1 */ auto b_i = color_i;
+      /* 3 x 1 */ auto r_i = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
 
+      // Generate boundary constraints for reflectance spectrum
+      /* N x K */ auto A_lu = basis_funcs;
+      /* N x 1 */ auto b_l = Spec(0.f);
+      /* N x 1 */ auto b_u = Spec(1.f);
+      /* 3 x 1 */ auto r_l = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE);
+      /* 3 x 1 */ auto r_u = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE);
 
-    auto A_lu = (basis_funcs * black_funcs).eval();
-    auto b_l  = (-(basis_funcs * r_fundm)).eval();
-    auto b_u  = (Spec(1.f).matrix() - (basis_funcs * r_fundm)).eval();
-    // auto A_eq = (basis_funcs * black_funcs).eval();
-    // auto b_eq = 
+      // Set up constraint matrices
+      constexpr uint N = wavelength_bases;
+      constexpr uint M = 3 + wavelength_samples + wavelength_samples;
+      auto A = (eig::Matrix<float, M, N>()  << A_i, A_lu, A_lu).finished();
+      auto b = (eig::Matrix<float, M, 1>()  << b_i, b_l, b_u).finished();
+      auto r = (eig::Matrix<LPComp, M, 1>() << r_i, r_l, r_u).finished();
 
-    auto A_equals = (r_fundm.transpose() * black_funcs).eval();
-    // auto A_bounds = basis_funcs * black_funcs;
+      // Set up full set of parameters and solve for alpha
+      LPParams<float, N, M> lp_params { .C = 1.f, .A = A, .b = b, .c0 = 0.f, .r = r };
+      r_fundm = linprog<float, N, M>(lp_params);
+    }
 
-    // Generate (valid, bounded) metameric black weights using linear programming
-    auto A = (csys_i.transpose() * basis_funcs * black_funcs).eval();
-    LPParams<float, wavelength_blacks, 3> lp_params {
-      .C = 0.f, 
-      .A = A, 
-      .b = Colr(0.f), 
-      .r = LPComp::eEQ,
-      .l =-1.f, 
-      .u = 1.f
-    };
-    auto alpha = linprog<float, wavelength_blacks, 3>(lp_params);
+    // Generate metameric black function weights
+    BSpec r_black;
+    {
+      // Generate color constraints for i, j
+      /* 3 x K - 3 */ auto A_i = (csys_i.transpose() * basis_funcs * black_funcs).eval();
+      /* 3 x K - 3 */ auto A_j = (csys_j.transpose() * basis_funcs * black_funcs).eval();
+      /* 3 x 1 */     auto b_i = (color_i - (G_i.transpose() * r_fundm).array()).eval();
+      /* 3 x 1 */     auto b_j = (color_j - (G_j.transpose() * r_fundm).array()).eval();
+      /* 3 x 1 */     auto r_i = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
+      /* 3 x 1 */     auto r_j = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
 
-    // auto  alpha   = eig::Matrix<float, wavelength_bases - 3, 1>::Random();
-    // BSpec r_black = (0.2f * black_funcs * alpha).eval();
-    fmt::print("r_black {}\n", alpha);
+      // Generate boundary constraints for reflectance spectrum
+      /* N x K - 3 */ auto A_lu = (basis_funcs * black_funcs).eval();
+      /* N x 1 */     auto b_l = (-(basis_funcs * r_fundm)).eval();
+      /* N x 1 */     auto b_u = (Spec(1.f).matrix() - (basis_funcs * r_fundm)).eval();
+      /* N x 1 */     auto r_l = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE);
+      /* N x 1 */     auto r_u = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE);
 
-    // Return resulting spectrum by weighting basis functions 
-    return (basis_funcs * (r_fundm)).cwiseMax(0.f).cwiseMin(1.f).eval();
+      // Set up constraints matrices
+      constexpr uint N = wavelength_blacks;
+      constexpr uint M = 3 + 3 + wavelength_samples + wavelength_samples;
+      auto A = (eig::Matrix<float, M, N>()  << A_i, A_j, A_lu, A_lu).finished();
+      auto b = (eig::Matrix<float, M, 1>()  << b_i, b_j, b_l, b_u).finished();
+      auto r = (eig::Matrix<LPComp, M, 1>() << r_i, r_j, r_l, r_u).finished();
+      
+      // Set up full set of parameters and solve for alpha
+      LPParams<float, N, M> lp_params { .C = 0.f, .A = A, .b = b, .c0 = 0.f, .r = r };
+      auto alpha = linprog<float, N, M>(lp_params);
+
+      // Generate metameric black weights from alpha
+      r_black = (black_funcs * alpha).eval();
+    }
+        
+    // Generate spectral distribution by weighting basis functions
+    // Spec s = (basis_funcs * (r_fundm)).cwiseMax(0.f).cwiseMin(1.f).eval();
+    return (basis_funcs * (r_fundm + r_black)); //s.cwiseMax(0.f).cwiseMin(1.f).eval();
+    // return s;
   }
 } // namespace met

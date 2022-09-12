@@ -10,7 +10,6 @@
 #include <metameric/components/views/viewport/task_draw_ocs.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
-#include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <ImGuizmo.h>
@@ -131,6 +130,14 @@ namespace met {
       std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_near_click,
         std::back_inserter(m_gamut_selection_indices));
     }
+
+    // If a single gamut point is selected, share this
+    auto &i_gamut_selection = info.get_resource<int>("gamut_selection");
+    if (m_gamut_selection_indices.size() == 1) {
+      i_gamut_selection = static_cast<int>(m_gamut_selection_indices[0]);
+    } else {
+      i_gamut_selection = -1;
+    }
   }
 
   void ViewportTask::eval_gizmo(detail::TaskEvalInfo &info) {
@@ -184,6 +191,7 @@ namespace met {
       const auto move_selection = m_gamut_selection_indices 
                                 | std::views::transform(detail::i_get(e_rgb_gamut));
       std::ranges::for_each(move_selection, 
+        // [&](auto &p) { p = (p + gamut_transl.array()); });
         [&](auto &p) { p = (p + gamut_transl.array()).min(1.f).max(0.f); });
     }
 
@@ -218,6 +226,7 @@ namespace met {
     // Share resources
     info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
     info.insert_resource<gl::Texture2d3f>("draw_texture", gl::Texture2d3f());
+    info.insert_resource<int>("gamut_selection", -1);
 
     // Add subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),   name() + draw_end_name);

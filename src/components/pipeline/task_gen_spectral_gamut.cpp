@@ -12,6 +12,10 @@
 #include <execution>
 #include <ranges>
 
+// TODO remove
+#include <metameric/components/views/detail/imgui.hpp>
+
+
 namespace met {
   GenSpectralGamutTask::GenSpectralGamutTask(const std::string &name)
   : detail::AbstractTask(name) { }
@@ -75,8 +79,15 @@ namespace met {
     // std::transform(std::execution::par_unseq, range_iter(color_gamut), spect_gamut.begin(),
     //   [&](const auto &p) { return generate_spectrum_from_basis(e_pca_bases, mapping.finalize(), p); });
 
+    // TODO Remove
+    if (ImGui::Begin("Metamer offset debug")) {
+      ImGui::SliderFloat3("Offset", c.data(), -1.f, 1.f);
+      ImGui::End();
+    }
+
+    // Generate spectra at gamut color positions
     std::transform(std::execution::par_unseq, range_iter(color_gamut), spect_gamut.begin(),
-      [&](const auto &p) { return e_metamer_mapping.generate(p, Colr(0.5f)); });
+      [&](const auto &p) { return e_metamer_mapping.generate(p, p + c); });
 
 
     // Sample spectra at gamut color positions from the KNN object

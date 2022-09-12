@@ -16,8 +16,8 @@ namespace met {
     std::vector<Spec> buffer(range_iter(spectra));
     
     // Normalize data
-    std::transform(std::execution::par_unseq, range_iter(buffer), buffer.begin(),
-      [](const auto &s) { return s.matrix().normalized().eval(); });
+    // std::transform(std::execution::par_unseq, range_iter(buffer), buffer.begin(),
+    //   [](const auto &s) { return s.matrix().normalized().eval(); });
 
     // Calculate empirical mean
     Spec mean = std::reduce(std::execution::par_unseq, range_iter(buffer), Spec(0.f),

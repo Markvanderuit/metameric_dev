@@ -28,7 +28,13 @@ namespace met {
 
     // Current mapping and gamut used for rgb->spectral conversion
     std::array<Colr, 4> rgb_gamut;
-    std::array<Spec, 4>  spec_gamut;
+    std::array<Spec, 4> spec_gamut;
+
+    // Per gamut vertex, store
+    // - its position in primary color space
+    // - its position (offset?) in secondary color space
+    // - its selected primary mapping
+    // - its selected secondary mapping
 
     /* Set of names of cmfs/illuminants that together form a spectral mapping */
     struct Mapping {
