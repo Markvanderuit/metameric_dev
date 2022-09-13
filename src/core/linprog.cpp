@@ -285,9 +285,17 @@ namespace met {
   template
   eig::Matrix<float, 9, 1> linprog<float, 9, 68>(LPParams<float, 9, 68>&);
   template
+  eig::Matrix<float, 13, 1> linprog<float, 13, 3>(LPParams<float, 13, 3>&);
+  template
+  eig::Matrix<float, 13, 1> linprog<float, 13, 68>(LPParams<float, 13, 68>&);
+  template
   eig::Matrix<float, 12, 1> linprog<float, 12, 65>(LPParams<float, 12, 65>&);
   template
   eig::Matrix<float, 12, 1> linprog<float, 12, 68>(LPParams<float, 12, 68>&);
+  template
+  eig::Matrix<float, 16, 1> linprog<float, 16, 65>(LPParams<float, 16, 65>&);
+  template
+  eig::Matrix<float, 16, 1> linprog<float, 16, 68>(LPParams<float, 16, 68>&);
   template
   eig::MatrixX<float> linprog<float>(LPParamsX<float>&);
 } // namespace met

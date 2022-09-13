@@ -4,8 +4,6 @@
 
 namespace met {
   class GamutEditorTask : public detail::AbstractTask {
-    // ...
-    
   public:
     GamutEditorTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
