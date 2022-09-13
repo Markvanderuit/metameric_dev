@@ -26,6 +26,8 @@ namespace met {
       // Can't modify the gamut, should modify offsets
       // Colr &c = e_gamut[e_gamut_idx];
       // ImGui::SliderFloat3("Offset", c.data(), -1.f, 1.f);
+      fmt::print("{}\n", e_gamut_idx);
+      ImGui::Text("Hi!");
       ImGui::End();
     }
   }

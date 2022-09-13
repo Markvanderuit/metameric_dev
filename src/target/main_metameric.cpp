@@ -12,7 +12,7 @@ int main() {
   /* try { */
     met::create_application({ .database_path = "database.mat",
                               // .project_path  = "",
-                              .project_path  = "C:/Users/markv/Documents/Drive/Metameric scenes/terrazzo.json",
+                              .project_path  = "C:/Users/mark/Documents/Drive/Metameric scenes/terrazzo.json",
                               .color_mode    = met::AppliationColorMode::eDark });
   /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());

@@ -31,10 +31,11 @@ namespace met {
     std::array<Spec, 4> spec_gamut;
 
     // Per gamut vertex, store
-    // - its position in primary color space
-    // - its position (offset?) in secondary color space
+    // - its position in a primary color space
+    // - its position in a secondary color space
     // - its selected primary mapping
     // - its selected secondary mapping
+    std::array<Colr, 4> rgb_offs = { Colr(0.f), Colr(0.f), Colr(0.f), Colr(0.f) };
 
     /* Set of names of cmfs/illuminants that together form a spectral mapping */
     struct Mapping {
