@@ -26,14 +26,34 @@ namespace met {
     // Relation for Ax <=> b (<=, ==, >=)
     eig::Array<LPComp, M, 1> r = LPComp::eEQ;
 
-    // Upper/lower limits to x, and masks to activate/deactivate them
+    // Upper/lower limits to x
     eig::Array<Ty, N, 1> l     = std::numeric_limits<Ty>::min();
     eig::Array<Ty, N, 1> u     = std::numeric_limits<Ty>::max();
+  };
+
+  template <typename Ty>
+  struct LPParamsX {
+    uint N, M;
+
+    // Components for defining "min C^T x + c0, w.r.t. Ax <=> b"
+    eig::ArrayX<Ty>  C;  /* N x 1 */
+    eig::MatrixX<Ty> A;  /* M x N */
+    eig::ArrayX<Ty>  b;  /* M x 1 */
+    Ty               c0; /* 1 x 1 */
+
+    // Relation for Ax <=> b (<=, ==, >=) 
+    eig::ArrayX<LPComp> r; /* M x 1 */
+
+    // Upper/lower limits to x
+    eig::ArrayX<Ty> l; /* N x 1 */
+    eig::ArrayX<Ty> u; /* N x 1 */
   };
 
   // Solve a linear program using a params object
   template <typename Ty, uint N, uint M>
   eig::Matrix<Ty, N, 1> linprog(LPParams<Ty, N, M> &params);
+  template <typename Ty>
+  eig::MatrixX<Ty>      linprog(LPParamsX<Ty>      &params);
 
   // Solve a linear program using provided data
   template <typename Ty, uint N, uint M>

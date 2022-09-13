@@ -104,6 +104,43 @@ namespace met {
       [](auto f) { return static_cast<Ty>(CGAL::to_double(f)); });
     return v;
   }
+  
+  template <typename Ty>
+  eig::MatrixX<Ty> linprog(LPParamsX<Ty> &params) {
+    met_trace();
+
+    // Linear program type shorthands
+    using CGComp     = CGAL::Comparison_result;
+    using CGFloat    = double; //CGAL::MP_Float; // grumble grumble
+    using CGOptions  = CGAL::Quadratic_program_options;
+    using CGSolution = CGAL::Quadratic_program_solution<CGFloat>;
+    using CGProgram  = CGAL::Linear_program_from_iterators
+      <Ty**, Ty*, CGComp*, bool*, Ty*, bool*, Ty*, Ty*>;
+
+    // Create solver components in the correct iterable format
+    std::vector<Ty*> A(params.N);
+    std::ranges::transform(params.A.colwise(), A.begin(), [](auto v) { return v.data(); });
+    auto m_l = (params.l != std::numeric_limits<Ty>::min()).eval();
+    auto m_u = (params.u != std::numeric_limits<Ty>::max()).eval();
+
+    // Construct and solve linear programs for minimization/maximization
+    CGProgram lp(
+      params.N, params.M, 
+      A.data(),   params.b.data(), 
+      (CGComp *)  params.r.data(), 
+      m_l.data(), params.l.data(), 
+      m_u.data(), params.u.data(), 
+      params.C.data(), 
+      params.c0);
+    // fmt::print("N = {}, M = {}\n", params.N, params.M);
+    // fmt::print("Ar = {}, Ac = {}\n", params.A.rows(), params.A.cols());
+    CGSolution s = CGAL::solve_linear_program(lp, CGFloat());
+    
+    eig::MatrixX<Ty> v(params.N, 1);
+    std::transform(s.variable_values_begin(), s.variable_values_end(), v.data(), 
+      [](auto f) { return static_cast<Ty>(CGAL::to_double(f)); });
+    return v;
+  }
 
   template <typename Ty, uint N, uint M>
   eig::Matrix<Ty, N, 1> linprog(const eig::Array<Ty, N, 1> &C,
@@ -233,20 +270,6 @@ namespace met {
     return (basis * rho_).cwiseMin(1.f).cwiseMax(0.f).eval();
   }
 
-  Spec generate_metameric_black_from_basis(const BMatrixType &eigen_vectors, 
-                                           const CMFS &csys) {
-    met_trace();
-    constexpr uint N = 16;                         // Nr. of basis functions used
-    
-    // Use right-most eigenvectors as basis functions
-    eig::Matrix<float, wavelength_samples, N> basis = eigen_vectors.rightCols(N);
-
-    // auto Gamma  = (csys.transpose() * basis).eval();
-    // auto Gamma_ = BMatrixType::Identity() - (Gamma * (Gamma.transpose() * Gamma).inverse() * Gamma.transpose()).eval();
-
-    return 0.f;
-  }
-
   Spec generate_spectrum(const CMFS &csys, const Colr &csig) {
     LPParams<float, wavelength_samples, 3> params = {
       .C = 0.f, .A = csys.transpose().eval(), .b = csig,
@@ -263,4 +286,8 @@ namespace met {
   eig::Matrix<float, 9, 1> linprog<float, 9, 68>(LPParams<float, 9, 68>&);
   template
   eig::Matrix<float, 12, 1> linprog<float, 12, 65>(LPParams<float, 12, 65>&);
+  template
+  eig::Matrix<float, 12, 1> linprog<float, 12, 68>(LPParams<float, 12, 68>&);
+  template
+  eig::MatrixX<float> linprog<float>(LPParamsX<float>&);
 } // namespace met
