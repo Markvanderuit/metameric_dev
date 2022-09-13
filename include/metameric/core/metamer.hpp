@@ -23,5 +23,10 @@ namespace met {
 
     // Produce a spectral reflectance for the given data
     Spec generate(const Colr &color_i, const Colr &color_j);
+    Spec generate(const std::vector<Colr> &constraints);
   };
+
+  Spec generate(const BBasis         &basis,
+                std::span<const CMFS> systems,
+                std::span<const Colr> signals);
 } // namespace met

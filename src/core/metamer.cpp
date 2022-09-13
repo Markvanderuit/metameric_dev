@@ -1,5 +1,6 @@
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 
 namespace met {
@@ -77,8 +78,101 @@ namespace met {
     }
         
     // Generate spectral distribution by weighting basis functions
-    // Spec s = (basis_funcs * (r_fundm)).cwiseMax(0.f).cwiseMin(1.f).eval();
     return (basis_funcs * (r_fundm + r_black)); //s.cwiseMax(0.f).cwiseMin(1.f).eval();
-    // return s;
+  }
+
+  Spec MetamerMapping::generate(const std::vector<Colr> &constraints) {
+    // Color system spectra
+    CMFS csys_i = mapping_i.finalize();
+    CMFS csys_j = mapping_j.finalize();
+
+    // Generate basis function weights satisfying all constraints
+    BSpec w;
+    {
+      // Generate color constraints
+      auto A_i = (csys_i.transpose() * basis_funcs).eval();
+      auto A_j = (csys_j.transpose() * basis_funcs).eval();
+      auto b_i = constraints[0];
+      auto b_j = constraints[1];
+      auto r_i = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
+      auto r_j = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
+
+      // Generate boundary constraints for reflectance spectrum
+      /* N x K */ auto A_lu = basis_funcs;
+      /* N x 1 */ auto b_l = Spec(0.f);
+      /* N x 1 */ auto b_u = Spec(1.f);
+      /* 3 x 1 */ auto r_l = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE);
+      /* 3 x 1 */ auto r_u = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE);
+      
+      // Set up constraint matrices
+      constexpr uint N = wavelength_bases;
+      constexpr uint M = 3 + wavelength_samples + wavelength_samples;
+      auto A = (eig::Matrix<float, M, N>()  << A_i, A_lu, A_lu).finished();
+      auto b = (eig::Matrix<float, M, 1>()  << b_i, b_l, b_u).finished();
+      auto r = (eig::Matrix<LPComp, M, 1>() << r_i, r_l, r_u).finished();
+
+      // Set up full set of parameters for solving minimized/maximized weights
+      LPParams<float, N, M> lp_params_min { .C = 1.f, .A = A, .b = b, .c0 = 0.f, .r = r };
+      LPParams<float, N, M> lp_params_max { .C =-1.f, .A = A, .b = b, .c0 = 0.f, .r = r };
+
+      // Take average of minimized/maximized spectra
+      w = 0.5f * linprog<float, N, M>(lp_params_min) 
+        + 0.5f * linprog<float, N, M>(lp_params_max);
+    }
+
+    return (basis_funcs * w).eval();
+  }
+  
+  Spec generate(const BBasis         &basis,
+                std::span<const CMFS> systems,
+                std::span<const Colr> signals) {
+    met_trace();
+    debug::check_expr_dbg(systems.size() == signals.size(),
+                          "Color system size not equal to color signal size");
+
+    // Expected matrix sizes
+    constexpr uint N = wavelength_bases;
+    const     uint M = 3 * systems.size() + 2 * wavelength_samples;
+    
+    // Constraints matrices
+    eig::MatrixXf       A(M, N);
+    eig::ArrayXf        b(M);
+    eig::ArrayX<LPComp> r(M);
+
+    // Generate color constraints
+    for (uint i = 0; i < systems.size(); ++i) {
+      A.block<3, wavelength_bases>(3 * i, 0) = (systems[i].transpose() * basis).eval();
+      b.block<3, 1>(3 * i, 0) = signals[i];
+      r.block<3, 1>(3 * i, 0).setConstant(LPComp::eEQ);
+    }
+
+    // Generate boundary constraints
+    const uint offset_l = 3 * systems.size();
+    const uint offset_u = offset_l + wavelength_samples;
+    A.block<wavelength_samples, wavelength_bases>(offset_l, 0) = basis;
+    b.block<wavelength_samples, 1>(offset_l, 0).setZero();
+    r.block<wavelength_samples, 1>(offset_l, 0).setConstant(LPComp::eGE);
+    A.block<wavelength_samples, wavelength_bases>(offset_u, 0) = basis;
+    b.block<wavelength_samples, 1>(offset_u, 0).setOnes();
+    r.block<wavelength_samples, 1>(offset_u, 0).setConstant(LPComp::eLE);
+
+    // Objective matrices for minimization/maximization of x
+    eig::Array<float, N, 1> C_min = 1.f, C_max =-1.f;
+
+    // Upper and lower limits to x are unrestrained
+    eig::Array<float, N, 1> l = std::numeric_limits<float>::min(), u = std::numeric_limits<float>::max();
+
+      // Set up full set of parameters for solving minimized/maximized weights
+    LPParamsX<float> lp_params_min { .N = N, .M = M, .C = C_min, 
+                                     .A = A, .b = b, .c0 = 0.f, 
+                                     .r = r, .l = l, .u = u };
+    LPParamsX<float> lp_params_max { .N = N, .M = M, .C = C_max, 
+                                     .A = A, .b = b, .c0 = 0.f, 
+                                     .r = r, .l = l, .u = u };
+
+    // Take average of minimized/maximized results
+    BSpec w = 0.5f * linprog<float>(lp_params_min) + 0.5f * linprog<float>(lp_params_max);
+
+    return (basis * w).eval();
   }
 } // namespace met
