@@ -12,13 +12,16 @@
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
+#include <metameric/components/misc/task_project_state.hpp>
 
 // Pipeline tasks
-#include <metameric/components/tasks/task_gen_spectral_mappings.hpp>
-#include <metameric/components/tasks/task_gen_spectral_gamut.hpp>
-#include <metameric/components/tasks/task_gen_spectral_texture.hpp>
-#include <metameric/components/tasks/task_gen_ocs.hpp>
-#include <metameric/components/tasks/task_gen_color_mappings.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_mappings.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
+
+// View data tasks
+#include <metameric/components/pipeline/task_gen_color_mappings.hpp>
+#include <metameric/components/pipeline/task_gen_ocs.hpp>
 
 // View tasks
 #include <metameric/components/views/task_error_viewer.hpp>
@@ -179,20 +182,18 @@ namespace met {
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
     scheduler.emplace_task<WindowTask>("window");
+    scheduler.emplace_task<ProjectStateTask>("project_state");
 
     // The following tasks define the color->spectrum uplifting pipeline
     scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");
     scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
 
-    // The following tasks define the metamer set necessities
+    // The following tasks define view data necessities
     scheduler.emplace_task<GenOCSTask>("gen_ocs");
-
-    // The following task defines the spectrum->color output pipeline
-    // (though it mostly spawns subtasks to do so)
     scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
 
-    // The following tasks define UI components and windows
+    // The following tasks define view components and windows
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
     scheduler.emplace_task<GamutEditorTask>("gamut_editor");
@@ -202,7 +203,7 @@ namespace met {
     scheduler.emplace_task<ErrorViewerTask>("error_viewer");
 
     // Insert temporary unimportant tasks
-    submit_schedule_debug(scheduler);
+    // submit_schedule_debug(scheduler);
     
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }

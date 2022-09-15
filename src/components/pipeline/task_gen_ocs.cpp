@@ -1,12 +1,18 @@
-#include <metameric/components/tasks/task_gen_ocs.hpp>
+#include <metameric/components/pipeline/task_gen_ocs.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
+#include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/convex_hull_3.h>
+#include <CGAL/Polyhedron_3.h>
+#include <CGAL/Surface_mesh.h>
+#include <omp.h>
 #include <algorithm>
 #include <random>
 #include <numbers>
@@ -15,12 +21,6 @@
 #include <map>
 #include <ranges>
 #include <set>
-#include <omp.h>
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/convex_hull_3.h>
-#include <CGAL/Polyhedron_3.h>
-#include <CGAL/Surface_mesh.h>
-// #include <libqhullcpp/Qhull.h>
 
 namespace met {
   constexpr uint n_samples = 16384;
@@ -105,113 +105,54 @@ namespace met {
       .size = static_cast<size_t>(n_samples) * sizeof(Spec)
     });
 
+    auto ocs_samples = detail::generate_unit_dirs<6>(128);
+    info.insert_resource<std::vector<eig::Array<float, 6, 1>>>("ocs_samples", std::move(ocs_samples));
+    info.insert_resource<gl::Buffer>("ocs_buffer", gl::Buffer());
+    info.insert_resource<gl::Buffer>("ocs_verts", gl::Buffer());
+    info.insert_resource<gl::Buffer>("ocs_elems", gl::Buffer());
+    info.insert_resource<Colr>("ocs_centr", 0.f);
+
     m_stale = true;
   }
 
   void GenOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Execute once, for now
-    guard(m_stale); 
-    m_stale = false;
+    // Generate OCS texture only on relevant state change
+    auto &e_gamut_idx = info.get_resource<int>("viewport", "gamut_selection");
+    guard(e_gamut_idx >= 0);
 
     // Get shared resources
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings    = e_app_data.loaded_mappings;
-    auto &i_spec_buffer = info.get_resource<gl::Buffer>("spectrum_buffer");
-    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mappings_buffer");
-    auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
+    auto &i_ocs_samples  = info.get_resource<std::vector<eig::Array<float, 6, 1>>>("ocs_samples");
+    auto &e_bases        = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings     = e_app_data.loaded_mappings;
+    auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
+    auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
+    auto &e_gamut_colr   = e_app_data.project_data.gamut_colr_i;
+    auto &e_gamut_spec   = e_app_data.project_data.gamut_spec;
 
-    fmt::print("sizeof mapping = {}\n", sizeof(SpectralMapping));
+    // Obtain color system data
+    CMFS system_i = e_mappings[e_gamut_mapp_i[e_gamut_idx]].finalize(e_gamut_spec[e_gamut_idx]);
+    CMFS system_j = e_mappings[e_gamut_mapp_j[e_gamut_idx]].finalize(e_gamut_spec[e_gamut_idx]);
+    Colr signal_i = e_gamut_colr[e_gamut_idx];
 
-    // Bind buffer resources to ssbo targets
-    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
-    e_mapp_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    i_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+    // Generate metamer set boundary
+    auto boundary = generate_boundary_colr(e_bases.rightCols(wavelength_bases), 
+      system_i, system_j, signal_i, i_ocs_samples);
+    std::vector<AlColr> boundary_al(range_iter(boundary));
 
-    // Dispatch shader to samples optimal spectra on OCS border
-    gl::dispatch_compute(m_dispatch);
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate);
-    
-    // Allocate buffers and transfer data back to client for convex hull generation
-    // auto colr_buffer = i_colr_buffer.map_as<const eig::AlArray3f>(gl::BufferAccessFlags::eMapRead);
-    std::vector<eig::AlArray3f> colr_buffer(n_samples);
-    i_colr_buffer.get_as<eig::AlArray3f>(colr_buffer);
+    // Generate convex hull mesh representatioon of boundary
+    auto ocs_mesh = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(boundary))));
+    Colr ocs_cntr = std::reduce(range_iter(ocs_mesh.vertices), AlColr(0.f), 
+                  [](const auto &a, const auto &b) { return (a + b).eval(); })
+                  / static_cast<float>(ocs_mesh.vertices.size());
 
-    auto avg = std::reduce(std::execution::par_unseq, range_iter(colr_buffer), eig::AlArray3f(0))
-           / static_cast<float>(colr_buffer.size());
-
-    constexpr auto eig_hash = [](const auto &v) {
-      size_t seed = 0;
-      for (size_t i = 0; i < v.size(); ++i) {
-        auto elem = *(v.data() + i);
-        seed ^= std::hash<float>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      }
-      return seed;
-    };
-    constexpr auto eig_compare = [](const auto &a, const auto &b) {
-      return (a < b).any();
-    };
-    std::set<eig::AlArray3f, decltype(eig_compare)> unique_set(range_iter(colr_buffer), eig_compare);
-
-    // Output information about generated positions
-   /*  for (auto &v : colr_buffer) {
-      fmt::print("{}\n", v);
-    } */
-    fmt::print("Average: {}\n", avg);    
-    fmt::print("Unique: {}\n", unique_set.size());    
-
-    // Generate convex hull over output vectors
-    auto mesh = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(colr_buffer));
-    fmt::print("Generated convex hull ({} verts, {} elems)\n", mesh.vertices.size(), mesh.elements.size());
-
-    // Submit data to buffer resources
-    info.emplace_resource<gl::Buffer>("ocs_verts", { .data = cnt_span<const std::byte>(mesh.vertices) });
-    info.emplace_resource<gl::Buffer>("ocs_elems", { .data = cnt_span<const std::byte>(mesh.elements) });
-
-    // Mappings for metamer set generation
-    SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
-    SpectralMapping mapp_j { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
-
-    // Be cool and generate a metamer set boundary on the fly just once
-    // Spec met_input_s = 0.5f;
-    Colr met_input_c = { 0.35f, 0.6f, 0.2f }; /// mapp_i.apply_color(met_input_s);
-    auto met_samples = detail::generate_unit_dirs<6>(10000);
-    auto met_spectra = generate_metamer_boundary(mapp_i.finalize(), mapp_j.finalize(), met_input_c, met_samples); 
-
-    std::vector<Colr> met_boundary(met_spectra.size());
-    std::transform(std::execution::par_unseq, range_iter(met_spectra), met_boundary.begin(),
-      [&](const auto &s) { return mapp_j.apply_color(s); });
-    auto met_mesh = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(met_boundary))));
-
-/*     Colr pos = (met_boundary[32] + met_boundary[1024]) * 0.5f;
-    std::vector<float> weights(met_spectra.size());
-    std::transform(range_iter(met_boundary), weights.begin(),
-      [&](const auto &c) { return std::sqrtf((c - pos).pow(2.f).sum()); });
-    
-    Spec spec_mean = 0.f;
-    for (uint i = 0; i < met_spectra.size(); ++i) {
-      spec_mean += weights[i] * met_spectra[i];
-    }
-    spec_mean /= static_cast<float>(met_spectra.size());
-    fmt::print("Mean: {}\n", spec_mean);
-    fmt::print("Err: {} -> {}\n", pos, mapp_j.apply_color(spec_mean)); */
-
-    Spec spec_mean = std::reduce(std::execution::par_unseq, range_iter(met_spectra), Spec(0.f),
-      [](const auto &a, const auto &b) { return (a + b).eval(); }) / static_cast<float>(met_spectra.size());
-    fmt::print("Generated: {}\n", spec_mean);
-    fmt::print("Producing: {} -> {}\n", mapp_i.apply_color(spec_mean), mapp_j.apply_color(spec_mean));
-
-
-
-    // Generate convex hull over metamer set points
-    fmt::print("Generated convex hull ({} verts, {} elems)\n", met_mesh.vertices.size(), met_mesh.elements.size());
-
-    // Submit data to buffer resources
-    info.emplace_resource<gl::Buffer>("metset_verts", { .data = cnt_span<const std::byte>(met_mesh.vertices) });
-    info.emplace_resource<gl::Buffer>("metset_elems", { .data = cnt_span<const std::byte>(met_mesh.elements) });
+    // Upload to buffer 
+    // TODO no!
+    info.get_resource<Colr>("ocs_centr")        = ocs_cntr;
+    info.get_resource<gl::Buffer>("ocs_verts")  = {{ .data = cnt_span<const std::byte>(ocs_mesh.vertices) }};
+    info.get_resource<gl::Buffer>("ocs_elems")  = {{ .data = cnt_span<const std::byte>(ocs_mesh.elements) }};
+    info.get_resource<gl::Buffer>("ocs_buffer") = {{ .data = cnt_span<const std::byte>(boundary_al) }};
   }
 }

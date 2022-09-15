@@ -18,8 +18,8 @@ namespace met {
     void eval(detail::TaskEvalInfo &info) override {
       // Get externally shared resources
       auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &rgb_gamut  = e_app_data.project_data.rgb_gamut;
-      auto &spec_gamut = e_app_data.project_data.spec_gamut;
+      auto &gamut_colr_i  = e_app_data.project_data.gamut_colr_i;
+      auto &gamut_spec = e_app_data.project_data.gamut_spec;
 
       // Quick temporary window to show nearest spectra in the local grid
       if (ImGui::Begin("Gamut viewer")) {
@@ -28,27 +28,27 @@ namespace met {
 
         // Obtain colors at gamut's point positions
         std::array<Colr, 4> spectra_to_colors;
-        std::ranges::transform(spec_gamut, spectra_to_colors.begin(),
+        std::ranges::transform(gamut_spec, spectra_to_colors.begin(),
           [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }).eval(); });
         
         eig::Array2f plot_size = viewport_size * eig::Array2f(.67f, .125f);
         
         // Plot spectra
-        ImGui::PlotLines("reflectance 0", spec_gamut[0].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 0", gamut_spec[0].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, plot_size);
-        ImGui::ColorEdit3("color 0, coordinates", rgb_gamut[0].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("color 0, coordinates", gamut_colr_i[0].data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("color 0, actual", spectra_to_colors[0].data(), ImGuiColorEditFlags_Float);
-        ImGui::PlotLines("reflectance 1", spec_gamut[1].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 1", gamut_spec[1].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, plot_size);
-        ImGui::ColorEdit3("color 1, coordinates", rgb_gamut[1].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("color 1, coordinates", gamut_colr_i[1].data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("color 1, actual", spectra_to_colors[1].data(), ImGuiColorEditFlags_Float);
-        ImGui::PlotLines("reflectance 2", spec_gamut[2].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 2", gamut_spec[2].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, plot_size);
-        ImGui::ColorEdit3("color 2, coordinates", rgb_gamut[2].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("color 2, coordinates", gamut_colr_i[2].data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("color 2, actual", spectra_to_colors[2].data(), ImGuiColorEditFlags_Float);
-        ImGui::PlotLines("reflectance 3", spec_gamut[3].data(), wavelength_samples, 0,
+        ImGui::PlotLines("reflectance 3", gamut_spec[3].data(), wavelength_samples, 0,
           nullptr, 0.f, 1.f, plot_size);
-        ImGui::ColorEdit3("color 3, coordinates", rgb_gamut[3].data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("color 3, coordinates", gamut_colr_i[3].data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("color 3, actual", spectra_to_colors[3].data(), ImGuiColorEditFlags_Float);
       }
       ImGui::End();

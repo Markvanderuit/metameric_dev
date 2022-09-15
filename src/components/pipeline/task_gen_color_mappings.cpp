@@ -1,6 +1,6 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/components/tasks/task_gen_color_mappings.hpp>
+#include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl_parser/parser.hpp>
 
@@ -36,14 +36,24 @@ namespace met {
       .size  = (size_t) mapping_n * sizeof(eig::AlArray3f),
       .flags = gl::BufferCreateFlags::eMapRead 
     });
+
+    m_init_stale = true;
   }
 
   void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
+    // Generate color texture only on relevant state change
+    auto &e_state_mapp = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
+    auto &e_state_spec = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
+    guard(m_init_stale
+      || e_state_mapp[m_mapping_i] == CacheState::eStale
+      || std::ranges::any_of(e_state_spec, [](auto s) { return s == CacheState::eStale; }));
+    m_init_stale = false;
+
     // Get shared resources
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
-    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mappings_buffer");
+    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "buffer_mapp");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
 
     // Bind buffer resources to ssbo targets

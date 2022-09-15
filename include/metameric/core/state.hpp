@@ -14,7 +14,7 @@ namespace met {
   struct ApplicationData;
 
   /* Save states in which project data can exist */
-  enum class ProjectState {
+  enum class ProjectSaveState {
     eUnloaded, // Project is not currently loaded
     eNew,      // Project has no previous save, is newly created
     eSaved,    // Project has previous save, and has not been modified
@@ -23,36 +23,26 @@ namespace met {
 
   /* Wrapper object to hold saveable project data */
   struct ProjectData {
-    // Default constr. provides sensible default values
-    ProjectData();
-
-    // Current mapping and gamut used for rgb->spectral conversion
-    std::array<Colr, 4> rgb_gamut;
-    std::array<Spec, 4> spec_gamut;
-
-    // Per gamut vertex, store
-    // - its position in a primary color space
-    // - its position in a secondary color space
-    // - its selected primary mapping
-    // - its selected secondary mapping
-    std::array<Colr, 4> rgb_offs = { Colr(0.f), Colr(0.f), Colr(0.f), Colr(0.f) };
-
-    /* Set of names of cmfs/illuminants that together form a spectral mapping */
-    struct Mapping {
-      std::string cmfs;
-      std::string illuminant;
+    /* Set of keys of cmfs/illuminants that together form a spectral mapping */
+    struct Mapp {
+      std::string cmfs, illuminant;
       uint        n_scatters; // stored directly
     };
 
-    // List of named user-loaded or program-provided mappings, illuminants, and cmfs
-    std::vector<std::pair<std::string, Mapping>> mappings;
-    std::vector<std::pair<std::string, CMFS>>    cmfs;
-    std::vector<std::pair<std::string, Spec>>    illuminants;
+    // Default constr. provides sensible default values
+    ProjectData();
 
-    // Given a mapping key, gather loaded data mapping into a SpectralMapping object
-    SpectralMapping load_mapping(const std::string &key) const;
-    CMFS            load_cmfs(const std::string &key) const;
-    Spec            load_illuminant(const std::string &key) const;
+    // Current mappings and gamuts used for rgb->spectral conversion
+    std::array<Colr, 4> gamut_colr_i; // Gamut vertex values under primary color system
+    std::array<Colr, 4> gamut_colr_j; // Gamut vertex values under secondary color system
+    std::array<uint, 4> gamut_mapp_i; // Gamut vertex index of primary color system 
+    std::array<uint, 4> gamut_mapp_j; // Gamut vertex index of secondary color system 
+    std::array<Spec, 4> gamut_spec;   // Resulting metameric spectra given above constraints
+
+    // List of named user-loaded or program-provided mappings, illuminants, and cmfs
+    std::vector<std::pair<std::string, Spec>> illuminants;
+    std::vector<std::pair<std::string, CMFS>> cmfs;
+    std::vector<std::pair<std::string, Mapp>> mappings;
   };
 
   /* Wrapper object to hold a modification to project data */
@@ -60,34 +50,36 @@ namespace met {
     // Short description of performed action
     std::string name;
 
-    // Performed action that is/has been applied
-    std::function<void(ProjectData &)> redo;
+    // Performed action that is/has been applied, and its reverse
+    std::function<void(ProjectData &)> redo, undo;
+  };
 
-    // Action to undo/remove the performed action
-    std::function<void(ProjectData &)> undo;
+  /* States in which project data caches can exist */
+  enum class CacheState {
+    eFresh, // Data cache is up to date
+    eStale  // Data cache is stale
   };
 
   /* Wrapper to hold all major application data */
   struct ApplicationData {
-    /* Project components */
+    /* Project (saved) components */
 
-    fs::path     project_path;
-    ProjectData  project_data;
-    ProjectState project_state = ProjectState::eUnloaded; 
+    fs::path         project_path;
+    ProjectData      project_data;
+    ProjectSaveState project_state = ProjectSaveState::eUnloaded; 
 
     /* History modification components */
 
-    std::vector<ProjectMod> mods;
-    int                     mod_i = -1;
+    std::vector<ProjectMod> mods;       // Stack of project data modifications
+    int                     mod_i = -1; // Index of current last modification
 
-    /* Loaded components */
+    /* Loaded (non-saved) components */
 
-    Texture2d3f                  loaded_texture;  // RGB texture object loaded from project data
-    std::vector<SpectralMapping> loaded_mappings; // Spectral mappings loaded from project data
-    KNNGrid<Spec>                spec_knn_grid;   // Placeholder spectral KNN dataset
-    VoxelGrid<Spec>              spec_vox_grid;   // Placeholder spectral voxel grid
+    Texture2d3f       loaded_texture;  // RGB texture image loaded from project data
+    std::vector<Mapp> loaded_mappings; // Spectral mappings loaded from project data
+    KNNGrid<Spec>     loaded_knn_grid; // Placeholder spectral KNN dataset
 
-    /* Project state handling */
+    /* Project data handling */
     
     // Create a new project and set state to ''new''
     void create(Texture2d3f &&texture);
@@ -102,8 +94,6 @@ namespace met {
     // Unload the current project and set state to 'unloaded'
     void unload();
 
-    /* Project modification handling */
-
     // Apply a modification to project data and set state to 'unsaved'
     void touch(ProjectMod &&mod);
 
@@ -111,9 +101,14 @@ namespace met {
     void redo();
     void undo();
 
-    /* Spectral mapping handling */
-
+    // Reload all relevant mappings/spectra/color systems from underlying project data
     void load_mappings();
+
+  private:
+    // Given a string key, extract mapping/spectrum/color system data from underlying project data
+    Mapp load_mapping(const std::string &key) const;
+    CMFS load_cmfs(const std::string &key) const;
+    Spec load_illuminant(const std::string &key) const;
   };
 
   namespace io {

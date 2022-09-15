@@ -174,8 +174,7 @@ namespace met {
     {
       // Set all linear programming parameters (except C, which depends on our input sample)
       LPParams<float, wavelength_samples, 3> params = {
-        .A = csys_i.transpose().eval(), .b = csig_i, 
-        .l = 0.f, .u = 1.f
+        .A = csys_i.transpose().eval(), .b = csig_i, .l = 0.f, .u = 1.f
       };
 
       #pragma omp for
@@ -279,23 +278,15 @@ namespace met {
   }
 
   /* Forward declarations */
-
+  
   template
-  eig::Matrix<float, 9, 1> linprog<float, 9, 3>(LPParams<float, 9, 3>&);
+  eig::Matrix<float, 7, 1> linprog<float, 7, 65>(LPParams<float, 7, 65>&);
   template
-  eig::Matrix<float, 9, 1> linprog<float, 9, 68>(LPParams<float, 9, 68>&);
+  eig::Matrix<float, 7, 1> linprog<float, 7, 68>(LPParams<float, 7, 68>&);
   template
-  eig::Matrix<float, 13, 1> linprog<float, 13, 3>(LPParams<float, 13, 3>&);
+  eig::Matrix<float, 10, 1> linprog<float, 10, 65>(LPParams<float, 10, 65>&);
   template
-  eig::Matrix<float, 13, 1> linprog<float, 13, 68>(LPParams<float, 13, 68>&);
-  template
-  eig::Matrix<float, 12, 1> linprog<float, 12, 65>(LPParams<float, 12, 65>&);
-  template
-  eig::Matrix<float, 12, 1> linprog<float, 12, 68>(LPParams<float, 12, 68>&);
-  template
-  eig::Matrix<float, 16, 1> linprog<float, 16, 65>(LPParams<float, 16, 65>&);
-  template
-  eig::Matrix<float, 16, 1> linprog<float, 16, 68>(LPParams<float, 16, 68>&);
+  eig::Matrix<float, 10, 1> linprog<float, 10, 68>(LPParams<float, 10, 68>&);
   template
   eig::MatrixX<float> linprog<float>(LPParamsX<float>&);
 } // namespace met

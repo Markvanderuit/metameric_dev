@@ -1,4 +1,4 @@
-#include <metameric/components/tasks/task_gen_spectral_texture.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
@@ -43,14 +43,18 @@ namespace met {
   void GenSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
+    // Generate spectral texture only on relevant state change
+    auto &e_state_spec = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
+    guard(std::ranges::any_of(e_state_spec, [](auto s) { return s == CacheState::eStale; }));
+
     // Get shared resources
     auto &e_app_data      = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_color_gamut_c = e_app_data.project_data.rgb_gamut;
-    auto &e_spect_gamut_s = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spectrum_buffer");
+    auto &e_color_gamut_c = e_app_data.project_data.gamut_colr_i;
+    auto &e_spect_gamut_s = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_spec");
     auto &i_color_texture = info.get_resource<gl::Buffer>("color_buffer");
     auto &i_spect_texture = info.get_resource<gl::Buffer>("spectrum_buffer");
 
-    // Update barycentric coordinate inverse matrix in mapped buffer
+    // Update barycentric coordinate inverse matrix in mapped uniform buffer
     m_bary_map->sub = e_color_gamut_c[3];
     m_bary_map->inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
       << e_color_gamut_c[0] - e_color_gamut_c[3], 

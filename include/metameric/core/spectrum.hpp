@@ -2,6 +2,7 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <compare>
 
 namespace met {
   /* Define metameric's spectral range layout */
@@ -109,23 +110,31 @@ namespace met {
       return finalize(sd).transpose() * sd.matrix();
     }
 
+    // Obtain power by applying this mapping's illuminant
     Spec apply_power(const Spec &sd) const {
       Spec e = illuminant * (n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval());
       return e * sd;
     }
+
+    bool operator==(const SpectralMapping &o) const {
+      return cmfs == o.cmfs && 
+             illuminant.matrix() == o.illuminant.matrix() && 
+             n_scatters == o.n_scatters;
+    }
   };
+  
+  // Shorthand for consistency
+  using Mapp = SpectralMapping;
 
   // Convert a spectral reflectance distr. to a color under a given mapping
   inline
-  Colr reflectance_to_color(const Spec &sd, 
-                             const SpectralMapping &mapping = SpectralMapping()) {
-    return mapping.apply_color(sd);
+  Colr reflectance_to_color(const Spec &sd, const Mapp &m = Mapp()) {
+    return m.apply_color(sd);
   }
 
   inline
-  Spec reflectance_to_power(const Spec &sd,
-                            const SpectralMapping &mapping = SpectralMapping()) {
-    return mapping.apply_power(sd);
+  Spec reflectance_to_power(const Spec &sd, const Mapp &m = Mapp()) {
+    return m.apply_power(sd);
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB

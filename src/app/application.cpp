@@ -45,7 +45,7 @@ namespace met {
 
     void init_schedule(LinearScheduler &scheduler) {
       auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
-      if (app_data.project_state == ProjectState::eSaved) {
+      if (app_data.project_state == ProjectSaveState::eSaved) {
         submit_schedule_main(scheduler);
       } else {
         submit_schedule_empty(scheduler);
@@ -75,7 +75,7 @@ namespace met {
         internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
 
       // Test PCA generation using a bunch of randomly chosen vectors
-      SpectralMapping mapp = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+      Mapp mapp = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
       std::vector<Spec> pca_input(16384);
       for (uint i = 0; i < pca_input.size(); ++i)
         pca_input[i] = internal_sd[256 * i];
@@ -94,42 +94,10 @@ namespace met {
       knn_grid.insert_n(internal_sd, knn_positions);
       knn_grid.retrace_size();
       fmt::print("Constructed KNN grid\n");
-
-      fmt::print("Constructing voxel grid\n");
-      VoxelGrid<Spec> voxel_grid = {{ .grid_size = 16 }};
-
-      // Construct list of voxel grid indices
-      auto grid_view = std::views::iota(0, (int) voxel_grid.size())
-                     | std::views::transform([&](int i) { return voxel_grid.grid_pos_from_index(i); });
-      std::vector<eig::Array3i> grid_pos(voxel_grid.size());
-      std::ranges::copy(grid_view, grid_pos.begin());
-
-      // Fill voxel grid by querying KNN grid at each voxel center and averaging, for now
-      constexpr auto kernel = [](float x) {
-        constexpr float stddev = 1.f;
-        constexpr float alpha = -1.f / (2.f * stddev * stddev);
-        return std::max(0.f, std::exp(alpha * (x * x)));
-      };
-      std::for_each(std::execution::par_unseq, range_iter(grid_pos), [&](const auto &p_i) {
-          auto query_list = knn_grid.query_k_nearest(voxel_grid.pos_from_grid_pos(p_i), 4);
-          
-          Spec v = 0.f;
-          float w = 0.f;
-
-          for (auto &query : query_list) {
-            float f = kernel(query.distance);
-            v += f * query.value;
-            w += f;
-          }
-
-          voxel_grid.at(p_i) = v / std::max(w, 0.00001f);
-      });
-      fmt::print("Constructed voxel grid\n");
-
+      
       // Make resources available through application data object
       auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
-      app_data.spec_knn_grid = std::move(knn_grid);
-      app_data.spec_vox_grid = std::move(voxel_grid);
+      app_data.loaded_knn_grid = std::move(knn_grid);
     }
   } // namespace detail                          
 

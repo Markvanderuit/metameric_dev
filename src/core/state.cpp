@@ -18,18 +18,20 @@ namespace met {
 
   ProjectData::ProjectData() {
     // Provide an initial example gamut for now
-    rgb_gamut = { Colr { .75f, .40f, .25f },
-                  Colr { .68f, .49f, .58f },
-                  Colr { .50f, .58f, .39f },
-                  Colr { .35f, .30f, .34f }};
-    spec_gamut = { 1.f, 1.f, 1.f, 1.f }; // TODO replace with sensible initialization
+    gamut_colr_i = { Colr { .75f, .40f, .25f },
+                     Colr { .68f, .49f, .58f },
+                     Colr { .50f, .58f, .39f },
+                     Colr { .35f, .30f, .34f }};
+    gamut_colr_j = { Colr { .75f, .40f, .25f },
+                     Colr { .68f, .49f, .58f },
+                     Colr { .50f, .58f, .39f },
+                     Colr { .35f, .30f, .34f }};
+    gamut_mapp_i.fill(0);
+    gamut_mapp_j.fill(0);
+    gamut_spec.fill(Spec(0.f));
 
     // Instantiate loaded components with sensible default values
-    mappings = {{" default", { 
-      .cmfs       = "CIE XYZ->sRGB",
-      .illuminant = "D65",
-      .n_scatters = 0 
-    }}};
+    mappings = {{ "default", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}};
     cmfs = {{ "CIE XYZ",       models::cmfs_cie_xyz },
             { "CIE XYZ->sRGB", models::cmfs_srgb    }};
     illuminants = {{ "D65",  models::emitter_cie_d65  },
@@ -38,46 +40,13 @@ namespace met {
                    { "FL11", models::emitter_cie_fl11 }};
   }
 
-  Spec ProjectData::load_illuminant(const std::string &key) const {
-    const auto pred = [&key](auto &p) { return key == p.first; };
-    if (auto i = std::ranges::find_if(illuminants, pred); i != illuminants.end()) {
-      return i->second;
-    } else {
-      // TODO: output a warning or something?
-      return models::emitter_cie_d65;
-    }
-  }
-
-  CMFS ProjectData::load_cmfs(const std::string &key) const {
-    const auto pred = [&key](auto &p) { return key == p.first; };
-    if (auto i = std::ranges::find_if(cmfs, pred); i != cmfs.end()) {
-      return i->second;
-    } else {
-      // TODO: output a warning or something?
-      return models::cmfs_srgb;
-    }
-  }
-
-  SpectralMapping ProjectData::load_mapping(const std::string &key) const {
-    const auto pred = [&key](auto &p) { return key == p.first; };
-    if (auto i = std::ranges::find_if(mappings, pred); i != mappings.end()) {
-      auto &mapping = i->second;
-      return { .cmfs       = load_cmfs(mapping.cmfs),
-               .illuminant = load_illuminant(mapping.illuminant),
-               .n_scatters = mapping.n_scatters };
-    } else {
-      // TODO: output a warning or something?
-      return SpectralMapping();
-    }
-  }
-
   void ApplicationData::create(const fs::path &texture_path) {
     // Forward loaded texture to ApplicationData::create(Texture2d3f &&)
     create(Texture2d3f {{ .path = texture_path }});
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
-    project_state  = ProjectState::eNew;
+    project_state  = ProjectSaveState::eNew;
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
@@ -88,14 +57,14 @@ namespace met {
   }
   
   void ApplicationData::save(const fs::path &save_path) {
-    project_state = ProjectState::eSaved;
+    project_state = ProjectSaveState::eSaved;
     project_path  = io::path_with_ext(save_path, ".json");
     io::save_project(project_path, project_data);
     io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture);
   }
 
   void ApplicationData::load(const fs::path &load_path) {
-    project_state  = ProjectState::eSaved;
+    project_state  = ProjectSaveState::eSaved;
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"));
@@ -116,8 +85,8 @@ namespace met {
     mods.resize(mod_i);
     mods.push_back(mod);   
     
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_state == ProjectSaveState::eSaved) {
+      project_state = ProjectSaveState::eUnsaved;
     }
   }
 
@@ -128,8 +97,8 @@ namespace met {
     mod_i += 1;
     mods[mod_i].redo(project_data);
 
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_state == ProjectSaveState::eSaved) {
+      project_state = ProjectSaveState::eUnsaved;
     }
   }
 
@@ -140,13 +109,13 @@ namespace met {
     mods[mod_i].undo(project_data);
     mod_i -= 1;
 
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_state == ProjectSaveState::eSaved) {
+      project_state = ProjectSaveState::eUnsaved;
     }
   }
 
   void ApplicationData::unload() {
-    project_state = ProjectState::eUnloaded;
+    project_state = ProjectSaveState::eUnloaded;
     project_path  = "";
     project_data  = { };
     loaded_texture  = { };
@@ -158,6 +127,33 @@ namespace met {
   void ApplicationData::load_mappings() {
     loaded_mappings = { };
     std::ranges::transform(project_data.mappings, std::back_inserter(loaded_mappings), 
-      [&](auto &p) { return project_data.load_mapping(p.first); });
+      [&](auto &p) { return load_mapping(p.first); });
+  }
+
+  Spec ApplicationData::load_illuminant(const std::string &key) const {
+    const auto it = std::ranges::find_if(project_data.illuminants, 
+      [&key](auto &p) { return key == p.first; });
+    debug::check_expr_rel(it != project_data.illuminants.end(), 
+      fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
+    return it->second; 
+  }
+
+  CMFS ApplicationData::load_cmfs(const std::string &key) const {
+    const auto it = std::ranges::find_if(project_data.cmfs, 
+      [&key](auto &p) { return key == p.first; });
+    debug::check_expr_rel(it != project_data.cmfs.end(), 
+      fmt::format("Could not load color matching functions from project data; name was \"{}\"", key));
+    return it->second; 
+  }
+
+  Mapp ApplicationData::load_mapping(const std::string &key) const {
+    const auto it = std::ranges::find_if(project_data.mappings, 
+      [&key](auto &p) { return key == p.first; });
+    debug::check_expr_rel(it != project_data.mappings.end(), 
+      fmt::format("Could not load spectral mapping from project data; name was \"{}\"", key));
+    const auto &mapping = it->second;
+    return { .cmfs       = load_cmfs(mapping.cmfs),
+             .illuminant = load_illuminant(mapping.illuminant),
+             .n_scatters = mapping.n_scatters };
   }
 } // namespace met

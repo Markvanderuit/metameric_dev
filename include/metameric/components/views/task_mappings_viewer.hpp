@@ -4,7 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
-#include <metameric/components/tasks/detail/task_texture_resample.hpp>
+#include <metameric/components/pipeline/detail/task_texture_resample.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
 #include <array>

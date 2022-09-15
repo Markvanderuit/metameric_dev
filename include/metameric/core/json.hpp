@@ -14,17 +14,13 @@ namespace met {
     void save_json(const fs::path &path, const json &js, uint indent = 2);
   }
 
-  /* json (de)serializations for SpectralMapping type */
-  void from_json(const json &js, SpectralMapping &v);
-  void to_json(json &js, const SpectralMapping &v);
-
-  /* json (de)serializations for Mapping type */
-  void from_json(const json &js, ProjectData::Mapping &v);
-  void to_json(json &js, const ProjectData::Mapping &v);
-
-  /* json (de)serializations for ProjectData type */
+  /* json (de)serializations for ProjectData type must be declared in met scope*/
   void from_json(const json &js, ProjectData &v);
   void to_json(json &js, const ProjectData &v);
+
+  /* json (de)serializations for ProjectData::Mapp type must be declared in met scope*/
+  void from_json(const json &js, ProjectData::Mapp &v);
+  void to_json(json &js, const ProjectData::Mapp &v);
 } // namespace met
 
 /* json (de)serializations for specific Eigen types must be declared in Eigen scope */

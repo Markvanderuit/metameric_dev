@@ -3,7 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
-#include <metameric/components/tasks/detail/task_texture_from_buffer.hpp>
+#include <metameric/components/pipeline/detail/task_texture_from_buffer.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
@@ -11,6 +11,7 @@
 
 namespace met {
   class GenColorMappingTask : public detail::AbstractTask {
+    bool            m_init_stale;
     uint            m_mapping_i;
     gl::Buffer      m_uniform_buffer;
     gl::Program     m_program;

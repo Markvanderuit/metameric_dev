@@ -81,7 +81,7 @@ namespace met {
     auto &e_mappings = e_app_data.project_data.mappings;
 
     // Define data before/after edit
-    auto redo_pair = std::pair<std::string, ProjectData::Mapping> { m_selected_key, m_selected_mapping };
+    auto redo_pair = std::pair<std::string, ProjectData::Mapp> { m_selected_key, m_selected_mapping };
     auto undo_pair = e_mappings[m_selected_i];
 
     // Register data edit

@@ -5,7 +5,7 @@
 
 namespace met {
   class GenSpectralMappingsTask : public detail::AbstractTask {
-    uint m_mapping_count;
+    uint m_max_maps;
     
   public:
     GenSpectralMappingsTask(const std::string &name);

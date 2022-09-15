@@ -1,5 +1,5 @@
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/components/tasks/detail/task_buffer_to_texture2d.hpp>
+#include <metameric/components/pipeline/detail/task_buffer_to_texture2d.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>

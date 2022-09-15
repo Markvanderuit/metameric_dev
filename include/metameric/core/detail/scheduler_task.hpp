@@ -152,7 +152,23 @@ namespace met::detail {
     }
 
     template <typename T>
+    const T & get_resource(const KeyType &key) const {
+      met_trace();
+      if (auto i = m_task_rsrc_registry.find(key); i != m_task_rsrc_registry.end()) {
+        return i->second->get_as<T>();
+      } else {
+        return get_resource<T>(global_key, key);
+      }
+    }
+
+    template <typename T>
     T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
+      met_trace();
+      return m_appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
+    }
+
+    template <typename T>
+    const T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) const {
       met_trace();
       return m_appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }

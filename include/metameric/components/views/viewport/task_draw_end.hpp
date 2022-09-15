@@ -15,18 +15,15 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
-      auto &e_frame_buffer      = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
-      auto &e_frame_buffer_msaa = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
+      auto &e_draw_texture    = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+      auto &e_frame_buffer    = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
+      auto &e_frame_buffer_ms = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
 
       const auto blit_size = e_draw_texture.size();
       constexpr auto blit_flags = gl::FramebufferMaskFlags::eColor | gl::FramebufferMaskFlags::eDepth;
 
       // Blit color results into the single-sampled framebuffer with attached viewport texture
-      e_frame_buffer_msaa.blit_to(e_frame_buffer, 
-                                  blit_size, eig::Array2u(0u), 
-                                  blit_size, eig::Array2u(0u), 
-                                  blit_flags);
+      e_frame_buffer_ms.blit_to(e_frame_buffer, blit_size, 0u, blit_size, 0u, blit_flags);
     }
   };
 } // namespace met

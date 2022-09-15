@@ -13,44 +13,38 @@ namespace met {
     }
   } // namespace io
 
-  void from_json(const json &js, SpectralMapping &v) {
-    v.cmfs       = js.at("cmfs").get<CMFS>();
-    v.illuminant = js.at("illuminant").get<Spec>();
-    v.n_scatters = js.at("n_scatters").get<uint>();
-  }
-
-  void to_json(json &js, const SpectralMapping &v) {
-    js["cmfs"]       = CMFS(v.cmfs);
-    js["illuminant"] = Spec(v.illuminant);
-    js["n_scatters"] = v.n_scatters;
-  }
-
-  void from_json(const json &js, ProjectData::Mapping &v) {
+  void from_json(const json &js, ProjectData::Mapp &v) {
     v.cmfs       = js.at("cmfs").get<std::string>();
     v.illuminant = js.at("illuminant").get<std::string>();
     v.n_scatters = js.at("n_scatters").get<uint>();
   }
 
-  void to_json(json &js, const ProjectData::Mapping &v) {
+  void to_json(json &js, const ProjectData::Mapp &v) {
     js["cmfs"]       = v.cmfs;
     js["illuminant"] = v.illuminant;
     js["n_scatters"] = v.n_scatters;
   }
 
   void from_json(const json &js, ProjectData &v) {
-    v.rgb_gamut   = js.at("rgb_gamut").get<std::array<Colr, 4>>();
-    v.spec_gamut  = js.at("spec_gamut").get<std::array<Spec, 4>>();
-    v.mappings    = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapping>>>();
-    v.cmfs        = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
-    v.illuminants = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
+    v.gamut_colr_i = js.at("gamut_colr_i").get<std::array<Colr, 4>>();
+    v.gamut_colr_j = js.at("gamut_colr_j").get<std::array<Colr, 4>>();
+    v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::array<uint, 4>>();
+    v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::array<uint, 4>>();
+    v.gamut_spec   = js.at("gamut_spec").get<std::array<Spec, 4>>();
+    v.mappings     = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapp>>>();
+    v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
+    v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
-    js["rgb_gamut"]   = v.rgb_gamut;
-    js["spec_gamut"]  = v.spec_gamut;
-    js["mappings"]    = v.mappings;
-    js["cmfs"]        = v.cmfs;
-    js["illuminants"] = v.illuminants;
+    js["gamut_colr_i"] = v.gamut_colr_i;
+    js["gamut_colr_j"] = v.gamut_colr_j;
+    js["gamut_mapp_i"] = v.gamut_mapp_i;
+    js["gamut_mapp_j"] = v.gamut_mapp_j;
+    js["gamut_spec"]   = v.gamut_spec;
+    js["mappings"]     = v.mappings;
+    js["cmfs"]         = v.cmfs;
+    js["illuminants"]  = v.illuminants;
   }
 } // namespace met
 

@@ -4,10 +4,9 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/viewport/task_draw_begin.hpp>
-#include <metameric/components/views/viewport/task_draw_end.hpp>
 #include <metameric/components/views/viewport/task_draw.hpp>
-#include <metameric/components/views/viewport/task_draw_grid.hpp>
 #include <metameric/components/views/viewport/task_draw_ocs.hpp>
+#include <metameric/components/views/viewport/task_draw_end.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/texture.hpp>
@@ -83,7 +82,7 @@ namespace met {
     // Get shared resources
     auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_rgb_gamut = e_app_data.project_data.rgb_gamut;
+    auto &e_rgb_gamut = e_app_data.project_data.gamut_colr_i;
     auto &io          = ImGui::GetIO();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
@@ -146,7 +145,7 @@ namespace met {
     // Get shared resources
     auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_rgb_gamut = e_app_data.project_data.rgb_gamut;
+    auto &e_rgb_gamut = e_app_data.project_data.gamut_colr_i;
     auto &io          = ImGui::GetIO();
 
     // Range over selected gamut positions
@@ -202,8 +201,8 @@ namespace met {
       // Register data edit as drag finishes
       e_app_data.touch({ 
         .name = "Move gamut points", 
-        .redo = [edit = e_rgb_gamut](auto &data) { data.rgb_gamut = edit; }, 
-        .undo = [edit = m_gamut_prev](auto &data) { data.rgb_gamut = edit; }
+        .redo = [edit = e_rgb_gamut](auto &data) { data.gamut_colr_i = edit; }, 
+        .undo = [edit = m_gamut_prev](auto &data) { data.gamut_colr_i = edit; }
       });
     }
   }
@@ -215,7 +214,7 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    auto &e_rgb_gamut  = info.get_resource<ApplicationData>(global_key, "app_data").project_data.rgb_gamut;
+    auto &e_rgb_gamut  = info.get_resource<ApplicationData>(global_key, "app_data").project_data.gamut_colr_i;
 
     // Store a copy of the initial gamut as previous state
     m_gamut_prev = e_rgb_gamut;
@@ -231,7 +230,7 @@ namespace met {
     // Add subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),   name() + draw_end_name);
     info.emplace_task_after<ViewportDrawTask>(name(),      name() + draw_name);
-    info.emplace_task_after<ViewportDrawOCSTask>(name(),name() + draw_ocs_name);
+    // info.emplace_task_after<ViewportDrawOCSTask>(name(),   name() + draw_ocs_name);
     info.emplace_task_after<ViewportDrawBeginTask>(name(), name() + draw_begin_name);
   }
 
@@ -240,7 +239,7 @@ namespace met {
     
     // Remove subtasks
     info.remove_task(name() + draw_begin_name);
-    info.remove_task(name() + draw_ocs_name);
+    // info.remove_task(name() + draw_ocs_name);
     info.remove_task(name() + draw_name);
     info.remove_task(name() + draw_end_name);
   }

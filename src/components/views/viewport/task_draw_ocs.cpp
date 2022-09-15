@@ -1,7 +1,7 @@
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/viewport/task_draw_ocs.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
