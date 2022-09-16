@@ -16,9 +16,11 @@
 namespace met {
   class DrawOcsTask : public detail::AbstractTask {
     std::string  m_parent;
-    gl::Array    m_array;
     gl::Program  m_program;
-    gl::DrawInfo m_dispatch;
+    gl::Array    m_array_hull;
+    gl::Array    m_array_points;
+    gl::DrawInfo m_dispatch_hull;
+    gl::DrawInfo m_dispatch_points;
     bool         m_stale;
     uint         m_buffer_i;
     
@@ -29,9 +31,6 @@ namespace met {
 
     void init(detail::TaskInitInfo &info) override {
       met_trace_full();
-      
-      // Get externally shared resources
-      auto &e_point_buffer = info.get_resource<gl::Buffer>("gen_ocs", "color_buffer");
 
       // Construct draw components
       m_program = {{ .type = gl::ShaderType::eVertex, 
@@ -60,22 +59,33 @@ namespace met {
         auto &e_ocs_verts  = info.get_resource<gl::Buffer>("gen_ocs", "ocs_verts");
         auto &e_ocs_elems  = info.get_resource<gl::Buffer>("gen_ocs", "ocs_elems");
 
-        m_array = {{
+        // Instantiate vertex array objects
+        m_array_points = {{
+          .buffers = {{ .buffer = &e_ocs_buffer, .index = 0, .stride = sizeof(AlColr) }},
+          .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+        }};
+        m_array_hull = {{
           .buffers = {{ .buffer = &e_ocs_verts, .index = 0, .stride = sizeof(AlColr) }},
           .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
           .elements = &e_ocs_elems
         }};
-        m_dispatch = { .type = gl::PrimitiveType::eTriangles,
-                       .vertex_count = (uint) (e_ocs_elems.size() / sizeof(uint)),
-                       .bindable_array = &m_array,
-                       .bindable_program = &m_program };
+
+        // Instantiate dispatch information
+        m_dispatch_hull = { .type = gl::PrimitiveType::eTriangles,
+                            .vertex_count = (uint) (e_ocs_elems.size() / sizeof(uint)),
+                            .bindable_array = &m_array_hull,
+                            .bindable_program = &m_program };
+        m_dispatch_points = { .type = gl::PrimitiveType::ePoints,
+                              .vertex_count = (uint) (e_ocs_buffer.size() / sizeof(AlColr)),
+                              .bindable_array = &m_array_points,
+                              .bindable_program = &m_program };
 
         m_buffer_i = e_ocs_buffer.object();
         m_stale    = false;
       }
 
       guard(!m_stale);
-      guard(m_dispatch.bindable_array);
+      guard(m_dispatch_hull.bindable_array);
 
       // Get shared resources 
       auto &e_arcball    = info.get_resource<detail::Arcball>(m_parent, "arcball");
@@ -98,11 +108,11 @@ namespace met {
       
       // Update program uniform data
       m_program.uniform("u_model_matrix",  transl.matrix());
-      // m_program.uniform("u_model_matrix",  eig::Matrix4f::Identity().eval());
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
       // Dispatch point draw
-      gl::dispatch_draw(m_dispatch);
+      gl::dispatch_draw(m_dispatch_hull);
+      gl::dispatch_draw(m_dispatch_points);
     }
   };
 } // namespace met

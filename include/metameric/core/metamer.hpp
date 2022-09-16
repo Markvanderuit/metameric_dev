@@ -12,33 +12,17 @@ namespace met {
   using BCMFS  = eig::Matrix<float, wavelength_bases, 3>;
   using BSpec  = eig::Matrix<float, wavelength_bases, 1>;
 
-  /* struct MetamerMapping {
-    // Spectrum->color mappings i and j, and requested signals for each
-    SpectralMapping mapping_i;
-    SpectralMapping mapping_j;
-
-    // Basis functions for spectral fundamentals and metameric blacks
-    BBasis basis_funcs;
-    BBlack black_funcs;
-
-    // Produce a spectral reflectance for the given data
-    Spec generate(const Colr &color_i, const Colr &color_j);
-    Spec generate(const std::vector<Colr> &constraints);
-  }; */
-
   Spec generate(const BBasis         &basis,
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals);
 
-  std::vector<Spec> generate_boundary_spec(const BBasis &basis,
-                                           const CMFS   &system_i,
-                                           const CMFS   &system_j,
-                                           const Colr   &signal_i,
-                                           const std::vector<eig::Array<float, 6, 1>> &samples);
-                                           
-  std::vector<Colr> generate_boundary_colr(const BBasis &basis,
-                                           const CMFS   &system_i,
-                                           const CMFS   &system_j,
-                                           const Colr   &signal_i,
-                                           const std::vector<eig::Array<float, 6, 1>> &samples);
+  std::vector<Colr> generate_boundary_examp(const CMFS &system_i,
+                                            const CMFS &system_j,
+                                            const std::vector<eig::Array<float, 6, 1>> &samples);
+
+  std::vector<Colr> generate_boundary(const BBasis &basis,
+                                      const CMFS   &system_i,
+                                      const CMFS   &system_j,
+                                      const Colr   &signal_i,
+                                      const std::vector<eig::Array<float, 6, 1>> &samples);
 } // namespace met

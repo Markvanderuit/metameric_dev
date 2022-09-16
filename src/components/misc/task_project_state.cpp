@@ -1,9 +1,11 @@
+#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/misc/task_project_state.hpp>
 
 namespace met {
   namespace detail {
     constexpr 
     auto compare_and_set(const auto &a, auto &b, auto &state) {
+      met_trace();
       if (b != a) {
         b = a;
         state = CacheState::eStale;
@@ -14,6 +16,7 @@ namespace met {
 
     constexpr 
     auto compare_and_set_v(const auto &a, auto &b, auto &state) {
+      met_trace();
       if (!b.isApprox(a)) {
         b = a;
         state = CacheState::eStale;
@@ -27,6 +30,8 @@ namespace met {
   : detail::AbstractTask(name) { }
 
   void ProjectStateTask::init(detail::TaskInitInfo &info) {
+    met_trace();
+
     GamutArray gamut_stale = { CacheState::eStale, CacheState::eStale, CacheState::eStale, CacheState::eStale };
 
     // Get shared resources
@@ -44,6 +49,8 @@ namespace met {
   }
 
   void ProjectStateTask::eval(detail::TaskEvalInfo &info) {
+    met_trace();
+    
     // Get shared resources
     const auto &e_app_data      = info.get_resource<ApplicationData>(global_key, "app_data");
     const auto &e_proj_data     = e_app_data.project_data;
@@ -57,7 +64,7 @@ namespace met {
     auto &i_state_mappings      = info.get_resource<std::vector<CacheState>>("mappings");
 
     // Check and set cache states for gamut vertex data to either fresh or stale
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (int i = 0; i < 4; ++i) {
       detail::compare_and_set_v(e_proj_data.gamut_colr_i[i], m_gamut_colr_i[i], i_state_gamut_colr_i[i]);
       detail::compare_and_set_v(e_proj_data.gamut_colr_j[i], m_gamut_colr_j[i], i_state_gamut_colr_j[i]);

@@ -6,125 +6,6 @@
 #include <execution>
 
 namespace met {
-  // Spec MetamerMapping::generate(const Colr &color_i,
-  //                               const Colr &color_j) {
-  //   met_trace();
-
-  //   // Color system spectra
-  //   CMFS csys_i = mapping_i.finalize();
-  //   CMFS csys_j = mapping_j.finalize();
-
-  //   BCMFS G_i = (csys_i.transpose() * basis_funcs).transpose().eval();
-  //   BCMFS G_j = (csys_j.transpose() * basis_funcs).transpose().eval();
-
-  //   // Generate fundamental basis function weights
-  //   BSpec r_fundm;
-  //   {
-  //     // r_fundm = G_i * (G_i.transpose() * G_i).inverse() * color_i.matrix();
-
-  //     // Generate color constraints
-  //     /* 3 x K */ auto A_i = (csys_i.transpose() * basis_funcs).eval();
-  //     /* 3 x 1 */ auto b_i = color_i;
-  //     /* 3 x 1 */ auto r_i = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
-
-  //     // Generate boundary constraints for reflectance spectrum
-  //     /* N x K */ auto A_lu = basis_funcs;
-  //     /* N x 1 */ auto b_l = Spec(0.f);
-  //     /* N x 1 */ auto b_u = Spec(1.f);
-  //     /* 3 x 1 */ auto r_l = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE);
-  //     /* 3 x 1 */ auto r_u = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE);
-
-  //     // Set up constraint matrices
-  //     constexpr uint N = wavelength_bases;
-  //     constexpr uint M = 3 + wavelength_samples + wavelength_samples;
-  //     auto A = (eig::Matrix<float, M, N>()  << A_i, A_lu, A_lu).finished();
-  //     auto b = (eig::Matrix<float, M, 1>()  << b_i, b_l, b_u).finished();
-  //     auto r = (eig::Matrix<LPComp, M, 1>() << r_i, r_l, r_u).finished();
-
-  //     // Set up full set of parameters and solve for alpha
-  //     LPParams<float, N, M> lp_params { .C = 1.f, .A = A, .b = b, .c0 = 0.f, .r = r };
-  //     r_fundm = linprog<float, N, M>(lp_params);
-  //   }
-
-  //   // Generate metameric black function weights
-  //   BSpec r_black;
-  //   {
-  //     // Generate color constraints for i, j
-  //     /* 3 x K - 3 */ auto A_i = (csys_i.transpose() * basis_funcs * black_funcs).eval();
-  //     /* 3 x K - 3 */ auto A_j = (csys_j.transpose() * basis_funcs * black_funcs).eval();
-  //     /* 3 x 1 */     auto b_i = (color_i - (G_i.transpose() * r_fundm).array()).eval();
-  //     /* 3 x 1 */     auto b_j = (color_j - (G_j.transpose() * r_fundm).array()).eval();
-  //     /* 3 x 1 */     auto r_i = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
-  //     /* 3 x 1 */     auto r_j = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
-
-  //     // Generate boundary constraints for reflectance spectrum
-  //     /* N x K - 3 */ auto A_lu = (basis_funcs * black_funcs).eval();
-  //     /* N x 1 */     auto b_l = (-(basis_funcs * r_fundm)).eval();
-  //     /* N x 1 */     auto b_u = (Spec(1.f).matrix() - (basis_funcs * r_fundm)).eval();
-  //     /* N x 1 */     auto r_l = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE);
-  //     /* N x 1 */     auto r_u = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE);
-
-  //     // Set up constraints matrices
-  //     constexpr uint N = wavelength_blacks;
-  //     constexpr uint M = 3 + 3 + wavelength_samples + wavelength_samples;
-  //     auto A = (eig::Matrix<float, M, N>()  << A_i, A_j, A_lu, A_lu).finished();
-  //     auto b = (eig::Matrix<float, M, 1>()  << b_i, b_j, b_l, b_u).finished();
-  //     auto r = (eig::Matrix<LPComp, M, 1>() << r_i, r_j, r_l, r_u).finished();
-      
-  //     // Set up full set of parameters and solve for alpha
-  //     LPParams<float, N, M> lp_params { .C = 0.f, .A = A, .b = b, .c0 = 0.f, .r = r };
-  //     auto alpha = linprog<float, N, M>(lp_params);
-
-  //     // Generate metameric black weights from alpha
-  //     r_black = (black_funcs * alpha).eval();
-  //   }
-        
-  //   // Generate spectral distribution by weighting basis functions
-  //   return (basis_funcs * (r_fundm + r_black)); //s.cwiseMax(0.f).cwiseMin(1.f).eval();
-  // }
-
-  // Spec MetamerMapping::generate(const std::vector<Colr> &constraints) {
-  //   // Color system spectra
-  //   CMFS csys_i = mapping_i.finalize();
-  //   CMFS csys_j = mapping_j.finalize();
-
-  //   // Generate basis function weights satisfying all constraints
-  //   BSpec w;
-  //   {
-  //     // Generate color constraints
-  //     auto A_i = (csys_i.transpose() * basis_funcs).eval();
-  //     auto A_j = (csys_j.transpose() * basis_funcs).eval();
-  //     auto b_i = constraints[0];
-  //     auto b_j = constraints[1];
-  //     auto r_i = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
-  //     auto r_j = eig::Matrix<LPComp, 3, 1>(LPComp::eEQ);
-
-  //     // Generate boundary constraints for reflectance spectrum
-  //     /* N x K */ auto A_lu = basis_funcs;
-  //     /* N x 1 */ auto b_l = Spec(0.f);
-  //     /* N x 1 */ auto b_u = Spec(1.f);
-  //     /* 3 x 1 */ auto r_l = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE);
-  //     /* 3 x 1 */ auto r_u = eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE);
-      
-  //     // Set up constraint matrices
-  //     constexpr uint N = wavelength_bases;
-  //     constexpr uint M = 3 + wavelength_samples + wavelength_samples;
-  //     auto A = (eig::Matrix<float, M, N>()  << A_i, A_lu, A_lu).finished();
-  //     auto b = (eig::Matrix<float, M, 1>()  << b_i, b_l, b_u).finished();
-  //     auto r = (eig::Matrix<LPComp, M, 1>() << r_i, r_l, r_u).finished();
-
-  //     // Set up full set of parameters for solving minimized/maximized weights
-  //     LPParams<float, N, M> lp_params_min { .C = 1.f, .A = A, .b = b, .c0 = 0.f, .r = r };
-  //     LPParams<float, N, M> lp_params_max { .C =-1.f, .A = A, .b = b, .c0 = 0.f, .r = r };
-
-  //     // Take average of minimized/maximized spectra
-  //     w = 0.5f * linprog<float, N, M>(lp_params_min) 
-  //       + 0.5f * linprog<float, N, M>(lp_params_max);
-  //   }
-
-  //   return (basis_funcs * w).eval();
-  // }
-  
   Spec generate(const BBasis         &basis,
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals) {
@@ -177,23 +58,41 @@ namespace met {
 
     return (basis * w).eval();
   }
+
   
-  std::vector<Spec> generate_boundary_spec(const BBasis                               &basis,
-                                           const CMFS                                 &system_i,
-                                           const CMFS                                 &system_j,
-                                           const Colr                                 &signal_i,
-                                           const std::vector<eig::Array<float, 6, 1>> &samples) {
+  std::vector<Colr> generate_boundary_examp(const CMFS &system_i,
+                                            const CMFS &system_j,
+                                            const std::vector<eig::Array<float, 6, 1>> &samples) {
     met_trace();
 
     // Obtain six orthogonal spectra through SVD of dual color system matrix
     auto S = (eig::Matrix<float, wavelength_samples, 6>() << system_i, system_j).finished();
     eig::JacobiSVD<decltype(S)> svd(S, eig::ComputeThinU | eig::ComputeThinV);
     auto U  = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
-    auto U_ = (U.transpose() * basis).eval(); // multiplied by basis  functions
-
+    
+    std::vector<Colr> output(samples.size());
+    std::transform(std::execution::par_unseq, range_iter(samples), output.begin(),
+      [&](const auto &sample) {
+        return (system_i.transpose() * U * sample.matrix()).eval();
+      });
+    return output;
+  }
+  
+  std::vector<Colr> generate_boundary(const BBasis                               &basis,
+                                      const CMFS                                 &system_i,
+                                      const CMFS                                 &system_j,
+                                      const Colr                                 &signal_i,
+                                      const std::vector<eig::Array<float, 6, 1>> &samples) {
+    met_trace();
+    
     // Fixed color system spectra for basis parameters
     auto csys_i = (system_i.transpose() * basis).eval();
     auto csys_j = (system_j.transpose() * basis).eval();
+
+    // Obtain orthogonal basis functions through SVD of dual color system matrix
+    auto S = (eig::Matrix<float, wavelength_bases, 6>() << csys_i.transpose(), csys_j.transpose()).finished();
+    eig::JacobiSVD<decltype(S)> svd(S, eig::ComputeThinU | eig::ComputeThinV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
     // Constraints matrices
     constexpr uint N = wavelength_bases, M = 3 + 2 * wavelength_samples;
@@ -205,33 +104,19 @@ namespace met {
          eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE)).finished();
     
     // Return object
-    std::vector<Spec> output(samples.size());
+    std::vector<Colr> output(samples.size());
 
     // Parallel solve for basis function weights defining OCS boundary spectra
     #pragma omp parallel
     {
-      LPParams<float, N, M> params = { .A = A, .b = b, .c0 = 0.f, .r = r, };
-
+      LPParams<float, N, M> params = { .A = A, .b = b, .c0 = 0.f, .r = r };
       #pragma omp for
       for (int i = 0; i < samples.size(); ++i) {
-        params.C = (U_.transpose() * samples[i].matrix()).eval();
-        output[i] = (basis * linprog<float, N, M>(params)).eval();
+        params.C = (U * samples[i].matrix()).eval();
+        output[i] = (csys_j * linprog<float, N, M>(params)).eval();
       }
     }
 
-    return output;
-  }
-
-  std::vector<Colr> generate_boundary_colr(const BBasis                               &basis,
-                                           const CMFS                                 &system_i,
-                                           const CMFS                                 &system_j,
-                                           const Colr                                 &signal_i,
-                                           const std::vector<eig::Array<float, 6, 1>> &samples) {
-    met_trace();
-    std::vector<Spec> input = generate_boundary_spec(basis, system_i, system_j, signal_i, samples);
-    std::vector<Colr> output(samples.size());
-    std::transform(std::execution::par_unseq, range_iter(input), output.begin(),
-      [&](const auto &s) { return (system_j.transpose() * s.matrix()).eval(); });
     return output;
   }
 } // namespace met

@@ -74,7 +74,7 @@ namespace met {
     auto &e_state_spec     = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
 
     // Generate spectra at gamut color positions across four threads
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
       // Ensure that we only continue if gamut data or mapping data is in any way stale
       const uint mapp_i = e_proj_data.gamut_mapp_i[i], mapp_j = e_proj_data.gamut_mapp_j[i];
