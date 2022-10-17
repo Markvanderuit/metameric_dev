@@ -175,7 +175,11 @@ namespace met {
     }); */
 
     // Get shared resources
-    auto &e_basis = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &e_basis    = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    // auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    // auto &e_mappings     = e_app_data.loaded_mappings;
+    // auto &e_gamut_mapp_i = e_mappings[0];
+    // auto &e_gamut_mapp_j = e_mappings[1];
 
     // Generate a unit sphere as a test mesh
     // auto points_unal = detail::generate_unit_dirs<3>(256);
@@ -191,6 +195,7 @@ namespace met {
     CMFS cmfs_i = mapp_i.finalize();
     CMFS cmfs_j = mapp_j.finalize();
     Colr signal = 0.5f;
+
     // auto boundary = generate_boundary_examp(cmfs_i, cmfs_j, unit_samples);
     auto boundary = generate_boundary(basis, cmfs_i, cmfs_j, signal, unit_samples);
 

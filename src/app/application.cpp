@@ -45,7 +45,7 @@ namespace met {
 
     void init_schedule(LinearScheduler &scheduler) {
       auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
-      if (app_data.project_state == ProjectSaveState::eSaved) {
+      if (app_data.project_state == ProjectState::eSaved) {
         submit_schedule_main(scheduler);
       } else {
         submit_schedule_empty(scheduler);

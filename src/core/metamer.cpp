@@ -72,9 +72,7 @@ namespace met {
     
     std::vector<Colr> output(samples.size());
     std::transform(std::execution::par_unseq, range_iter(samples), output.begin(),
-      [&](const auto &sample) {
-        return (system_i.transpose() * U * sample.matrix()).eval();
-      });
+      [&](const auto &sample) { return (system_i.transpose() * U * sample.matrix()).eval(); });
     return output;
   }
   
@@ -103,7 +101,7 @@ namespace met {
          eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE),
          eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE)).finished();
     
-    // Return object
+    // Define return object
     std::vector<Colr> output(samples.size());
 
     // Parallel solve for basis function weights defining OCS boundary spectra

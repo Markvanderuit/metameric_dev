@@ -46,7 +46,7 @@ namespace met {
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
-    project_state  = ProjectSaveState::eNew;
+    project_state  = ProjectState::eNew;
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
@@ -57,14 +57,14 @@ namespace met {
   }
   
   void ApplicationData::save(const fs::path &save_path) {
-    project_state = ProjectSaveState::eSaved;
+    project_state = ProjectState::eSaved;
     project_path  = io::path_with_ext(save_path, ".json");
     io::save_project(project_path, project_data);
     io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture);
   }
 
   void ApplicationData::load(const fs::path &load_path) {
-    project_state  = ProjectSaveState::eSaved;
+    project_state  = ProjectState::eSaved;
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"));
@@ -85,8 +85,8 @@ namespace met {
     mods.resize(mod_i);
     mods.push_back(mod);   
     
-    if (project_state == ProjectSaveState::eSaved) {
-      project_state = ProjectSaveState::eUnsaved;
+    if (project_state == ProjectState::eSaved) {
+      project_state = ProjectState::eUnsaved;
     }
   }
 
@@ -97,8 +97,8 @@ namespace met {
     mod_i += 1;
     mods[mod_i].redo(project_data);
 
-    if (project_state == ProjectSaveState::eSaved) {
-      project_state = ProjectSaveState::eUnsaved;
+    if (project_state == ProjectState::eSaved) {
+      project_state = ProjectState::eUnsaved;
     }
   }
 
@@ -109,13 +109,13 @@ namespace met {
     mods[mod_i].undo(project_data);
     mod_i -= 1;
 
-    if (project_state == ProjectSaveState::eSaved) {
-      project_state = ProjectSaveState::eUnsaved;
+    if (project_state == ProjectState::eSaved) {
+      project_state = ProjectState::eUnsaved;
     }
   }
 
   void ApplicationData::unload() {
-    project_state = ProjectSaveState::eUnloaded;
+    project_state = ProjectState::eUnloaded;
     project_path  = "";
     project_data  = { };
     loaded_texture  = { };

@@ -8,22 +8,23 @@
 #include <utility>
 
 namespace met {
-  // FWD
-  struct ProjectData;
-  struct ProjectModification;
-  struct ApplicationData;
-
   /* Save states in which project data can exist */
-  enum class ProjectSaveState {
+  enum class ProjectState {
     eUnloaded, // Project is not currently loaded
     eNew,      // Project has no previous save, is newly created
     eSaved,    // Project has previous save, and has not been modified
     eUnsaved,  // Project has previous save, and has been modified
   };
 
+  /* Cache states in which project data values can exist throughout the program pipeline */
+  enum class CacheState {
+    eFresh, // Data is up to date
+    eStale  // Data is stale, pipeline should recompute dependent values
+  };
+
   /* Wrapper object to hold saveable project data */
   struct ProjectData {
-    /* Set of keys of cmfs/illuminants that together form a spectral mapping */
+    /* Set of keys of cmfs/illuminants that together describe a stored spectral mapping */
     struct Mapp {
       std::string cmfs, illuminant;
       uint        n_scatters; // stored directly
@@ -35,8 +36,8 @@ namespace met {
     // Current mappings and gamuts used for rgb->spectral conversion
     std::array<Colr, 4> gamut_colr_i; // Gamut vertex values under primary color system
     std::array<Colr, 4> gamut_colr_j; // Gamut vertex values under secondary color system
-    std::array<uint, 4> gamut_mapp_i; // Gamut vertex index of primary color system 
-    std::array<uint, 4> gamut_mapp_j; // Gamut vertex index of secondary color system 
+    std::array<uint, 4> gamut_mapp_i; // Gamut vertex index of selected primary color system 
+    std::array<uint, 4> gamut_mapp_j; // Gamut vertex index of selected secondary color system 
     std::array<Spec, 4> gamut_spec;   // Resulting metameric spectra given above constraints
 
     // List of named user-loaded or program-provided mappings, illuminants, and cmfs
@@ -47,37 +48,31 @@ namespace met {
 
   /* Wrapper object to hold a modification to project data */
   struct ProjectMod {
-    // Short description of performed action
+    // Short name of performed action for undo/redo view
     std::string name;
 
-    // Performed action that is/has been applied, and its reverse
+    // Applied modification (and its reverse), stored in a function capture
     std::function<void(ProjectData &)> redo, undo;
-  };
-
-  /* States in which project data caches can exist */
-  enum class CacheState {
-    eFresh, // Data cache is up to date
-    eStale  // Data cache is stale
   };
 
   /* Wrapper to hold all major application data */
   struct ApplicationData {
     /* Project (saved) components */
 
-    fs::path         project_path;
-    ProjectData      project_data;
-    ProjectSaveState project_state = ProjectSaveState::eUnloaded; 
+    fs::path     project_path;
+    ProjectData  project_data;
+    ProjectState project_state = ProjectState::eUnloaded; 
 
     /* History modification components */
 
     std::vector<ProjectMod> mods;       // Stack of project data modifications
-    int                     mod_i = -1; // Index of current last modification
+    int                     mod_i = -1; // Index of current last modification for undo/redo 
 
     /* Loaded (non-saved) components */
 
-    Texture2d3f       loaded_texture;  // RGB texture image loaded from project data
-    std::vector<Mapp> loaded_mappings; // Spectral mappings loaded from project data
-    KNNGrid<Spec>     loaded_knn_grid; // Placeholder spectral KNN dataset
+    Texture2d3f       loaded_texture;  // RGB texture image extracted from project data
+    std::vector<Mapp> loaded_mappings; // Spectral mappings extracted from project data
+    KNNGrid<Spec>     loaded_knn_grid; // Placeholder spectral KNN dataset // TODO remove
 
     /* Project data handling */
     

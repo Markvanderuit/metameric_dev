@@ -49,7 +49,7 @@ namespace met {
       // Compute viewport size minus ImGui's tab bars etc
       // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       eig::Array2f texture_size  = viewport_size.x();
       eig::Array2f plot_size     = viewport_size * eig::Array2f(.67f, .1f);
 
@@ -68,17 +68,17 @@ namespace met {
         auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
         auto &e_mappings     = e_app_data.loaded_mappings;
 
-        // Obtain colors at gamut's point positions
-        std::array<Colr, 4> spectra_to_colors;
-        std::ranges::transform(e_gamut_spec, spectra_to_colors.begin(),
-          [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }).eval(); });
+        // // Compute colors at gamut's point positions
+        // std::array<Colr, 4> spectra_to_colors;
+        // std::ranges::transform(e_gamut_spec, spectra_to_colors.begin(),
+        //   [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }).eval(); });
           
-        // Render selected reflectance and colors
-        Spec &gamut_spec = e_gamut_spec[e_gamut_idx];
+        // Obtain selected reflectance and colors
+        Spec &gamut_spec   = e_gamut_spec[e_gamut_idx];
         Colr &gamut_colr_i = e_gamut_colr[e_gamut_idx];
-        Colr &gamut_offs = e_gamut_offs[e_gamut_idx];
+        Colr &gamut_offs   = e_gamut_offs[e_gamut_idx];
 
-        // Show actual resulting color and error
+        // Compute actual resulting color and error
         Colr gamut_actual = e_mappings[e_gamut_mapp_i[e_gamut_idx]].apply_color(gamut_spec);
         Colr gamut_error  = (gamut_actual - gamut_colr_i).abs();
 
