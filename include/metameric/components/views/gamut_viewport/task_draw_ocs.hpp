@@ -40,8 +40,6 @@ namespace met {
 
       // Set non-changing uniform values
       m_program.uniform("u_alpha", .66f);
-
-      m_stale = true;
     }
     
     void eval(detail::TaskEvalInfo &info) override {
@@ -84,6 +82,7 @@ namespace met {
         m_stale    = false;
       }
 
+      // Continue only if draw data is no longer stale
       guard(!m_stale);
       guard(m_dispatch_hull.bindable_array);
 

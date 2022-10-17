@@ -146,6 +146,147 @@ namespace met {
     };
     constexpr auto matrix_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
 
+    detail::BasicAlMesh generate_uv_sphere(const uint subdivision_depth = 4) {
+      met_trace();
+
+      using Vert = detail::BasicAlMesh::VertType;
+      using Elem = detail::BasicAlMesh::ElemType;
+      using VMap  = std::unordered_map<Vert, uint, decltype(matrix_hash), decltype(matrix_equal)>;
+
+      // Initial mesh describes an octahedron
+      std::vector<Vert> verts = {
+        Vert(-1.f, 0.f, 0.f ), Vert( 0.f,-1.f, 0.f ), Vert( 0.f, 0.f,-1.f ),
+        Vert( 1.f, 0.f, 0.f ), Vert( 0.f, 1.f, 0.f ), Vert( 0.f, 0.f, 1.f )
+      };
+      std::vector<Elem> elems = {
+        Elem(0, 1, 2), Elem(3, 2, 1), Elem(0, 5, 1), Elem(3, 1, 5),
+        Elem(0, 4, 5), Elem(3, 5, 4), Elem(0, 2, 4), Elem(3, 4, 2)
+      };
+
+      // Perform loop subdivision several times
+      for (uint d = 0; d < subdivision_depth; ++d) {        
+        // New elements are inserted in this larger vector
+        std::vector<Elem> subdiv_elems(4 * elems.size());
+
+        // Identical vertices (of which there are a lot) are first tested in this map
+        VMap verts_map;
+
+        #pragma omp parallel for
+        for (int e = 0; e < elems.size(); ++e) {
+          // Obtain old vertex indices
+          const auto &elem = elems[e];  
+          const uint i = elem.x(), j = elem.y(), k = elem.z();
+          
+          // Compute edge midpoints, lifted to the unit sphere
+          const Vert mid_a = (0.5f * (verts[i] + verts[j])).matrix().normalized(),
+                     mid_b = (0.5f * (verts[j] + verts[k])).matrix().normalized(),
+                     mid_c = (0.5f * (verts[k] + verts[i])).matrix().normalized();
+
+          // Define new vertex indices
+          uint a, b, c;
+
+          #pragma omp critical
+          { // Insert lifted edge midpoints if they don't exist yet
+            if (auto it = verts_map.find(mid_a); it != verts_map.end()) {
+              a = it->second;
+            } else {
+              a = verts.size();
+              verts.push_back(mid_a);
+              verts_map.emplace(mid_a, a);
+            }
+            if (auto it = verts_map.find(mid_b); it != verts_map.end()) {
+              b = it->second;
+            } else {
+              b = verts.size();
+              verts.push_back(mid_b);
+              verts_map.emplace(mid_b, b);
+            }
+            if (auto it = verts_map.find(mid_c); it != verts_map.end()) {
+              c = it->second;
+            } else {
+              c = verts.size();
+              verts.push_back(mid_c);
+              verts_map.emplace(mid_c, c);
+            }
+          }
+          
+          // Insert newly subdivided elements
+          subdiv_elems[4 * e]     = Elem(i, a, c);
+          subdiv_elems[4 * e + 1] = Elem(a, j, b);
+          subdiv_elems[4 * e + 2] = Elem(b, k, c);
+          subdiv_elems[4 * e + 3] = Elem(c, a, b);
+        }
+
+        elems = subdiv_elems;
+      }      
+
+      return { std::move(verts), std::move(elems) };
+    }
+
+    BasicAlMesh generate_approximate_hull(const BasicAlMesh       &input_mesh, 
+                                          const std::vector<Colr> &input_points) {
+      met_trace();
+
+      BasicAlMesh output_mesh = input_mesh;
+
+      // For each vertex in mesh, , which defines a line through origin:
+      std::for_each(std::execution::par_unseq, range_iter(output_mesh.vertices), [&](auto &v) {
+        // Define range of point projections along line
+        auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
+        auto projection = input_points | std::views::transform(projector);
+
+        // Find iterator to endpoint in input_points given this projection
+        auto it = std::ranges::max_element(projection);
+
+        // Set the vertex to this endpoint
+        v = *(input_points.begin() + std::distance(projection.begin(), it));
+      });
+      
+      /* #pragma omp parallel for
+      for (int i = 0; i < output_mesh.vertices.size(); ++i) {
+        // Obtain vertex, which defines line from origin
+        const auto &v = output_mesh.vertices[i];
+        
+        // Define range of point projections along line
+        auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
+        auto projection = input_points | std::views::transform(projector);
+
+        // Find iterator to endpoint in input_points given this projection
+        auto it = std::ranges::max_element(projection);
+
+        // Set vertex to endpoint
+        output_mesh.vertices[i] = *(input_points.begin() + std::distance(projection.begin(), it));
+      } */
+
+      // // Generate set of K projection vectors V (random for now, but should be spaced!)
+      // constexpr uint K = 32;
+      // std::vector<Colr> V = generate_unit_dirs<3>(K);
+      // std::vector<Colr> output_set(2 * K);
+
+      // // For each projection vector, generate two points
+      // #pragma omp parallel for
+      // for (int i = 0; i < K; ++i) {
+      //   // Projection vector defining line
+      //   const auto &v = V[i];
+
+      //   // Define range of point projections along line
+      //   auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
+      //   auto projection = input_points | std::views::transform(projector);
+
+      //   // Find indices of endpoints
+      //   auto minmax = std::ranges::minmax_element(projection);
+      //   const auto &minv = *(input_points.begin() + std::distance(projection.begin(), minmax.min));
+      //   const auto &maxv = *(input_points.begin() + std::distance(projection.begin(), minmax.max));
+        
+      //   // Push back newly found points
+      //   output_set[2 * i]     = minv;
+      //   output_set[2 * i + 1] = maxv;
+      // }
+
+      // return output_set;
+
+      return output_mesh;
+    }
   } // namespace detail
   
   GenOCSTask::GenOCSTask(const std::string &name)
@@ -202,28 +343,32 @@ namespace met {
     // Generate test mesh
     auto points = std::vector<AlColr>(range_iter(boundary));
     auto hull = detail::cgal_convex_hull(points);
-    auto mesh = detail::cgal_surface_to_mesh(hull);
+    auto mesh = detail::generate_uv_sphere(); // detail::cgal_surface_to_mesh(hull);
 
-    using map_3f_1ui = std::unordered_map<eig::Array<float, 3, 1>, uint, 
-                                          decltype(detail::matrix_hash), decltype(detail::matrix_equal)>;
+    // Generate approximate convex hull
+    mesh = detail::generate_approximate_hull(mesh, boundary);
+    auto approx  = mesh.vertices; // std::vector<AlColr>(range_iter(approx_));
+
+    // using map_3f_1ui = std::unordered_map<eig::Array<float, 3, 1>, uint, 
+    //                                       decltype(detail::matrix_hash), decltype(detail::matrix_equal)>;
 
     // Assign one index to every possible unique vertex
-    map_3f_1ui vertex_source_ui(32, detail::matrix_hash, detail::matrix_equal);
+    /* map_3f_1ui vertex_source_ui(32, detail::matrix_hash, detail::matrix_equal);
     for (uint i = 0; i < boundary.size(); ++i) {
       auto vertex = boundary[i];
       guard_continue(!vertex_source_ui.contains(vertex));
       vertex_source_ui.insert({ vertex, i });
-    }
+    } */
 
-    // Obtain index of vertices in their mesh order
-    std::vector<uint> sorted_source_ui(mesh.vertices.size());
-    std::transform(std::execution::par_unseq, range_iter(mesh.vertices), sorted_source_ui.begin(),
-      [&](const auto &v) { return vertex_source_ui[v]; });
+    // // Obtain index of vertices in their mesh order
+    // std::vector<uint> sorted_source_ui(mesh.vertices.size());
+    // std::transform(std::execution::par_unseq, range_iter(mesh.vertices), sorted_source_ui.begin(),
+    //   [&](const auto &v) { return vertex_source_ui[v]; });
 
-    // Obtain unique subset of original 6d samples using sorted indices
-    std::vector<eig::Array<float, 6, 1>> unique_samples(sorted_source_ui.size());
-    std::transform(std::execution::par_unseq, range_iter(sorted_source_ui), unique_samples.begin(),
-      [&](const uint &i) { return unit_samples[i]; });
+    // // Obtain unique subset of original 6d samples using sorted indices
+    // std::vector<eig::Array<float, 6, 1>> unique_samples(sorted_source_ui.size());
+    // std::transform(std::execution::par_unseq, range_iter(sorted_source_ui), unique_samples.begin(),
+    //   [&](const uint &i) { return unit_samples[i]; });
 
     // Re-generate metamer boundary with this subset and different parameters
     // Mapp mapp_k = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
@@ -239,15 +384,15 @@ namespace met {
     //   mesh.elements = { eig::Array3u(0) };
     // mesh = detail::cgal_surface_to_mesh(hull);
 
-    fmt::print("{} -> {}, {}\n", unique_samples.size(), mesh.vertices.size(), mesh.elements.size());
+    // fmt::print("{} -> {}, {}\n", unique_samples.size(), mesh.vertices.size(), mesh.elements.size());
 
-    // Determine center of mesh (should be approaching 0, 0, 0)
+    // Determine center of mesh (should be approaching 0, 0, 0)?
     auto mesh_center = std::reduce(std::execution::par_unseq, range_iter(mesh.vertices), 
       eig::AlArray3f(0.f), [](const auto &a, const auto &b) { return (a + b).eval(); })
                   / static_cast<float>(mesh.vertices.size());
 
     // Insert example buffers
-    info.emplace_resource<gl::Buffer>("ocs_buffer", { .data = cnt_span<const std::byte>(points) });
+    info.emplace_resource<gl::Buffer>("ocs_buffer", { .data = cnt_span<const std::byte>(approx) });
     info.emplace_resource<gl::Buffer>("ocs_verts",  { .data = cnt_span<const std::byte>(mesh.vertices) });
     info.emplace_resource<gl::Buffer>("ocs_elems",  { .data = cnt_span<const std::byte>(mesh.elements) });
     info.insert_resource<Colr>("ocs_centr", Colr(mesh_center));
@@ -265,7 +410,7 @@ namespace met {
   void GenOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Generate OCS texture only on relevant state change
+    // Generate OCS only on relevant state change
     auto &e_gamut_idx = info.get_resource<int>("viewport", "gamut_selection");
     guard(e_gamut_idx >= 0);
 
