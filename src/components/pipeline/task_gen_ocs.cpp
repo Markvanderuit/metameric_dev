@@ -146,7 +146,7 @@ namespace met {
     };
     constexpr auto matrix_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
 
-    detail::BasicAlMesh generate_uv_sphere(const uint subdivision_depth = 4) {
+    detail::BasicAlMesh generate_uv_sphere(const uint subdivision_depth = 2) {
       met_trace();
 
       using Vert = detail::BasicAlMesh::VertType;
@@ -223,69 +223,23 @@ namespace met {
       return { std::move(verts), std::move(elems) };
     }
 
-    BasicAlMesh generate_approximate_hull(const BasicAlMesh       &input_mesh, 
-                                          const std::vector<Colr> &input_points) {
+    BasicAlMesh generate_approximate_hull(BasicAlMesh mesh, const std::vector<Colr> &points) {
       met_trace();
 
-      BasicAlMesh output_mesh = input_mesh;
-
-      // For each vertex in mesh, , which defines a line through origin:
-      std::for_each(std::execution::par_unseq, range_iter(output_mesh.vertices), [&](auto &v) {
+      // For each vertex in mesh, each defining a line through the origin:
+      std::for_each(std::execution::par_unseq, range_iter(mesh.vertices), [&](auto &v) {
         // Define range of point projections along line
         auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
-        auto projection = input_points | std::views::transform(projector);
+        auto projection = points | std::views::transform(projector);
 
-        // Find iterator to endpoint in input_points given this projection
+        // Find iterator to endpoint in points given this projection
         auto it = std::ranges::max_element(projection);
 
         // Set the vertex to this endpoint
-        v = *(input_points.begin() + std::distance(projection.begin(), it));
+        v = *(points.begin() + std::distance(projection.begin(), it));
       });
-      
-      /* #pragma omp parallel for
-      for (int i = 0; i < output_mesh.vertices.size(); ++i) {
-        // Obtain vertex, which defines line from origin
-        const auto &v = output_mesh.vertices[i];
-        
-        // Define range of point projections along line
-        auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
-        auto projection = input_points | std::views::transform(projector);
 
-        // Find iterator to endpoint in input_points given this projection
-        auto it = std::ranges::max_element(projection);
-
-        // Set vertex to endpoint
-        output_mesh.vertices[i] = *(input_points.begin() + std::distance(projection.begin(), it));
-      } */
-
-      // // Generate set of K projection vectors V (random for now, but should be spaced!)
-      // constexpr uint K = 32;
-      // std::vector<Colr> V = generate_unit_dirs<3>(K);
-      // std::vector<Colr> output_set(2 * K);
-
-      // // For each projection vector, generate two points
-      // #pragma omp parallel for
-      // for (int i = 0; i < K; ++i) {
-      //   // Projection vector defining line
-      //   const auto &v = V[i];
-
-      //   // Define range of point projections along line
-      //   auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
-      //   auto projection = input_points | std::views::transform(projector);
-
-      //   // Find indices of endpoints
-      //   auto minmax = std::ranges::minmax_element(projection);
-      //   const auto &minv = *(input_points.begin() + std::distance(projection.begin(), minmax.min));
-      //   const auto &maxv = *(input_points.begin() + std::distance(projection.begin(), minmax.max));
-        
-      //   // Push back newly found points
-      //   output_set[2 * i]     = minv;
-      //   output_set[2 * i + 1] = maxv;
-      // }
-
-      // return output_set;
-
-      return output_mesh;
+      return mesh;
     }
   } // namespace detail
   
