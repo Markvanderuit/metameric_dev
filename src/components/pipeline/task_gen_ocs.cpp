@@ -24,20 +24,12 @@
 #include <unordered_set>
 
 namespace met {
-  constexpr uint n_samples = 16384;
+  constexpr uint n_samples = 128;
 
   namespace detail {
     using Kernel      = CGAL::Exact_predicates_inexact_constructions_kernel;
     using Point       = Kernel::Point_3;
     using SurfaceMesh = CGAL::Surface_mesh<Point>;
-
-    struct BasicAlMesh {
-      using VertType = eig::AlArray3f;
-      using ElemType = eig::Array3u;
-
-      std::vector<VertType> vertices;
-      std::vector<ElemType> elements; 
-    };
 
     /**
      * Given a set of vertices in 3d space, compute the convex hull around these vertices as a
@@ -146,81 +138,57 @@ namespace met {
     };
     constexpr auto matrix_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
 
-    detail::BasicAlMesh generate_uv_sphere(const uint subdivision_depth = 2) {
+    BasicAlMesh generate_uv_sphere(const uint subdiv_depth = 3) {
       met_trace();
 
-      using Vert = detail::BasicAlMesh::VertType;
-      using Elem = detail::BasicAlMesh::ElemType;
-      using VMap  = std::unordered_map<Vert, uint, decltype(matrix_hash), decltype(matrix_equal)>;
+      using Vt = BasicAlMesh::VertType;
+      using El = BasicAlMesh::ElemType;
+      using VMap  = std::unordered_map<Vt, uint, decltype(matrix_hash), decltype(matrix_equal)>;
 
       // Initial mesh describes an octahedron
-      std::vector<Vert> verts = {
-        Vert(-1.f, 0.f, 0.f ), Vert( 0.f,-1.f, 0.f ), Vert( 0.f, 0.f,-1.f ),
-        Vert( 1.f, 0.f, 0.f ), Vert( 0.f, 1.f, 0.f ), Vert( 0.f, 0.f, 1.f )
-      };
-      std::vector<Elem> elems = {
-        Elem(0, 1, 2), Elem(3, 2, 1), Elem(0, 5, 1), Elem(3, 1, 5),
-        Elem(0, 4, 5), Elem(3, 5, 4), Elem(0, 2, 4), Elem(3, 4, 2)
-      };
+      std::vector<Vt> vts = { Vt(-1.f, 0.f, 0.f ), Vt( 0.f,-1.f, 0.f ), Vt( 0.f, 0.f,-1.f ),
+                              Vt( 1.f, 0.f, 0.f ), Vt( 0.f, 1.f, 0.f ), Vt( 0.f, 0.f, 1.f ) };
+      std::vector<El> els = { El(0, 1, 2), El(3, 2, 1), El(0, 5, 1), El(3, 1, 5),
+                              El(0, 4, 5), El(3, 5, 4), El(0, 2, 4), El(3, 4, 2) };
 
       // Perform loop subdivision several times
-      for (uint d = 0; d < subdivision_depth; ++d) {        
-        // New elements are inserted in this larger vector
-        std::vector<Elem> subdiv_elems(4 * elems.size());
-
-        // Identical vertices (of which there are a lot) are first tested in this map
-        VMap verts_map;
+      for (uint d = 0; d < subdiv_depth; ++d) {        
+        std::vector<El> els_(4 * els.size()); // New elements are inserted in this larger vector
+        VMap vmap; // Identical vertices are first tested in this map
 
         #pragma omp parallel for
-        for (int e = 0; e < elems.size(); ++e) {
-          // Obtain old vertex indices
-          const auto &elem = elems[e];  
-          const uint i = elem.x(), j = elem.y(), k = elem.z();
+        for (int e = 0; e < els.size(); ++e) {
+          // Old and new vertex indices
+          eig::Array3u ijk = els[e], abc;
           
           // Compute edge midpoints, lifted to the unit sphere
-          const Vert mid_a = (0.5f * (verts[i] + verts[j])).matrix().normalized(),
-                     mid_b = (0.5f * (verts[j] + verts[k])).matrix().normalized(),
-                     mid_c = (0.5f * (verts[k] + verts[i])).matrix().normalized();
+          std::array<Vt, 3> new_vts = { (vts[ijk[0]] + vts[ijk[1]]).matrix().normalized(),
+                                        (vts[ijk[1]] + vts[ijk[2]]).matrix().normalized(),
+                                        (vts[ijk[2]] + vts[ijk[0]]).matrix().normalized() };
 
-          // Define new vertex indices
-          uint a, b, c;
-
+          // Inside critical section, insert lifted edge midpoints and set new vertex indices
+          // if they don't exist already on a neighbouring triangle
           #pragma omp critical
-          { // Insert lifted edge midpoints if they don't exist yet
-            if (auto it = verts_map.find(mid_a); it != verts_map.end()) {
-              a = it->second;
+          for (uint i = 0; i < abc.size(); ++i) {
+            if (auto it = vmap.find(new_vts[i]); it != vmap.end()) {
+              abc[i] = it->second;
             } else {
-              a = verts.size();
-              verts.push_back(mid_a);
-              verts_map.emplace(mid_a, a);
-            }
-            if (auto it = verts_map.find(mid_b); it != verts_map.end()) {
-              b = it->second;
-            } else {
-              b = verts.size();
-              verts.push_back(mid_b);
-              verts_map.emplace(mid_b, b);
-            }
-            if (auto it = verts_map.find(mid_c); it != verts_map.end()) {
-              c = it->second;
-            } else {
-              c = verts.size();
-              verts.push_back(mid_c);
-              verts_map.emplace(mid_c, c);
+              abc[i] = vts.size();
+              vts.push_back(new_vts[i]);
+              vmap.emplace(new_vts[i], abc[i]);
             }
           }
-          
-          // Insert newly subdivided elements
-          subdiv_elems[4 * e]     = Elem(i, a, c);
-          subdiv_elems[4 * e + 1] = Elem(a, j, b);
-          subdiv_elems[4 * e + 2] = Elem(b, k, c);
-          subdiv_elems[4 * e + 3] = Elem(c, a, b);
+        
+          // Create and insert newly subdivided elements
+          const auto new_els = { El(ijk[0], abc[0], abc[2]), El(ijk[1], abc[1], abc[0]), 
+                                 El(ijk[2], abc[2], abc[1]), El(abc[0], abc[1], abc[2]) };
+          std::ranges::copy(new_els, els_.begin() + 4 * e);
         }
 
-        elems = subdiv_elems;
+        els = els_; // Overwrite list of elements with new subdivided list
       }      
 
-      return { std::move(verts), std::move(elems) };
+      return { std::move(vts), std::move(els) };
     }
 
     BasicAlMesh generate_approximate_hull(BasicAlMesh mesh, const std::vector<Colr> &points) {
@@ -228,16 +196,30 @@ namespace met {
 
       // For each vertex in mesh, each defining a line through the origin:
       std::for_each(std::execution::par_unseq, range_iter(mesh.vertices), [&](auto &v) {
-        // Define range of point projections along line
-        auto projector  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
-        auto projection = points | std::views::transform(projector);
+        // Obtain a range of point projections along this line
+        auto proj_funct  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
+        auto proj_range = points | std::views::transform(proj_funct);
 
-        // Find iterator to endpoint in points given this projection
-        auto it = std::ranges::max_element(projection);
+        // Find iterator to endpoint, given projections
+        auto it = std::ranges::max_element(proj_range);
 
-        // Set the vertex to this endpoint
-        v = *(points.begin() + std::distance(projection.begin(), it));
+        // Replace mesh vertex with this endpoint
+        v = *(points.begin() + std::distance(proj_range.begin(), it));
       });
+
+      /* // Find and erase collapsed triangles
+      fmt::print("pre_erase {}\n", mesh.elements.size());
+      std::erase_if(mesh.elements, [&](const auto &e) {
+        const uint i = e.x(), j = e.y(), k = e.z();
+        return (mesh.vertices[i].isApprox(mesh.vertices[j])) ||
+               (mesh.vertices[j].isApprox(mesh.vertices[k])) ||
+               (mesh.vertices[k].isApprox(mesh.vertices[i]));
+      });
+      fmt::print("post_erase {}\n", mesh.elements.size()); */
+
+      // Find and erase inward-pointing triangles
+      /* std::erase_if(mesh.elements, [&](const auto &e) {
+      }); */
 
       return mesh;
     }
@@ -249,158 +231,69 @@ namespace met {
   void GenOCSTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
-    /* // Initialize objects for shader call
-    constexpr uint wvl_div = ceil_div(wavelength_samples, 4u);
-    m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_ocs/gen_ocs_cl.comp.spv_opt",
-                   .is_spirv_binary = true }};
-    m_dispatch = { .groups_x = ceil_div(n_samples, 256u / wvl_div), 
-                   .bindable_program = &m_program };
+    // Generate reused 6d samples and a uv sphere mesh for faster OCS hull generation
+    m_sphere_mesh = detail::generate_uv_sphere();
+    m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
 
-    // Set up uniform buffer
-    std::array<uint, 2> uniform_data = { n_samples, 0u };
-    m_uniform_buffer = {{ .data = obj_span<std::byte>(uniform_data) }};
-
-    // Initialize main buffers
-    info.emplace_resource<gl::Buffer>("color_buffer", {
-      .size  = static_cast<size_t>(n_samples) * sizeof(eig::AlArray3f)
-    });
-    info.emplace_resource<gl::Buffer>("spectrum_buffer", {
-      .size = static_cast<size_t>(n_samples) * sizeof(Spec)
-    }); */
-
-    // Get shared resources
-    auto &e_basis    = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    // auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    // auto &e_mappings     = e_app_data.loaded_mappings;
-    // auto &e_gamut_mapp_i = e_mappings[0];
-    // auto &e_gamut_mapp_j = e_mappings[1];
-
-    // Generate a unit sphere as a test mesh
-    // auto points_unal = detail::generate_unit_dirs<3>(256);
-    // auto points = std::vector<AlColr>(range_iter(points_unal));
-    // auto hull = detail::cgal_convex_hull(points);
-    // auto mesh = detail::cgal_surface_to_mesh(hull);
-
-    // Replace sampled vertices with an example metamer boundary
-    auto unit_samples = detail::generate_unit_dirs<6>(256);
-    auto basis  = e_basis.rightCols(wavelength_bases);
-    Mapp mapp_i = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65  };
-    Mapp mapp_j = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
-    CMFS cmfs_i = mapp_i.finalize();
-    CMFS cmfs_j = mapp_j.finalize();
-    Colr signal = 0.5f;
-
-    // auto boundary = generate_boundary_examp(cmfs_i, cmfs_j, unit_samples);
-    auto boundary = generate_boundary(basis, cmfs_i, cmfs_j, signal, unit_samples);
-
-    // Generate test mesh
-    auto points = std::vector<AlColr>(range_iter(boundary));
-    auto hull = detail::cgal_convex_hull(points);
-    auto mesh = detail::generate_uv_sphere(); // detail::cgal_surface_to_mesh(hull);
-
-    // Generate approximate convex hull
-    mesh = detail::generate_approximate_hull(mesh, boundary);
-    auto approx  = mesh.vertices; // std::vector<AlColr>(range_iter(approx_));
-
-    // using map_3f_1ui = std::unordered_map<eig::Array<float, 3, 1>, uint, 
-    //                                       decltype(detail::matrix_hash), decltype(detail::matrix_equal)>;
-
-    // Assign one index to every possible unique vertex
-    /* map_3f_1ui vertex_source_ui(32, detail::matrix_hash, detail::matrix_equal);
-    for (uint i = 0; i < boundary.size(); ++i) {
-      auto vertex = boundary[i];
-      guard_continue(!vertex_source_ui.contains(vertex));
-      vertex_source_ui.insert({ vertex, i });
-    } */
-
-    // // Obtain index of vertices in their mesh order
-    // std::vector<uint> sorted_source_ui(mesh.vertices.size());
-    // std::transform(std::execution::par_unseq, range_iter(mesh.vertices), sorted_source_ui.begin(),
-    //   [&](const auto &v) { return vertex_source_ui[v]; });
-
-    // // Obtain unique subset of original 6d samples using sorted indices
-    // std::vector<eig::Array<float, 6, 1>> unique_samples(sorted_source_ui.size());
-    // std::transform(std::execution::par_unseq, range_iter(sorted_source_ui), unique_samples.begin(),
-    //   [&](const uint &i) { return unit_samples[i]; });
-
-    // Re-generate metamer boundary with this subset and different parameters
-    // Mapp mapp_k = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
-    // CMFS cmfs_k = mapp_k.finalize();
-    // boundary = generate_boundaryz(basis, cmfs_i, cmfs_j, Colr(0.5, 0.5, 0.5), unit_samples);
-    // // boundary = generate_boundary_examp(cmfs_i, cmfs_k, unique_samples);
-    // points = std::vector<AlColr>(range_iter(boundary));
-    // mesh.vertices = points;
-
-    // hull = detail::cgal_convex_hull(points);
-    // mesh = detail::cgal_surface_to_mesh(hull);
-    // if (mesh.elements.size() == 0)
-    //   mesh.elements = { eig::Array3u(0) };
-    // mesh = detail::cgal_surface_to_mesh(hull);
-
-    // fmt::print("{} -> {}, {}\n", unique_samples.size(), mesh.vertices.size(), mesh.elements.size());
-
-    // Determine center of mesh (should be approaching 0, 0, 0)?
-    auto mesh_center = std::reduce(std::execution::par_unseq, range_iter(mesh.vertices), 
-      eig::AlArray3f(0.f), [](const auto &a, const auto &b) { return (a + b).eval(); })
-                  / static_cast<float>(mesh.vertices.size());
-
-    // Insert example buffers
-    info.emplace_resource<gl::Buffer>("ocs_buffer", { .data = cnt_span<const std::byte>(approx) });
-    info.emplace_resource<gl::Buffer>("ocs_verts",  { .data = cnt_span<const std::byte>(mesh.vertices) });
-    info.emplace_resource<gl::Buffer>("ocs_elems",  { .data = cnt_span<const std::byte>(mesh.elements) });
-    info.insert_resource<Colr>("ocs_centr", Colr(mesh_center));
-
-    /* auto ocs_samples = detail::generate_unit_dirs<6>(128);
-    info.insert_resource<std::vector<eig::Array<float, 6, 1>>>("ocs_samples", std::move(ocs_samples));
-    info.insert_resource<gl::Buffer>("ocs_buffer", gl::Buffer());
-    info.insert_resource<gl::Buffer>("ocs_verts", gl::Buffer());
-    info.insert_resource<gl::Buffer>("ocs_elems", gl::Buffer());
-    info.insert_resource<Colr>("ocs_centr", 0.f); */
-
-    // m_stale = true;
+    // Register ocs buffers
+    constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
+    info.emplace_resource<gl::Buffer>("ocs_verts", { 
+      .size = sizeof(eig::AlArray3f) * m_sphere_mesh.vertices.size(), .flags = create_flags });
+    info.emplace_resource<gl::Buffer>("ocs_elems", { 
+      .size = sizeof(eig::Array3u) * m_sphere_mesh.elements.size(), .flags = create_flags });
+    info.emplace_resource<gl::Buffer>("ocs_buffer", { 
+      .size = sizeof(eig::AlArray3f) * m_sphere_samples.size(), .flags = create_flags });
+    info.insert_resource<Colr>("ocs_centr", Colr(0.f));
+    
+    // Set last accessed gamut to "none"
+    m_gamut_idx = -1;
   }
 
   void GenOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Generate OCS only on relevant state change
-    auto &e_gamut_idx = info.get_resource<int>("viewport", "gamut_selection");
-    guard(e_gamut_idx >= 0);
+    // Get shared resources to verify state change
+    auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    auto &e_gamut_idx   = info.get_resource<int>("viewport", "gamut_selection");
 
-    /* 
+    // Generate OCS only on relevant state changes
+    guard(e_gamut_idx >= 0);
+    guard(m_gamut_idx != e_gamut_idx || e_state_gamut[e_gamut_idx] == CacheState::eStale);
+
+    // Cache last accessed gamut idx
+    m_gamut_idx = e_gamut_idx;
 
     // Get shared resources
-    auto &i_ocs_samples  = info.get_resource<std::vector<eig::Array<float, 6, 1>>>("ocs_samples");
-    auto &e_bases        = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings     = e_app_data.loaded_mappings;
-    auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
-    auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
-    auto &e_gamut_colr   = e_app_data.project_data.gamut_colr_i;
-    auto &e_gamut_spec   = e_app_data.project_data.gamut_spec;
+    auto &e_basis       = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_gamut_colr_i  = e_app_data.project_data.gamut_colr_i[e_gamut_idx];
+    auto &e_gamut_mapp_i  = e_app_data.project_data.gamut_mapp_i[e_gamut_idx];
+    auto &e_gamut_mapp_j  = e_app_data.project_data.gamut_mapp_j[e_gamut_idx];
+    auto &e_mapp_i        = e_app_data.loaded_mappings[e_gamut_mapp_i];
+    auto &e_mapp_j        = e_app_data.loaded_mappings[e_gamut_mapp_j];
 
-    // Obtain color system data
-    CMFS system_i = e_mappings[e_gamut_mapp_i[e_gamut_idx]].finalize(e_gamut_spec[e_gamut_idx]);
-    CMFS system_j = e_mappings[e_gamut_mapp_j[e_gamut_idx]].finalize(e_gamut_spec[e_gamut_idx]);
-    Colr signal_i = e_gamut_colr[e_gamut_idx];
+    // Generate color systems
+    auto basis  = e_basis.rightCols(wavelength_bases);
+    CMFS cmfs_i = e_mapp_i.finalize();
+    CMFS cmfs_j = e_mapp_j.finalize();
 
-    // Generate metamer set boundary
-    auto boundary = generate_boundary_colr(e_bases.rightCols(wavelength_bases), 
-      system_i, system_j, signal_i, i_ocs_samples);
-    std::vector<AlColr> boundary_al(range_iter(boundary));
+    // Generate metamer set convex hull 
+    auto points = generate_boundary(basis, cmfs_i, cmfs_j, e_gamut_colr_i, m_sphere_samples);
+    auto ocs_points = std::vector<AlColr>(range_iter(points));
+    auto ocs_hull   = detail::generate_approximate_hull(m_sphere_mesh, points);
+    auto ocs_center = std::reduce(std::execution::par_unseq, range_iter(ocs_hull.vertices), 
+      eig::AlArray3f(0.f), [](const auto &a, const auto &b) { return (a + b).eval(); })
+                  / static_cast<float>(ocs_hull.vertices.size());
 
-    // Generate convex hull mesh representatioon of boundary
-    auto ocs_mesh = detail::cgal_surface_to_mesh(detail::cgal_convex_hull(std::vector<AlColr>(range_iter(boundary))));
-    Colr ocs_cntr = std::reduce(range_iter(ocs_mesh.vertices), AlColr(0.f), 
-                  [](const auto &a, const auto &b) { return (a + b).eval(); })
-                  / static_cast<float>(ocs_mesh.vertices.size());
+    // Update buffers
+    auto &i_ocs_buffer = info.get_resource<gl::Buffer>("ocs_buffer");
+    auto &i_ocs_verts  = info.get_resource<gl::Buffer>("ocs_verts");
+    auto &i_ocs_elems  = info.get_resource<gl::Buffer>("ocs_elems");
+    auto &i_ocs_center = info.get_resource<Colr>("ocs_centr");
 
-    // Upload to buffer 
-    // TODO no!
-    info.get_resource<Colr>("ocs_centr")        = ocs_cntr;
-    info.get_resource<gl::Buffer>("ocs_verts")  = {{ .data = cnt_span<const std::byte>(ocs_mesh.vertices) }};
-    info.get_resource<gl::Buffer>("ocs_elems")  = {{ .data = cnt_span<const std::byte>(ocs_mesh.elements) }};
-    info.get_resource<gl::Buffer>("ocs_buffer") = {{ .data = cnt_span<const std::byte>(boundary_al) }}; */
+    i_ocs_buffer.set(cnt_span<const std::byte>(ocs_points));
+    i_ocs_verts.set(cnt_span<const std::byte>(ocs_hull.vertices));
+    i_ocs_elems.set(cnt_span<const std::byte>(ocs_hull.elements));
+    i_ocs_center = ocs_center;
   }
 }
