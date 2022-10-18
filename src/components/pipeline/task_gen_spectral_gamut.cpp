@@ -73,7 +73,7 @@ namespace met {
     auto &e_state_gamut    = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     auto &e_state_spec     = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
 
-    // Generate spectra at gamut color positions across four threads
+    // Generate spectra at gamut color positions
     // #pragma omp parallel for
     for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
       // Ensure that we only continue if gamut data or mapping data is in any way stale
@@ -82,14 +82,14 @@ namespace met {
                   || e_state_mappings[mapp_i] == CacheState::eStale 
                   || e_state_mappings[mapp_j] == CacheState::eStale);
 
-      // std::array<CMFS, 2> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize(),
-      //                                 e_mappings[e_proj_data.gamut_mapp_j[i]].finalize() };
-      // std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
-      //                                 e_proj_data.gamut_colr_j[i] };
+      std::array<CMFS, 2> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize(),
+                                      e_mappings[e_proj_data.gamut_mapp_j[i]].finalize() };
+      std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
+                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
       
       // Generate new metameric spectrum for given color systems and expected color signals
-      std::array<CMFS, 1> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize() };
-      std::array<Colr, 1> signals = { e_proj_data.gamut_colr_i[i] };
+      // std::array<CMFS, 1> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize() };
+      // std::array<Colr, 1> signals = { e_proj_data.gamut_colr_i[i] };
       e_proj_data.gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 

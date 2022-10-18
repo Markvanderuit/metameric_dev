@@ -96,14 +96,16 @@ namespace met {
 
       // Declare scoped OpenGL state
       gl::state::set_point_size(8.f);
-      gl::state::set_op(gl::CullOp::eFront);
+      gl::state::set_op(gl::CullOp::eBack);
       gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
-      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,    true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eCullOp,  true) };
+      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
       
       // Describe inverse translation to center
-      eig::Affine3f transl(eig::Translation3f(eig::Vector3f(0.5f) - e_ocs_centr.matrix()));
+      // eig::Affine3f transl(eig::Translation3f(eig::Vector3f(0.5f) - e_ocs_centr.matrix()));
+      eig::Affine3f transl(eig::Translation3f(eig::Vector3f(0.f)));
       
       // Update program uniform data
       m_program.uniform("u_model_matrix",  transl.matrix());

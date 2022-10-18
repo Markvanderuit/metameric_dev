@@ -62,7 +62,7 @@ namespace met {
         auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
         auto &e_ocs_center   = info.get_resource<Colr>("gen_ocs", "ocs_centr");
         auto &e_gamut_colr   = e_app_data.project_data.gamut_colr_i;
-        auto &e_gamut_offs   = e_app_data.project_data.gamut_colr_j;
+        auto &e_gamut_offs   = e_app_data.project_data.gamut_offs_j;
         auto &e_gamut_spec   = e_app_data.project_data.gamut_spec;
         auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
         auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
@@ -146,14 +146,14 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
+    auto &i_arcball    = info.get_resource<detail::Arcball>("arcball");
     auto &e_gamut_idx  = info.get_resource<int>("viewport", "gamut_selection");
     auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_colr = e_app_data.project_data.gamut_colr_i;
-    auto &e_gamut_offs = e_app_data.project_data.gamut_colr_j;
+    auto &e_gamut_offs = e_app_data.project_data.gamut_offs_j;
 
     // Anchor position is colr + offset, minus center offset 
-    eig::Array3f anchor_pos = (e_gamut_colr[e_gamut_idx] + e_gamut_offs[e_gamut_idx]) - 0.5f;
+    eig::Array3f anchor_pos = e_gamut_colr[e_gamut_idx] + e_gamut_offs[e_gamut_idx]; // - 0.5f;
     auto anchor_trf = eig::Affine3f(eig::Translation3f(anchor_pos));
     auto pre_pos    = anchor_trf * eig::Vector3f(0, 0, 0);
 
@@ -180,7 +180,7 @@ namespace met {
 
     // Halfway gizmo drag
     if (ImGuizmo::IsUsing()) {
-      e_gamut_offs[e_gamut_idx] = (e_gamut_offs[e_gamut_idx] + transl.array()).min(1.f).max(0.f);
+      e_gamut_offs[e_gamut_idx] = (e_gamut_offs[e_gamut_idx] + transl.array()).eval();
     }
 
     // End gizmo drag
@@ -190,8 +190,8 @@ namespace met {
       // Register data edit as drag finishes
       e_app_data.touch({ 
         .name = "Move gamut offsets", 
-        .redo = [edit = e_gamut_offs](auto &data) { data.gamut_colr_j = edit; }, 
-        .undo = [edit = m_offs_prev](auto &data) { data.gamut_colr_j = edit; }
+        .redo = [edit = e_gamut_offs](auto &data) { data.gamut_offs_j = edit; }, 
+        .undo = [edit = m_offs_prev](auto &data) { data.gamut_offs_j = edit; }
       });
     }
 

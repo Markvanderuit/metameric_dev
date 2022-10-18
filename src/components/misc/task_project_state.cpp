@@ -40,7 +40,7 @@ namespace met {
     
     // Submit shared resource values as initially stale
     info.insert_resource<GamutArray>("gamut_colr_i",  GamutArray(gamut_stale));
-    info.insert_resource<GamutArray>("gamut_colr_j",  GamutArray(gamut_stale));
+    info.insert_resource<GamutArray>("gamut_offs_j",  GamutArray(gamut_stale));
     info.insert_resource<GamutArray>("gamut_mapp_i",  GamutArray(gamut_stale));
     info.insert_resource<GamutArray>("gamut_mapp_j",  GamutArray(gamut_stale));
     info.insert_resource<GamutArray>("gamut_spec",    GamutArray(gamut_stale));
@@ -56,7 +56,7 @@ namespace met {
     const auto &e_proj_data     = e_app_data.project_data;
     const auto &e_mappings      = e_app_data.loaded_mappings;
     auto &i_state_gamut_colr_i  = info.get_resource<GamutArray>("gamut_colr_i");
-    auto &i_state_gamut_colr_j  = info.get_resource<GamutArray>("gamut_colr_j");
+    auto &i_state_gamut_colr_j  = info.get_resource<GamutArray>("gamut_offs_j");
     auto &i_state_gamut_mapp_i  = info.get_resource<GamutArray>("gamut_mapp_i");
     auto &i_state_gamut_mapp_j  = info.get_resource<GamutArray>("gamut_mapp_j");
     auto &i_state_gamut_spec    = info.get_resource<GamutArray>("gamut_spec");
@@ -67,7 +67,7 @@ namespace met {
     // #pragma omp parallel for
     for (int i = 0; i < 4; ++i) {
       detail::compare_and_set_v(e_proj_data.gamut_colr_i[i], m_gamut_colr_i[i], i_state_gamut_colr_i[i]);
-      detail::compare_and_set_v(e_proj_data.gamut_colr_j[i], m_gamut_colr_j[i], i_state_gamut_colr_j[i]);
+      detail::compare_and_set_v(e_proj_data.gamut_offs_j[i], m_gamut_offs_j[i], i_state_gamut_colr_j[i]);
       detail::compare_and_set_v(e_proj_data.gamut_spec[i], m_gamut_spec[i], i_state_gamut_spec[i]);
       detail::compare_and_set(e_proj_data.gamut_mapp_i[i], m_gamut_mapp_i[i], i_state_gamut_mapp_i[i]);
       detail::compare_and_set(e_proj_data.gamut_mapp_j[i], m_gamut_mapp_j[i], i_state_gamut_mapp_j[i]);
