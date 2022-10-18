@@ -27,7 +27,7 @@ namespace met {
 
   void from_json(const json &js, ProjectData &v) {
     v.gamut_colr_i = js.at("gamut_colr_i").get<std::array<Colr, 4>>();
-    v.gamut_colr_j = js.at("gamut_colr_j").get<std::array<Colr, 4>>();
+    v.gamut_offs_j = js.at("gamut_offs_j").get<std::array<Colr, 4>>();
     v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::array<uint, 4>>();
     v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::array<uint, 4>>();
     v.gamut_spec   = js.at("gamut_spec").get<std::array<Spec, 4>>();
@@ -38,7 +38,7 @@ namespace met {
 
   void to_json(json &js, const ProjectData &v) {
     js["gamut_colr_i"] = v.gamut_colr_i;
-    js["gamut_colr_j"] = v.gamut_colr_j;
+    js["gamut_offs_j"] = v.gamut_offs_j;
     js["gamut_mapp_i"] = v.gamut_mapp_i;
     js["gamut_mapp_j"] = v.gamut_mapp_j;
     js["gamut_spec"]   = v.gamut_spec;

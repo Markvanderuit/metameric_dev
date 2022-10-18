@@ -35,7 +35,7 @@ namespace met {
 
     // Current mappings and gamuts used for rgb->spectral conversion
     std::array<Colr, 4> gamut_colr_i; // Gamut vertex values under primary color system
-    std::array<Colr, 4> gamut_colr_j; // Gamut vertex values under secondary color system
+    std::array<Colr, 4> gamut_offs_j; // Gamut value offsets under secondary color system
     std::array<uint, 4> gamut_mapp_i; // Gamut vertex index of selected primary color system 
     std::array<uint, 4> gamut_mapp_j; // Gamut vertex index of selected secondary color system 
     std::array<Spec, 4> gamut_spec;   // Resulting metameric spectra given above constraints

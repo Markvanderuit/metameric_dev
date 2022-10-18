@@ -12,7 +12,7 @@ namespace met {
     // Copies of data available in ProjectData and ApplicationData
     // to check for and report state changes
     std::array<Colr, 4> m_gamut_colr_i;
-    std::array<Colr, 4> m_gamut_colr_j;
+    std::array<Colr, 4> m_gamut_offs_j;
     std::array<uint, 4> m_gamut_mapp_i;
     std::array<uint, 4> m_gamut_mapp_j;
     std::array<Spec, 4> m_gamut_spec;

@@ -22,16 +22,17 @@ namespace met {
                      Colr { .68f, .49f, .58f },
                      Colr { .50f, .58f, .39f },
                      Colr { .35f, .30f, .34f }};
-    gamut_colr_j = { Colr { .75f, .40f, .25f },
-                     Colr { .68f, .49f, .58f },
-                     Colr { .50f, .58f, .39f },
-                     Colr { .35f, .30f, .34f }};
+    gamut_offs_j = { Colr { 0.f, 0.f, 0.f },
+                     Colr { 0.f, 0.f, 0.f },
+                     Colr { 0.f, 0.f, 0.f },
+                     Colr { 0.f, 0.f, 0.f }};
     gamut_mapp_i.fill(0);
-    gamut_mapp_j.fill(0);
+    gamut_mapp_j.fill(1);
     gamut_spec.fill(Spec(0.f));
 
     // Instantiate loaded components with sensible default values
-    mappings = {{ "default", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}};
+    mappings = {{ "D65", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}, 
+                { "FL11", { .cmfs = "CIE XYZ->sRGB", .illuminant = "FL11", .n_scatters = 0 }}};
     cmfs = {{ "CIE XYZ",       models::cmfs_cie_xyz },
             { "CIE XYZ->sRGB", models::cmfs_srgb    }};
     illuminants = {{ "D65",  models::emitter_cie_d65  },
