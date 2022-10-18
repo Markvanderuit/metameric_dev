@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
 
 namespace met {

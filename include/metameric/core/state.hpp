@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/knn.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>
@@ -70,9 +71,10 @@ namespace met {
 
     /* Loaded (non-saved) components */
 
-    Texture2d3f       loaded_texture;  // RGB texture image extracted from project data
-    std::vector<Mapp> loaded_mappings; // Spectral mappings extracted from project data
-    KNNGrid<Spec>     loaded_knn_grid; // Placeholder spectral KNN dataset // TODO remove
+    Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
+    std::vector<Mapp>   loaded_mappings; // Spectral mappings extracted from project data
+    std::array<Mesh, 4> loaded_met_sets; // Object color solids loaded around gamut data
+    // KNNGrid<Spec>       loaded_knn_grid; // Placeholder spectral KNN dataset // TODO remove
 
     /* Project data handling */
     

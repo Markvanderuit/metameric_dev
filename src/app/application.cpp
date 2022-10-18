@@ -96,8 +96,8 @@ namespace met {
       fmt::print("Constructed KNN grid\n");
       
       // Make resources available through application data object
-      auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
-      app_data.loaded_knn_grid = std::move(knn_grid);
+      // auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
+      // app_data.loaded_knn_grid = std::move(knn_grid); // TODO remove
     }
   } // namespace detail                          
 

@@ -94,10 +94,8 @@ namespace met {
     }
 
     // Re-upload stale gamut data to the gpu
-    uint count = 0;
     for (uint i = 0; i < e_state_spec.size(); ++i) {
       guard_continue(e_state_spec[i] == CacheState::eStale);
-      count++;
       i_buffer_colr_map[i] = e_proj_data.gamut_colr_i[i];
       i_buffer_spec_map[i] = e_proj_data.gamut_spec[i];
       i_buffer_colr.flush(sizeof(AlColr), i * sizeof(AlColr));

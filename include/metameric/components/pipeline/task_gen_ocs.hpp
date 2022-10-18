@@ -12,7 +12,7 @@ namespace met {
     gl::Program     m_program;    
     gl::ComputeInfo m_dispatch;    
     bool            m_stale;
-    BasicAlMesh     m_sphere_mesh;
+    Mesh     m_sphere_mesh;
     std::vector<eig::Array<float, 6, 1>>
                     m_sphere_samples;    
     int             m_gamut_idx;

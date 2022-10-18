@@ -76,9 +76,9 @@ namespace met {
         // Obtain selected reflectance and colors
         Spec &gamut_spec   = e_gamut_spec[e_gamut_idx];
         Colr &gamut_colr_i = e_gamut_colr[e_gamut_idx];
-        Colr &gamut_offs   = e_gamut_offs[e_gamut_idx];
+        Colr &gamut_offs_j = e_gamut_offs[e_gamut_idx];
 
-        // Compute actual resulting color and error
+        // Compute resulting color and error
         Colr gamut_actual = e_mappings[e_gamut_mapp_i[e_gamut_idx]].apply_color(gamut_spec);
         Colr gamut_error  = (gamut_actual - gamut_colr_i).abs();
 
@@ -88,18 +88,22 @@ namespace met {
         
         ImGui::ColorEdit3("Color, coords", gamut_colr_i.data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("Color, actual", gamut_actual.data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Color, error", gamut_error.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color, error",  gamut_error.data(), ImGuiColorEditFlags_Float);
 
         ImGui::Separator();
 
-        ImGui::SliderFloat3("Color offset", gamut_offs.data(), -1.f, 1.f);
+        ImGui::SliderFloat3("Color offset", gamut_offs_j.data(), -1.f, 1.f);
 
         ImGui::Separator();
 
-        Colr metam_expected = e_ocs_center + gamut_offs;
-        Colr metam_actual   = e_mappings[e_gamut_mapp_j[e_gamut_idx]].apply_color(gamut_spec);
-        ImGui::ColorEdit3("Metamer, expctd", metam_expected.data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Metamer, actual", metam_actual.data(), ImGuiColorEditFlags_Float);
+        // Compute resulting other color and error
+        Colr other_expected = gamut_colr_i + gamut_offs_j;
+        Colr other_actual   = e_mappings[e_gamut_mapp_j[e_gamut_idx]].apply_color(gamut_spec);
+        Colr other_error = (other_actual - other_expected).abs();
+
+        ImGui::ColorEdit3("Other, coords", other_expected.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Other, actual", other_actual.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Other, error", other_error.data(), ImGuiColorEditFlags_Float);
 
         ImGui::Separator();
 
