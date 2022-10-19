@@ -23,6 +23,16 @@ namespace met {
     eStale  // Data is stale, pipeline should recompute dependent values
   };
 
+  struct GamutVertex {
+    Colr position, offset;
+    uint mapping_i, mapping_j;
+  };
+
+  struct GamutData {
+    std::array<GamutVertex, 4> vertices;
+    std::array<Spec, 4>        spectra;
+  };
+
   /* Wrapper object to hold saveable project data */
   struct ProjectData {
     /* Set of keys of cmfs/illuminants that together describe a stored spectral mapping */

@@ -24,8 +24,8 @@ namespace met {
   Mesh generate_unit_sphere(uint n_subdivs) {
     met_trace();
 
-    using Vt = Mesh::VertType;
-    using El = Mesh::ElemType;
+    using Vt = Mesh::Vert;
+    using El = Mesh::Elem;
     using VMap  = std::unordered_map<Vt, uint, 
                                       decltype(detail::matrix_hash), 
                                       decltype(detail::matrix_equal)>;
