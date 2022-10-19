@@ -86,18 +86,20 @@ namespace met {
       scheduler.insert_resource<std::vector<Spec>>("pca_input", std::move(pca_input));
 
       // Create a KNN grid over the spectral distributions,based on their color as a position
-      fmt::print("Constructing KNN grid\n");
+      // TODO remove
+      /* fmt::print("Constructing KNN grid\n");
       std::vector<eig::Array3f> knn_positions(internal_sd.size());
       std::transform(std::execution::par_unseq, range_iter(internal_sd), knn_positions.begin(),
         [&](const Spec &sd) { return reflectance_to_color(sd, { .cmfs = models::cmfs_srgb }); });
       KNNGrid<Spec> knn_grid = {{ .grid_size = 32, .max_cell_size = 128 }};
       knn_grid.insert_n(internal_sd, knn_positions);
       knn_grid.retrace_size();
-      fmt::print("Constructed KNN grid\n");
+      fmt::print("Constructed KNN grid\n"); */
       
       // Make resources available through application data object
+      // TODO remove
       // auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
-      // app_data.loaded_knn_grid = std::move(knn_grid); // TODO remove
+      // app_data.loaded_knn_grid = std::move(knn_grid); 
     }
   } // namespace detail                          
 

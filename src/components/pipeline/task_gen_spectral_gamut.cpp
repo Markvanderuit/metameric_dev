@@ -78,14 +78,14 @@ namespace met {
     for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
       // Ensure that we only continue if gamut data or mapping data is in any way stale
       const uint mapp_i = e_proj_data.gamut_mapp_i[i], mapp_j = e_proj_data.gamut_mapp_j[i];
-      guard_continue(e_state_gamut[i] == CacheState::eStale 
+      guard_continue(e_state_gamut[i]         == CacheState::eStale 
                   || e_state_mappings[mapp_i] == CacheState::eStale 
                   || e_state_mappings[mapp_j] == CacheState::eStale);
 
-      std::array<CMFS, 2> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize(),
-                                      e_mappings[e_proj_data.gamut_mapp_j[i]].finalize() };
+      std::array<CMFS, 2> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize(e_proj_data.gamut_spec[i]),
+                                      e_mappings[e_proj_data.gamut_mapp_j[i]].finalize(e_proj_data.gamut_spec[i]) };
       std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
-                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
+                                     (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
       
       // Generate new metameric spectrum for given color systems and expected color signals
       // std::array<CMFS, 1> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize() };

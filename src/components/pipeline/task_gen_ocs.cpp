@@ -119,6 +119,7 @@ namespace met {
     auto &e_state_gamut_colr_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_colr_i")[e_gamut_idx];
     auto &e_state_gamut_mapp_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_i")[e_gamut_idx];
     auto &e_state_gamut_mapp_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_j")[e_gamut_idx];
+    auto &e_state_gamut_spec   = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec")[e_gamut_idx];
     auto &e_state_mappings     = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
     guard(m_gamut_idx != e_gamut_idx || e_state_gamut_colr_i == CacheState::eStale || 
           e_state_gamut_mapp_i == CacheState::eStale || e_state_gamut_mapp_j == CacheState::eStale ||
@@ -135,10 +136,11 @@ namespace met {
     auto &e_basis         = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_gamut_colr_i  = e_app_data.project_data.gamut_colr_i[e_gamut_idx];
     auto &e_gamut_offs_j  = e_app_data.project_data.gamut_offs_j[e_gamut_idx];
+    auto &e_gamut_spec    = e_app_data.project_data.gamut_spec[e_gamut_idx];
 
     // Generate color system spectra
-    CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i].finalize();
-    CMFS cmfs_j = e_app_data.loaded_mappings[e_gamut_mapp_j].finalize();
+    CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i].finalize(e_gamut_spec);
+    CMFS cmfs_j = e_app_data.loaded_mappings[e_gamut_mapp_j].finalize(e_gamut_spec);
 
     // Generate metamer set convex hull 
     auto basis  = e_basis.rightCols(wavelength_bases);

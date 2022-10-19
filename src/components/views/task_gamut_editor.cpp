@@ -171,8 +171,7 @@ namespace met {
                          ImGuizmo::MODE::LOCAL, 
                          anchor_trf.data());
 
-    // After transformation update, we transform a second point to obtain
-    // translation distance
+    // After transformation update, we transform a second point to obtain translation distance
     auto post_pos = anchor_trf * eig::Vector3f(0, 0, 0);
     auto transl   = (post_pos - pre_pos).eval();
 
