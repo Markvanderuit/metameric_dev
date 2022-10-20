@@ -1,8 +1,11 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/utility.hpp>
 #include <span>
 #include <vector>
+#include <unordered_map>
+#include <utility>
 
 namespace met {
   /* Simple indexed triangle mesh structure */
@@ -15,13 +18,48 @@ namespace met {
     std::vector<Elem> elements;
   };
 
-  struct MeshTriangle {
+  template <typename T = eig::AlArray3f>
+  struct SimpleMesh {
+    struct Face {
+      T x, y, z;
+    };
+
+    private:
+      std::vector<Face> m_faces;
+
+    public:
 
   };
 
-  template <typename T>
-  struct SeparateMesh {
+  template <typename T = eig::AlArray3f>
+  struct HalfEdgeMesh {
+    struct Vertex {
+      T p;         // Position vector
+      uint half_i; // Component index
+    };
     
+    struct Face {
+      uint half_i; // Component index
+    };
+
+    struct HalfEdge {
+      uint twin_i, next_i, prev_i; // Half-edge indexes
+      uint vert_i, face_i;         // Component indices
+    };
+
+  private:
+    std::vector<Vertex>   m_vertices;
+    std::vector<Face>     m_faces;
+    std::vector<HalfEdge> m_halves;
+
+  public:
+    HalfEdgeMesh(const IndexedMesh<T> other);
+
+    // Index accessors
+    std::vector<uint> vertices_for_face(uint face_i);
+    std::vector<uint> halves_for_face(uint face_i);
+    std::vector<uint> faces_around_vertex(uint vert_i);
+    std::vector<uint> faces_around_face(uint face_i);
   };
   
   using Array3fMesh   = IndexedMesh<eig::Array3f>;

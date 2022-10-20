@@ -55,9 +55,9 @@ namespace met {
     gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
-                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
-                                gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
-                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
+                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
+                               gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
+                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
 
     // Dispatch draw call
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
