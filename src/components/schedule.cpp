@@ -1,4 +1,3 @@
-
 // Metameric includes
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/math.hpp>
@@ -21,7 +20,7 @@
 
 // View data tasks
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
-#include <metameric/components/pipeline/task_gen_ocs.hpp>
+#include <metameric/components/pipeline/task_gen_metamer_ocs.hpp>
 
 // View tasks
 #include <metameric/components/views/task_error_viewer.hpp>
@@ -190,7 +189,8 @@ namespace met {
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
 
     // The following tasks define view data necessities
-    scheduler.emplace_task<GenOCSTask>("gen_ocs");
+    // scheduler.emplace_task<GenOCSTask>("gen_ocs");
+    scheduler.emplace_task<GenMetamerOCSTask>("gen_metamer_ocs");
     scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
 
     // The following tasks define view components and windows

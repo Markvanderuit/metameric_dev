@@ -21,14 +21,15 @@ namespace met {
     constexpr auto matrix_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
   } // namespace detail
 
-  Mesh generate_unit_sphere(uint n_subdivs) {
+  template <typename T>
+  IndexedMesh<T> generate_unit_sphere(uint n_subdivs) {
     met_trace();
 
-    using Vt = Mesh::Vert;
-    using El = Mesh::Elem;
+    using Vt = IndexedMesh<T>::Vert;
+    using El = IndexedMesh<T>::Elem;
     using VMap  = std::unordered_map<Vt, uint, 
-                                      decltype(detail::matrix_hash), 
-                                      decltype(detail::matrix_equal)>;
+                                     decltype(detail::matrix_hash), 
+                                     decltype(detail::matrix_equal)>;
     
     // Initial mesh describes an octahedron
     std::vector<Vt> vts = { Vt(-1.f, 0.f, 0.f ), Vt( 0.f,-1.f, 0.f ), Vt( 0.f, 0.f,-1.f ),
@@ -76,11 +77,12 @@ namespace met {
     return { std::move(vts), std::move(els) };
   }
 
-  Mesh generate_convex_hull(const Mesh &sphere_mesh,
-                            const std::vector<eig::Array3f> &points) {
+  template <typename T>
+  IndexedMesh<T> generate_convex_hull(const IndexedMesh<T> &sphere_mesh,
+                                      std::span<const T> points) {
     met_trace();
 
-    Mesh mesh = sphere_mesh;
+    IndexedMesh<T> mesh = sphere_mesh;
 
     // For each vertex in mesh, each defining a line through the origin:
     std::for_each(std::execution::par_unseq, range_iter(mesh.vertices), [&](auto &v) {
@@ -112,8 +114,41 @@ namespace met {
     return mesh;
   }
   
-  Mesh generate_convex_hull(const std::vector<eig::Array3f> &points) {
+  template <typename T>
+  IndexedMesh<T> generate_convex_hull(std::span<const T> points) {
     met_trace();
-    return generate_convex_hull(generate_unit_sphere(), points);
+    return generate_convex_hull<T>(generate_unit_sphere<T>(), points);
   }
+
+  template <typename T>
+  IndexedMesh<T> simplify_mesh(const IndexedMesh<T> &mesh, uint max_vertices) {
+    IndexedMesh<T> new_mesh = mesh;
+    
+    while (new_mesh.vertices.size() > max_vertices) {
+      // Find mesh to collapse based on criterion
+
+      // Identify faces that need modification
+
+      // Rebuild mesh element set
+    }
+
+    return new_mesh;
+  }
+
+  /* Explicit template instantiations for common types */
+
+  template IndexedMesh<eig::Array3f>
+  generate_unit_sphere<eig::Array3f>(uint);
+  template IndexedMesh<eig::AlArray3f>
+  generate_unit_sphere<eig::AlArray3f>(uint);
+  template IndexedMesh<eig::Array3f> 
+  generate_convex_hull<eig::Array3f>(const IndexedMesh<eig::Array3f> &sphere_mesh,
+                                     std::span<const eig::Array3f>);
+  template IndexedMesh<eig::AlArray3f> 
+  generate_convex_hull<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f> &sphere_mesh,
+                                       std::span<const eig::AlArray3f>);
+  template IndexedMesh<eig::Array3f> 
+  generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
+  template IndexedMesh<eig::AlArray3f> 
+  generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
 } // namespace met

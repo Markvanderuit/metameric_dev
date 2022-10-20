@@ -86,7 +86,7 @@ namespace met {
     met_trace_full();
 
     // Generate reused 6d samples and a uv sphere mesh for faster OCS hull generation
-    m_sphere_mesh = generate_unit_sphere();
+    m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>();
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
 
     // Register ocs buffers
@@ -146,7 +146,7 @@ namespace met {
     auto basis  = e_basis.rightCols(wavelength_bases);
     auto points = generate_boundary(e_basis.rightCols(wavelength_bases), cmfs_i, cmfs_j, e_gamut_colr_i, m_sphere_samples);
     auto ocs_points = std::vector<AlColr>(range_iter(points));
-    auto ocs_hull   = generate_convex_hull(m_sphere_mesh, points);
+    auto ocs_hull   = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, ocs_points);
 
     // Compute center of object color solid
     i_ocs_center = std::reduce(std::execution::par_unseq, range_iter(ocs_hull.vertices), 

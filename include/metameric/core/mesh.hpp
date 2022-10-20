@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <span>
 #include <vector>
 
 namespace met {
@@ -13,11 +14,33 @@ namespace met {
     std::vector<Vert> vertices;
     std::vector<Elem> elements;
   };
-  
-  using Mesh = IndexedMesh<eig::AlArray3f>;
 
-  Mesh generate_unit_sphere(uint n_subdivs = 3);
-  Mesh generate_convex_hull(const Mesh &sphere_mesh,
-                            const std::vector<eig::Array3f> &points);
-  Mesh generate_convex_hull(const std::vector<eig::Array3f> &points);
+  struct MeshTriangle {
+
+  };
+
+  template <typename T>
+  struct SeparateMesh {
+    
+  };
+  
+  using Array3fMesh   = IndexedMesh<eig::Array3f>;
+  using AlArray3fMesh = IndexedMesh<eig::AlArray3f>;
+
+  // Generate a subdivided octahedron whose vertices lie on a unit sphere
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T> generate_unit_sphere(uint n_subdivs = 3);
+
+  // Generate an approximate convex hull from a mesh describing a unit sphere
+  // by matching each vertex to a point
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T> generate_convex_hull(const IndexedMesh<T> &sphere_mesh,
+                                      std::span<const T> points);
+
+  // Shorthand that first generates a sphere mesh
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T> generate_convex_hull(std::span<const T> points);
+
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T> simplify_mesh(const IndexedMesh<T> &mesh, uint max_vertices);
 } // namespace met

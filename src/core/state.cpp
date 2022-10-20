@@ -51,6 +51,12 @@ namespace met {
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
+
+    // Instantiate convex hull
+    std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
+    loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
+
+    // Reset undo/redo history
     mods  = { };
     mod_i = -1;
 
@@ -69,6 +75,12 @@ namespace met {
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"));
+    
+    // Instantiate convex hull
+    std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
+    loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
+
+    // Reset undo/redo history
     mods  = { };
     mod_i = -1;
     
@@ -121,6 +133,7 @@ namespace met {
     project_data  = { };
     loaded_texture  = { };
     loaded_mappings = { };
+    loaded_chull    = { };
     mods  = { };
     mod_i = -1;
   }

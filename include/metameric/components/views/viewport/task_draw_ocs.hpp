@@ -2,21 +2,17 @@
 
 #include <metameric/core/detail/scheduler_task.hpp>
 #include <small_gl/array.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 
 namespace met {
   class ViewportDrawOCSTask : public detail::AbstractTask {
-    gl::Array    m_array_points;
-    gl::Array    m_array_hull;
+    gl::Buffer   m_hull_vertices;
+    gl::Buffer   m_hull_elements;
+    gl::Array    m_hull_array;
+    gl::DrawInfo m_hull_dispatch;
     gl::Program  m_program;
-    gl::DrawInfo m_draw_points;
-    gl::DrawInfo m_draw_hull;
-    float        m_psize = 1.f;
-    bool         m_stale;
-    gl::Array    m_array_metset;
-    gl::DrawInfo m_draw_metset;
-    bool         m_stale_metset;
 
   public:
     ViewportDrawOCSTask(const std::string &name);

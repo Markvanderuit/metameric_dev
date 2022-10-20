@@ -1,6 +1,7 @@
 #include <metameric/components/views/task_gamut_editor.hpp>
 #include <metameric/components/views/gamut_viewport/task_draw_begin.hpp>
-#include <metameric/components/views/gamut_viewport/task_draw_ocs.hpp>
+// #include <metameric/components/views/gamut_viewport/task_draw_ocs.hpp>
+#include <metameric/components/views/gamut_viewport/task_draw_metamer_ocs.hpp>
 #include <metameric/components/views/gamut_viewport/task_draw_end.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -24,7 +25,8 @@ namespace met {
 
     // Add subtasks in reverse order
     info.emplace_task_after<DrawEndTask>(name(), name() + "_draw_end", name());
-    info.emplace_task_after<DrawOcsTask>(name(), name() + "_draw_ocs", name());
+    info.emplace_task_after<DrawMetamerOCSTask>(name(), name() + "_draw_metamer_ocs", name());
+    // info.emplace_task_after<DrawOcsTask>(name(), name() + "_draw_ocs", name());
     info.emplace_task_after<DrawBeginTask>(name(), name() + "_draw_begin", name());
 
     // Start with gizmo inactive
@@ -34,7 +36,8 @@ namespace met {
   void GamutEditorTask::dstr(detail::TaskDstrInfo &info) {
     // Remove subtasks
     info.remove_task(name() + "_draw_begin");
-    info.remove_task(name() + "_draw_ocs");
+    info.remove_task(name() + "_draw_metamer_ocs");
+    // info.remove_task(name() + "_draw_ocs");
     info.remove_task(name() + "_draw_end");
   }
 
@@ -60,7 +63,6 @@ namespace met {
       if (e_gamut_idx >= 0) {
         // Get shared resources
         auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-        auto &e_ocs_center   = info.get_resource<Colr>("gen_ocs", "ocs_centr");
         auto &e_gamut_colr   = e_app_data.project_data.gamut_colr_i;
         auto &e_gamut_offs   = e_app_data.project_data.gamut_offs_j;
         auto &e_gamut_spec   = e_app_data.project_data.gamut_spec;
@@ -68,11 +70,6 @@ namespace met {
         auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
         auto &e_mappings     = e_app_data.loaded_mappings;
 
-        // // Compute colors at gamut's point positions
-        // std::array<Colr, 4> spectra_to_colors;
-        // std::ranges::transform(e_gamut_spec, spectra_to_colors.begin(),
-        //   [](const auto &s) { return reflectance_to_color(s, { .cmfs = models::cmfs_srgb }).eval(); });
-          
         // Obtain selected reflectance and colors
         Spec &gamut_spec   = e_gamut_spec[e_gamut_idx];
         Colr &gamut_colr_i = e_gamut_colr[e_gamut_idx];

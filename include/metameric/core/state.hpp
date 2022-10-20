@@ -83,8 +83,7 @@ namespace met {
 
     Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
     std::vector<Mapp>   loaded_mappings; // Spectral mappings extracted from project data
-    std::array<Mesh, 4> loaded_met_sets; // Object color solids loaded around gamut data
-    // KNNGrid<Spec>       loaded_knn_grid; // Placeholder spectral KNN dataset // TODO remove
+    AlArray3fMesh       loaded_chull;    // Approximate convex hull surrounding RGB texture
 
     /* Project data handling */
     
