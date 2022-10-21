@@ -38,8 +38,8 @@ namespace met {
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>();
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      m_hull_vertices = {{ .size = sizeof(eig::AlArray3f) * m_sphere_mesh.vertices.size(), .flags = create_flags }};
-      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elements) }};
+      m_hull_vertices = {{ .size = sizeof(eig::AlArray3f) * m_sphere_mesh.verts().size(), .flags = create_flags }};
+      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()) }};
       
       // Construct non-changing draw components
       m_program = {{ .type = gl::ShaderType::eVertex, 
@@ -93,7 +93,7 @@ namespace met {
 
         // Generate approximate convex hull around points and move to gl buffer
         auto hull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, e_ocs_points);
-        m_hull_vertices.set(cnt_span<const std::byte>(hull.vertices));
+        m_hull_vertices.set(cnt_span<const std::byte>(hull.verts()));
       }
 
       // Declare scoped OpenGL state

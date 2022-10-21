@@ -24,8 +24,8 @@ namespace met {
     auto &e_chull    = e_app_data.loaded_chull;
 
     // Construct draw components
-    m_hull_vertices = {{ .data = cnt_span<const std::byte>(e_chull.vertices) }};
-    m_hull_elements = {{ .data = cnt_span<const std::byte>(e_chull.elements) }};
+    m_hull_vertices = {{ .data = cnt_span<const std::byte>(e_chull.verts()) }};
+    m_hull_elements = {{ .data = cnt_span<const std::byte>(e_chull.elems()) }};
     m_hull_array = {{
       .buffers = {{ .buffer = &m_hull_vertices, .index = 0, .stride = sizeof(AlColr) }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},

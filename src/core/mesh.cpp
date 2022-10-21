@@ -23,14 +23,36 @@ namespace met {
   } // namespace detail
 
   template <typename T>
-  HalfEdgeMesh<T>::HalfEdgeMesh(const IndexedMesh<T> other) {
+  IndexedMesh<T>::IndexedMesh(std::span<const Vert> verts, std::span<const Elem> elems)
+  : m_verts(range_iter(verts)), m_elems(range_iter(elems)) { }
+
+  template <typename T>
+  IndexedMesh<T>::IndexedMesh(const HalfEdgeMesh<T> &other) {
     // Allocate record space
-    m_vertices.resize(other.vertices.size());
-    m_faces.resize(other.elements.size());
+    m_verts.resize(other.verts().size());
+    m_elems.resize(other.faces().size());
 
     // Initialize vertex positions
-    std::transform(range_iter(other.vertices), m_vertices.begin(), [&](const auto &p) { 
-      return Vertex { p, static_cast<uint>(other.vertices.size()) }; });
+    std::transform(std::execution::par_unseq, range_iter(other.verts()), m_verts.begin(),
+      [](const auto &v) { return v.p; });
+
+    // Construct faces
+    #pragma omp parallel for
+    for (int i = 0; i < m_elems.size(); ++i) {
+      auto verts = other.verts_around_face(i);
+      m_elems[i] = Elem { verts[0], verts[1], verts[2] };
+    }
+  }
+
+  template <typename T>
+  HalfEdgeMesh<T>::HalfEdgeMesh(const IndexedMesh<T> other) {
+    // Allocate record space
+    m_verts.resize(other.verts().size());
+    m_faces.resize(other.elems().size());
+
+    // Initialize vertex positions
+    std::transform(std::execution::par_unseq, range_iter(other.verts()), m_verts.begin(), 
+      [&](const auto &p) { return Vert { p, 3 * static_cast<uint>(other.elems().size()) }; });
     
     // Map to perform half-edge connections
     using Edge  = eig::Array2u;
@@ -39,18 +61,19 @@ namespace met {
                                      decltype(detail::matrix_equal)>;
     Edges edge_map;
 
-    for (uint face_i = 0; face_i < other.elements.size(); ++face_i) {
-      const auto &el = other.elements[face_i];
+    for (uint face_i = 0; face_i < m_faces.size(); ++face_i) {
+      const auto &el = other.elems()[face_i];
       std::array<Edge, 3> face = { Edge { el.x(), el.y() },
                                    Edge { el.y(), el.z() }, 
                                    Edge { el.z(), el.x() }};
 
       // Insert initial half-edge data for this face 
       for (uint i = 0; i < face.size(); ++i) {
-        auto &edge = face[i];
-        HalfEdge half = { .vert_i = edge.x(), .face_i = face_i };
-        m_halves.push_back(half);
-        edge_map.insert({ edge, static_cast<uint>(m_halves.size() - 1) });
+        auto &curr_edge = face[i];
+        m_halfs.push_back(Half { .vert_i = curr_edge.x(), .face_i = face_i });
+        
+        debug::check_expr_rel(!edge_map.contains(curr_edge));
+        edge_map.insert({ curr_edge, static_cast<uint>(m_halfs.size() - 1) });
       }
 
       // Establish connections
@@ -60,16 +83,17 @@ namespace met {
         auto &curr_edge = face[i], &next_edge = face[j], &prev_edge = face[k];
 
         // Find the current half edge and assign connections
-        auto &curr_half  = m_halves[edge_map[curr_edge]];
+        uint curr_i = edge_map[curr_edge];
+        auto &curr_half  = m_halfs[curr_i];
         curr_half.next_i = edge_map[next_edge];
         curr_half.prev_i = edge_map[prev_edge];
 
-        // Find half edge's twin and assign connections
+        // Find half edge's twin and build connections
         eig::Array2u twin_edge = { curr_edge.y(), curr_edge.x() };
         if (auto it = edge_map.find(twin_edge); it != edge_map.end()) {
-          auto &twin_half = m_halves[it->second];
+          auto &twin_half = m_halfs[it->second];
           curr_half.twin_i = it->second;
-          twin_half.twin_i = edge_map[curr_edge];
+          twin_half.twin_i = curr_i;
         }
       }
 
@@ -78,54 +102,71 @@ namespace met {
     }
 
     // Assign arbitrary half-edge to each vertex
-    for (uint i = 0; i < m_halves.size(); ++i) {
-      auto &half = m_halves[i];
-      auto &vert = m_vertices[half.vert_i];
-      guard_continue(vert.half_i == other.vertices.size());
+    for (uint i = 0; i < m_halfs.size(); ++i) {
+      auto &half = m_halfs[i];
+      auto &vert = m_verts[half.vert_i];
+      guard_continue(vert.half_i == m_halfs.size());
       vert.half_i = i;
     }
   }
 
   template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::vertices_for_face(uint face_i) {
+  std::vector<uint> HalfEdgeMesh<T>::halfs_storing_vert(uint vert_i) const {
+    std::vector<uint> halfs;
+    for (uint i = 0; i < m_halfs.size(); ++i) {
+      guard_continue(m_halfs[i].vert_i == vert_i);
+      halfs.push_back(i);
+    }
+    return halfs;
+  }
+
+  template <typename T>
+  std::vector<uint> HalfEdgeMesh<T>::verts_around_face(uint face_i) const {
     std::vector<uint> vertices;
-    for (uint half_i : halves_for_face(face_i)) {
-      vertices.push_back(m_halves[half_i].vert_i);
+    for (uint half_i : halfs_around_face(face_i)) {
+      vertices.push_back(m_halfs[half_i].vert_i);
     }
     return vertices;
   }
 
 
   template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::halves_for_face(uint face_i) {
+  std::vector<uint> HalfEdgeMesh<T>::halfs_around_face(uint face_i) const {
     const auto &face = m_faces[face_i];
-    const auto &half = m_halves[face.half_i];
+    const auto &half = m_halfs[face.half_i];
     return { face.half_i, half.next_i, half.prev_i };
   }
 
   template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::faces_around_vertex(uint vert_i) {
+  std::vector<uint> HalfEdgeMesh<T>::faces_around_vert(uint vert_i) const {
     std::vector<uint> faces;
-    const auto &vert = m_vertices[vert_i];
+    const auto &vert = m_verts[vert_i];
     uint half_i = vert.half_i;
     do {
-      const auto &half = m_halves[half_i];
+      const auto &half = m_halfs[half_i];
       faces.push_back(half.face_i);
-      half_i = m_halves[half.prev_i].twin_i;
+      half_i = m_halfs[half.prev_i].twin_i;
     } while (half_i != vert.half_i);
     return faces;
   }
 
   template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::faces_around_face(uint face_i) {
+  std::vector<uint> HalfEdgeMesh<T>::faces_around_face(uint face_i) const {
     std::vector<uint> faces;
     const auto &face = m_faces[face_i];
-    for (uint half_i : halves_for_face(face_i)) {
-      const auto &half = m_halves[half_i];
-      const auto &twin = m_halves[half.twin_i];
+    for (uint half_i : halfs_around_face(face_i)) {
+      const auto &half = m_halfs[half_i];
+      const auto &twin = m_halfs[half.twin_i];
       faces.push_back(twin.face_i);
     }
     return faces;
+  }
+  
+  template <typename T>
+  std::vector<uint> HalfEdgeMesh<T>::faces_around_half(uint half_i) const {
+    const Half &half = m_halfs[half_i];
+    const Half &twin = m_halfs[half.twin_i];
+    return { half.face_i, twin.face_i };
   }
 
   template <typename T>
@@ -193,7 +234,7 @@ namespace met {
     HalfEdgeMesh<T> mesh_(mesh);
 
     // For each vertex in mesh, each defining a line through the origin:
-    std::for_each(std::execution::par_unseq, range_iter(mesh.vertices), [&](auto &v) {
+    std::for_each(std::execution::par_unseq, range_iter(mesh.verts()), [&](auto &v) {
       // Obtain a range of point projections along this line
       auto proj_funct  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
       auto proj_range = points | std::views::transform(proj_funct);
@@ -229,15 +270,82 @@ namespace met {
   }
 
   template <typename T>
-  IndexedMesh<T> simplify_mesh(const IndexedMesh<T> &mesh, uint max_vertices) {
-    IndexedMesh<T> new_mesh = mesh;
+  HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices) {
+    using Vert = HalfEdgeMesh<T>::Vert;
+    using Face = HalfEdgeMesh<T>::Face;
+    using Half = HalfEdgeMesh<T>::Half;
     
-    while (new_mesh.vertices.size() > max_vertices) {
-      // Find mesh to collapse based on criterion
+    HalfEdgeMesh<T> new_mesh = mesh;
+    
+    while (new_mesh.verts().size() > max_vertices) {
+      // Find half-edge to collapse based on criterion
+      // TODO for now, collapse shortest edges
+      auto half_it = std::min_element(std::execution::par_unseq, range_iter(new_mesh.halfs()), 
+        [&](const Half &a, const Half &b){
+          const Half &a_ = new_mesh.halfs()[a.next_i], &b_ = new_mesh.halfs()[b.next_i];
+          float a_len = (new_mesh.verts()[a.vert_i].p - new_mesh.verts()[a_.vert_i].p).matrix().norm();
+          float b_len = (new_mesh.verts()[b.vert_i].p - new_mesh.verts()[b_.vert_i].p).matrix().norm();
+          return a_len < b_len;
+        });
+      uint half_i = std::distance(new_mesh.halfs().begin(), half_it);
 
-      // Identify faces that need modification
+      // Obtain half edges and their vertices, as temporary copy
+      Half half = new_mesh.halfs()[half_i], twin = new_mesh.halfs()[half.twin_i];
+      Vert &half_vert = new_mesh.verts()[half.vert_i], &twin_vert = new_mesh.verts()[twin.vert_i];
 
-      // Rebuild mesh element set
+      // Modify vertex position; use the average for now
+      half_vert.p = 0.5f * (half_vert.p + twin_vert.p);
+
+      // Move references from the second vertex towards the first
+      for (auto &other_half : new_mesh.halfs_storing_vert(twin.vert_i))
+        new_mesh.halfs()[other_half].vert_i = half.vert_i;
+
+      // Move twins in surrounding faces to stitch halves together, collapsing edge
+      Half &ri_next = new_mesh.halfs()[new_mesh.halfs()[half.next_i].twin_i],
+           &ri_prev = new_mesh.halfs()[new_mesh.halfs()[half.prev_i].twin_i];
+      Half &le_next = new_mesh.halfs()[new_mesh.halfs()[twin.next_i].twin_i],
+           &le_prev = new_mesh.halfs()[new_mesh.halfs()[twin.prev_i].twin_i];
+      ri_next.twin_i = new_mesh.halfs()[half.prev_i].twin_i;
+      ri_prev.twin_i = new_mesh.halfs()[half.next_i].twin_i;
+      le_next.twin_i = new_mesh.halfs()[twin.prev_i].twin_i;
+      le_prev.twin_i = new_mesh.halfs()[twin.next_i].twin_i;
+
+      // Erase faces and half edges
+      std::vector<uint> faces_to_remv = new_mesh.faces_around_half(half_i);
+      for (auto face_i : faces_to_remv) {
+        // Erase half edges first
+        auto halfs_to_remv = new_mesh.halfs_around_face(face_i);
+        for (uint i = 0; i < halfs_to_remv.size(); ++i) {
+          // Erase half edge from record
+          uint half_i = halfs_to_remv[i];
+          new_mesh.halfs().erase(new_mesh.halfs().begin() + half_i);
+
+          // Update rest of records
+          std::for_each(std::execution::par_unseq, range_iter(new_mesh.verts()),
+            [&](Vert &vert) { guard(vert.half_i > half_i); vert.half_i--; });
+          std::for_each(std::execution::par_unseq, range_iter(new_mesh.faces()),
+            [&](Face &face) { guard(face.half_i > half_i); face.half_i--; });
+          std::for_each(std::execution::par_unseq, range_iter(new_mesh.halfs()),
+            [&](Half &half) {
+              if (half.next_i > half_i) half.next_i--;
+              if (half.prev_i > half_i) half.prev_i--;
+              if (half.twin_i > half_i) half.twin_i--;
+            });
+          
+          // Update record currently in iteration
+          std::for_each(range_iter(halfs_to_remv), [&](uint &i) { guard(i > half_i); i--; });
+        }
+
+        // Erase face next and update records
+        new_mesh.faces().erase(new_mesh.faces().begin() + face_i);
+        std::for_each(std::execution::par_unseq, range_iter(new_mesh.halfs()),
+          [&](Half &half) { guard(half.face_i > face_i); half.face_i--; });
+      }
+      
+      // Remove collapsed vertex and update records
+      new_mesh.verts().erase(new_mesh.verts().begin() + twin.vert_i);
+      std::for_each(std::execution::par_unseq, range_iter(new_mesh.halfs()),
+        [&](Half &half) { guard(half.vert_i > twin.vert_i); half.vert_i--; });
     }
 
     return new_mesh;
@@ -245,18 +353,30 @@ namespace met {
 
   /* Explicit template instantiations for common types */
 
+  template class IndexedMesh<eig::Array3f>;
+  template class IndexedMesh<eig::AlArray3f>;
+  template class HalfEdgeMesh<eig::Array3f>;
+  template class HalfEdgeMesh<eig::AlArray3f>;
+
   template IndexedMesh<eig::Array3f>
   generate_unit_sphere<eig::Array3f>(uint);
   template IndexedMesh<eig::AlArray3f>
   generate_unit_sphere<eig::AlArray3f>(uint);
+
   template IndexedMesh<eig::Array3f> 
   generate_convex_hull<eig::Array3f>(const IndexedMesh<eig::Array3f> &sphere_mesh,
                                      std::span<const eig::Array3f>);
   template IndexedMesh<eig::AlArray3f> 
   generate_convex_hull<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f> &sphere_mesh,
                                        std::span<const eig::AlArray3f>);
+                                       
   template IndexedMesh<eig::Array3f> 
   generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
   template IndexedMesh<eig::AlArray3f> 
   generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
+
+  template HalfEdgeMesh<eig::Array3f> 
+  simplify_mesh<eig::Array3f>(const HalfEdgeMesh<eig::Array3f> &, uint);
+  template HalfEdgeMesh<eig::AlArray3f> 
+  simplify_mesh<eig::AlArray3f>(const HalfEdgeMesh<eig::AlArray3f> &, uint);
 } // namespace met

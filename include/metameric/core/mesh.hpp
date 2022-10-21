@@ -8,15 +8,11 @@
 #include <utility>
 
 namespace met {
-  /* Simple indexed triangle mesh structure */
+  // FWD
   template <typename T>
-  struct IndexedMesh {
-    using Vert = T;
-    using Elem = eig::Array3u;
-
-    std::vector<Vert> vertices;
-    std::vector<Elem> elements;
-  };
+  struct IndexedMesh;
+  template <typename T>
+  struct HalfEdgeMesh;
 
   template <typename T = eig::AlArray3f>
   struct SimpleMesh {
@@ -31,9 +27,31 @@ namespace met {
 
   };
 
+  /* Simple indexed triangle mesh structure */
+  template <typename T>
+  struct IndexedMesh {
+    using Vert = T;
+    using Elem = eig::Array3u;
+
+  private:
+    std::vector<Vert> m_verts;
+    std::vector<Elem> m_elems;
+
+  public:
+    IndexedMesh() = default;
+    IndexedMesh(const HalfEdgeMesh<T> &other);
+    IndexedMesh(std::span<const Vert> verts, std::span<const Elem> elems);
+
+    // Accessors
+    std::vector<Vert>& verts() { return m_verts; }
+    std::vector<Elem>& elems() { return m_elems; }
+    const std::vector<Vert>& verts() const { return m_verts; }
+    const std::vector<Elem>& elems() const { return m_elems; }
+  };
+
   template <typename T = eig::AlArray3f>
   struct HalfEdgeMesh {
-    struct Vertex {
+    struct Vert {
       T p;         // Position vector
       uint half_i; // Component index
     };
@@ -42,24 +60,34 @@ namespace met {
       uint half_i; // Component index
     };
 
-    struct HalfEdge {
+    struct Half {
       uint twin_i, next_i, prev_i; // Half-edge indexes
       uint vert_i, face_i;         // Component indices
     };
 
   private:
-    std::vector<Vertex>   m_vertices;
-    std::vector<Face>     m_faces;
-    std::vector<HalfEdge> m_halves;
+    std::vector<Vert> m_verts;
+    std::vector<Face> m_faces;
+    std::vector<Half> m_halfs;
 
   public:
     HalfEdgeMesh(const IndexedMesh<T> other);
 
-    // Index accessors
-    std::vector<uint> vertices_for_face(uint face_i);
-    std::vector<uint> halves_for_face(uint face_i);
-    std::vector<uint> faces_around_vertex(uint vert_i);
-    std::vector<uint> faces_around_face(uint face_i);
+    // Accessors
+    std::vector<Vert>& verts() { return m_verts; }
+    std::vector<Face>& faces() { return m_faces; }
+    std::vector<Half>& halfs() { return m_halfs; }
+    const std::vector<Vert>& verts() const { return m_verts; }
+    const std::vector<Face>& faces() const { return m_faces; }
+    const std::vector<Half>& halfs() const { return m_halfs; }
+
+    // Surrounding accessors
+    std::vector<uint> halfs_storing_vert(uint vert_i) const;
+    std::vector<uint> verts_around_face(uint face_i) const;
+    std::vector<uint> halfs_around_face(uint face_i) const;
+    std::vector<uint> faces_around_vert(uint vert_i) const;
+    std::vector<uint> faces_around_half(uint half_i) const;
+    std::vector<uint> faces_around_face(uint face_i) const;
   };
   
   using Array3fMesh   = IndexedMesh<eig::Array3f>;
@@ -80,5 +108,5 @@ namespace met {
   IndexedMesh<T> generate_convex_hull(std::span<const T> points);
 
   template <typename T = eig::AlArray3f>
-  IndexedMesh<T> simplify_mesh(const IndexedMesh<T> &mesh, uint max_vertices);
+  HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices);
 } // namespace met

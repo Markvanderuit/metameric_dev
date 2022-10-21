@@ -52,9 +52,10 @@ namespace met {
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
 
-    // Instantiate convex hull
+    // Instantiate approximate convex hull
     std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
     loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
+    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), 4);
 
     // Reset undo/redo history
     mods  = { };
@@ -79,6 +80,7 @@ namespace met {
     // Instantiate convex hull
     std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
     loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
+    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), 6);
 
     // Reset undo/redo history
     mods  = { };
