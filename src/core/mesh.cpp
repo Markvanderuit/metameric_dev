@@ -215,7 +215,7 @@ namespace met {
       
         // Create and insert newly subdivided elements
         const auto new_els = { El(ijk[0], abc[0], abc[2]), El(ijk[1], abc[1], abc[0]), 
-                                El(ijk[2], abc[2], abc[1]), El(abc[0], abc[1], abc[2]) };
+                               El(ijk[2], abc[2], abc[1]), El(abc[0], abc[1], abc[2]) };
         std::ranges::copy(new_els, els_.begin() + 4 * e);
       }
 
@@ -316,8 +316,14 @@ namespace met {
         // Erase half edges first
         auto halfs_to_remv = new_mesh.halfs_around_face(face_i);
         for (uint i = 0; i < halfs_to_remv.size(); ++i) {
-          // Erase half edge from record
           uint half_i = halfs_to_remv[i];
+
+          // Move vertex to another edge if this is an issue
+          auto &vert = new_mesh.verts()[new_mesh.halfs()[half_i].vert_i];
+          if (vert.half_i == half_i)
+            vert.half_i = new_mesh.halfs()[half_i].next_i;
+
+          // Erase half edge from record
           new_mesh.halfs().erase(new_mesh.halfs().begin() + half_i);
 
           // Update rest of records
