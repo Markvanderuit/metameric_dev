@@ -92,7 +92,6 @@ namespace met {
                                      decltype(detail::matrix_hash<uint>), 
                                      decltype(detail::matrix_equal)>;
     Edges edge_map;
-
     for (uint face_i = 0; face_i < m_faces.size(); ++face_i) {
       const auto &el = other.elems()[face_i];
       std::array<Edge, 3> face = { Edge { el.x(), el.y() },
@@ -418,6 +417,11 @@ namespace met {
     /* fmt::print("Erased collapsed elements\n");
     fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size()); */
 
+    for (auto &el : mesh.elems()) {
+      fmt::print("{} -> {}\n", el[0], el[1]);
+      fmt::print("{} -> {}\n", el[1], el[2]);
+      fmt::print("{} -> {}\n", el[2], el[0]);
+    }
     return mesh;
   }
   
@@ -454,8 +458,8 @@ namespace met {
     using Face = HalfEdgeMesh<T>::Face;
     using Half = HalfEdgeMesh<T>::Half;
     
+    fmt::print("Beginning halfedge generation\n");
     HalfEdgeMesh<T> new_mesh = mesh;
-
     for (uint i = 0; i < new_mesh.halfs().size(); ++i) {
       auto &half = new_mesh.halfs()[i];
       auto &twin = new_mesh.halfs()[half.twin_i];
@@ -483,7 +487,7 @@ namespace met {
       // Modify vertex position; use the average for now
       half_vert.p = (0.5f * (half_vert.p + twin_vert.p)).eval();
 
-      fmt::print("Shortest half: {} : {} -> {}\n", half_i, half.vert_i, twin.vert_i);
+      // fmt::print("Shortest half: {} : {} -> {}\n", half_i, half.vert_i, twin.vert_i);
 
       // Move all references from the second vertex towards the first
       for (auto &other_half : new_mesh.halfs_storing_vert(twin.vert_i))
