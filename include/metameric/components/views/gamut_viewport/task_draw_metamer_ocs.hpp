@@ -21,6 +21,8 @@ namespace met {
     std::string   m_parent;
     int           m_gamut_idx;
     AlArray3fMesh m_sphere_mesh;
+    AlArray3fWireframe 
+                  m_sphere_mesh_wf;
     gl::Buffer    m_hull_vertices;
     gl::Buffer    m_hull_elements;
     gl::Array     m_hull_array;
@@ -36,10 +38,11 @@ namespace met {
       met_trace_full();
 
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
-      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>();
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      m_hull_vertices = {{ .size = sizeof(eig::AlArray3f) * m_sphere_mesh.verts().size(), .flags = create_flags }};
-      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()) }};
+      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>();
+      m_sphere_mesh_wf = generate_wireframe<eig::AlArray3f>(m_sphere_mesh);
+      m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh_wf.verts()), .flags = create_flags }};
+      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh_wf.elems()), .flags = create_flags }};
       
       // Construct non-changing draw components
       m_program = {{ .type = gl::ShaderType::eVertex, 
@@ -51,7 +54,7 @@ namespace met {
         .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         .elements = &m_hull_elements
       }};
-      m_hull_dispatch = { .type = gl::PrimitiveType::eTriangles,
+      m_hull_dispatch = { .type = gl::PrimitiveType::eLines,
                           .vertex_count = (uint) (m_hull_elements.size() / sizeof(uint)),
                           .bindable_array = &m_hull_array,
                           .bindable_program = &m_program };
@@ -82,8 +85,8 @@ namespace met {
       auto &e_arcball        = info.get_resource<detail::Arcball>(m_parent, "arcball");
       
       // Update convex hull mesh if selection has changed, or selected gamut point has changed
-      if (m_gamut_idx != e_gamut_idx                                          ||
-          e_state_gamut[e_gamut_idx] == CacheState::eStale                    ||
+      if (m_gamut_idx                                   != e_gamut_idx        ||
+          e_state_gamut[e_gamut_idx]                    == CacheState::eStale ||
           e_state_mappings[e_gamut_mapp_i[e_gamut_idx]] == CacheState::eStale ||
           e_state_mappings[e_gamut_mapp_j[e_gamut_idx]] == CacheState::eStale) {
         m_gamut_idx = e_gamut_idx;
@@ -91,9 +94,14 @@ namespace met {
         // Get shared resources
         auto &e_ocs_points = info.get_resource<std::vector<eig::AlArray3f>>("gen_metamer_ocs", fmt::format("ocs_points_{}", m_gamut_idx));
 
-        // Generate approximate convex hull around points and move to gl buffer
+        // Generate approximate convex hull around points and copy to gl buffer
         auto hull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, e_ocs_points);
-        m_hull_vertices.set(cnt_span<const std::byte>(hull.verts()));
+        auto hull_wf = generate_wireframe<eig::AlArray3f>(hull);
+        m_hull_vertices.set(cnt_span<const std::byte>(hull_wf.verts()), hull_wf.verts().size() * sizeof(decltype(hull_wf)::Vert));
+        m_hull_elements.set(cnt_span<const std::byte>(hull_wf.elems()), hull_wf.elems().size() * sizeof(decltype(hull_wf)::Elem));
+
+        // Adjust vertex count in case convex hull is smaller
+        m_hull_dispatch.vertex_count = hull_wf.elems().size() * 2;
       }
 
       // Declare scoped OpenGL state

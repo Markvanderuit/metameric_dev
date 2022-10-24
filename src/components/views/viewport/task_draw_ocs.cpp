@@ -31,7 +31,7 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
       .elements = &m_hull_elements
     }};
-    m_hull_dispatch = { .type = gl::PrimitiveType::eTriangles,
+    m_hull_dispatch = { .type = gl::PrimitiveType::eLines,
                         .vertex_count = (uint) (m_hull_elements.size() / sizeof(uint)),
                         .bindable_array = &m_hull_array,
                         .bindable_program = &m_program };
@@ -61,6 +61,7 @@ namespace met {
 
     // Dispatch draw call
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
+    gl::state::set_line_width(2.f);
     gl::dispatch_draw(m_hull_dispatch);
   }
 } // namespace met

@@ -1,9 +1,11 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <fmt/ranges.h>
 #include <algorithm>
 #include <execution>
 #include <ranges>
+#include <unordered_set>
 #include <unordered_map>
 #include <vector>
 
@@ -20,14 +22,43 @@ namespace met {
       return seed;
     };
     constexpr auto matrix_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
+
+    template <typename T>
+    void half_mesh_erase_vert(HalfEdgeMesh<T> &mesh, uint i) {
+      mesh.verts().erase(mesh.verts().begin() + i);
+      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
+        [&](auto &half) { guard(half.vert_i > i); half.vert_i--; });
+    }
+    
+    template <typename T>
+    void half_mesh_erase_face(HalfEdgeMesh<T> &mesh, uint i) {
+      mesh.faces().erase(mesh.faces().begin() + i);
+      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
+        [&](auto &half) { guard(half.face_i > i); half.face_i--; });
+    }
+    
+    template <typename T>
+    void half_mesh_erase_half(HalfEdgeMesh<T> &mesh, uint i) {
+      mesh.halfs().erase(mesh.halfs().begin() + i);
+      std::for_each(std::execution::par_unseq, range_iter(mesh.verts()),
+        [&](auto &vert) { guard(vert.half_i > i); vert.half_i--; });
+      std::for_each(std::execution::par_unseq, range_iter(mesh.faces()),
+        [&](auto &face) { guard(face.half_i > i); face.half_i--; });
+      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
+        [&](auto &half) {
+          if (half.next_i > i) half.next_i--;
+          if (half.prev_i > i) half.prev_i--;
+          if (half.twin_i > i) half.twin_i--;
+      });
+    }
   } // namespace detail
 
-  template <typename T>
-  IndexedMesh<T>::IndexedMesh(std::span<const Vert> verts, std::span<const Elem> elems)
+  template <typename T, typename E>
+  IndexedMesh<T, E>::IndexedMesh(std::span<const Vert> verts, std::span<const Elem> elems)
   : m_verts(range_iter(verts)), m_elems(range_iter(elems)) { }
 
-  template <typename T>
-  IndexedMesh<T>::IndexedMesh(const HalfEdgeMesh<T> &other) {
+  template <typename T, typename E>
+  IndexedMesh<T, E>::IndexedMesh(const HalfEdgeMesh<T> &other) {
     // Allocate record space
     m_verts.resize(other.verts().size());
     m_elems.resize(other.faces().size());
@@ -40,12 +71,13 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < m_elems.size(); ++i) {
       auto verts = other.verts_around_face(i);
-      m_elems[i] = Elem { verts[0], verts[1], verts[2] };
+      for (int j = 0; j < verts.size(); j++)
+        m_elems[i][j] = verts[j];
     }
   }
 
   template <typename T>
-  HalfEdgeMesh<T>::HalfEdgeMesh(const IndexedMesh<T> other) {
+  HalfEdgeMesh<T>::HalfEdgeMesh(const IndexedMesh<T, eig::Array3u> other) {
     // Allocate record space
     m_verts.resize(other.verts().size());
     m_faces.resize(other.elems().size());
@@ -129,7 +161,6 @@ namespace met {
     return vertices;
   }
 
-
   template <typename T>
   std::vector<uint> HalfEdgeMesh<T>::halfs_around_face(uint face_i) const {
     const auto &face = m_faces[face_i];
@@ -170,11 +201,11 @@ namespace met {
   }
 
   template <typename T>
-  IndexedMesh<T> generate_unit_sphere(uint n_subdivs) {
+  IndexedMesh<T, eig::Array3u> generate_unit_sphere(uint n_subdivs) {
     met_trace();
 
-    using Vt = IndexedMesh<T>::Vert;
-    using El = IndexedMesh<T>::Elem;
+    using Vt = IndexedMesh<T, eig::Array3u>::Vert;
+    using El = IndexedMesh<T, eig::Array3u>::Elem;
     using VMap  = std::unordered_map<Vt, uint, 
                                      decltype(detail::matrix_hash<float>), 
                                      decltype(detail::matrix_equal)>;
@@ -226,13 +257,15 @@ namespace met {
   }
 
   template <typename T>
-  IndexedMesh<T> generate_convex_hull(const IndexedMesh<T> &sphere_mesh,
-                                      std::span<const T> points) {
+  IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh,
+                                                    std::span<const T> points) {
     met_trace();
 
-    IndexedMesh<T> mesh = sphere_mesh;
-    HalfEdgeMesh<T> mesh_(mesh);
+    IndexedMesh<T, eig::Array3u> mesh = sphere_mesh;
 
+    fmt::print("Input mesh\n");
+    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size());    
+    
     // For each vertex in mesh, each defining a line through the origin:
     std::for_each(std::execution::par_unseq, range_iter(mesh.verts()), [&](auto &v) {
       // Obtain a range of point projections along this line
@@ -246,36 +279,190 @@ namespace met {
       v = *(points.begin() + std::distance(proj_range.begin(), it));
     });
 
-    /* // Find and erase collapsed triangles
-    fmt::print("pre_erase {}\n", mesh.elements.size());
-    std::erase_if(mesh.elements, [&](const auto &e) {
-      const uint i = e.x(), j = e.y(), k = e.z();
-      return (mesh.vertices[i].isApprox(mesh.vertices[j])) ||
-              (mesh.vertices[j].isApprox(mesh.vertices[k])) ||
-              (mesh.vertices[k].isApprox(mesh.vertices[i]));
-    });
-    fmt::print("post_erase {}\n", mesh.elements.size()); */
+    // Data structures for cleanup
+    using vertex_ui_map = std::unordered_map<T, uint, 
+      decltype(detail::matrix_hash<float>), decltype(detail::matrix_equal)>;
+    vertex_ui_map            vert_identify_map;
+    std::vector<uint>        vert_remove_list;
+    std::unordered_set<uint> vert_removed_list;
 
-    // Find and erase inward-pointing triangles
-    /* std::erase_if(mesh.elements, [&](const auto &e) {
+    // Structures to flag vertices/elements for removal
+    vertex_ui_map     vert_index_map;
+    std::vector<bool> vert_remove_flags(mesh.verts().size(), false);
+    std::vector<bool> elem_remove_flags(mesh.elems().size(), false);
+
+    // Identify removable double vertices, and update element indices to avoid these
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &elem = mesh.elems()[i];
+      for (uint j = 0; j < 3; ++j) {
+        auto &indx = elem[j];
+        auto &vert = mesh.verts()[indx];
+
+        // If the vert_index_map has a registered vertex already, it is a double
+        if (auto it = vert_index_map.find(vert); it != vert_index_map.end()) {
+          guard_continue(indx != it->second);
+          vert_remove_flags[indx] = true; // Double vertex; flag for removal
+          indx = it->second;              // and update referring index
+        } else {
+          vert_index_map.emplace(vert, indx);
+        }
+      }
+    }
+
+    // Identify removable collapsed elements
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &elem = mesh.elems()[i];
+      if (elem[0] == elem[1] || elem[1] == elem[2] || elem[2] == elem[0]) {
+        elem_remove_flags[i] = true;
+      }
+    }
+
+    // Perform an exclusive scan of removal flags to build a new set of indices
+    std::vector<uint> vert_new_indices(mesh.verts().size());
+    constexpr auto bool_to_ui = [](bool b) { return b ? 0 : 1; };
+    std::transform_exclusive_scan(std::execution::par_unseq, 
+                                  range_iter(vert_remove_flags),
+                                  vert_new_indices.begin(), 0,
+                                  std::plus<uint>(), bool_to_ui);
+
+    // Apply new indices to element set
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &elem = mesh.elems()[i];
+      for (uint j = 0; j < 3; ++j) {
+        elem[j] = vert_new_indices[elem[j]];
+      }
+    }
+
+    // Obtain indices of erasable vertices and elements from data
+    std::vector<uint> vert_remove_indices, elem_remove_indices;
+    for (uint i = 0; i < vert_remove_flags.size(); ++i) { 
+      if (vert_remove_flags[i]) 
+        vert_remove_indices.push_back(i);
+    }
+    for (uint i = 0; i < elem_remove_flags.size(); ++i) { 
+      if (elem_remove_flags[i]) 
+        elem_remove_indices.push_back(i);
+    }
+
+    // Sort in reverse order to facilitate erasure without modifying iterators
+    std::sort(std::execution::par_unseq, range_iter(vert_remove_indices), [](uint i, uint j) { return i > j; });
+    std::sort(std::execution::par_unseq, range_iter(elem_remove_indices), [](uint i, uint j) { return i > j; });
+
+    // fmt::print("{}\n", vert_new_indices);
+    // fmt::print("{}\n", elem_remove_indices);
+
+    for (uint i : vert_remove_indices)
+      mesh.verts().erase(mesh.verts().begin() + i);
+    for (uint i : elem_remove_indices)
+      mesh.elems().erase(mesh.elems().begin() + i);
+
+    fmt::print("Erased vertices and elements\n");
+    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size());
+
+    /* // Identify identical vertices
+    for (auto &elem : mesh.elems()) {
+      for (uint &i : elem) {
+        const auto &v = mesh.verts()[i];
+        if (auto it = vert_identify_map.find(v); it != vert_identify_map.end()) {
+          guard_continue(it->second != i);
+
+          // Register vertex for erasure as it is not unique
+          vert_remove_list.emplace_back(i);
+
+          // Point element to other already registered vertex
+          i = it->second;
+        } else {
+          // Register vertex as first of its kind
+          vert_identify_map.emplace(v, i);
+        }
+      }
+    } */
+
+    /* // Erase identical vertices
+    for (auto it = vert_remove_list.begin(); it != vert_remove_list.end(); ++it) {
+      uint i = *it;
+
+      // Check that a vertex is not removed twice
+      guard_continue(!vert_removed_list.contains(i));
+      vert_removed_list.insert(i);
+
+      fmt::print("Erasing {}\n", i);
+      mesh.verts().erase(mesh.verts().begin() + i);
+
+      // Update index offsets as an element was removed in the list
+      std::for_each(std::execution::par_unseq, range_iter(mesh.elems()),
+        [&](auto &elem) { 
+          if (elem[0] > i) elem[0]--;
+          if (elem[1] > i) elem[1]--;
+          if (elem[2] > i) elem[2]--;
+      });
+      std::for_each(std::execution::par_unseq, range_iter(vert_remove_list),
+        [&](uint &j) { 
+          guard(j > i);
+          j--;
+      });
+    } */
+
+    /* fmt::print("Erased identical vertices\n");
+    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size()); */
+
+    /* // Erase collapsed triangles
+    std::erase_if(mesh.elems(), [&](const auto &e) {
+      const uint i = e.x(), j = e.y(), k = e.z();
+      return (i == j) || (j == k) || (k == i);
+      // return (mesh.verts()[i].isApprox(mesh.verts()[j])) ||
+      //        (mesh.verts()[j].isApprox(mesh.verts()[k])) ||
+      //        (mesh.verts()[k].isApprox(mesh.verts()[i]));
     }); */
+
+    /* fmt::print("Erased collapsed elements\n");
+    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size()); */
 
     return mesh;
   }
   
   template <typename T>
-  IndexedMesh<T> generate_convex_hull(std::span<const T> points) {
+  IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points) {
     met_trace();
     return generate_convex_hull<T>(generate_unit_sphere<T>(), points);
   }
 
   template <typename T>
+  IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &input_mesh) {
+    met_trace();
+
+    IndexedMesh<T, eig::Array2u> mesh;
+    mesh.verts() = input_mesh.verts();
+    mesh.elems().reserve(input_mesh.elems().size() * 2);
+
+    auto &elems = mesh.elems();
+    for (auto &e : input_mesh.elems()) {
+      const uint i = e.x(), j = e.y(), k = e.z();
+      elems.push_back({ i, j });
+      elems.push_back({ j, k });
+      elems.push_back({ k, i });
+    }
+
+    return mesh;
+  }
+
+  template <typename T>
   HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices) {
+    met_trace();
+    
     using Vert = HalfEdgeMesh<T>::Vert;
     using Face = HalfEdgeMesh<T>::Face;
     using Half = HalfEdgeMesh<T>::Half;
     
     HalfEdgeMesh<T> new_mesh = mesh;
+
+    for (uint i = 0; i < new_mesh.halfs().size(); ++i) {
+      auto &half = new_mesh.halfs()[i];
+      auto &twin = new_mesh.halfs()[half.twin_i];
+      fmt::print("Half: {} : {} -> {}\n", i, half.vert_i, twin.vert_i);
+    }
+
+    fmt::print("\n");
     
     while (new_mesh.verts().size() > max_vertices) {
       // Find half-edge to collapse based on criterion
@@ -294,9 +481,11 @@ namespace met {
       Vert &half_vert = new_mesh.verts()[half.vert_i], &twin_vert = new_mesh.verts()[twin.vert_i];
 
       // Modify vertex position; use the average for now
-      half_vert.p = 0.5f * (half_vert.p + twin_vert.p);
+      half_vert.p = (0.5f * (half_vert.p + twin_vert.p)).eval();
 
-      // Move references from the second vertex towards the first
+      fmt::print("Shortest half: {} : {} -> {}\n", half_i, half.vert_i, twin.vert_i);
+
+      // Move all references from the second vertex towards the first
       for (auto &other_half : new_mesh.halfs_storing_vert(twin.vert_i))
         new_mesh.halfs()[other_half].vert_i = half.vert_i;
 
@@ -316,42 +505,27 @@ namespace met {
         // Erase half edges first
         auto halfs_to_remv = new_mesh.halfs_around_face(face_i);
         for (uint i = 0; i < halfs_to_remv.size(); ++i) {
-          uint half_i = halfs_to_remv[i];
+          uint half_j = halfs_to_remv[i];
 
           // Move vertex to another edge if this is an issue
-          auto &vert = new_mesh.verts()[new_mesh.halfs()[half_i].vert_i];
-          if (vert.half_i == half_i)
-            vert.half_i = new_mesh.halfs()[half_i].next_i;
+          auto &vert = new_mesh.verts()[new_mesh.halfs()[half_j].vert_i];
+          if (vert.half_i == half_j)
+            vert.half_i = new_mesh.halfs()[half_j].next_i;
 
           // Erase half edge from record
-          new_mesh.halfs().erase(new_mesh.halfs().begin() + half_i);
-
-          // Update rest of records
-          std::for_each(std::execution::par_unseq, range_iter(new_mesh.verts()),
-            [&](Vert &vert) { guard(vert.half_i > half_i); vert.half_i--; });
-          std::for_each(std::execution::par_unseq, range_iter(new_mesh.faces()),
-            [&](Face &face) { guard(face.half_i > half_i); face.half_i--; });
-          std::for_each(std::execution::par_unseq, range_iter(new_mesh.halfs()),
-            [&](Half &half) {
-              if (half.next_i > half_i) half.next_i--;
-              if (half.prev_i > half_i) half.prev_i--;
-              if (half.twin_i > half_i) half.twin_i--;
-            });
+          detail::half_mesh_erase_half(new_mesh, half_j);
           
           // Update record currently in iteration
-          std::for_each(range_iter(halfs_to_remv), [&](uint &i) { guard(i > half_i); i--; });
+          std::for_each(range_iter(halfs_to_remv), 
+            [&](uint &i) { guard(i > half_j); i--; });
         }
 
         // Erase face next and update records
-        new_mesh.faces().erase(new_mesh.faces().begin() + face_i);
-        std::for_each(std::execution::par_unseq, range_iter(new_mesh.halfs()),
-          [&](Half &half) { guard(half.face_i > face_i); half.face_i--; });
+        detail::half_mesh_erase_face(new_mesh, face_i);
       }
       
       // Remove collapsed vertex and update records
-      new_mesh.verts().erase(new_mesh.verts().begin() + twin.vert_i);
-      std::for_each(std::execution::par_unseq, range_iter(new_mesh.halfs()),
-        [&](Half &half) { guard(half.vert_i > twin.vert_i); half.vert_i--; });
+      detail::half_mesh_erase_vert(new_mesh, twin.vert_i);
     }
 
     return new_mesh;
@@ -359,27 +533,30 @@ namespace met {
 
   /* Explicit template instantiations for common types */
 
-  template class IndexedMesh<eig::Array3f>;
-  template class IndexedMesh<eig::AlArray3f>;
+  template class IndexedMesh<eig::Array3f, eig::Array3u>;
+  template class IndexedMesh<eig::AlArray3f, eig::Array3u>;
   template class HalfEdgeMesh<eig::Array3f>;
   template class HalfEdgeMesh<eig::AlArray3f>;
 
-  template IndexedMesh<eig::Array3f>
-  generate_unit_sphere<eig::Array3f>(uint);
-  template IndexedMesh<eig::AlArray3f>
-  generate_unit_sphere<eig::AlArray3f>(uint);
+  template IndexedMesh<eig::Array3f, eig::Array3u>   generate_unit_sphere<eig::Array3f>(uint);
+  template IndexedMesh<eig::AlArray3f, eig::Array3u> generate_unit_sphere<eig::AlArray3f>(uint);
 
-  template IndexedMesh<eig::Array3f> 
-  generate_convex_hull<eig::Array3f>(const IndexedMesh<eig::Array3f> &sphere_mesh,
+  template IndexedMesh<eig::Array3f, eig::Array3u> 
+  generate_convex_hull<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &sphere_mesh,
                                      std::span<const eig::Array3f>);
-  template IndexedMesh<eig::AlArray3f> 
-  generate_convex_hull<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f> &sphere_mesh,
+  template IndexedMesh<eig::AlArray3f, eig::Array3u> 
+  generate_convex_hull<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &sphere_mesh,
                                        std::span<const eig::AlArray3f>);
                                        
-  template IndexedMesh<eig::Array3f> 
+  template IndexedMesh<eig::Array3f, eig::Array3u> 
   generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
-  template IndexedMesh<eig::AlArray3f> 
+  template IndexedMesh<eig::AlArray3f, eig::Array3u> 
   generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
+
+  template IndexedMesh<eig::Array3f, eig::Array2u>
+  generate_wireframe<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &);
+  template IndexedMesh<eig::AlArray3f, eig::Array2u>
+  generate_wireframe<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &);
 
   template HalfEdgeMesh<eig::Array3f> 
   simplify_mesh<eig::Array3f>(const HalfEdgeMesh<eig::Array3f> &, uint);

@@ -6,6 +6,8 @@
 #include <algorithm>
 
 namespace met {
+  constexpr uint chull_vertex_count = 42;
+
   namespace io {
     ProjectData load_project(const fs::path &path) {
       return load_json(path).get<ProjectData>();
@@ -55,7 +57,8 @@ namespace met {
     // Instantiate approximate convex hull
     std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
     loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
-    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), 4);
+    // loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
+    loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
     // Reset undo/redo history
     mods  = { };
@@ -79,8 +82,10 @@ namespace met {
     
     // Instantiate convex hull
     std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
-    loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
-    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), 6);
+    loaded_chull = generate_unit_sphere<eig::AlArray3f>(3u);
+    // loaded_chull = generate_convex_hull<eig::AlArray3f>(loaded_chull, points);
+    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
+    loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
     // Reset undo/redo history
     mods  = { };

@@ -9,7 +9,7 @@
 
 namespace met {
   // FWD
-  template <typename T>
+  template <typename T, typename E = eig::Array3u>
   struct IndexedMesh;
   template <typename T>
   struct HalfEdgeMesh;
@@ -28,10 +28,10 @@ namespace met {
   };
 
   /* Simple indexed triangle mesh structure */
-  template <typename T>
+  template <typename T, typename E>
   struct IndexedMesh {
     using Vert = T;
-    using Elem = eig::Array3u;
+    using Elem = E;
 
   private:
     std::vector<Vert> m_verts;
@@ -90,8 +90,10 @@ namespace met {
     std::vector<uint> faces_around_face(uint face_i) const;
   };
   
-  using Array3fMesh   = IndexedMesh<eig::Array3f>;
-  using AlArray3fMesh = IndexedMesh<eig::AlArray3f>;
+  using Array3fMesh        = IndexedMesh<eig::Array3f, eig::Array3u>;
+  using AlArray3fMesh      = IndexedMesh<eig::AlArray3f, eig::Array3u>;
+  using Array3fWireframe   = IndexedMesh<eig::Array3f, eig::Array2u>;
+  using AlArray3fWireframe = IndexedMesh<eig::AlArray3f, eig::Array2u>;
 
   // Generate a subdivided octahedron whose vertices lie on a unit sphere
   template <typename T = eig::AlArray3f>
@@ -100,13 +102,18 @@ namespace met {
   // Generate an approximate convex hull from a mesh describing a unit sphere
   // by matching each vertex to a point
   template <typename T = eig::AlArray3f>
-  IndexedMesh<T> generate_convex_hull(const IndexedMesh<T> &sphere_mesh,
-                                      std::span<const T> points);
+  IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh, 
+                                                    std::span<const T> points);
 
   // Shorthand that first generates a sphere mesh
   template <typename T = eig::AlArray3f>
-  IndexedMesh<T> generate_convex_hull(std::span<const T> points);
+  IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points);
 
+  // Generate a wireframe mesh from an input triangle mesh
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &mesh);
+
+  // Perform progressive mesh simplification by edge collapse until vertex count <= max_vertices
   template <typename T = eig::AlArray3f>
   HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices);
 } // namespace met
