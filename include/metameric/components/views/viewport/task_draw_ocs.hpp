@@ -12,6 +12,10 @@ namespace met {
     gl::Buffer   m_hull_elements;
     gl::Array    m_hull_array;
     gl::DrawInfo m_hull_dispatch;
+    gl::Buffer   m_hull_wf_vertices;
+    gl::Buffer   m_hull_wf_elements;
+    gl::Array    m_hull_wf_array;
+    gl::DrawInfo m_hull_wf_dispatch;
     gl::Program  m_program;
 
   public:

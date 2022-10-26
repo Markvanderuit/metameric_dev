@@ -51,6 +51,41 @@ namespace met {
           if (half.twin_i > i) half.twin_i--;
       });
     }
+
+    template <typename T>
+    bool elements_share_edge(const T &a, const T &b) {
+      uint num_eq = 0;
+      for (uint i = 0; i < 3; ++i)
+        for (uint j = 0; j < 3; ++j)
+          num_eq += (a[i] == b[j]) ? 1 : 0;
+      return num_eq > 1;
+    }
+
+    template <typename T>
+    bool elements_falsely_wind(const T &a, const T &b) {
+      for (uint i = 0; i < 3; ++i) {
+        uint _i = (i + 1) % 3;
+        for (uint j = 0; j < 3; ++j) {
+          uint _j = (j + 1) % 3;
+          if (a[j] == b[i] && a[_j] == b[_i])
+            return true;
+        }
+      }
+      return false;
+    }
+
+    template <typename T>
+    std::pair<uint, uint> falsely_wound_indices(const T &base, const T &next) {
+      for (uint i = 0; i < 3; ++i) {
+        uint _i = (i + 1) % 3;
+        for (uint j = 0; j < 3; ++j) {
+          uint _j = (j + 1) % 3;
+          if (base[j] == next[i] && base[_j] == next[_i])
+            return { i, _i };
+        }
+      }
+      return { 0, 0 };
+    }
   } // namespace detail
 
   template <typename T, typename E>
@@ -94,15 +129,19 @@ namespace met {
     Edges edge_map;
     for (uint face_i = 0; face_i < m_faces.size(); ++face_i) {
       const auto &el = other.elems()[face_i];
-      std::array<Edge, 3> face = { Edge { el.x(), el.y() },
-                                   Edge { el.y(), el.z() }, 
-                                   Edge { el.z(), el.x() }};
+      std::array<Edge, 3> face = { Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
 
       // Insert initial half-edge data for this face 
       for (uint i = 0; i < face.size(); ++i) {
         auto &curr_edge = face[i];
         m_halfs.push_back(Half { .vert_i = curr_edge.x(), .face_i = face_i });
         
+        if (edge_map.contains(curr_edge)) {
+          fmt::print("{} : {} conflicts with {}\n",
+            curr_edge,
+            other.elems()[face_i],
+            other.elems()[m_halfs[edge_map[curr_edge]].face_i]);
+        }
         debug::check_expr_rel(!edge_map.contains(curr_edge));
         edge_map.insert({ curr_edge, static_cast<uint>(m_halfs.size() - 1) });
       }
@@ -262,13 +301,10 @@ namespace met {
 
     IndexedMesh<T, eig::Array3u> mesh = sphere_mesh;
 
-    fmt::print("Input mesh\n");
-    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size());    
-    
     // For each vertex in mesh, each defining a line through the origin:
     std::for_each(std::execution::par_unseq, range_iter(mesh.verts()), [&](auto &v) {
       // Obtain a range of point projections along this line
-      auto proj_funct  = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
+      auto proj_funct = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
       auto proj_range = points | std::views::transform(proj_funct);
 
       // Find iterator to endpoint, given projections
@@ -278,157 +314,134 @@ namespace met {
       v = *(points.begin() + std::distance(proj_range.begin(), it));
     });
 
-    // Data structures for cleanup
-    using vertex_ui_map = std::unordered_map<T, uint, 
-      decltype(detail::matrix_hash<float>), decltype(detail::matrix_equal)>;
-    vertex_ui_map            vert_identify_map;
-    std::vector<uint>        vert_remove_list;
-    std::unordered_set<uint> vert_removed_list;
-
-    // Structures to flag vertices/elements for removal
-    vertex_ui_map     vert_index_map;
-    std::vector<bool> vert_remove_flags(mesh.verts().size(), false);
-    std::vector<bool> elem_remove_flags(mesh.elems().size(), false);
-
-    // Identify removable double vertices, and update element indices to avoid these
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &elem = mesh.elems()[i];
-      for (uint j = 0; j < 3; ++j) {
-        auto &indx = elem[j];
-        auto &vert = mesh.verts()[indx];
-
-        // If the vert_index_map has a registered vertex already, it is a double
-        if (auto it = vert_index_map.find(vert); it != vert_index_map.end()) {
-          guard_continue(indx != it->second);
-          vert_remove_flags[indx] = true; // Double vertex; flag for removal
-          indx = it->second;              // and update referring index
-        } else {
-          vert_index_map.emplace(vert, indx);
-        }
-      }
-    }
-
-    // Identify removable collapsed elements
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &elem = mesh.elems()[i];
-      if (elem[0] == elem[1] || elem[1] == elem[2] || elem[2] == elem[0]) {
-        elem_remove_flags[i] = true;
-      }
-    }
-
-    // Perform an exclusive scan of removal flags to build a new set of indices
-    std::vector<uint> vert_new_indices(mesh.verts().size());
-    constexpr auto bool_to_ui = [](bool b) { return b ? 0 : 1; };
-    std::transform_exclusive_scan(std::execution::par_unseq, 
-                                  range_iter(vert_remove_flags),
-                                  vert_new_indices.begin(), 0,
-                                  std::plus<uint>(), bool_to_ui);
-
-    // Apply new indices to element set
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &elem = mesh.elems()[i];
-      for (uint j = 0; j < 3; ++j) {
-        elem[j] = vert_new_indices[elem[j]];
-      }
-    }
-
-    // Obtain indices of erasable vertices and elements from data
-    std::vector<uint> vert_remove_indices, elem_remove_indices;
-    for (uint i = 0; i < vert_remove_flags.size(); ++i) { 
-      if (vert_remove_flags[i]) 
-        vert_remove_indices.push_back(i);
-    }
-    for (uint i = 0; i < elem_remove_flags.size(); ++i) { 
-      if (elem_remove_flags[i]) 
-        elem_remove_indices.push_back(i);
-    }
-
-    // Sort in reverse order to facilitate erasure without modifying iterators
-    std::sort(std::execution::par_unseq, range_iter(vert_remove_indices), [](uint i, uint j) { return i > j; });
-    std::sort(std::execution::par_unseq, range_iter(elem_remove_indices), [](uint i, uint j) { return i > j; });
-
-    // fmt::print("{}\n", vert_new_indices);
-    // fmt::print("{}\n", elem_remove_indices);
-
-    for (uint i : vert_remove_indices)
-      mesh.verts().erase(mesh.verts().begin() + i);
-    for (uint i : elem_remove_indices)
-      mesh.elems().erase(mesh.elems().begin() + i);
-
-    fmt::print("Erased vertices and elements\n");
-    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size());
-
-    /* // Identify identical vertices
-    for (auto &elem : mesh.elems()) {
-      for (uint &i : elem) {
-        const auto &v = mesh.verts()[i];
-        if (auto it = vert_identify_map.find(v); it != vert_identify_map.end()) {
-          guard_continue(it->second != i);
-
-          // Register vertex for erasure as it is not unique
-          vert_remove_list.emplace_back(i);
-
-          // Point element to other already registered vertex
-          i = it->second;
-        } else {
-          // Register vertex as first of its kind
-          vert_identify_map.emplace(v, i);
-        }
-      }
-    } */
-
-    /* // Erase identical vertices
-    for (auto it = vert_remove_list.begin(); it != vert_remove_list.end(); ++it) {
-      uint i = *it;
-
-      // Check that a vertex is not removed twice
-      guard_continue(!vert_removed_list.contains(i));
-      vert_removed_list.insert(i);
-
-      fmt::print("Erasing {}\n", i);
-      mesh.verts().erase(mesh.verts().begin() + i);
-
-      // Update index offsets as an element was removed in the list
-      std::for_each(std::execution::par_unseq, range_iter(mesh.elems()),
-        [&](auto &elem) { 
-          if (elem[0] > i) elem[0]--;
-          if (elem[1] > i) elem[1]--;
-          if (elem[2] > i) elem[2]--;
-      });
-      std::for_each(std::execution::par_unseq, range_iter(vert_remove_list),
-        [&](uint &j) { 
-          guard(j > i);
-          j--;
-      });
-    } */
-
-    /* fmt::print("Erased identical vertices\n");
-    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size()); */
-
-    /* // Erase collapsed triangles
-    std::erase_if(mesh.elems(), [&](const auto &e) {
-      const uint i = e.x(), j = e.y(), k = e.z();
-      return (i == j) || (j == k) || (k == i);
-      // return (mesh.verts()[i].isApprox(mesh.verts()[j])) ||
-      //        (mesh.verts()[j].isApprox(mesh.verts()[k])) ||
-      //        (mesh.verts()[k].isApprox(mesh.verts()[i]));
-    }); */
-
-    /* fmt::print("Erased collapsed elements\n");
-    fmt::print("{} verts, {} elems\n", mesh.verts().size(), mesh.elems().size()); */
-
-    for (auto &el : mesh.elems()) {
-      fmt::print("{} -> {}\n", el[0], el[1]);
-      fmt::print("{} -> {}\n", el[1], el[2]);
-      fmt::print("{} -> {}\n", el[2], el[0]);
-    }
-    return mesh;
+    return cleanup(mesh);
   }
   
   template <typename T>
   IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points) {
     met_trace();
     return generate_convex_hull<T>(generate_unit_sphere<T>(), points);
+  }
+
+  template <typename T>
+  IndexedMesh<T, eig::Array3u> cleanup(const IndexedMesh<T, eig::Array3u> &input_mesh) {
+    met_trace();
+
+    IndexedMesh<T, eig::Array3u> mesh = input_mesh;
+    
+    // Structures to flag vertices/elements for removal
+    using vertex_ui_map = std::unordered_map<T, uint, 
+      decltype(detail::matrix_hash<float>), decltype(detail::matrix_equal)>;
+    vertex_ui_map     vert_index_map;
+    std::vector<bool> vert_remove_flags(mesh.verts().size(), false);
+    std::vector<bool> elem_remove_flags(mesh.elems().size(), false);
+
+    // Identify double vertices, and update element indices to avoid these
+    for (auto &elem : mesh.elems()) {
+      for (auto &i : elem) {
+        const auto &vert = mesh.verts()[i];
+
+        // If the vert_index_map has a registered vertex already, it is a double
+        if (auto it = vert_index_map.find(vert); it != vert_index_map.end()) {
+          guard_continue(i != it->second);
+          vert_remove_flags[i] = true; // Double vertex; flag for removal
+          i = it->second;              // and update referring index to first vertex
+        } else {
+          vert_index_map.emplace(vert, i);
+        }
+      }
+    }
+
+    // Identify collapsed elements
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &el = mesh.elems()[i];
+      if (el[0] == el[1] || el[1] == el[2] || el[2] == el[0])
+        elem_remove_flags[i] = true;
+    }
+
+    // Perform an exclusive scan of removal flags to build a new set of indices
+    std::vector<uint> vert_new_indices(mesh.verts().size());
+    std::transform_inclusive_scan(std::execution::par_unseq, range_iter(vert_remove_flags),
+      vert_new_indices.begin(), std::plus<uint>(), [](bool b) { return b ? 0 : 1; });
+    std::for_each(std::execution::par_unseq, range_iter(vert_new_indices), [](uint &i) { i--; });
+
+    // Apply new indices to element set
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &elem = mesh.elems()[i];
+      for (uint j = 0; j < 3; ++j)
+        elem[j] = vert_new_indices[elem[j]];
+    }
+
+    // Obtain indices of erasable vertices and elements from data **in reverse order**
+    std::vector<uint> vert_remove_indices, elem_remove_indices;
+    for (auto it = vert_remove_flags.rbegin(); it != vert_remove_flags.rend(); ++it)
+      if (bool flag = *it; flag) vert_remove_indices.push_back(std::distance(it, vert_remove_flags.rend()) - 1);
+    for (auto it = elem_remove_flags.rbegin(); it != elem_remove_flags.rend(); ++it)
+      if (bool flag = *it; flag) elem_remove_indices.push_back(std::distance(it, elem_remove_flags.rend()) - 1);
+
+    // Erase marked vertices
+    for (uint i : vert_remove_indices) mesh.verts().erase(mesh.verts().begin() + i);
+    for (uint i : elem_remove_indices) mesh.elems().erase(mesh.elems().begin() + i);
+
+    // Data structures for fixing winding order inconsistencies
+    auto winding_queue = mesh.elems();
+    auto winding_fixed = decltype(winding_queue)();
+
+    // Remove a single triangle from the winding queue
+    winding_fixed.reserve(winding_queue.size());
+    winding_fixed.push_back(winding_queue.at(winding_queue.size() - 1));
+    winding_queue.pop_back();
+
+    using Elem = decltype(mesh)::Elem;
+    
+    // Until no triangles remain:
+    while (!winding_queue.empty()) {
+      bool it_found = false;
+      Elem elem_next, elem_fixed;
+
+      for (auto &_elem_fixed : winding_fixed) {
+        // First, find an adjacent triangle in the winding queue
+        auto it_next = std::find_if(range_iter(winding_queue),
+          [&](const auto &el) { return detail::elements_share_edge(_elem_fixed, el); });
+        guard_continue(it_next != winding_queue.end());
+
+        elem_next = *it_next;
+        winding_queue.erase(it_next);
+        it_found = true;
+      }
+
+      // Extract a triangle from the queue adjacent to a already correct triangle
+      for (auto it_queue = winding_queue.begin(); it_queue != winding_queue.end(); ++it_queue) {
+        elem_next = *it_queue;
+
+        // First, find an element in the fixed queue which shares an edge
+        auto it_fixed = std::find_if(range_iter(winding_fixed), 
+          [&](const auto &elem) { return detail::elements_share_edge(elem, elem_next); });
+        guard_continue(it_fixed != winding_fixed.end());
+
+        // If an element is found, extract the current element from the queue and halt iteration
+        elem_fixed = *it_fixed;
+        winding_queue.erase(it_queue);
+        it_found = true;
+        break;
+      }
+      debug::check_expr_rel(it_found, "Could not find an adjacent triangle");
+
+      // Check and potentially fix winding order inconsistencies with this triangle
+      // Fix implies to simply flip triangle vertex order
+      if (detail::elements_falsely_wind(elem_fixed, elem_next)) {
+        auto [a, b] = detail::falsely_wound_indices(elem_fixed, elem_next);
+        fmt::print("{} and {}, {} <-> {}\n", elem_fixed, elem_next, a, b);
+        std::swap(elem_next[a], elem_next[b]);
+      }
+
+      // Push it into the fixed set of triangles
+      winding_fixed.push_back(elem_next);
+    }
+
+    mesh.elems() = winding_fixed;
+
+    return mesh;
   }
 
   template <typename T>
@@ -556,6 +569,11 @@ namespace met {
   generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
   template IndexedMesh<eig::AlArray3f, eig::Array3u> 
   generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
+
+  template IndexedMesh<eig::Array3f, eig::Array3u>
+  cleanup<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &);
+  template IndexedMesh<eig::AlArray3f, eig::Array3u>
+  cleanup<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &);
 
   template IndexedMesh<eig::Array3f, eig::Array2u>
   generate_wireframe<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &);

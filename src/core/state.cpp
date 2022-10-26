@@ -84,6 +84,7 @@ namespace met {
     std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
     loaded_chull = generate_unit_sphere<eig::AlArray3f>(3u);
     loaded_chull = generate_convex_hull<eig::AlArray3f>(loaded_chull, points);
+    loaded_chull = cleanup(loaded_chull);
     loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
     loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 

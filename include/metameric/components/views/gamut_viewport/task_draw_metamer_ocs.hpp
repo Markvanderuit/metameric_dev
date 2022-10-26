@@ -40,9 +40,9 @@ namespace met {
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
       m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>();
-      m_sphere_mesh_wf = generate_wireframe<eig::AlArray3f>(m_sphere_mesh);
-      m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh_wf.verts()), .flags = create_flags }};
-      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh_wf.elems()), .flags = create_flags }};
+      // m_sphere_mesh_wf = generate_wireframe<eig::AlArray3f>(m_sphere_mesh);
+      m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.verts()), .flags = create_flags }};
+      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()), .flags = create_flags }};
       
       // Construct non-changing draw components
       m_program = {{ .type = gl::ShaderType::eVertex, 
@@ -54,7 +54,7 @@ namespace met {
         .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         .elements = &m_hull_elements
       }};
-      m_hull_dispatch = { .type = gl::PrimitiveType::eLines,
+      m_hull_dispatch = { .type = gl::PrimitiveType::eTriangles,
                           .vertex_count = (uint) (m_hull_elements.size() / sizeof(uint)),
                           .bindable_array = &m_hull_array,
                           .bindable_program = &m_program };
@@ -96,12 +96,12 @@ namespace met {
 
         // Generate approximate convex hull around points and copy to gl buffer
         auto hull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, e_ocs_points);
-        auto hull_wf = generate_wireframe<eig::AlArray3f>(hull);
-        m_hull_vertices.set(cnt_span<const std::byte>(hull_wf.verts()), hull_wf.verts().size() * sizeof(decltype(hull_wf)::Vert));
-        m_hull_elements.set(cnt_span<const std::byte>(hull_wf.elems()), hull_wf.elems().size() * sizeof(decltype(hull_wf)::Elem));
+        // auto hull_wf = generate_wireframe<eig::AlArray3f>(hull);
+        m_hull_vertices.set(cnt_span<const std::byte>(hull.verts()), hull.verts().size() * sizeof(decltype(hull)::Vert));
+        m_hull_elements.set(cnt_span<const std::byte>(hull.elems()), hull.elems().size() * sizeof(decltype(hull)::Elem));
 
         // Adjust vertex count in case convex hull is smaller
-        m_hull_dispatch.vertex_count = hull_wf.elems().size() * 2;
+        m_hull_dispatch.vertex_count = hull.elems().size() * 3;
       }
 
       // Declare scoped OpenGL state

@@ -105,6 +105,9 @@ namespace met {
   IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh, 
                                                     std::span<const T> points);
 
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T, eig::Array3u> cleanup(const IndexedMesh<T, eig::Array3u> &mesh);
+
   // Shorthand that first generates a sphere mesh
   template <typename T = eig::AlArray3f>
   IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points);
