@@ -359,6 +359,34 @@ namespace met {
         elem_remove_flags[i] = true;
     }
 
+    // Identify "stick-out" elements (as we're currently cleaning a convex hull)
+    using Edge  = eig::Array2u;
+    using Edges = std::unordered_map<Edge, uint, decltype(detail::matrix_hash<uint>), decltype(detail::matrix_equal)>;
+    Edges edge_counter;
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &el = mesh.elems()[i];
+      std::array<Edge, 3> edges = { Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
+      for (auto ed : edges) {
+        ed = Edge { ed.minCoeff(), ed.maxCoeff() };
+        if (!edge_counter.contains(ed)) {
+          edge_counter[ed] = 1;
+        } else {
+          edge_counter[ed] = edge_counter[ed] + 1;
+        }
+      }
+    }
+    for (uint i = 0; i < mesh.elems().size(); ++i) {
+      auto &el = mesh.elems()[i];
+      std::array<Edge, 3> edges = { Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
+      for (auto ed : edges) {
+        ed = Edge { ed.minCoeff(), ed.maxCoeff() };
+        if (edge_counter[ed] == 1) {
+          elem_remove_flags[i] = true;
+          break;
+        }
+      }
+    }
+
     // Perform an exclusive scan of removal flags to build a new set of indices
     std::vector<uint> vert_new_indices(mesh.verts().size());
     std::transform_inclusive_scan(std::execution::par_unseq, range_iter(vert_remove_flags),
@@ -383,63 +411,93 @@ namespace met {
     for (uint i : vert_remove_indices) mesh.verts().erase(mesh.verts().begin() + i);
     for (uint i : elem_remove_indices) mesh.elems().erase(mesh.elems().begin() + i);
 
-    // Data structures for fixing winding order inconsistencies
-    auto winding_queue = mesh.elems();
-    auto winding_fixed = decltype(winding_queue)();
+    // // Data structures for fixing winding order inconsistencies
+    // auto winding_queue = mesh.elems();
+    // auto winding_fixed = decltype(winding_queue)();
 
-    // Remove a single triangle from the winding queue
-    winding_fixed.reserve(winding_queue.size());
-    winding_fixed.push_back(winding_queue.at(winding_queue.size() - 1));
-    winding_queue.pop_back();
+    // // Remove a single triangle from the winding queue
+    // winding_fixed.reserve(winding_queue.size());
+    // winding_fixed.push_back(winding_queue.at(winding_queue.size() - 1));
+    // winding_queue.pop_back();
 
-    using Elem = decltype(mesh)::Elem;
+    // using Elem = decltype(mesh)::Elem;
     
-    // Until no triangles remain:
-    while (!winding_queue.empty()) {
-      bool it_found = false;
-      Elem elem_next, elem_fixed;
+    // // Until no triangles remain:
+    // while (!winding_queue.empty()) {
+    //   bool it_found = false;
+    //   Elem elem_next;
 
-      for (auto &_elem_fixed : winding_fixed) {
-        // First, find an adjacent triangle in the winding queue
-        auto it_next = std::find_if(range_iter(winding_queue),
-          [&](const auto &el) { return detail::elements_share_edge(_elem_fixed, el); });
-        guard_continue(it_next != winding_queue.end());
+    //   // First, find an arbitrarty adjacent triangle in the winding queue
+    //   for (auto &_elem_fixed : winding_fixed) {
+    //     auto it_next = std::find_if(range_iter(winding_queue),
+    //       [&](const auto &el) { return detail::elements_share_edge(_elem_fixed, el); });
+    //     guard_continue(it_next != winding_queue.end());
 
-        elem_next = *it_next;
-        winding_queue.erase(it_next);
-        it_found = true;
-      }
+    //     elem_next = *it_next;
+    //     winding_queue.erase(it_next);
+    //     it_found = true;
 
-      // Extract a triangle from the queue adjacent to a already correct triangle
-      for (auto it_queue = winding_queue.begin(); it_queue != winding_queue.end(); ++it_queue) {
-        elem_next = *it_queue;
+    //     break;
+    //   }
+    //   debug::check_expr_rel(it_found, "Could not find an adjacent triangle");
 
-        // First, find an element in the fixed queue which shares an edge
-        auto it_fixed = std::find_if(range_iter(winding_fixed), 
-          [&](const auto &elem) { return detail::elements_share_edge(elem, elem_next); });
-        guard_continue(it_fixed != winding_fixed.end());
+    //   // Next, identify all triangles in the fixed queue which are adjacent to this triangle
+    //   std::vector<Elem> adjacent_elems;
+    //   for (auto &elem_adj : winding_fixed) {
+    //     guard_continue(detail::elements_share_edge(elem_adj, elem_next));
+    //     adjacent_elems.push_back(elem_adj);
+    //   }
 
-        // If an element is found, extract the current element from the queue and halt iteration
-        elem_fixed = *it_fixed;
-        winding_queue.erase(it_queue);
-        it_found = true;
-        break;
-      }
-      debug::check_expr_rel(it_found, "Could not find an adjacent triangle");
+    //   // Finally, fix potential winding order inconsistencies with the new triangle,
+    //   // compared to all adjacent triangles
+    //   while (true) {
+    //     bool all_fixed = true;
+    //     for (auto &elem_adj : adjacent_elems) {
+    //       guard_continue(detail::elements_falsely_wind(elem_adj, elem_next));
+    //       all_fixed = false;
 
-      // Check and potentially fix winding order inconsistencies with this triangle
-      // Fix implies to simply flip triangle vertex order
-      if (detail::elements_falsely_wind(elem_fixed, elem_next)) {
-        auto [a, b] = detail::falsely_wound_indices(elem_fixed, elem_next);
-        fmt::print("{} and {}, {} <-> {}\n", elem_fixed, elem_next, a, b);
-        std::swap(elem_next[a], elem_next[b]);
-      }
+    //       auto [a, b] = detail::falsely_wound_indices(elem_adj, elem_next);
+    //       std::swap(elem_next[a], elem_next[b]);
+    //       fmt::print("{} and {}, {} <-> {}\n", elem_adj, elem_next, a, b);
+    //     }
+    //     guard_break(!all_fixed);
+    //   }
 
-      // Push it into the fixed set of triangles
-      winding_fixed.push_back(elem_next);
-    }
+    //   /* if (detail::elements_falsely_wind(elem_fixed, elem_next)) {
+    //     auto [a, b] = detail::falsely_wound_indices(elem_fixed, elem_next);
+    //     fmt::print("{} and {}, {} <-> {}\n", elem_fixed, elem_next, a, b);
+    //     std::swap(elem_next[a], elem_next[b]);
+    //   } */
 
-    mesh.elems() = winding_fixed;
+    //   /* // Extract a triangle from the queue adjacent to a already correct triangle
+    //   for (auto it_queue = winding_queue.begin(); it_queue != winding_queue.end(); ++it_queue) {
+    //     elem_next = *it_queue;
+
+    //     // First, find an element in the fixed queue which shares an edge
+    //     auto it_fixed = std::find_if(range_iter(winding_fixed), 
+    //       [&](const auto &elem) { return detail::elements_share_edge(elem, elem_next); });
+    //     guard_continue(it_fixed != winding_fixed.end());
+
+    //     // If an element is found, extract the current element from the queue and halt iteration
+    //     elem_fixed = *it_fixed;
+    //     winding_queue.erase(it_queue);
+    //     it_found = true;
+    //     break;
+    //   } */
+
+    //   // Check and potentially fix winding order inconsistencies with this triangle
+    //   // Fix implies to simply flip triangle vertex order
+    //   /* if (detail::elements_falsely_wind(elem_fixed, elem_next)) {
+    //     auto [a, b] = detail::falsely_wound_indices(elem_fixed, elem_next);
+    //     fmt::print("{} and {}, {} <-> {}\n", elem_fixed, elem_next, a, b);
+    //     std::swap(elem_next[a], elem_next[b]);
+    //   } */
+
+    //   // Push it into the fixed set of triangles
+    //   winding_fixed.push_back(elem_next);
+    // }
+
+    // mesh.elems() = winding_fixed;
 
     return mesh;
   }

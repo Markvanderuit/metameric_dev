@@ -77,9 +77,9 @@ namespace met {
 
     // Dispatch draw call
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
-    m_program.uniform("u_alpha", 1.f);
+    m_program.uniform("u_alpha", .66f);
     gl::dispatch_draw(m_hull_dispatch);
-    // m_program.uniform("u_alpha", 1.f);
-    // gl::dispatch_draw(m_hull_wf_dispatch);
+    m_program.uniform("u_alpha", 1.f);
+    gl::dispatch_draw(m_hull_wf_dispatch);
   }
 } // namespace met

@@ -85,7 +85,7 @@ namespace met {
     loaded_chull = generate_unit_sphere<eig::AlArray3f>(3u);
     loaded_chull = generate_convex_hull<eig::AlArray3f>(loaded_chull, points);
     loaded_chull = cleanup(loaded_chull);
-    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
+    // loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
     loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
     // Reset undo/redo history
