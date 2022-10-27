@@ -66,6 +66,7 @@ namespace met {
         auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
         auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
         auto &e_mappings     = e_app_data.loaded_mappings;
+        auto &e_mapping_data = e_app_data.project_data.mappings;
 
         // Obtain selected reflectance and colors
         Spec &gamut_spec   = e_gamut_spec[e_gamut_idx];
@@ -77,6 +78,54 @@ namespace met {
         Colr gamut_error  = (gamut_actual - gamut_colr_i).abs();
 
         ImGui::PlotLines("Reflectance", gamut_spec.data(), gamut_spec.rows(), 0, nullptr, 0.f, 1.f, plot_size);
+
+        ImGui::Separator();
+
+        // Local copies of gamut mapping indices
+        uint l_gamut_mapp_i = e_gamut_mapp_i[e_gamut_idx];
+        uint l_gamut_mapp_j = e_gamut_mapp_j[e_gamut_idx];
+        
+        // Names of selected mappings
+        const auto &mapping_name_i = e_mapping_data[l_gamut_mapp_i].first;
+        const auto &mapping_name_j = e_mapping_data[l_gamut_mapp_j].first;
+
+        // Selector for first mapping index
+        if (ImGui::BeginCombo("Mapping 0", mapping_name_i.c_str())) {
+          for (uint i = 0; i < e_mapping_data.size(); ++i) {
+            auto &[key, _] = e_mapping_data[i];
+            if (ImGui::Selectable(key.c_str(), i == l_gamut_mapp_i)) {
+              l_gamut_mapp_i = i;
+            }
+          }
+          ImGui::EndCombo();
+        }
+
+        // Selector for second mapping index
+        if (ImGui::BeginCombo("Mapping 1", mapping_name_j.c_str())) {
+          for (uint i = 0; i < e_mapping_data.size(); ++i) {
+            auto &[key, _] = e_mapping_data[i];
+            if (ImGui::Selectable(key.c_str(), i == l_gamut_mapp_j)) {
+              l_gamut_mapp_j = i;
+            }
+          }
+          ImGui::EndCombo();
+        }
+
+        // If changes to local copies were made, register a data edit
+        if (l_gamut_mapp_i != e_gamut_mapp_i[e_gamut_idx]) {
+          e_app_data.touch({
+            .name = "Change gamut mapping 0",
+            .redo = [edit = l_gamut_mapp_i,              i = e_gamut_idx](auto &data) { data.gamut_mapp_i[i] = edit; },
+            .undo = [edit = e_gamut_mapp_i[e_gamut_idx], i = e_gamut_idx](auto &data) { data.gamut_mapp_i[i] = edit; }
+          });
+        }
+        if (l_gamut_mapp_j != e_gamut_mapp_j[e_gamut_idx]) {
+          e_app_data.touch({
+            .name = "Change gamut mapping 1",
+            .redo = [edit = l_gamut_mapp_j,              i = e_gamut_idx](auto &data) { data.gamut_mapp_j[i] = edit; },
+            .undo = [edit = e_gamut_mapp_j[e_gamut_idx], i = e_gamut_idx](auto &data) { data.gamut_mapp_j[i] = edit; }
+          });
+        }
 
         ImGui::Separator();
         
@@ -194,7 +243,5 @@ namespace met {
         .undo = [edit = m_offs_prev](auto &data) { data.gamut_offs_j = edit; }
       });
     }
-
-    auto &io = ImGui::GetIO();
   }
 } // namespace met

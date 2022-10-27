@@ -16,7 +16,7 @@
 
 namespace met {
   // Nr. of samples for OCS generation
-  constexpr uint n_samples = 128;
+  constexpr uint n_samples = 64;
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
