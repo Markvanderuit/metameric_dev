@@ -67,8 +67,8 @@ namespace met {
     auto &e_arcball = info.get_resource<detail::Arcball>("viewport", "arcball");
 
     // Declare scoped OpenGL state
-    gl::state::set_line_width(1.f);
-    gl::state::set_op(gl::CullOp::eBack);
+    gl::state::set_line_width(2.f);
+    gl::state::set_op(gl::CullOp::eFront);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
@@ -77,8 +77,8 @@ namespace met {
 
     // Dispatch draw call
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
-    m_program.uniform("u_alpha", .66f);
-    gl::dispatch_draw(m_hull_dispatch);
+    // m_program.uniform("u_alpha", 0.8f);
+    // gl::dispatch_draw(m_hull_dispatch);
     m_program.uniform("u_alpha", 1.f);
     gl::dispatch_draw(m_hull_wf_dispatch);
   }

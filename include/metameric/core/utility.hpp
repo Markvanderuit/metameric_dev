@@ -11,7 +11,8 @@
 #define guard_break(expr) if (!(expr)) { break; }
 
 // Simple range-like syntactic sugar
-#define range_iter(c) c.begin(), c.end()
+#define range_iter(c)  c.begin(), c.end()
+#define range_riter(c) c.rbegin(), c.rend()
 
 // For enum class T, declare bitflag operators and has_flag(T, T) boolean operator
 #define met_declare_bitflag(T)                                               \

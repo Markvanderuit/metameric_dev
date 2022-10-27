@@ -105,8 +105,20 @@ namespace met {
   IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh, 
                                                     std::span<const T> points);
 
+  /* Mesh cleanup functions */
+
   template <typename T = eig::AlArray3f>
-  IndexedMesh<T, eig::Array3u> cleanup(const IndexedMesh<T, eig::Array3u> &mesh);
+  void clean_stitch_vertices(IndexedMesh<T, eig::Array3u> &mesh);
+  template <typename T = eig::AlArray3f>
+  void clean_delete_unused_vertices(IndexedMesh<T, eig::Array3u> &mesh);
+  template <typename T = eig::AlArray3f>
+  void clean_delete_double_elems(IndexedMesh<T, eig::Array3u> &mesh);
+  template <typename T = eig::AlArray3f>
+  void clean_delete_collapsed_elems(IndexedMesh<T, eig::Array3u> &mesh);
+  template <typename T = eig::AlArray3f>
+  void clean_fix_winding_order(IndexedMesh<T, eig::Array3u> &mesh);
+  template <typename T = eig::AlArray3f>
+  void clean_all(IndexedMesh<T, eig::Array3u> &mesh);
 
   // Shorthand that first generates a sphere mesh
   template <typename T = eig::AlArray3f>

@@ -96,6 +96,7 @@ namespace met {
 
         // Generate approximate convex hull around points and copy to gl buffer
         auto hull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, e_ocs_points);
+        // clean_all(hull);
         // auto hull_wf = generate_wireframe<eig::AlArray3f>(hull);
         m_hull_vertices.set(cnt_span<const std::byte>(hull.verts()), hull.verts().size() * sizeof(decltype(hull)::Vert));
         m_hull_elements.set(cnt_span<const std::byte>(hull.elems()), hull.elems().size() * sizeof(decltype(hull)::Elem));

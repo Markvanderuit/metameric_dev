@@ -13,7 +13,7 @@ namespace met {
   namespace detail {
     // Hash and key_equal for eigen types for std::unordered_map insertion
     template <typename T>
-    constexpr auto matrix_hash = [](const auto &mat) {
+    constexpr auto eig_hash = [](const auto &mat) {
       size_t seed = 0;
       for (size_t i = 0; i < mat.size(); ++i) {
         auto elem = *(mat.data() + i);
@@ -21,71 +21,7 @@ namespace met {
       }
       return seed;
     };
-    constexpr auto matrix_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
-
-    template <typename T>
-    void half_mesh_erase_vert(HalfEdgeMesh<T> &mesh, uint i) {
-      mesh.verts().erase(mesh.verts().begin() + i);
-      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
-        [&](auto &half) { guard(half.vert_i > i); half.vert_i--; });
-    }
-    
-    template <typename T>
-    void half_mesh_erase_face(HalfEdgeMesh<T> &mesh, uint i) {
-      mesh.faces().erase(mesh.faces().begin() + i);
-      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
-        [&](auto &half) { guard(half.face_i > i); half.face_i--; });
-    }
-    
-    template <typename T>
-    void half_mesh_erase_half(HalfEdgeMesh<T> &mesh, uint i) {
-      mesh.halfs().erase(mesh.halfs().begin() + i);
-      std::for_each(std::execution::par_unseq, range_iter(mesh.verts()),
-        [&](auto &vert) { guard(vert.half_i > i); vert.half_i--; });
-      std::for_each(std::execution::par_unseq, range_iter(mesh.faces()),
-        [&](auto &face) { guard(face.half_i > i); face.half_i--; });
-      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
-        [&](auto &half) {
-          if (half.next_i > i) half.next_i--;
-          if (half.prev_i > i) half.prev_i--;
-          if (half.twin_i > i) half.twin_i--;
-      });
-    }
-
-    template <typename T>
-    bool elements_share_edge(const T &a, const T &b) {
-      uint num_eq = 0;
-      for (uint i = 0; i < 3; ++i)
-        for (uint j = 0; j < 3; ++j)
-          num_eq += (a[i] == b[j]) ? 1 : 0;
-      return num_eq > 1;
-    }
-
-    template <typename T>
-    bool elements_falsely_wind(const T &a, const T &b) {
-      for (uint i = 0; i < 3; ++i) {
-        uint _i = (i + 1) % 3;
-        for (uint j = 0; j < 3; ++j) {
-          uint _j = (j + 1) % 3;
-          if (a[j] == b[i] && a[_j] == b[_i])
-            return true;
-        }
-      }
-      return false;
-    }
-
-    template <typename T>
-    std::pair<uint, uint> falsely_wound_indices(const T &base, const T &next) {
-      for (uint i = 0; i < 3; ++i) {
-        uint _i = (i + 1) % 3;
-        for (uint j = 0; j < 3; ++j) {
-          uint _j = (j + 1) % 3;
-          if (base[j] == next[i] && base[_j] == next[_i])
-            return { i, _i };
-        }
-      }
-      return { 0, 0 };
-    }
+    constexpr auto eig_equal = [](const auto &a, const auto &b) { return a.isApprox(b); };
   } // namespace detail
 
   template <typename T, typename E>
@@ -112,141 +48,14 @@ namespace met {
   }
 
   template <typename T>
-  HalfEdgeMesh<T>::HalfEdgeMesh(const IndexedMesh<T, eig::Array3u> other) {
-    // Allocate record space
-    m_verts.resize(other.verts().size());
-    m_faces.resize(other.elems().size());
-
-    // Initialize vertex positions
-    std::transform(std::execution::par_unseq, range_iter(other.verts()), m_verts.begin(), 
-      [&](const auto &p) { return Vert { p, 3 * static_cast<uint>(other.elems().size()) }; });
-    
-    // Map to perform half-edge connections
-    using Edge  = eig::Array2u;
-    using Edges = std::unordered_map<Edge, uint, 
-                                     decltype(detail::matrix_hash<uint>), 
-                                     decltype(detail::matrix_equal)>;
-    Edges edge_map;
-    for (uint face_i = 0; face_i < m_faces.size(); ++face_i) {
-      const auto &el = other.elems()[face_i];
-      std::array<Edge, 3> face = { Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
-
-      // Insert initial half-edge data for this face 
-      for (uint i = 0; i < face.size(); ++i) {
-        auto &curr_edge = face[i];
-        m_halfs.push_back(Half { .vert_i = curr_edge.x(), .face_i = face_i });
-        
-        if (edge_map.contains(curr_edge)) {
-          fmt::print("{} : {} conflicts with {}\n",
-            curr_edge,
-            other.elems()[face_i],
-            other.elems()[m_halfs[edge_map[curr_edge]].face_i]);
-        }
-        debug::check_expr_rel(!edge_map.contains(curr_edge));
-        edge_map.insert({ curr_edge, static_cast<uint>(m_halfs.size() - 1) });
-      }
-
-      // Establish connections
-      for (uint i = 0; i < face.size(); ++i) {
-        // Find next/previous edges in face: j = next, k = prev
-        const uint j = (i + 1) % face.size(), k = (j + 1) % face.size();
-        auto &curr_edge = face[i], &next_edge = face[j], &prev_edge = face[k];
-
-        // Find the current half edge and assign connections
-        uint curr_i = edge_map[curr_edge];
-        auto &curr_half  = m_halfs[curr_i];
-        curr_half.next_i = edge_map[next_edge];
-        curr_half.prev_i = edge_map[prev_edge];
-
-        // Find half edge's twin and build connections
-        eig::Array2u twin_edge = { curr_edge.y(), curr_edge.x() };
-        if (auto it = edge_map.find(twin_edge); it != edge_map.end()) {
-          auto &twin_half = m_halfs[it->second];
-          curr_half.twin_i = it->second;
-          twin_half.twin_i = curr_i;
-        }
-      }
-
-      // Assign first half-edge to each face
-      m_faces[face_i].half_i = edge_map[face[0]];
-    }
-
-    // Assign arbitrary half-edge to each vertex
-    for (uint i = 0; i < m_halfs.size(); ++i) {
-      auto &half = m_halfs[i];
-      auto &vert = m_verts[half.vert_i];
-      guard_continue(vert.half_i == m_halfs.size());
-      vert.half_i = i;
-    }
-  }
-
-  template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::halfs_storing_vert(uint vert_i) const {
-    std::vector<uint> halfs;
-    for (uint i = 0; i < m_halfs.size(); ++i) {
-      guard_continue(m_halfs[i].vert_i == vert_i);
-      halfs.push_back(i);
-    }
-    return halfs;
-  }
-
-  template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::verts_around_face(uint face_i) const {
-    std::vector<uint> vertices;
-    for (uint half_i : halfs_around_face(face_i)) {
-      vertices.push_back(m_halfs[half_i].vert_i);
-    }
-    return vertices;
-  }
-
-  template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::halfs_around_face(uint face_i) const {
-    const auto &face = m_faces[face_i];
-    const auto &half = m_halfs[face.half_i];
-    return { face.half_i, half.next_i, half.prev_i };
-  }
-
-  template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::faces_around_vert(uint vert_i) const {
-    std::vector<uint> faces;
-    const auto &vert = m_verts[vert_i];
-    uint half_i = vert.half_i;
-    do {
-      const auto &half = m_halfs[half_i];
-      faces.push_back(half.face_i);
-      half_i = m_halfs[half.prev_i].twin_i;
-    } while (half_i != vert.half_i);
-    return faces;
-  }
-
-  template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::faces_around_face(uint face_i) const {
-    std::vector<uint> faces;
-    const auto &face = m_faces[face_i];
-    for (uint half_i : halfs_around_face(face_i)) {
-      const auto &half = m_halfs[half_i];
-      const auto &twin = m_halfs[half.twin_i];
-      faces.push_back(twin.face_i);
-    }
-    return faces;
-  }
-  
-  template <typename T>
-  std::vector<uint> HalfEdgeMesh<T>::faces_around_half(uint half_i) const {
-    const Half &half = m_halfs[half_i];
-    const Half &twin = m_halfs[half.twin_i];
-    return { half.face_i, twin.face_i };
-  }
-
-  template <typename T>
   IndexedMesh<T, eig::Array3u> generate_unit_sphere(uint n_subdivs) {
     met_trace();
 
     using Vt = IndexedMesh<T, eig::Array3u>::Vert;
     using El = IndexedMesh<T, eig::Array3u>::Elem;
     using VMap  = std::unordered_map<Vt, uint, 
-                                     decltype(detail::matrix_hash<float>), 
-                                     decltype(detail::matrix_equal)>;
+                                     decltype(detail::eig_hash<float>), 
+                                     decltype(detail::eig_equal)>;
     
     // Initial mesh describes an octahedron
     std::vector<Vt> vts = { Vt(-1.f, 0.f, 0.f ), Vt( 0.f,-1.f, 0.f ), Vt( 0.f, 0.f,-1.f ),
@@ -257,7 +66,7 @@ namespace met {
     // Perform loop subdivision several times
     for (uint d = 0; d < n_subdivs; ++d) {        
       std::vector<El> els_(4 * els.size()); // New elements are inserted in this larger vector
-      VMap vmap(64, detail::matrix_hash<float>, detail::matrix_equal); // Identical vertices are first tested in this map
+      VMap vmap(64, detail::eig_hash<float>, detail::eig_equal); // Identical vertices are first tested in this map
 
       #pragma omp parallel for
       for (int e = 0; e < els.size(); ++e) {
@@ -295,214 +104,6 @@ namespace met {
   }
 
   template <typename T>
-  IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh,
-                                                    std::span<const T> points) {
-    met_trace();
-
-    IndexedMesh<T, eig::Array3u> mesh = sphere_mesh;
-
-    // For each vertex in mesh, each defining a line through the origin:
-    std::for_each(std::execution::par_unseq, range_iter(mesh.verts()), [&](auto &v) {
-      // Obtain a range of point projections along this line
-      auto proj_funct = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
-      auto proj_range = points | std::views::transform(proj_funct);
-
-      // Find iterator to endpoint, given projections
-      auto it = std::ranges::max_element(proj_range);
-
-      // Replace mesh vertex with this endpoint
-      v = *(points.begin() + std::distance(proj_range.begin(), it));
-    });
-
-    return cleanup(mesh);
-  }
-  
-  template <typename T>
-  IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points) {
-    met_trace();
-    return generate_convex_hull<T>(generate_unit_sphere<T>(), points);
-  }
-
-  template <typename T>
-  IndexedMesh<T, eig::Array3u> cleanup(const IndexedMesh<T, eig::Array3u> &input_mesh) {
-    met_trace();
-
-    IndexedMesh<T, eig::Array3u> mesh = input_mesh;
-    
-    // Structures to flag vertices/elements for removal
-    using vertex_ui_map = std::unordered_map<T, uint, 
-      decltype(detail::matrix_hash<float>), decltype(detail::matrix_equal)>;
-    vertex_ui_map     vert_index_map;
-    std::vector<bool> vert_remove_flags(mesh.verts().size(), false);
-    std::vector<bool> elem_remove_flags(mesh.elems().size(), false);
-
-    // Identify double vertices, and update element indices to avoid these
-    for (auto &elem : mesh.elems()) {
-      for (auto &i : elem) {
-        const auto &vert = mesh.verts()[i];
-
-        // If the vert_index_map has a registered vertex already, it is a double
-        if (auto it = vert_index_map.find(vert); it != vert_index_map.end()) {
-          guard_continue(i != it->second);
-          vert_remove_flags[i] = true; // Double vertex; flag for removal
-          i = it->second;              // and update referring index to first vertex
-        } else {
-          vert_index_map.emplace(vert, i);
-        }
-      }
-    }
-
-    // Identify collapsed elements
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &el = mesh.elems()[i];
-      if (el[0] == el[1] || el[1] == el[2] || el[2] == el[0])
-        elem_remove_flags[i] = true;
-    }
-
-    // Identify "stick-out" elements (as we're currently cleaning a convex hull)
-    using Edge  = eig::Array2u;
-    using Edges = std::unordered_map<Edge, uint, decltype(detail::matrix_hash<uint>), decltype(detail::matrix_equal)>;
-    Edges edge_counter;
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &el = mesh.elems()[i];
-      std::array<Edge, 3> edges = { Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
-      for (auto ed : edges) {
-        ed = Edge { ed.minCoeff(), ed.maxCoeff() };
-        if (!edge_counter.contains(ed)) {
-          edge_counter[ed] = 1;
-        } else {
-          edge_counter[ed] = edge_counter[ed] + 1;
-        }
-      }
-    }
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &el = mesh.elems()[i];
-      std::array<Edge, 3> edges = { Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
-      for (auto ed : edges) {
-        ed = Edge { ed.minCoeff(), ed.maxCoeff() };
-        if (edge_counter[ed] == 1) {
-          elem_remove_flags[i] = true;
-          break;
-        }
-      }
-    }
-
-    // Perform an exclusive scan of removal flags to build a new set of indices
-    std::vector<uint> vert_new_indices(mesh.verts().size());
-    std::transform_inclusive_scan(std::execution::par_unseq, range_iter(vert_remove_flags),
-      vert_new_indices.begin(), std::plus<uint>(), [](bool b) { return b ? 0 : 1; });
-    std::for_each(std::execution::par_unseq, range_iter(vert_new_indices), [](uint &i) { i--; });
-
-    // Apply new indices to element set
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
-      auto &elem = mesh.elems()[i];
-      for (uint j = 0; j < 3; ++j)
-        elem[j] = vert_new_indices[elem[j]];
-    }
-
-    // Obtain indices of erasable vertices and elements from data **in reverse order**
-    std::vector<uint> vert_remove_indices, elem_remove_indices;
-    for (auto it = vert_remove_flags.rbegin(); it != vert_remove_flags.rend(); ++it)
-      if (bool flag = *it; flag) vert_remove_indices.push_back(std::distance(it, vert_remove_flags.rend()) - 1);
-    for (auto it = elem_remove_flags.rbegin(); it != elem_remove_flags.rend(); ++it)
-      if (bool flag = *it; flag) elem_remove_indices.push_back(std::distance(it, elem_remove_flags.rend()) - 1);
-
-    // Erase marked vertices
-    for (uint i : vert_remove_indices) mesh.verts().erase(mesh.verts().begin() + i);
-    for (uint i : elem_remove_indices) mesh.elems().erase(mesh.elems().begin() + i);
-
-    // // Data structures for fixing winding order inconsistencies
-    // auto winding_queue = mesh.elems();
-    // auto winding_fixed = decltype(winding_queue)();
-
-    // // Remove a single triangle from the winding queue
-    // winding_fixed.reserve(winding_queue.size());
-    // winding_fixed.push_back(winding_queue.at(winding_queue.size() - 1));
-    // winding_queue.pop_back();
-
-    // using Elem = decltype(mesh)::Elem;
-    
-    // // Until no triangles remain:
-    // while (!winding_queue.empty()) {
-    //   bool it_found = false;
-    //   Elem elem_next;
-
-    //   // First, find an arbitrarty adjacent triangle in the winding queue
-    //   for (auto &_elem_fixed : winding_fixed) {
-    //     auto it_next = std::find_if(range_iter(winding_queue),
-    //       [&](const auto &el) { return detail::elements_share_edge(_elem_fixed, el); });
-    //     guard_continue(it_next != winding_queue.end());
-
-    //     elem_next = *it_next;
-    //     winding_queue.erase(it_next);
-    //     it_found = true;
-
-    //     break;
-    //   }
-    //   debug::check_expr_rel(it_found, "Could not find an adjacent triangle");
-
-    //   // Next, identify all triangles in the fixed queue which are adjacent to this triangle
-    //   std::vector<Elem> adjacent_elems;
-    //   for (auto &elem_adj : winding_fixed) {
-    //     guard_continue(detail::elements_share_edge(elem_adj, elem_next));
-    //     adjacent_elems.push_back(elem_adj);
-    //   }
-
-    //   // Finally, fix potential winding order inconsistencies with the new triangle,
-    //   // compared to all adjacent triangles
-    //   while (true) {
-    //     bool all_fixed = true;
-    //     for (auto &elem_adj : adjacent_elems) {
-    //       guard_continue(detail::elements_falsely_wind(elem_adj, elem_next));
-    //       all_fixed = false;
-
-    //       auto [a, b] = detail::falsely_wound_indices(elem_adj, elem_next);
-    //       std::swap(elem_next[a], elem_next[b]);
-    //       fmt::print("{} and {}, {} <-> {}\n", elem_adj, elem_next, a, b);
-    //     }
-    //     guard_break(!all_fixed);
-    //   }
-
-    //   /* if (detail::elements_falsely_wind(elem_fixed, elem_next)) {
-    //     auto [a, b] = detail::falsely_wound_indices(elem_fixed, elem_next);
-    //     fmt::print("{} and {}, {} <-> {}\n", elem_fixed, elem_next, a, b);
-    //     std::swap(elem_next[a], elem_next[b]);
-    //   } */
-
-    //   /* // Extract a triangle from the queue adjacent to a already correct triangle
-    //   for (auto it_queue = winding_queue.begin(); it_queue != winding_queue.end(); ++it_queue) {
-    //     elem_next = *it_queue;
-
-    //     // First, find an element in the fixed queue which shares an edge
-    //     auto it_fixed = std::find_if(range_iter(winding_fixed), 
-    //       [&](const auto &elem) { return detail::elements_share_edge(elem, elem_next); });
-    //     guard_continue(it_fixed != winding_fixed.end());
-
-    //     // If an element is found, extract the current element from the queue and halt iteration
-    //     elem_fixed = *it_fixed;
-    //     winding_queue.erase(it_queue);
-    //     it_found = true;
-    //     break;
-    //   } */
-
-    //   // Check and potentially fix winding order inconsistencies with this triangle
-    //   // Fix implies to simply flip triangle vertex order
-    //   /* if (detail::elements_falsely_wind(elem_fixed, elem_next)) {
-    //     auto [a, b] = detail::falsely_wound_indices(elem_fixed, elem_next);
-    //     fmt::print("{} and {}, {} <-> {}\n", elem_fixed, elem_next, a, b);
-    //     std::swap(elem_next[a], elem_next[b]);
-    //   } */
-
-    //   // Push it into the fixed set of triangles
-    //   winding_fixed.push_back(elem_next);
-    // }
-
-    // mesh.elems() = winding_fixed;
-
-    return mesh;
-  }
-
-  template <typename T>
   IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &input_mesh) {
     met_trace();
 
@@ -521,125 +122,16 @@ namespace met {
     return mesh;
   }
 
-  template <typename T>
-  HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices) {
-    met_trace();
-    
-    using Vert = HalfEdgeMesh<T>::Vert;
-    using Face = HalfEdgeMesh<T>::Face;
-    using Half = HalfEdgeMesh<T>::Half;
-    
-    fmt::print("Beginning halfedge generation\n");
-    HalfEdgeMesh<T> new_mesh = mesh;
-    for (uint i = 0; i < new_mesh.halfs().size(); ++i) {
-      auto &half = new_mesh.halfs()[i];
-      auto &twin = new_mesh.halfs()[half.twin_i];
-      fmt::print("Half: {} : {} -> {}\n", i, half.vert_i, twin.vert_i);
-    }
-
-    fmt::print("\n");
-    
-    while (new_mesh.verts().size() > max_vertices) {
-      // Find half-edge to collapse based on criterion
-      // TODO for now, collapse shortest edges
-      auto half_it = std::min_element(std::execution::par_unseq, range_iter(new_mesh.halfs()), 
-        [&](const Half &a, const Half &b){
-          const Half &a_ = new_mesh.halfs()[a.next_i], &b_ = new_mesh.halfs()[b.next_i];
-          float a_len = (new_mesh.verts()[a.vert_i].p - new_mesh.verts()[a_.vert_i].p).matrix().norm();
-          float b_len = (new_mesh.verts()[b.vert_i].p - new_mesh.verts()[b_.vert_i].p).matrix().norm();
-          return a_len < b_len;
-        });
-      uint half_i = std::distance(new_mesh.halfs().begin(), half_it);
-
-      // Obtain half edges and their vertices, as temporary copy
-      Half half = new_mesh.halfs()[half_i], twin = new_mesh.halfs()[half.twin_i];
-      Vert &half_vert = new_mesh.verts()[half.vert_i], &twin_vert = new_mesh.verts()[twin.vert_i];
-
-      // Modify vertex position; use the average for now
-      half_vert.p = (0.5f * (half_vert.p + twin_vert.p)).eval();
-
-      // fmt::print("Shortest half: {} : {} -> {}\n", half_i, half.vert_i, twin.vert_i);
-
-      // Move all references from the second vertex towards the first
-      for (auto &other_half : new_mesh.halfs_storing_vert(twin.vert_i))
-        new_mesh.halfs()[other_half].vert_i = half.vert_i;
-
-      // Move twins in surrounding faces to stitch halves together, collapsing edge
-      Half &ri_next = new_mesh.halfs()[new_mesh.halfs()[half.next_i].twin_i],
-           &ri_prev = new_mesh.halfs()[new_mesh.halfs()[half.prev_i].twin_i];
-      Half &le_next = new_mesh.halfs()[new_mesh.halfs()[twin.next_i].twin_i],
-           &le_prev = new_mesh.halfs()[new_mesh.halfs()[twin.prev_i].twin_i];
-      ri_next.twin_i = new_mesh.halfs()[half.prev_i].twin_i;
-      ri_prev.twin_i = new_mesh.halfs()[half.next_i].twin_i;
-      le_next.twin_i = new_mesh.halfs()[twin.prev_i].twin_i;
-      le_prev.twin_i = new_mesh.halfs()[twin.next_i].twin_i;
-
-      // Erase faces and half edges
-      std::vector<uint> faces_to_remv = new_mesh.faces_around_half(half_i);
-      for (auto face_i : faces_to_remv) {
-        // Erase half edges first
-        auto halfs_to_remv = new_mesh.halfs_around_face(face_i);
-        for (uint i = 0; i < halfs_to_remv.size(); ++i) {
-          uint half_j = halfs_to_remv[i];
-
-          // Move vertex to another edge if this is an issue
-          auto &vert = new_mesh.verts()[new_mesh.halfs()[half_j].vert_i];
-          if (vert.half_i == half_j)
-            vert.half_i = new_mesh.halfs()[half_j].next_i;
-
-          // Erase half edge from record
-          detail::half_mesh_erase_half(new_mesh, half_j);
-          
-          // Update record currently in iteration
-          std::for_each(range_iter(halfs_to_remv), 
-            [&](uint &i) { guard(i > half_j); i--; });
-        }
-
-        // Erase face next and update records
-        detail::half_mesh_erase_face(new_mesh, face_i);
-      }
-      
-      // Remove collapsed vertex and update records
-      detail::half_mesh_erase_vert(new_mesh, twin.vert_i);
-    }
-
-    return new_mesh;
-  }
-
   /* Explicit template instantiations for common types */
 
   template class IndexedMesh<eig::Array3f, eig::Array3u>;
   template class IndexedMesh<eig::AlArray3f, eig::Array3u>;
-  template class HalfEdgeMesh<eig::Array3f>;
-  template class HalfEdgeMesh<eig::AlArray3f>;
 
   template IndexedMesh<eig::Array3f, eig::Array3u>   generate_unit_sphere<eig::Array3f>(uint);
   template IndexedMesh<eig::AlArray3f, eig::Array3u> generate_unit_sphere<eig::AlArray3f>(uint);
-
-  template IndexedMesh<eig::Array3f, eig::Array3u> 
-  generate_convex_hull<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &sphere_mesh,
-                                     std::span<const eig::Array3f>);
-  template IndexedMesh<eig::AlArray3f, eig::Array3u> 
-  generate_convex_hull<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &sphere_mesh,
-                                       std::span<const eig::AlArray3f>);
-                                       
-  template IndexedMesh<eig::Array3f, eig::Array3u> 
-  generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
-  template IndexedMesh<eig::AlArray3f, eig::Array3u> 
-  generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
-
-  template IndexedMesh<eig::Array3f, eig::Array3u>
-  cleanup<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &);
-  template IndexedMesh<eig::AlArray3f, eig::Array3u>
-  cleanup<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &);
 
   template IndexedMesh<eig::Array3f, eig::Array2u>
   generate_wireframe<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &);
   template IndexedMesh<eig::AlArray3f, eig::Array2u>
   generate_wireframe<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &);
-
-  template HalfEdgeMesh<eig::Array3f> 
-  simplify_mesh<eig::Array3f>(const HalfEdgeMesh<eig::Array3f> &, uint);
-  template HalfEdgeMesh<eig::AlArray3f> 
-  simplify_mesh<eig::AlArray3f>(const HalfEdgeMesh<eig::AlArray3f> &, uint);
 } // namespace met
