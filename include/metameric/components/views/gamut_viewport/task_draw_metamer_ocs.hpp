@@ -60,9 +60,7 @@ namespace met {
                           .bindable_program = &m_program };
 
       // Set non-changing uniform values
-      eig::Affine3f transl(eig::Translation3f(eig::Vector3f(0.f)));
       m_program.uniform("u_alpha", .66f);
-      m_program.uniform("u_model_matrix",  transl.matrix());
 
       // Set selection to "none"
       m_gamut_idx = -1;
@@ -83,7 +81,9 @@ namespace met {
       auto &e_state_gamut    = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
       auto &e_state_mappings = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
       auto &e_arcball        = info.get_resource<detail::Arcball>(m_parent, "arcball");
+      auto &e_ocs_centr      = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
       
+
       // Update convex hull mesh if selection has changed, or selected gamut point has changed
       if (m_gamut_idx                                   != e_gamut_idx        ||
           e_state_gamut[e_gamut_idx]                    == CacheState::eStale ||
@@ -112,9 +112,13 @@ namespace met {
                                  gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
+                                 
+      // Set model/camera translations
+      eig::Affine3f transl(eig::Translation3f(-e_ocs_centr .matrix().eval()));
+      m_program.uniform("u_model_matrix",  transl.matrix());
+      m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
       // Dispatch draw
-      m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
       gl::dispatch_draw(m_hull_dispatch);
     }
   };

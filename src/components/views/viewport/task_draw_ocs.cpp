@@ -67,7 +67,7 @@ namespace met {
     auto &e_arcball = info.get_resource<detail::Arcball>("viewport", "arcball");
 
     // Declare scoped OpenGL state
-    gl::state::set_line_width(2.f);
+    gl::state::set_line_width(1.f);
     gl::state::set_op(gl::CullOp::eFront);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),

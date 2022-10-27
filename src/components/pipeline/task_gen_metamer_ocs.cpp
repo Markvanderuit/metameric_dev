@@ -98,7 +98,6 @@ namespace met {
     auto &e_app_data           = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_mapp_i       = e_app_data.project_data.gamut_mapp_i;
     auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
-    // auto &e_state_gamut        = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     auto &e_state_gamut_colr_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_colr_i");
     auto &e_state_gamut_offs_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_offs_j");
     auto &e_state_gamut_mapp_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_i");

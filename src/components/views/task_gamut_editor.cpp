@@ -1,6 +1,5 @@
 #include <metameric/components/views/task_gamut_editor.hpp>
 #include <metameric/components/views/gamut_viewport/task_draw_begin.hpp>
-// #include <metameric/components/views/gamut_viewport/task_draw_ocs.hpp>
 #include <metameric/components/views/gamut_viewport/task_draw_metamer_ocs.hpp>
 #include <metameric/components/views/gamut_viewport/task_draw_end.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -21,12 +20,11 @@ namespace met {
 
     // Share resources
     info.insert_resource<gl::Texture2d3f>("draw_texture", gl::Texture2d3f());
-    info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
+    info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.0f, .e_center = 0.0f });
 
     // Add subtasks in reverse order
     info.emplace_task_after<DrawEndTask>(name(), name() + "_draw_end", name());
     info.emplace_task_after<DrawMetamerOCSTask>(name(), name() + "_draw_metamer_ocs", name());
-    // info.emplace_task_after<DrawOcsTask>(name(), name() + "_draw_ocs", name());
     info.emplace_task_after<DrawBeginTask>(name(), name() + "_draw_begin", name());
 
     // Start with gizmo inactive
@@ -37,7 +35,6 @@ namespace met {
     // Remove subtasks
     info.remove_task(name() + "_draw_begin");
     info.remove_task(name() + "_draw_metamer_ocs");
-    // info.remove_task(name() + "_draw_ocs");
     info.remove_task(name() + "_draw_end");
   }
 
@@ -149,12 +146,15 @@ namespace met {
     // Get shared resources
     auto &i_arcball    = info.get_resource<detail::Arcball>("arcball");
     auto &e_gamut_idx  = info.get_resource<int>("viewport", "gamut_selection");
+    auto &e_ocs_centr  = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
     auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_colr = e_app_data.project_data.gamut_colr_i;
     auto &e_gamut_offs = e_app_data.project_data.gamut_offs_j;
 
     // Anchor position is colr + offset, minus center offset 
-    eig::Array3f anchor_pos = e_gamut_colr[e_gamut_idx] + e_gamut_offs[e_gamut_idx]; // - 0.5f;
+    eig::Array3f anchor_pos = e_gamut_colr[e_gamut_idx] 
+                            + e_gamut_offs[e_gamut_idx]
+                            - e_ocs_centr;
     auto anchor_trf = eig::Affine3f(eig::Translation3f(anchor_pos));
     auto pre_pos    = anchor_trf * eig::Vector3f(0, 0, 0);
 
