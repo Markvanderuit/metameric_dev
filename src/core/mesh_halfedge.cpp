@@ -12,7 +12,6 @@
 
 namespace met {
   namespace detail {
-
     // key_hash for eigen types for std::unordered_map/unordered_set
     template <typename T>
     constexpr auto eig_hash = [](const auto &mat) {
@@ -35,34 +34,26 @@ namespace met {
     using eig_equal_t = decltype(eig_equal);
 
     template <typename T>
-    void half_mesh_erase_vert(HalfEdgeMesh<T> &mesh, uint i) {
-      mesh.verts().erase(mesh.verts().begin() + i);
-      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
-        [&](auto &half) { guard(half.vert_i > i); half.vert_i--; });
+    std::vector<uint> masked_halfs_storing_vert(const HalfEdgeMesh<T>   &mesh,
+                                                const std::vector<bool> &mask,
+                                                uint vert_i) {
+      std::vector<uint> halfs;
+      for (uint i = 0; i < mask.size(); ++i)
+        if (!mask[i] && mesh.halfs()[i].vert_i == vert_i)
+          halfs.push_back(i);
+      return halfs;
     }
-    
+
     template <typename T>
-    void half_mesh_erase_face(HalfEdgeMesh<T> &mesh, uint i) {
-      mesh.faces().erase(mesh.faces().begin() + i);
-      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
-        [&](auto &half) { guard(half.face_i > i); half.face_i--; });
+    std::vector<uint> masked_verts_around_vert(const HalfEdgeMesh<T>   &mesh,
+                                               const std::vector<bool> &half_mask,
+                                               uint vert_i) {
+      std::vector<uint> verts;
+      for (uint h : masked_halfs_storing_vert(mesh, half_mask, vert_i))
+        verts.push_back(mesh.halfs()[mesh.halfs()[h].twin_i].vert_i);
+      return verts;
     }
-    
-    template <typename T>
-    void half_mesh_erase_half(HalfEdgeMesh<T> &mesh, uint i) {
-      mesh.halfs().erase(mesh.halfs().begin() + i);
-      std::for_each(std::execution::par_unseq, range_iter(mesh.verts()),
-        [&](auto &vert) { guard(vert.half_i > i); vert.half_i--; });
-      std::for_each(std::execution::par_unseq, range_iter(mesh.faces()),
-        [&](auto &face) { guard(face.half_i > i); face.half_i--; });
-      std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()),
-        [&](auto &half) {
-          if (half.next_i > i) half.next_i--;
-          if (half.prev_i > i) half.prev_i--;
-          if (half.twin_i > i) half.twin_i--;
-      });
-    }
-  } // namespace detail
+   } // namespace detail
 
   template <typename T>
   HalfEdgeMesh<T>::HalfEdgeMesh(const IndexedMesh<T, eig::Array3u> other) {
@@ -87,34 +78,30 @@ namespace met {
       // Obtain current element and split into separate edges
       const auto &el = *it;
       const uint face_i = std::distance(other.elems().begin(), it);
-      std::array<Edge, 3> face = { Edge { el[0], el[1] }, 
-                                   Edge { el[1], el[2] }, 
-                                   Edge { el[2], el[0] }};
+      std::array<Edge, 3> face = { 
+        Edge { el[0], el[1] }, Edge { el[1], el[2] }, Edge { el[2], el[0] }};
       
       // For each edge in element
       for (Edge &edge : face) {
         // Create initial half-edge and check uniqueness
-        m_halfs.push_back(Half { .vert_i = edge.x(), .face_i = face_i });
+        m_halfs.push_back(Half { .vert_i = edge[0], .face_i = face_i });
         debug::check_expr_rel(!edge_map.contains(edge), fmt::format("Edge {} already exists", edge));
 
         // Register half-edge in connection map
-        const uint half_i = m_halfs.size() - 1;
-        edge_map.insert({edge, half_i });
+        edge_map.insert({edge, static_cast<uint>(m_halfs.size() - 1) });
       }
 
       // For each edge in element
       for (uint i = 0; i < face.size(); ++i) {
         // Obtain trio of separated edges in the correct order
-        const uint j = (i + 1) % face.size(), k = (j + 1) % face.size();
+        const uint j = (i + 1) % face.size(), k = (i + 2) % face.size();
         auto &edge = face[i], &next = face[j], &prev = face[k];
 
-        // Obtain indices to respective half-edges from edge map
-        uint edge_i = edge_map[edge], next_i = edge_map[next], prev_i = edge_map[prev];
-
         // Fill in half-edge data
+        uint edge_i = edge_map[edge];
         Half &half = m_halfs[edge_i];
-        half.next_i = next_i;
-        half.prev_i = prev_i;
+        half.next_i = edge_map[next];
+        half.prev_i = edge_map[prev];
         
         // Attempt to find twin edge
         if (auto it = edge_map.find(Edge { edge.y(), edge.x() }); it != edge_map.end()) {
@@ -138,6 +125,14 @@ namespace met {
       if (vert.half_i == vertex_to_half_i)
         vert.half_i = i;
     }
+  }
+
+  template <typename T>
+  std::vector<uint> HalfEdgeMesh<T>::verts_around_vert(uint vert_i) const {
+    std::vector<uint> verts;
+    for (auto &h : halfs_storing_vert(vert_i))
+      verts.push_back(m_halfs[m_halfs[h].twin_i].vert_i);
+    return verts;
   }
 
   template <typename T>
@@ -194,7 +189,6 @@ namespace met {
     return { half.face_i, twin.face_i };
   }
 
-
   template <typename T>
   HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &input_mesh, uint max_vertices) {
     met_trace();
@@ -211,7 +205,7 @@ namespace met {
 
     uint vert_count = mesh.verts().size();
     uint face_count = mesh.faces().size();
-    while (vert_count > max_vertices && face_count > 4) {
+    while (vert_count > max_vertices) {
       fmt::print("{} - {}\n", vert_count, face_count);
 
       // Compute half-edge lengths // TODO: employ different metric
@@ -221,7 +215,6 @@ namespace met {
         auto v = (mesh.verts()[a.vert_i].p
                -  mesh.verts()[mesh.halfs()[a.twin_i].vert_i].p).matrix().eval();
         return v.isZero() ? 0.f : v.norm();
-        // return (mesh.verts()[a.vert_i].p - mesh.verts()[a_.vert_i].p).matrix().norm();
       });
 
       // Set lengths for (deleted) halfs to 0
@@ -229,9 +222,31 @@ namespace met {
         if (half_flag_erase[i])
           lengths[i] = std::numeric_limits<float>::max();
 
-      // Find shortest half-edge // TODO: employ different metric
-      uint half_i = std::distance(lengths.begin(), 
-        std::min_element(std::execution::par_unseq, range_iter(lengths)));
+      // Find shortest collapsible half-edge satisfying collapse criteria
+      uint half_i;
+      while (true) {
+        // Find shortest half-edge pair
+        half_i = std::distance(lengths.begin(), std::min_element(std::execution::par_unseq, range_iter(lengths)));
+        Half &half = mesh.halfs()[half_i], &twin = mesh.halfs()[half.twin_i];
+
+        // Test for correct connectivity
+        auto half_neighbours = detail::masked_verts_around_vert(mesh, half_flag_erase, half.vert_i);
+        auto twin_neighbours = detail::masked_verts_around_vert(mesh, half_flag_erase, twin.vert_i);
+        std::ranges::sort(half_neighbours);
+        std::ranges::sort(twin_neighbours);
+        std::vector<uint> intersection;
+        std::ranges::set_intersection(half_neighbours, twin_neighbours, std::back_inserter(intersection));
+        
+        if (intersection.size() > 2) {
+          lengths[half_i] = std::numeric_limits<float>::max();
+          continue;
+        }
+        fmt::print("Overlap: {}\n", intersection.size());
+
+        break;
+      }
+
+      fmt::print("Shortest is {} at {}\n", half_i, lengths[half_i]);
 
       // Obtain half edge and twin, as well as their respective vertices
       Half &half      = mesh.halfs()[half_i], 
@@ -245,7 +260,8 @@ namespace met {
 
       // Move all uses of the twin vertex to this edge's vertex, but store the id
       const uint twin_vert_i_copy = twin.vert_i;
-      for (uint h : mesh.halfs_storing_vert(twin_vert_i_copy))
+      for (uint h : detail::masked_halfs_storing_vert(mesh, half_flag_erase, twin_vert_i_copy))
+      // for (uint h : mesh.halfs_storing_vert(twin_vert_i_copy))
         mesh.halfs()[h].vert_i = half.vert_i;
       
       // Obtain the twins of next/prev halfs to right and left
@@ -253,6 +269,13 @@ namespace met {
            &righ_prev = mesh.halfs()[mesh.halfs()[half.prev_i].twin_i];
       Half &left_next = mesh.halfs()[mesh.halfs()[twin.next_i].twin_i],
            &left_prev = mesh.halfs()[mesh.halfs()[twin.prev_i].twin_i];
+
+      fmt::print("righ face = {}, half = {} - {} - {}, left face = {}, half = {} - {} - {}\n",
+        half.face_i,
+        half_i, half.next_i, half.prev_i,
+        twin.face_i,
+        half.twin_i, twin.next_i, twin.prev_i
+      );
 
       // Connect these through their own twins
       righ_next.twin_i = mesh.halfs()[half.prev_i].twin_i;
@@ -263,6 +286,8 @@ namespace met {
       if (half.vert_i != twin_vert_i_copy) {
         vert_count--;
         vert_flag_erase[twin_vert_i_copy] = true;
+      } else {
+        fmt::print("Uhh!\n");
       }
 
       // Flag components for deletion

@@ -82,6 +82,7 @@ namespace met {
     const std::vector<Half>& halfs() const { return m_halfs; }
 
     // Surrounding accessors
+    std::vector<uint> verts_around_vert(uint vert_i) const;
     std::vector<uint> halfs_storing_vert(uint vert_i) const;
     std::vector<uint> verts_around_face(uint face_i) const;
     std::vector<uint> halfs_around_face(uint face_i) const;
