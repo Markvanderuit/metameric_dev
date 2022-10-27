@@ -25,9 +25,11 @@ namespace met {
 
       // Find iterator to endpoint, given projections
       auto it = std::ranges::max_element(proj_range);
-
+      
       // Replace mesh vertex with this endpoint
-      v = *(points.begin() + std::distance(proj_range.begin(), it));
+      v = (v + .5f) * .5f; 
+      v = .15f * v 
+        + .85f * *(points.begin() + std::distance(proj_range.begin(), it));
     });
 
     return mesh;

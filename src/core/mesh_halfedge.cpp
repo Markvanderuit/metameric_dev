@@ -4,11 +4,11 @@
 #include <fmt/ranges.h>
 #include <algorithm>
 #include <execution>
+#include <limits>
 #include <ranges>
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
-
 
 namespace met {
   namespace detail {
@@ -209,32 +209,111 @@ namespace met {
     std::vector<bool> face_flag_erase(mesh.faces().size(), false);
     std::vector<bool> half_flag_erase(mesh.halfs().size(), false);
 
-    uint vertex_target = mesh.verts().size() - max_vertices;
-    while (vertex_target-- >= 0) {
-      // Compute half-edge lengths
+    uint vert_count = mesh.verts().size();
+    uint face_count = mesh.faces().size();
+    while (vert_count > max_vertices && face_count > 4) {
+      fmt::print("{} - {}\n", vert_count, face_count);
+
+      // Compute half-edge lengths // TODO: employ different metric
       std::vector<float> lengths(mesh.halfs().size());
       std::transform(std::execution::par_unseq, range_iter(mesh.halfs()), lengths.begin(),
-      [&](const Half &ha) {
-        const Half &a_ = mesh.halfs()[a.next_i];
-        return (mesh.verts()[a.vert_i].p - mesh.verts()[a_.vert_i].p).matrix().norm();
+      [&](const Half &a) {
+        auto v = (mesh.verts()[a.vert_i].p
+               -  mesh.verts()[mesh.halfs()[a.twin_i].vert_i].p).matrix().eval();
+        return v.isZero() ? 0.f : v.norm();
+        // return (mesh.verts()[a.vert_i].p - mesh.verts()[a_.vert_i].p).matrix().norm();
       });
 
       // Set lengths for (deleted) halfs to 0
       for (uint i = 0; i < mesh.halfs().size(); ++i)
         if (half_flag_erase[i])
-          lengths[i] = std::numeric_limits<float>::min();
+          lengths[i] = std::numeric_limits<float>::max();
 
-      // Find longest half-edge
-      uint half_i = std::distance(lengths.begin(), std::min_element(std::execution::par_unseq, range_iter(lengths)));
+      // Find shortest half-edge // TODO: employ different metric
+      uint half_i = std::distance(lengths.begin(), 
+        std::min_element(std::execution::par_unseq, range_iter(lengths)));
 
-      // Obtain half edge and twin, as well as their vertices
+      // Obtain half edge and twin, as well as their respective vertices
       Half &half      = mesh.halfs()[half_i], 
            &twin      = mesh.halfs()[half.twin_i];
       Vert &half_vert = mesh.verts()[half.vert_i], 
            &twin_vert = mesh.verts()[twin.vert_i];
 
+      // Shift vertex positions to their respective average center
+      half_vert.p = ((half_vert.p + twin_vert.p) * 0.5f).eval();
+      // twin_vert.p = half_vert.p; // TODO: redundant
+
+      // Move all uses of the twin vertex to this edge's vertex, but store the id
+      const uint twin_vert_i_copy = twin.vert_i;
+      for (uint h : mesh.halfs_storing_vert(twin_vert_i_copy))
+        mesh.halfs()[h].vert_i = half.vert_i;
       
+      // Obtain the twins of next/prev halfs to right and left
+      Half &righ_next = mesh.halfs()[mesh.halfs()[half.next_i].twin_i],
+           &righ_prev = mesh.halfs()[mesh.halfs()[half.prev_i].twin_i];
+      Half &left_next = mesh.halfs()[mesh.halfs()[twin.next_i].twin_i],
+           &left_prev = mesh.halfs()[mesh.halfs()[twin.prev_i].twin_i];
+
+      // Connect these through their own twins
+      righ_next.twin_i = mesh.halfs()[half.prev_i].twin_i;
+      righ_prev.twin_i = mesh.halfs()[half.next_i].twin_i;
+      left_next.twin_i = mesh.halfs()[twin.prev_i].twin_i;
+      left_prev.twin_i = mesh.halfs()[twin.next_i].twin_i;
+      
+      if (half.vert_i != twin_vert_i_copy) {
+        vert_count--;
+        vert_flag_erase[twin_vert_i_copy] = true;
+      }
+
+      // Flag components for deletion
+      face_flag_erase[half.face_i] = true;
+      face_flag_erase[twin.face_i] = true;
+      face_count -= 2;
+      for (uint h : mesh.halfs_around_face(half.face_i)) half_flag_erase[h] = true;
+      for (uint h : mesh.halfs_around_face(twin.face_i)) half_flag_erase[h] = true;
     }
+
+    // Determine new indices of non-deleted vertices, faces, and halfs
+    // through exclusive prefix scan
+    std::vector<uint> vert_indx_new(mesh.verts().size());
+    std::vector<uint> face_indx_new(mesh.faces().size());
+    std::vector<uint> half_indx_new(mesh.halfs().size());
+    std::transform_inclusive_scan(std::execution::par_unseq, range_iter(vert_flag_erase),
+      vert_indx_new.begin(), std::plus<uint>(), [](bool b) { return b ? 0 : 1; });
+    std::transform_inclusive_scan(std::execution::par_unseq, range_iter(face_flag_erase),
+      face_indx_new.begin(), std::plus<uint>(), [](bool b) { return b ? 0 : 1; });
+    std::transform_inclusive_scan(std::execution::par_unseq, range_iter(half_flag_erase),
+      half_indx_new.begin(), std::plus<uint>(), [](bool b) { return b ? 0 : 1; });
+    std::for_each(std::execution::par_unseq, range_iter(vert_indx_new), [](uint &i) { i--; });
+    std::for_each(std::execution::par_unseq, range_iter(face_indx_new), [](uint &i) { i--; });
+    std::for_each(std::execution::par_unseq, range_iter(half_indx_new), [](uint &i) { i--; });
+
+    // Apply new indices to verts, faces, and halfs
+    for (Vert &v : mesh.verts()) v.half_i = half_indx_new[v.half_i];
+    for (Face &f : mesh.faces()) f.half_i = half_indx_new[f.half_i];
+    for (Half &h : mesh.halfs()) {
+      h.twin_i = half_indx_new[h.twin_i];
+      h.next_i = half_indx_new[h.next_i];
+      h.prev_i = half_indx_new[h.prev_i];
+      h.vert_i = vert_indx_new[h.vert_i];
+      h.face_i = face_indx_new[h.face_i];
+    }
+
+    // Obtain indices of deleted verts, faces, and halfs in reverse order
+    std::vector<uint> vert_indx_erase;
+    std::vector<uint> face_indx_erase;
+    std::vector<uint> half_indx_erase;
+    for (auto it = vert_flag_erase.rbegin(); it != vert_flag_erase.rend(); ++it)
+      if (bool flag = *it; flag) vert_indx_erase.push_back(std::distance(it, vert_flag_erase.rend()) - 1);
+    for (auto it = face_flag_erase.rbegin(); it != face_flag_erase.rend(); ++it)
+      if (bool flag = *it; flag) face_indx_erase.push_back(std::distance(it, face_flag_erase.rend()) - 1);
+    for (auto it = half_flag_erase.rbegin(); it != half_flag_erase.rend(); ++it)
+      if (bool flag = *it; flag) half_indx_erase.push_back(std::distance(it, half_flag_erase.rend()) - 1);
+    
+    // Erase marked verts, faces and halfs in reverse order
+    for (uint i : vert_indx_erase) mesh.verts().erase(mesh.verts().begin() + i);
+    for (uint i : face_indx_erase) mesh.faces().erase(mesh.faces().begin() + i);
+    for (uint i : half_indx_erase) mesh.halfs().erase(mesh.halfs().begin() + i);
 
     return mesh;
   }

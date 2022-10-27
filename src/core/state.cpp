@@ -6,7 +6,7 @@
 #include <algorithm>
 
 namespace met {
-  constexpr uint chull_vertex_count = 16;
+  constexpr uint chull_vertex_count = 4;
 
   namespace io {
     ProjectData load_project(const fs::path &path) {
@@ -85,10 +85,12 @@ namespace met {
     loaded_chull = generate_unit_sphere<eig::AlArray3f>(3u);
     loaded_chull = generate_convex_hull<eig::AlArray3f>(loaded_chull, points);
     // loaded_chull = cleanup(loaded_chull);
-    // clean_all(loaded_chull);
     fmt::print("pre {} - {}\n", loaded_chull.verts().size(), loaded_chull.elems().size());
     loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
     fmt::print("post {} - {}\n", loaded_chull.verts().size(), loaded_chull.elems().size());
+    // clean_all(loaded_chull);
+    // loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
+    // fmt::print("post {} - {}\n", loaded_chull.verts().size(), loaded_chull.elems().size());
     loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
     // Reset undo/redo history
