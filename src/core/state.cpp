@@ -57,7 +57,7 @@ namespace met {
     // Instantiate approximate convex hull
     std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
     loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
-    // loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
+    loaded_chull = simplify_mesh(HalfEdgeMesh<eig::AlArray3f>(loaded_chull), chull_vertex_count);
     loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
     // Reset undo/redo history
