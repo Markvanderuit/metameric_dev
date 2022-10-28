@@ -45,7 +45,7 @@ namespace met {
     // Upper and lower limits to x are unrestrained
     eig::Array<float, N, 1> l = std::numeric_limits<float>::min(), u = std::numeric_limits<float>::max();
 
-      // Set up full set of parameters for solving minimized/maximized weights
+    // Set up full set of parameters for solving minimized/maximized weights
     LPParamsX<float> lp_params_min { .N = N, .M = M, .C = C_min, 
                                      .A = A, .b = b, .c0 = 0.f, 
                                      .r = r, .l = l, .u = u };

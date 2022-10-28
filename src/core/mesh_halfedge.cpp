@@ -1,4 +1,5 @@
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/linprog.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <fmt/ranges.h>
@@ -33,13 +34,89 @@ namespace met {
     using eig_hash_t  = decltype(eig_hash<T>);
     using eig_equal_t = decltype(eig_equal);
 
+    struct RealizedTriangle {
+      eig::Vector3f p0, p1, p2;
+      eig::Vector3f e0, e1, e2;
+      eig::Vector3f n;
+      float A;
+
+      RealizedTriangle(const eig::Vector3f &_p0, 
+                       const eig::Vector3f &_p1, 
+                       const eig::Vector3f &_p2)
+      : p0(_p0), p1(_p1), p2(_p2),
+        e0(p1 - p0), e1(p2 - p1), e2(p0 - p2),
+        n(-e0.cross(e1).normalized()) {
+          // Heron's formula to obtain triangle surface area
+          float a = e0.norm(), b = e1.norm(), c = e2.norm();
+          float s = (a + b + c) * 0.5f;
+          A = std::sqrt(s * (s - a) * (s - b) * (s - c));
+        }
+    };
+
+    eig::Vector3f solve_for_vertex(const std::vector<RealizedTriangle> &triangles) {
+      met_trace();
+
+      constexpr uint N = 3;
+      const     uint M = triangles.size();
+
+      // Constraints matrices
+      eig::MatrixXf       A(M, N);
+      eig::ArrayXf        b(M);
+      eig::ArrayX<LPComp> r(M);
+
+      // Generate constraints data
+      for (uint i = 0; i < M; ++i) {
+        A.row(i) = ((triangles[i].A / 3.f) * triangles[i].n).eval();
+        b[i]     = ((triangles[i].A / 3.f) * triangles[i].n.dot(triangles[i].p0));
+        r[i]     = LPComp::eGE;
+      }
+
+      // Objective matrix for minimization
+      eig::Array<float, N, 1> C = 1.f;
+
+      // Upper and lower limits to x are restrained
+      eig::Array<float, N, 1> l = 0.f, u = 1.f;
+
+      // Set up full set of parameters and run minimization
+      LPParamsX<float> lp_params { .N = N, .M = M, .C = C, .A = A, .b = b, 
+                                   .c0 = 0.f, .r = r, .l = l, .u = u };
+      eig::Vector3f v = linprog<float>(lp_params);
+
+      return v;
+    }
+
+    // Based on this question:
+    // https://stackoverflow.com/questions/1406029/how-to-calculate-the-volume-of-a-3d-mesh-object-the-surface-of-which-is-made-up
+    template <typename T>
+    float volume_of_triangle(const T &v1, const T &v2, const T &v3) {
+      float v321 = v3[0] * v2[1] * v1[2];
+      float v231 = v2[0] * v3[1] * v1[2];
+      float v312 = v3[0] * v1[1] * v2[2];
+      float v132 = v1[0] * v3[1] * v2[2];
+      float v213 = v2[0] * v1[1] * v3[2];
+      float v123 = v1[0] * v2[1] * v3[2];
+      return (1.f / 6.f) * (-v321 + v231 + v312 - v132 - v213 + v123);
+    }
+
+    // Based on this question:
+    // https://stackoverflow.com/questions/1406029/how-to-calculate-the-volume-of-a-3d-mesh-object-the-surface-of-which-is-made-up
+    template <typename T>
+    float volume_of_mesh_patch(const HalfEdgeMesh<T> &mesh, const std::vector<uint> &faces_i) {
+      float vol = 0.f;
+      for (uint f : faces_i) {
+        auto vt = mesh.verts_around_face(f);
+        vol += volume_of_triangle(mesh.verts()[vt[0]].p, mesh.verts()[vt[1]].p, mesh.verts()[vt[2]].p);
+      }
+      return std::abs(vol);
+    }
+
     template <typename T>
     std::vector<uint> masked_halfs_storing_vert(const HalfEdgeMesh<T>   &mesh,
-                                                const std::vector<bool> &mask,
+                                                const std::vector<bool> &half_mask,
                                                 uint vert_i) {
       std::vector<uint> halfs;
-      for (uint i = 0; i < mask.size(); ++i)
-        if (!mask[i] && mesh.halfs()[i].vert_i == vert_i)
+      for (uint i = 0; i < half_mask.size(); ++i)
+        if (!half_mask[i] && mesh.halfs()[i].vert_i == vert_i)
           halfs.push_back(i);
       return halfs;
     }
@@ -52,6 +129,30 @@ namespace met {
       for (uint h : masked_halfs_storing_vert(mesh, half_mask, vert_i))
         verts.push_back(mesh.halfs()[mesh.halfs()[h].twin_i].vert_i);
       return verts;
+    }
+
+    template <typename T>
+    std::vector<uint> masked_faces_around_vert(const HalfEdgeMesh<T>   &mesh,
+                                               const std::vector<bool> &half_mask,
+                                               uint vert_i) {
+      auto halfs = masked_halfs_storing_vert(mesh, half_mask, vert_i);
+      std::vector<uint> faces;
+      for (auto h : halfs)
+        faces.push_back(mesh.halfs()[h].face_i);      
+      return faces;
+    }
+
+    template <typename T>
+    std::vector<uint> masked_faces_around_half(const HalfEdgeMesh<T>   &mesh,
+                                               const std::vector<bool> &half_mask,
+                                               uint half_i) {
+      std::unordered_set<uint> uset;
+      const auto &hl = mesh.halfs()[half_i];
+      for (const auto &h : { hl, mesh.halfs()[hl.twin_i] }) {
+        auto faces = masked_faces_around_vert(mesh, half_mask, h.vert_i);
+        std::ranges::copy(faces, std::inserter(uset, uset.begin()));
+      }      
+      return std::vector(range_iter(uset));
     }
    } // namespace detail
 
@@ -254,14 +355,28 @@ namespace met {
       Vert &half_vert = mesh.verts()[half.vert_i], 
            &twin_vert = mesh.verts()[twin.vert_i];
 
+      // Solve for vertex position
+      auto face_ids = detail::masked_faces_around_half(mesh, half_flag_erase, half_i);
+      std::vector<detail::RealizedTriangle> triangle_data;
+      triangle_data.reserve(face_ids.size());
+      for (auto &face_i : face_ids) {
+        auto v = mesh.verts_around_face(face_i);
+        auto p0 = mesh.verts()[v[0]].p, p1 = mesh.verts()[v[1]].p, p2 = mesh.verts()[v[2]].p;
+        triangle_data.push_back(detail::RealizedTriangle(p0, p1, p2));
+      }
+
+      // Update vertex position to optimal result, but only if this makes sense
+      if (!half_vert.p.isApprox(twin_vert.p)) {
+        half_vert.p = detail::solve_for_vertex(triangle_data);
+        fmt::print("Solved for {}\n", half_vert.p);
+      }
+
       // Shift vertex positions to their respective average center
-      half_vert.p = ((half_vert.p + twin_vert.p) * 0.5f).eval();
-      // twin_vert.p = half_vert.p; // TODO: redundant
+      // half_vert.p = ((half_vert.p + twin_vert.p) * 0.5f).eval();
 
       // Move all uses of the twin vertex to this edge's vertex, but store the id
       const uint twin_vert_i_copy = twin.vert_i;
       for (uint h : detail::masked_halfs_storing_vert(mesh, half_flag_erase, twin_vert_i_copy))
-      // for (uint h : mesh.halfs_storing_vert(twin_vert_i_copy))
         mesh.halfs()[h].vert_i = half.vert_i;
       
       // Obtain the twins of next/prev halfs to right and left
