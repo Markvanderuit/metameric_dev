@@ -260,23 +260,25 @@ namespace met {
     HalfEdgeMesh<T> mesh = input_mesh;
     
     // Temporary containers used during minimization
-    std::vector<bool>  vert_flag_rem(mesh.verts().size(), false);
-    std::vector<bool>  face_flag_rem(mesh.faces().size(), false);
-    std::vector<bool>  half_flag_rem(mesh.halfs().size(), false);
-    std::vector<float> collapse_metr(mesh.halfs().size(), 0.f);
-    std::vector<T>     collapse_vert(mesh.halfs().size(), T(0.f));
+    std::vector<bool>  vert_flag_rem(mesh.verts().size(), false);  // Vertices flagged for removal
+    std::vector<bool>  face_flag_rem(mesh.faces().size(), false);  // Faces flagged for removal
+    std::vector<bool>  half_flag_rem(mesh.halfs().size(), false);  // Halfs flagged for removal
+    std::vector<bool>  collapse_test(mesh.halfs().size(), true);   // Halfs flagged for metric recomputation
+    std::vector<float> collapse_metr(mesh.halfs().size(), 0.f);    // Half collapse cost metric
+    std::vector<T>     collapse_vert(mesh.halfs().size(), T(0.f)); // Half collapse, vertex position
 
     // Keep minimizing until maximum vertex count is satisfied
     uint curr_vertices = mesh.verts().size();
     while (curr_vertices-- > max_vertices) {
       // Compute half-edge collapse metric
       #pragma omp parallel for
-      for (int i = 0; i < collapse_metr.size(); ++i) {
+      for (int i = 0; i < collapse_test.size(); ++i) {
         // Half-edge has already been collapsed and marked for removal
         guard_continue(!half_flag_rem[i]);
+        guard_continue(collapse_test[i]);
 
         // Obtain const half edge and its twin
-        const Half &half   = mesh.halfs()[i],            
+        const Half &half   = mesh.halfs()[i],
                    &twin   = mesh.halfs()[half.twin_i];
         const Vert &half_v = mesh.verts()[half.vert_i], 
                    &twin_v = mesh.verts()[twin.vert_i];
@@ -320,6 +322,7 @@ namespace met {
 
         collapse_metr[i] = metric;
         collapse_vert[i] = new_p;
+        collapse_test[i] = false;
       }
 
       // Find cheapest collapsible half-edge satisfying all criteria
@@ -333,6 +336,14 @@ namespace met {
       // Throw on a debug error resulting in non-manifold meshes
       debug::check_expr_dbg(half.vert_i != twin.vert_i, 
         "Error while simplifying mesh; non-manifold geometry detected");
+        
+      // Flag affected half-edges for metric recomputation
+      for (uint f : detail::masked_faces_around_half(mesh, half_flag_rem, half_i)) {
+        for (uint h : mesh.halfs_around_face(f)) {
+          collapse_test[h] = true;
+          collapse_test[mesh.halfs()[h].twin_i] = true;
+        }
+      }
         
       // Shift this edge's vertex position to the solved for position
       mesh.verts()[half.vert_i].p = collapse_vert[half_i];
@@ -358,10 +369,12 @@ namespace met {
       face_flag_rem[twin.face_i] = true;
       for (uint h : mesh.halfs_around_face(half.face_i)) {
         half_flag_rem[h] = true;
+        collapse_test[h] = false;
         collapse_metr[h] = std::numeric_limits<float>::max();
       }
       for (uint h : mesh.halfs_around_face(twin.face_i)) {
         half_flag_rem[h] = true;
+        collapse_test[h] = false;
         collapse_metr[h] = std::numeric_limits<float>::max();
       }
     }
