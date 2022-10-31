@@ -80,6 +80,13 @@ namespace ImGui {
     ImGui::CloseCurrentPopup();
   }
 
+  void CloseAllPopupsIfOpen() {
+    while (true) {
+      guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
+      ImGui::CloseCurrentPopup();
+    }
+  }
+
 struct InputTextCallback_UserData{
   std::string*            Str;
   ImGuiInputTextCallback  ChainCallback;

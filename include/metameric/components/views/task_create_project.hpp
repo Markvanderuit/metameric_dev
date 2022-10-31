@@ -78,7 +78,7 @@ namespace met {
         ImGui::SpacedSeparator();
 
         // Define create/cancel buttons to handle results 
-        if (ImGui::Button("Create") && create_project_safe(info)) { ImGui::CloseCurrentPopup(); }
+        if (ImGui::Button("Create") && create_project_safe(info)) { ImGui::CloseAnyPopupIfOpen(); }
         ImGui::SameLine();      
         if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
 

@@ -19,7 +19,7 @@ namespace met {
     met_trace_full();
 
     // Share resources
-    info.insert_resource<gl::Texture2d3f>("draw_texture", gl::Texture2d3f());
+    info.emplace_resource<gl::Texture2d3f>("draw_texture", { .size = 1 });
     info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.0f, .e_center = 0.0f });
 
     // Add subtasks in reverse order

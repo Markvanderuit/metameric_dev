@@ -88,14 +88,13 @@ namespace met {
                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
       
       // Generate new metameric spectrum for given color systems and expected color signals
-      // std::array<CMFS, 1> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize() };
-      // std::array<Colr, 1> signals = { e_proj_data.gamut_colr_i[i] };
       e_proj_data.gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 
     // Re-upload stale gamut data to the gpu
     for (uint i = 0; i < e_state_spec.size(); ++i) {
-      guard_continue(e_state_spec[i] == CacheState::eStale);
+      guard_continue(e_state_spec[i] == CacheState::eStale || e_state_gamut[i] == CacheState::eStale);
+      fmt::print("Uploaded stale gamut {}\n", i);
       i_buffer_colr_map[i] = e_proj_data.gamut_colr_i[i];
       i_buffer_spec_map[i] = e_proj_data.gamut_spec[i];
       i_buffer_colr.flush(sizeof(AlColr), i * sizeof(AlColr));

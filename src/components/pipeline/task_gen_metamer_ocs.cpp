@@ -114,6 +114,8 @@ namespace met {
                      e_state_gamut_mapp_j[i] == CacheState::eStale             ||
                      e_state_mappings[e_gamut_mapp_i[i]] == CacheState::eStale ||
                      e_state_mappings[e_gamut_mapp_j[i]] == CacheState::eStale);
+                     
+      fmt::print("Uploaded stale ocs {}\n", i);
 
       // Get rest of shared resources
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));

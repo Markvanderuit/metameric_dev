@@ -60,6 +60,9 @@ namespace met {
     loaded_chull = simplify_mesh(loaded_chull, chull_vertex_count);
     loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
+    // Instantiate gamut settings with convex hull vertices
+    std::copy(range_iter(loaded_chull.verts()), project_data.gamut_colr_i.begin());
+
     // Reset undo/redo history
     mods  = { };
     mod_i = -1;

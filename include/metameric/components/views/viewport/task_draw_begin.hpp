@@ -38,8 +38,8 @@ namespace met {
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
       if (!i_frame_buffer.is_init() || (e_draw_texture.size() != m_color_buffer_msaa.size()).any()) {
-        m_color_buffer_msaa = {{ .size = e_draw_texture.size() }};
-        m_depth_buffer_msaa = {{ .size = e_draw_texture.size() }};
+        m_color_buffer_msaa = {{ .size = e_draw_texture.size().max(1) }};
+        m_depth_buffer_msaa = {{ .size = e_draw_texture.size().max(1) }};
         i_frame_buffer_msaa = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_msaa },
                                { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer_msaa }};
         i_frame_buffer      = {{ .type = gl::FramebufferType::eColor, .attachment = &e_draw_texture }};

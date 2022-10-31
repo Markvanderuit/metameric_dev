@@ -224,7 +224,7 @@ namespace met {
 
     // Share resources
     info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
-    info.insert_resource<gl::Texture2d3f>("draw_texture", gl::Texture2d3f());
+    info.emplace_resource<gl::Texture2d3f>("draw_texture", { .size = 1 });
     info.insert_resource<int>("gamut_selection", -1);
 
     // Add subtasks in reverse order

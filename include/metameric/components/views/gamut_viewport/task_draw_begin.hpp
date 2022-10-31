@@ -41,8 +41,8 @@ namespace met {
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
       if (!i_frame_buffer.is_init() || (e_target_texture.size() != m_color_buffer_ms.size()).any()) {
-        m_color_buffer_ms = {{ .size = e_target_texture.size() }};
-        m_depth_buffer_ms = {{ .size = e_target_texture.size() }};
+        m_color_buffer_ms = {{ .size = e_target_texture.size().max(1) }};
+        m_depth_buffer_ms = {{ .size = e_target_texture.size().max(1) }};
         i_frame_buffer_ms = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_ms },
                              { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer_ms }};
         i_frame_buffer    = {{ .type = gl::FramebufferType::eColor, .attachment = &e_target_texture }};
