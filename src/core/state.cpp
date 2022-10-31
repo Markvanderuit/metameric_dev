@@ -54,20 +54,12 @@ namespace met {
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
 
-    // Instantiate approximate convex hull
-    std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
-    loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
-    loaded_chull = simplify_mesh(loaded_chull, chull_vertex_count);
-    loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
-
-    // Instantiate gamut settings with convex hull vertices
-    std::copy(range_iter(loaded_chull.verts()), project_data.gamut_colr_i.begin());
-
     // Reset undo/redo history
     mods  = { };
     mod_i = -1;
 
     load_mappings();
+    load_chull_gamut();
   }
   
   void ApplicationData::save(const fs::path &save_path) {
@@ -82,12 +74,6 @@ namespace met {
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"));
-    
-    // Instantiate convex hull
-    std::vector<eig::AlArray3f> points(range_iter(loaded_texture.data()));
-    loaded_chull = generate_convex_hull<eig::AlArray3f>(points);
-    loaded_chull = simplify_mesh(loaded_chull, chull_vertex_count);
-    loaded_chull_wf = generate_wireframe<eig::AlArray3f>(loaded_chull);
 
     // Reset undo/redo history
     mods  = { };
@@ -140,9 +126,10 @@ namespace met {
     project_state = ProjectState::eUnloaded;
     project_path  = "";
     project_data  = { };
+
     loaded_texture  = { };
     loaded_mappings = { };
-    loaded_chull    = { };
+    
     mods  = { };
     mod_i = -1;
   }
@@ -151,6 +138,14 @@ namespace met {
     loaded_mappings = { };
     std::ranges::transform(project_data.mappings, std::back_inserter(loaded_mappings), 
       [&](auto &p) { return load_mapping(p.first); });
+  }
+  
+  void ApplicationData::load_chull_gamut() {
+    // Instantiate approximate convex hull, simplified to a tetrahedron, to place initial 
+    // project gamut vertices
+    auto chull_mesh = generate_convex_hull<eig::Array3f>(loaded_texture.data());
+    auto chull_tetr = simplify_mesh(chull_mesh, chull_vertex_count);
+    std::copy(range_iter(chull_tetr.verts()), project_data.gamut_colr_i.begin());
   }
 
   Spec ApplicationData::load_illuminant(const std::string &key) const {

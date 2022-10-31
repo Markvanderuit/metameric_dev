@@ -83,8 +83,8 @@ namespace met {
 
     Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
     std::vector<Mapp>   loaded_mappings; // Spectral mappings extracted from project data
-    AlArray3fMesh       loaded_chull;    // Approximate convex hull surrounding RGB texture
-    AlArray3fWireframe  loaded_chull_wf; // Wireframe mesh of approximate convex hull
+    /* AlArray3fMesh       loaded_chull;    // Approximate convex hull surrounding RGB texture
+    AlArray3fWireframe  loaded_chull_wf; // Wireframe mesh of approximate convex hull */
 
     /* Project data handling */
     
@@ -110,6 +110,9 @@ namespace met {
 
     // Reload all relevant mappings/spectra/color systems from underlying project data
     void load_mappings();
+
+    // Reload gamut project data based on a convex hull approximation of the input texture
+    void load_chull_gamut();
 
   private:
     // Given a string key, extract mapping/spectrum/color system data from underlying project data
