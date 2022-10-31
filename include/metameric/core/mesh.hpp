@@ -14,19 +14,6 @@ namespace met {
   template <typename T>
   struct HalfEdgeMesh;
 
-  template <typename T = eig::AlArray3f>
-  struct SimpleMesh {
-    struct Face {
-      T x, y, z;
-    };
-
-    private:
-      std::vector<Face> m_faces;
-
-    public:
-
-  };
-
   /* Simple indexed triangle mesh structure */
   template <typename T, typename E>
   struct IndexedMesh {
@@ -132,4 +119,6 @@ namespace met {
   // Perform progressive mesh simplification by edge collapse until vertex count <= max_vertices
   template <typename T = eig::AlArray3f>
   HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices);
+  template <typename T = eig::AlArray3f>
+  IndexedMesh<T, eig::Array3u> simplify_mesh(const IndexedMesh<T, eig::Array3u> &mesh, uint max_vertices);
 } // namespace met
