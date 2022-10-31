@@ -51,11 +51,27 @@ namespace met {
         }
     };
 
-    eig::Vector3f solve_for_vertex(const std::vector<RealizedTriangle> &triangles) {
+    eig::Vector3f solve_for_vertex(const std::vector<RealizedTriangle> &triangles,
+                                   const eig::Vector3f &min_v = 0.f,
+                                   const eig::Vector3f &max_v = 1.f) {
       met_trace();
 
       constexpr uint N = 3;
       const     uint M = triangles.size();
+
+      /* 
+        N = triangles.size()
+        M = 3
+
+        min  C^T x
+        s.t. Ax = b
+
+        C = 1xN
+        x = 1xN
+        A = 3xN
+        b = 3x1
+        r = 3x1
+      */
 
       // Instantiate constraints matrices
       eig::MatrixXf       A(M, N);
@@ -67,14 +83,14 @@ namespace met {
         eig::Vector<float, N> n = ((triangles[i].A / 3.f) * triangles[i].n).eval();
         A.row(i) = n;
         b[i] = n.dot(triangles[i].p0);
-        r[i] = LPComp::eGE;
+        r[i] = LPComp::eEQ;
       }
       
       // Set up other components
-      eig::Array<float, N, 1> C = 1.f;          // Objective matrix for minimization
-      eig::Array<float, N, 1> l = 0.f, u = 1.f; // Upper and lower limits to x
+      eig::Array<float, N, 1> C = 1.f;               // Objective matrix for minimization
+      eig::Array<float, N, 1> l = min_v, u = max_v; // Upper and lower limits to x
 
-      // Set up parameter jobject and run minimization
+      // Set up parameter object and run minimization
       LPParamsX<float> lp_params { .N = N, .M = M, .C = C, .A = A, .b = b, 
                                    .c0 = 0.f, .r = r, .l = l, .u = u };
       return linprog<float>(lp_params);
@@ -278,33 +294,39 @@ namespace met {
 
     uint vert_count = mesh.verts().size();
     uint face_count = mesh.faces().size();
+    
     while (vert_count > max_vertices) {
-      fmt::print("{} - {}\n", vert_count, face_count);
+      // fmt::print("{} - {}\n", vert_count, face_count);
 
       // Compute half-edge collapse metric
       #pragma omp parallel for
       for (int i = 0; i < edge_collapse_metric.size(); ++i) {
+        // Half-edge has already been collapsed and marked for removal
         if (half_flag_erase[i]) {
           edge_collapse_metric[i] = std::numeric_limits<float>::max();
           continue;
         }
 
         const Half &half = mesh.halfs()[i], &twin = mesh.halfs()[half.twin_i];
-        const Vert &vert_0 = mesh.verts()[half.vert_i], &vert_1 = mesh.verts()[twin.vert_i];
 
-        // Test for connectivity
+        // Build connectivity set
         auto half_neighbours = detail::masked_verts_around_vert(mesh, half_flag_erase, half.vert_i);
         auto twin_neighbours = detail::masked_verts_around_vert(mesh, half_flag_erase, twin.vert_i);
         std::ranges::sort(half_neighbours);
         std::ranges::sort(twin_neighbours);
         std::vector<uint> intersection;
+        intersection.reserve(half_neighbours.size() + twin_neighbours.size());
         std::ranges::set_intersection(half_neighbours, twin_neighbours, std::back_inserter(intersection));
+
+        // Test for connectivity to avoid non-manifold collapses
         if (intersection.size() > 2) {
           edge_collapse_metric[i] = std::numeric_limits<float>::max();
           continue;
         }
         
         // If vertex positions are identical, collapse is essentially free
+        const Vert &vert_0 = mesh.verts()[half.vert_i], 
+                   &vert_1 = mesh.verts()[twin.vert_i];
         if (vert_0.p.isApprox(vert_1.p)) {
           edge_collapse_metric[i] = 0.f;
           edge_collapse_vertex[i] = vert_0.p;
@@ -320,60 +342,24 @@ namespace met {
           auto p0 = mesh.verts()[v[0]].p, p1 = mesh.verts()[v[1]].p, p2 = mesh.verts()[v[2]].p;
           triangle_data.push_back(detail::RealizedTriangle(p0, p1, p2));
         }
-        auto new_p = detail::solve_for_vertex(triangle_data);
+        auto avg_p = 0.5f * (vert_0.p + vert_1.p);
+        auto new_p = detail::solve_for_vertex(triangle_data,
+                                              (avg_p - 0.15f).max(0.f).eval(),
+                                              (avg_p + 0.15f).min(1.f).eval());
         
         // Compute volume of new shape as metric
         float metric = 0.f;
         for (const auto &tri : triangle_data)
           metric += std::abs(((tri.A / 3.f) * tri.n).dot(new_p - tri.p0));
 
-        edge_collapse_metric[i] = metric; // (vert_0.p - vert_1.p).matrix().norm();
+        edge_collapse_metric[i] = metric;
         edge_collapse_vertex[i] = new_p;
       }
 
-      /* // Compute half-edge lengths // TODO: employ different metric
-      std::vector<float> lengths(mesh.halfs().size());
-      std::transform(std::execution::par_unseq, range_iter(mesh.halfs()), lengths.begin(),
-      [&](const Half &a) {
-        auto v = (mesh.verts()[a.vert_i].p
-               -  mesh.verts()[mesh.halfs()[a.twin_i].vert_i].p).matrix().eval();
-        return v.isZero() ? 0.f : v.norm();
-      }); */
-
-      /* // Set lengths for (deleted) halfs to 0
-      for (uint i = 0; i < mesh.halfs().size(); ++i)
-        if (half_flag_erase[i])
-          lengths[i] = std::numeric_limits<float>::max(); */
-
-      // Find shortest collapsible half-edge satisfying collapse criteria
-
-      
+      // Find cheapest collapsible half-edge satisfying all criteria
       uint half_i = std::distance(edge_collapse_metric.begin(), 
         std::min_element(std::execution::par_unseq, range_iter(edge_collapse_metric)));
-
-     /*  while (true) {
-        // Find shortest half-edge pair
-        half_i = std::distance(edge_collapse_metric.begin(), std::min_element(std::execution::par_unseq, range_iter(edge_collapse_metric)));
-        Half &half = mesh.halfs()[half_i], &twin = mesh.halfs()[half.twin_i];
-
-        // Test for correct connectivity
-        auto half_neighbours = detail::masked_verts_around_vert(mesh, half_flag_erase, half.vert_i);
-        auto twin_neighbours = detail::masked_verts_around_vert(mesh, half_flag_erase, twin.vert_i);
-        std::ranges::sort(half_neighbours);
-        std::ranges::sort(twin_neighbours);
-        std::vector<uint> intersection;
-        std::ranges::set_intersection(half_neighbours, twin_neighbours, std::back_inserter(intersection));
-        
-        if (intersection.size() > 2) {
-          edge_collapse_metric[half_i] = std::numeric_limits<float>::max();
-          continue;
-        }
-        fmt::print("Overlap: {}\n", intersection.size());
-
-        break;
-      } */
-
-      fmt::print("Shortest is {} at {}\n", half_i, edge_collapse_metric[half_i]);
+      // fmt::print("Shortest is {} at {}\n", half_i, edge_collapse_metric[half_i]);
 
       // Obtain half edge and twin, as well as their respective vertices
       Half &half      = mesh.halfs()[half_i], 
@@ -381,25 +367,8 @@ namespace met {
       Vert &half_vert = mesh.verts()[half.vert_i], 
            &twin_vert = mesh.verts()[twin.vert_i];
 
-      // Solve for vertex position
-      /* auto face_ids = detail::masked_faces_around_half(mesh, half_flag_erase, half_i);
-      std::vector<detail::RealizedTriangle> triangle_data;
-      triangle_data.reserve(face_ids.size());
-      for (auto &face_i : face_ids) {
-        auto v = mesh.verts_around_face(face_i);
-        auto p0 = mesh.verts()[v[0]].p, p1 = mesh.verts()[v[1]].p, p2 = mesh.verts()[v[2]].p;
-        triangle_data.push_back(detail::RealizedTriangle(p0, p1, p2));
-      } */
-
-      /* // Update vertex position to optimal result, but only if this makes sense
-      if (!half_vert.p.isApprox(twin_vert.p)) {
-        half_vert.p = detail::solve_for_vertex(triangle_data);
-        fmt::print("Solved for {}\n", half_vert.p);
-      } */
-
       // Shift vertex positions to their respective average center
       half_vert.p = edge_collapse_vertex[half_i];
-      // half_vert.p = ((half_vert.p + twin_vert.p) * 0.5f).eval();
 
       // Move all uses of the twin vertex to this edge's vertex, but store the id
       const uint twin_vert_i_copy = twin.vert_i;
@@ -412,12 +381,12 @@ namespace met {
       Half &left_next = mesh.halfs()[mesh.halfs()[twin.next_i].twin_i],
            &left_prev = mesh.halfs()[mesh.halfs()[twin.prev_i].twin_i];
 
-      fmt::print("righ face = {}, half = {} - {} - {}, left face = {}, half = {} - {} - {}\n",
+      /* fmt::print("righ face = {}, half = {} - {} - {}, left face = {}, half = {} - {} - {}\n",
         half.face_i,
         half_i, half.next_i, half.prev_i,
         twin.face_i,
         half.twin_i, twin.next_i, twin.prev_i
-      );
+      ); */
 
       // Connect these through their own twins
       righ_next.twin_i = mesh.halfs()[half.prev_i].twin_i;
@@ -425,15 +394,16 @@ namespace met {
       left_next.twin_i = mesh.halfs()[twin.prev_i].twin_i;
       left_prev.twin_i = mesh.halfs()[twin.next_i].twin_i;
       
+      // Catch an error, and mark the half-flag for erasure
       if (half.vert_i != twin_vert_i_copy) {
         vert_count--;
         vert_flag_erase[twin_vert_i_copy] = true;
       } else {
-        break;
         fmt::print("Uhh!\n");
+        break;
       }
 
-      // Flag components for deletion
+      // Flag affected vertices/faces components for erasure
       face_flag_erase[half.face_i] = true;
       face_flag_erase[twin.face_i] = true;
       face_count -= 2;
@@ -457,7 +427,17 @@ namespace met {
     std::for_each(std::execution::par_unseq, range_iter(half_indx_new), [](uint &i) { i--; });
 
     // Apply new indices to verts, faces, and halfs
-    for (Vert &v : mesh.verts()) v.half_i = half_indx_new[v.half_i];
+    std::for_each(std::execution::par_unseq, range_iter(mesh.verts()), [&](Vert &v) { v.half_i = half_indx_new[v.half_i]; });
+    std::for_each(std::execution::par_unseq, range_iter(mesh.faces()), [&](Face &f) { f.half_i = half_indx_new[f.half_i]; });
+    std::for_each(std::execution::par_unseq, range_iter(mesh.halfs()), [&](Half &h) {
+      h.twin_i = half_indx_new[h.twin_i];
+      h.next_i = half_indx_new[h.next_i];
+      h.prev_i = half_indx_new[h.prev_i];
+      h.vert_i = vert_indx_new[h.vert_i];
+      h.face_i = face_indx_new[h.face_i];
+    });
+    
+    /* for (Vert &v : mesh.verts()) v.half_i = half_indx_new[v.half_i];
     for (Face &f : mesh.faces()) f.half_i = half_indx_new[f.half_i];
     for (Half &h : mesh.halfs()) {
       h.twin_i = half_indx_new[h.twin_i];
@@ -465,12 +445,19 @@ namespace met {
       h.prev_i = half_indx_new[h.prev_i];
       h.vert_i = vert_indx_new[h.vert_i];
       h.face_i = face_indx_new[h.face_i];
-    }
+    } */
 
-    // Obtain indices of deleted verts, faces, and halfs in reverse order
+
+    // TODO: We can estimate the size of erasure pretty well based on the vertex count
+    std::erase_if(mesh.verts(), [&](const Vert &v) { return vert_flag_erase[&v - &*mesh.verts().begin()]; });
+    std::erase_if(mesh.faces(), [&](const Face &v) { return face_flag_erase[&v - &*mesh.faces().begin()]; });
+    std::erase_if(mesh.halfs(), [&](const Half &v) { return half_flag_erase[&v - &*mesh.halfs().begin()]; });
+
+    /* // Obtain indices of deleted verts, faces, and halfs in reverse order
     std::vector<uint> vert_indx_erase;
     std::vector<uint> face_indx_erase;
     std::vector<uint> half_indx_erase;
+
     for (auto it = vert_flag_erase.rbegin(); it != vert_flag_erase.rend(); ++it)
       if (bool flag = *it; flag) vert_indx_erase.push_back(std::distance(it, vert_flag_erase.rend()) - 1);
     for (auto it = face_flag_erase.rbegin(); it != face_flag_erase.rend(); ++it)
@@ -481,7 +468,7 @@ namespace met {
     // Erase marked verts, faces and halfs in reverse order
     for (uint i : vert_indx_erase) mesh.verts().erase(mesh.verts().begin() + i);
     for (uint i : face_indx_erase) mesh.faces().erase(mesh.faces().begin() + i);
-    for (uint i : half_indx_erase) mesh.halfs().erase(mesh.halfs().begin() + i);
+    for (uint i : half_indx_erase) mesh.halfs().erase(mesh.halfs().begin() + i); */
 
     return mesh;
   }
