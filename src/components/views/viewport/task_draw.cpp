@@ -74,7 +74,7 @@ namespace met {
     m_gamut_program = gl::Program({{ .type = gl::ShaderType::eVertex, 
                                      .path = "resources/shaders/viewport/draw_color_array.vert" },
                                    { .type = gl::ShaderType::eFragment,  
-                                     .path = "resources/shaders/viewport/draw_color.frag" }});
+                                     .path = "resources/shaders/viewport/draw_color_uniform_offset.frag" }});
     m_gamut_draw = { .type             = gl::PrimitiveType::eLineLoop,
                      .vertex_count     = (uint) gamut_elements.size(),
                      .bindable_array   = &m_gamut_array,
@@ -97,6 +97,8 @@ namespace met {
     // Set non-changing uniform values
     m_texture_points_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
     m_gamut_program.uniform("u_model_matrix",          eig::Matrix4f::Identity().eval());
+    m_gamut_program.uniform("u_alpha",                 1.f);
+    m_gamut_program.uniform("u_offset",                .5f);
     m_cube_program.uniform("u_model_matrix",           eig::Matrix4f::Identity().eval());
     m_cube_program.uniform("u_value",                  eig::Array3f(1.f));
   }

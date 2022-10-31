@@ -115,8 +115,6 @@ namespace met {
                      e_state_mappings[e_gamut_mapp_i[i]] == CacheState::eStale ||
                      e_state_mappings[e_gamut_mapp_j[i]] == CacheState::eStale);
                      
-      fmt::print("Uploaded stale ocs {}\n", i);
-
       // Get rest of shared resources
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
       auto &i_ocs_center   = info.get_resource<Colr>(fmt::format("ocs_center_{}", i));
@@ -141,8 +139,9 @@ namespace met {
         eig::AlArray3f(0.f), f_add) / static_cast<float>(i_ocs_points.size());
 
       // Reset gamut offset to center on metamer set recomputation, but not on first execution
-      // as all data will be considered "stale" at that point
-      if (!m_first_eval) {
+      // as all data will be considered "stale" at that point... unless it is a new project
+      // in which case offsets DO need to be initialized. Aaargh. State machines.
+      if (!m_first_eval || e_app_data.project_state == ProjectState::eNew) {
         e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
       }
     }

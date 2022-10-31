@@ -230,7 +230,7 @@ namespace met {
     // Add subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),   name() + draw_end_name);
     info.emplace_task_after<ViewportDrawTask>(name(),      name() + draw_name);
-    info.emplace_task_after<ViewportDrawOCSTask>(name(),   name() + draw_ocs_name);
+    // info.emplace_task_after<ViewportDrawOCSTask>(name(),   name() + draw_ocs_name);
     info.emplace_task_after<ViewportDrawBeginTask>(name(), name() + draw_begin_name);
   }
 
@@ -239,7 +239,7 @@ namespace met {
     
     // Remove subtasks
     info.remove_task(name() + draw_begin_name);
-    info.remove_task(name() + draw_ocs_name);
+    // info.remove_task(name() + draw_ocs_name);
     info.remove_task(name() + draw_name);
     info.remove_task(name() + draw_end_name);
   }

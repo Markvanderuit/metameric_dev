@@ -180,7 +180,6 @@ namespace met {
   template <typename Scheduler>
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
-    scheduler.emplace_task<WindowTask>("window");
     scheduler.emplace_task<ProjectStateTask>("project_state");
 
     // The following tasks define the color->spectrum uplifting pipeline
@@ -189,11 +188,11 @@ namespace met {
     scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
 
     // The following tasks define view data necessities
-    // scheduler.emplace_task<GenOCSTask>("gen_ocs");
     scheduler.emplace_task<GenMetamerOCSTask>("gen_metamer_ocs");
     scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
 
     // The following tasks define view components and windows
+    scheduler.emplace_task<WindowTask>("window");
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
     scheduler.emplace_task<GamutEditorTask>("gamut_editor");
