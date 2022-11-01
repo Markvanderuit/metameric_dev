@@ -71,7 +71,8 @@ namespace met {
       constexpr auto task_begin_fmt = FMT_COMPILE("{}_draw_begin");
 
       // Verify that a gamut point is selected before continuing
-      auto &e_gamut_idx  = info.get_resource<int>("viewport", "gamut_selection");
+      auto &e_gamut_ind = info.get_resource<std::vector<uint>>("viewport", "gamut_selection");
+      int   e_gamut_idx = e_gamut_ind.size() == 1 ? e_gamut_ind[0] : -1;
       guard(e_gamut_idx >= 0);
 
       // Get shared resources

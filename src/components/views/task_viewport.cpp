@@ -5,7 +5,6 @@
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/viewport/task_draw_begin.hpp>
 #include <metameric/components/views/viewport/task_draw.hpp>
-// #include <metameric/components/views/viewport/task_draw_ocs.hpp>
 #include <metameric/components/views/viewport/task_draw_end.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -45,11 +44,11 @@ namespace met {
     constexpr auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
   } // namespace detail
 
-  const static std::string draw_begin_name = "_draw_begin";
-  const static std::string draw_grid_name  = "_draw_grid";
-  const static std::string draw_ocs_name   = "_draw_ocs";
-  const static std::string draw_name       = "_draw";
-  const static std::string draw_end_name   = "_draw_end";
+  constexpr auto draw_begin_name = "_draw_begin";
+  constexpr auto draw_grid_name  = "_draw_grid";
+  constexpr auto draw_ocs_name   = "_draw_ocs";
+  constexpr auto draw_name       = "_draw";
+  constexpr auto draw_end_name   = "_draw_end";
 
   void ViewportTask::eval_camera(detail::TaskEvalInfo &info) {
     met_trace_full();
@@ -83,6 +82,7 @@ namespace met {
     auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_rgb_gamut = e_app_data.project_data.gamut_colr_i;
+    auto &i_gamut_ind = info.get_resource<std::vector<uint>>("gamut_selection");
     auto &io          = ImGui::GetIO();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
@@ -111,13 +111,12 @@ namespace met {
       });
                 
       // Find and store selected gamut position indices
-      m_gamut_selection_indices.clear();
-      std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_in_rect, 
-        std::back_inserter(m_gamut_selection_indices));
+      i_gamut_ind.clear();
+      std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_in_rect, std::back_inserter(i_gamut_ind));
     }
 
     // Left-click selects a gamut position
-    if (io.MouseClicked[0] && !ImGuizmo::IsOver()) {
+    if (io.MouseClicked[0] && (i_gamut_ind.empty() || !ImGuizmo::IsOver())) {
       // Filter tests if a gamut position is near a clicked position in window space
       auto is_near_click = std::views::filter([&](uint i) {
         eig::Array2f p = detail::window_space(e_rgb_gamut[i], i_arcball.full(), viewport_offs, viewport_size);
@@ -125,18 +124,17 @@ namespace met {
       });
 
       // Find and store selected gamut position indices
-      m_gamut_selection_indices.clear();
-      std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_near_click,
-        std::back_inserter(m_gamut_selection_indices));
+      i_gamut_ind.clear();
+      std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_near_click, std::back_inserter(i_gamut_ind));
     }
 
-    // If a single gamut point is selected, share this
+    /* // If a single gamut point is selected, share this
     auto &i_gamut_selection = info.get_resource<int>("gamut_selection");
     if (m_gamut_selection_indices.size() == 1) {
       i_gamut_selection = static_cast<int>(m_gamut_selection_indices[0]);
     } else {
       i_gamut_selection = -1;
-    }
+    } */
   }
 
   void ViewportTask::eval_gizmo(detail::TaskEvalInfo &info) {
@@ -146,11 +144,11 @@ namespace met {
     auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_rgb_gamut = e_app_data.project_data.gamut_colr_i;
+    auto &i_gamut_ind = info.get_resource<std::vector<uint>>("gamut_selection");
     auto &io          = ImGui::GetIO();
 
     // Range over selected gamut positions
-    const auto gamut_selection = m_gamut_selection_indices 
-                               | std::views::transform(detail::i_get(e_rgb_gamut));
+    const auto gamut_selection = i_gamut_ind | std::views::transform(detail::i_get(e_rgb_gamut));
 
     // Gizmo anchor position is mean of selected gamut positions
     eig::Vector3f gamut_anchor_pos = std::reduce(range_iter(gamut_selection), Colr(0.f))
@@ -185,13 +183,9 @@ namespace met {
 
     // Halfway gizmo drag
     if (ImGuizmo::IsUsing()) {
-      // Get range view over gamut components affected by the translation;
-      // then apply translation
-      const auto move_selection = m_gamut_selection_indices 
-                                | std::views::transform(detail::i_get(e_rgb_gamut));
-      std::ranges::for_each(move_selection, 
-        // [&](auto &p) { p = (p + gamut_transl.array()); });
-        [&](auto &p) { p = (p + gamut_transl.array()).min(1.f).max(0.f); });
+      // Get range view over gamut components affected by the translation; then apply translation
+      const auto move_selection = i_gamut_ind | std::views::transform(detail::i_get(e_rgb_gamut));
+      std::ranges::for_each(move_selection, [&](auto &p) { p = (p + gamut_transl.array()).min(1.f).max(0.f); });
     }
 
     // End gizmo drag
@@ -225,7 +219,8 @@ namespace met {
     // Share resources
     info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
     info.emplace_resource<gl::Texture2d3f>("draw_texture", { .size = 1 });
-    info.insert_resource<int>("gamut_selection", -1);
+    // info.insert_resource<int>("gamut_selection", -1);
+    info.insert_resource<std::vector<uint>>("gamut_selection", { });
 
     // Add subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),   name() + draw_end_name);
@@ -249,6 +244,7 @@ namespace met {
     
     // Get shared resources
     auto &i_draw_texture = info.get_resource<gl::Texture2d3f>("draw_texture");
+    auto &i_gamut_ind    = info.get_resource<std::vector<uint>>("gamut_selection");
 
     // Begin window draw; declare scoped ImGui style state
     auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
@@ -275,10 +271,40 @@ namespace met {
           eval_select(info);
         }
 
-        if (!m_gamut_selection_indices.empty()) {
+        if (!i_gamut_ind.empty()) {
           eval_gizmo(info);
         }
       }
+
+      /* BEGIN EXPERIMENT */
+      
+      // Get shared resources
+      auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
+      auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_rgb_gamut = e_app_data.project_data.gamut_colr_i;
+      auto &io          = ImGui::GetIO();
+
+      // Compute viewport offset and size, minus ImGui's tab bars etc
+      auto viewport_offs = (static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                         + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())).eval();
+
+      // Gizmo anchor position is mean of selected gamut positions
+      auto gamut_selection = i_gamut_ind | std::views::transform(detail::i_get(e_rgb_gamut));
+      eig::Vector3f gamut_anchor_pos = std::reduce(range_iter(gamut_selection), Colr(0.f))/ static_cast<float>(gamut_selection.size());
+
+      // Compute window-space coordinates
+      eig::Array2f p = detail::window_space(gamut_anchor_pos, i_arcball.full(), viewport_offs, viewport_size);
+      p.y() += 100.f; // 100 pixels down/up
+
+      ImVec2 m = ImGui::GetIO().MousePos;
+      // ImGui::SetNextWindowPos(ImVec2(m.x - 10, m.y));
+      ImGui::SetNextWindowPos(p);
+      // ImGui::SetNextWindowPos(ImVec2(m.x + 100, m.y));
+      ImGui::Begin("1", NULL, ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+      ImGui::Text("FIRST TOOLTIP");
+      ImGui::End();
+
+      /* END EXPERIMENT */
     }
     
     ImGui::End();

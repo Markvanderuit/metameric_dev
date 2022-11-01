@@ -47,6 +47,13 @@ namespace met {
     auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
     auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
 
+    // Define flags for creation of a persistent, write-only flushable buffer map
+    auto create_flags = gl::BufferCreateFlags::eMapWrite 
+                      | gl::BufferCreateFlags::eMapPersistent;
+    auto map_flags    = gl::BufferAccessFlags::eMapWrite 
+                      | gl::BufferAccessFlags::eMapPersistent
+                      | gl::BufferAccessFlags::eMapFlush;
+
     // Setup objects for cube line draw
     m_cube_vertex_buffer = {{ .data = cnt_span<const std::byte>(cube_vertices) }};
     m_cube_elem_buffer   = {{ .data = cnt_span<const std::byte>(cube_elements) }};
@@ -80,6 +87,22 @@ namespace met {
                      .bindable_array   = &m_gamut_array,
                      .bindable_program = &m_gamut_program };
 
+    // Setup objects for gamut selection draw
+    m_selection_elem_buffer = {{ .size = 4 * sizeof(uint), .flags = create_flags }};
+    m_selection_array = {{
+      .buffers = {{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3  }},
+      .elements = &m_selection_elem_buffer
+    }};
+    m_selection_draw = { .type             = gl::PrimitiveType::ePoints,
+                         .vertex_count     = 4,
+                         .bindable_array   = &m_selection_array,
+                         .bindable_program = &m_gamut_program };
+
+    // Setup map to modifyable element buffer
+    auto selection_elem_map = cast_span<uint>(m_selection_elem_buffer.map(map_flags));
+    info.insert_resource("selection_elem_map", std::move(selection_elem_map));
+
     // Setup objects for texture point draw
     m_texture_points_array = gl::Array({ 
       .buffers = {{ .buffer = &e_texture_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
@@ -94,6 +117,7 @@ namespace met {
                               .bindable_array   = &m_texture_points_array,
                               .bindable_program = &m_texture_points_program };
 
+
     // Set non-changing uniform values
     m_texture_points_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
     m_gamut_program.uniform("u_model_matrix",          eig::Matrix4f::Identity().eval());
@@ -101,6 +125,10 @@ namespace met {
     m_gamut_program.uniform("u_offset",                .5f);
     m_cube_program.uniform("u_model_matrix",           eig::Matrix4f::Identity().eval());
     m_cube_program.uniform("u_value",                  eig::Array3f(1.f));
+  }
+
+  void ViewportDrawTask::dstr(detail::TaskDstrInfo &info) {
+    m_selection_elem_buffer.unmap();
   }
 
   void ViewportDrawTask::eval(detail::TaskEvalInfo &info) {
@@ -114,15 +142,23 @@ namespace met {
     ImGui::End();
                                 
     // Get externally shared resources 
-    auto &e_viewport_texture = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
-    auto &e_viewport_arcball = info.get_resource<detail::Arcball>("viewport", "arcball");
-    auto &e_viewport_fbuffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
-    
+    auto &e_viewport_texture   = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+    auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_viewport_fbuffer   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
+    auto &e_gamut_selection    = info.get_resource<std::vector<uint>>("viewport", "gamut_selection");
+    auto &i_selection_elem_map = info.get_resource<std::span<uint>>("selection_elem_map");
+
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true),
                                gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, true) };
     
+    // Submit gamut selection data to buffer map
+    // std::vector<uint> test_sel = { 1, 1, 1, 1 };
+    std::ranges::copy(e_gamut_selection, i_selection_elem_map.begin());
+    m_selection_draw.vertex_count = e_gamut_selection.size(); //test_sel.size();
+    // fmt::print("{}\n", test_sel);
+
     // Update program uniforms
     auto camera_matrix = e_viewport_arcball.full().matrix();
     m_gamut_program.uniform("u_camera_matrix",          camera_matrix);
@@ -140,5 +176,10 @@ namespace met {
     // Dispatch draws for gamut shape
     gl::state::set_line_width(m_gamut_lwidth);
     gl::dispatch_draw(m_gamut_draw);
+
+    // Dispatch draw for selection vertices
+    gl::state::set_point_size(m_selection_psize);
+    if (m_selection_draw.vertex_count > 0)
+      gl::dispatch_draw(m_selection_draw);
   }
 } // namespace met

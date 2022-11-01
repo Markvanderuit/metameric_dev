@@ -23,6 +23,12 @@ namespace met {
     gl::Program  m_gamut_program;
     float        m_gamut_lwidth = 1.f;
     
+    // Selection draw components
+    gl::Buffer   m_selection_elem_buffer;
+    gl::Array    m_selection_array;
+    gl::DrawInfo m_selection_draw;
+    float        m_selection_psize = 8.f;
+
     // Texture pointset draw components
     gl::Array    m_texture_points_array;
     gl::DrawInfo m_texture_points_draw;
@@ -32,6 +38,7 @@ namespace met {
   public:
     ViewportDrawTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
+    void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 } // namespace met
