@@ -51,8 +51,6 @@ namespace met {
       i_frame_buffer_msaa.bind();
 
       // Specify viewport for next subtasks
-      gl::state::set_viewport(e_draw_texture.size());
-
-    }
+      gl::state::set_viewport(e_draw_texture.size());    }
   };
 } // namespace met

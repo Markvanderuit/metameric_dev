@@ -8,26 +8,12 @@
 
 namespace met {
   class ViewportDrawTask : public detail::AbstractTask {
-    // Cube draw components
-    gl::Buffer   m_cube_vertex_buffer;
-    gl::Buffer   m_cube_elem_buffer;
-    gl::Array    m_cube_array;
-    gl::DrawInfo m_cube_draw;
-    gl::Program  m_cube_program; 
-    float        m_cube_lwidth = 1.f;
-
     // Gamut draw components
     gl::Buffer   m_gamut_elem_buffer;
     gl::Array    m_gamut_array;
     gl::DrawInfo m_gamut_draw;
     gl::Program  m_gamut_program;
     float        m_gamut_lwidth = 1.f;
-    
-    // Selection draw components
-    gl::Buffer   m_selection_elem_buffer;
-    gl::Array    m_selection_array;
-    gl::DrawInfo m_selection_draw;
-    float        m_selection_psize = 8.f;
 
     // Texture pointset draw components
     gl::Array    m_texture_points_array;
@@ -36,9 +22,8 @@ namespace met {
     float        m_texture_points_psize = 1.f;
 
   public:
-    ViewportDrawTask(const std::string &name);
+    ViewportDrawTask(const std::string &);
     void init(detail::TaskInitInfo &) override;
-    void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 } // namespace met

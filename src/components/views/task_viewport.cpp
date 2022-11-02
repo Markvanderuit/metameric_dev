@@ -5,6 +5,8 @@
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/viewport/task_draw_begin.hpp>
 #include <metameric/components/views/viewport/task_draw.hpp>
+#include <metameric/components/views/viewport/task_draw_cube.hpp>
+#include <metameric/components/views/viewport/task_draw_vertices.hpp>
 #include <metameric/components/views/viewport/task_draw_end.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -44,11 +46,13 @@ namespace met {
     constexpr auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
   } // namespace detail
 
-  constexpr auto draw_begin_name = "_draw_begin";
-  constexpr auto draw_grid_name  = "_draw_grid";
-  constexpr auto draw_ocs_name   = "_draw_ocs";
-  constexpr auto draw_name       = "_draw";
-  constexpr auto draw_end_name   = "_draw_end";
+  constexpr auto draw_begin_name    = "_draw_begin";
+  constexpr auto draw_grid_name     = "_draw_grid";
+  constexpr auto draw_ocs_name      = "_draw_ocs";
+  constexpr auto draw_name          = "_draw";
+  constexpr auto draw_vertices_name = "_draw_vertices";
+  constexpr auto draw_cube_name     = "_draw_cube";
+  constexpr auto draw_end_name      = "_draw_end";
 
   void ViewportTask::eval_camera(detail::TaskEvalInfo &info) {
     met_trace_full();
@@ -223,10 +227,13 @@ namespace met {
     info.insert_resource<std::vector<uint>>("gamut_selection", { });
 
     // Add subtasks in reverse order
-    info.emplace_task_after<ViewportDrawEndTask>(name(),   name() + draw_end_name);
-    info.emplace_task_after<ViewportDrawTask>(name(),      name() + draw_name);
+    info.emplace_task_after<ViewportDrawEndTask>(name(),      name() + draw_end_name);
+    info.emplace_task_after<ViewportDrawCubeTask>(name(),     name() + draw_cube_name);
+    info.emplace_task_after<ViewportDrawVerticesTask>(name(), name() + draw_vertices_name);
+    info.emplace_task_after<ViewportDrawTask>(name(),         name() + draw_name);
+    info.emplace_task_after<ViewportDrawBeginTask>(name(),    name() + draw_begin_name);
+
     // info.emplace_task_after<ViewportDrawOCSTask>(name(),   name() + draw_ocs_name);
-    info.emplace_task_after<ViewportDrawBeginTask>(name(), name() + draw_begin_name);
   }
 
   void ViewportTask::dstr(detail::TaskDstrInfo &info) {
@@ -234,8 +241,9 @@ namespace met {
     
     // Remove subtasks
     info.remove_task(name() + draw_begin_name);
-    // info.remove_task(name() + draw_ocs_name);
     info.remove_task(name() + draw_name);
+    info.remove_task(name() + draw_vertices_name);
+    info.remove_task(name() + draw_cube_name);
     info.remove_task(name() + draw_end_name);
   }
 

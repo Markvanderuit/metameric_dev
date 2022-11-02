@@ -1,8 +1,13 @@
 #version 460 core
 
-layout(location = 0) in  vec3 value_in;
-layout(location = 0) out vec3 value_out;
+layout(location = 0) in  vec2  in_value_vert;
+layout(location = 1) in  float in_value_size;
+layout(location = 0) out vec3  out_value_colr;
 
 void main() {
-  value_out = value_in;
+  if (length(in_value_vert) > 1.f) {
+    discard;
+  }
+
+  out_value_colr = vec3(1);
 }
