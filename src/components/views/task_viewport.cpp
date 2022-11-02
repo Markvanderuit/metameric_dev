@@ -47,8 +47,6 @@ namespace met {
   } // namespace detail
 
   constexpr auto draw_begin_name    = "_draw_begin";
-  constexpr auto draw_grid_name     = "_draw_grid";
-  constexpr auto draw_ocs_name      = "_draw_ocs";
   constexpr auto draw_name          = "_draw";
   constexpr auto draw_vertices_name = "_draw_vertices";
   constexpr auto draw_cube_name     = "_draw_cube";
@@ -131,14 +129,6 @@ namespace met {
       i_gamut_ind.clear();
       std::ranges::copy(std::views::iota(0u, e_rgb_gamut.size()) | is_near_click, std::back_inserter(i_gamut_ind));
     }
-
-    /* // If a single gamut point is selected, share this
-    auto &i_gamut_selection = info.get_resource<int>("gamut_selection");
-    if (m_gamut_selection_indices.size() == 1) {
-      i_gamut_selection = static_cast<int>(m_gamut_selection_indices[0]);
-    } else {
-      i_gamut_selection = -1;
-    } */
   }
 
   void ViewportTask::eval_gizmo(detail::TaskEvalInfo &info) {
@@ -232,8 +222,6 @@ namespace met {
     info.emplace_task_after<ViewportDrawVerticesTask>(name(), name() + draw_vertices_name);
     info.emplace_task_after<ViewportDrawTask>(name(),         name() + draw_name);
     info.emplace_task_after<ViewportDrawBeginTask>(name(),    name() + draw_begin_name);
-
-    // info.emplace_task_after<ViewportDrawOCSTask>(name(),   name() + draw_ocs_name);
   }
 
   void ViewportTask::dstr(detail::TaskDstrInfo &info) {
