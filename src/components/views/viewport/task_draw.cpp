@@ -157,7 +157,6 @@ namespace met {
     // std::vector<uint> test_sel = { 1, 1, 1, 1 };
     std::ranges::copy(e_gamut_selection, i_selection_elem_map.begin());
     m_selection_draw.vertex_count = e_gamut_selection.size(); //test_sel.size();
-    // fmt::print("{}\n", test_sel);
 
     // Update program uniforms
     auto camera_matrix = e_viewport_arcball.full().matrix();
@@ -178,8 +177,9 @@ namespace met {
     gl::dispatch_draw(m_gamut_draw);
 
     // Dispatch draw for selection vertices
-    gl::state::set_point_size(m_selection_psize);
-    if (m_selection_draw.vertex_count > 0)
+    if (m_selection_draw.vertex_count > 0) {
+      gl::state::set_point_size(m_selection_psize);
       gl::dispatch_draw(m_selection_draw);
+    }
   }
 } // namespace met
