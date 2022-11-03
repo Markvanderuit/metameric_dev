@@ -18,9 +18,11 @@ namespace met {
       met_trace_full();
       
       auto fb = gl::Framebuffer::make_default();
-      fb.clear(gl::FramebufferType::eColor, eig::Array3f(0));
+
+      if (m_bind_default_fbo)
+        fb.bind();
+      fb.clear(gl::FramebufferType::eColor, eig::Array3f(0).eval());
       fb.clear(gl::FramebufferType::eDepth, 0.f);
-      if (m_bind_default_fbo) fb.bind();
 
       ImGui::DrawFrame();
 
