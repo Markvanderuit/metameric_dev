@@ -56,7 +56,7 @@ find_package(imguizmo  CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
-find_path(STB_INCLUDE_DIRS "stb.h")
+find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 
 # Include third party shader-related libraries provided through vcpkg
