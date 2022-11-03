@@ -10,9 +10,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr float unselected_psize = 0.005f;
-  constexpr float selected_psize   = 0.01f;
-
   constexpr std::array<float, 3 * 8> verts = {
     0.f, 0.f, 0.f,
     0.f, 0.f, 1.f,

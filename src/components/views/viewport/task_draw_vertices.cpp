@@ -39,8 +39,8 @@ namespace met {
     auto &e_gamut_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
 
     // Setup program for instanced billboard point draw
-    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_point.vert" },
-                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_point.frag" }};
+    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_vertices.vert" },
+                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_vertices.frag" }};
 
     // Declare buffer flags for persistent, write-only, flushable mapping
     auto create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;

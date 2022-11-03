@@ -49,6 +49,7 @@ namespace met {
   constexpr auto draw_begin_name    = "_draw_begin";
   constexpr auto draw_name          = "_draw";
   constexpr auto draw_vertices_name = "_draw_vertices";
+  constexpr auto draw_texture_name = "_draw_texture";
   constexpr auto draw_cube_name     = "_draw_cube";
   constexpr auto draw_end_name      = "_draw_end";
 
