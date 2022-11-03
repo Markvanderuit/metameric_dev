@@ -7,7 +7,7 @@ namespace met {
   struct GenSpectralGamutTask : public detail::AbstractTask {
     Colr c = 0.f;
 
-    GenSpectralGamutTask(const std::string &name);
+    GenSpectralGamutTask(const std::string &);
     void init(detail::TaskInitInfo &) override;
     void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;

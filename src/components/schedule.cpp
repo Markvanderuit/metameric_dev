@@ -19,6 +19,7 @@
 #include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
 
 // View data tasks
+#include <metameric/components/pipeline/task_validate_spectral_texture.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/pipeline/task_gen_metamer_ocs.hpp>
 
@@ -190,6 +191,7 @@ namespace met {
     // The following tasks define view data necessities
     scheduler.emplace_task<GenMetamerOCSTask>("gen_metamer_ocs");
     scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
+    scheduler.emplace_task<ValidateSpectralTextureTask>("validate_spectarl_texture");
 
     // The following tasks define view components and windows
     scheduler.emplace_task<WindowTask>("window");

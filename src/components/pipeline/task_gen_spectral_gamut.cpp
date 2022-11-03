@@ -1,5 +1,4 @@
 #include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/linprog.hpp>
@@ -7,6 +6,7 @@
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <small_gl/buffer.hpp>
 #include <algorithm>
 #include <execution>

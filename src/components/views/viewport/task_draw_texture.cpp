@@ -10,8 +10,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr float unselected_psize = 0.005f;
-  constexpr float selected_psize   = 0.01f;
+  constexpr float point_psize = 0.001f;
 
   constexpr std::array<float, 2 * 4> verts = {
     -1.f, -1.f,
@@ -57,19 +56,23 @@ namespace met {
     };
 
     // Set constant uniforms
-    m_program.uniform("u_point_radius", 0.05f);
+    m_program.uniform("u_point_radius", point_psize);
   }
 
   void ViewportDrawTextureTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_arcball           = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_validation_buffer = info.get_resource<gl::Buffer>("validate_spectral_texture", "validation_buffer");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true) };
     
+    // Bind resources to buffer targets
+    e_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+
     // Update varying program uniforms
     eig::Matrix4f camera_matrix = e_arcball.full().matrix();
     eig::Vector2f camera_aspect = { 1.f, e_arcball.m_aspect };

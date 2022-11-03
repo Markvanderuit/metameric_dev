@@ -6,6 +6,7 @@
 #include <metameric/components/views/viewport/task_draw_begin.hpp>
 #include <metameric/components/views/viewport/task_draw.hpp>
 #include <metameric/components/views/viewport/task_draw_cube.hpp>
+#include <metameric/components/views/viewport/task_draw_texture.hpp>
 #include <metameric/components/views/viewport/task_draw_vertices.hpp>
 #include <metameric/components/views/viewport/task_draw_end.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -49,7 +50,7 @@ namespace met {
   constexpr auto draw_begin_name    = "_draw_begin";
   constexpr auto draw_name          = "_draw";
   constexpr auto draw_vertices_name = "_draw_vertices";
-  constexpr auto draw_texture_name = "_draw_texture";
+  constexpr auto draw_texture_name  = "_draw_texture";
   constexpr auto draw_cube_name     = "_draw_cube";
   constexpr auto draw_end_name      = "_draw_end";
 
@@ -221,6 +222,7 @@ namespace met {
     info.emplace_task_after<ViewportDrawEndTask>(name(),      name() + draw_end_name);
     info.emplace_task_after<ViewportDrawCubeTask>(name(),     name() + draw_cube_name);
     info.emplace_task_after<ViewportDrawVerticesTask>(name(), name() + draw_vertices_name);
+    info.emplace_task_after<ViewportDrawTextureTask>(name(),  name() + draw_texture_name);
     info.emplace_task_after<ViewportDrawTask>(name(),         name() + draw_name);
     info.emplace_task_after<ViewportDrawBeginTask>(name(),    name() + draw_begin_name);
   }
@@ -232,6 +234,7 @@ namespace met {
     info.remove_task(name() + draw_begin_name);
     info.remove_task(name() + draw_name);
     info.remove_task(name() + draw_vertices_name);
+    info.remove_task(name() + draw_texture_name);
     info.remove_task(name() + draw_cube_name);
     info.remove_task(name() + draw_end_name);
   }

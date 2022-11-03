@@ -14,11 +14,11 @@ namespace met {
   void GenSpectralTextureTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
-    // Get externally shared resources
+    // Get shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
-    const uint generate_cl   = ceil_div(wavelength_samples, 4u);
-    const uint generate_n    = e_rgb_texture.size().prod();
+    const uint generate_cl      = ceil_div(wavelength_samples, 4u);
+    const uint generate_n       = e_rgb_texture.size().prod();
     const uint generate_ndiv_cl = ceil_div(generate_n, 256u / generate_cl);
 
     // Initialize objects for clustered shader call
@@ -69,7 +69,7 @@ namespace met {
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
     m_bary_buffer.bind_to(gl::BufferTargetType::eUniform,    1);
     
-    // Dispatch shader to generate spectral datas
+    // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_dispatch_cl);
   }

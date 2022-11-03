@@ -17,7 +17,6 @@ namespace met {
   public:
     ViewportDrawTextureTask(const std::string &);
     void init(detail::TaskInitInfo &) override;
-    void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 } // namespace met

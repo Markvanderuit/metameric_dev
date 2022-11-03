@@ -93,8 +93,8 @@ namespace met {
     m_texture_points_program.uniform("u_camera_matrix", camera_matrix);
 
     // Dispatch draw for loaded texture points
-    gl::state::set_point_size(m_texture_points_psize);
-    gl::dispatch_draw(m_texture_points_draw);
+    // gl::state::set_point_size(m_texture_points_psize);
+    // gl::dispatch_draw(m_texture_points_draw);
 
     // Dispatch draws for gamut shape
     gl::state::set_line_width(m_gamut_lwidth);
