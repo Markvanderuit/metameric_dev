@@ -15,10 +15,10 @@ namespace met {
     eDual    // Dual simplex
   };
   
-  enum class LPCompare {
-    eEQ,
-    eLE,
-    eGE
+  enum class LPCompare : int {
+    eLE =-1,
+    eEQ = 0,
+    eGE = 1
   };
 
   // Full set of parameters for a linear program
