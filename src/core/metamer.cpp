@@ -80,12 +80,14 @@ namespace met {
                                           .r = r, .l = l, .u = u };
     BSpec w_test_min = linprog_test<double>(lp_params_test).cast<float>();
     BSpec w_test_max = linprog_test<double>(lp_params_test_).cast<float>();
+    BSpec w_min = lp_solve(lp_params_tin).cast<float>();
+    BSpec w_max = lp_solve(lp_params_tax).cast<float>();
+    // BSpec w = 0.5f * w_min + 0.5f * w_max;
+    BSpec w = 0.5f * w_test_min + 0.5f * w_test_max;
 
 
     // Take average of minimized/maximized results
     // BSpec w = 0.5f * linprog<float>(lp_params_min) + 0.5f * linprog<float>(lp_params_max);
-    // BSpec w = (lp_solve(lp_params_tin)).cast<float>();
-    BSpec w = 0.5f * w_test_min + 0.5f * w_test_max;
     return (basis * w).eval();
   }
   
