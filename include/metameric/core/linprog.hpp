@@ -7,6 +7,39 @@
 #include <vector>
 
 namespace met {
+  constexpr double lp_max_value = std::numeric_limits<double>::max();
+  constexpr double lp_min_value = std::numeric_limits<double>::min();
+
+  enum class LPMethod {
+    ePrimal, // Primal simplex
+    eDual    // Dual simplex
+  };
+  
+  enum class LPCompare {
+    eEQ,
+    eLE,
+    eGE
+  };
+
+  // Full set of parameters for a linear program
+  struct LPParameters {
+    LPMethod method = LPMethod::ePrimal;
+
+    // Rows and cols
+    uint M, N;
+
+    // Components for defining "min C^T x + c0, w.r.t. Ax <=> b"
+    eig::ArrayXd C;        /* N x 1 */
+    eig::ArrayXd A;        /* M x N */
+    eig::ArrayXd b;        /* M x 1 */
+
+    // Relation for Ax <=> b (<=, ==, >=) 
+    eig::ArrayX<LPCompare> r;
+
+    // Bounds for the solution vector x; x_l <= x <= x_u
+    eig::ArrayXd x_l, x_u; /* N x 1 */
+  };
+
   // Comparative relationship operands for a linear program
   enum class LPComp : int {
     eEQ = 0, // ==
@@ -49,6 +82,9 @@ namespace met {
     eig::ArrayX<Ty> u; /* N x 1 */
   };
 
+  // Solve a linear program given a valid parameter object
+  eig::ArrayXd lp_solve(const LPParameters &params);
+
   // Solve a linear program using a params object
   template <typename Ty, uint N, uint M>
   eig::Matrix<Ty, N, 1> linprog(LPParams<Ty, N, M> &params);
@@ -56,28 +92,4 @@ namespace met {
   eig::MatrixX<Ty>      linprog(LPParamsX<Ty>      &params);
   template <typename Ty>
   eig::MatrixX<Ty>      linprog_test(LPParamsX<Ty> &params);
-
-  // Solve a linear program using provided data
-  template <typename Ty, uint N, uint M>
-  eig::Matrix<Ty, N, 1> linprog(const eig::Array<Ty, N, 1> &C,
-                                const eig::Array<Ty, M, N> &A,
-                                const eig::Array<Ty, M, 1> &b,
-                                const eig::Array<LPComp, M, 1>
-                                                           &r = LPComp::eEQ,
-                                const eig::Array<Ty, N, 1> &l = std::numeric_limits<Ty>::min(),
-                                const eig::Array<Ty, N, 1> &u = std::numeric_limits<Ty>::max());
-
-  std::vector<Spec> generate_metamer_boundary(const CMFS &csystem_i,
-                                              const CMFS &csystem_j,
-                                              const Colr &csignal_i,
-                                              const std::vector<eig::Array<float, 6, 1>> &samples);
-
-  std::vector<Colr> generate_metamer_boundary_c(const CMFS &csystem_i,
-                                                const CMFS &csystem_j,
-                                                const Colr &csignal_i,
-                                                const std::vector<eig::Array<float, 6, 1>> &samples);
-
-  Spec generate_spectrum_from_basis(const BMatrixType &basis, 
-                                    const CMFS &csystem, 
-                                    const Colr &csignal);
 } // namespace met

@@ -146,11 +146,11 @@ foreach(glsl_src ${glsl_srcs})
   # Generate spir-v binary using glslangValidator
   add_custom_command(
     OUTPUT  ${shader_binary_out}
-    COMMAND glslangValidator
+    COMMAND ${glsl_validator_path}
             ${shader_preprocess_out}
             -o ${shader_binary_out}
             --client opengl100 --target-env spirv1.5 -l
-    DEPENDS glslangValidator ${shader_preprocess_out}
+    DEPENDS ${glsl_validator_path} ${shader_preprocess_out}
     VERBATIM
   )
 
@@ -314,7 +314,3 @@ target_link_libraries(playground_spv PRIVATE
   spirv-cross-util
   spirv-cross-reflect
 )
-
-# Set up solve executable
-add_executable_r(solve src/target/main_solve.cpp)
-target_link_libraries(solve PRIVATE core small_gl small_gl_parser_lib)

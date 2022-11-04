@@ -17,10 +17,6 @@ namespace met {
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals);
 
-  std::vector<Colr> generate_boundary_examp(const CMFS &system_i,
-                                            const CMFS &system_j,
-                                            const std::vector<eig::Array<float, 6, 1>> &samples);
-
   std::vector<Colr> generate_boundary(const BBasis &basis,
                                       const CMFS   &system_i,
                                       const CMFS   &system_j,

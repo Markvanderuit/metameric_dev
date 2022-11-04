@@ -10,6 +10,7 @@
 #include <random>
 #include <ranges>
 #include <omp.h>
+#include <fmt/core.h>
 
 #include <ClpSimplex.hpp>
 #include <ClpLinearObjective.hpp>
@@ -87,15 +88,166 @@ namespace met {
     return v;
   }
 
+  eig::ArrayXd lp_solve(const LPParameters &params) {
+    // Set up a simplex model without log output
+    ClpSimplex model;
+    model.messageHandler()->setLogLevel(0); // shuddup you
+    model.resize(0, params.N);
+
+    // Pass in objective coefficients
+    for (int i = 0; i < params.N; ++i)
+      model.setObjCoeff(i, params.C[i]);
+
+    // Pass in solution constraints
+    for (int i = 0; i < params.N; ++i)
+      //  model.setColBounds(i, params.x_l[i], params.x_u[i]);
+       model.setColBounds(i, -COIN_DBL_MAX, COIN_DBL_MAX);
+
+    // Pass in constraints matrix
+    eig::ArrayXi indices = eig::ArrayXi::LinSpaced(params.N, 0, params.N - 1);
+    for (int i = 0; i < params.M; ++i) {
+      auto values = params.A.row(i).eval();
+      auto b_l = (params.r[i] == LPCompare::eLE) ? -COIN_DBL_MAX : params.b[i]; 
+      auto b_u = (params.r[i] == LPCompare::eGE) ?  COIN_DBL_MAX : params.b[i]; 
+      model.addRow(params.N, indices.data(), values.data(), b_l, b_u);
+    } 
+
+    // Solve for solution with requested method
+    if (params.method == LPMethod::ePrimal) {
+      model.primal();
+    } else {
+      model.dual();
+    }
+
+    // Obtain and return solution
+    eig::ArrayXd x(params.N);
+    const double *solution = model.getColSolution();
+    std::copy(solution, solution + params.N, x.data());
+    return x;
+  }
+
   template <typename Ty>
   eig::MatrixX<Ty> linprog_test(LPParamsX<Ty> &params) {
-    ClpLinearObjective obj(params.C.data(), params.N);
+    ClpSimplex model;
+    model.messageHandler()->setLogLevel(0); // shuddup you
+    model.resize(0, params.N);
+
+    // Set objective coefficients
+    for (int i = 0; i < params.N; ++i)
+      model.setObjCoeff(i, params.C[i]);
+
+    // Set constraint to unbounded 
+    for (int i = 0; i < params.N; ++i)
+       model.setColBounds(i, -COIN_DBL_MAX, COIN_DBL_MAX);
+      //  model.setColBounds(i, params.l[i], params.u[i]);
+
+    // Set constraint data
+    eig::ArrayXi row_idx = eig::ArrayXi::LinSpaced(params.N, 0, params.N - 1);
+    for (int i = 0; i < params.M; ++i) {
+      // Determine bounds values
+      double bound_min = -COIN_DBL_MAX, bound_max = COIN_DBL_MAX;
+      switch (params.r[i]) {
+        case LPComp::eEQ: bound_min = params.b[i]; bound_max = params.b[i]; break;
+        case LPComp::eLE: bound_max = params.b[i]; break;
+        case LPComp::eGE: bound_min = params.b[i]; break;
+      }
+      auto row_data = params.A.row(i).eval();
+      model.addRow(params.N, row_idx.data(), row_data.data(), bound_min, bound_max);
+    }
+    // model.addRows()
+
+    // Solve and obtain result
+    model.dual();
+    
+    const double * model_sol = model.getColSolution();
+    eig::VectorXd result(params.N);
+    std::copy(model_sol, model_sol + params.N, result.data());
+
+    // ClpLinearObjective obj(params.C.data(), params.N);
+
+    
+    /* // Objective - just nonzeros
+    int    obj_index[] = { 0,   2   };
+    double obj_value[] = { 1.0, 4.0 };
+
+    // Upper bounds - as dense vector
+    double upper[] = { 2.0, COIN_DBL_MAX, 4.0 }; */
+
+    /*  
+    ClpSimplex model;
+    
+    // Create space for 0 rows, 3 cols
+    model.resize(0, 3);
+
+    // Set objective coefficients
+    for (int i = 0; i < 2; ++i)
+      model.setObjCoeff(obj_index[i], obj_value[i]);
+
+    // Set upper bounds
+    for (int i = 0; i < 3; ++i)
+      model.setColBounds(i, 0.0, upper[i]);
+
+    // Row 1 data
+    int    row_1_index[] = { 0,   2   };
+    double row_1_value[] = { 1.0, 1.0 };
+
+    // Add row 1 as >= 2.0
+    model.addRow(2, row_1_index, row_1_value, 2.0, COIN_DBL_MAX);
+
+    // Row 2 data
+    int    row_2_index[] = { 0,   1,   2   };
+    double row_2_value[] = { 1.0,-5.0, 1.0 };
+
+    // Add row 2 as == 1.0
+    model.addRow(3, row_2_index, row_2_value, 1.0, 1.0);
+    
+    // Solve
+    model.dual(); */
+
+    // [ A A A ] [x] <= [b]
+    // [ A A A ] [x] <= [b]
+    // [ ..... ] [.] <= [.]
+    // [ A A A ] [x] <= [b]
+
+    /* int num_rows = 10000, num_cols = 3, num_elems = num_rows * num_cols;
 
     ClpSimplex model;
-    model.setObjective(obj);
+    model.resize(num_rows, num_cols);
+
+    std::vector<double> elements(num_elems);
+    std::vector<int>    starts(num_cols);
+    std::vector<int>    rows(num_elems);
+    std::vector<int>    lens(num_cols);
+
+    double * col_upper = model.columnUpper();
+    double * objective = model.objective();
+    double * row_lower = model.rowLower();
+    double * row_upper = model.rowUpper();
+
+    // Fill objective
+    for (int i = 0; i < 2; ++i)
+      objective[obj_index[i]] = obj_value[i];
+
+    // Fill upper boundary to solution
+    for (int i = 0; i < num_cols; ++i)
+      col_upper[i] = upper[i];
+    
+    // Fill lower/upper boundary to constraint; Ax = 1
+    for (int i = 0; i < num_rows; ++i) {
+      row_lower[i] = 1.0;
+      row_upper[i] = 1.0;
+    }
+
+    // Fill elements of constraint matrix A
+    for (int i = 0; i < num_cols; ++i) {
+
+    } */
+
+
+    // model.setObjective(obj);
 
     // obj.resize(params.N);
-    model.resize(params.N, params.M);
+    // model.resize(params.N, params.M);
 
     // model.setObjective(ClpO/)
 
@@ -118,109 +270,8 @@ namespace met {
     // model.constr
     // model.loadProblem()
 
-    eig::MatrixX<Ty> m(3, 3);
-    return m;
-  }
-
-  template <typename Ty, uint N, uint M>
-  eig::Matrix<Ty, N, 1> linprog(const eig::Array<Ty, N, 1> &C,
-                                const eig::Array<Ty, M, N> &A,
-                                const eig::Array<Ty, M, 1> &b,
-                                const eig::Array<LPComp, M, 1>
-                                                           &r,
-                                const eig::Array<Ty, N, 1> &l,
-                                const eig::Array<Ty, N, 1> &u) {
-    met_trace();
-    LPParams<Ty, N, M> params = { .C = C, .A = A, .b = b, .r = r, .l = l, .u = u };
-    return linprog<Ty, N, M>(params);
-  }
-
-  std::vector<Spec> generate_metamer_boundary(const CMFS &csys_i,
-                                              const CMFS &csys_j,
-                                              const Colr &csig_i,
-                                              const std::vector<eig::Array<float, 6, 1>> &samples) {
-    using SMatrixTy = eig::Matrix<float, wavelength_samples, 6>;
-    met_trace();
-
-    // Return object
-    std::vector<Spec> spectra(samples.size());
-
-    // Obtain orthogonal spectra through SVD of dual color system matrix
-    SMatrixTy S = (SMatrixTy() << csys_i, csys_j).finished();
-    eig::JacobiSVD<SMatrixTy> svd(S, eig::ComputeThinU | eig::ComputeThinV);
-    SMatrixTy U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
-    
-    #pragma omp parallel
-    {
-      // Set all linear programming parameters (except C, which depends on our input sample)
-      LPParams<float, wavelength_samples, 3> params = {
-        .A = csys_i.transpose().eval(), .b = csig_i, .l = 0.f, .u = 1.f
-      };
-
-      #pragma omp for
-      for (int i = 0; i < spectra.size(); ++i) {
-        params.C = (U * samples[i].matrix()).eval();
-        spectra[i] = linprog<float, wavelength_samples, 3>(params);
-      }
-    }
-                                                
-    return spectra;
-  }
-  
-  std::vector<Colr> generate_metamer_boundary_c(const CMFS &csys_i,
-                                                const CMFS &csys_j,
-                                                const Colr &csig_i,
-                                                const std::vector<eig::Array<float, 6, 1>> &samples) {
-    met_trace();
-
-    // Generate boundary spectra
-    std::vector<Spec> opt = generate_metamer_boundary(csys_i, csys_j, csig_i, samples);
-
-    // Apply color mapping to obtain signal values
-    std::vector<Colr> sig(opt.size());
-    std::transform(std::execution::par_unseq, range_iter(opt), sig.begin(),
-      [&](const Spec &s) { return csys_j.transpose() * s.matrix(); });
-      
-    return sig;
-  }
-  
-  Spec generate_spectrum_from_basis(const BMatrixType &eigen_vectors, 
-                                    const CMFS &csys, 
-                                    const Colr &csig) {
-    met_trace();
-    constexpr uint K = 16;                         // Nr. of basis functions used
-    constexpr uint M = 3 + 2 * wavelength_samples; // Nr. of constraints used
-
-    // Use right-most eigenvectors as basis functions
-    eig::Matrix<float, wavelength_samples, K> basis = eigen_vectors.rightCols(K);
-
-    /* // Set up constraints Ax = b
-    eig::Matrix<float,      M, N> A_;
-    eig::Matrix<CGAL::Sign, M, 1> r_;
-    eig::Matrix<float,      M, 1> b_;
-    A_ << (csys.transpose() * basis).eval(), 
-           basis, 
-           basis;
-    r_ << eig::Matrix<CGAL::Sign, 3,                  1>(CGAL::EQUAL),
-          eig::Matrix<CGAL::Sign, wavelength_samples, 1>(CGAL::SMALLER),
-          eig::Matrix<CGAL::Sign, wavelength_samples, 1>(CGAL::LARGER);
-    b_ << csig,
-          eig::Matrix<float, wavelength_samples, 1>(1.f),
-          eig::Matrix<float, wavelength_samples, 1>(0.f);
-
-    // Run solver to determine basis function weights
-    detail::LPParams<float, N, M> params = {
-      .C = 0.f, .A = A_, .b = b_, .r = r_
-    };
-    eig::Matrix<float, N, 1> rho = detail::linprog<float, N, M>(params); */
-    
-    auto Gamma = (csys.transpose() * basis).eval();
-    eig::Matrix<float, K, 1> rho_ = Gamma.transpose() 
-                                  * (Gamma * Gamma.transpose()).inverse() 
-                                  * csig.matrix();
-
-    // Return resulting clamped spectrum
-    return (basis * rho_).cwiseMin(1.f).cwiseMax(0.f).eval();
+    // eig::MatrixX<Ty> m(3, 3);
+    return result.cast<Ty>();
   }
 
   /* Forward declarations */
@@ -236,5 +287,5 @@ namespace met {
   template
   eig::MatrixX<float> linprog<float>(LPParamsX<float>&);
   template
-  eig::MatrixX<float> linprog_test<float>(LPParamsX<float>&);
+  eig::MatrixX<double> linprog_test<double>(LPParamsX<double>&);
 } // namespace met

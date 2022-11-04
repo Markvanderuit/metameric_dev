@@ -100,24 +100,6 @@ namespace met {
 
     // Temporary window to plot pca components
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
-
-      if (ImGui::Begin("PCA results")) {
-        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
-                               * eig::Array2f(.67f, 0.3f);
-        
-        // Do some stuff with the PCA code
-        SpectralMapping mapp_i { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
-        auto &pca_basis = info.get_resource<BMatrixType>(global_key, "pca_basis");
-        Spec gen_spec = generate_spectrum_from_basis(pca_basis, mapp_i.finalize(), 0.5f);
-        Colr gen_colr = mapp_i.finalize().transpose() * gen_spec.matrix();
-        
-        ImGui::PlotLines("Spectrum", gen_spec.data(), 
-          wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
-        ImGui::ColorEdit3("Signal", gen_colr.data(), ImGuiColorEditFlags_Float);
-      }
-      ImGui::End();
-      
       if (ImGui::Begin("PCA inputs")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
