@@ -100,8 +100,7 @@ namespace met {
 
     // Pass in solution constraints
     for (int i = 0; i < params.N; ++i)
-      //  model.setColBounds(i, params.x_l[i], params.x_u[i]);
-       model.setColBounds(i, -COIN_DBL_MAX, COIN_DBL_MAX);
+      model.setColBounds(i, -COIN_DBL_MAX, COIN_DBL_MAX);
 
     // Pass in constraints matrix
     eig::ArrayXi indices = eig::ArrayXi::LinSpaced(params.N, 0, params.N - 1);
@@ -140,7 +139,7 @@ namespace met {
 
     // Set constraint to unbounded 
     for (int i = 0; i < params.N; ++i)
-       model.setColBounds(i, -COIN_DBL_MAX, COIN_DBL_MAX);
+      model.setColBounds(i, -COIN_DBL_MAX, COIN_DBL_MAX);
 
     // Set constraint data
     eig::ArrayXi row_idx = eig::ArrayXi::LinSpaced(params.N, 0, params.N - 1);
