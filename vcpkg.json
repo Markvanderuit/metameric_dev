@@ -4,6 +4,7 @@
   "dependencies" : [
     "benchmark",
     "cgal",
+    "clp",
     "cxxopts",
     "eigen3",
     "glslang",

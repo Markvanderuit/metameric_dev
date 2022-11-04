@@ -48,6 +48,9 @@ find_package(OpenMP REQUIRED)
 # Include third party libraries provided through vcpkg
 find_package(benchmark CONFIG REQUIRED)
 find_package(CGAL      CONFIG REQUIRED)
+find_package(CoinUtils CONFIG REQUIRED)
+find_package(Osi       CONFIG REQUIRED)
+find_package(Clp       CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
@@ -231,6 +234,7 @@ target_link_libraries(core PUBLIC
   small_gl_parser_lib
   Eigen3::Eigen
   fmt::fmt-header-only
+  Coin::Clp
   CGAL::CGAL
   Tracy::TracyClient
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs

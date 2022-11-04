@@ -191,7 +191,7 @@ namespace met {
     // The following tasks define view data necessities
     scheduler.emplace_task<GenMetamerOCSTask>("gen_metamer_ocs");
     scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
-    scheduler.emplace_task<ValidateSpectralTextureTask>("validate_spectarl_texture");
+    scheduler.emplace_task<ValidateSpectralTextureTask>("validate_spectral_texture");
 
     // The following tasks define view components and windows
     scheduler.emplace_task<WindowTask>("window");

@@ -11,6 +11,9 @@
 #include <ranges>
 #include <omp.h>
 
+#include <ClpSimplex.hpp>
+#include <ClpLinearObjective.hpp>
+
 namespace met {
   template <typename Ty, uint N, uint M>
   eig::Matrix<Ty, N, 1> linprog(LPParams<Ty, N, M> &params) {
@@ -82,6 +85,41 @@ namespace met {
     std::transform(s.variable_values_begin(), s.variable_values_end(), v.data(), 
       [](auto f) { return static_cast<Ty>(CGAL::to_double(f)); });
     return v;
+  }
+
+  template <typename Ty>
+  eig::MatrixX<Ty> linprog_test(LPParamsX<Ty> &params) {
+    ClpLinearObjective obj(params.C.data(), params.N);
+
+    ClpSimplex model;
+    model.setObjective(obj);
+
+    // obj.resize(params.N);
+    model.resize(params.N, params.M);
+
+    // model.setObjective(ClpO/)
+
+    // model.addRows()
+
+    // CoinPackedMatrix matrix(false, params.N, nullptr, params.M, nullptr);
+    
+
+    // model.addO    
+
+    // // Vector x is Nx1, vector A is MxN
+    // int nr_of_rows = params.M;
+    // int nr_of_cols = params.N;
+
+    // std::vector<CoinBigIndex>
+    
+    // model.addRow()
+    // model.addColumn()
+    // model.loadProblem()
+    // model.constr
+    // model.loadProblem()
+
+    eig::MatrixX<Ty> m(3, 3);
+    return m;
   }
 
   template <typename Ty, uint N, uint M>
@@ -197,4 +235,6 @@ namespace met {
   eig::Matrix<float, 10, 1> linprog<float, 10, 68>(LPParams<float, 10, 68>&);
   template
   eig::MatrixX<float> linprog<float>(LPParamsX<float>&);
+  template
+  eig::MatrixX<float> linprog_test<float>(LPParamsX<float>&);
 } // namespace met

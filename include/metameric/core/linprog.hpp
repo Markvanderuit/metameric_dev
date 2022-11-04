@@ -54,6 +54,8 @@ namespace met {
   eig::Matrix<Ty, N, 1> linprog(LPParams<Ty, N, M> &params);
   template <typename Ty>
   eig::MatrixX<Ty>      linprog(LPParamsX<Ty>      &params);
+  template <typename Ty>
+  eig::MatrixX<Ty>      linprog_test(LPParamsX<Ty> &params);
 
   // Solve a linear program using provided data
   template <typename Ty, uint N, uint M>
