@@ -48,29 +48,22 @@ namespace met {
                                    const eig::Vector3f &max_v = 1.f) {
       met_trace();
 
-      constexpr uint N = 3;
-      const     uint M = triangles.size();
+      // Initialize parameter object for LP solver with expected matrix sizes
+      LPParameters params(triangles.size(), 3);
+      params.method    = LPMethod::ePrimal;
+      params.objective = LPObjective::eMinimize;
+      params.x_l       = min_v.cast<double>();
+      params.x_u       = max_v.cast<double>();
 
-      // Instantiate constraints matrices
-      eig::MatrixXf       A(M, N);
-      eig::ArrayXf        b(M);
-      eig::ArrayX<LPComp> r(M);
-
-      // Fill constraints data
-      for (uint i = 0; i < M; ++i) {
-        eig::Vector<float, N> n = (triangles[i].n).eval();
-        A.row(i) = n;
-        b[i] = n.dot(triangles[i].p0);
-        r[i] = LPComp::eEQ;
+      // Fill constraint matrices
+      for (uint i = 0; i < triangles.size(); ++i) {
+        eig::Vector3d n = (triangles[i].n).cast<double>().eval();
+        params.A.row(i) = n;
+        params.b[i] = n.dot(triangles[i].p0.cast<double>());
       }
-      
-      // Set up other components
-      eig::Array<float, N, 1> C = 1.f, l = min_v, u = max_v;
 
-      // Set up parameter object and run minimization
-      LPParamsX<float> lp_params { .N = N, .M = M, .C = C, .A = A, .b = b, 
-                                   .c0 = 0.f, .r = r, .l = l, .u = u };
-      return linprog<float>(lp_params);
+      // Return minimized solution
+      return lp_solve(params).cast<float>().eval();
     }
 
     template <typename T>
@@ -313,7 +306,12 @@ namespace met {
           tris.push_back(detail::RealizedTriangle(mesh.verts()[v[0]].p, mesh.verts()[v[1]].p, mesh.verts()[v[2]].p));
         }
         auto avg_p = 0.5f * (half_v.p + twin_v.p);
-        auto new_p = detail::solve_for_vertex(tris, (avg_p - 0.1f).max(0.f).eval(), (avg_p + 0.1f).min(1.f).eval());
+        // auto new_p = detail::solve_for_vertex(tris, 
+        //                                       (avg_p - 0.2f).max(0.05f).eval(), 
+        //                                       (avg_p + 0.2f).min(.95f).eval());
+        auto new_p = detail::solve_for_vertex(tris, 
+                                              eig::Vector3f(0.05f),
+                                              eig::Vector3f(0.95f));
         
         // Compute resulting cost metric of solved-for vertex
         float metric = 0.f;

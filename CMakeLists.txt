@@ -47,7 +47,6 @@ find_package(OpenMP REQUIRED)
 
 # Include third party libraries provided through vcpkg
 find_package(benchmark CONFIG REQUIRED)
-find_package(CGAL      CONFIG REQUIRED)
 find_package(CoinUtils CONFIG REQUIRED)
 find_package(Osi       CONFIG REQUIRED)
 find_package(Clp       CONFIG REQUIRED)
@@ -235,7 +234,6 @@ target_link_libraries(core PUBLIC
   Eigen3::Eigen
   fmt::fmt-header-only
   Coin::Clp
-  CGAL::CGAL
   Tracy::TracyClient
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   nlohmann_json::nlohmann_json

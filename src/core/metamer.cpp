@@ -13,82 +13,34 @@ namespace met {
     debug::check_expr_dbg(systems.size() == signals.size(),
                           "Color system size not equal to color signal size");
 
-    // Expected matrix sizes
+    // Initialize parameter object for LP solver with expected matrix sizes
     constexpr uint N = wavelength_bases;
     const     uint M = 3 * systems.size() + 2 * wavelength_samples;
-    
-    // Constraints matrices
-    eig::MatrixXd          A(M, N);
-    eig::ArrayXd           b(M);
-    eig::ArrayX<LPComp>    r(M);
-    eig::ArrayX<LPCompare> r_(M);
+    LPParameters params(M, N);
+    params.method = LPMethod::eDual;
 
-    // Generate color constraints
+    // Add constraints to ensure resulting spectra produce the given color signals
     for (uint i = 0; i < systems.size(); ++i) {
-      A.block<3, wavelength_bases>(3 * i, 0) = (systems[i].transpose() * basis).cast<double>().eval();
-      b.block<3, 1>(3 * i, 0) = signals[i].cast<double>().eval();
-      r.block<3, 1>(3 * i, 0).setConstant(LPComp::eEQ);
-      r_.block<3, 1>(3 * i, 0).setConstant(LPCompare::eEQ);
+      params.A.block<3, N>(3 * i, 0) = (systems[i].transpose() * basis).cast<double>().eval();
+      params.b.block<3, 1>(3 * i, 0) = signals[i].cast<double>().eval();
     }
 
-    // Generate boundary constraints
-    const uint offset_l = 3 * systems.size();
-    const uint offset_u = offset_l + wavelength_samples;
-    A.block<wavelength_samples, wavelength_bases>(offset_l, 0) = basis.cast<double>().eval();
-    b.block<wavelength_samples, 1>(offset_l, 0).setZero();
-    r.block<wavelength_samples, 1>(offset_l, 0).setConstant(LPComp::eGE);
-    r_.block<wavelength_samples, 1>(offset_l, 0).setConstant(LPCompare::eGE);
-    A.block<wavelength_samples, wavelength_bases>(offset_u, 0) = basis.cast<double>().eval();
-    b.block<wavelength_samples, 1>(offset_u, 0).setOnes();
-    r.block<wavelength_samples, 1>(offset_u, 0).setConstant(LPComp::eLE);
-    r_.block<wavelength_samples, 1>(offset_u, 0).setConstant(LPCompare::eLE);
+    // Add constraints to restrict resulting spectra are bounded to [0, 1]
+    const uint offs_l = 3 * systems.size();
+    const uint offs_u = offs_l + wavelength_samples;
+    params.A.block<wavelength_samples, N>(offs_l, 0) = basis.cast<double>().eval();
+    params.A.block<wavelength_samples, N>(offs_u, 0) = basis.cast<double>().eval();
+    params.b.block<wavelength_samples, 1>(offs_l, 0) = 0.0;
+    params.b.block<wavelength_samples, 1>(offs_u, 0) = 1.0;
+    params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
+    params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
 
-    // Objective matrices for minimization/maximization of x
-    eig::Array<double, N, 1> C_min = 1.0, C_max =-1.0;
-
-    // Upper and lower limits to x are unrestrained
-    eig::Array<double, N, 1> l = std::numeric_limits<double>::min(), 
-                             u = std::numeric_limits<double>::max();
-
-    // Upper and lower limits to x
-    eig::Array<double, N, 1> x_l = l; // lp_min_value;
-    eig::Array<double, N, 1> x_u = u; //lp_max_value;
-
-    // Set up full set of parameters for solving minimized/maximized weights
-    LPParameters lp_params_tin {
-      .method = LPMethod::eDual,
-      .M = M, .N = N, .C = C_min, .A = A, .b = b, .r = r_, .x_l = x_l, .x_u = x_u
-    };
-    LPParameters lp_params_tax {
-      .method = LPMethod::eDual,
-      .M = M, .N = N, .C = C_max, .A = A, .b = b, .r = r_, .x_l = x_l, .x_u = x_u
-    };
-
-    /* // Set up full set of parameters for solving minimized/maximized weights
-    LPParamsX<float> lp_params_min { .N = N, .M = M, .C = C_min, 
-                                     .A = A, .b = b, .c0 = 0.f, 
-                                     .r = r, .l = l, .u = u };
-    LPParamsX<float> lp_params_max { .N = N, .M = M, .C = C_max, 
-                                     .A = A, .b = b, .c0 = 0.f, 
-                                     .r = r, .l = l, .u = u };
-     */
-    LPParamsX<double> lp_params_test = { .N = N, .M = M, .C = C_min,
-                                         .A = A, .b = b, .c0 = 0.0,
-                                         .r = r, .l = l, .u = u };
-    LPParamsX<double> lp_params_test_ = { .N = N, .M = M, .C = C_max,
-                                          .A = A, .b = b, .c0 = 0.0,
-                                          .r = r, .l = l, .u = u };
-    BSpec w_test_min = linprog_test<double>(lp_params_test).cast<float>();
-    BSpec w_test_max = linprog_test<double>(lp_params_test_).cast<float>();
-    BSpec w_min = lp_solve(lp_params_tin).cast<float>();
-    BSpec w_max = lp_solve(lp_params_tax).cast<float>();
-    // BSpec w = 0.5f * w_min + 0.5f * w_max;
-    BSpec w = 0.5f * w_test_min + 0.5f * w_test_max;
-
-
-    // Take average of minimized/maximized results
-    // BSpec w = 0.5f * linprog<float>(lp_params_min) + 0.5f * linprog<float>(lp_params_max);
-    return (basis * w).eval();
+    // Solve for average of minimized/maximized results, given default objective function
+    params.objective = LPObjective::eMinimize;
+    BSpec w_min = lp_solve(params).cast<float>();
+    params.objective = LPObjective::eMaximize;
+    BSpec w_max = lp_solve(params).cast<float>();
+    return basis * 0.5f * (w_min + w_max);
   }
   
   std::vector<Colr> generate_boundary(const BBasis                               &basis,
@@ -102,19 +54,21 @@ namespace met {
     auto csys_i = (system_i.transpose() * basis).eval();
     auto csys_j = (system_j.transpose() * basis).eval();
 
+    // Initialize parameter object for LP solver with expected matrix sizes
+    constexpr uint N = wavelength_bases, M = 3 + 2 * wavelength_samples;
+    LPParameters params(M, N);
+    params.method = LPMethod::eDual;
+
+    // Specify constraints
+    params.A = (eig::Matrix<float, M, N>() << csys_i, basis, basis).finished().cast<double>().eval();
+    params.b = (eig::Matrix<float, M, 1>() << signal_i, Spec(0.f), Spec(1.f)).finished().cast<double>().eval();
+    params.r.block<wavelength_samples, 1>(3, 0)                      = LPCompare::eGE;
+    params.r.block<wavelength_samples, 1>(3 + wavelength_samples, 0) = LPCompare::eLE;
+
     // Obtain orthogonal basis functions through SVD of dual color system matrix
-    auto S = (eig::Matrix<float, wavelength_bases, 6>() << csys_i.transpose(), csys_j.transpose()).finished();
+    auto S = (eig::Matrix<float, N, 6>() << csys_i.transpose(), csys_j.transpose()).finished();
     eig::JacobiSVD<decltype(S)> svd(S, eig::ComputeThinU | eig::ComputeThinV);
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
-
-    // Constraints matrices
-    constexpr uint N = wavelength_bases, M = 3 + 2 * wavelength_samples;
-    auto A = (eig::Matrix<float, M, N>() << csys_i, basis, basis).finished();
-    auto b = (eig::Matrix<float, M, 1>() << signal_i, Spec(0.f), Spec(1.f)).finished();
-    auto r = (eig::Matrix<LPComp, M, 1>() 
-      << eig::Matrix<LPComp, 3, 1>(LPComp::eEQ),
-         eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eGE),
-         eig::Matrix<LPComp, wavelength_samples, 1>(LPComp::eLE)).finished();
     
     // Define return object
     std::vector<Colr> output(samples.size());
@@ -122,11 +76,12 @@ namespace met {
     // Parallel solve for basis function weights defining OCS boundary spectra
     #pragma omp parallel
     {
-      LPParams<float, N, M> params = { .A = A, .b = b, .c0 = 0.f, .r = r };
+      LPParameters local_params = params;
       #pragma omp for
       for (int i = 0; i < samples.size(); ++i) {
-        params.C = (U * samples[i].matrix()).eval();
-        output[i] = (csys_j * linprog<float, N, M>(params)).eval();
+        local_params.C = (U * samples[i].matrix()).cast<double>().eval();
+        BSpec w = lp_solve(local_params).cast<float>().eval();
+        output[i] = csys_j * w;
       }
     }
 
