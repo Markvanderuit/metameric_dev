@@ -138,7 +138,7 @@ namespace met {
                                  * 0.95f / static_cast<float>(n_cols);
                                  
       // If texture size has changed, respawn texture resample tasks
-      if (auto resample_size = texture_size.cast<uint>(); !resample_size.isApprox(m_resample_size)) {
+      if (auto resample_size = texture_size.cast<uint>().max(1u); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
         m_resample_tasks.init(name(), info, e_mappings_n, resample_subtask_add(m_resample_size), resample_subtask_rmv);

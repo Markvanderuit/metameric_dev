@@ -170,7 +170,7 @@ namespace met {
       eig::Array2f texture_size = viewport_size * e_tex_data.size().y() / e_tex_data.size().x()
                                 * 0.95f;;
 
-      if (auto resample_size = texture_size.cast<uint>(); !resample_size.isApprox(m_resample_size)) {
+      if (auto resample_size = texture_size.cast<uint>().max(1u); !resample_size.isApprox(m_resample_size)) {
         m_resample_size = resample_size;
 
         // Remove previous resample subtask and insert a new one
