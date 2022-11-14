@@ -81,9 +81,9 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball         = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_arcball         = info.get_resource<detail::Arcball>("viewport_input", "arcball");
     auto &i_size_map        = info.get_resource<std::span<float>>("size_map");
-    auto &e_gamut_selection = info.get_resource<std::vector<uint>>("viewport", "gamut_selection");
+    auto &e_gamut_selection = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
 
     // Update point size data based on selected vertices
     std::ranges::for_each(i_size_map, [](float &f) { f = unselected_psize; });

@@ -43,7 +43,7 @@ namespace met {
     
     // Get shared resources
     auto &i_draw_texture = info.get_resource<gl::Texture2d3f>("draw_texture");
-    auto &e_gamut_ind    = info.get_resource<std::vector<uint>>("viewport", "gamut_selection");
+    auto &e_gamut_ind    = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
     int   e_gamut_idx    = e_gamut_ind.size() == 1 ? e_gamut_ind[0] : -1;
 
     if (ImGui::Begin("Gamut editor")) {
@@ -195,7 +195,7 @@ namespace met {
 
     // Get shared resources
     auto &i_arcball    = info.get_resource<detail::Arcball>("arcball");
-    auto &e_gamut_ind  = info.get_resource<std::vector<uint>>("viewport", "gamut_selection");
+    auto &e_gamut_ind  = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
     int   e_gamut_idx  = e_gamut_ind.size() == 1 ? e_gamut_ind[0] : -1;
     auto &e_ocs_centr  = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
     auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");

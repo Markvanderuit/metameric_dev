@@ -32,7 +32,7 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+      auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport_begin", "draw_texture");
       auto &i_frame_buffer      = info.get_resource<gl::Framebuffer>("frame_buffer");
       auto &i_frame_buffer_msaa = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
 

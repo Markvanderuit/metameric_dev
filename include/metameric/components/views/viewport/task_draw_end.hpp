@@ -15,7 +15,7 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_draw_texture    = info.get_resource<gl::Texture2d3f>("viewport", "draw_texture");
+      auto &e_draw_texture    = info.get_resource<gl::Texture2d3f>("viewport_begin", "draw_texture");
       auto &e_frame_buffer    = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
       auto &e_frame_buffer_ms = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
 

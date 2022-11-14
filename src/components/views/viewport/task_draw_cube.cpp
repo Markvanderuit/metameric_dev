@@ -66,7 +66,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball = info.get_resource<detail::Arcball>("viewport", "arcball");
+    auto &e_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

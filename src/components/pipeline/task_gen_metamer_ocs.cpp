@@ -16,7 +16,10 @@
 
 namespace met {
   // Nr. of samples for OCS generation
-  constexpr uint n_samples = 64;
+  constexpr uint n_samples = 32;
+
+  // Nr. of subdivisions for input sphere
+  constexpr uint n_subdivs = 3;
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -24,6 +27,7 @@ namespace met {
     template <uint N>
     eig::Array<float, N, 1> inv_gaussian_cdf(const eig::Array<float, N, 1> &x) {
       met_trace();
+      
       using ArrayNf = eig::Array<float, N, 1>;
 
       auto y = (ArrayNf(1.f) - x * x).max(.0001f).log().eval();
@@ -80,7 +84,7 @@ namespace met {
 
     // Generate reused 6d samples and a uv sphere mesh for faster OCS generation
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
-    m_sphere_mesh    = generate_unit_sphere<eig::AlArray3f>();
+    m_sphere_mesh    = generate_unit_sphere<eig::AlArray3f>(n_subdivs);
 
     // Register resource to hold points for each vertex of the gamut shape
     for (uint i = 0; i < 4; ++i) {
