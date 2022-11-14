@@ -11,7 +11,7 @@
 
 namespace met {
   constexpr float unselected_psize = 0.005f;
-  constexpr float selected_psize   = 0.01f;
+  constexpr float selected_psize   = 0.02f;
 
   constexpr std::array<float, 2 * 4> verts = {
     -1.f, -1.f,
