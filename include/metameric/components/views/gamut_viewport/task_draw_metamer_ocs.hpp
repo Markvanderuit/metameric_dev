@@ -81,7 +81,7 @@ namespace met {
       auto &e_gamut_mapp_j   = e_app_data.project_data.gamut_mapp_j;
       auto &e_state_gamut    = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
       auto &e_state_mappings = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
-      auto &e_arcball        = info.get_resource<detail::Arcball>("gamut_editor", "arcball");
+      auto &e_arcball        = info.get_resource<detail::Arcball>(m_parent, "arcball");
       auto &e_ocs_centr      = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
 
       // Update convex hull mesh if selection has changed, or selected gamut point has changed

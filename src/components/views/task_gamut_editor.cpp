@@ -32,6 +32,8 @@ namespace met {
   }
 
   void GamutEditorTask::dstr(detail::TaskDstrInfo &info) {
+    met_trace_full();
+
     // Remove subtasks
     info.remove_task(name() + "_draw_begin");
     info.remove_task(name() + "_draw_metamer_ocs");
@@ -53,7 +55,6 @@ namespace met {
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       eig::Array2f texture_size  = viewport_size.x();
       eig::Array2f plot_size     = viewport_size * eig::Array2f(.67f, .1f);
-
       if (!i_draw_texture.is_init() || (i_draw_texture.size() != viewport_size.cast<uint>()).all()) {
         i_draw_texture = {{ .size = texture_size.cast<uint>() }};
       }

@@ -15,6 +15,10 @@ namespace met::detail {
     eig::Array3f e_eye    = { 1, 0, 0 };
     eig::Array3f e_center = { 0, 0, 0 };
     eig::Array3f e_up     = { 0, 1, 0 };
+
+    // Multipliers to scrolling/movement deltas
+    float        dist_delta_mult = 1.f; 
+    eig::Array2f pos_delta_mult  = 1.f; 
   };
 
   /* 
@@ -26,12 +30,12 @@ namespace met::detail {
     eig::Affine3f     m_view;
     eig::Projective3f m_proj;
     eig::Projective3f m_full;
-
-    eig::Array3f m_eye;
-    eig::Array3f m_center;
-    eig::Array3f m_up;
-
-    float m_dist;
+    eig::Array3f      m_eye;
+    eig::Array3f      m_center;
+    eig::Array3f      m_up;
+    float             m_dist;
+    float             m_dist_delta_mult;
+    eig::Array2f      m_pos_delta_mult;
 
   public:
     using InfoType = ArcballCreateInfo;
@@ -45,7 +49,10 @@ namespace met::detail {
       m_dist(info.dist),
       m_eye(info.e_eye), 
       m_center(info.e_center), 
-      m_up(info.e_up) {
+      m_up(info.e_up),
+      m_pos_delta_mult(info.pos_delta_mult),
+      m_dist_delta_mult(info.dist_delta_mult) 
+    {
       update_matrices();
     }
 
@@ -73,14 +80,15 @@ namespace met::detail {
 
     // Before next update_matrices() call, set distance delta
     void set_dist_delta(float dist_delta) {
-      m_dist = std::max(m_dist + dist_delta, 0.01f);
+      m_dist = std::max(m_dist + dist_delta * m_dist_delta_mult, 0.01f);
     }
 
     // Before next update_matrices() call, set positional delta
     void set_pos_delta(eig::Array2f pos_delta) {
       guard(!pos_delta.isZero());
 
-      eig::Array2f delta_angle = pos_delta 
+      eig::Array2f delta_angle = pos_delta
+                               * m_pos_delta_mult 
                                * eig::Array2f(-2, 1) 
                                * std::numbers::pi_v<float>;
       
