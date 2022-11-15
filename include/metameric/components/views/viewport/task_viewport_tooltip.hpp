@@ -185,6 +185,46 @@ namespace met {
 
           ImGui::ColorEdit3("Color, coords", gamut_colr_i.data(), ImGuiColorEditFlags_Float);
           ImGui::ColorEdit3("Color, error",  gamut_error.data(), ImGuiColorEditFlags_Float);
+              
+         /*  ImGui::Separator();
+
+          // Selector for first mapping index
+          if (ImGui::BeginCombo("Mapping 0", mapping_name_i.c_str())) {
+            for (uint j = 0; j < e_mapping_data.size(); ++j) {
+              auto &[key, _] = e_mapping_data[j];
+              if (ImGui::Selectable(key.c_str(), j == l_gamut_mapp_i)) {
+                l_gamut_mapp_i = j;
+              }
+            }
+            ImGui::EndCombo();
+          }
+
+          // Selector for second mapping index
+          if (ImGui::BeginCombo("Mapping 1", mapping_name_j.c_str())) {
+            for (uint j = 0; j < e_mapping_data.size(); ++j) {
+              auto &[key, _] = e_mapping_data[i];
+              if (ImGui::Selectable(key.c_str(), j == l_gamut_mapp_j)) {
+                l_gamut_mapp_j = j;
+              }
+            }
+            ImGui::EndCombo();
+          }
+
+          // If changes to local copies were made, register a data edit
+          if (l_gamut_mapp_i != e_gamut_mapp_i[e_gamut_index[i]]) {
+            e_app_data.touch({
+              .name = "Change gamut mapping 0",
+              .redo = [edit = l_gamut_mapp_i,                   j = e_gamut_index[i]](auto &data) { data.gamut_mapp_i[j] = edit; },
+              .undo = [edit = e_gamut_mapp_i[e_gamut_index[i]], j = e_gamut_index[i]](auto &data) { data.gamut_mapp_i[j] = edit; }
+            });
+          }
+          if (l_gamut_mapp_j != e_gamut_mapp_j[e_gamut_index[i]]) {
+            e_app_data.touch({
+              .name = "Change gamut mapping 1",
+              .redo = [edit = l_gamut_mapp_j,                   j = e_gamut_index[i]](auto &data) { data.gamut_mapp_j[j] = edit; },
+              .undo = [edit = e_gamut_mapp_j[e_gamut_index[i]], j = e_gamut_index[i]](auto &data) { data.gamut_mapp_j[j] = edit; }
+            });
+          } */
         }
       }
     }
