@@ -15,24 +15,10 @@ namespace met {
     ViewportTooltipTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
-      met_trace_full();
-    }
-    
-    void dstr(detail::TaskDstrInfo &info) override {
-      met_trace_full();
-    }
-
     void eval(detail::TaskEvalInfo &info) override {
       met_trace_full();
-
-      constexpr 
-      auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
     
       // Get shared resources
-      auto &io            = ImGui::GetIO();
-      auto &i_arcball     = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-      auto &e_gamut_colr  = info.get_resource<ApplicationData>(global_key, "app_data").project_data.gamut_colr_i;
       auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
 
       // Only spawn tooltip on non-empty gamut selection
@@ -41,27 +27,33 @@ namespace met {
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-      // Gizmo anchor position is mean of selected gamut positions
-      auto gamut_selection = e_gamut_index | std::views::transform(i_get(e_gamut_colr));
-      eig::Vector3f gamut_anchor_pos = std::reduce(range_iter(gamut_selection), Colr(0.f))
-                                     / static_cast<float>(gamut_selection.size());
-
-      // Compute window-space coordinates plus an offset for tooltip position
-      eig::Array2f p = eig::window_space(gamut_anchor_pos, i_arcball.full(), viewport_offs, viewport_size);
-      p.x() -= 100.f;  // 50 pixels to the left
-      p.y() -= 200.f; // 100 pixels down/up
-
-      ImGui::SetNextWindowPos(p);
-      ImGui::Begin("1", NULL, ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
-      if (gamut_selection.size() == 1) {
-        eval_single(info);
-      } else {
-        eval_multiple(info);
+      // Spawn window with selection info if one or more vertices are selected
+      eig::Array2f ttip_posi = viewport_offs + 16.f;
+      ImGui::SetNextWindowPos(ttip_posi);
+      if (ImGui::Begin("Vertex selection", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking)) {
+        if (e_gamut_index.size() == 1) {
+          eval_single(info);
+        } else {
+          eval_multiple(info);
+        }
       }
+
+      // Capture size of window before closing to offset next window properly 
+      eig::Array2f ttip_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());
       ImGui::End();
+
+      // Spawn window for metamer set editing if there is one vertex selected
+      if (e_gamut_index.size() == 1) {
+        ttip_posi.y() += ttip_size.y() + 16.f;
+        ttip_size.y() = 384.f;
+        ImGui::SetNextWindowPos(ttip_posi);
+        ImGui::SetNextWindowSize(ttip_size);
+        if (ImGui::Begin("Metamer set", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking)) {
+          eval_metamer_set(info);
+        }
+        ImGui::End();
+      }
     }
 
     void eval_single(detail::TaskEvalInfo &info) {
@@ -99,7 +91,7 @@ namespace met {
       Colr gamut_error  = (gamut_actual - gamut_colr_i).abs();
 
       // Plot of solved-for reflectance
-      ImGui::PlotLines("Reflectance", gamut_spec.data(), gamut_spec.rows(), 0, nullptr, 0.f, 1.f, { 0.f, 32.f });
+      ImGui::PlotLines("Reflectance", gamut_spec.data(), gamut_spec.rows(), 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
 
       ImGui::Separator();
 
@@ -150,8 +142,8 @@ namespace met {
     void eval_multiple(detail::TaskEvalInfo &info) {
       met_trace_full();
 
-      constexpr 
-      auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
+      /* constexpr 
+      auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; }; */
 
       // Get shared resources
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -164,10 +156,41 @@ namespace met {
       auto &e_mapping_data = e_app_data.project_data.mappings;
       auto &e_gamut_index  = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
 
-      // Gizmo anchor position is mean of selected gamut positions
-      auto gamut_selection = e_gamut_index | std::views::transform(i_get(e_gamut_colr));
+      // Iterate
+      for (const uint &i : e_gamut_index) {
+        if (ImGui::CollapsingHeader(fmt::format("Vertex {}", i).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+          ImGui::Text("Metamer set");
 
-      ImGui::Text("MULTIPLE TOOLTIP");
+          // Obtain selected reflectance and colors
+          Spec &gamut_spec   = e_gamut_spec[i];
+          Colr &gamut_colr_i = e_gamut_colr[i];
+          Colr &gamut_offs_j = e_gamut_offs[i];
+
+          // Local copies of gamut mapping indices
+          uint l_gamut_mapp_i = e_gamut_mapp_i[i];
+          uint l_gamut_mapp_j = e_gamut_mapp_j[i];
+          
+          // Names of selected mappings
+          const auto &mapping_name_i = e_mapping_data[l_gamut_mapp_i].first;
+          const auto &mapping_name_j = e_mapping_data[l_gamut_mapp_j].first;
+
+          // Compute resulting color and error
+          Colr gamut_actual = e_mappings[e_gamut_mapp_i[i]].apply_color(gamut_spec);
+          Colr gamut_error  = (gamut_actual - gamut_colr_i).abs();
+
+          // Plot of solved-for reflectance
+          ImGui::PlotLines("Reflectance", gamut_spec.data(), gamut_spec.rows(), 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
+
+          ImGui::Separator();
+
+          ImGui::ColorEdit3("Color, coords", gamut_colr_i.data(), ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("Color, error",  gamut_error.data(), ImGuiColorEditFlags_Float);
+        }
+      }
+    }
+
+    void eval_metamer_set(detail::TaskEvalInfo &info) {
+      ImGui::Text("Metamer set");
     }
   };
 } // namespace met
