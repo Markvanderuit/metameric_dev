@@ -17,7 +17,9 @@ namespace met {
     constexpr uint N = wavelength_bases;
     const     uint M = 3 * systems.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
-    params.method = LPMethod::eDual;
+    params.method    = LPMethod::ePrimal;
+    params.objective = LPObjective::eMinimize;
+    params.scaling   = false;
 
     // Add constraints to ensure resulting spectra produce the given color signals
     for (uint i = 0; i < systems.size(); ++i) {
@@ -35,12 +37,8 @@ namespace met {
     params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
     params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
 
-    // Solve for average of minimized/maximized results, given default objective function
-    params.objective = LPObjective::eMinimize;
-    BSpec w_min = lp_solve(params).cast<float>();
-    params.objective = LPObjective::eMaximize;
-    BSpec w_max = lp_solve(params).cast<float>();
-    return basis * 0.5f * (w_min + w_max);
+    // Solve for minimized results, given default objective function
+    return basis * BSpec(lp_solve(params).cast<float>());
   }
   
   std::vector<Colr> generate_boundary(const BBasis                               &basis,

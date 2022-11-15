@@ -34,7 +34,7 @@ namespace met {
 
     // Pass in objective coefficients and constraintss
     for (int i = 0; i < params.N; ++i) {
-      model.setObjCoeff(i, (params.objective == LPObjective::eMinimize) ? params.C[i] : -params.C[i]);
+      model.setObjCoeff(i, (params.objective == LPObjective::eMaximize) ? params.C[i] : -params.C[i]);
       model.setColBounds(i, params.x_l[i], params.x_u[i]);
     }
 
@@ -47,6 +47,8 @@ namespace met {
                    params.r[i] == LPCompare::eLE ? -COIN_DBL_MAX : params.b[i], 
                    params.r[i] == LPCompare::eGE ?  COIN_DBL_MAX : params.b[i]);
 
+    // Model settings
+    model.scaling(params.scaling ? 1 : 0);
 
     // Solve for solution with requested method
     if (params.method == LPMethod::ePrimal) {
@@ -54,6 +56,7 @@ namespace met {
     } else {
       model.dual();
     }
+    model.cleanup(3);
 
     // Obtain solution data and copy to return object
     std::span<const double> solution = { model.getColSolution(), params.N };

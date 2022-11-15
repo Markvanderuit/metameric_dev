@@ -76,9 +76,10 @@ namespace met {
 
       // Test PCA generation using a bunch of randomly chosen vectors
       Mapp mapp = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
-      std::vector<Spec> pca_input(16384);
-      for (uint i = 0; i < pca_input.size(); ++i)
-        pca_input[i] = internal_sd[256 * i];
+      std::vector<Spec> pca_input(32768);
+      #pragma omp parallel for
+      for (int i = 0; i < pca_input.size(); ++i)
+        pca_input[i] = internal_sd[128 * i];
       auto pca_basis = eigen_vectors(covariance_matrix(pca_input));
       auto pca_orth  = orthogonal_complement(mapp.finalize(), pca_basis);
       scheduler.insert_resource<decltype(pca_orth)>("pca_orth", std::move(pca_orth));

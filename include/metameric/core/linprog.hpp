@@ -16,11 +16,24 @@ namespace met {
     eMinimize, // Minimize objective function
     eMaximize  // Maximize objective function by minimizing negative
   };
-  
+
   enum class LPCompare : int {
     eLE =-1, 
     eEQ = 0, 
     eGE = 1
+  };
+
+  enum class LPStatus {
+    eOptimal,
+    eUnbounded,
+    eInfeasible,
+    eAbandoned
+  };
+
+  struct LPResult {
+    LPStatus status;
+
+    eig::ArrayXd x;
   };
 
   // Full set of parameters for a linear program
@@ -29,8 +42,10 @@ namespace met {
     LPParameters() = default;
     LPParameters(uint M, uint N);
 
+    // Method settings
     LPMethod    method    = LPMethod::ePrimal;
     LPObjective objective = LPObjective::eMinimize;
+    bool        scaling   = false;
 
     // Rows and cols
     uint M, N;

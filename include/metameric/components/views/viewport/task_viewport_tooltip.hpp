@@ -6,14 +6,30 @@
 #include <metameric/core/detail/scheduler_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
+#include <ImGuizmo.h>
 #include <numeric>
 #include <ranges>
 
 namespace met {
   class ViewportTooltipTask : public detail::AbstractTask {
+    bool m_is_gizmo_used;
+
   public:
     ViewportTooltipTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
+
+    void init(detail::TaskInitInfo &info) override {
+      met_trace_full();
+
+      // Share resources
+      info.emplace_resource<gl::Texture2d3f>("draw_texture", { .size = 1 });
+      info.emplace_resource<detail::Arcball>("arcball",      { .e_eye = 1.0f, .e_center = 0.0f });
+
+      // Start with gizmo inactive
+      m_is_gizmo_used = false;
+    }
 
     void eval(detail::TaskEvalInfo &info) override {
       met_trace_full();
@@ -142,9 +158,6 @@ namespace met {
     void eval_multiple(detail::TaskEvalInfo &info) {
       met_trace_full();
 
-      /* constexpr 
-      auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; }; */
-
       // Get shared resources
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_gamut_spec   = e_app_data.project_data.gamut_spec;
@@ -230,7 +243,7 @@ namespace met {
     }
 
     void eval_metamer_set(detail::TaskEvalInfo &info) {
-      ImGui::Text("Metamer set");
+      
     }
   };
 } // namespace met
