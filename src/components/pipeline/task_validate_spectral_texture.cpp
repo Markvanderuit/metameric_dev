@@ -3,7 +3,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
 
 namespace met {
@@ -26,9 +25,10 @@ namespace met {
                    .is_spirv_binary = true }};
     m_dispatch = { .groups_x = generate_ndiv, 
                    .bindable_program = &m_program }; 
+    m_uniform_buffer = {{ .data = obj_span<const std::byte>(generate_n) }};
 
     // Initialize validation result buffer
-    info.emplace_resource<gl::Buffer>("validation_buffer", { .size  = sizeof(bool) * generate_n });
+    info.emplace_resource<gl::Buffer>("validation_buffer", { .size  = sizeof(uint) * generate_n });
   }
 
   void ValidateSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
@@ -45,6 +45,7 @@ namespace met {
     // Bind resources to buffer targets
     e_spectral_texture.bind_to(gl::BufferTargetType::eShaderStorage,  0);
     i_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
 
     // Dispatch shader to validate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);

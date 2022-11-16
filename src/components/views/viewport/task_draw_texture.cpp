@@ -79,6 +79,9 @@ namespace met {
     m_program.uniform("u_camera_matrix", camera_matrix);
     m_program.uniform("u_billboard_aspect", camera_aspect);
 
+    // Bind resources to buffer targets
+    e_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    
     // Submit draw information
     gl::dispatch_draw(m_draw);
   }

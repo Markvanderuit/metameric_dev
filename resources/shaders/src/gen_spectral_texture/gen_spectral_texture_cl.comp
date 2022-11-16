@@ -68,5 +68,6 @@ void main() {
     sd += bary[i] * load_gamut_shared_cl(i);
 
   // Store results to buffer
-  store_spec_texture(clamp(sd, 0.f, 1.f), i);
+  // store_spec_texture(clamp(sd, 0.f, 1.f), i); // should only enforce this on export
+  store_spec_texture(sd, i);
 }

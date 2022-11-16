@@ -80,7 +80,11 @@ namespace met {
       nullptr, 0.f, e_mapping.illuminant.maxCoeff(), { 0.f, 64.f });
     ImGui::ColorEdit3("Power (rgb)", power_rgb.data(), ImGuiColorEditFlags_Float);
     ImGui::Separator();
-    ImGui::Text("Hint: double-click image to show it in a window");
+    ImGui::Value("Minimum", reflectance.minCoeff(), "%.16f");
+    ImGui::Value("Maximum", reflectance.maxCoeff(), "%.16f");
+    ImGui::Value("Valid", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+    // ImGui::Separator();
+    // ImGui::Text("Hint: double-click image to show it in a window");
     ImGui::EndTooltip();
   }
 

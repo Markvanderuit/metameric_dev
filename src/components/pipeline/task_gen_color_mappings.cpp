@@ -55,12 +55,14 @@ namespace met {
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
     auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "buffer_mapp");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
+    auto &i_vali_buffer = info.get_resource<gl::Buffer>("validate_spectral_texture", "validation_buffer");
 
     // Bind buffer resources to ssbo targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
     e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_mapp_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    i_vali_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
 
     // Dispatch shader to generate color-mapped buffer

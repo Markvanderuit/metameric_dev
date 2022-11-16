@@ -20,7 +20,7 @@ uint cl_spectrum_bin_offs = cl_spectrum_invc_i * cl_spectrum_bins_n;
 uint cl_spectrum_bin_size = min(cl_spectrum_bin_offs + cl_spectrum_bins_n, wavelength_samples) - cl_spectrum_bin_offs;
 
 // Define to perform commonly occuring iteration
-#define cl_bin_iter(__b) for (uint __b = 0; __b < cl_spectrum_bin_size; ++__b)
+#define cl_bin_iter(__b)           for (uint __b = 0; __b < cl_spectrum_bin_size; ++__b)
 #define cl_bin_iter_remainder(__b) for (uint __b = cl_spectrum_bin_size; __b < cl_spectrum_bins_n; ++__b)
 
 // Scatter/gather spectrum data into/from clustered representation
@@ -54,12 +54,12 @@ float cl_hmean(in ClSpec s) {
 }
 
 float cl_hmax(in ClSpec s) {
-  cl_bin_iter_remainder(i) s[i] = FLT_MIN;
+  // cl_bin_iter_remainder(i) s[i] = -FLT_MAX;
   return subgroupClusteredMax(hmax(s), cl_spectrum_invc_n);
 }
 
 float cl_hmin(in ClSpec s) {
-  cl_bin_iter_remainder(i) s[i] = FLT_MAX;
+  // cl_bin_iter_remainder(i) s[i] = FLT_MAX;
   return subgroupClusteredMin(hmin(s), cl_spectrum_invc_n);
 }
 
