@@ -165,8 +165,8 @@ namespace met {
         }
       }
 
-      ImGui::End();
     }
+    ImGui::End();
   }
   
   void GamutEditorTask::eval_camera(detail::TaskEvalInfo &info) {

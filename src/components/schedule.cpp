@@ -127,35 +127,6 @@ namespace met {
         }
       }
       
-      if (ImGui::Begin("PCA orths")) {
-        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
-                               * eig::Array2f(.67f, 0.1f);
-        constexpr uint K = 16;
-
-        // Do some stuff with the PCA bases
-        auto &orth = info.get_resource<eig::Matrix<float, K - 3, K>>(global_key, "pca_orth");
-        auto &pca  = info.get_resource<BMatrixType>(global_key, "pca_basis");
-        auto _orth = orth.eval();
-
-        // Generate 3 x k matrix gamma
-        SpectralMapping mapp_i { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
-        CMFS csys = mapp_i.finalize();
-        auto basis = pca.rightCols(K);
-        auto Gamma = (csys.transpose() * basis).eval();
-
-
-        // Generate metameric black
-        for (uint i = 0; i < 16; ++i) {
-          eig::Matrix<float, K, 1> rho_o = orth.transpose() * 0.5f * eig::Matrix<float, K - 3, 1>(float(i) / 8.f - 1.f);
-
-          Spec black_spc = (basis * rho_o).eval();
-          Colr black_sig = mapp_i.apply_color(black_spc);
-
-          ImGui::PlotLines(fmt::format("Spectrum {}", i).c_str(), black_spc.data(), black_spc.size(), 0, nullptr, -1.f, 1.f, plot_size);
-          ImGui::ColorEdit3(fmt::format("Signal {}", i).c_str(), black_sig.data(), ImGuiColorEditFlags_Float);
-        }
-      }
       ImGui::End();
     });
   }

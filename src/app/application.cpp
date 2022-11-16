@@ -81,8 +81,8 @@ namespace met {
       for (int i = 0; i < pca_input.size(); ++i)
         pca_input[i] = internal_sd[128 * i];
       auto pca_basis = eigen_vectors(covariance_matrix(pca_input));
-      auto pca_orth  = orthogonal_complement(mapp.finalize(), pca_basis);
-      scheduler.insert_resource<decltype(pca_orth)>("pca_orth", std::move(pca_orth));
+      // auto pca_orth  = orthogonal_complement(mapp.finalize(), pca_basis);
+      // scheduler.insert_resource<decltype(pca_orth)>("pca_orth", std::move(pca_orth));
       scheduler.insert_resource<BMatrixType>("pca_basis", std::move(pca_basis));
       scheduler.insert_resource<std::vector<Spec>>("pca_input", std::move(pca_input));
 

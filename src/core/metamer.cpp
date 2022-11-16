@@ -64,8 +64,9 @@ namespace met {
     params.r.block<wavelength_samples, 1>(3 + wavelength_samples, 0) = LPCompare::eLE;
 
     // Obtain orthogonal basis functions through SVD of dual color system matrix
-    auto S = (eig::Matrix<float, N, 6>() << csys_i.transpose(), csys_j.transpose()).finished();
-    eig::JacobiSVD<decltype(S)> svd(S, eig::ComputeThinU | eig::ComputeThinV);
+    eig::Matrix<float, N, 6> S = (eig::Matrix<float, N, 6>() << csys_i.transpose(), csys_j.transpose()).finished();
+    eig::JacobiSVD<eig::Matrix<float, N, 6>> svd;
+    svd.compute(S, eig::ComputeFullV);
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
     
     // Define return object
