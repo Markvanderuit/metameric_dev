@@ -127,7 +127,6 @@ namespace met {
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
       auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_tex_data  = e_app_data.loaded_texture;
       auto &e_prj_data  = e_app_data.project_data;
       auto &e_mappings  = e_prj_data.mappings;
       uint e_mappings_n = e_app_data.loaded_mappings.size();
