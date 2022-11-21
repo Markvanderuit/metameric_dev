@@ -67,7 +67,7 @@ struct MVCResult {
 };
 
 MVCResult mvc_per_triangle_direct(in vec3 x, uint j) {
-  // The following block is a near-direct implementation of the pseudocode 
+  // The following block is a near-direct implementation of MVC pseudocode 
   // from "Mean Value Coordinates for Closed Triangular Meshes", Ju et al, 
   // Rice University, 2005.
 

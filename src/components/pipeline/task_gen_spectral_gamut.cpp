@@ -14,9 +14,9 @@
 
 namespace met {
   constexpr std::array<uint, 16> gamut_elems_al = {
-    2, 0, 1, 0, // 4 padding bytes
-    3, 0, 1, 0, // 4 padding bytes
-    1, 3, 2, 0, // 4 padding bytes
+    0, 1, 2, 0, // 4 padding bytes
+    0, 1, 3, 0, // 4 padding bytes
+    3, 1, 2, 0, // 4 padding bytes
     0, 3, 2, 0  // 4 padding bytes
   };
 
