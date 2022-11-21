@@ -1,0 +1,175 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <math.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+layout(std430) buffer;
+layout(std140) uniform;
+
+// Shader storage buffer declarations
+layout(binding = 0) restrict readonly  buffer b_0 { vec3  data[]; } b_colr_gamut;
+layout(binding = 1) restrict readonly  buffer b_1 { uvec3 data[]; } b_elem_gamut;
+layout(binding = 2) restrict writeonly buffer b_2 { vec3  data[]; } b_grid_posit;
+layout(binding = 3) restrict writeonly buffer b_3 { vec4  data[]; } b_grid_color;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform u_0 {
+  uvec3 n;
+} b_size;
+layout(binding = 1) uniform u_1 {
+  vec3 sub;
+  mat3 inv;
+} b_bary;
+
+struct MVCResult {
+  vec3  v;
+  float w;
+  bool  ret;
+};
+
+MVCResult mvc_per_triangle_direct(in vec3 x, uint j) {
+  // The following block is a near-direct implementation of MVC pseudocode 
+  // from "Mean Value Coordinates for Closed Triangular Meshes", Ju et al, 
+  // Rice University, 2005.
+
+  // Constants
+  const uint  n_elem_verts = 3;
+  const uvec3 verts        = b_elem_gamut.data[j];
+  const float eps          = M_EPS;
+  const float pi           = M_PI;
+
+  // Result storage
+  MVCResult result = MVCResult(vec3(0.f), 0.f, false);
+
+  // Compute |p - x| and normalized (p - x) / |p - x|
+  vec3  u[n_elem_verts];
+  float d[n_elem_verts];
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    vec3 p = b_colr_gamut.data[verts[i]];
+    d[i] = length(p - x);
+    u[i] = (p - x) / d[i];
+
+    // Fallback: x lies on vertex, return directly
+    if (d[i] < eps) {
+      result.v = b_colr_gamut.data[verts[i]];
+      result.w = 1.f;
+      result.ret = true;
+      return result;
+    }
+  }
+
+  // Spherical triangle data
+  float theta[n_elem_verts];
+  float h = 0.f;
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+
+    theta[i] = 2.f * asin(length(u[ip] - u[im]) / 2.f);
+    h += theta[i];
+  }
+  h /= 2.f;
+
+  // Fallback: x lies on triangle, use 2D barycentric coordinates
+  if (pi - h < eps) {
+    float w[n_elem_verts];
+    for (uint i = 0; i < n_elem_verts; ++i) {
+      uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+      w[i] = sin(theta[i]) * d[im] * d[ip];
+    }
+    for (uint i = 0; i < n_elem_verts; ++i) {
+      result.v += w[i] * b_colr_gamut.data[verts[i]];
+      result.w += w[i];
+    }
+    result.v /= result.w;
+    result.ret = true;
+    return result;
+  }
+
+  float c[n_elem_verts];
+  float s[n_elem_verts];
+  float det = determinant((mat3(u[0], u[1], u[2])));
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+
+    c[i] = (2.f * sin(h) * sin(h - theta[i])) 
+         / (sin(theta[ip]) * sin(theta[im]))
+         - 1.f;
+    s[i] = sign(det) * sqrt(1.f - (c[i] * c[i]));
+  }
+
+  // Fallback: x lies outside triangle but on same plane, return nothing
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    if (s[i] < eps) {
+      return result;
+    }
+  }
+
+  float w[n_elem_verts];
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+
+    w[i] = (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
+         / (d[i] * sin(theta[ip]) * s[im]);
+  }
+  
+  // Sum together spectra and weights
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    result.v += w[i] * b_colr_gamut.data[verts[i]];
+    result.w += w[i];
+  }
+
+  return result;
+}
+
+vec4 mvc_main(in vec3 x) {
+  vec3  total_v = vec3(0.f);
+  float total_w = 0.f;
+
+  for (uint i = 0; i < 4; ++i) {
+    MVCResult result = mvc_per_triangle_direct(x, i);
+
+    if (result.ret) {
+      return vec4(result.v, 0);
+    }
+
+    total_v += result.v;
+    total_w += result.w;
+  }
+  
+  return vec4(total_v / total_w, 1);
+}
+
+vec4 bary_main(in vec3 x) {
+  // Obtain barycentric coordinates for positions in the color texture
+  vec4 bary;
+  bary.xyz = b_bary.inv * (x - b_bary.sub);
+  bary.w   = 1.f - hsum(bary.xyz);
+
+  // Interpolate values using basic barycentric coordinates
+  vec4 v;
+  v.w = any(lessThan(bary, vec4(0))) ? 0.f : 1.f;
+  for (uint i = 0; i < 4; ++i)
+    v.xyz += b_colr_gamut.data[i] * bary[i];
+  
+  return v;
+}
+
+void main() {
+  const uvec3 xyz = gl_GlobalInvocationID.xyz;
+  const uint i = xyz.z * b_size.n.y * b_size.n.x
+               + xyz.y * b_size.n.x 
+               + xyz.x;
+  guard(all(lessThan(xyz, b_size.n)));
+
+  // Compute query position in grid
+  const vec3 x = (vec3(xyz) + 0.5f) / vec3(b_size.n);
+
+  // Interpolate values using basic barycentric coordinates
+  vec4 v = mvc_main(x);
+
+  // Store results
+  b_grid_posit.data[i] = x;
+  b_grid_color.data[i] = v;
+}

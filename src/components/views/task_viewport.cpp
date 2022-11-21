@@ -10,6 +10,7 @@
 #include <metameric/components/views/viewport/task_draw_cube.hpp>
 #include <metameric/components/views/viewport/task_draw_texture.hpp>
 #include <metameric/components/views/viewport/task_draw_vertices.hpp>
+#include <metameric/components/views/viewport/task_draw_mvc.hpp>
 #include <metameric/components/views/viewport/task_draw_end.hpp>
 
 namespace met {
@@ -21,6 +22,7 @@ namespace met {
   constexpr auto draw_gamut_name       = "_draw_gamut";
   constexpr auto draw_vertices_name    = "_draw_vertices";
   constexpr auto draw_texture_name     = "_draw_texture";
+  constexpr auto draw_mvc_name         = "_draw_mvc";
   constexpr auto draw_cube_name        = "_draw_cube";
   constexpr auto draw_end_name         = "_draw_end";
   
@@ -34,6 +36,7 @@ namespace met {
     info.emplace_task_after<ViewportDrawEndTask>(name(),      name() + draw_end_name);
     info.emplace_task_after<ViewportDrawCubeTask>(name(),     name() + draw_cube_name);
     info.emplace_task_after<ViewportDrawVerticesTask>(name(), name() + draw_vertices_name);
+    info.emplace_task_after<ViewportDrawMVCTask>(name(),      name() + draw_mvc_name);
     info.emplace_task_after<ViewportDrawTextureTask>(name(),  name() + draw_texture_name);
     info.emplace_task_after<ViewportDrawGamutTask>(name(),    name() + draw_gamut_name);
     info.emplace_task_after<ViewportDrawBeginTask>(name(),    name() + draw_begin_name);
@@ -55,6 +58,7 @@ namespace met {
     info.remove_task(name() + draw_gamut_name);
     info.remove_task(name() + draw_vertices_name);
     info.remove_task(name() + draw_texture_name);
+    info.remove_task(name() + draw_mvc_name);
     info.remove_task(name() + draw_cube_name);
     info.remove_task(name() + draw_end_name);
   }
