@@ -13,6 +13,13 @@
 #include <ranges>
 
 namespace met {
+  constexpr std::array<uint, 16> gamut_elems_al = {
+    2, 0, 1, 0, // 4 padding bytes
+    3, 0, 1, 0, // 4 padding bytes
+    1, 3, 2, 0, // 4 padding bytes
+    0, 3, 2, 0  // 4 padding bytes
+  };
+
   GenSpectralGamutTask::GenSpectralGamutTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
@@ -29,6 +36,7 @@ namespace met {
     // Define color and spectral gamut buffers
     gl::Buffer buffer_colr = {{ .size  = 4 * sizeof(AlColr), .flags = create_flags }};
     gl::Buffer buffer_spec = {{ .size  = 4 * sizeof(Spec), .flags = create_flags }};
+    gl::Buffer buffer_elem = {{ .data = cnt_span<const std::byte>(gamut_elems_al) }};
 
     // Prepare buffer maps which are written to often
     auto buffer_colr_map = cast_span<AlColr>(buffer_colr.map(map_flags));
@@ -37,6 +45,7 @@ namespace met {
     // Submit resources 
     info.insert_resource("buffer_colr",     std::move(buffer_colr));
     info.insert_resource("buffer_spec",     std::move(buffer_spec));
+    info.insert_resource("buffer_elem",     std::move(buffer_elem));
     info.insert_resource("buffer_colr_map", std::move(buffer_colr_map));
     info.insert_resource("buffer_spec_map", std::move(buffer_spec_map));
   }

@@ -10,7 +10,8 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr float point_psize = 0.001f;
+  constexpr float point_psize_min = 0.001f;
+  constexpr float point_psize_max = 0.003f;
 
   constexpr std::array<float, 2 * 4> verts = {
     -1.f, -1.f,
@@ -56,7 +57,8 @@ namespace met {
     };
 
     // Set constant uniforms
-    m_program.uniform("u_point_radius", point_psize);
+    m_program.uniform("u_point_radius_min", point_psize_min);
+    m_program.uniform("u_point_radius_max", point_psize_max);
   }
 
   void ViewportDrawTextureTask::eval(detail::TaskEvalInfo &info) {
@@ -65,14 +67,12 @@ namespace met {
     // Get shared resources 
     auto &e_arcball           = info.get_resource<detail::Arcball>("viewport_input", "arcball");
     auto &e_validation_buffer = info.get_resource<gl::Buffer>("validate_spectral_texture", "validation_buffer");
+    auto &e_error_buffer      = info.get_resource<gl::Buffer>("error_viewer", "color_buffer");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true) };
     
-    // Bind resources to buffer targets
-    e_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-
     // Update varying program uniforms
     eig::Matrix4f camera_matrix = e_arcball.full().matrix();
     eig::Vector2f camera_aspect = { 1.f, e_arcball.m_aspect };
@@ -80,7 +80,8 @@ namespace met {
     m_program.uniform("u_billboard_aspect", camera_aspect);
 
     // Bind resources to buffer targets
-    e_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_error_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    // e_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     
     // Submit draw information
     gl::dispatch_draw(m_draw);

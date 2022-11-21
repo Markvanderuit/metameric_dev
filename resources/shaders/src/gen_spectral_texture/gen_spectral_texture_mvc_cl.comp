@@ -1,0 +1,202 @@
+#version 460 core
+
+// Enable necessary subgroup extensions
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_clustered  : require
+
+#include <guard.glsl>
+#include <spectrum_invoc.glsl>
+#include <spectrum_cluster.glsl>
+
+#define Spec ClSpec           // Use shorthand for clustered types
+const uint n_gamut_verts = 4; // Nr. of tetrahedron vertices 
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
+
+// Shader storage buffer declarations
+layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[n_gamut_verts]; } b_spec_gamut;
+layout(binding = 1) restrict readonly  buffer b_1 { vec3   data[];              } b_colr_gamut;
+layout(binding = 2) restrict readonly  buffer b_2 { uvec3  data[];              } b_elem_gamut;
+layout(binding = 3) restrict readonly  buffer b_3 { vec3   data[];              } b_colr_texture;
+layout(binding = 4) restrict writeonly buffer b_4 { InSpec data[];              } b_spec_texture;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform u_0 {
+  uint n;
+} b_size;
+layout(binding = 1) uniform u_1 {
+  vec3 sub;
+  mat3 inv;
+} b_bary;
+// layout(binding = 2) uniform u_2 {
+//   uint n; // Todo: Move to u_1
+// } b_gamut_size;
+
+// Shared memory declarations
+shared InSpec s_spectral_gamut[n_gamut_verts];
+
+void load_gamut_shared_in() {
+  const uint i = gl_LocalInvocationID.x / wavelength_samples_al;
+  const uint j = gl_LocalInvocationID.x % wavelength_samples_al;
+  
+  if (i < n_gamut_verts && j < wavelength_samples)
+    s_spectral_gamut[i][j] = b_spec_gamut.data[i][j];
+
+  barrier();
+  memoryBarrierShared();
+}
+
+Spec load_gamut_shared_cl(uint i) {
+  Spec s;
+  cl_spec_scatter(s, s_spectral_gamut[i]);
+  return s;
+}
+
+void store_spec_texture(in Spec s, uint i) {
+  cl_spec_gather(b_spec_texture.data[i], s);
+}
+
+struct MVCResult {
+  Spec s;
+  float w;
+  bool ret;
+};
+
+MVCResult mvc_per_triangle_direct(in vec3 x, uint j) {
+  // The following block is a near-direct implementation of the pseudocode 
+  // from "Mean Value Coordinates for Closed Triangular Meshes", Ju et al, 
+  // Rice University, 2005.
+
+  // Constants
+  const uint  n_elem_verts = 3;
+  const uvec3 verts        = b_elem_gamut.data[j];
+  const float eps          = M_EPS;
+  const float pi           = M_PI;
+
+  // Result storage
+  MVCResult result = MVCResult(Spec(0.f), 0.f, false);
+
+  // Compute |p - x| and normalized (p - x) / |p - x|
+  vec3  u[n_elem_verts];
+  float d[n_elem_verts];
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    vec3 p = b_colr_gamut.data[verts[i]];
+    d[i] = length(p - x);
+    u[i] = (p - x) / d[i];
+
+    // Fallback: x lies on vertex, return directly
+    if (d[i] < eps) {
+      result.s = load_gamut_shared_cl(verts[i]);
+      result.w = 1.f;
+      result.ret = true;
+      return result;
+    }
+  }
+
+  // Spherical triangle data
+  float theta[n_elem_verts];
+  float h = 0.f;
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+
+    theta[i] = 2.f * asin(length(u[ip] - u[im]) / 2.f);
+    h += theta[i];
+  }
+  h /= 2.f;
+
+  // Fallback: x lies on triangle, use 2D barycentric coordinates
+  if (pi - h < eps) {
+    float w[n_elem_verts];
+    for (uint i = 0; i < n_elem_verts; ++i) {
+      uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+      w[i] = sin(theta[i]) * d[im] * d[ip];
+    }
+    for (uint i = 0; i < n_elem_verts; ++i) {
+      result.s += w[i] * load_gamut_shared_cl(verts[i]);
+      result.w += w[i];
+    }
+    result.s /= result.w;
+    result.ret = true;
+    return result;
+  }
+
+  float c[n_elem_verts];
+  float s[n_elem_verts];
+  float det = determinant((mat3(u[0], u[1], u[2])));
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+
+    c[i] = (2.f * sin(h) * sin(h - theta[i])) 
+         / (sin(theta[ip]) * sin(theta[im]))
+         - 1.f;
+    s[i] = sign(det) * sqrt(1.f - (c[i] * c[i]));
+  }
+
+  // Fallback: x lies outside triangle but on same plane, return nothing
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    if (s[i] < eps) {
+      return result;
+    }
+  }
+
+  float w[n_elem_verts];
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
+
+    w[i] = (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
+         / (d[i] * sin(theta[ip]) * s[im]);
+  }
+  
+  // Sum together spectra and weights
+  for (uint i = 0; i < n_elem_verts; ++i) {
+    result.s += w[i] * load_gamut_shared_cl(verts[i]);
+    result.w += w[i];
+  }
+
+  return result;
+}
+
+Spec mvc_main(in vec3 x) {
+  Spec  total_s = Spec(0.f);
+  float total_w = 0.f;
+
+  for (uint i = 0; i < n_gamut_verts; ++i) {
+    MVCResult result = mvc_per_triangle_direct(x, i);
+
+    if (result.ret) {
+      return result.s; // / result.w;
+    }
+
+    total_s += result.s;
+    total_w += result.w;
+  }
+  
+  return total_s / total_w;
+}
+
+void main() {
+  const uint i = gl_GlobalInvocationID.x / cl_spectrum_invc_n;
+  guard(i < b_size.n);
+
+  // Load spectral gamut data into shared memory
+  load_gamut_shared_in();
+
+  // Obtain barycentric coordinates for positions in the color texture
+  vec4 bary;
+  bary.xyz = b_bary.inv * (b_colr_texture.data[i] - b_bary.sub);
+  bary.w   = 1.f - hsum(bary.xyz);
+  
+  // Perform gamut mapping by applying barycentric coordinates to spectral gamut
+  Spec sd = mvc_main(b_colr_texture.data[i]);
+  // Spec sd = Spec(0.f);
+  // for (uint i = 0; i < n_gamut_verts; ++i)
+  //   sd += bary[i] * load_gamut_shared_cl(i);
+
+  // Store results to buffer
+  store_spec_texture(clamp(sd, 0.f, 1.f), i); // should only enforce this on export
+  // store_spec_texture(sd, i);
+}

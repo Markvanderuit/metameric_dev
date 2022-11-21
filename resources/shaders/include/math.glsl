@@ -5,6 +5,10 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
+// Define math constants
+#define M_PI  3.1415926538f
+#define M_EPS 0.00000001f
+
 // Rounded-up division functions
 
 #define CEIL_DIV(a, b) ((a + (b - 1)) / b)

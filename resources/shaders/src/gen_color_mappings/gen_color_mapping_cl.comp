@@ -60,10 +60,6 @@ Spec load_spec(uint i) {
   return s;
 }
 
-bool is_valid(uint i) {
-  return b_vali.data[i] == 0;
-}
-
 void main() {
   const uint i =  gl_GlobalInvocationID.x / cl_spectrum_invc_n;
   guard(i < b_unif.n);
@@ -76,8 +72,7 @@ void main() {
   CMFS cs = finalize_mapp(load_mapp_shared_cl(), sd);
   vec3 v  = cl_mmul(cs, sd);
   
-  // Sture results using first invocation, if spectrum is valid
+  // Sture results using first invocation
   if (cl_bin_elect())
     b_colr.data[i] = v;
-    // b_colr.data[i] = is_valid(i) ? v : vec3(1, 0, 0);
 }

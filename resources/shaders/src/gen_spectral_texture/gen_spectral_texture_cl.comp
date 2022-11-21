@@ -12,13 +12,17 @@
 #define Spec ClSpec           // Use shorthand for clustered types
 const uint n_gamut_verts = 4; // Nr. of tetrahedron vertices 
 
+// General layout rule declarations
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
 layout(std140)             uniform;
 
+// Shader storage buffer declarations
 layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[n_gamut_verts]; } b_spec_gamut;
 layout(binding = 1) restrict readonly  buffer b_1 { vec3   data[];              } b_colr_texture;
 layout(binding = 2) restrict writeonly buffer b_2 { InSpec data[];              } b_spec_texture;
+
+// Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
   uint n;
 } b_size;
@@ -27,6 +31,7 @@ layout(binding = 1) uniform u_1 {
   mat3 inv;
 } b_bary;
 
+// Shared memory declarations
 shared InSpec s_spectral_gamut[n_gamut_verts];
 
 void load_gamut_shared_in() {

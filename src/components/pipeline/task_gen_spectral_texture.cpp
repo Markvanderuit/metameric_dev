@@ -17,13 +17,12 @@ namespace met {
     // Get shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
-    const uint generate_cl      = ceil_div(wavelength_samples, 4u);
     const uint generate_n       = e_rgb_texture.size().prod();
-    const uint generate_ndiv_cl = ceil_div(generate_n, 256u / generate_cl);
+    const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(wavelength_samples, 4u));
 
     // Initialize objects for clustered shader call
     m_program_cl = {{ .type = gl::ShaderType::eCompute,
-                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_cl.comp.spv_opt",
+                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_mvc_cl.comp.spv_opt",
                       .is_spirv_binary = true }};
     m_dispatch_cl = { .groups_x = generate_ndiv_cl, 
                       .bindable_program = &m_program_cl }; 
@@ -53,6 +52,8 @@ namespace met {
     auto &e_spect_gamut_s = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_spec");
     auto &i_color_texture = info.get_resource<gl::Buffer>("color_buffer");
     auto &i_spect_texture = info.get_resource<gl::Buffer>("spectrum_buffer");
+    auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
+    auto &e_elems_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_elem");
 
     // Update barycentric coordinate inverse matrix in mapped uniform buffer
     m_bary_map->sub = e_color_gamut_c[3];
@@ -64,8 +65,10 @@ namespace met {
 
     // Bind resources to buffer targets
     e_spect_gamut_s.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    e_color_gamut.bind_to(gl::BufferTargetType::eShaderStorage,   1);
+    e_elems_gamut.bind_to(gl::BufferTargetType::eShaderStorage,   2);
+    i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 3);
+    i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 4);
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
     m_bary_buffer.bind_to(gl::BufferTargetType::eUniform,    1);
     
