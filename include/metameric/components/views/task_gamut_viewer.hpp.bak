@@ -16,10 +16,10 @@ namespace met {
     : detail::AbstractTask(name) { }
 
     void eval(detail::TaskEvalInfo &info) override {
-      // Get externally shared resources
-      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &gamut_colr_i  = e_app_data.project_data.gamut_colr_i;
-      auto &gamut_spec = e_app_data.project_data.gamut_spec;
+      // Get shared resources
+      auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &gamut_colr_i = e_app_data.project_data.gamut_colr_i;
+      auto &gamut_spec   = e_app_data.project_data.gamut_spec;
 
       // Quick temporary window to show nearest spectra in the local grid
       if (ImGui::Begin("Gamut viewer")) {
