@@ -38,61 +38,47 @@ namespace met {
     gl::Buffer buffer_spec = {{ .size  = 4 * sizeof(Spec), .flags = create_flags }};
     gl::Buffer buffer_elem = {{ .data = cnt_span<const std::byte>(gamut_elems_al) }};
 
-    // Prepare buffer maps which are written to often
-    auto buffer_colr_map = cast_span<AlColr>(buffer_colr.map(map_flags));
-    auto buffer_spec_map = cast_span<Spec>(buffer_spec.map(map_flags));
+    // Prepare persistent buffer maps which are written to on a regular basis
+    auto mapping_colr = cast_span<AlColr>(buffer_colr.map(map_flags));
+    auto mapping_spec = cast_span<Spec>(buffer_spec.map(map_flags));
 
-    // Submit resources 
-    info.insert_resource("buffer_colr",     std::move(buffer_colr));
-    info.insert_resource("buffer_spec",     std::move(buffer_spec));
-    info.insert_resource("buffer_elem",     std::move(buffer_elem));
-    info.insert_resource("buffer_colr_map", std::move(buffer_colr_map));
-    info.insert_resource("buffer_spec_map", std::move(buffer_spec_map));
+    // Submit shared resources 
+    info.insert_resource("buffer_colr",  std::move(buffer_colr));
+    info.insert_resource("buffer_spec",  std::move(buffer_spec));
+    info.insert_resource("buffer_elem",  std::move(buffer_elem));
+    info.insert_resource("mapping_colr", std::move(mapping_colr));
+    info.insert_resource("mapping_spec", std::move(mapping_spec));
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
 
-    // Get shared resources
-    auto &i_buffer_colr = info.get_resource<gl::Buffer>("buffer_colr");
-    auto &i_buffer_spec = info.get_resource<gl::Buffer>("buffer_spec");
-
     // Unmap buffers
-    i_buffer_colr.unmap();
-    i_buffer_spec.unmap();
+    info.get_resource<gl::Buffer>("buffer_colr").unmap();
+    info.get_resource<gl::Buffer>("buffer_spec").unmap();
   }
   
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &i_buffer_colr     = info.get_resource<gl::Buffer>("buffer_colr");
-    auto &i_buffer_spec     = info.get_resource<gl::Buffer>("buffer_spec");
-    auto &i_buffer_colr_map = info.get_resource<std::span<AlColr>>("buffer_colr_map");
-    auto &i_buffer_spec_map = info.get_resource<std::span<Spec>>("buffer_spec_map");
-    auto &e_basis           = info.get_resource<BMatrixType>(global_key, "pca_basis");
-
-    // Get relevant application/project data shorthands
-    auto &e_proj_data  = e_app_data.project_data;
-    auto &e_mappings   = e_app_data.loaded_mappings;
-
-    // Get relevant shared state data
-    auto &e_state_mappings = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
-    auto &e_state_gamut    = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
-    auto &e_state_spec     = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
+    auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    auto &i_buffer_colr  = info.get_resource<gl::Buffer>("buffer_colr");
+    auto &i_mapping_colr = info.get_resource<std::span<AlColr>>("mapping_colr");
+    auto &i_buffer_spec  = info.get_resource<gl::Buffer>("buffer_spec");
+    auto &i_mapping_spec = info.get_resource<std::span<Spec>>("mapping_spec");
+    auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data    = e_app_data.project_data;
 
     // Generate spectra at gamut color positions
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
-      // Ensure that we only continue if gamut data or mapping data is in any way stale
-      const uint mapp_i = e_proj_data.gamut_mapp_i[i], mapp_j = e_proj_data.gamut_mapp_j[i];
-      guard_continue(e_state_gamut[i]         == CacheState::eStale 
-                  || e_state_mappings[mapp_i] == CacheState::eStale 
-                  || e_state_mappings[mapp_j] == CacheState::eStale);
+      // Ensure that we only continue if gamut is in any way stale
+      guard_continue(e_state_gamut[i] == CacheState::eStale);
 
-      std::array<CMFS, 2> systems = { e_mappings[e_proj_data.gamut_mapp_i[i]].finalize(e_proj_data.gamut_spec[i]),
-                                      e_mappings[e_proj_data.gamut_mapp_j[i]].finalize(e_proj_data.gamut_spec[i]) };
+      std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(e_proj_data.gamut_spec[i]),
+                                      e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(e_proj_data.gamut_spec[i]) };
       std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
       
@@ -101,10 +87,11 @@ namespace met {
     }
 
     // Re-upload stale gamut data to the gpu
-    for (uint i = 0; i < e_state_spec.size(); ++i) {
-      guard_continue(e_state_spec[i] == CacheState::eStale || e_state_gamut[i] == CacheState::eStale);
-      i_buffer_colr_map[i] = e_proj_data.gamut_colr_i[i];
-      i_buffer_spec_map[i] = e_proj_data.gamut_spec[i];
+    for (uint i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
+      guard_continue(e_state_gamut[i] == CacheState::eStale);
+
+      i_mapping_colr[i] = e_proj_data.gamut_colr_i[i];
+      i_mapping_spec[i] = e_proj_data.gamut_spec[i];
       i_buffer_colr.flush(sizeof(AlColr), i * sizeof(AlColr));
       i_buffer_spec.flush(sizeof(Spec), i * sizeof(Spec));
     }
