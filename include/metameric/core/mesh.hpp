@@ -108,9 +108,16 @@ namespace met {
   template <typename T = eig::AlArray3f>
   void clean_all(IndexedMesh<T, eig::Array3u> &mesh);
 
+  /* Convex hull functions */
+
   // Shorthand that first generates a sphere mesh
   template <typename T = eig::AlArray3f>
   IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points);
+
+  template <typename T = eig::AlArray3f>
+  T move_point_inside_convex_hull(const IndexedMesh<T, eig::Array3u> &chull, const T &test_point);
+
+  /* Miscellaneous functions */
 
   // Generate a wireframe mesh from an input triangle mesh
   template <typename T = eig::AlArray3f>

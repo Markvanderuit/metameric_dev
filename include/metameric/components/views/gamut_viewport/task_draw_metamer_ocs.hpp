@@ -77,8 +77,6 @@ namespace met {
 
       // Get shared resources
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
-      auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
       auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
       auto &e_arcball      = info.get_resource<detail::Arcball>(m_parent, "arcball");
       auto &e_ocs_centr    = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
@@ -88,15 +86,12 @@ namespace met {
         m_gamut_idx = e_gamut_idx;
         
         // Get shared resources
-        auto &e_ocs_points = info.get_resource<std::vector<eig::AlArray3f>>("gen_metamer_ocs", fmt::format("ocs_points_{}", m_gamut_idx));
+        auto &e_ocs_chull = info.get_resource<AlArray3fMesh>("gen_metamer_ocs", fmt::format("ocs_chull_{}", m_gamut_idx));
 
-        // Generate approximate convex hull around points and copy to gl buffer
-        auto hull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, e_ocs_points);
-        m_hull_vertices.set(cnt_span<const std::byte>(hull.verts()), hull.verts().size() * sizeof(decltype(hull)::Vert));
-        m_hull_elements.set(cnt_span<const std::byte>(hull.elems()), hull.elems().size() * sizeof(decltype(hull)::Elem));
-
-        // Adjust vertex count in case convex hull is smaller
-        m_hull_dispatch.vertex_count = hull.elems().size() * 3;
+        // Copy new data to buffer and adjust vertex draw count
+        m_hull_vertices.set(cnt_span<const std::byte>(e_ocs_chull.verts()), e_ocs_chull.verts().size() * sizeof(AlArray3fMesh::Vert));
+        m_hull_elements.set(cnt_span<const std::byte>(e_ocs_chull.elems()), e_ocs_chull.elems().size() * sizeof(AlArray3fMesh::Elem));
+        m_hull_dispatch.vertex_count = e_ocs_chull.elems().size() * 3;
       }
 
       // Declare scoped OpenGL state

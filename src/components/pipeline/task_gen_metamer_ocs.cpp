@@ -83,10 +83,11 @@ namespace met {
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
     m_sphere_mesh    = generate_unit_sphere<eig::AlArray3f>(n_subdivs);
 
-    // Register resource to hold points for each vertex of the gamut shape
+    // Register resource to hold convex hull data for each vertex of the gamut shape
     for (uint i = 0; i < 4; ++i) {
       info.insert_resource(fmt::format("ocs_points_{}", i), std::vector<eig::AlArray3f>(n_samples));
       info.insert_resource(fmt::format("ocs_center_{}", i), Colr(0.f));
+      info.insert_resource(fmt::format("ocs_chull_{}", i), IndexedMesh<eig::AlArray3f>());
     }
 
     m_first_eval = true;
@@ -99,8 +100,8 @@ namespace met {
     auto &e_app_data           = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_mapp_i       = e_app_data.project_data.gamut_mapp_i;
     auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
+    auto &e_state_gamut        = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     auto &e_state_gamut_colr_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_colr_i");
-    auto &e_state_gamut_offs_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_offs_j");
     auto &e_state_gamut_mapp_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_i");
     auto &e_state_gamut_mapp_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_j");
     auto &e_state_mappings     = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
@@ -111,15 +112,17 @@ namespace met {
     for (uint i = 0; i < 4; ++i) {
       // Verify relevant state changes before continuing
       // Note that gamut offsets are not included, as these usually don't change the metamer set
-      guard_continue(e_state_gamut_colr_i[i] == CacheState::eStale             ||
-                     e_state_gamut_mapp_i[i] == CacheState::eStale             ||
-                     e_state_gamut_mapp_j[i] == CacheState::eStale             ||
-                     e_state_mappings[e_gamut_mapp_i[i]] == CacheState::eStale ||
-                     e_state_mappings[e_gamut_mapp_j[i]] == CacheState::eStale);
+      guard_continue(e_state_gamut[i] == CacheState::eStale);
+      // guard_continue(e_state_gamut_colr_i[i] == CacheState::eStale             ||
+      //                e_state_gamut_mapp_i[i] == CacheState::eStale             ||
+      //                e_state_gamut_mapp_j[i] == CacheState::eStale             ||
+      //                e_state_mappings[e_gamut_mapp_i[i]] == CacheState::eStale ||
+      //                e_state_mappings[e_gamut_mapp_j[i]] == CacheState::eStale);
                      
       // Get rest of shared resources
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
       auto &i_ocs_center   = info.get_resource<Colr>(fmt::format("ocs_center_{}", i));
+      auto &i_ocs_chull    = info.get_resource<AlArray3fMesh>(fmt::format("ocs_chull_{}", i));
       auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
       auto &e_gamut_offs_j = e_app_data.project_data.gamut_offs_j[i];
 
@@ -139,12 +142,20 @@ namespace met {
       i_ocs_center = std::reduce(std::execution::par_unseq, range_iter(i_ocs_points), 
         eig::AlArray3f(0.f), f_add) / static_cast<float>(i_ocs_points.size());
 
+      // Generate convex hull mesh
+      i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
+
+      // Colr gamut_point = e_gamut_colr_i + e_gamut_offs_j;
+      // e_gamut_offs_j = 
+      Colr(move_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull, eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) - e_gamut_colr_i;
+      // e_gamut_offs_j
+
       // Reset gamut offset to center on metamer set recomputation, but not on first execution
       // as all data will be considered "stale" at that point... unless it is a new project
       // in which case offsets DO need to be initialized. Aaargh. State machines.
-      if (!m_first_eval || e_app_data.project_state == ProjectState::eNew) {
+      /* if (!m_first_eval || e_app_data.project_state == ProjectState::eNew) {
         e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
-      }
+      } */
     }
     m_first_eval = false;
   }

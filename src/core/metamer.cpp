@@ -36,10 +36,6 @@ namespace met {
     params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
     params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
 
-    // Clamp weight values to [-1, 1]
-    params.x_l =-1000.f;
-    params.x_u = 1000.f;
-
     // Solve for minimized/maximized results and take average
     params.objective = LPObjective::eMinimize;
     BSpec minv = lp_solve(params).cast<float>();
