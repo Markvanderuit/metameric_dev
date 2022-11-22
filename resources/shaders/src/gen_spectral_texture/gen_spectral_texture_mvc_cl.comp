@@ -191,10 +191,10 @@ void main() {
   bary.w   = 1.f - hsum(bary.xyz);
   
   // Perform gamut mapping by applying barycentric coordinates to spectral gamut
-  Spec sd = mvc_main(b_colr_texture.data[i]);
-  // Spec sd = Spec(0.f);
-  // for (uint i = 0; i < n_gamut_verts; ++i)
-  //   sd += bary[i] * load_gamut_shared_cl(i);
+  // Spec sd = mvc_main(b_colr_texture.data[i]);
+  Spec sd = Spec(0.f);
+  for (uint i = 0; i < n_gamut_verts; ++i)
+    sd += bary[i] * load_gamut_shared_cl(i);
 
   // Store results to buffer
   store_spec_texture(clamp(sd, 0.f, 1.f), i); // should only enforce this on export

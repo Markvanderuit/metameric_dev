@@ -17,7 +17,7 @@ layout(location = 2) uniform float u_point_radius_min;
 layout(location = 3) uniform float u_point_radius_max;
 
 void main() {
-  float err = min(10.f * hsum(b_erro_buffer.data[gl_InstanceID]), 1.f);
+  float err = min(4.f * hsum(b_erro_buffer.data[gl_InstanceID]), 1.f);
 
   out_value_vert = in_value_vert;
   out_value_colr = mix(in_value_posi, vec3(1, 0, 0), err);

@@ -17,7 +17,7 @@ namespace met {
     2, 3, 0
   };
 
-  constexpr float point_psize = 0.001f;
+  constexpr float point_psize = 0.002f;
   constexpr uint n_points_per_dim = 32;
   constexpr uint n_points = n_points_per_dim * n_points_per_dim * n_points_per_dim;
 
