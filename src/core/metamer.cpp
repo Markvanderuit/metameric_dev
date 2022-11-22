@@ -13,7 +13,7 @@ namespace met {
     debug::check_expr_dbg(systems.size() == signals.size(),
                           "Color system size not equal to color signal size");
 
-    // Initialize parameter object for LP solver with expected matrix sizes
+    // Initialize parameter object for LP solver with expected matrix sizes M, N
     constexpr uint N = wavelength_bases;
     const     uint M = 3 * systems.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
@@ -35,6 +35,10 @@ namespace met {
     params.b.block<wavelength_samples, 1>(offs_u, 0) = 1.0;
     params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
     params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
+
+    // Clamp weight values to [-1, 1]
+    params.x_l =-1000.f;
+    params.x_u = 1000.f;
 
     // Solve for minimized/maximized results and take average
     params.objective = LPObjective::eMinimize;

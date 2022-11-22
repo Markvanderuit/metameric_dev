@@ -56,7 +56,6 @@ namespace met {
     } else {
       model.dual();
     }
-    model.cleanup(3);
 
     // Obtain solution data and copy to return object
     std::span<const double> solution = { model.getColSolution(), params.N };
