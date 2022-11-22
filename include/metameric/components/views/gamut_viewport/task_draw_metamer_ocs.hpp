@@ -76,19 +76,15 @@ namespace met {
       guard(e_gamut_idx >= 0);
 
       // Get shared resources
-      auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_gamut_mapp_i   = e_app_data.project_data.gamut_mapp_i;
-      auto &e_gamut_mapp_j   = e_app_data.project_data.gamut_mapp_j;
-      auto &e_state_gamut    = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
-      auto &e_state_mappings = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
-      auto &e_arcball        = info.get_resource<detail::Arcball>(m_parent, "arcball");
-      auto &e_ocs_centr      = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
+      auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
+      auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
+      auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+      auto &e_arcball      = info.get_resource<detail::Arcball>(m_parent, "arcball");
+      auto &e_ocs_centr    = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
 
       // Update convex hull mesh if selection has changed, or selected gamut point has changed
-      if (m_gamut_idx                                   != e_gamut_idx        ||
-          e_state_gamut[e_gamut_idx]                    == CacheState::eStale ||
-          e_state_mappings[e_gamut_mapp_i[e_gamut_idx]] == CacheState::eStale ||
-          e_state_mappings[e_gamut_mapp_j[e_gamut_idx]] == CacheState::eStale) {
+      if (m_gamut_idx != e_gamut_idx || e_state_gamut[e_gamut_idx] == CacheState::eStale) {
         m_gamut_idx = e_gamut_idx;
         
         // Get shared resources
@@ -96,8 +92,6 @@ namespace met {
 
         // Generate approximate convex hull around points and copy to gl buffer
         auto hull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, e_ocs_points);
-        // clean_all(hull);
-        // auto hull_wf = generate_wireframe<eig::AlArray3f>(hull);
         m_hull_vertices.set(cnt_span<const std::byte>(hull.verts()), hull.verts().size() * sizeof(decltype(hull)::Vert));
         m_hull_elements.set(cnt_span<const std::byte>(hull.elems()), hull.elems().size() * sizeof(decltype(hull)::Elem));
 

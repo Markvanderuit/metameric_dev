@@ -43,8 +43,8 @@ namespace met {
     met_trace_full();
 
     // Generate spectral texture only on relevant state change
-    auto &e_state_spec = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
-    guard(std::ranges::any_of(e_state_spec, [](auto s) { return s == CacheState::eStale; }));
+    auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources
     auto &e_app_data      = info.get_resource<ApplicationData>(global_key, "app_data");

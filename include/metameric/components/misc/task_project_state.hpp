@@ -15,7 +15,6 @@ namespace met {
     std::array<Colr, 4> m_gamut_offs_j;
     std::array<uint, 4> m_gamut_mapp_i;
     std::array<uint, 4> m_gamut_mapp_j;
-    std::array<Spec, 4> m_gamut_spec;
     std::vector<Mapp>   m_mappings;
 
   public:

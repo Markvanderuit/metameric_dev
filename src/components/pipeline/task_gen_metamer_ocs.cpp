@@ -15,11 +15,8 @@
 #include <unordered_map>
 
 namespace met {
-  // Nr. of samples for OCS generation
-  constexpr uint n_samples = 32;
-
-  // Nr. of subdivisions for input sphere
-  constexpr uint n_subdivs = 3;
+  constexpr uint n_samples = 32; // Nr. of samples for OCS generation
+  constexpr uint n_subdivs = 3; // Nr. of subdivisions for input sphere
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -102,17 +99,18 @@ namespace met {
     auto &e_app_data           = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_mapp_i       = e_app_data.project_data.gamut_mapp_i;
     auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
+    // auto &e_state_gamut        = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     auto &e_state_gamut_colr_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_colr_i");
     auto &e_state_gamut_offs_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_offs_j");
     auto &e_state_gamut_mapp_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_i");
     auto &e_state_gamut_mapp_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_j");
-    auto &e_state_gamut_spec   = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
     auto &e_state_mappings     = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
     auto &e_basis              = info.get_resource<BMatrixType>(global_key, "pca_basis");
 
     // For each vertex of the gamut shape
     for (uint i = 0; i < 4; ++i) {
       // Verify relevant state changes before continuing
+      // Note that gamut offsets are not included, as these usually don't change the metamer set
       guard_continue(e_state_gamut_colr_i[i] == CacheState::eStale             ||
                      e_state_gamut_mapp_i[i] == CacheState::eStale             ||
                      e_state_gamut_mapp_j[i] == CacheState::eStale             ||

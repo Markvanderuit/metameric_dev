@@ -44,11 +44,11 @@ namespace met {
     met_trace_full();
 
     // Generate color texture only on relevant state change
-    auto &e_state_mapp = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
-    auto &e_state_spec = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_spec");
+    auto &e_state_mapp  = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
+    auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     guard(m_init_stale
       || e_state_mapp[m_mapping_i] == CacheState::eStale
-      || std::ranges::any_of(e_state_spec, [](auto s) { return s == CacheState::eStale; }));
+      || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
     m_init_stale = false;
 
     // Get shared resources

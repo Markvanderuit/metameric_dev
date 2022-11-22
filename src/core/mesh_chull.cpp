@@ -6,10 +6,6 @@
 #include <ranges>
 
 namespace met {
-  namespace detail {
-    // ...
-  } // namespace detail 
-
   template <typename T>
   IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh,
                                                     std::span<const T> points) {
