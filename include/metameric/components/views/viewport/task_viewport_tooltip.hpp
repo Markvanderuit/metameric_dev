@@ -98,8 +98,8 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
+      auto &e_gamut_spec   = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_gamut_spec   = e_app_data.project_data.gamut_spec;
       auto &e_gamut_colr   = e_app_data.project_data.gamut_colr_i;
       auto &e_gamut_offs   = e_app_data.project_data.gamut_offs_j;
       auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;

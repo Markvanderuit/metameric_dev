@@ -43,6 +43,7 @@ namespace met {
     auto mapping_spec = cast_span<Spec>(buffer_spec.map(map_flags));
 
     // Submit shared resources 
+    info.insert_resource<std::array<Spec, 4>>("gamut_spec", { });
     info.insert_resource("buffer_colr",  std::move(buffer_colr));
     info.insert_resource("buffer_spec",  std::move(buffer_spec));
     info.insert_resource("buffer_elem",  std::move(buffer_elem));
@@ -63,6 +64,7 @@ namespace met {
 
     // Get shared resources
     auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    auto &i_gamut_spec   = info.get_resource<std::array<Spec, 4>>("gamut_spec");
     auto &i_buffer_colr  = info.get_resource<gl::Buffer>("buffer_colr");
     auto &i_mapping_colr = info.get_resource<std::span<AlColr>>("mapping_colr");
     auto &i_buffer_spec  = info.get_resource<gl::Buffer>("buffer_spec");
@@ -77,13 +79,13 @@ namespace met {
       // Ensure that we only continue if gamut is in any way stale
       guard_continue(e_state_gamut[i] == CacheState::eStale);
 
-      std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(e_proj_data.gamut_spec[i]),
-                                      e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(e_proj_data.gamut_spec[i]) };
+      std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(i_gamut_spec[i]),
+                                      e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(i_gamut_spec[i]) };
       std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
       
       // Generate new metameric spectrum for given color systems and expected color signals
-      e_proj_data.gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
+      i_gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 
     // Re-upload stale gamut data to the gpu
@@ -91,7 +93,7 @@ namespace met {
       guard_continue(e_state_gamut[i] == CacheState::eStale);
 
       i_mapping_colr[i] = e_proj_data.gamut_colr_i[i];
-      i_mapping_spec[i] = e_proj_data.gamut_spec[i];
+      i_mapping_spec[i] = i_gamut_spec[i];
       i_buffer_colr.flush(sizeof(AlColr), i * sizeof(AlColr));
       i_buffer_spec.flush(sizeof(Spec), i * sizeof(Spec));
     }

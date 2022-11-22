@@ -30,7 +30,6 @@ namespace met {
                      Colr { 0.f, 0.f, 0.f }};
     gamut_mapp_i.fill(0);
     gamut_mapp_j.fill(1);
-    gamut_spec.fill(Spec(0.f));
 
     // Instantiate loaded components with sensible default values
     mappings = {{ "D65", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}, 

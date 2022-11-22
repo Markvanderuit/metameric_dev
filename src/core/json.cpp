@@ -30,7 +30,6 @@ namespace met {
     v.gamut_offs_j = js.at("gamut_offs_j").get<std::array<Colr, 4>>();
     v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::array<uint, 4>>();
     v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::array<uint, 4>>();
-    v.gamut_spec   = js.at("gamut_spec").get<std::array<Spec, 4>>();
     v.mappings     = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapp>>>();
     v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
@@ -41,7 +40,6 @@ namespace met {
     js["gamut_offs_j"] = v.gamut_offs_j;
     js["gamut_mapp_i"] = v.gamut_mapp_i;
     js["gamut_mapp_j"] = v.gamut_mapp_j;
-    js["gamut_spec"]   = v.gamut_spec;
     js["mappings"]     = v.mappings;
     js["cmfs"]         = v.cmfs;
     js["illuminants"]  = v.illuminants;

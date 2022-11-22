@@ -99,13 +99,13 @@ namespace met {
     auto &e_app_data           = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_mapp_i       = e_app_data.project_data.gamut_mapp_i;
     auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
-    // auto &e_state_gamut        = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     auto &e_state_gamut_colr_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_colr_i");
     auto &e_state_gamut_offs_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_offs_j");
     auto &e_state_gamut_mapp_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_i");
     auto &e_state_gamut_mapp_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_j");
     auto &e_state_mappings     = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
     auto &e_basis              = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &e_gamut_spec         = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
 
     // For each vertex of the gamut shape
     for (uint i = 0; i < 4; ++i) {
@@ -120,13 +120,12 @@ namespace met {
       // Get rest of shared resources
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
       auto &i_ocs_center   = info.get_resource<Colr>(fmt::format("ocs_center_{}", i));
-      auto &e_gamut_spec   = e_app_data.project_data.gamut_spec[i];
       auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
       auto &e_gamut_offs_j = e_app_data.project_data.gamut_offs_j[i];
 
       // Generate color system spectra
-      CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i[i]].finalize(e_gamut_spec);
-      CMFS cmfs_j = e_app_data.loaded_mappings[e_gamut_mapp_j[i]].finalize(e_gamut_spec);
+      CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i[i]].finalize(e_gamut_spec[i]);
+      CMFS cmfs_j = e_app_data.loaded_mappings[e_gamut_mapp_j[i]].finalize(e_gamut_spec[i]);
 
       // Generate points on metamer set boundary
       auto basis  = e_basis.rightCols(wavelength_bases);

@@ -49,7 +49,6 @@ namespace met {
     std::array<Colr, 4> gamut_offs_j; // Gamut value offsets under secondary color system
     std::array<uint, 4> gamut_mapp_i; // Gamut vertex index of selected primary color system 
     std::array<uint, 4> gamut_mapp_j; // Gamut vertex index of selected secondary color system 
-    std::array<Spec, 4> gamut_spec;   // Resulting metameric spectra given above constraints
 
     // List of named user-loaded or program-provided mappings, illuminants, and cmfs
     std::vector<std::pair<std::string, Spec>> illuminants;
