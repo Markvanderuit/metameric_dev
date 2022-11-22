@@ -125,8 +125,15 @@ namespace met {
 
       ImGui::Separator();
 
-      ImGui::ColorEdit3("Color, coords", gamut_colr_i.data(), ImGuiColorEditFlags_Float);
-      ImGui::ColorEdit3("Color, error",  gamut_error.data(), ImGuiColorEditFlags_Float);
+      ImGui::Text("Color input");
+      ImGui::ColorEdit3("Value",  gamut_colr_i.data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Offset", gamut_offs_j.data(), ImGuiColorEditFlags_Float);
+  
+      ImGui::Separator();
+
+      ImGui::Text("Color output");
+      ImGui::ColorEdit3("Value", gamut_actual.data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Error", gamut_error.data(), ImGuiColorEditFlags_Float);
 
       ImGui::Separator();
 

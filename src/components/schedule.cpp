@@ -26,7 +26,7 @@
 // View tasks
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/task_gamut_viewer.hpp>
-#include <metameric/components/views/task_gamut_editor.hpp>
+// #include <metameric/components/views/task_gamut_editor.hpp>
 #include <metameric/components/views/task_mappings_editor.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
@@ -150,7 +150,6 @@ namespace met {
     scheduler.emplace_task<WindowTask>("window");
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<GamutViewerTask>("gamut_viewer");
-    scheduler.emplace_task<GamutEditorTask>("gamut_editor");
     scheduler.emplace_task<SpectraEditorTask>("spectra_editor");
     scheduler.emplace_task<MappingsEditorTask>("mappings_editor");
     scheduler.emplace_task<MappingsViewerTask>("mappings_viewer");
