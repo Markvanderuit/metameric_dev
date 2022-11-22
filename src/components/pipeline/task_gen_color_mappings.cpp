@@ -44,25 +44,20 @@ namespace met {
     met_trace_full();
 
     // Generate color texture only on relevant state change
-    auto &e_state_mapp  = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
     auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
-    guard(m_init_stale
-      || e_state_mapp[m_mapping_i] == CacheState::eStale
-      || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    guard(m_init_stale || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
     m_init_stale = false;
 
     // Get shared resources
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
     auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "buffer_mapp");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
-    auto &i_vali_buffer = info.get_resource<gl::Buffer>("validate_spectral_texture", "validation_buffer");
 
     // Bind buffer resources to ssbo targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
     e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_mapp_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    i_vali_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
 
     // Dispatch shader to generate color-mapped buffer

@@ -62,8 +62,11 @@ namespace met {
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Get shared resources
+    // Continue only on relevant state change
     auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+
+    // Get shared resources
     auto &i_gamut_spec   = info.get_resource<std::array<Spec, 4>>("gamut_spec");
     auto &i_buffer_colr  = info.get_resource<gl::Buffer>("buffer_colr");
     auto &i_mapping_colr = info.get_resource<std::span<AlColr>>("mapping_colr");
@@ -78,7 +81,7 @@ namespace met {
     for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
       guard_continue(e_state_gamut[i] == CacheState::eStale);
-
+      
       std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(i_gamut_spec[i]),
                                       e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(i_gamut_spec[i]) };
       std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 

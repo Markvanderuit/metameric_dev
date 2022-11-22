@@ -65,9 +65,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball           = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_validation_buffer = info.get_resource<gl::Buffer>("validate_spectral_texture", "validation_buffer");
-    auto &e_error_buffer      = info.get_resource<gl::Buffer>("error_viewer", "color_buffer");
+    auto &e_arcball      = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_error_buffer = info.get_resource<gl::Buffer>("error_viewer", "color_buffer");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
@@ -81,7 +80,6 @@ namespace met {
 
     // Bind resources to buffer targets
     e_error_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    // e_validation_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     
     // Submit draw information
     gl::dispatch_draw(m_draw);
