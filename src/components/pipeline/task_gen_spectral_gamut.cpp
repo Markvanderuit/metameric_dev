@@ -14,10 +14,10 @@
 
 namespace met {
   constexpr std::array<uint, 16> gamut_elems_al = {
-    0, 2, 1, 0, // 4 padding bytes
+    2, 0, 1, 0, // 4 padding bytes
     0, 3, 1, 0, // 4 padding bytes 
     2, 1, 3, 0, // 4 padding bytes
-    2, 0, 3, 0  // 4 padding bytes
+    0, 2, 3, 0  // 4 padding bytes
   };
 
   GenSpectralGamutTask::GenSpectralGamutTask(const std::string &name)

@@ -32,8 +32,9 @@ struct MVCResult {
 // The following block is a near-direct implementation of MVC pseudocode 
 // from "Mean Value Coordinates for Closed Triangular Meshes", Ju et al, 
 // Rice University, 2005.
-vec4 mvc_per_triangle_direct(in vec3 x) {
+vec4 bary_generalized(in vec3 x) {
   // Constants
+  const uint  n_elems      = 4;
   const uint  n_elem_verts = 3;
   const float eps          = M_EPS;
   const float pi           = M_PI;
@@ -41,9 +42,9 @@ vec4 mvc_per_triangle_direct(in vec3 x) {
   // Results storage
   vec3  total_v = vec3(0);
   float total_w = 0.f;
-  
+
   // For each triangle:
-  for (uint j = 0; j < 4; ++j) {
+  for (uint j = 0; j < n_elems; ++j) {
     const uvec3 verts = b_elem_gamut.data[j];
 
     // Results storage
@@ -103,7 +104,7 @@ vec4 mvc_per_triangle_direct(in vec3 x) {
     // Fallback: x lies outside triangle but on same plane, return nothing
     bool x_continue = false;
     for (uint i = 0; i < n_elem_verts; ++i) {
-      if (s[i] < eps)
+      if (abs(s[i]) < eps)
         x_continue = true;
     }
 
@@ -115,11 +116,7 @@ vec4 mvc_per_triangle_direct(in vec3 x) {
       uint ip = (i + 1) % n_elem_verts, im = (i + 2) % n_elem_verts;
 
       w[i] = (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
-          / (d[i] * sin(theta[ip]) * s[im]);
-
-      // x lies outside convex hull
-      if (w[i] < 0)
-        return vec4(0);
+           / (d[i] * sin(theta[ip]) * s[im]);
     }
     
     // Sum together spectra and weights
@@ -135,14 +132,14 @@ vec4 mvc_per_triangle_direct(in vec3 x) {
   return vec4(total_v / total_w, 1);
 }
 
-vec4 bary_main(in vec3 x) {
+vec4 bary_analytic(in vec3 x) {
   // Obtain barycentric coordinates for positions in the color texture
   vec4 bary;
   bary.xyz = b_bary.inv * (x - b_bary.sub);
   bary.w   = 1.f - hsum(bary.xyz);
 
   // Interpolate values using basic barycentric coordinates
-  vec4 v;
+  vec4 v = vec4(0);
   v.w = any(lessThan(bary, vec4(0))) ? 0.f : 1.f;
   for (uint i = 0; i < 4; ++i)
     v.xyz += b_colr_gamut.data[i] * bary[i];
@@ -157,11 +154,14 @@ void main() {
                + xyz.x;
   guard(all(lessThan(xyz, b_size.n)));
 
-  // Compute query position in grid
+  // Compute query position in [0, 1]
   const vec3 x = (vec3(xyz) + 0.5f) / vec3(b_size.n);
 
   // Interpolate values using basic barycentric coordinates
-  vec4 v = bary_main(x);
+  vec4 v_analytic    = bary_analytic(x);
+  vec4 v_generalized = bary_generalized(x);
+  vec3 v_error       = vec3(16.f * hsum(abs(v_analytic - v_generalized).xyz), 0, 0);
+  vec4 v = v_generalized; // vec4(v_error, 1);
 
   // Store results
   b_grid_posit.data[i] = x;
