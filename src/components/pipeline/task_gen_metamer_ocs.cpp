@@ -133,6 +133,7 @@ namespace met {
       // Generate points on metamer set boundary
       auto basis  = e_basis.rightCols(wavelength_bases);
       auto points = generate_boundary(basis, cmfs_i, cmfs_j, e_gamut_colr_i, m_sphere_samples);
+      // fmt::print("{} -> {}\n", m_sphere_samples.size(), points.size());
 
       // Store in aligned format // TODO generate in aligned format
       i_ocs_points = std::vector<eig::AlArray3f>(range_iter(points));

@@ -21,8 +21,6 @@ namespace met {
     std::string   m_parent;
     int           m_gamut_idx;
     AlArray3fMesh m_sphere_mesh;
-    AlArray3fWireframe 
-                  m_sphere_mesh_wf;
     gl::Buffer    m_hull_vertices;
     gl::Buffer    m_hull_elements;
     gl::Array     m_hull_array;
@@ -39,8 +37,7 @@ namespace met {
 
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>();
-      // m_sphere_mesh_wf = generate_wireframe<eig::AlArray3f>(m_sphere_mesh);
+      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>(3);
       m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.verts()), .flags = create_flags }};
       m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()), .flags = create_flags }};
       

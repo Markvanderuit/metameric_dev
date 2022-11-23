@@ -53,28 +53,45 @@ namespace met {
       5. Project the test point on to this plane, and return this projected point
     */
 
+    // Compute mesh centroid
+    constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+    T center = std::reduce(std::execution::par_unseq, range_iter(chull.verts()), T(0.f), f_add) 
+             / static_cast<float>(chull.verts().size());
+    
     // Compute triangle normals and centroids
-    std::vector<T> face_normals(chull.elems().size()), face_centroids(chull.elems().size());
-    std::transform(std::execution::par_unseq, range_iter(chull.elems()), face_normals.begin(), 
-    [&](const eig::AlArray3u &el) {
-      const T &a = chull.verts()[el[0]], &b = chull.verts()[el[1]], &c = chull.verts()[el[2]];
-      if (a.isApprox(b) || a.isApprox(c) || b.isApprox(c))
-        return T(0.f);
-      return T(-(b - a).matrix().cross((c - a).matrix()).normalized().eval());
-    });
+    std::vector<T> face_normals(chull.elems().size()),
+                   face_centroids(chull.elems().size());
+    
     std::transform(std::execution::par_unseq, range_iter(chull.elems()), face_centroids.begin(), 
     [&](const eig::AlArray3u &el) {
       const T &a = chull.verts()[el[0]], &b = chull.verts()[el[1]], &c = chull.verts()[el[2]];
       return ((c + b + a) / 3.f).eval();
     });
 
+    std::transform(std::execution::par_unseq, range_iter(chull.elems()), face_normals.begin(), 
+    [&](const eig::AlArray3u &el) {
+      const T &a = chull.verts()[el[0]], &b = chull.verts()[el[1]], &c = chull.verts()[el[2]];
+
+      // Test for collapsed triangles
+      if (a.isApprox(b) || a.isApprox(c) || b.isApprox(c))
+        return T(0.f);
+
+      return T(-(b - a).matrix().cross((c - a).matrix()).normalized().eval());
+    });
+
     // Project on to every triangle plane
     std::vector<float> dot_prod(chull.elems().size(), 0.f);
     #pragma omp parallel for
     for (int i = 0; i < dot_prod.size(); ++i) {
-      const T &n = face_normals[i];
+      const T &n = face_normals[i], &c = face_centroids[i];
+      
+      // Skip collapsed triangles
       guard_continue(!n.isZero());
-      const T v = (test_point - face_centroids[i]).matrix().normalized().eval();
+
+      // Skip inwards-facing triangles
+      guard_continue((c - center).matrix().normalized().dot(n.matrix()) >= 0.f);
+
+      const T v = (test_point - c).matrix().normalized().eval();
       dot_prod[i] = v.matrix().dot(n.matrix());
     }
 
@@ -86,6 +103,13 @@ namespace met {
       face_centroids[std::distance(dot_prod.begin(), it)],
       face_normals[std::distance(dot_prod.begin(), it)],
       d);
+
+    uint positive_count = 0;
+    for (uint i = 0; i < dot_prod.size(); ++i) {
+      if (dot_prod[i] > 0.f)
+        positive_count++;
+    }
+    fmt::print("{}\n", positive_count);
     // fmt::print("max d is {} given {}\n", d, face_centroids[std::distance(dot_prod.begin(), it)]);
     
     // Test if point lies inside convex hull
@@ -95,33 +119,6 @@ namespace met {
 
     // Return closest point on/inside convex hull
     return face_centroids[std::distance(dot_prod.begin(), it)];
-
-    /* // Compute centroid of convex hull
-    constexpr auto f_add = [](const T &a, const T &b) { return (a + b).eval(); };
-    T c = std::reduce(std::execution::par_unseq, range_iter(hull_points), T(0.f), f_add) 
-        / static_cast<float>(hull_points.size());
-    
-    std::vector<float> dot_prod(hull_points.size());
-    #pragma omp parallel for
-    for (int i = 0; i < hull_points.size(); ++i) {
-      const T &x = hull_points[i];
-      const T n = (x - c).matrix().normalized();
-      const T v = (test_point - x).matrix().normalized();
-      dot_prod[i] = v.matrix().dot(n.matrix());
-    }
-
-    // Find maximum element in dot_prod
-    auto it = std::max_element(std::execution::par_unseq, range_iter(dot_prod));
-    float d = *it;
-    
-    // Test if point lies inside convex hull
-    fmt::print("max dot: {}\n", d);
-    if (d <= 0.f) {
-      return test_point;
-    }
-
-    // Return closest point on/inside convex hull
-    return hull_points[std::distance(dot_prod.begin(), it)];  */
   }
 
   /* Explicit template instantiations for common types */

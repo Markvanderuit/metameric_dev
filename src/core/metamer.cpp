@@ -4,8 +4,38 @@
 #include <metameric/core/detail/trace.hpp>
 #include <algorithm>
 #include <execution>
+#include <unordered_set>
 
 namespace met {
+  namespace detail {
+    // key_hash for eigen types for std::unordered_map/unordered_set
+    template <typename T>
+    constexpr
+    auto eig_hash = [](const auto &mat) {
+      size_t seed = 0;
+      for (size_t i = 0; i < mat.size(); ++i) {
+        auto elem = *(mat.data() + i);
+        seed ^= std::hash<T>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      }
+      return seed;
+    };
+
+    // key_equal for eigen types for std::unordered_map/unordered_set
+    constexpr 
+    auto eig_equal = [](const auto &a, const auto &b) { 
+      return a.isApprox(b); 
+    };
+    
+    template <typename T>
+    using eig_hash_t  = decltype(eig_hash<T>);
+    using eig_equal_t = decltype(eig_equal);
+
+    std::vector<Colr> remove_identical_points(const std::vector<Colr> &v) {
+      std::unordered_set<Colr, eig_hash_t<float>, eig_equal_t> s(range_iter(v), 16);
+      return std::vector<Colr>(range_iter(s));
+    }
+  } // namespace detail
+
   Spec generate(const BBasis         &basis,
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals) {
@@ -87,6 +117,6 @@ namespace met {
       }
     }
 
-    return output;
+    return detail::remove_identical_points(output);
   }
 } // namespace met
