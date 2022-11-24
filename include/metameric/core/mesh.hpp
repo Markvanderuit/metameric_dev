@@ -115,7 +115,7 @@ namespace met {
   IndexedMesh<T, eig::Array3u> generate_convex_hull(std::span<const T> points);
 
   template <typename T = eig::AlArray3f>
-  T move_point_inside_convex_hull(const IndexedMesh<T, eig::Array3u> &chull, const T &test_point);
+  bool is_point_inside_convex_hull(const IndexedMesh<T, eig::Array3u> &chull, const T &test_point);
 
   /* Miscellaneous functions */
 

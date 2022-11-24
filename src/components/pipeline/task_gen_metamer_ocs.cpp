@@ -137,6 +137,11 @@ namespace met {
       // Generate convex hull mesh
       i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
 
+      // Test if gamut offset lies within convex hull. Center otherwise
+      if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
+        e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
+      }
+
       // Colr gamut_point = e_gamut_colr_i + e_gamut_offs_j;
       // e_gamut_offs_j = 
       // Colr(move_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull, eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) - e_gamut_colr_i;

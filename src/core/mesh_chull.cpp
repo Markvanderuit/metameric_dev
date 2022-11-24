@@ -25,6 +25,36 @@ namespace met {
       v = points[std::distance(proj_range.begin(), it)];
     });
 
+    // Destroy inverted triangles
+    constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+    T center = std::reduce(std::execution::par_unseq, range_iter(mesh.verts()), T(0.f), f_add) 
+             / static_cast<float>(mesh.verts().size());
+    std::vector<T> face_normals(mesh.elems().size()), face_centroids(mesh.elems().size());
+    std::transform(std::execution::par_unseq, range_iter(mesh.elems()), face_centroids.begin(), 
+    [&](const eig::AlArray3u &el) {
+      const T &a = mesh.verts()[el[0]], &b = mesh.verts()[el[1]], &c = mesh.verts()[el[2]];
+      return ((c + b + a) / 3.f).eval();
+    });
+    std::transform(std::execution::par_unseq, range_iter(mesh.elems()), face_normals.begin(), 
+    [&](const eig::AlArray3u &el) {
+      const T &a = mesh.verts()[el[0]], &b = mesh.verts()[el[1]], &c = mesh.verts()[el[2]];
+
+      // Test for collapsed triangles
+      if (a.isApprox(b) || a.isApprox(c) || b.isApprox(c))
+        return T(0.f);
+
+      return T(-(b - a).matrix().cross((c - a).matrix()).normalized().eval());
+    });
+    int count = 0;
+    for (int i = 0; i < mesh.elems().size(); ++i) {
+      const T &n = face_normals[i], &c = face_centroids[i];
+      guard_continue(!n.isZero());
+      guard_continue((c - center).matrix().normalized().dot(n.matrix()) < 0.f);
+      count++;
+      mesh.elems()[i] = eig::Array3u(0);
+    }
+    fmt::print("Deleted {}\n", count);
+
     return mesh;
   }
   
@@ -35,7 +65,7 @@ namespace met {
   }
 
   template <typename T>
-  T move_point_inside_convex_hull(const IndexedMesh<T, eig::Array3u> &chull, const T &test_point) {
+  bool is_point_inside_convex_hull(const IndexedMesh<T, eig::Array3u> &chull, const T &test_point) {
     met_trace();
 
     /*
@@ -59,15 +89,12 @@ namespace met {
              / static_cast<float>(chull.verts().size());
     
     // Compute triangle normals and centroids
-    std::vector<T> face_normals(chull.elems().size()),
-                   face_centroids(chull.elems().size());
-    
+    std::vector<T> face_normals(chull.elems().size()), face_centroids(chull.elems().size());
     std::transform(std::execution::par_unseq, range_iter(chull.elems()), face_centroids.begin(), 
     [&](const eig::AlArray3u &el) {
       const T &a = chull.verts()[el[0]], &b = chull.verts()[el[1]], &c = chull.verts()[el[2]];
       return ((c + b + a) / 3.f).eval();
     });
-
     std::transform(std::execution::par_unseq, range_iter(chull.elems()), face_normals.begin(), 
     [&](const eig::AlArray3u &el) {
       const T &a = chull.verts()[el[0]], &b = chull.verts()[el[1]], &c = chull.verts()[el[2]];
@@ -95,9 +122,7 @@ namespace met {
       dot_prod[i] = v.matrix().dot(n.matrix());
     }
 
-    // Find maximum element in dot_prod
-    auto it = std::max_element(std::execution::par_unseq, range_iter(dot_prod));
-    float d = *it;
+    // float d = *it;
     // fmt::print("x = {}, p = {}, n = {}, d = {}\n", 
     //   test_point,
     //   face_centroids[std::distance(dot_prod.begin(), it)],
@@ -109,16 +134,13 @@ namespace met {
       if (dot_prod[i] > 0.f)
         positive_count++;
     }
-    // fmt::print("{}\n", positive_count);
+    fmt::print("{}\n", positive_count);
     // fmt::print("max d is {} given {}\n", d, face_centroids[std::distance(dot_prod.begin(), it)]);
     
-    // Test if point lies inside convex hull
-    if (d <= 0.f) {
-      return test_point;
-    }
 
-    // Return closest point on/inside convex hull
-    return face_centroids[std::distance(dot_prod.begin(), it)];
+    // Find maximum element in dot_prod, test if it is positive
+    auto it = std::max_element(std::execution::par_unseq, range_iter(dot_prod));
+    return (*it <= 0.f);
   }
 
   /* Explicit template instantiations for common types */
@@ -133,8 +155,8 @@ namespace met {
   template IndexedMesh<eig::AlArray3f, eig::Array3u> 
   generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);  
 
-  template eig::Array3f
-  move_point_inside_convex_hull(const IndexedMesh<eig::Array3f, eig::Array3u> &chull, const eig::Array3f &);
-  template eig::AlArray3f
-  move_point_inside_convex_hull(const IndexedMesh<eig::AlArray3f, eig::Array3u> &chull, const eig::AlArray3f &);
+  template bool
+  is_point_inside_convex_hull(const IndexedMesh<eig::Array3f, eig::Array3u> &chull, const eig::Array3f &);
+  template bool
+  is_point_inside_convex_hull(const IndexedMesh<eig::AlArray3f, eig::Array3u> &chull, const eig::AlArray3f &);
 } // namespace metameric
