@@ -160,8 +160,8 @@ void main() {
   // Interpolate values using basic barycentric coordinates
   vec4 v_analytic    = bary_analytic(x);
   vec4 v_generalized = bary_generalized(x);
-  vec3 v_error       = vec3(16.f * hsum(abs(v_analytic - v_generalized).xyz), 0, 0);
-  vec4 v = v_generalized; // vec4(v_error, 1);
+  // vec3 v_error       = vec3(16.f * hsum(abs(v_analytic - v_generalized).xyz), 0, 0);
+  vec4 v = vec4(vec3(v_generalized), v_analytic.w); // vec4(v_error, 1);
 
   // Store results
   b_grid_posit.data[i] = x;

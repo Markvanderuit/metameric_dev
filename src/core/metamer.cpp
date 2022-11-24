@@ -31,6 +31,7 @@ namespace met {
     using eig_equal_t = decltype(eig_equal);
 
     std::vector<Colr> remove_identical_points(const std::vector<Colr> &v) {
+      met_trace();
       std::unordered_set<Colr, eig_hash_t<float>, eig_equal_t> s(range_iter(v), 16);
       return std::vector<Colr>(range_iter(s));
     }

@@ -98,18 +98,18 @@ namespace met {
     // Find maximum element in dot_prod
     auto it = std::max_element(std::execution::par_unseq, range_iter(dot_prod));
     float d = *it;
-    fmt::print("x = {}, p = {}, n = {}, d = {}\n", 
-      test_point,
-      face_centroids[std::distance(dot_prod.begin(), it)],
-      face_normals[std::distance(dot_prod.begin(), it)],
-      d);
+    // fmt::print("x = {}, p = {}, n = {}, d = {}\n", 
+    //   test_point,
+    //   face_centroids[std::distance(dot_prod.begin(), it)],
+    //   face_normals[std::distance(dot_prod.begin(), it)],
+    //   d);
 
     uint positive_count = 0;
     for (uint i = 0; i < dot_prod.size(); ++i) {
       if (dot_prod[i] > 0.f)
         positive_count++;
     }
-    fmt::print("{}\n", positive_count);
+    // fmt::print("{}\n", positive_count);
     // fmt::print("max d is {} given {}\n", d, face_centroids[std::distance(dot_prod.begin(), it)]);
     
     // Test if point lies inside convex hull

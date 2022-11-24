@@ -9,7 +9,6 @@ namespace met {
 
     std::vector<Array6f> m_sphere_samples;    
     AlArray3fMesh        m_sphere_mesh;
-    bool                 m_first_eval;
     
   public:
     GenMetamerOCSTask(const std::string &name);

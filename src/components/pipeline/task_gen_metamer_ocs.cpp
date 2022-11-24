@@ -16,7 +16,7 @@
 
 namespace met {
   constexpr uint n_samples = 32; // Nr. of samples for OCS generation
-  constexpr uint n_subdivs = 3; // Nr. of subdivisions for input sphere
+  constexpr uint n_subdivs = 2; // Nr. of subdivisions for input sphere
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -89,22 +89,19 @@ namespace met {
       info.insert_resource(fmt::format("ocs_center_{}", i), Colr(0.f));
       info.insert_resource(fmt::format("ocs_chull_{}", i), IndexedMesh<eig::AlArray3f>());
     }
-
-    m_first_eval = true;
   }
   
   void GenMetamerOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
     
+    // Continue only on relevant state change
+    auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+
     // Get shared resources
     auto &e_app_data           = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_gamut_mapp_i       = e_app_data.project_data.gamut_mapp_i;
     auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
-    auto &e_state_gamut        = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
-    auto &e_state_gamut_colr_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_colr_i");
-    auto &e_state_gamut_mapp_i = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_i");
-    auto &e_state_gamut_mapp_j = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_mapp_j");
-    auto &e_state_mappings     = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
     auto &e_basis              = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_gamut_spec         = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
 
@@ -113,11 +110,6 @@ namespace met {
       // Verify relevant state changes before continuing
       // Note that gamut offsets are not included, as these usually don't change the metamer set
       guard_continue(e_state_gamut[i] == CacheState::eStale);
-      // guard_continue(e_state_gamut_colr_i[i] == CacheState::eStale             ||
-      //                e_state_gamut_mapp_i[i] == CacheState::eStale             ||
-      //                e_state_gamut_mapp_j[i] == CacheState::eStale             ||
-      //                e_state_mappings[e_gamut_mapp_i[i]] == CacheState::eStale ||
-      //                e_state_mappings[e_gamut_mapp_j[i]] == CacheState::eStale);
                      
       // Get rest of shared resources
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
@@ -133,7 +125,6 @@ namespace met {
       // Generate points on metamer set boundary
       auto basis  = e_basis.rightCols(wavelength_bases);
       auto points = generate_boundary(basis, cmfs_i, cmfs_j, e_gamut_colr_i, m_sphere_samples);
-      // fmt::print("{} -> {}\n", m_sphere_samples.size(), points.size());
 
       // Store in aligned format // TODO generate in aligned format
       i_ocs_points = std::vector<eig::AlArray3f>(range_iter(points));
@@ -148,7 +139,7 @@ namespace met {
 
       // Colr gamut_point = e_gamut_colr_i + e_gamut_offs_j;
       // e_gamut_offs_j = 
-      Colr(move_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull, eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) - e_gamut_colr_i;
+      // Colr(move_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull, eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) - e_gamut_colr_i;
       // e_gamut_offs_j
 
       // Reset gamut offset to center on metamer set recomputation, but not on first execution
@@ -158,6 +149,5 @@ namespace met {
         e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
       } */
     }
-    m_first_eval = false;
   }
 } // namespace met
