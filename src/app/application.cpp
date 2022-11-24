@@ -62,7 +62,7 @@ namespace met {
       const float data_minv  = 400.f,
                   data_maxv  = 710.f,
                   data_ssize = (data_maxv - data_minv) / static_cast<float>(hd5_data.dims);
-      auto idx_to_data = [&](uint i) { return (.5f + static_cast<float>(i)) * data_ssize + data_minv; };
+      auto idx_to_data = [&](uint i) { return (static_cast<float>(i)) * data_ssize + data_minv; };
 
       // Fill list of wavelengths matching data layout for spectrum_from_data(...)
       std::vector<float> wavelengths(hd5_data.dims);

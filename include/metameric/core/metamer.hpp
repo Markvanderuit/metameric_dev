@@ -5,7 +5,7 @@
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
-  constexpr static uint wavelength_bases  = 8;
+  constexpr static uint wavelength_bases  = 16;
   constexpr static uint wavelength_blacks = wavelength_bases - 3;
 
   using BBasis = eig::Matrix<float, wavelength_samples, wavelength_bases>;

@@ -82,12 +82,11 @@ namespace met {
       // Ensure that we only continue if gamut is in any way stale
       guard_continue(e_state_gamut[i] == CacheState::eStale);
       
+      // Generate new metameric spectrum for given color systems and expected color signals
       std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(i_gamut_spec[i]),
                                       e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(i_gamut_spec[i]) };
       std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
-      
-      // Generate new metameric spectrum for given color systems and expected color signals
       i_gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 
