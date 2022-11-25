@@ -130,7 +130,8 @@ namespace met {
 
     std::vector<bool> elem_flag_erase(mesh.elems().size(), false);
     auto &verts = mesh.verts();
-    for (uint i = 0; i < mesh.elems().size(); ++i) {
+    #pragma omp parallel for
+    for (int i = 0; i < mesh.elems().size(); ++i) {
       auto &el = mesh.elems()[i];
       if (verts[el[0]].isApprox(verts[el[1]]) ||
           verts[el[1]].isApprox(verts[el[2]]) ||

@@ -15,8 +15,8 @@
 #include <unordered_map>
 
 namespace met {
-  constexpr uint n_samples = 64; // Nr. of samples for OCS generation
-  constexpr uint n_subdivs = 3; // Nr. of subdivisions for input sphere
+  constexpr uint n_samples = 32; // Nr. of samples for OCS generation
+  constexpr uint n_subdivs = 6; // Nr. of subdivisions for input sphere
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -105,8 +105,15 @@ namespace met {
     auto &e_basis              = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_gamut_spec         = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
 
+#ifdef _MSC_VER
+    omp_set_nested(4);
+#else
+    omp_set_max_active_levels(4);
+#endif
+
+    std::vector<uint> convex_hull_worklist;
+
     // For each vertex of the gamut shape
-    #pragma omp parallel for
     for (int i = 0; i < 4; ++i) {
       // Verify relevant state changes before continuing
       // Note that gamut offsets are not included, as these usually don't change the metamer set
@@ -135,13 +142,16 @@ namespace met {
       i_ocs_center = std::reduce(std::execution::par_unseq, range_iter(i_ocs_points), 
         eig::AlArray3f(0.f), f_add) / static_cast<float>(i_ocs_points.size());
 
+      // Postpone convex hull generation for later
+      convex_hull_worklist.push_back(i);
+
       // Generate convex hull mesh
-      i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
+      // i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
 
       // Test if gamut offset lies within convex hull. Center otherwise
-      if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
+      /* if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
         e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
-      }
+      } */
 
       // Colr gamut_point = e_gamut_colr_i + e_gamut_offs_j;
       // e_gamut_offs_j = 
@@ -154,6 +164,17 @@ namespace met {
       /* if (!m_first_eval || e_app_data.project_state == ProjectState::eNew) {
         e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
       } */
+    }
+
+    #pragma omp parallel for
+    for (int j = 0; j < convex_hull_worklist.size(); ++j) {
+      // Gather shared resources
+      uint i = convex_hull_worklist[j];
+      auto &i_ocs_chull    = info.get_resource<AlArray3fMesh>(fmt::format("ocs_chull_{}", i));
+      auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
+
+      // Generate convex hull mesh
+      i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
     }
   }
 } // namespace met

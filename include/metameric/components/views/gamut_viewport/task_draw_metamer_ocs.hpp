@@ -37,7 +37,7 @@ namespace met {
 
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>(3);
+      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>(6);
       m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.verts()), .flags = create_flags }};
       m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()), .flags = create_flags }};
       
@@ -57,7 +57,7 @@ namespace met {
                           .bindable_program = &m_program };
 
       // Set non-changing uniform values
-      m_program.uniform("u_alpha", .66f);
+      m_program.uniform("u_alpha", 1.f);
 
       // Set selection to "none"
       m_gamut_idx = -1;
@@ -92,10 +92,10 @@ namespace met {
       }
 
       // Declare scoped OpenGL state
-      gl::state::set_op(gl::CullOp::eBack);
+      gl::state::set_op(gl::CullOp::eFront);
       gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
       auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   false),
                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
                                  

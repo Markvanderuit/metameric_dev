@@ -9,6 +9,7 @@
 #include "libqhullcpp/QhullVertex.h"
 #include "libqhullcpp/QhullVertexSet.h"
 #include "libqhullcpp/QhullPoint.h"
+#include <meshoptimizer.h>
 
 namespace met {
   namespace detail {
@@ -41,9 +42,9 @@ namespace met {
     /* BEGIN here */
     /* https://stackoverflow.com/questions/19530731/qhull-library-c-interface */
 
-    constexpr uint n_dims = 3;
+    /* constexpr uint n_dims = 3;
     const char *input_comm = "";
-    const char *qhull_comm = "Qt Qx"; // Ask for triangulated output
+    const char *qhull_comm = "Qt"; // Ask for triangulated output
 
     // Slow scatter to avoid padding: TODO replace with something smarter, or convert to unpadded input beforehand?
     // Needs benchmarking
@@ -64,8 +65,6 @@ namespace met {
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_faces = qhull.facetList().toStdVector();
 
-    fmt::print("Result is {} verts, {} faces\n", qh_verts.size(), qh_faces.size());
-
     uint map_c = 0;
     std::unordered_map<T, uint, detail::eig_hash_t<float>, detail::eig_equal_t> vertex_map;
     
@@ -75,65 +74,80 @@ namespace met {
       std::copy(coords, coords + n_dims, _v.begin());
       return _v;
     };
+
+    std::for_each(range_iter(qh_verts), [&](const orgQhull::QhullVertex &_v) {
+      T v = facet_to_eig(_v);
+      if (auto it = vertex_map.find(v); it == vertex_map.end()) {
+        verts.push_back(v);
+        vertex_map[v] = map_c++;
+      }
+    });
     
-    std::transform(range_iter(qh_faces), elems.begin(), [&](const orgQhull::QhullFacet &f) {
+    std::transform(std::execution::par_unseq, range_iter(qh_faces), elems.begin(), [&](const orgQhull::QhullFacet &f) {
       eig::Array3u el;
       for (uint i = 0; i < 3; ++i) {
         T v = facet_to_eig(f.vertices()[i]);
-        if (auto it = vertex_map.find(v); it != vertex_map.end()) {
-          el[i] = it->second;
-        } else {
-          el[i] = map_c;
-          verts.push_back(v);
-          vertex_map[v] = map_c++;
-        }
+        el[i] = vertex_map[v];
       }
       return el;
     });
 
-    fmt::print("Output is {} verts, {} faces\n", verts.size(), elems.size());
-
-    // std::transform(range_iter(qh_verts), verts.begin(), [](const orgQhull::QhullVertex &v) {
-    //   T _v;
-    //   for (uint i = 0; i < n_dims; ++i)
-    //     _v[i] = static_cast<float>(v.point().coordinates()[i]);
-    //   if 
-    //   return _v;
-    // });
-
-
-    // std::transform(range_iter(qh_faces), elems.begin(), [](const orgQhull::QhullFacet &f) {
-    //   eig::Array3u el;
-    //   for (uint i = 0; i < 3; ++i)
-    //     el[i] = f.vertices()[i].id() - 1;
-    //   return el;
-    // });
-
     auto m = IndexedMesh<T, eig::Array3u>(verts, elems);
-    clean_fix_winding_order(m);
-    return m;
-
-    // Extract mesh
-    IndexedMesh<T, eig::Array3u> hull_mesh;
+    return m; */
 
     /* STOP here */
 
     IndexedMesh<T, eig::Array3u> mesh = sphere_mesh;
-
-    // For each vertex in mesh, each defining a line through the origin:
+    
+    // For each vertex in mesh, each defining a unit direction and therefore line through the origin:
     std::for_each(std::execution::par_unseq, range_iter(mesh.verts()), [&](auto &v) {
       // Obtain a range of point projections along this line
-      auto proj_funct = [&v](const auto &p) { return (v).matrix().dot(p.matrix()); };
+      auto proj_funct = [&v](const auto &p) { return v.matrix().dot(p.matrix()); };
+      // auto proj_funct = [&v, &centroid](const auto &p) { return v.matrix().dot((p - centroid).matrix().normalized()); };
+      // auto proj_funct = [&v](const auto &p) { return v.matrix().dot((p).matrix()); };
       auto proj_range = points | std::views::transform(proj_funct);
 
-      // Find iterator to endpoint, given projections
-      auto it = std::ranges::max_element(proj_range);
+      // Find iterator to endpoint, given these point projections
+      auto proj_maxel = std::ranges::max_element(proj_range);
       
       // Replace mesh vertex with this endpoint
-      v = points[std::distance(proj_range.begin(), it)];
+      v = points[std::distance(proj_range.begin(), proj_maxel)];
     });
 
-    return mesh;
+    // Compute centroid of point set
+    constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+    T centroid = std::reduce(std::execution::par_unseq, range_iter(mesh.verts()), T(0.f), f_add) / static_cast<float>(mesh.verts().size());
+
+    // Collapse inward-facing triangles
+    std::for_each(std::execution::par_unseq, range_iter(mesh.elems()), [&](auto &e) {
+      const T &u = mesh.verts()[e[0]], &v = mesh.verts()[e[1]], &w = mesh.verts()[e[2]];
+      T c = (u + v + w) / 3.f;
+
+      // Already collapsed vertex 
+      guard (!c.isApprox(u));
+      
+      T n  = T(-(v - u).matrix().cross((w - u).matrix()).normalized().eval());
+      T n_ = (c - centroid).matrix().normalized();
+
+      // Outward facing triangle
+      guard(n.matrix().dot(n_.matrix()) <= 0);
+
+      // Forcibly collapse triangle
+      e = 0;
+    });
+
+    float threshold = 0.1;
+    size_t target_index_count = size_t((mesh.elems().size() * 3) * threshold);
+
+    std::vector<uint> elems_target(mesh.elems().size() * 3);
+    auto elems_src = cnt_span<const uint>(mesh.elems());
+    auto verts_src = cnt_span<const float>(mesh.verts());
+    size_t new_index_count = meshopt_simplifySloppy(elems_target.data(), elems_src.data(), elems_src.size(), verts_src.data(), 
+      mesh.verts().size(), sizeof(T), target_index_count, 0.02f, nullptr);
+
+    elems_target.resize(new_index_count);
+
+    return IndexedMesh<T, eig::Array3u>(mesh.verts(), cnt_span<const eig::Array3u>(elems_target));
   }
   
   template <typename T>

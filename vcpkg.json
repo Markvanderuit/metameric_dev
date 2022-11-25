@@ -18,6 +18,7 @@
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
     "highfive",
     "imguizmo",
+    "meshoptimizer",
     "nativefiledialog",
     "nlohmann-json",
     "stb",

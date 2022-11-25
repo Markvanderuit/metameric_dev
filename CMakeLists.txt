@@ -55,6 +55,7 @@ find_package(fmt       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
+find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
@@ -237,6 +238,7 @@ target_link_libraries(core PUBLIC
   Coin::Clp
   Tracy::TracyClient
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
+  meshoptimizer::meshoptimizer
   nlohmann_json::nlohmann_json
   Qhull::qhull_r
   Qhull::qhullcpp
