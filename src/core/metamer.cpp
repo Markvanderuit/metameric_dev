@@ -2,6 +2,7 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <omp.h>
 #include <algorithm>
 #include <execution>
 #include <unordered_set>

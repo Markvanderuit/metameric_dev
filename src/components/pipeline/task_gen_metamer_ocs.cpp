@@ -16,7 +16,7 @@
 
 namespace met {
   constexpr uint n_samples = 32; // Nr. of samples for OCS generation
-  constexpr uint n_subdivs = 6; // Nr. of subdivisions for input sphere
+  constexpr uint n_subdivs = 3; // Nr. of subdivisions for input sphere
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
