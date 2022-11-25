@@ -15,8 +15,8 @@
 #include <unordered_map>
 
 namespace met {
-  constexpr uint n_samples = 32; // Nr. of samples for OCS generation
-  constexpr uint n_subdivs = 2; // Nr. of subdivisions for input sphere
+  constexpr uint n_samples = 64; // Nr. of samples for OCS generation
+  constexpr uint n_subdivs = 3; // Nr. of subdivisions for input sphere
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -106,7 +106,8 @@ namespace met {
     auto &e_gamut_spec         = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
 
     // For each vertex of the gamut shape
-    for (uint i = 0; i < 4; ++i) {
+    #pragma omp parallel for
+    for (int i = 0; i < 4; ++i) {
       // Verify relevant state changes before continuing
       // Note that gamut offsets are not included, as these usually don't change the metamer set
       guard_continue(e_state_gamut[i] == CacheState::eStale);

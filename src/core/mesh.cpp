@@ -48,6 +48,31 @@ namespace met {
   }
 
   template <typename T>
+  IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &input_mesh) {
+    met_trace();
+
+    IndexedMesh<T, eig::Array2u> mesh;
+    mesh.verts() = input_mesh.verts();
+    mesh.elems().reserve(input_mesh.elems().size() * 2);
+
+    auto &elems = mesh.elems();
+    for (auto &e : input_mesh.elems()) {
+      const uint i = e.x(), j = e.y(), k = e.z();
+      elems.push_back({ i, j });
+      elems.push_back({ j, k });
+      elems.push_back({ k, i });
+    }
+
+    return mesh;
+  }
+
+  template <typename T, typename E>
+  T IndexedMesh<T, E>::centroid() const {
+    constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+    return std::reduce(std::execution::par_unseq, range_iter(m_verts), T(0.f), f_add) / static_cast<float>(m_verts.size());
+  }
+
+  template <typename T>
   IndexedMesh<T, eig::Array3u> generate_unit_sphere(uint n_subdivs) {
     met_trace();
 
@@ -103,24 +128,6 @@ namespace met {
     return { std::move(vts), std::move(els) };
   }
 
-  template <typename T>
-  IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &input_mesh) {
-    met_trace();
-
-    IndexedMesh<T, eig::Array2u> mesh;
-    mesh.verts() = input_mesh.verts();
-    mesh.elems().reserve(input_mesh.elems().size() * 2);
-
-    auto &elems = mesh.elems();
-    for (auto &e : input_mesh.elems()) {
-      const uint i = e.x(), j = e.y(), k = e.z();
-      elems.push_back({ i, j });
-      elems.push_back({ j, k });
-      elems.push_back({ k, i });
-    }
-
-    return mesh;
-  }
 
   /* Explicit template instantiations for common types */
 

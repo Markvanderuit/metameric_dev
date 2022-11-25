@@ -34,6 +34,10 @@ namespace met {
     std::vector<Elem>& elems() { return m_elems; }
     const std::vector<Vert>& verts() const { return m_verts; }
     const std::vector<Elem>& elems() const { return m_elems; }
+
+    // Algorithms
+
+    T centroid() const;
   };
 
   template <typename T = eig::AlArray3f>
