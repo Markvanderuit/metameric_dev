@@ -57,7 +57,6 @@ find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_package(Qhull     CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
@@ -240,8 +239,6 @@ target_link_libraries(core PUBLIC
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   meshoptimizer::meshoptimizer
   nlohmann_json::nlohmann_json
-  Qhull::qhull_r
-  Qhull::qhullcpp
   TBB::tbb
 )
 target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})

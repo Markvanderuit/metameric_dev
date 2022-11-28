@@ -21,10 +21,10 @@
     "meshoptimizer",
     "nativefiledialog",
     "nlohmann-json",
+    "openmesh",
     "stb",
     "tbb",
-    "tracy",
-    "qhull"
+    "tracy"
   ],
   "features" : { }
 }
