@@ -10,9 +10,16 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr std::array<uint, 8> gamut_elements = {
+  /* constexpr std::array<uint, 8> gamut_elements = {
     0, 1, 2, 0,
     3, 1, 3, 2
+  }; */
+  
+  constexpr std::array<uint, 12> gamut_elements = {
+    0, 1, 2, 
+    1, 3, 2,
+    3, 0, 2,
+    3, 1, 0
   };
 
   ViewportDrawGamutTask::ViewportDrawGamutTask(const std::string &name)
@@ -42,7 +49,7 @@ namespace met {
                                      .path = "resources/shaders/viewport/draw_color_array.vert" },
                                    { .type = gl::ShaderType::eFragment,  
                                      .path = "resources/shaders/viewport/draw_color_uniform_offset.frag" }});
-    m_gamut_draw = { .type             = gl::PrimitiveType::eLineLoop,
+    m_gamut_draw = { .type             = gl::PrimitiveType::eTriangles,
                      .vertex_count     = (uint) gamut_elements.size(),
                      .bindable_array   = &m_gamut_array,
                      .bindable_program = &m_gamut_program };
@@ -67,6 +74,8 @@ namespace met {
     m_gamut_program.uniform("u_camera_matrix", e_viewport_arcball.full().matrix());
 
     // Dispatch draws for gamut shape
+    gl::state::set_op(gl::DrawOp::eLine);
     gl::dispatch_draw(m_gamut_draw);
+    gl::state::set_op(gl::DrawOp::eFill);
   }
 } // namespace met

@@ -2,54 +2,61 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/openmesh.hpp>
 #include <span>
 #include <vector>
 #include <unordered_map>
 #include <utility>
 
 namespace met {
-  template <typename T>
-  struct SeparatedSurfaceMesh;
-  template <typename T>
-  struct IndexedSurfaceMesh;
+  /* OpenMesh begins here */
 
-  template <typename T>
-  struct UnindexedSurfaceMesh {
-    using VertexType = T;
+  // Mesh type: triangle mesh
+  // Mesh kernel: array kernel
+  // Mesh traits: specify types
 
-    struct ElemType {
-      std::array<T, 3> vertices;
-    };
-    
-    std::vector<ElemType> m_elements;
-
-  public:
-    IndexedSurfaceMesh<T> to_indexed() const;
+  /* An indexed mesh with face normals and no additional data */
+  struct BaselineMeshTraits : public omesh::DefaultTraits {
+    // Define default attributes; only face normals are stored, half-edges are intentionally omitted
+    VertexAttributes(omesh::Attributes::None);
+    HalfedgeAttributes(omesh::Attributes::None);
+    FaceAttributes(omesh::Attributes::None);
   };
 
-  template <typename T>
-  struct IndexedSurfaceMesh {
-    using VertexType = T;
-    
-    struct ElemType {
-      uint i, j, k;
-    };
-
-    std::vector<VertexType> m_vertices;
-    std::vector<ElemType>   m_elements;
-
-  public:
-    IndexedSurfaceMesh<T> simplify(uint n_vertices, float max_error) const;
-    UnindexedSurfaceMesh<T> to_unindexed() const;
+  /* An indexed mesh with face normals */
+  struct FNormalMeshTraits : public omesh::DefaultTraits {
+    VertexAttributes(omesh::Attributes::None);
+    HalfedgeAttributes(omesh::Attributes::None);
+    FaceAttributes(omesh::Attributes::Normal);
   };
-  
-  /* TODO: look at openmesh https://www.graphics.rwth-aachen.de/media/openmesh_static/Documentations/OpenMesh-8.1-Documentation/a04342.html */
+
+  /* An indexed mesh with face normals and half-edges to simplify a number of operations */
+  struct HalfedgeMeshTraits : public omesh::DefaultTraits {
+    VertexAttributes(omesh::Attributes::None);
+    HalfedgeAttributes(omesh::Attributes::PrevHalfedge);
+    FaceAttributes(omesh::Attributes::Normal);
+  };
+
+  // Triangle mesh shorthands implementing the above defined traits
+  using BaselineMesh = omesh::TriMesh_ArrayKernelT<BaselineMeshTraits>;
+  using FNormalMesh   = omesh::TriMesh_ArrayKernelT<FNormalMeshTraits>;
+  using HalfedgeMesh = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
+
+
+  struct GamutMeshTraits : public omesh::DefaultTraits {
+    // Use internal types; there are many bugs with Eigen and e.g. the OpenMesh minimization framework
+    using Point    = omesh::Vec3f;
+    using Normal   = omesh::Vec3f;
+
+  };
+
+  using GamutMesh = omesh::TriMesh_ArrayKernelT<GamutMeshTraits>;
+
+  /* OpenMesh ends here */
 
   // FWD
   template <typename T, typename E = eig::Array3u>
   struct IndexedMesh;
-  template <typename T>
-  struct HalfEdgeMesh;
 
   /* Simple indexed triangle mesh structure */
   template <typename T, typename E>
@@ -63,7 +70,6 @@ namespace met {
 
   public:
     IndexedMesh() = default;
-    IndexedMesh(const HalfEdgeMesh<T> &other);
     IndexedMesh(std::span<const Vert> verts, std::span<const Elem> elems);
 
     // Accessors
@@ -77,52 +83,8 @@ namespace met {
     T centroid() const;
   };
 
-  template <typename T = eig::AlArray3f>
-  struct HalfEdgeMesh {
-    struct Vert {
-      T p;         // Position vector
-      uint half_i; // Component index
-    };
-    
-    struct Face {
-      uint half_i; // Component index
-    };
-
-    struct Half {
-      uint twin_i, next_i, prev_i; // Half-edge indexes
-      uint vert_i, face_i;         // Component indices
-    };
-
-  private:
-    std::vector<Vert> m_verts;
-    std::vector<Face> m_faces;
-    std::vector<Half> m_halfs;
-
-  public:
-    HalfEdgeMesh(const IndexedMesh<T> other);
-
-    // Accessors
-    std::vector<Vert>& verts() { return m_verts; }
-    std::vector<Face>& faces() { return m_faces; }
-    std::vector<Half>& halfs() { return m_halfs; }
-    const std::vector<Vert>& verts() const { return m_verts; }
-    const std::vector<Face>& faces() const { return m_faces; }
-    const std::vector<Half>& halfs() const { return m_halfs; }
-
-    // Surrounding accessors
-    std::vector<uint> verts_around_vert(uint vert_i) const;
-    std::vector<uint> halfs_storing_vert(uint vert_i) const;
-    std::vector<uint> verts_around_face(uint face_i) const;
-    std::vector<uint> halfs_around_face(uint face_i) const;
-    std::vector<uint> faces_around_vert(uint vert_i) const;
-    std::vector<uint> faces_around_half(uint half_i) const;
-    std::vector<uint> faces_around_face(uint face_i) const;
-  };
-  
   using Array3fMesh        = IndexedMesh<eig::Array3f, eig::Array3u>;
   using AlArray3fMesh      = IndexedMesh<eig::AlArray3f, eig::Array3u>;
-  using Array3fWireframe   = IndexedMesh<eig::Array3f, eig::Array2u>;
-  using AlArray3fWireframe = IndexedMesh<eig::AlArray3f, eig::Array2u>;
 
   // Generate a subdivided octahedron whose vertices lie on a unit sphere
   template <typename T = eig::AlArray3f>
@@ -135,21 +97,6 @@ namespace met {
                                                     std::span<const T> points,
                                                     float threshold,
                                                     float max_error);
-
-  /* Mesh cleanup functions */
-
-  template <typename T = eig::AlArray3f>
-  void clean_stitch_vertices(IndexedMesh<T, eig::Array3u> &mesh);
-  template <typename T = eig::AlArray3f>
-  void clean_delete_unused_vertices(IndexedMesh<T, eig::Array3u> &mesh);
-  template <typename T = eig::AlArray3f>
-  void clean_delete_double_elems(IndexedMesh<T, eig::Array3u> &mesh);
-  template <typename T = eig::AlArray3f>
-  void clean_delete_collapsed_elems(IndexedMesh<T, eig::Array3u> &mesh);
-  template <typename T = eig::AlArray3f>
-  void clean_fix_winding_order(IndexedMesh<T, eig::Array3u> &mesh);
-  template <typename T = eig::AlArray3f>
-  void clean_all(IndexedMesh<T, eig::Array3u> &mesh);
 
   /* Convex hull functions */
 
@@ -167,8 +114,6 @@ namespace met {
   IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &mesh);
 
   // Perform progressive mesh simplification by edge collapse until vertex count <= max_vertices
-  template <typename T = eig::AlArray3f>
-  HalfEdgeMesh<T> simplify_mesh(const HalfEdgeMesh<T> &mesh, uint max_vertices);
   template <typename T = eig::AlArray3f>
   IndexedMesh<T, eig::Array3u> simplify_mesh(const IndexedMesh<T, eig::Array3u> &mesh, uint max_vertices);
 } // namespace met

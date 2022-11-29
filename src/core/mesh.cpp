@@ -29,7 +29,7 @@ namespace met {
   IndexedMesh<T, E>::IndexedMesh(std::span<const Vert> verts, std::span<const Elem> elems)
   : m_verts(range_iter(verts)), m_elems(range_iter(elems)) { }
 
-  template <typename T, typename E>
+  /* template <typename T, typename E>
   IndexedMesh<T, E>::IndexedMesh(const HalfEdgeMesh<T> &other) {
     // Allocate record space
     m_verts.resize(other.verts().size());
@@ -46,7 +46,7 @@ namespace met {
       for (int j = 0; j < verts.size(); j++)
         m_elems[i][j] = verts[j];
     }
-  }
+  } */
 
   template <typename T>
   IndexedMesh<T, eig::Array2u> generate_wireframe(const IndexedMesh<T, eig::Array3u> &input_mesh) {
