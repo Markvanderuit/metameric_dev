@@ -8,6 +8,43 @@
 #include <utility>
 
 namespace met {
+  template <typename T>
+  struct SeparatedSurfaceMesh;
+  template <typename T>
+  struct IndexedSurfaceMesh;
+
+  template <typename T>
+  struct UnindexedSurfaceMesh {
+    using VertexType = T;
+
+    struct ElemType {
+      std::array<T, 3> vertices;
+    };
+    
+    std::vector<ElemType> m_elements;
+
+  public:
+    IndexedSurfaceMesh<T> to_indexed() const;
+  };
+
+  template <typename T>
+  struct IndexedSurfaceMesh {
+    using VertexType = T;
+    
+    struct ElemType {
+      uint i, j, k;
+    };
+
+    std::vector<VertexType> m_vertices;
+    std::vector<ElemType>   m_elements;
+
+  public:
+    IndexedSurfaceMesh<T> simplify(uint n_vertices, float max_error) const;
+    UnindexedSurfaceMesh<T> to_unindexed() const;
+  };
+  
+  /* TODO: look at openmesh https://www.graphics.rwth-aachen.de/media/openmesh_static/Documentations/OpenMesh-8.1-Documentation/a04342.html */
+
   // FWD
   template <typename T, typename E = eig::Array3u>
   struct IndexedMesh;
@@ -95,7 +132,9 @@ namespace met {
   // by matching each vertex to a point
   template <typename T = eig::AlArray3f>
   IndexedMesh<T, eig::Array3u> generate_convex_hull(const IndexedMesh<T, eig::Array3u> &sphere_mesh, 
-                                                    std::span<const T> points);
+                                                    std::span<const T> points,
+                                                    float threshold,
+                                                    float max_error);
 
   /* Mesh cleanup functions */
 

@@ -82,8 +82,8 @@ namespace met {
         // If this vertex is already in the map with a different index....
         if (auto it = vertex_id_map.find(vt); it != vertex_id_map.end()) {
           // Move index to this other vertex
-          if (i != it->second) i = it->second;        
-          // guard_continue(i != it->second);
+          if (i != it->second) 
+            i = it->second;        
         } else {
           // Otherwise, register vertex id
           vertex_id_map.emplace(vt, i);

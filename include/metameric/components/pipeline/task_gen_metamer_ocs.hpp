@@ -9,6 +9,8 @@ namespace met {
 
     std::vector<Array6f> m_sphere_samples;    
     AlArray3fMesh        m_sphere_mesh;
+    float                m_threshold = 0.05f;
+    float                m_error     = 0.5f;
     
   public:
     GenMetamerOCSTask(const std::string &name);

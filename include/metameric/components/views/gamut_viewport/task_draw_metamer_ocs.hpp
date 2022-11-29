@@ -21,6 +21,9 @@ namespace met {
     std::string   m_parent;
     int           m_gamut_idx;
     AlArray3fMesh m_sphere_mesh;
+    gl::Buffer    m_point_vertices;
+    gl::Array     m_point_array;
+    gl::DrawInfo  m_point_dispatch;
     gl::Buffer    m_hull_vertices;
     gl::Buffer    m_hull_elements;
     gl::Array     m_hull_array;
@@ -37,10 +40,11 @@ namespace met {
 
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>(3);
+      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>(6);
       m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.verts()), .flags = create_flags }};
       m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()), .flags = create_flags }};
-      
+      m_point_vertices = {{ .size = 32 * sizeof(eig::AlArray3f), .flags = create_flags }};
+
       // Construct non-changing draw components
       m_program = {{ .type = gl::ShaderType::eVertex, 
                      .path = "resources/shaders/viewport/draw_color_array.vert" },
@@ -51,13 +55,21 @@ namespace met {
         .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         .elements = &m_hull_elements
       }};
+      m_point_array = {{
+        .buffers = {{ .buffer = &m_point_vertices, .index = 0, .stride = sizeof(AlColr) }},
+        .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+      }};
       m_hull_dispatch = { .type = gl::PrimitiveType::eTriangles,
                           .vertex_count = (uint) (m_hull_elements.size() / sizeof(uint)),
                           .bindable_array = &m_hull_array,
                           .bindable_program = &m_program };
+      m_point_dispatch = { .type = gl::PrimitiveType::ePoints,
+                           .vertex_count = (uint) (m_point_vertices.size() / sizeof(eig::AlArray3f)),
+                           .bindable_array = &m_point_array,
+                           .bindable_program = &m_program };
 
       // Set non-changing uniform values
-      m_program.uniform("u_alpha", 1.f);
+      m_program.uniform("u_alpha", .66f);
 
       // Set selection to "none"
       m_gamut_idx = -1;
@@ -77,6 +89,7 @@ namespace met {
       auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
       auto &e_arcball      = info.get_resource<detail::Arcball>(m_parent, "arcball");
       auto &e_ocs_centr    = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
+      auto &e_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>("gen_metamer_ocs", fmt::format("ocs_points_{}", e_gamut_idx));
 
       // Update convex hull mesh if selection has changed, or selected gamut point has changed
       if (m_gamut_idx != e_gamut_idx || e_state_gamut[e_gamut_idx] == CacheState::eStale) {
@@ -89,13 +102,16 @@ namespace met {
         m_hull_vertices.set(cnt_span<const std::byte>(e_ocs_chull.verts()), e_ocs_chull.verts().size() * sizeof(AlArray3fMesh::Vert));
         m_hull_elements.set(cnt_span<const std::byte>(e_ocs_chull.elems()), e_ocs_chull.elems().size() * sizeof(AlArray3fMesh::Elem));
         m_hull_dispatch.vertex_count = e_ocs_chull.elems().size() * 3;
+        m_point_vertices.set(cnt_span<const std::byte>(e_ocs_points), e_ocs_points.size() * sizeof(eig::AlArray3f));
+        m_point_dispatch.vertex_count = e_ocs_points.size();
       }
 
       // Declare scoped OpenGL state
       gl::state::set_op(gl::CullOp::eFront);
       gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
+      gl::state::set_point_size(8.f);
       auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   false),
+                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
                                  
@@ -105,7 +121,10 @@ namespace met {
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
       // Dispatch draw
+      m_program.uniform("u_alpha", .66f);
       gl::dispatch_draw(m_hull_dispatch);
+      m_program.uniform("u_alpha", 1.f);
+      gl::dispatch_draw(m_point_dispatch);
     }
   };
 } // namespace met

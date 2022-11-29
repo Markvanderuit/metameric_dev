@@ -57,6 +57,7 @@ find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(openmesh  CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
@@ -239,14 +240,19 @@ target_link_libraries(core PUBLIC
   libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   meshoptimizer::meshoptimizer
   nlohmann_json::nlohmann_json
+  ${OPENMESH_LIBRARIES}
   TBB::tbb
 )
-target_include_directories(core PRIVATE ${STB_INCLUDE_DIRS})
+target_include_directories(core PUBLIC
+  ${STB_INCLUDE_DIRS}
+  ${OPENMESH_INCLUDE_DIRS}
+)
 target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN}
   MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX}
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
 )
+target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
 
 # Set up components library
 add_library_r(components components)

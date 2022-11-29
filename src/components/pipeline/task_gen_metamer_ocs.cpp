@@ -1,4 +1,5 @@
 #include <metameric/components/pipeline/task_gen_metamer_ocs.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
@@ -93,6 +94,12 @@ namespace met {
   
   void GenMetamerOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
+
+    if (ImGui::Begin("GenMetamerOCSTask debug")) {
+      ImGui::InputScalar("Threshold", ImGuiDataType_Float, &m_threshold);
+      ImGui::InputScalar("Error", ImGuiDataType_Float, &m_error);
+    }
+    ImGui::End();
     
     // Continue only on relevant state change
     auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
@@ -104,12 +111,6 @@ namespace met {
     auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
     auto &e_basis              = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_gamut_spec         = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
-
-#ifdef _MSC_VER
-    omp_set_nested(4);
-#else
-    omp_set_max_active_levels(4);
-#endif
 
     std::vector<uint> convex_hull_worklist;
 
@@ -174,7 +175,14 @@ namespace met {
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
 
       // Generate convex hull mesh
-      i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
+      i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points, m_threshold, m_error);
+
+      // Test if gamut offset lies within convex hull. Center otherwise
+      auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
+      auto &e_gamut_offs_j = e_app_data.project_data.gamut_offs_j[i];
+      if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
+        // e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
+      }
     }
   }
 } // namespace met

@@ -17,8 +17,8 @@
   #define met_trace_frame()
 #else // MET_ENABLE_TRACY
   #include <glad/glad.h>
-  #include <Tracy.hpp>
-  #include <TracyOpenGL.hpp>
+  #include <tracy/Tracy.hpp>
+  #include <tracy/TracyOpenGL.hpp>
 
   // Insert CPU event trace
   #define met_trace()            ZoneScoped;
@@ -34,13 +34,13 @@
   
   // Insert memory event trace
   #define met_trace_alloc(ptr, size)                \
-    TracyAlloc(ptr, size)
+    TracyAlloc(ptr, size);
   #define met_trace_alloc_n(name, ptr, size)        \
-    TracyAllocN(ptr, size, name)
+    TracyAllocN(ptr, size, name);
   #define met_trace_free(ptr)                       \
-    TracyFree(ptr)
+    TracyFree(ptr);
   #define met_trace_free_n(name, ptr)               \
-    TracyFreeN(ptr, name)
+    TracyFreeN(ptr, name);
   #define met_trace_realloc(ptr, new_size)          \
     met_trace_free(ptr)                             \
     met_trace_alloc(ptr, new_size)

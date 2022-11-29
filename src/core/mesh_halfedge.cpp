@@ -412,10 +412,10 @@ namespace met {
     return mesh;
   }
 
-  template <typename T>
-  IndexedMesh<T, eig::Array3u> simplify_mesh(const IndexedMesh<T, eig::Array3u> &mesh, uint max_vertices) {
-    return simplify_mesh(HalfEdgeMesh<T>(mesh), max_vertices);
-  }
+  // template <typename T>
+  // IndexedMesh<T, eig::Array3u> simplify_mesh(const IndexedMesh<T, eig::Array3u> &mesh, uint max_vertices) {
+  //   return simplify_mesh(HalfEdgeMesh<T>(mesh), max_vertices);
+  // }
 
   /* Explicit template instantiations for common types */
 
@@ -426,8 +426,4 @@ namespace met {
   simplify_mesh<eig::Array3f>(const HalfEdgeMesh<eig::Array3f> &, uint);
   template HalfEdgeMesh<eig::AlArray3f> 
   simplify_mesh<eig::AlArray3f>(const HalfEdgeMesh<eig::AlArray3f> &, uint);
-  template IndexedMesh<eig::Array3f, eig::Array3u> 
-  simplify_mesh<eig::Array3f>(const IndexedMesh<eig::Array3f, eig::Array3u> &, uint);
-  template IndexedMesh<eig::AlArray3f, eig::Array3u> 
-  simplify_mesh<eig::AlArray3f>(const IndexedMesh<eig::AlArray3f, eig::Array3u> &, uint);
 } // namespace met

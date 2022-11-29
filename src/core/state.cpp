@@ -144,6 +144,7 @@ namespace met {
     // project gamut vertices
     auto chull_mesh = generate_convex_hull<eig::Array3f>(loaded_texture.data());
     auto chull_tetr = simplify_mesh(chull_mesh, chull_vertex_count);
+    fmt::print("{} - {}\n", chull_tetr.verts().size(), chull_tetr.elems().size());
     std::copy(range_iter(chull_tetr.verts()), project_data.gamut_colr_i.begin());
   }
 
