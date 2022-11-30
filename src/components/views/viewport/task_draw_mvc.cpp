@@ -112,10 +112,10 @@ namespace met {
     m_baryc_bary_buffer.bind_to(gl::BufferTargetType::eUniform,    1);
 
     // Generate interpolated colors per grid point
-    gl::dispatch_compute(m_baryc_dispatch);
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+    // gl::dispatch_compute(m_baryc_dispatch);
+    // gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
 
     // Draw grid points with interpolated colors
-    gl::dispatch_draw(m_points_dispatch);
+    // gl::dispatch_draw(m_points_dispatch);
   }
 } // namespace met

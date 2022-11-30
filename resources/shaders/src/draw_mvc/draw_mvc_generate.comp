@@ -34,7 +34,7 @@ struct MVCResult {
 // Rice University, 2005.
 vec4 bary_generalized(in vec3 x) {
   // Constants
-  const uint  n_elems      = 4;
+  const uint  n_elems      = 6;
   const uint  n_elem_verts = 3;
   const float eps          = M_EPS;
   const float pi           = M_PI;
@@ -158,10 +158,11 @@ void main() {
   const vec3 x = (vec3(xyz) + 0.5f) / vec3(b_size.n);
 
   // Interpolate values using basic barycentric coordinates
-  vec4 v_analytic    = bary_analytic(x);
-  vec4 v_generalized = bary_generalized(x);
+  // vec4 v_analytic    = bary_analytic(x);
   // vec3 v_error       = vec3(16.f * hsum(abs(v_analytic - v_generalized).xyz), 0, 0);
-  vec4 v = vec4(vec3(v_generalized), v_analytic.w); // vec4(v_error, 1);
+  // vec4 v = vec4(vec3(v_generalized), v_analytic.w); // vec4(v_error, 1);
+
+  vec4 v = bary_generalized(x);
 
   // Store results
   b_grid_posit.data[i] = x;
