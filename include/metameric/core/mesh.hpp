@@ -42,15 +42,23 @@ namespace met {
   using FNormalMesh   = omesh::TriMesh_ArrayKernelT<FNormalMeshTraits>;
   using HalfedgeMesh = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
 
+  /* Generational helper functions */
 
-  struct GamutMeshTraits : public omesh::DefaultTraits {
-    // Use internal types; there are many bugs with Eigen and e.g. the OpenMesh minimization framework
-    using Point    = omesh::Vec3f;
-    using Normal   = omesh::Vec3f;
+  template <typename Traits, typename T = eig::Array3f>
+  omesh::TriMesh_ArrayKernelT<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements);
 
-  };
+  template <typename Traits>
+  omesh::TriMesh_ArrayKernelT<Traits> generate_octahedron();
 
-  using GamutMesh = omesh::TriMesh_ArrayKernelT<GamutMeshTraits>;
+  template <typename Traits>
+  omesh::TriMesh_ArrayKernelT<Traits> generate_spheroid(uint n_subdivs = 3);
+
+  template <typename Traits, typename T = eig::AlArray3f>
+  omesh::TriMesh_ArrayKernelT<Traits> generate_convex_hull(std::span<const T> points,
+                                                           const omesh::TriMesh_ArrayKernelT<Traits> &spheroid_mesh = generate_spheroid<Traits>());
+
+  template <typename Traits>
+  omesh::TriMesh_ArrayKernelT<Traits> simplify(const omesh::TriMesh_ArrayKernelT<Traits> &mesh, uint max_vertices);
 
   /* OpenMesh ends here */
 
