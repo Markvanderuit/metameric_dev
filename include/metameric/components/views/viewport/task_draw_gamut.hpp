@@ -8,6 +8,9 @@
 
 namespace met {
   class ViewportDrawGamutTask : public detail::AbstractTask {
+    // State to detect buffer changes
+    uint m_gamut_buffer_cache;
+    
     // Gamut draw components
     gl::Buffer   m_gamut_elem_buffer;
     gl::Array    m_gamut_array;

@@ -10,11 +10,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  /* constexpr std::array<uint, 8> gamut_elements = {
-    0, 1, 2, 0,
-    3, 1, 3, 2
-  }; */
-  
   constexpr std::array<uint, 12> gamut_elements = {
     0, 1, 2, 
     1, 3, 2,
@@ -28,7 +23,7 @@ namespace met {
   void ViewportDrawGamutTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
     
-    // Get externally shared resources 
+    // Get shared resources 
     auto &e_gamut_buffer   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
 
     // Define flags for creation of a persistent, write-only flushable buffer map
@@ -58,13 +53,22 @@ namespace met {
     m_gamut_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
     m_gamut_program.uniform("u_alpha",        1.f);
     m_gamut_program.uniform("u_offset",       .5f);
+
+    m_gamut_buffer_cache = e_gamut_buffer.object();
   }
 
   void ViewportDrawGamutTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
                                 
     // Get shared resources 
-    auto &e_viewport_arcball   = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_viewport_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_gamut_buffer     = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
+
+    // Update array object in case gamut buffer was resized
+    if (m_gamut_buffer_cache != e_gamut_buffer.object()) {
+      m_gamut_buffer_cache = e_gamut_buffer.object();
+      m_gamut_array.attach_buffer({{ .buffer = &e_gamut_buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }});
+    }
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

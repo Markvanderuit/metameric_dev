@@ -69,6 +69,8 @@ namespace met {
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
+
+    m_gamut_buffer_cache = e_gamut_buffer.object();
   }
 
   void ViewportDrawVerticesTask::dstr(detail::TaskDstrInfo &info) {
@@ -83,7 +85,14 @@ namespace met {
     // Get shared resources 
     auto &e_arcball         = info.get_resource<detail::Arcball>("viewport_input", "arcball");
     auto &i_size_map        = info.get_resource<std::span<float>>("size_map");
+    auto &e_gamut_buffer    = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
     auto &e_gamut_selection = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
+
+    // Update array object in case gamut buffer was resized
+    if (m_gamut_buffer_cache != e_gamut_buffer.object()) {
+      m_gamut_buffer_cache = e_gamut_buffer.object();
+      m_array.attach_buffer({{ .buffer = &e_gamut_buffer, .index = 1, .stride = sizeof(eig::AlArray3f), .divisor = 1 }});
+    }
 
     // Update point size data based on selected vertices
     std::ranges::for_each(i_size_map, [](float &f) { f = unselected_psize; });

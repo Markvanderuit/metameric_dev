@@ -13,6 +13,12 @@
 #include <ranges>
 
 namespace met {
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite 
+                                     | gl::BufferCreateFlags::eMapPersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite 
+                                     | gl::BufferAccessFlags::eMapPersistent
+                                     | gl::BufferAccessFlags::eMapFlush;
+
   constexpr std::array<uint, 16> gamut_elems_al = {
     2, 0, 1, 0, // 4 padding bytes
     0, 3, 1, 0, // 4 padding bytes 
@@ -25,30 +31,17 @@ namespace met {
   
   void GenSpectralGamutTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
-
-    // Define flags for creation of a persistent, write-only flushable buffer map
-    auto create_flags = gl::BufferCreateFlags::eMapWrite 
-                      | gl::BufferCreateFlags::eMapPersistent;
-    auto map_flags    = gl::BufferAccessFlags::eMapWrite 
-                      | gl::BufferAccessFlags::eMapPersistent
-                      | gl::BufferAccessFlags::eMapFlush;
     
     // Define color and spectral gamut buffers
-    gl::Buffer buffer_colr = {{ .size  = 4 * sizeof(AlColr), .flags = create_flags }};
-    gl::Buffer buffer_spec = {{ .size  = 4 * sizeof(Spec), .flags = create_flags }};
     gl::Buffer buffer_elem = {{ .data = cnt_span<const std::byte>(gamut_elems_al) }};
 
-    // Prepare persistent buffer maps which are written to on a regular basis
-    auto mapping_colr = cast_span<AlColr>(buffer_colr.map(map_flags));
-    auto mapping_spec = cast_span<Spec>(buffer_spec.map(map_flags));
-
     // Submit shared resources 
-    info.insert_resource<std::vector<Spec>>("gamut_spec", { });
-    info.insert_resource("buffer_colr",  std::move(buffer_colr));
-    info.insert_resource("buffer_spec",  std::move(buffer_spec));
     info.insert_resource("buffer_elem",  std::move(buffer_elem));
-    info.insert_resource("mapping_colr", std::move(mapping_colr));
-    info.insert_resource("mapping_spec", std::move(mapping_spec));
+    info.insert_resource<std::vector<Spec>>("gamut_spec", { });
+    info.insert_resource<gl::Buffer>("buffer_colr", { });
+    info.insert_resource<gl::Buffer>("buffer_spec", { });
+    info.insert_resource<std::span<AlColr>>("mapping_colr", { });
+    info.insert_resource<std::span<Spec>>("mapping_spec", { });
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
@@ -76,9 +69,19 @@ namespace met {
     auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_app_data.project_data;
 
-    // Resize gamut vector in case nr. of vertices changes
-    if (e_state_gamut.size() != i_gamut_spec.size())
+    // Resize gamut vector and associated buffers in case nr. of vertices changes
+    if (e_state_gamut.size() != i_gamut_spec.size()) {
       i_gamut_spec.resize(e_state_gamut.size());
+
+      if (i_buffer_spec.is_init() && i_buffer_spec.is_mapped()) i_buffer_spec.unmap();
+      if (i_buffer_colr.is_init() && i_buffer_colr.is_mapped()) i_buffer_colr.unmap();
+      
+      i_buffer_spec = {{ .size  = e_state_gamut.size() * sizeof(Spec),   .flags = buffer_create_flags }};
+      i_buffer_colr = {{ .size  = e_state_gamut.size() * sizeof(AlColr), .flags = buffer_create_flags }};
+      
+      i_mapping_spec = cast_span<Spec>(i_buffer_spec.map(buffer_access_flags));
+      i_mapping_colr = cast_span<AlColr>(i_buffer_colr.map(buffer_access_flags));
+    }
 
     // Generate spectra at gamut color positions
     #pragma omp parallel for
