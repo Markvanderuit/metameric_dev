@@ -142,10 +142,10 @@ namespace met {
   void ApplicationData::load_chull_gamut() {
     // Instantiate approximate convex hull, simplified to a tetrahedron, to place initial 
     // project gamut vertices
-    auto chull_mesh = generate_convex_hull<eig::Array3f>(loaded_texture.data());
-    auto chull_tetr = simplify_mesh(chull_mesh, chull_vertex_count);
-    fmt::print("{} - {}\n", chull_tetr.verts().size(), chull_tetr.elems().size());
-    std::copy(range_iter(chull_tetr.verts()), project_data.gamut_colr_i.begin());
+    auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
+    auto chull_tetr = simplify(chull_mesh, chull_vertex_count);
+    auto [verts, elems] = generate_data(chull_tetr);
+    std::ranges::copy(verts, project_data.gamut_colr_i.begin());
   }
 
   Spec ApplicationData::load_illuminant(const std::string &key) const {

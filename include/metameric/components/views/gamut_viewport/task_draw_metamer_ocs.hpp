@@ -20,7 +20,6 @@ namespace met {
   class DrawMetamerOCSTask : public detail::AbstractTask {
     std::string   m_parent;
     int           m_gamut_idx;
-    AlArray3fMesh m_sphere_mesh;
     gl::Buffer    m_point_vertices;
     gl::Array     m_point_array;
     gl::DrawInfo  m_point_dispatch;
@@ -40,9 +39,9 @@ namespace met {
 
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      m_sphere_mesh = generate_unit_sphere<eig::AlArray3f>(6);
-      m_hull_vertices = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.verts()), .flags = create_flags }};
-      m_hull_elements = {{ .data = cnt_span<const std::byte>(m_sphere_mesh.elems()), .flags = create_flags }};
+      const auto spheroid_mesh = generate_spheroid<HalfedgeMeshTraits>(3);
+      m_hull_vertices = {{ .size = spheroid_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = create_flags }};
+      m_hull_elements = {{ .size = spheroid_mesh.n_faces() * sizeof(eig::Array3u), .flags = create_flags }};
       m_point_vertices = {{ .size = 32 * sizeof(eig::AlArray3f), .flags = create_flags }};
 
       // Construct non-changing draw components
