@@ -56,6 +56,7 @@ namespace met {
     
     // Submit shared resource values as initially stale
     info.insert_resource<std::vector<CacheState>>("mappings",      { });
+    info.insert_resource<std::vector<CacheState>>("gamut_elems",   { });
     info.insert_resource<std::vector<CacheState>>("gamut_colr_i",  { });
     info.insert_resource<std::vector<CacheState>>("gamut_offs_j",  { });
     info.insert_resource<std::vector<CacheState>>("gamut_mapp_i",  { });
@@ -70,6 +71,7 @@ namespace met {
     auto &e_app_data            = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data           = e_app_data.project_data;
     auto &i_state_mapp          = info.get_resource<std::vector<CacheState>>("mappings");
+    auto &i_state_gamut_elems   = info.get_resource<std::vector<CacheState>>("gamut_elems");
     auto &i_state_gamut_colr_i  = info.get_resource<std::vector<CacheState>>("gamut_colr_i");
     auto &i_state_gamut_offs_j  = info.get_resource<std::vector<CacheState>>("gamut_offs_j");
     auto &i_state_gamut_mapp_i  = info.get_resource<std::vector<CacheState>>("gamut_mapp_i");
@@ -78,6 +80,7 @@ namespace met {
 
     // Check and set cache states for loaded mappings to either fresh or stale
     detail::compare_and_set_all(i_state_mapp, m_mappings, e_app_data.loaded_mappings);
+    detail::compare_and_set_all_eig(i_state_gamut_elems, m_gamut_elems, e_app_data.project_data.gamut_elems);
     detail::compare_and_set_all_eig(i_state_gamut_colr_i, m_gamut_colr_i, e_app_data.project_data.gamut_colr_i);
     detail::compare_and_set_all_eig(i_state_gamut_offs_j, m_gamut_offs_j, e_app_data.project_data.gamut_offs_j);
     detail::compare_and_set_all(i_state_gamut_mapp_i, m_gamut_mapp_i, e_app_data.project_data.gamut_mapp_i);
