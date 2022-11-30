@@ -10,7 +10,7 @@
 #include <spectrum_cluster.glsl>
 
 #define Spec ClSpec           // Use shorthand for clustered types
-const uint n_gamut_verts = 4; // Nr. of tetrahedron vertices 
+const uint n_gamut_verts = 6; // Nr. of tetrahedron vertices 
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -32,9 +32,6 @@ layout(binding = 1) uniform u_1 {
   vec3 sub;
   mat3 inv;
 } b_bary;
-// layout(binding = 2) uniform u_2 {
-//   uint n; // Todo: Move to u_1
-// } b_gamut_size;
 
 // Shared memory declarations
 shared InSpec s_spectral_gamut[n_gamut_verts];
@@ -71,7 +68,7 @@ struct MVCResult {
 // Rice University, 2005.
 Spec query_spectrum_mvc_baseline(in vec3 x) {
   // Hardcoded constants describing triangle mesh layout
-  const uint n_elems = 4;
+  const uint n_elems = 6;
   const uint n_verts = 3;
 
   // Results
