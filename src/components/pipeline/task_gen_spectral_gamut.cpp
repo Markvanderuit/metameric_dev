@@ -43,7 +43,7 @@ namespace met {
     auto mapping_spec = cast_span<Spec>(buffer_spec.map(map_flags));
 
     // Submit shared resources 
-    info.insert_resource<std::array<Spec, 4>>("gamut_spec", { });
+    info.insert_resource<std::vector<Spec>>("gamut_spec", { });
     info.insert_resource("buffer_colr",  std::move(buffer_colr));
     info.insert_resource("buffer_spec",  std::move(buffer_spec));
     info.insert_resource("buffer_elem",  std::move(buffer_elem));
@@ -67,7 +67,7 @@ namespace met {
     guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources
-    auto &i_gamut_spec   = info.get_resource<std::array<Spec, 4>>("gamut_spec");
+    auto &i_gamut_spec   = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_buffer_colr  = info.get_resource<gl::Buffer>("buffer_colr");
     auto &i_mapping_colr = info.get_resource<std::span<AlColr>>("mapping_colr");
     auto &i_buffer_spec  = info.get_resource<gl::Buffer>("buffer_spec");
@@ -76,9 +76,13 @@ namespace met {
     auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_app_data.project_data;
 
+    // Resize gamut vector in case nr. of vertices changes
+    if (e_state_gamut.size() != i_gamut_spec.size())
+      i_gamut_spec.resize(e_state_gamut.size());
+
     // Generate spectra at gamut color positions
     #pragma omp parallel for
-    for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
+    for (int i = 0; i < i_gamut_spec.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
       guard_continue(e_state_gamut[i] == CacheState::eStale);
       

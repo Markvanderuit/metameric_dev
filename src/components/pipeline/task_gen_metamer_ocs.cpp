@@ -99,16 +99,16 @@ namespace met {
     guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources
-    auto &e_app_data           = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_gamut_mapp_i       = e_app_data.project_data.gamut_mapp_i;
-    auto &e_gamut_mapp_j       = e_app_data.project_data.gamut_mapp_j;
-    auto &e_basis              = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    auto &e_gamut_spec         = info.get_resource<std::array<Spec, 4>>("gen_spectral_gamut", "gamut_spec");
+    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
+    auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
+    auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &e_gamut_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
 
     std::vector<uint> convex_hull_worklist;
 
     // For each vertex of the gamut shape
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < e_state_gamut.size(); ++i) {
       // Verify relevant state changes before continuing
       // Note that gamut offsets are not included, as these usually don't change the metamer set
       guard_continue(e_state_gamut[i] == CacheState::eStale);
