@@ -79,12 +79,16 @@ namespace met {
   void GenMetamerOCSTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
+    // Get shared resources
+    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_app_data.project_data;
+    
     // Generate reused 6d samples and a uv sphere mesh for faster OCS generation
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
     m_sphere_mesh = generate_spheroid<HalfedgeMeshTraits>(n_subdivs);
 
     // Register resource to hold convex hull data for each vertex of the gamut shape
-    for (uint i = 0; i < 4; ++i) {
+    for (uint i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
       info.insert_resource(fmt::format("ocs_points_{}", i), std::vector<eig::AlArray3f>(n_samples));
       info.insert_resource(fmt::format("ocs_center_{}", i), Colr(0.f));
       info.insert_resource(fmt::format("ocs_chull_{}", i), HalfedgeMesh());
