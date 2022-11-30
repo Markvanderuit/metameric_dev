@@ -13,10 +13,25 @@
 #include <vector>
 
 namespace met {
-  namespace detail {
-    // ...
-  } // namespace detail
-  
+  template <typename Traits, typename T>
+  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const omesh::TriMesh_ArrayKernelT<Traits> &mesh) {
+    met_trace();
+
+    std::vector<T> vertices(mesh.n_vertices());
+    std::vector<eig::Array3u> elements(mesh.n_faces());
+
+    std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), vertices.begin(), [&](auto vh) { 
+      return to_eig<float, 3>(mesh.point(vh));
+    });
+    std::transform(std::execution::par_unseq, range_iter(mesh.faces()), elements.begin(), [](auto fh) {
+      eig::Array3u el; 
+      std::ranges::transform(fh.vertices(), el.begin(), [](auto vh) { return vh.idx(); });
+      return el;
+    });
+
+    return { vertices, elements };
+  }
+
   template <typename Traits, typename T>
   omesh::TriMesh_ArrayKernelT<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements) {
     met_trace();
@@ -132,17 +147,31 @@ namespace met {
 
   /* Forward declarations over common Openmesh types */
 
+  
+  template
+  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<BaselineMeshTraits, eig::Array3f>(const BaselineMesh &);
+  template
+  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<FNormalMeshTraits, eig::Array3f>(const FNormalMesh &);
+  template
+  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<HalfedgeMeshTraits, eig::Array3f>(const HalfedgeMesh &);
+  template
+  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<BaselineMeshTraits, eig::AlArray3f>(const BaselineMesh &);
+  template
+  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<FNormalMeshTraits, eig::AlArray3f>(const FNormalMesh &);
+  template
+  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<HalfedgeMeshTraits, eig::AlArray3f>(const HalfedgeMesh &);
+
   template
   BaselineMesh generate_from_data<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
   template
-  BaselineMesh generate_from_data<BaselineMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
+  BaselineMesh generate_from_data<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
   template
   FNormalMesh generate_from_data<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
 
   template
   FNormalMesh generate_from_data<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
   template
-  HalfedgeMesh generate_from_data<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
+  HalfedgeMesh generate_from_data<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
   template
   HalfedgeMesh generate_from_data<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
 
@@ -166,6 +195,12 @@ namespace met {
   FNormalMesh generate_convex_hull<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const FNormalMesh &);
   template
   HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const HalfedgeMesh &);
+  template
+  BaselineMesh generate_convex_hull<BaselineMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const BaselineMesh &);
+  template
+  FNormalMesh generate_convex_hull<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const FNormalMesh &);
+  template
+  HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const HalfedgeMesh &);
 
   template
   BaselineMesh simplify<BaselineMeshTraits>(const BaselineMesh &, uint);

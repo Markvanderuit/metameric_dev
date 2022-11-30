@@ -8,7 +8,7 @@ namespace met {
     using Array6f = eig::Array<float, 6, 1>;
 
     std::vector<Array6f> m_sphere_samples;    
-    AlArray3fMesh        m_sphere_mesh;
+    HalfedgeMesh         m_sphere_mesh;
     float                m_threshold = 0.05f;
     float                m_error     = 0.5f;
     

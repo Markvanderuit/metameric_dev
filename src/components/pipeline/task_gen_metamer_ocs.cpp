@@ -82,13 +82,13 @@ namespace met {
 
     // Generate reused 6d samples and a uv sphere mesh for faster OCS generation
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
-    m_sphere_mesh    = generate_unit_sphere<eig::AlArray3f>(n_subdivs);
+    m_sphere_mesh = generate_spheroid<HalfedgeMeshTraits>(n_subdivs);
 
     // Register resource to hold convex hull data for each vertex of the gamut shape
     for (uint i = 0; i < 4; ++i) {
       info.insert_resource(fmt::format("ocs_points_{}", i), std::vector<eig::AlArray3f>(n_samples));
       info.insert_resource(fmt::format("ocs_center_{}", i), Colr(0.f));
-      info.insert_resource(fmt::format("ocs_chull_{}", i), IndexedMesh<eig::AlArray3f>());
+      info.insert_resource(fmt::format("ocs_chull_{}", i), HalfedgeMesh());
     }
   }
   
@@ -123,9 +123,7 @@ namespace met {
       // Get rest of shared resources
       auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
       auto &i_ocs_center   = info.get_resource<Colr>(fmt::format("ocs_center_{}", i));
-      auto &i_ocs_chull    = info.get_resource<AlArray3fMesh>(fmt::format("ocs_chull_{}", i));
       auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
-      auto &e_gamut_offs_j = e_app_data.project_data.gamut_offs_j[i];
 
       // Generate color system spectra
       CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i[i]].finalize(e_gamut_spec[i]);
@@ -145,44 +143,24 @@ namespace met {
 
       // Postpone convex hull generation for later
       convex_hull_worklist.push_back(i);
-
-      // Generate convex hull mesh
-      // i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points);
-
-      // Test if gamut offset lies within convex hull. Center otherwise
-      /* if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
-        e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
-      } */
-
-      // Colr gamut_point = e_gamut_colr_i + e_gamut_offs_j;
-      // e_gamut_offs_j = 
-      // Colr(move_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull, eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) - e_gamut_colr_i;
-      // e_gamut_offs_j
-
-      // Reset gamut offset to center on metamer set recomputation, but not on first execution
-      // as all data will be considered "stale" at that point... unless it is a new project
-      // in which case offsets DO need to be initialized. Aaargh. State machines.
-      /* if (!m_first_eval || e_app_data.project_state == ProjectState::eNew) {
-        e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
-      } */
     }
 
     #pragma omp parallel for
     for (int j = 0; j < convex_hull_worklist.size(); ++j) {
       // Gather shared resources
       uint i = convex_hull_worklist[j];
-      auto &i_ocs_chull    = info.get_resource<AlArray3fMesh>(fmt::format("ocs_chull_{}", i));
-      auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
+      auto &i_ocs_points = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
+      auto &i_ocs_chull  = info.get_resource<HalfedgeMesh>(fmt::format("ocs_chull_{}", i));
 
       // Generate convex hull mesh
-      i_ocs_chull = generate_convex_hull<eig::AlArray3f>(m_sphere_mesh, i_ocs_points, m_threshold, m_error);
+      i_ocs_chull = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(i_ocs_points, m_sphere_mesh);
 
-      // Test if gamut offset lies within convex hull. Center otherwise
+      /* // Test if gamut offset lies within convex hull. Center otherwise
       auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
       auto &e_gamut_offs_j = e_app_data.project_data.gamut_offs_j[i];
       if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
         // e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
-      }
+      } */
     }
   }
 } // namespace met

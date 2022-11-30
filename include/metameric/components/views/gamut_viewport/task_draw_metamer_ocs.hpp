@@ -96,12 +96,13 @@ namespace met {
         m_gamut_idx = e_gamut_idx;
         
         // Get shared resources
-        auto &e_ocs_chull = info.get_resource<AlArray3fMesh>("gen_metamer_ocs", fmt::format("ocs_chull_{}", m_gamut_idx));
+        auto &e_ocs_chull = info.get_resource<HalfedgeMesh>("gen_metamer_ocs", fmt::format("ocs_chull_{}", m_gamut_idx));
+        auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(e_ocs_chull);
 
         // Copy new data to buffer and adjust vertex draw count
-        m_hull_vertices.set(cnt_span<const std::byte>(e_ocs_chull.verts()), e_ocs_chull.verts().size() * sizeof(AlArray3fMesh::Vert));
-        m_hull_elements.set(cnt_span<const std::byte>(e_ocs_chull.elems()), e_ocs_chull.elems().size() * sizeof(AlArray3fMesh::Elem));
-        m_hull_dispatch.vertex_count = e_ocs_chull.elems().size() * 3;
+        m_hull_vertices.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
+        m_hull_elements.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
+        m_hull_dispatch.vertex_count = e_ocs_chull.n_faces() * 3;
         m_point_vertices.set(cnt_span<const std::byte>(e_ocs_points), e_ocs_points.size() * sizeof(eig::AlArray3f));
         m_point_dispatch.vertex_count = e_ocs_points.size();
       }

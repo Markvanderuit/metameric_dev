@@ -2,6 +2,10 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/openmesh.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <OpenMesh/Tools/Subdivider/Uniform/LoopT.hh>
+#include <OpenMesh/Core/Geometry/EigenVectorT.hh>
+#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 #include <fmt/ranges.h>
 #include <algorithm>
 #include <execution>

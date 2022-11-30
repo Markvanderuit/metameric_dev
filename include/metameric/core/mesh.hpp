@@ -45,6 +45,9 @@ namespace met {
   /* Generational helper functions */
 
   template <typename Traits, typename T = eig::Array3f>
+  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const omesh::TriMesh_ArrayKernelT<Traits> &mesh);
+
+  template <typename Traits, typename T = eig::Array3f>
   omesh::TriMesh_ArrayKernelT<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements);
 
   template <typename Traits>
