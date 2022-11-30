@@ -1,11 +1,10 @@
 #pragma once
 
-#include <metameric/core/knn.hpp>
-#include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>
 #include <functional>
+#include <vector>
 #include <utility>
 
 namespace met {
@@ -23,16 +22,6 @@ namespace met {
     eStale  // Data is stale, pipeline should recompute dependent values
   };
 
-  struct GamutVertex {
-    Colr position, offset;
-    uint mapping_i, mapping_j;
-  };
-
-  struct GamutData {
-    std::array<GamutVertex, 4> vertices;
-    std::array<Spec, 4>        spectra;
-  };
-
   /* Wrapper object to hold saveable project data */
   struct ProjectData {
     /* Set of keys of cmfs/illuminants that together describe a stored spectral mapping */
@@ -45,10 +34,10 @@ namespace met {
     ProjectData();
 
     // Current mappings and gamuts used for rgb->spectral conversion
-    std::array<Colr, 4> gamut_colr_i; // Gamut vertex values under primary color system
-    std::array<Colr, 4> gamut_offs_j; // Gamut value offsets under secondary color system
-    std::array<uint, 4> gamut_mapp_i; // Gamut vertex index of selected primary color system 
-    std::array<uint, 4> gamut_mapp_j; // Gamut vertex index of selected secondary color system 
+    std::vector<Colr> gamut_colr_i; // Gamut vertex values under primary color system
+    std::vector<Colr> gamut_offs_j; // Gamut value offsets under secondary color system
+    std::vector<uint> gamut_mapp_i; // Gamut vertex index of selected primary color system 
+    std::vector<uint> gamut_mapp_j; // Gamut vertex index of selected secondary color system 
 
     // List of named user-loaded or program-provided mappings, illuminants, and cmfs
     std::vector<std::pair<std::string, Spec>> illuminants;
