@@ -34,10 +34,11 @@ namespace met {
     ProjectData();
 
     // Current mappings and gamuts used for rgb->spectral conversion
-    std::vector<Colr> gamut_colr_i; // Gamut vertex values under primary color system
-    std::vector<Colr> gamut_offs_j; // Gamut value offsets under secondary color system
-    std::vector<uint> gamut_mapp_i; // Gamut vertex index of selected primary color system 
-    std::vector<uint> gamut_mapp_j; // Gamut vertex index of selected secondary color system 
+    std::vector<eig::Array3u> gamut_elems;  // Triangle connections describing a convex hull
+    std::vector<Colr>         gamut_colr_i; // Gamut vertex values under primary color system
+    std::vector<Colr>         gamut_offs_j; // Gamut value offsets under secondary color system
+    std::vector<uint>         gamut_mapp_i; // Gamut vertex index of selected primary color system 
+    std::vector<uint>         gamut_mapp_j; // Gamut vertex index of selected secondary color system
 
     // List of named user-loaded or program-provided mappings, illuminants, and cmfs
     std::vector<std::pair<std::string, Spec>> illuminants;

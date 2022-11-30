@@ -7,7 +7,7 @@
 #include <algorithm>
 
 namespace met {
-  constexpr uint chull_vertex_count = 4;
+  constexpr uint chull_vertex_count = 5;
 
   namespace io {
     ProjectData load_project(const fs::path &path) {
@@ -21,6 +21,10 @@ namespace met {
 
   ProjectData::ProjectData() {
     // Provide an initial example gamut for now
+    gamut_elems  = { eig::Array3u { 2, 0, 1 },
+                     eig::Array3u { 0, 3, 1 },
+                     eig::Array3u { 2, 1, 3 },
+                     eig::Array3u { 0, 2, 3 }};
     gamut_colr_i = { Colr { .75f, .40f, .25f },
                      Colr { .68f, .49f, .58f },
                      Colr { .50f, .58f, .39f },
@@ -141,13 +145,13 @@ namespace met {
   }
   
   void ApplicationData::load_chull_gamut() {
-    // Instantiate approximate convex hull, simplified to a tetrahedron, to place initial 
-    // project gamut vertices
+    // Instantiate decimated approximate convex hull to place initial project gamut vertices
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
-    auto chull_tetr = simplify(chull_mesh, chull_vertex_count);
-    auto [verts, elems] = generate_data(chull_tetr);
+    auto chull_simp = simplify(chull_mesh, chull_vertex_count);
+    auto [verts, elems] = generate_data(chull_simp);
 
     // Assign new default gamut matching the convex hull
+    project_data.gamut_elems  = elems;
     project_data.gamut_colr_i = verts;
     project_data.gamut_offs_j = std::vector<Colr>(verts.size(), Colr(0.f));
     project_data.gamut_mapp_i = std::vector<uint>(verts.size(), 0);

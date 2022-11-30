@@ -26,6 +26,7 @@ namespace met {
   }
 
   void from_json(const json &js, ProjectData &v) {
+    v.gamut_elems  = js.at("gamut_elems").get<std::vector<eig::Array3u>>();
     v.gamut_colr_i = js.at("gamut_colr_i").get<std::vector<Colr>>();
     v.gamut_offs_j = js.at("gamut_offs_j").get<std::vector<Colr>>();
     v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::vector<uint>>();
@@ -36,6 +37,7 @@ namespace met {
   }
 
   void to_json(json &js, const ProjectData &v) {
+    js["gamut_elems"]  = v.gamut_elems;
     js["gamut_colr_i"] = v.gamut_colr_i;
     js["gamut_offs_j"] = v.gamut_offs_j;
     js["gamut_mapp_i"] = v.gamut_mapp_i;
@@ -47,6 +49,14 @@ namespace met {
 } // namespace met
 
 namespace Eigen {
+  void from_json(const met::json& js, Array3u &v) {
+    std::ranges::copy(js, v.begin());
+  }
+
+  void to_json(met::json &js, const Array3u &v) {
+    js = std::vector<Array3u::value_type>(v.begin(), v.end());
+  }
+
   void from_json(const met::json& js, met::Spec &v) {
     std::ranges::copy(js, v.begin());
   }
@@ -60,7 +70,7 @@ namespace Eigen {
   }
 
   void to_json(met::json &js, const met::Colr &v) {
-    js = std::vector<met::Spec::value_type>(v.begin(), v.end());
+    js = std::vector<met::Colr::value_type>(v.begin(), v.end());
   }
   
   void from_json(const met::json& js, met::CMFS &v) {
@@ -69,6 +79,6 @@ namespace Eigen {
 
   void to_json(met::json &js, const met::CMFS &v) {
     auto r = v.reshaped();
-    js = std::vector<met::Colr::value_type>(r.begin(), r.end());
+    js = std::vector<met::CMFS::value_type>(r.begin(), r.end());
   }
 } // namespace Eigen
