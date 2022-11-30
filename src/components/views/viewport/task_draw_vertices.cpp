@@ -25,10 +25,6 @@ namespace met {
     2, 3, 0
   };
 
-  constexpr std::array<float, 4> sizes = {
-    unselected_psize, unselected_psize, unselected_psize, unselected_psize
-  };
-
   ViewportDrawVerticesTask::ViewportDrawVerticesTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
@@ -47,7 +43,8 @@ namespace met {
     auto map_flags    = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
     // Setup sizes buffer using mapping flags
-    m_size_buffer = {{ .data = cnt_span<const std::byte>(sizes), .flags = create_flags }};
+    std::vector<float> input_sizes(16, unselected_psize);
+    m_size_buffer = {{ .data = cnt_span<const std::byte>(input_sizes), .flags = create_flags }};
     info.insert_resource("size_map", cast_span<float>(m_size_buffer.map(map_flags)));
 
     // Setup objects for instanced quad draw
@@ -65,7 +62,7 @@ namespace met {
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = elems.size(),
-      .instance_count   = 4,
+      .instance_count   = 5,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
