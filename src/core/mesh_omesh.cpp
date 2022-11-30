@@ -13,6 +13,28 @@
 #include <vector>
 
 namespace met {
+  namespace detail {
+    template <typename T>
+    constexpr
+    auto eig_hash = [](const auto &mat) {
+      size_t seed = 0;
+      for (size_t i = 0; i < mat.size(); ++i) {
+        auto elem = *(mat.data() + i);
+        seed ^= std::hash<T>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      }
+      return seed;
+    };
+
+    // key_equal for eigen types for std::unordered_map/unordered_set
+    constexpr 
+    auto eig_equal = [](const auto &a, const auto &b) { 
+      return a.isApprox(b); 
+    };
+
+    constexpr
+    auto eig_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+  } // namespace detail
+
   template <typename Traits, typename T>
   std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const omesh::TriMesh_ArrayKernelT<Traits> &mesh) {
     met_trace();
@@ -98,20 +120,21 @@ namespace met {
     met_trace();
 
     auto mesh = spheroid_mesh;
-    // auto cntr = to_eig(mesh.calc_centroid());
+
+    // Compute centroid of unique input points
+    std::unordered_set<T, decltype(detail::eig_hash<float>), decltype(detail::eig_equal)> point_set(range_iter(points));
+    T cntr = std::reduce(std::execution::par_unseq, range_iter(point_set), T(0.f), detail::eig_add)
+           / static_cast<float>(point_set.size());
 
     // For each vertex in mesh, each defining a unit direction and therefore line through the origin:
     std::for_each(std::execution::par_unseq, range_iter(mesh.vertices()), [&](auto &vh) {
       auto v = to_eig(mesh.point(vh));
 
       // Obtain a range of point projections along this line
-      auto proj_funct = [&](const auto &p) { 
-        auto p_ = (p).matrix();
-        return v.matrix().dot(p_); 
-      };
+      auto proj_funct = [&](const auto &p) { return v.matrix().dot((p - cntr).matrix());  };
       auto proj_range = points | std::views::transform(proj_funct);
 
-      // Find iterator to endpoint, given these point projections
+      // Provide iterator to endpoint, given the largest point projection
       auto proj_maxel = std::ranges::max_element(proj_range);
       
       // Replace mesh vertex with this endpoint
@@ -145,9 +168,9 @@ namespace met {
     return mesh;
   }
 
-  /* Forward declarations over common Openmesh types */
-
+  /* Forward declarations over common OpenMesh types and Array3f/AlArray3f */
   
+  // generate_data
   template
   std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<BaselineMeshTraits, eig::Array3f>(const BaselineMesh &);
   template
@@ -161,13 +184,13 @@ namespace met {
   template
   std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<HalfedgeMeshTraits, eig::AlArray3f>(const HalfedgeMesh &);
 
+  // generate_from_data
   template
   BaselineMesh generate_from_data<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
   template
   BaselineMesh generate_from_data<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
   template
   FNormalMesh generate_from_data<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
-
   template
   FNormalMesh generate_from_data<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
   template
@@ -175,13 +198,13 @@ namespace met {
   template
   HalfedgeMesh generate_from_data<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
 
+  // generate_octahedron
   template
   BaselineMesh generate_octahedron<BaselineMeshTraits>();
   template
   FNormalMesh generate_octahedron<FNormalMeshTraits>();
   template
   HalfedgeMesh generate_octahedron<HalfedgeMeshTraits>();
-
   template
   BaselineMesh generate_spheroid<BaselineMeshTraits>(uint);
   template
@@ -189,6 +212,7 @@ namespace met {
   template
   HalfedgeMesh generate_spheroid<HalfedgeMeshTraits>(uint);
   
+  // generate_convex_hull
   template
   BaselineMesh generate_convex_hull<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const BaselineMesh &);
   template
@@ -202,6 +226,7 @@ namespace met {
   template
   HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const HalfedgeMesh &);
 
+  // simplify
   template
   BaselineMesh simplify<BaselineMeshTraits>(const BaselineMesh &, uint);
   template
