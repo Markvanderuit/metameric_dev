@@ -16,7 +16,7 @@
 namespace met {
   class ViewportInputTask : public detail::AbstractTask {
     bool                 m_is_gizmo_used;
-    std::array<Colr, 4>  m_gamut_prev;
+    std::vector<Colr>    m_gamut_prev;
 
   public:
     ViewportInputTask(const std::string &name)

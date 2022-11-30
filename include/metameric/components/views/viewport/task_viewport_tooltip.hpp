@@ -18,7 +18,7 @@
 namespace met {
   class ViewportTooltipTask : public detail::AbstractTask {
     bool                 m_is_gizmo_used;
-    std::array<Colr, 4>  m_offs_prev;
+    std::vector<Colr>    m_offs_prev;
     
   public:
     ViewportTooltipTask(const std::string &name)
