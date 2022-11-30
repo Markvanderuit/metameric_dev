@@ -35,7 +35,7 @@ namespace met {
     met_trace_full();
 
     // Validate spectral texture only on relevant state change
-    auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
     guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources

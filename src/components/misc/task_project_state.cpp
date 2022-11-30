@@ -84,7 +84,7 @@ namespace met {
     detail::compare_and_set_all(i_state_gamut_mapp_j, m_gamut_mapp_j, e_app_data.project_data.gamut_mapp_j);
     
     i_state_gamut = std::vector<CacheState>(i_state_gamut_colr_i.size());
-    fmt::print("i_state_gamut.size() = {}\n", i_state_gamut.size());
+    // fmt::print("i_state_gamut.size() = {}\n", i_state_gamut.size());
     for (uint i = 0; i < i_state_gamut.size(); ++i) {
       // Summary data for parts of the application interested in "any" change to gamut data
       const bool gamut_stale = i_state_gamut_colr_i[i] == CacheState::eStale || i_state_gamut_offs_j[i] == CacheState::eStale 
@@ -92,7 +92,7 @@ namespace met {
                             || i_state_mapp[e_proj_data.gamut_mapp_i[i]] == CacheState::eStale
                             || i_state_mapp[e_proj_data.gamut_mapp_j[i]] == CacheState::eStale;
       i_state_gamut[i] = gamut_stale ? CacheState::eStale : CacheState::eFresh;
-      fmt::print("i_state_gamut[{}] = {}\n", i, gamut_stale ? "stale" : "fresh");
+      // fmt::print("i_state_gamut[{}] = {}\n", i, gamut_stale ? "stale" : "fresh");
     }
 
     /* if (m_mappings.size() != e_app_data.loaded_mappings.size()) {

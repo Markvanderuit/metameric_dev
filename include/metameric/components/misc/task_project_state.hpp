@@ -7,8 +7,6 @@
 
 namespace met {
   class ProjectStateTask : public detail::AbstractTask {
-    using GamutArray  = std::array<CacheState, 4>;
-
     // Copies of data available in ProjectData and ApplicationData
     // to check for and report state changes
     std::vector<Colr> m_gamut_colr_i;

@@ -85,7 +85,7 @@ namespace met {
 
       // Get shared resources
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+      auto &e_state_gamut  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
       auto &e_arcball      = info.get_resource<detail::Arcball>(m_parent, "arcball");
       auto &e_ocs_centr    = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
       auto &e_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>("gen_metamer_ocs", fmt::format("ocs_points_{}", e_gamut_idx));

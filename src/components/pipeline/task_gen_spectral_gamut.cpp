@@ -63,7 +63,7 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_state_gamut  = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
+    auto &e_state_gamut  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
     guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources
@@ -87,6 +87,8 @@ namespace met {
                                       e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(i_gamut_spec[i]) };
       std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
                                      (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
+      
+      // Generate new spectrum given the above systems+signals as solver constraints
       i_gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 
