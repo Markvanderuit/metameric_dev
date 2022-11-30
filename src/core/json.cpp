@@ -26,10 +26,10 @@ namespace met {
   }
 
   void from_json(const json &js, ProjectData &v) {
-    v.gamut_colr_i = js.at("gamut_colr_i").get<std::array<Colr, 4>>();
-    v.gamut_offs_j = js.at("gamut_offs_j").get<std::array<Colr, 4>>();
-    v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::array<uint, 4>>();
-    v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::array<uint, 4>>();
+    v.gamut_colr_i = js.at("gamut_colr_i").get<std::vector<Colr>>();
+    v.gamut_offs_j = js.at("gamut_offs_j").get<std::vector<Colr>>();
+    v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::vector<uint>>();
+    v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::vector<uint>>();
     v.mappings     = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapp>>>();
     v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();

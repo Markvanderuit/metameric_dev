@@ -1,6 +1,7 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/json.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -28,8 +29,8 @@ namespace met {
                      Colr { 0.f, 0.f, 0.f },
                      Colr { 0.f, 0.f, 0.f },
                      Colr { 0.f, 0.f, 0.f }};
-    gamut_mapp_i.fill(0);
-    gamut_mapp_j.fill(1);
+    gamut_mapp_i = { 0, 0, 0, 0 };
+    gamut_mapp_j = { 1, 1, 1, 1 };
 
     // Instantiate loaded components with sensible default values
     mappings = {{ "D65", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}, 
@@ -145,7 +146,12 @@ namespace met {
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
     auto chull_tetr = simplify(chull_mesh, chull_vertex_count);
     auto [verts, elems] = generate_data(chull_tetr);
-    std::ranges::copy(verts, project_data.gamut_colr_i.begin());
+
+    // Assign new default gamut matching the convex hull
+    project_data.gamut_colr_i = verts;
+    project_data.gamut_offs_j = std::vector<Colr>(verts.size(), Colr(0.f));
+    project_data.gamut_mapp_i = std::vector<uint>(verts.size(), 0);
+    project_data.gamut_mapp_j = std::vector<uint>(verts.size(), 1);
   }
 
   Spec ApplicationData::load_illuminant(const std::string &key) const {
