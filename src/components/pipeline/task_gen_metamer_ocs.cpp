@@ -1,5 +1,4 @@
 #include <metameric/components/pipeline/task_gen_metamer_ocs.hpp>
-#include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
@@ -95,12 +94,6 @@ namespace met {
   void GenMetamerOCSTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    if (ImGui::Begin("GenMetamerOCSTask debug")) {
-      ImGui::InputScalar("Threshold", ImGuiDataType_Float, &m_threshold);
-      ImGui::InputScalar("Error", ImGuiDataType_Float, &m_error);
-    }
-    ImGui::End();
-    
     // Continue only on relevant state change
     auto &e_state_gamut = info.get_resource<std::array<CacheState, 4>>("project_state", "gamut_summary");
     guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
