@@ -107,19 +107,22 @@ namespace met {
       i_gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 
-    // Re-upload stale gamut vertex data to the gpu
-    for (uint i = 0; i < e_state_gamut.size(); ++i) {
-      guard_continue(e_state_gamut[i] == CacheState::eStale);
+    // Describe ranges over stale gamut vertex/elements
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_state_gamut.size()))
+                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheState::eStale; });
+    auto elem_range = std::views::iota(0u, static_cast<uint>(e_state_elems.size()))
+                    | std::views::filter([&](uint i) { return e_state_elems[i] == CacheState::eStale; });
 
+    // Push stale gamut vertex data to gpu
+    for (uint i : vert_range) {
       i_mapping_colr[i] = e_proj_data.gamut_colr_i[i];
       i_mapping_spec[i] = i_gamut_spec[i];
       i_buffer_colr.flush(sizeof(AlColr), i * sizeof(AlColr));
       i_buffer_spec.flush(sizeof(Spec), i * sizeof(Spec));
     }
-
-    // Re-upload stale gamut element data to the gpu
-    for (uint i = 0; i < e_state_elems.size(); ++i) {
-      guard_continue(e_state_elems[i] == CacheState::eStale);
+    
+    // Push stale gamut element data to gpu
+    for (uint i : elem_range) {
       i_mapping_elem[i] = e_proj_data.gamut_elems[i];
       i_buffer_elem.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
     }

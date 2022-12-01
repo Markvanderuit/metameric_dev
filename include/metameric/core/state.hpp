@@ -17,10 +17,11 @@ namespace met {
   };
 
   /* Cache states in which project data values can exist throughout the program pipeline */
-  enum class CacheState {
-    eFresh, // Data is up to date
-    eStale  // Data is stale, pipeline should recompute dependent values
+  enum class CacheState : uint {
+    eStale = 0,  // Data is stale, pipeline should recompute dependent values
+    eFresh = 1  // Data is up to date
   };
+  met_declare_bitflag(CacheState);
 
   /* Wrapper object to hold saveable project data */
   struct ProjectData {

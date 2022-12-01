@@ -86,45 +86,23 @@ namespace met {
     detail::compare_and_set_all(i_state_gamut_mapp_i, m_gamut_mapp_i, e_app_data.project_data.gamut_mapp_i);
     detail::compare_and_set_all(i_state_gamut_mapp_j, m_gamut_mapp_j, e_app_data.project_data.gamut_mapp_j);
     
-    i_state_gamut = std::vector<CacheState>(i_state_gamut_colr_i.size());
-    // fmt::print("i_state_gamut.size() = {}\n", i_state_gamut.size());
-    for (uint i = 0; i < i_state_gamut.size(); ++i) {
-      // Summary data for parts of the application interested in "any" change to gamut data
-      const bool gamut_stale = i_state_gamut_colr_i[i] == CacheState::eStale || i_state_gamut_offs_j[i] == CacheState::eStale 
-                            || i_state_gamut_mapp_i[i] == CacheState::eStale || i_state_gamut_mapp_j[i] == CacheState::eStale
-                            || i_state_mapp[e_proj_data.gamut_mapp_i[i]] == CacheState::eStale
-                            || i_state_mapp[e_proj_data.gamut_mapp_j[i]] == CacheState::eStale;
-      i_state_gamut[i] = gamut_stale ? CacheState::eStale : CacheState::eFresh;
-      // fmt::print("i_state_gamut[{}] = {}\n", i, gamut_stale ? "stale" : "fresh");
+    // Flag vertex data for stale mappings as stale
+    for (uint i = 0; i < e_proj_data.gamut_mapp_i.size(); ++i) {
+      i_state_gamut_mapp_i[i] &= i_state_mapp[e_proj_data.gamut_mapp_i[i]];
+      i_state_gamut_mapp_j[i] &= i_state_mapp[e_proj_data.gamut_mapp_j[i]];
     }
 
-    /* if (m_mappings.size() != e_app_data.loaded_mappings.size()) {
-      // Size changed; just invalidate the whole thing
-      m_mappings = e_app_data.loaded_mappings;
-      i_state_mapp = std::vector<CacheState>(m_mappings.size(), CacheState::eStale);
-    } else {
-      // Size is the same; check mappings it on a case by case basis
-      for (uint i = 0; i < m_mappings.size(); ++i) {
-        detail::compare_and_set(e_app_data.loaded_mappings[i], m_mappings[i], i_state_mapp[i]);
-      }
-    } */
-
-    // Check and set cache states for gamut vertex data to either fresh or stale
-    // #pragma omp parallel for
-    /* for (int i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
-      detail::compare_and_set_eig(e_proj_data.gamut_colr_i[i], m_gamut_colr_i[i], i_state_gamut_colr_i[i]);
-      detail::compare_and_set_eig(e_proj_data.gamut_offs_j[i], m_gamut_offs_j[i], i_state_gamut_offs_j[i]);
-      detail::compare_and_set(e_proj_data.gamut_mapp_i[i], m_gamut_mapp_i[i], i_state_gamut_mapp_i[i]);
-      detail::compare_and_set(e_proj_data.gamut_mapp_j[i], m_gamut_mapp_j[i], i_state_gamut_mapp_j[i]);
-
-      // Summary data for parts of the application interested in "any" change to gamut data
+    // Compute summary flag for parts of the application interested in "any" change to gamut data
+    i_state_gamut = std::vector<CacheState>(i_state_gamut_colr_i.size());
+    for (uint i = 0; i < i_state_gamut.size(); ++i) {
       const bool gamut_stale = i_state_gamut_colr_i[i] == CacheState::eStale 
                             || i_state_gamut_offs_j[i] == CacheState::eStale 
                             || i_state_gamut_mapp_i[i] == CacheState::eStale 
-                            || i_state_gamut_mapp_j[i] == CacheState::eStale
-                            || i_state_mapp[e_proj_data.gamut_mapp_i[i]] == CacheState::eStale
-                            || i_state_mapp[e_proj_data.gamut_mapp_j[i]] == CacheState::eStale;
+                            || i_state_gamut_mapp_j[i] == CacheState::eStale;
       i_state_gamut[i] = gamut_stale ? CacheState::eStale : CacheState::eFresh;
-    } */
+    }
+
+    guard(std::ranges::any_of(i_state_mapp, [](auto s) { return s == CacheState::eStale; }));
+    fmt::print("mapping update\n");
   }
 } // namespace met

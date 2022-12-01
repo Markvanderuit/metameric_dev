@@ -121,13 +121,14 @@ namespace met {
 
     auto mesh = spheroid_mesh;
 
-    // Compute centroid of unique input points
-    std::unordered_set<T, decltype(detail::eig_hash<float>), decltype(detail::eig_equal)> point_set(range_iter(points));
-    T cntr = std::reduce(std::execution::par_unseq, range_iter(point_set), T(0.f), detail::eig_add)
-           / static_cast<float>(point_set.size());
+    // Compute centroid of input points
+    T cntr = std::reduce(std::execution::par_unseq, range_iter(points), T(0.f), detail::eig_add)
+           / static_cast<float>(points.size());
 
     // For each vertex in mesh, each defining a unit direction and therefore line through the origin:
     std::for_each(std::execution::par_unseq, range_iter(mesh.vertices()), [&](auto &vh) {
+      met_trace();
+
       auto v = to_eig(mesh.point(vh));
 
       // Obtain a range of point projections along this line

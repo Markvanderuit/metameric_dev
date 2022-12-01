@@ -43,9 +43,12 @@ namespace met {
   void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Generate color texture only on relevant state change
+    // Generate color texture only on relevant state changes
     auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
-    guard(m_init_stale || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    auto &e_state_mapp  = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
+    guard(m_init_stale || 
+          e_state_mapp[m_mapping_i] == CacheState::eStale ||
+          std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
     m_init_stale = false;
 
     // Get shared resources
