@@ -87,12 +87,10 @@ namespace met {
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
     m_sphere_mesh = generate_spheroid<HalfedgeMeshTraits>(n_subdivs);
 
-    // Register resource to hold convex hull data for each vertex of the gamut shape
-    for (uint i = 0; i < e_proj_data.gamut_colr_i.size(); ++i) {
-      info.insert_resource(fmt::format("ocs_points_{}", i), std::vector<eig::AlArray3f>(n_samples));
-      info.insert_resource(fmt::format("ocs_center_{}", i), Colr(0.f));
-      info.insert_resource(fmt::format("ocs_chull_{}", i), HalfedgeMesh());
-    }
+    // Register resources to hold convex hull data for each vertex of the gamut shape
+    info.insert_resource("ocs_points", std::vector<std::vector<eig::AlArray3f>>());
+    info.insert_resource("ocs_centers", std::vector<Colr>());
+    info.insert_resource("ocs_chulls", std::vector<HalfedgeMesh>());
   }
   
   void GenMetamerOCSTask::eval(detail::TaskEvalInfo &info) {
@@ -104,10 +102,22 @@ namespace met {
 
     // Get shared resources
     auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_gamut_mapp_i = e_app_data.project_data.gamut_mapp_i;
-    auto &e_gamut_mapp_j = e_app_data.project_data.gamut_mapp_j;
+    auto &e_proj_data    = e_app_data.project_data;
+    auto &e_gamut_colr_i = e_proj_data.gamut_colr_i;
+    auto &e_gamut_mapp_i = e_proj_data.gamut_mapp_i;
+    auto &e_gamut_mapp_j = e_proj_data.gamut_mapp_j;
     auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_gamut_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
+    auto &i_ocs_data     = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("ocs_points");
+    auto &i_ocs_cntrs    = info.get_resource<std::vector<Colr>>("ocs_centers");
+    auto &i_ocs_hulls    = info.get_resource<std::vector<HalfedgeMesh>>("ocs_chulls");
+
+    // Deal with resized gamut
+    if (e_state_gamut.size() != i_ocs_data.size()) {
+      i_ocs_data.resize(e_state_gamut.size());
+      i_ocs_cntrs.resize(e_state_gamut.size());
+      i_ocs_hulls.resize(e_state_gamut.size());
+    }
 
     // Describe ranges over stale gamut vertices
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_state_gamut.size()))
@@ -115,37 +125,27 @@ namespace met {
 
     // For each vertex of the gamut shape
     for (uint i : vert_range) {
-      // Get rest of shared resources
-      auto &i_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
-      auto &i_ocs_center   = info.get_resource<Colr>(fmt::format("ocs_center_{}", i));
-      auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
-
       // Generate color system spectra
       CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i[i]].finalize(e_gamut_spec[i]);
       CMFS cmfs_j = e_app_data.loaded_mappings[e_gamut_mapp_j[i]].finalize(e_gamut_spec[i]);
 
       // Generate points on metamer set boundary
       auto basis  = e_basis.rightCols(wavelength_bases);
-      auto points = generate_boundary(basis, cmfs_i, cmfs_j, e_gamut_colr_i, m_sphere_samples);
+      auto points = generate_boundary(basis, cmfs_i, cmfs_j, e_gamut_colr_i[i], m_sphere_samples);
 
       // Store in aligned format // TODO generate in aligned format
-      i_ocs_points = std::vector<eig::AlArray3f>(range_iter(points));
+      i_ocs_data[i] = std::vector<eig::AlArray3f>(range_iter(points));
       
       // Compute center of metamer set boundary
       constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
-      i_ocs_center = std::reduce(std::execution::par_unseq, range_iter(i_ocs_points), 
-        eig::AlArray3f(0.f), f_add) / static_cast<float>(i_ocs_points.size());
+      i_ocs_cntrs[i] = std::reduce(std::execution::par_unseq, range_iter(i_ocs_data[i]), 
+        eig::AlArray3f(0.f), f_add) / static_cast<float>(i_ocs_data[i].size());
     }
 
-    // Process convex hull worklist in parallel
+    // Process convex hull generation worklist in parallel
     std::vector<uint> vert_indices(range_iter(vert_range));
     std::for_each(std::execution::par_unseq, range_iter(vert_indices), [&](uint i) {
-      // Get rest of shared resources
-      auto &i_ocs_points = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
-      auto &i_ocs_chull  = info.get_resource<HalfedgeMesh>(fmt::format("ocs_chull_{}", i));
-
-      // Generate convex hull mesh
-      i_ocs_chull = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(i_ocs_points, m_sphere_mesh);
+      i_ocs_hulls[i] = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(i_ocs_data[i], m_sphere_mesh);
     });
   }
 } // namespace met

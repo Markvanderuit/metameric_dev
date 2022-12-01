@@ -59,6 +59,10 @@ namespace met {
                      .vertex_count     = static_cast<uint>(e_gamut_elem.size()) * 3,
                      .bindable_array   = &m_gamut_array,
                      .bindable_program = &m_gamut_program };
+    m_gamut_draw_selection = { .type             = gl::PrimitiveType::eTriangles,
+                               .vertex_count     = static_cast<uint>(e_gamut_elem.size()) * 3,
+                               .bindable_array   = &m_gamut_array,
+                               .bindable_program = &m_gamut_program };
 
     // Set non-changing uniform values
     m_gamut_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
@@ -79,6 +83,7 @@ namespace met {
     auto &e_proj_data        = e_app_data.project_data;
     auto &e_gamut_elem       = e_proj_data.gamut_elems;
     auto &e_gamut_vert       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
+    auto &e_elem_selection   = info.get_resource<std::vector<uint>>("viewport_input", "gamut_elem_selection");
 
     // Update array object in case gamut buffer was resized
     if (m_gamut_vert_cache != e_gamut_vert.object()) {
@@ -107,9 +112,16 @@ namespace met {
     // Update program uniforms
     m_gamut_program.uniform("u_camera_matrix", e_viewport_arcball.full().matrix());
 
-    // Dispatch draws for gamut shape
+    // Dispatch draws for gamut lines
     gl::state::set_op(gl::DrawOp::eLine);
     gl::dispatch_draw(m_gamut_draw);
     gl::state::set_op(gl::DrawOp::eFill);
+
+    // Dispatch draws for gamut selection
+    if (e_elem_selection.size() > 0 ) {
+      m_gamut_draw_selection.vertex_count = 3;
+      m_gamut_draw_selection.vertex_first = e_elem_selection[0] * 3;
+      gl::dispatch_draw(m_gamut_draw_selection);
+    }
   }
 } // namespace met

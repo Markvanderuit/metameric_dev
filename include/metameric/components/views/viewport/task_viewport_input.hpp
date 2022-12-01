@@ -21,28 +21,26 @@ namespace met {
 
     struct VertexQuery {
       uint i;
-      eig::Array3f vertex;
+      float t;
     };
 
     struct ElementQuery {
       uint i;
-      eig::Array3u element;
+      float t;
     };
 
-    Ray generate_ray(const  Arcball      &cam,
-                     const eig::Vector2f &screen_pos) {
-      const float tanf = std::tanf(cam.m_fov_y / 2.f * std::numbers::pi_v<float> / 180.f);
-      auto view_inv = cam.view().inverse();
+    Ray generate_ray(const  Arcball       &cam,
+                     const  eig::Vector2f &screen_pos) {
+      const float tanf = std::tanf(cam.m_fov_y * .5f);
+      const auto &view_inv = cam.view().inverse();
       
-      eig::Vector2f s = ((screen_pos.array() - .5f) * 2.f).eval();
-      eig::Vector3f o = (view_inv * eig::Vector3f(0)).eval();
-      eig::Vector3f d = (view_inv * eig::Vector3f(s.x() * tanf, s.y() * tanf * cam.m_aspect, -1) - o).normalized().eval();
+      eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;
+      eig::Vector3f o = view_inv * eig::Vector3f::Zero();
+      eig::Vector3f d = (view_inv * eig::Vector3f(s.x() * tanf * cam.m_aspect, 
+                                                  s.y() * tanf, 
+                                                  -1) - o).normalized();
 
       return { o, d };
-
-      // eig::Vector3f o = eig::screen_to_world_space(screen_pos, cam.full());
-      // eig::Vector4f d_ = cam.full().inverse() * (eig::Vector4f() << (screen_pos.array() - 0.5f) * 2.f, 1, 1).finished();
-      // eig::Vector3f d  = (d_.head<3>() / d_[3]).normalized();
     }
 
     std::optional<VertexQuery> rt_nearest_vertex(const Ray                       &ray,
@@ -52,25 +50,54 @@ namespace met {
       std::optional<VertexQuery> query;
 
       for (uint i = 0; i < verts.size(); ++i) {
-        const auto &v = verts[i];
-        float t_ = (v.matrix() - ray.o).dot(ray.d);
-        eig::Vector3f p = ray.o + ray.d * t_;
-        float d_ = (v.matrix() - p).norm();
+        eig::Vector3f v = verts[i];
+        float         t_ = (v - ray.o).dot(ray.d);
+        guard_continue(t_ >= 0.f && t_ < t);
 
-        if (i == 0) {
-          // fmt::print("o = {} - d = {}\n", ray.o, ray.d);
-          // fmt::print("v = {} - p = {}\n", v, p);
-          fmt::print("o = {}, d = {}, v = {}, d_ = {}, t_ = {}\n", ray.o, ray.d, v, d_, t_);
-          // fmt::print("d = {} - t = {}\n", d_, t_);
-        }
-        
-        if (d_ <= min_distance && t_ < t) {
-          t = t_;
-          query = { i, v };
-        }
+        eig::Vector3f x = ray.o + t_ * ray.d;
+        guard_continue((v - x).matrix().norm() <= min_distance);
+
+        t = t_;
+        query = { i, t };
       }
 
       return query;
+    }
+
+    std::optional<VertexQuery> rt_nearest_triangle(const Ray &ray,
+                                                   const std::vector<eig::Array3f> &verts,
+                                                   const std::vector<eig::Array3u> &elems) {
+      float t = std::numeric_limits<float>::max();
+      std::optional<VertexQuery> query;
+
+      for (uint i = 0; i < elems.size(); ++i) {
+        // Load triangle data
+        const eig::Array3u e = elems[i];
+        eig::Vector3f a = verts[e[0]], b = verts[e[1]], c = verts[e[2]];
+
+        // Compute edges, plane normal, triangle centroid
+        eig::Vector3f ab = b - a, bc = c - b, ca = a - c;
+        eig::Vector3f n  = bc.cross(ab).normalized(),
+                      p  = (a + b + c) / 3.f;
+        
+        // Find intersection point with triangle's plane
+        float n_dot_d = n.dot(ray.d);
+        guard_continue(std::abs(n_dot_d) >= 0.00001f);
+
+        float t_ = (p - ray.o).dot(n) / n_dot_d;
+        guard_continue(t_ >= 0.f && t_ < t);
+
+        // Test if intersection point lies within triangle
+        eig::Vector3f x = ray.o + t_ * ray.d;
+        guard_continue(n.dot((x - a).cross(ab)) >= 0.f);
+        guard_continue(n.dot((x - b).cross(bc)) >= 0.f);
+        guard_continue(n.dot((x - c).cross(ca)) >= 0.f);
+
+        t = t_;
+        query = { i, t };
+      }
+
+      return query;  
     }
   } // namespace detail 
 
@@ -94,6 +121,8 @@ namespace met {
       
       // Share resources
       info.insert_resource<std::vector<uint>>("gamut_selection", { });
+      info.insert_resource<std::vector<uint>>("gamut_vert_selection", { });
+      info.insert_resource<std::vector<uint>>("gamut_elem_selection", { });
       info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
     }
     
@@ -146,13 +175,15 @@ namespace met {
       met_trace_full();
       
       // Get shared resources
-      auto &io            = ImGui::GetIO();
-      auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
-      auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &i_gamut_ind   = info.get_resource<std::vector<uint>>("gamut_selection");
-      auto &e_proj_data   = e_app_data.project_data;
-      auto &e_gamut_verts = e_app_data.project_data.gamut_colr_i;
-      auto &e_gamut_elems = e_proj_data.gamut_elems;
+      auto &io               = ImGui::GetIO();
+      auto &i_arcball        = info.get_resource<detail::Arcball>("arcball");
+      auto &i_gamut_ind      = info.get_resource<std::vector<uint>>("gamut_selection");
+      auto &i_vert_selection = info.get_resource<std::vector<uint>>("gamut_vert_selection");
+      auto &i_elem_selection = info.get_resource<std::vector<uint>>("gamut_elem_selection");
+      auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data      = e_app_data.project_data;
+      auto &e_gamut_verts    = e_app_data.project_data.gamut_colr_i;
+      auto &e_gamut_elems    = e_proj_data.gamut_elems;
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -168,8 +199,15 @@ namespace met {
       // auto near_vert_range = std::views::iota(0u, e_gamut_verts .size()) | near_vert_filt;
 
       auto ray = detail::generate_ray(i_arcball, eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size));
+      i_vert_selection.clear();
+      i_elem_selection.clear();
+      if (auto query = detail::rt_nearest_triangle(ray, e_gamut_verts, e_gamut_elems)) {
+        fmt::print("{}\n", e_gamut_elems[query->i]);
+        i_elem_selection = { query->i };
+      }
       if (auto query = detail::rt_nearest_vertex(ray, e_gamut_verts, 0.025f)) {
-        fmt::print("{}\n", query->i);
+        // fmt::print("{}\n", query->i);
+        i_vert_selection = { query->i };
       }
 
       // Apply selection area: right mouse OR left mouse + shift
@@ -207,6 +245,28 @@ namespace met {
         // Find and store selected gamut position indices
         i_gamut_ind.clear();
         std::ranges::copy(std::views::iota(0u, e_gamut_verts .size()) | is_near_click, std::back_inserter(i_gamut_ind));
+
+        // Quick test hack; subdivide triangle forcibly
+        for (uint i : i_elem_selection) {
+          eig::Array3u el = e_gamut_elems[i];
+          
+          // Add new vertex
+          Colr c = (e_gamut_verts[el[0]] + e_gamut_verts[el[1]] + e_gamut_verts[el[2]]) / 3.f;
+          e_gamut_verts.push_back(c);
+          e_proj_data.gamut_offs_j.push_back(Colr(0.f));
+          e_proj_data.gamut_mapp_i.push_back(0);
+          e_proj_data.gamut_mapp_j.push_back(1);
+
+          // Replace current element by three new elements
+          uint j = e_gamut_verts.size() - 1;
+          e_gamut_elems.erase(e_gamut_elems.begin() + i);
+          e_gamut_elems.push_back(eig::Array3u(el[0], el[1], j));
+          e_gamut_elems.push_back(eig::Array3u(el[1], el[2], j));
+          e_gamut_elems.push_back(eig::Array3u(el[2], el[0], j));
+
+          // This invalidates iteration, so break accordingly
+          break;
+        }
       }
     }
     

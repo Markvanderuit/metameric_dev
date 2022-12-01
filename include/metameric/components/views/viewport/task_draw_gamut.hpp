@@ -17,6 +17,7 @@ namespace met {
     gl::Array    m_gamut_array;
     gl::DrawInfo m_gamut_draw;
     gl::Program  m_gamut_program;
+    gl::DrawInfo m_gamut_draw_selection;
 
     // Map span for gamut element data
     std::span<eig::Array3u> m_gamut_elem_mapping;

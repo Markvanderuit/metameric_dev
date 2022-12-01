@@ -228,7 +228,7 @@ namespace met {
       // Get shared resources
       auto &i_arcball    = info.get_resource<detail::Arcball>("arcball");
       auto &e_gamut_idx  = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection")[0];
-      auto &e_ocs_centr  = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
+      auto &e_ocs_centr  = info.get_resource<std::vector<Colr>>("gen_metamer_ocs", "ocs_centers")[e_gamut_idx];
       auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_gamut_colr = e_app_data.project_data.gamut_colr_i;
       auto &e_gamut_offs = e_app_data.project_data.gamut_offs_j;

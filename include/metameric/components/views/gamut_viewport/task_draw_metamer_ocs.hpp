@@ -87,23 +87,23 @@ namespace met {
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_state_gamut  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
       auto &e_arcball      = info.get_resource<detail::Arcball>(m_parent, "arcball");
-      auto &e_ocs_centr    = info.get_resource<Colr>("gen_metamer_ocs", fmt::format("ocs_center_{}", e_gamut_idx));
-      auto &e_ocs_points   = info.get_resource<std::vector<eig::AlArray3f>>("gen_metamer_ocs", fmt::format("ocs_points_{}", e_gamut_idx));
+      auto &e_ocs_centr    = info.get_resource<std::vector<Colr>>("gen_metamer_ocs", "ocs_centers")[e_gamut_idx];
 
-      // Update convex hull mesh if selection has changed, or selected gamut point has changed
+      // Update convex hull mesh data if selection has changed, or selected gamut point has changed
       if (m_gamut_idx != e_gamut_idx || e_state_gamut[e_gamut_idx] == CacheState::eStale) {
         m_gamut_idx = e_gamut_idx;
         
         // Get shared resources
-        auto &e_ocs_chull = info.get_resource<HalfedgeMesh>("gen_metamer_ocs", fmt::format("ocs_chull_{}", m_gamut_idx));
-        auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(e_ocs_chull);
+        auto &e_ocs_hull = info.get_resource<std::vector<HalfedgeMesh>>("gen_metamer_ocs", "ocs_chulls")[m_gamut_idx];
+        auto &e_ocs_data = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("gen_metamer_ocs", "ocs_points")[m_gamut_idx];
+        auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(e_ocs_hull);
 
         // Copy new data to buffer and adjust vertex draw count
         m_hull_vertices.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
         m_hull_elements.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
-        m_hull_dispatch.vertex_count = e_ocs_chull.n_faces() * 3;
-        m_point_vertices.set(cnt_span<const std::byte>(e_ocs_points), e_ocs_points.size() * sizeof(eig::AlArray3f));
-        m_point_dispatch.vertex_count = e_ocs_points.size();
+        m_point_vertices.set(cnt_span<const std::byte>(e_ocs_data), e_ocs_data.size() * sizeof(eig::AlArray3f));
+        m_hull_dispatch.vertex_count  = elems.size() * 3;
+        m_point_dispatch.vertex_count = e_ocs_data.size();
       }
 
       // Declare scoped OpenGL state
@@ -116,7 +116,7 @@ namespace met {
                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
                                  
       // Set model/camera translations
-      eig::Affine3f transl(eig::Translation3f(-e_ocs_centr .matrix().eval()));
+      eig::Affine3f transl(eig::Translation3f(-e_ocs_centr.matrix().eval()));
       m_program.uniform("u_model_matrix",  transl.matrix());
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
