@@ -147,23 +147,5 @@ namespace met {
       // Generate convex hull mesh
       i_ocs_chull = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(i_ocs_points, m_sphere_mesh);
     });
-
-    // #pragma omp parallel for
-    // for (int j = 0; j < convex_hull_worklist.size(); ++j) {
-    //   // Gather shared resources
-    //   uint i = convex_hull_worklist[j];
-    //   auto &i_ocs_points = info.get_resource<std::vector<eig::AlArray3f>>(fmt::format("ocs_points_{}", i));
-    //   auto &i_ocs_chull  = info.get_resource<HalfedgeMesh>(fmt::format("ocs_chull_{}", i));
-
-    //   // Generate convex hull mesh
-    //   i_ocs_chull = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(i_ocs_points, m_sphere_mesh);
-
-    //   /* // Test if gamut offset lies within convex hull. Center otherwise
-    //   auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i[i];
-    //   auto &e_gamut_offs_j = e_app_data.project_data.gamut_offs_j[i];
-    //   if (!is_point_inside_convex_hull<eig::AlArray3f>(i_ocs_chull,  eig::AlArray3f(e_gamut_colr_i + e_gamut_offs_j).eval())) {
-    //     // e_gamut_offs_j = i_ocs_center - e_gamut_colr_i;
-    //   } */
-    // }
   }
 } // namespace met
