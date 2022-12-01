@@ -47,7 +47,7 @@ namespace met::detail {
       m_far_z(info.far_z),
       m_aspect(info.aspect),
       m_dist(info.dist),
-      m_eye(info.e_eye), 
+      m_eye(info.e_eye.matrix().normalized()), 
       m_center(info.e_center), 
       m_up(info.e_up),
       m_pos_delta_mult(info.pos_delta_mult),
@@ -68,6 +68,22 @@ namespace met::detail {
     eig::Affine3f     & view() { return m_view; } // Access view transform
     eig::Projective3f & proj() { return m_proj; } // Access projection transform    
     eig::Projective3f & full() { return m_full; } // Access full proj * view transform
+    const eig::Affine3f     & view() const { return m_view; } // Access view transform
+    const eig::Projective3f & proj() const { return m_proj; } // Access projection transform    
+    const eig::Projective3f & full() const { return m_full; } // Access full proj * view transform
+
+    /* public vector accessors */
+
+    eig::Array3f & eye()    { return m_eye;    }
+    eig::Array3f & up()     { return m_up;     }
+    eig::Array3f & center() { return m_center; }
+    const eig::Array3f & eye()    const { return m_eye;    }
+    const eig::Array3f & up()     const { return m_up;     }
+    const eig::Array3f & center() const { return m_center; }
+
+    /* misc accessors */
+
+    eig::Array3f eye_pos() const { return m_center + m_dist * (m_eye - m_center); }
 
     /* update functions */
 

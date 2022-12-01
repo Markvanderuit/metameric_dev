@@ -10,7 +10,7 @@
 #include <spectrum_cluster.glsl>
 
 #define Spec ClSpec           // Use shorthand for clustered types
-const uint n_gamut_verts = 6; // Nr. of tetrahedron vertices 
+const uint n_gamut_verts = 5; // Nr. of tetrahedron vertices 
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
