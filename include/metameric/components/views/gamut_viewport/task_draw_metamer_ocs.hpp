@@ -39,7 +39,7 @@ namespace met {
 
       // Generate a uv sphere mesh for convex hull approximation and create gpu buffers
       constexpr auto create_flags = gl::BufferCreateFlags::eStorageDynamic;
-      const auto spheroid_mesh = generate_spheroid<HalfedgeMeshTraits>(3);
+      const auto spheroid_mesh = generate_spheroid<HalfedgeMeshTraits>(4);
       m_hull_vertices = {{ .size = spheroid_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = create_flags }};
       m_hull_elements = {{ .size = spheroid_mesh.n_faces() * sizeof(eig::Array3u), .flags = create_flags }};
       m_point_vertices = {{ .size = 32 * sizeof(eig::AlArray3f), .flags = create_flags }};
