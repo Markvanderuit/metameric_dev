@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/ray.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
@@ -7,6 +8,9 @@
 #include <metameric/core/detail/scheduler_task.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <metameric/components/views/viewport/task_viewport_input_vertex.hpp>
+#include <metameric/components/views/viewport/task_viewport_input_edge.hpp>
+#include <metameric/components/views/viewport/task_viewport_input_face.hpp>
 #include <ImGuizmo.h>
 #include <algorithm>
 #include <functional>
@@ -16,90 +20,90 @@
 #include <limits>
 
 namespace met {
-  namespace detail {
-    struct Ray { eig::Vector3f o, d; };
+  // namespace detail {
+  //   struct Ray { eig::Vector3f o, d; };
 
-    struct VertexQuery {
-      uint i;
-      float t;
-    };
+  //   struct VertexQuery {
+  //     uint i;
+  //     float t;
+  //   };
 
-    struct ElementQuery {
-      uint i;
-      float t;
-    };
+  //   struct ElementQuery {
+  //     uint i;
+  //     float t;
+  //   };
 
-    Ray generate_ray(const  Arcball       &cam,
-                     const  eig::Vector2f &screen_pos) {
-      const float tanf = std::tanf(cam.m_fov_y * .5f);
-      const auto &view_inv = cam.view().inverse();
+  //   Ray generate_ray(const  Arcball       &cam,
+  //                    const  eig::Vector2f &screen_pos) {
+  //     const float tanf = std::tanf(cam.m_fov_y * .5f);
+  //     const auto  view_inv = cam.view().inverse();
       
-      eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;
-      eig::Vector3f o = view_inv * eig::Vector3f::Zero();
-      eig::Vector3f d = (view_inv * eig::Vector3f(s.x() * tanf * cam.m_aspect, 
-                                                  s.y() * tanf, 
-                                                  -1) - o).normalized();
+  //     eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;
+  //     eig::Vector3f o = view_inv * eig::Vector3f::Zero();
+  //     eig::Vector3f d = (view_inv * eig::Vector3f(s.x() * tanf * cam.m_aspect, 
+  //                                                 s.y() * tanf, 
+  //                                                 -1) - o).normalized();
 
-      return { o, d };
-    }
+  //     return { o, d };
+  //   }
 
-    std::optional<VertexQuery> rt_nearest_vertex(const Ray                       &ray,
-                                                 const std::vector<eig::Array3f> &verts,
-                                                       float                      min_distance) {
-      float t = std::numeric_limits<float>::max();
-      std::optional<VertexQuery> query;
+  //   std::optional<VertexQuery> rt_nearest_vertex(const Ray                       &ray,
+  //                                                const std::vector<eig::Array3f> &verts,
+  //                                                      float                      min_distance) {
+  //     float t = std::numeric_limits<float>::max();
+  //     std::optional<VertexQuery> query;
 
-      for (uint i = 0; i < verts.size(); ++i) {
-        eig::Vector3f v = verts[i];
-        float         t_ = (v - ray.o).dot(ray.d);
-        guard_continue(t_ >= 0.f && t_ < t);
+  //     for (uint i = 0; i < verts.size(); ++i) {
+  //       eig::Vector3f v = verts[i];
+  //       float         t_ = (v - ray.o).dot(ray.d);
+  //       guard_continue(t_ >= 0.f && t_ < t);
 
-        eig::Vector3f x = ray.o + t_ * ray.d;
-        guard_continue((v - x).matrix().norm() <= min_distance);
+  //       eig::Vector3f x = ray.o + t_ * ray.d;
+  //       guard_continue((v - x).matrix().norm() <= min_distance);
 
-        t = t_;
-        query = { i, t };
-      }
+  //       t = t_;
+  //       query = { i, t };
+  //     }
 
-      return query;
-    }
+  //     return query;
+  //   }
 
-    std::optional<VertexQuery> rt_nearest_triangle(const Ray &ray,
-                                                   const std::vector<eig::Array3f> &verts,
-                                                   const std::vector<eig::Array3u> &elems) {
-      float t = std::numeric_limits<float>::max();
-      std::optional<VertexQuery> query;
+  //   std::optional<VertexQuery> rt_nearest_triangle(const Ray &ray,
+  //                                                  const std::vector<eig::Array3f> &verts,
+  //                                                  const std::vector<eig::Array3u> &elems) {
+  //     float t = std::numeric_limits<float>::max();
+  //     std::optional<VertexQuery> query;
 
-      for (uint i = 0; i < elems.size(); ++i) {
-        // Load triangle data
-        const eig::Array3u e = elems[i];
-        eig::Vector3f a = verts[e[0]], b = verts[e[1]], c = verts[e[2]];
+  //     for (uint i = 0; i < elems.size(); ++i) {
+  //       // Load triangle data
+  //       const eig::Array3u e = elems[i];
+  //       eig::Vector3f a = verts[e[0]], b = verts[e[1]], c = verts[e[2]];
 
-        // Compute edges, plane normal, triangle centroid
-        eig::Vector3f ab = b - a, bc = c - b, ca = a - c;
-        eig::Vector3f n  = bc.cross(ab).normalized(),
-                      p  = (a + b + c) / 3.f;
+  //       // Compute edges, plane normal, triangle centroid
+  //       eig::Vector3f ab = b - a, bc = c - b, ca = a - c;
+  //       eig::Vector3f n  = bc.cross(ab).normalized(),
+  //                     p  = (a + b + c) / 3.f;
         
-        // Find intersection point with triangle's plane
-        float n_dot_d = n.dot(ray.d);
-        guard_continue(std::abs(n_dot_d) >= 0.00001f);
+  //       // Find intersection point with triangle's plane
+  //       float n_dot_d = n.dot(ray.d);
+  //       guard_continue(std::abs(n_dot_d) >= 0.00001f);
 
-        float t_ = (p - ray.o).dot(n) / n_dot_d;
-        guard_continue(t_ >= 0.f && t_ < t);
+  //       float t_ = (p - ray.o).dot(n) / n_dot_d;
+  //       guard_continue(t_ >= 0.f && t_ < t);
 
-        // Test if intersection point lies within triangle
-        eig::Vector3f x = ray.o + t_ * ray.d;
-        guard_continue(n.dot((x - a).cross(ab)) >= 0.f);
-        guard_continue(n.dot((x - b).cross(bc)) >= 0.f);
-        guard_continue(n.dot((x - c).cross(ca)) >= 0.f);
+  //       // Test if intersection point lies within triangle
+  //       eig::Vector3f x = ray.o + t_ * ray.d;
+  //       guard_continue(n.dot((x - a).cross(ab)) >= 0.f);
+  //       guard_continue(n.dot((x - b).cross(bc)) >= 0.f);
+  //       guard_continue(n.dot((x - c).cross(ca)) >= 0.f);
 
-        t = t_;
-        query = { i, t };
-      }
+  //       t = t_;
+  //       query = { i, t };
+  //     }
 
-      return query;  
-    }
-  } // namespace detail 
+  //     return query;  
+  //   }
+  // } // namespace detail 
 
   class ViewportInputTask : public detail::AbstractTask {
     bool                 m_is_gizmo_used;
@@ -119,15 +123,25 @@ namespace met {
       m_gamut_prev = e_gamut_verts ; // Store a copy of the initial gamut as previous state
       m_is_gizmo_used = false;    // Start with gizmo inactive
       
+      // Add subtasks
+      info.emplace_task_after<ViewportInputVertexTask>(name(), name() + "_vertex");
+      info.emplace_task_after<ViewportInputEdgeTask>(name(), name() + "_edge");
+      info.emplace_task_after<ViewportInputFaceTask>(name(), name() + "_face");
+
       // Share resources
       info.insert_resource<std::vector<uint>>("gamut_selection", { });
       info.insert_resource<std::vector<uint>>("gamut_vert_selection", { });
       info.insert_resource<std::vector<uint>>("gamut_elem_selection", { });
       info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
     }
-    
+
     void dstr(detail::TaskDstrInfo &info) override {
       met_trace_full();
+
+      // Remove subtasks
+      info.remove_task(name() + "_vertex");
+      info.remove_task(name() + "_edge");
+      info.remove_task(name() + "_face");
     }
 
     void eval(detail::TaskEvalInfo &info) override {
@@ -142,8 +156,8 @@ namespace met {
       guard(ImGui::IsItemHovered());
 
       // If gizmo is not active, handle selection and camera rotation
+      eval_camera(info);
       if (!ImGuizmo::IsUsing()) {
-        eval_camera(info);
         eval_select(info);
       }
 
@@ -198,16 +212,17 @@ namespace met {
       // });
       // auto near_vert_range = std::views::iota(0u, e_gamut_verts .size()) | near_vert_filt;
 
-      auto ray = detail::generate_ray(i_arcball, eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size));
+      // auto ray = detail::generate_ray(i_arcball, eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size));
       i_vert_selection.clear();
       i_elem_selection.clear();
-      if (auto query = detail::rt_nearest_triangle(ray, e_gamut_verts, e_gamut_elems)) {
-        fmt::print("{}\n", e_gamut_elems[query->i]);
-        i_elem_selection = { query->i };
+
+      Ray ray = i_arcball.generate_ray(eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size));
+      if (auto query = ray_trace_nearest_vert(ray, e_gamut_verts); query) {
+        fmt::print("{}\n", query.i);
+        i_vert_selection = { query.i };
       }
-      if (auto query = detail::rt_nearest_vertex(ray, e_gamut_verts, 0.025f)) {
-        // fmt::print("{}\n", query->i);
-        i_vert_selection = { query->i };
+      if (auto query = ray_trace_nearest_elem(ray, e_gamut_verts, e_gamut_elems); query) {
+        i_elem_selection = { query.i };
       }
 
       // Apply selection area: right mouse OR left mouse + shift
