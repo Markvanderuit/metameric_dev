@@ -9,8 +9,6 @@
 #include <utility>
 
 namespace met {
-  /* OpenMesh begins here */
-
   /* An indexed mesh with face normals and no additional data */
   struct BaselineMeshTraits : public omesh::DefaultTraits {
     // Define default attributes; only face normals are stored, half-edges are intentionally omitted
@@ -34,32 +32,31 @@ namespace met {
   };
 
   // Triangle mesh shorthands implementing the above defined traits
-  using BaselineMesh = omesh::TriMesh_ArrayKernelT<BaselineMeshTraits>;
-  using FNormalMesh   = omesh::TriMesh_ArrayKernelT<FNormalMeshTraits>;
-  using HalfedgeMesh = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
+  template <typename Traits>
+  using TriMesh      = omesh::TriMesh_ArrayKernelT<Traits>;
+  using BaselineMesh = TriMesh<BaselineMeshTraits>;
+  using FNormalMesh  = TriMesh<FNormalMeshTraits>;
+  using HalfedgeMesh = TriMesh<HalfedgeMeshTraits>;
 
   /* Generational helper functions */
 
   template <typename Traits, typename T = eig::Array3f>
-  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const omesh::TriMesh_ArrayKernelT<Traits> &mesh);
+  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const TriMesh<Traits> &mesh);
 
   template <typename Traits, typename T = eig::Array3f>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements);
+  TriMesh<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements);
 
   template <typename Traits>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_octahedron();
+  TriMesh<Traits> generate_octahedron();
 
   template <typename Traits>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_spheroid(uint n_subdivs = 3);
+  TriMesh<Traits> generate_spheroid(uint n_subdivs = 3);
 
   template <typename Traits, typename T = eig::AlArray3f>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_convex_hull(std::span<const T> points,
-                                                           const omesh::TriMesh_ArrayKernelT<Traits> &spheroid_mesh = generate_spheroid<Traits>());
+  TriMesh<Traits> generate_convex_hull(std::span<const T> points, const TriMesh<Traits> &spheroid_mesh = generate_spheroid<Traits>());
 
   template <typename Traits>
-  omesh::TriMesh_ArrayKernelT<Traits> simplify(const omesh::TriMesh_ArrayKernelT<Traits> &mesh, uint max_vertices);
-
-  /* OpenMesh ends here */
+  TriMesh<Traits> simplify(const TriMesh<Traits> &mesh, uint max_vertices);
 
   // // FWD
   // template <typename T, typename E = eig::Array3u>

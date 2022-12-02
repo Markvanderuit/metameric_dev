@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/ray.hpp>
 #include <metameric/core/utility.hpp>
 #include <numbers>
 
@@ -123,6 +124,21 @@ namespace met::detail {
       
       // Apply rotation
       m_eye = m_center + rot * (m_eye - m_center);
+    }
+
+    /* ray tracing functions */
+
+    Ray generate_ray(eig::Vector2f screen_pos) const {
+      const float tan = std::tanf(m_fov_y * .5f);
+      const auto  mat = m_view.inverse(); // camera-to-world
+
+      eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;
+      eig::Vector3f o = mat * eig::Vector3f::Zero();
+      eig::Vector3f d = (mat * eig::Vector3f(s.x() * tan * m_aspect, 
+                                             s.y() * tan, 
+                                             -1) - o).normalized();
+      
+      return { o, d };
     }
   };
 } // namespace met::detail
