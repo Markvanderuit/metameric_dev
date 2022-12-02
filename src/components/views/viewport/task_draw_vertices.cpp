@@ -83,7 +83,7 @@ namespace met {
     auto &e_arcball         = info.get_resource<detail::Arcball>("viewport_input", "arcball");
     auto &i_size_map        = info.get_resource<std::span<float>>("size_map");
     auto &e_gamut_buffer    = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
-    auto &e_gamut_selection = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
+    auto &e_gamut_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
 
     // Update array object in case gamut buffer was resized
     if (m_gamut_buffer_cache != e_gamut_buffer.object()) {

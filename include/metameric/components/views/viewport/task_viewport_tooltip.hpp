@@ -17,8 +17,8 @@
 
 namespace met {
   class ViewportTooltipTask : public detail::AbstractTask {
-    bool                 m_is_gizmo_used;
-    std::vector<Colr>    m_offs_prev;
+    std::vector<Colr> m_offs_prev;
+    bool              m_is_gizmo_used;
     
   public:
     ViewportTooltipTask(const std::string &name)
@@ -53,7 +53,7 @@ namespace met {
       met_trace_full();
     
       // Get shared resources
-      auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection");
+      auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
 
       // Only spawn tooltip on non-empty gamut selection
       guard(!e_gamut_index.empty());
@@ -181,7 +181,7 @@ namespace met {
         
       // Get shared resources
       auto &i_draw_texture = info.get_resource<gl::Texture2d3f>("draw_texture");
-      auto &e_gamut_index  = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection")[0];
+      auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
 
       // Compute viewport size minus ImGui's tab bars etc
       // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
@@ -216,9 +216,8 @@ namespace met {
       // Update camera info: aspect ratio, scroll delta, move delta
       i_arcball.m_aspect = i_texture.size().x() / i_texture.size().y();
       i_arcball.set_dist_delta(io.MouseWheel);
-      if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl)) {
+      if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
         i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / i_texture.size().cast<float>());
-      }
       i_arcball.update_matrices();
     }
 
@@ -226,51 +225,44 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      auto &i_arcball    = info.get_resource<detail::Arcball>("arcball");
-      auto &e_gamut_idx  = info.get_resource<std::vector<uint>>("viewport_input", "gamut_selection")[0];
-      auto &e_ocs_centr  = info.get_resource<std::vector<Colr>>("gen_metamer_ocs", "ocs_centers")[e_gamut_idx];
-      auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_gamut_colr = e_app_data.project_data.gamut_colr_i;
-      auto &e_gamut_offs = e_app_data.project_data.gamut_offs_j;
+      auto &e_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection")[0];
+      auto &e_ocs_centr = info.get_resource<std::vector<Colr>>("gen_metamer_ocs", "ocs_centers")[e_selection];
+      auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
+      auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data = e_app_data.project_data;
+      auto &e_vert      = e_proj_data.gamut_colr_i;
+      auto &e_offs      = e_proj_data.gamut_offs_j;
 
       // Anchor position is colr + offset, minus center offset 
-      eig::Array3f anchor_pos = e_gamut_colr[e_gamut_idx] + e_gamut_offs[e_gamut_idx] - e_ocs_centr;
-      auto anchor_trf = eig::Affine3f(eig::Translation3f(anchor_pos));
-      auto pre_pos    = anchor_trf * eig::Vector3f(0, 0, 0);
+      eig::Vector3f trf_trnsl = e_vert[e_selection] + e_offs[e_selection] - e_ocs_centr;
+      eig::Affine3f trf_basic = eig::Affine3f(eig::Translation3f(trf_trnsl));
+      eig::Affine3f trf_delta = eig::Affine3f::Identity();
 
       // Insert ImGuizmo manipulator at anchor position
       eig::Vector2f rmin = ImGui::GetItemRectMin(), rmax = ImGui::GetItemRectSize();
       ImGuizmo::SetRect(rmin.x(), rmin.y(), rmax.x(), rmax.y());
       ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-      ImGuizmo::Manipulate(i_arcball.view().data(), 
-                           i_arcball.proj().data(),
-                           ImGuizmo::OPERATION::TRANSLATE, 
-                           ImGuizmo::MODE::LOCAL, 
-                           anchor_trf.data());
+      ImGuizmo::Manipulate(i_arcball.view().data(), i_arcball.proj().data(), 
+        ImGuizmo::OPERATION::TRANSLATE, ImGuizmo::MODE::LOCAL, trf_basic.data(), trf_delta.data());
 
-      // After transformation update, we transform a second point to obtain translation distance
-      auto post_pos = anchor_trf * eig::Vector3f(0, 0, 0);
-      auto transl   = (post_pos - pre_pos).eval();
-
-      // Start gizmo drag
+      // Register gizmo use start, cache current position
       if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
+        m_offs_prev = e_offs;
         m_is_gizmo_used = true;
-        m_offs_prev = e_gamut_offs;
       }
 
-      // Halfway gizmo drag
-      if (ImGuizmo::IsUsing()) {
-        e_gamut_offs[e_gamut_idx] = (e_gamut_offs[e_gamut_idx] + transl.array()).eval();
-      }
+      // Register gizmo use
+      if (ImGuizmo::IsUsing())
+        e_offs[e_selection] = (trf_delta * e_offs[e_selection].matrix()).array();
 
-      // End gizmo drag
+      // Register gizmo use end, update positions
       if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
         m_is_gizmo_used = false;
         
         // Register data edit as drag finishes
         e_app_data.touch({ 
           .name = "Move gamut offsets", 
-          .redo = [edit = e_gamut_offs](auto &data) { data.gamut_offs_j = edit; }, 
+          .redo = [edit = e_offs](auto &data) { data.gamut_offs_j = edit; }, 
           .undo = [edit = m_offs_prev](auto &data) { data.gamut_offs_j = edit; }
         });
       }
