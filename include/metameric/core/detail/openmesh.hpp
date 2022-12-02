@@ -24,47 +24,47 @@ namespace met {
   }
 } // namespace met
 
-namespace OpenMesh {
-  struct BaseMeshTraits : public DefaultTraits {
-    // Attribute types
-    using Point      = Eigen::Vector3f;
-    using Normal     = Eigen::Vector3f;
-    using Color      = Eigen::Vector3f;
-    using TexCoord2D = Eigen::Vector2f;
+// namespace OpenMesh {
+//   struct BaseMeshTraits : public DefaultTraits {
+//     // Attribute types
+//     using Point      = Eigen::Vector3f;
+//     using Normal     = Eigen::Vector3f;
+//     using Color      = Eigen::Vector3f;
+//     using TexCoord2D = Eigen::Vector2f;
 
-    // User-defined traits
-    VertexTraits    {};
-    HalfedgeTraits  {};
-    EdgeTraits      {};
-    FaceTraits      {};
+//     // User-defined traits
+//     VertexTraits    {};
+//     HalfedgeTraits  {};
+//     EdgeTraits      {};
+//     FaceTraits      {};
 
-    // Predefined attributes
-    VertexAttributes(Attributes::None);
-    EdgeAttributes(Attributes::None);
-    HalfedgeAttributes(Attributes::PrevHalfedge);
-    FaceAttributes(Attributes::Normal);
-  };
+//     // Predefined attributes
+//     VertexAttributes(Attributes::None);
+//     EdgeAttributes(Attributes::None);
+//     HalfedgeAttributes(Attributes::PrevHalfedge);
+//     FaceAttributes(Attributes::Normal);
+//   };
 
-  template <typename VectorType>
-  struct VMeshTraits : public DefaultTraits {
-    using Point  = VectorType;
-    using Normal = VectorType;
+//   template <typename VectorType>
+//   struct VMeshTraits : public DefaultTraits {
+//     using Point  = VectorType;
+//     using Normal = VectorType;
 
-    // User-defined traits
-    VertexTraits    {};
-    HalfedgeTraits  {};
-    EdgeTraits      {};
-    FaceTraits      {};
+//     // User-defined traits
+//     VertexTraits    {};
+//     HalfedgeTraits  {};
+//     EdgeTraits      {};
+//     FaceTraits      {};
 
-    // Predefined attributes
-    VertexAttributes(Attributes::None);
-    EdgeAttributes(Attributes::None);
-    HalfedgeAttributes(Attributes::PrevHalfedge);
-    FaceAttributes(Attributes::Normal);
-  };
+//     // Predefined attributes
+//     VertexAttributes(Attributes::None);
+//     EdgeAttributes(Attributes::None);
+//     HalfedgeAttributes(Attributes::PrevHalfedge);
+//     FaceAttributes(Attributes::Normal);
+//   };
 
-  using BaseMesh = TriMesh_ArrayKernelT<BaseMeshTraits>;
+//   using BaseMesh = TriMesh_ArrayKernelT<BaseMeshTraits>;
 
-  template <typename VectorType>
-  using VMesh = TriMesh_ArrayKernelT<VMeshTraits<VectorType>>;
-} // namespace OpenMesh
+//   template <typename VectorType>
+//   using VMesh = TriMesh_ArrayKernelT<VMeshTraits<VectorType>>;
+// } // namespace OpenMesh
