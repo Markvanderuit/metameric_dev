@@ -36,7 +36,7 @@ namespace met {
   } // namespace detail
 
   template <typename Traits, typename T>
-  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const omesh::TriMesh_ArrayKernelT<Traits> &mesh) {
+  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const TriMesh<Traits> &mesh) {
     met_trace();
 
     std::vector<T> vertices(mesh.n_vertices());
@@ -55,10 +55,10 @@ namespace met {
   }
 
   template <typename Traits, typename T>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements) {
+  TriMesh<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements) {
     met_trace();
 
-    omesh::TriMesh_ArrayKernelT<Traits> mesh;
+    TriMesh<Traits> mesh;
     mesh.reserve(vertices.size(), (vertices.size() + elements.size() - 2), elements.size());
 
     std::vector<typename decltype(mesh)::VertexHandle> vth(vertices.size());
@@ -75,7 +75,7 @@ namespace met {
   }
 
   template <typename Traits>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_octahedron() {
+  TriMesh<Traits> generate_octahedron() {
     met_trace();
 
     using V = eig::Array3f;
@@ -90,7 +90,7 @@ namespace met {
   }
 
   template <typename Traits>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_spheroid(uint n_subdivs) {
+  TriMesh<Traits> generate_spheroid(uint n_subdivs) {
     met_trace();
 
     // Start with an octahedron; doing loop subdivision and normalizing the resulting vertices
@@ -116,7 +116,7 @@ namespace met {
   }
 
   template <typename Traits, typename T>
-  omesh::TriMesh_ArrayKernelT<Traits> generate_convex_hull(std::span<const T> points, const omesh::TriMesh_ArrayKernelT<Traits> &spheroid_mesh) {
+  TriMesh<Traits> generate_convex_hull(std::span<const T> points, const TriMesh<Traits> &spheroid_mesh) {
     met_trace();
 
     auto mesh = spheroid_mesh;
@@ -146,7 +146,7 @@ namespace met {
   }
 
   template <typename Traits>
-  omesh::TriMesh_ArrayKernelT<Traits> simplify(const omesh::TriMesh_ArrayKernelT<Traits> &input_mesh, uint max_vertices) {
+  TriMesh<Traits> simplify(const TriMesh<Traits> &input_mesh, uint max_vertices) {
     met_trace();
     
     auto mesh = input_mesh;
