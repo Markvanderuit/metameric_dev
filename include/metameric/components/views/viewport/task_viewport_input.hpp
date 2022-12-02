@@ -1,6 +1,5 @@
 #pragma once
 
-#include <metameric/core/ray.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
@@ -34,8 +33,6 @@ namespace met {
       info.emplace_task_after<ViewportInputElemTask>(name(), name() + "_elem");
 
       // Share resources
-      info.insert_resource<std::vector<uint>>("gamut_vert_selection", { });
-      info.insert_resource<std::vector<uint>>("gamut_elem_selection", { });
       info.emplace_resource<detail::ViewportInputMode>("mode", detail::ViewportInputMode::eVertex);
       info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.5f, .e_center = 0.5f });
     }

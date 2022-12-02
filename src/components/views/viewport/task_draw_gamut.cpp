@@ -83,7 +83,7 @@ namespace met {
     auto &e_proj_data        = e_app_data.project_data;
     auto &e_gamut_elem       = e_proj_data.gamut_elems;
     auto &e_gamut_vert       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
-    auto &e_elem_selection   = info.get_resource<std::vector<uint>>("viewport_input", "gamut_elem_selection");
+    auto &e_elem_selection   = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
 
     // Update array object in case gamut buffer was resized
     if (m_gamut_vert_cache != e_gamut_vert.object()) {
