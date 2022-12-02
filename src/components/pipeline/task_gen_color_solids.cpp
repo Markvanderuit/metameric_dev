@@ -1,4 +1,4 @@
-#include <metameric/components/pipeline/task_gen_metamer_ocs.hpp>
+#include <metameric/components/pipeline/task_gen_color_solids.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
@@ -73,10 +73,10 @@ namespace met {
     }
   } // namespace detail
 
-  GenMetamerOCSTask::GenMetamerOCSTask(const std::string &name)
+  GenColorSolidsTask::GenColorSolidsTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenMetamerOCSTask::init(detail::TaskInitInfo &info) {
+  void GenColorSolidsTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -93,7 +93,7 @@ namespace met {
     info.insert_resource("ocs_chulls", std::vector<HalfedgeMesh>());
   }
   
-  void GenMetamerOCSTask::eval(detail::TaskEvalInfo &info) {
+  void GenColorSolidsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Continue only on relevant state change

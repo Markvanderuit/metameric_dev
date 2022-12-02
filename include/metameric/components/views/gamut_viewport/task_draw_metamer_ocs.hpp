@@ -87,15 +87,15 @@ namespace met {
       auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_state_gamut  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
       auto &e_arcball      = info.get_resource<detail::Arcball>(m_parent, "arcball");
-      auto &e_ocs_centr    = info.get_resource<std::vector<Colr>>("gen_metamer_ocs", "ocs_centers")[e_gamut_idx];
+      auto &e_ocs_centr    = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_gamut_idx];
 
       // Update convex hull mesh data if selection has changed, or selected gamut point has changed
       if (m_gamut_idx != e_gamut_idx || e_state_gamut[e_gamut_idx] == CacheState::eStale) {
         m_gamut_idx = e_gamut_idx;
         
         // Get shared resources
-        auto &e_ocs_hull = info.get_resource<std::vector<HalfedgeMesh>>("gen_metamer_ocs", "ocs_chulls")[m_gamut_idx];
-        auto &e_ocs_data = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("gen_metamer_ocs", "ocs_points")[m_gamut_idx];
+        auto &e_ocs_hull = info.get_resource<std::vector<HalfedgeMesh>>("gen_color_solids", "ocs_chulls")[m_gamut_idx];
+        auto &e_ocs_data = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("gen_color_solids", "ocs_points")[m_gamut_idx];
         auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(e_ocs_hull);
 
         // Copy new data to buffer and adjust vertex draw count

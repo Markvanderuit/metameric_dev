@@ -4,14 +4,14 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class GenMetamerOCSTask : public detail::AbstractTask {
+  class GenColorSolidsTask : public detail::AbstractTask {
     using Array6f = eig::Array<float, 6, 1>;
 
     std::vector<Array6f> m_sphere_samples;    
     HalfedgeMesh         m_sphere_mesh;
     
   public:
-    GenMetamerOCSTask(const std::string &name);
+    GenColorSolidsTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
