@@ -22,7 +22,7 @@ namespace met {
   constexpr uint n_points = n_points_per_dim * n_points_per_dim * n_points_per_dim;
 
   ViewportDrawMVCTask::ViewportDrawMVCTask(const std::string &name)
-  : detail::AbstractTask(name) { }
+  : detail::AbstractTask(name, true) { }
 
   void ViewportDrawMVCTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
