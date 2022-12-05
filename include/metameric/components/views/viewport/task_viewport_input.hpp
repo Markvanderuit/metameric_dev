@@ -18,6 +18,69 @@
 #include <ranges>
 
 namespace met {
+  namespace detail {
+    using MeshReturnType = std::pair<
+      std::vector<eig::Array3f>, 
+      std::vector<eig::Array3u>
+    >;
+
+    MeshReturnType subdivide_elem(const std::vector<eig::Array3f> &verts,
+                                  const std::vector<eig::Array3u> &elems,
+                                  uint i) {
+      // Generate openmesh representation to perform mesh operations
+      auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(verts, elems);
+
+      // Acquire handle to relevant subdividable face and vertices
+      auto fh = mesh.face_handle(i);
+      auto [fv0, fv1, fv2] = mesh.fv_range(fh).to_array<3>();
+
+      // Insert new vertex at face's centroid
+      auto vh = mesh.add_vertex(mesh.calc_face_centroid(fh));
+
+      // Insert new faces connecting to this vertex and delete the old one
+      mesh.delete_face(fh);
+      mesh.add_face(fv0, fv1, vh);
+      mesh.add_face(fv1, fv2, vh);
+      mesh.add_face(fv2, fv0, vh);
+
+      mesh.garbage_collection();
+      return generate_data(mesh);
+    }
+
+    /* MeshReturnType collapse_elem(const std::vector<eig::Array3f> &verts,
+                                 const std::vector<eig::Array3u> &elems,
+                                 uint i) {
+      // Generate openmesh representation to perform mesh operations
+      auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(verts, elems);
+                      
+      // Acquire handle to relevant collapsable face and vertices
+      auto fh = mesh.face_handle(i);
+      auto [vh0, vh1, vh2] = mesh.fv_range(fh).to_array<3>();
+
+      auto [eh0, eh1, eh2] = mesh.fe_range(fh).to_array<3>();
+
+      mesh.garbage_collection();
+      return generate_data(mesh);           
+    } */
+
+    MeshReturnType collapse_vert(const std::vector<eig::Array3f> &verts,
+                                 const std::vector<eig::Array3u> &elems,
+                                 uint i) {
+      // Generate openmesh representation to perform mesh operations
+      auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(verts, elems);
+
+      // Acquire handle to relevant center vertex and surrounding faces/verts
+      auto vh = mesh.vertex_handle(i);
+
+      // Remove trio of faces around vertex and fill hole with a single face
+      auto [vh0, vh1, vh2] = mesh.vv_range(vh).to_array<3>();
+      mesh.delete_vertex(vh);
+      mesh.add_face(vh1, vh0, vh2);
+
+      mesh.garbage_collection();
+      return generate_data(mesh);
+    }
+  } // namespace detail
 
   class ViewportInputTask : public detail::AbstractTask {
   public:
@@ -96,40 +159,33 @@ namespace met {
         if (i_mode == detail::ViewportInputMode::eVertex && e_selection_vert.size() == 1) {
           ImGui::Separator();
           if (ImGui::Button("Collapse vertex")) {
-            // Generate openmesh representation to perform mesh operations
-            auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(e_verts, e_elems);
-
-            // Acquire handle to relevant center vertex and surrounding faces/verts
-            auto vh = mesh.vertex_handle(e_selection_vert[0]);
-
-            // Remove trio of faces around vertex and fill hole with a single face
-            auto [vh0, vh1, vh2] = mesh.vv_range(vh).to_array<3>();
-            mesh.delete_vertex(vh);
-            mesh.add_face(vh1, vh0, vh2);
-
-            // Shift project data to new positions, given deleted vertex
-            std::vector<uint> vert_indices(mesh.n_vertices() - 1);
-            std::ranges::transform(mesh.vertices(), vert_indices.begin(),
-              [&](const auto &vh) { return vh.idx(); });
-  
-            // Return updated data from mesh
-            mesh.garbage_collection();
-            auto [verts, elems] = generate_data<HalfedgeMeshTraits, Colr>(mesh);
-
-            // Shift project data to front vertices
-            for (uint i = 0; i < vert_indices.size(); ++i) {
-              uint j = vert_indices[i];
-              e_proj_data.gamut_offs_j[i] = e_proj_data.gamut_offs_j[j];
-              e_proj_data.gamut_mapp_i[i] = e_proj_data.gamut_mapp_i[j];
-              e_proj_data.gamut_mapp_j[i] = e_proj_data.gamut_mapp_j[j];
-            }
-
-            // Remove last vertex from project data
-            e_proj_data.gamut_elems = elems;
-            e_proj_data.gamut_colr_i = verts;
-            e_proj_data.gamut_offs_j.resize(verts.size());
-            e_proj_data.gamut_mapp_i.resize(verts.size());
-            e_proj_data.gamut_mapp_j.resize(verts.size());
+            // Obtain mesh data with the collapsed vertex
+            auto [verts, elems] = detail::collapse_vert(e_verts, e_elems, e_selection_vert[0]);
+            
+            // Apply data modification to project
+            e_app_data.touch({
+              .name = "Collapse vertex",
+              .redo = [colr_i = verts,
+                       elems  = elems,
+                       i      = e_selection_vert[0]](auto &data) {
+                data.gamut_elems  = elems;
+                data.gamut_colr_i = colr_i;
+                data.gamut_offs_j.erase(data.gamut_offs_j.begin() + i);
+                data.gamut_mapp_i.erase(data.gamut_mapp_i.begin() + i);
+                data.gamut_mapp_j.erase(data.gamut_mapp_j.begin() + i);
+              },
+              .undo = [elems  = e_elems,
+                       colr_i = e_verts,
+                       offs_j = e_proj_data.gamut_offs_j,
+                       mapp_i = e_proj_data.gamut_mapp_i,
+                       mapp_j = e_proj_data.gamut_mapp_j](auto &data) {
+                data.gamut_elems  = elems;
+                data.gamut_colr_i = colr_i;
+                data.gamut_offs_j = offs_j;
+                data.gamut_mapp_i = mapp_i;
+                data.gamut_mapp_j = mapp_j;
+              }
+            });
 
             // Clear selection to prevent issues down the line with non-existent 
             // data still being selected
@@ -142,34 +198,33 @@ namespace met {
         if (i_mode == detail::ViewportInputMode::eFace && !e_selection_elem.empty()) {
           ImGui::Separator();
           if (ImGui::Button("Subdivide face")) {
-            // Generate openmesh representation to perform mesh operations
-            auto mesh = generate_from_data<BaselineMeshTraits, Colr>(e_verts, e_elems);
-            mesh.request_face_status();
-
-            // Acquire handle to relevant subdividable face and vertices
-            auto fh = mesh.face_handle(e_selection_elem[0]);
-            auto [fv0, fv1, fv2] = mesh.fv_range(fh).to_array<3>();
-
-            // Insert new vertex at face's centroid
-            auto vh = mesh.add_vertex(mesh.calc_face_centroid(fh));
-
-            // Insert new faces connecting to this vertex and delete the old one
-            mesh.delete_face(fh);
-            mesh.add_face(fv0, fv1, vh);
-            mesh.add_face(fv1, fv2, vh);
-            mesh.add_face(fv2, fv0, vh);
-
-            // Return updated data from mesh
-            mesh.garbage_collection();
-            auto [verts, elems] = generate_data<BaselineMeshTraits, Colr>(mesh);
+            // Obtain mesh data with the subdivided face
+            auto [verts, elems] = detail::subdivide_elem(e_verts, e_elems, e_selection_elem[0]);
 
             // Apply data modification to project
-            e_proj_data.gamut_elems  = elems;
-            e_proj_data.gamut_colr_i = verts;
-            e_proj_data.gamut_offs_j.resize(verts.size(), Colr(0));
-            e_proj_data.gamut_mapp_i.resize(verts.size(), 0);
-            e_proj_data.gamut_mapp_j.resize(verts.size(), 1);
-            
+            e_app_data.touch({
+              .name = "Subdivide face",
+              .redo = [colr_i = verts, 
+                       elems  = elems](auto &data) {
+                data.gamut_elems  = elems;
+                data.gamut_colr_i = colr_i;
+                data.gamut_offs_j.resize(colr_i.size(), Colr(0));
+                data.gamut_mapp_i.resize(colr_i.size(), 0);
+                data.gamut_mapp_j.resize(colr_i.size(), 1);
+              },
+              .undo = [elems  = e_elems,
+                       colr_i = e_verts,
+                       offs_j = e_proj_data.gamut_offs_j,
+                       mapp_i = e_proj_data.gamut_mapp_i,
+                       mapp_j = e_proj_data.gamut_mapp_j](auto &data) {
+                data.gamut_elems  = elems;
+                data.gamut_colr_i = colr_i;
+                data.gamut_offs_j = offs_j;
+                data.gamut_mapp_i = mapp_i;
+                data.gamut_mapp_j = mapp_j;
+              },
+            });
+
             // Clear selection to prevent issues down the line with non-existent data being selected
             e_selection_vert.clear(); 
             e_selection_elem.clear();

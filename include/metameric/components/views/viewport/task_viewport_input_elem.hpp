@@ -58,7 +58,6 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-
       // Generate and fire a camera ray against the gamut's triangle elements
       auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
       auto camera_ray = i_arcball.generate_ray(screen_pos);
