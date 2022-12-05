@@ -8,13 +8,17 @@
 
 namespace met {
   class ViewportDrawVerticesTask : public detail::AbstractTask {
-    // State to detect buffer changes
-    uint m_gamut_buffer_cache;
+    // Caches to detect buffer/selection changes
+    uint              m_gamut_buffer_cache;
+    std::vector<uint> m_gamut_select_cache;
+    std::vector<uint> m_gamut_msover_cache;
 
     // Draw components
     gl::Buffer   m_vert_buffer;
     gl::Buffer   m_elem_buffer;
     gl::Buffer   m_size_buffer;
+    std::span<float>
+                 m_size_map;
     gl::Array    m_array;
     gl::DrawInfo m_draw;
     gl::Program  m_program;

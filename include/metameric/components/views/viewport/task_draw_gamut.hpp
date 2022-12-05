@@ -8,23 +8,24 @@
 
 namespace met {
   class ViewportDrawGamutTask : public detail::AbstractTask {
-    // Local state to detect external buffer changes
-    uint m_gamut_vert_cache;
-    uint m_gamut_elem_count;    
+    // Caches to detect buffer/selection changes
+    uint              m_gamut_vert_cache;
+    std::vector<uint> m_gamut_select_cache;
+    std::vector<uint> m_gamut_msover_cache;
+
+    // Local components to have individual opacities for selections/mouseovers
+    gl::Buffer       m_opac_buffer;
+    std::span<float> m_opac_map;
 
     // Gamut draw components
-    gl::Buffer   m_gamut_elem_buffer;
-    gl::Array    m_gamut_array;
-    gl::DrawInfo m_gamut_draw;
-    gl::Program  m_gamut_program;
-    gl::DrawInfo m_gamut_draw_selection;
-
-    // Map span for gamut element data
-    std::span<eig::Array3u> m_gamut_elem_mapping;
+    gl::Array    m_array;
+    gl::Program  m_program;
+    gl::DrawInfo m_draw;
 
   public:
     ViewportDrawGamutTask(const std::string &);
     void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
+    void dstr(detail::TaskDstrInfo &) override;
   };
 } // namespace met

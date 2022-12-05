@@ -12,13 +12,19 @@ namespace met {
       eig::Array44f  inv;
     };
 
+    struct UniformBuffer {
+      uint n;       // Nr. of points to dispatch computation for
+      uint n_verts; // Nr. of vertices defining surrounding hull
+      uint n_elems; // Nr. of elements defining surrounding hull
+    };
+
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::ComputeInfo m_dispatch_cl;
     gl::Program     m_program_cl;
     gl::Buffer      m_uniform_buffer;
     gl::Buffer      m_bary_buffer;
-    
+    UniformBuffer  *m_uniform_map;
     BarycentricBuffer *m_bary_map;
 
   public:

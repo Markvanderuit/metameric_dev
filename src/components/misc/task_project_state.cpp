@@ -62,6 +62,7 @@ namespace met {
     info.insert_resource<std::vector<CacheState>>("gamut_mapp_i",  { });
     info.insert_resource<std::vector<CacheState>>("gamut_mapp_j",  { });
     info.insert_resource<std::vector<CacheState>>("gamut_summary", { });
+    info.insert_resource<CacheState>("gamut_size", { });
   }
 
   void ProjectStateTask::eval(detail::TaskEvalInfo &info) {
@@ -77,6 +78,11 @@ namespace met {
     auto &i_state_gamut_mapp_i  = info.get_resource<std::vector<CacheState>>("gamut_mapp_i");
     auto &i_state_gamut_mapp_j  = info.get_resource<std::vector<CacheState>>("gamut_mapp_j");
     auto &i_state_gamut         = info.get_resource<std::vector<CacheState>>("gamut_summary");
+    auto &i_state_gamut_size    = info.get_resource<CacheState>("gamut_size");
+
+    // Have summary flag for resized data
+    i_state_gamut_size = (i_state_gamut_colr_i.size() != m_gamut_colr_i.size())
+                       ? CacheState::eStale : CacheState::eFresh;
 
     // Check and set cache states for loaded mappings to either fresh or stale
     detail::compare_and_set_all(i_state_mapp, m_mappings, e_app_data.loaded_mappings);
@@ -86,7 +92,7 @@ namespace met {
     detail::compare_and_set_all(i_state_gamut_mapp_i, m_gamut_mapp_i, e_app_data.project_data.gamut_mapp_i);
     detail::compare_and_set_all(i_state_gamut_mapp_j, m_gamut_mapp_j, e_app_data.project_data.gamut_mapp_j);
     
-    // Flag vertex data for stale mappings as stale
+    // Flag vertex data for stale mappings as, well, stale
     for (uint i = 0; i < e_proj_data.gamut_mapp_i.size(); ++i) {
       i_state_gamut_mapp_i[i] &= i_state_mapp[e_proj_data.gamut_mapp_i[i]];
       i_state_gamut_mapp_j[i] &= i_state_mapp[e_proj_data.gamut_mapp_j[i]];
@@ -101,8 +107,5 @@ namespace met {
                             || i_state_gamut_mapp_j[i] == CacheState::eStale;
       i_state_gamut[i] = gamut_stale ? CacheState::eStale : CacheState::eFresh;
     }
-
-    guard(std::ranges::any_of(i_state_mapp, [](auto s) { return s == CacheState::eStale; }));
-    fmt::print("mapping update\n");
   }
 } // namespace met

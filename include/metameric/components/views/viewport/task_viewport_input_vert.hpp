@@ -13,6 +13,8 @@
 #include <ranges>
 
 namespace met {
+  constexpr float selector_near_distance = 12.f;
+
   class ViewportInputVertTask : public detail::AbstractTask {
     std::vector<Colr> m_verts_prev;
     bool              m_is_gizmo_used;
@@ -26,6 +28,7 @@ namespace met {
 
       // Insert shared resources
       info.insert_resource<std::vector<uint>>("selection", { });
+      info.insert_resource<std::vector<uint>>("mouseover", { });
 
       // Start with gizmo inactive
       m_is_gizmo_used = false;
@@ -40,12 +43,13 @@ namespace met {
       guard(ImGui::IsItemHovered());
 
       // Get shared resources
-      auto &io           = ImGui::GetIO();
+      auto &io          = ImGui::GetIO();
       auto &i_selection = info.get_resource<std::vector<uint>>("selection");
-      auto &i_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-      auto &e_app_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_proj_data  = e_app_data.project_data;
-      auto &e_verts      = e_app_data.project_data.gamut_colr_i;
+      auto &i_mouseover = info.get_resource<std::vector<uint>>("mouseover");
+      auto &i_arcball   = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+      auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data = e_app_data.project_data;
+      auto &e_verts     = e_app_data.project_data.gamut_colr_i;
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -53,14 +57,33 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       
-      // If gizmo is not used or active, handle selection
-      if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !m_is_gizmo_used) {
+      // If gizmo is not used or active, handle selection/highlighting
+      if ((!ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) || !m_is_gizmo_used) {
+        // Declare selector captures to determine point selection/highlighting
+        auto selector_ul = eig::Array2f(io.MouseClickedPos[1]).min(eig::Array2f(io.MousePos)).eval();
+        auto selector_br = eig::Array2f(io.MouseClickedPos[1]).max(eig::Array2f(io.MousePos)).eval();
+        auto selector_rectangle = std::views::filter([&](uint i) {
+          eig::Array2f p = eig::world_to_window_space(e_verts[i], i_arcball.full(), viewport_offs, viewport_size);
+          return p.max(selector_ul).min(selector_br).isApprox(p);
+        });
+        auto selector_near = std::views::filter([&](uint i) {
+          eig::Vector2f p = eig::world_to_window_space(e_verts[i], i_arcball.full(), viewport_offs, viewport_size);
+          return (p - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance;
+        });
+
+        // Apply mouseover on every iteration
+        i_mouseover.clear();
+        std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near, std::back_inserter(i_mouseover));
+
         // Apply selection area: right mouse OR left mouse + shift
         if (io.MouseDown[1]) {
-          eig::Array2f ul = io.MouseClickedPos[1], br = io.MousePos;
+          // Add colored rectangles to highlight selection area
           auto col = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_DockingPreview));
-          ImGui::GetWindowDrawList()->AddRect(ul, br, col);
-          ImGui::GetWindowDrawList()->AddRectFilled(ul, br, col);
+          ImGui::GetWindowDrawList()->AddRect(selector_ul, selector_br, col);
+          ImGui::GetWindowDrawList()->AddRectFilled(selector_ul, selector_br, col);
+
+          // Push vertex indices on mouseover list
+          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(i_mouseover));
         }
 
         // Right-click-release fixes the selection area; then determine selected gamut position idxs
@@ -68,34 +91,24 @@ namespace met {
           // Filter tests if a gamut position is inside the selection rectangle in window space
           auto ul = eig::Array2f(io.MouseClickedPos[1]).min(eig::Array2f(io.MousePos)).eval();
           auto br = eig::Array2f(io.MouseClickedPos[1]).max(eig::Array2f(io.MousePos)).eval();
-
-          // Selector tests if projected point lies in selection rectangle in window space
-          auto selector = std::views::filter([&](uint i) {
-            eig::Array2f p = eig::world_to_window_space(e_verts[i], i_arcball.full(), viewport_offs, viewport_size);
-            return p.max(ul).min(br).isApprox(p);
-          });
                     
-          // Store selected gamut position indices
+          // Push vertex indices on selection list
           i_selection.clear();
-          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector, std::back_inserter(i_selection));
+          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(i_selection));
         }
 
         // Left-click selects a gamut position
         if (io.MouseClicked[0] && (i_selection.empty() || !ImGuizmo::IsOver())) {
-          // Selector tests if projected point lies near click position in window space
-          auto selector = std::views::filter([&](uint i) {
-            eig::Vector2f p = eig::world_to_window_space(e_verts[i], i_arcball.full(), viewport_offs, viewport_size);
-            return (p - eig::Vector2f(io.MouseClickedPos[0])).squaredNorm() < 64.f;
-          });
-
-          // Store selected gamut position indices
           i_selection.clear();
-          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector, std::back_inserter(i_selection));
+          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near, std::back_inserter(i_selection));
         }
       }
 
       // Continue only if a selection has been made
-      guard(!i_selection.empty());
+      if (i_selection.empty()) {
+        m_is_gizmo_used = false;
+        return;
+      }
 
       // Range over- and center of selected gamut positions
       constexpr

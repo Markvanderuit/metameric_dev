@@ -8,6 +8,9 @@
 #include <ranges>
 
 namespace met {
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+
   GenSpectralTextureTask::GenSpectralTextureTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
@@ -27,12 +30,9 @@ namespace met {
     m_dispatch_cl = { .groups_x = generate_ndiv_cl, 
                       .bindable_program = &m_program_cl }; 
 
-    // Initialize uniform buffers
-    const auto create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-    const auto map_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
-    m_uniform_buffer = {{ .data = obj_span<const std::byte>(generate_n) }};
-    m_bary_buffer = {{ .size = sizeof(BarycentricBuffer), .flags = create_flags}};
-    m_bary_map = &m_bary_buffer.map_as<BarycentricBuffer>(map_flags)[0];
+    // Initialize uniform buffer and writeable, flushable mapping
+    m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
 
     // Initialize main color and spectral texture buffers
     info.emplace_resource<gl::Buffer>("color_buffer", {  .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
@@ -54,14 +54,12 @@ namespace met {
     auto &i_spect_texture = info.get_resource<gl::Buffer>("spectrum_buffer");
     auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
     auto &e_elems_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_elem");
-
-    // Update barycentric coordinate inverse matrix in mapped uniform buffer
-    m_bary_map->sub = e_color_gamut_c[3];
-    m_bary_map->inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
-      << e_color_gamut_c[0] - e_color_gamut_c[3], 
-         e_color_gamut_c[1] - e_color_gamut_c[3], 
-         e_color_gamut_c[2] - e_color_gamut_c[3]).finished().inverse().eval();
-    m_bary_buffer.flush();
+    
+    // Update uniform data
+    m_uniform_map->n = e_app_data.loaded_texture.size().prod();
+    m_uniform_map->n_verts = e_color_gamut_c.size();
+    m_uniform_map->n_elems = e_app_data.project_data.gamut_elems.size();
+    m_uniform_buffer.flush();
 
     // Bind resources to buffer targets
     e_spect_gamut_s.bind_to(gl::BufferTargetType::eShaderStorage, 0);
@@ -70,7 +68,6 @@ namespace met {
     i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 3);
     i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 4);
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
-    m_bary_buffer.bind_to(gl::BufferTargetType::eUniform,    1);
     
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);

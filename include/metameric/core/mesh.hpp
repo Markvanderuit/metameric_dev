@@ -19,16 +19,16 @@ namespace met {
 
   /* An indexed mesh with face normals */
   struct FNormalMeshTraits : public omesh::DefaultTraits {
-    VertexAttributes(omesh::Attributes::None);
+    VertexAttributes(omesh::Attributes::Status);
     HalfedgeAttributes(omesh::Attributes::None);
-    FaceAttributes(omesh::Attributes::Normal);
+    FaceAttributes(omesh::Attributes::Normal | omesh::Attributes::Status);
   };
 
   /* An indexed mesh with face normals and half-edges to simplify a number of operations */
   struct HalfedgeMeshTraits : public omesh::DefaultTraits {
-    VertexAttributes(omesh::Attributes::None);
-    HalfedgeAttributes(omesh::Attributes::PrevHalfedge);
-    FaceAttributes(omesh::Attributes::Normal);
+    VertexAttributes(omesh::Attributes::Status);
+    HalfedgeAttributes(omesh::Attributes::PrevHalfedge | omesh::Attributes::Status);
+    FaceAttributes(omesh::Attributes::Normal | omesh::Attributes::Status);
   };
 
   // Triangle mesh shorthands implementing the above defined traits

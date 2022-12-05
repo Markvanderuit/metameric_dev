@@ -226,7 +226,7 @@ namespace met {
 
       // Get shared resources
       auto &e_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection")[0];
-      auto &e_ocs_centr = info.get_resource<std::vector<Colr>>("gen_metamer_ocs", "ocs_centers")[e_selection];
+      auto &e_ocs_centr = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_selection];
       auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
       auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_app_data.project_data;

@@ -1,4 +1,5 @@
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
@@ -10,20 +11,16 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr float unselected_psize = 0.005f;
-  constexpr float selected_psize   = 0.02f;
+  constexpr uint  max_vertices     = 16u;
+  constexpr float deselected_psize = 0.005f;
+  constexpr float mouseover_psize  = 0.015f;
+  constexpr float selected_psize   = 0.015f;
 
-  constexpr std::array<float, 2 * 4> verts = {
-    -1.f, -1.f,
-     1.f, -1.f,
-     1.f,  1.f,
-    -1.f,  1.f
-  };
+  constexpr std::array<float, 2 * 4> verts = { -1.f, -1.f, 1.f, -1.f, 1.f,  1.f, -1.f,  1.f };
+  constexpr std::array<uint, 2 * 3>  elems = { 0, 1, 2, 2, 3, 0 };
 
-  constexpr std::array<uint, 2 * 3> elems = {
-    0, 1, 2,
-    2, 3, 0
-  };
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
   ViewportDrawVerticesTask::ViewportDrawVerticesTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
@@ -32,20 +29,18 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
+    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data    = e_app_data.project_data;
     auto &e_gamut_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_vertices.vert" },
                  { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_vertices.frag" }};
 
-    // Declare buffer flags for persistent, write-only, flushable mapping
-    auto create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-    auto map_flags    = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
-
     // Setup sizes buffer using mapping flags
-    std::vector<float> input_sizes(16, unselected_psize);
-    m_size_buffer = {{ .data = cnt_span<const std::byte>(input_sizes), .flags = create_flags }};
-    info.insert_resource("size_map", cast_span<float>(m_size_buffer.map(map_flags)));
+    std::vector<float> input_sizes(max_vertices, deselected_psize);
+    m_size_buffer = {{ .data = cnt_span<const std::byte>(input_sizes), .flags = buffer_create_flags }};
+    m_size_map = cast_span<float>(m_size_buffer.map(buffer_access_flags));
 
     // Setup objects for instanced quad draw
     m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};
@@ -62,7 +57,7 @@ namespace met {
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = elems.size(),
-      .instance_count   = 5,
+      .instance_count   = static_cast<uint>(e_proj_data.gamut_colr_i.size()),
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
@@ -80,21 +75,29 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
+    auto &e_app_data        = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data       = e_app_data.project_data;
     auto &e_arcball         = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &i_size_map        = info.get_resource<std::span<float>>("size_map");
     auto &e_gamut_buffer    = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
     auto &e_gamut_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_gamut_mouseover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
 
-    // Update array object in case gamut buffer was resized
+    // On state change, update array object as gamut buffer was re-allocated
     if (m_gamut_buffer_cache != e_gamut_buffer.object()) {
-      m_gamut_buffer_cache = e_gamut_buffer.object();
       m_array.attach_buffer({{ .buffer = &e_gamut_buffer, .index = 1, .stride = sizeof(eig::AlArray3f), .divisor = 1 }});
+      m_draw.instance_count = static_cast<uint>(e_proj_data.gamut_colr_i.size());
+      m_gamut_buffer_cache = e_gamut_buffer.object();
     }
 
-    // Update point size data based on selected vertices
-    std::ranges::for_each(i_size_map, [](float &f) { f = unselected_psize; });
-    std::ranges::for_each(e_gamut_selection, [&](uint i) { i_size_map[i] = selected_psize; });
-    m_size_buffer.flush();
+    // On state change, update point size data based on selected vertices
+    if (!std::ranges::equal(m_gamut_select_cache, e_gamut_selection) || !std::ranges::equal(m_gamut_msover_cache, e_gamut_mouseover)) {
+      std::ranges::fill(m_size_map, deselected_psize);
+      std::ranges::for_each(e_gamut_mouseover, [&](uint i) { m_size_map[i] = mouseover_psize; });
+      std::ranges::for_each(e_gamut_selection, [&](uint i) { m_size_map[i] = selected_psize; });
+      m_size_buffer.flush();
+      m_gamut_select_cache = e_gamut_selection;
+      m_gamut_msover_cache = e_gamut_mouseover;
+    }
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

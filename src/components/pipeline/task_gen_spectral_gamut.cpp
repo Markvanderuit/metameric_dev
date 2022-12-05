@@ -24,34 +24,33 @@ namespace met {
   
   void GenSpectralGamutTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
-    
-    // Get shared resources
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data   = e_app_data.project_data;
-    auto &e_gamut_elems = e_proj_data.gamut_elems;
 
     // Submit shared resources 
     info.insert_resource<std::vector<Spec>>("gamut_spec", { });
     info.insert_resource<gl::Buffer>("buffer_colr", { });
     info.insert_resource<gl::Buffer>("buffer_spec", { });
     info.insert_resource<gl::Buffer>("buffer_elem", { });
+    info.insert_resource<gl::Buffer>("buffer_elem_unal", { });
     info.insert_resource<std::span<AlColr>>("mapping_colr", { });
     info.insert_resource<std::span<Spec>>("mapping_spec", { });
     info.insert_resource<std::span<eig::AlArray3u>>("mapping_elem", { });
+    info.insert_resource<std::span<eig::Array3u>>("mapping_elem_unal", { });
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
 
     // Get shared resources
-    auto &i_buffer_spec  = info.get_resource<gl::Buffer>("buffer_spec");
-    auto &i_buffer_colr  = info.get_resource<gl::Buffer>("buffer_colr");
-    auto &i_buffer_elem  = info.get_resource<gl::Buffer>("buffer_elem");
+    auto &i_buffer_spec = info.get_resource<gl::Buffer>("buffer_spec");
+    auto &i_buffer_colr = info.get_resource<gl::Buffer>("buffer_colr");
+    auto &i_buffer_elem = info.get_resource<gl::Buffer>("buffer_elem");
+    auto &i_buffer_elem_= info.get_resource<gl::Buffer>("buffer_elem_unal");
 
     // Unmap buffers
     if (i_buffer_spec.is_init() && i_buffer_spec.is_mapped()) i_buffer_spec.unmap();
     if (i_buffer_colr.is_init() && i_buffer_colr.is_mapped()) i_buffer_colr.unmap();
     if (i_buffer_elem.is_init() && i_buffer_elem.is_mapped()) i_buffer_elem.unmap();
+    if (i_buffer_elem_.is_init() && i_buffer_elem_.is_mapped()) i_buffer_elem_.unmap();
   }
   
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
@@ -65,30 +64,37 @@ namespace met {
     auto &e_state_elems  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_elems");
     auto &i_gamut_spec   = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_buffer_colr  = info.get_resource<gl::Buffer>("buffer_colr");
-    auto &i_buffer_elem  = info.get_resource<gl::Buffer>("buffer_elem");
     auto &i_buffer_spec  = info.get_resource<gl::Buffer>("buffer_spec");
+    auto &i_buffer_elem  = info.get_resource<gl::Buffer>("buffer_elem");
+    auto &i_buffer_elem_ = info.get_resource<gl::Buffer>("buffer_elem_unal");
     auto &i_mapping_colr = info.get_resource<std::span<AlColr>>("mapping_colr");
     auto &i_mapping_spec = info.get_resource<std::span<Spec>>("mapping_spec");
     auto &i_mapping_elem = info.get_resource<std::span<eig::AlArray3u>>("mapping_elem");
+    auto &i_mapping_elem_= info.get_resource<std::span<eig::Array3u>>("mapping_elem_unal");
     auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_app_data.project_data;
+    auto &e_gamut_colr_i = e_proj_data.gamut_colr_i;
+    auto &e_gamut_elems  = e_proj_data.gamut_elems;
 
     // Resize spectrum data vector and re-create gamut buffers in case of nr. of vertices changes
-    if (e_state_gamut.size() != i_gamut_spec.size()) {
-      i_gamut_spec.resize(e_state_gamut.size());
+    if (e_gamut_colr_i.size() != i_gamut_spec.size()) {
+      i_gamut_spec.resize(e_gamut_colr_i.size());
 
       if (i_buffer_spec.is_init() && i_buffer_spec.is_mapped()) i_buffer_spec.unmap();
       if (i_buffer_colr.is_init() && i_buffer_colr.is_mapped()) i_buffer_colr.unmap();
       if (i_buffer_elem.is_init() && i_buffer_elem.is_mapped()) i_buffer_elem.unmap();
+      if (i_buffer_elem_.is_init() && i_buffer_elem_.is_mapped()) i_buffer_elem_.unmap();
       
-      i_buffer_spec = {{ .size  = e_state_gamut.size() * sizeof(Spec),           .flags = buffer_create_flags }};
-      i_buffer_colr = {{ .size  = e_state_gamut.size() * sizeof(AlColr),         .flags = buffer_create_flags }};
-      i_buffer_elem = {{ .size  = e_state_elems.size() * sizeof(eig::AlArray3u), .flags = buffer_create_flags }};
+      i_buffer_spec = {{ .size  = e_gamut_colr_i.size() * sizeof(Spec),          .flags = buffer_create_flags }};
+      i_buffer_colr = {{ .size  = e_gamut_colr_i.size() * sizeof(AlColr),        .flags = buffer_create_flags }};
+      i_buffer_elem = {{ .size  = e_gamut_elems.size() * sizeof(eig::AlArray3u), .flags = buffer_create_flags }};
+      i_buffer_elem_= {{ .size  = e_gamut_elems.size() * sizeof(eig::Array3u),   .flags = buffer_create_flags }};
       
       i_mapping_spec = cast_span<Spec>(i_buffer_spec.map(buffer_access_flags));
       i_mapping_colr = cast_span<AlColr>(i_buffer_colr.map(buffer_access_flags));
       i_mapping_elem = cast_span<eig::AlArray3u>(i_buffer_elem.map(buffer_access_flags));
+      i_mapping_elem_= cast_span<eig::Array3u>(i_buffer_elem_.map(buffer_access_flags));
     }
 
     // Generate spectra at gamut color positions
@@ -108,7 +114,7 @@ namespace met {
     }
 
     // Describe ranges over stale gamut vertex/elements
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_state_gamut.size()))
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_gamut_colr_i.size()))
                     | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheState::eStale; });
     auto elem_range = std::views::iota(0u, static_cast<uint>(e_state_elems.size()))
                     | std::views::filter([&](uint i) { return e_state_elems[i] == CacheState::eStale; });
@@ -123,8 +129,10 @@ namespace met {
     
     // Push stale gamut element data to gpu
     for (uint i : elem_range) {
-      i_mapping_elem[i] = e_proj_data.gamut_elems[i];
+      i_mapping_elem[i]  = e_proj_data.gamut_elems[i];
+      i_mapping_elem_[i] = e_proj_data.gamut_elems[i];
       i_buffer_elem.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
+      i_buffer_elem_.flush(sizeof(eig::Array3u), i * sizeof(eig::Array3u));
     }
   }
 } // namespace met

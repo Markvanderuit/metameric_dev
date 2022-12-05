@@ -113,14 +113,14 @@ namespace met {
     auto &i_ocs_hulls    = info.get_resource<std::vector<HalfedgeMesh>>("ocs_chulls");
 
     // Deal with resized gamut
-    if (e_state_gamut.size() != i_ocs_data.size()) {
-      i_ocs_data.resize(e_state_gamut.size());
-      i_ocs_cntrs.resize(e_state_gamut.size());
-      i_ocs_hulls.resize(e_state_gamut.size());
+    if (e_gamut_colr_i.size() != i_ocs_data.size()) {
+      i_ocs_data.resize(e_gamut_colr_i.size());
+      i_ocs_cntrs.resize(e_gamut_colr_i.size());
+      i_ocs_hulls.resize(e_gamut_colr_i.size());
     }
 
     // Describe ranges over stale gamut vertices
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_state_gamut.size()))
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_gamut_colr_i.size()))
                     | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheState::eStale; });
 
     // For each vertex of the gamut shape
