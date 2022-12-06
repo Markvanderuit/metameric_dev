@@ -14,6 +14,24 @@ namespace met {
       return path.replace_extension(ext);
     }
 
+    /* Data block for spectral texture export format */
+    struct SpectralDataHeader {
+      float wavelength_min    = MET_WAVELENGTH_MIN;
+      float wavelength_max    = MET_WAVELENGTH_MAX;
+      uint wavelength_samples = MET_WAVELENGTH_SAMPLES;
+      uint function_count;
+      uint weights_xres;
+      uint weights_yres;
+    };
+
+    struct SpectralData {
+      SpectralDataHeader header;
+      std::vector<float> functions;
+      std::vector<float> weights;
+    };
+    void save_spectral_data(const SpectralData &data, const fs::path &path);
+    SpectralData load_spectral_data(const fs::path &path);
+
     /* Wrapper object for two-dimensional HD5 data files */
     struct HD5Data {
       std::vector<std::vector<float>> data;

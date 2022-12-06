@@ -92,4 +92,33 @@ namespace met::io {
     ofs.write(str.data(), str.size());
     ofs.close();
   }
+
+  void save_spectral_data(const SpectralData &data, const fs::path &path) {
+    met_trace();
+    
+    // Attempt to open output file stream in binary mode
+    std::ofstream ofs(path, std::ios::out | std::ios::binary);
+    debug::check_expr_dbg(ofs.is_open(),
+      fmt::format("failed to open file \"{}\"", path.string()));
+
+    // Write header data, byte by byte so things remain tightly packed
+    ofs.write((const char *) &data.header.wavelength_min,     sizeof(float));
+    ofs.write((const char *) &data.header.wavelength_max,     sizeof(float));
+    ofs.write((const char *) &data.header.wavelength_samples, sizeof(uint));
+    ofs.write((const char *) &data.header.function_count,     sizeof(uint));
+    ofs.write((const char *) &data.header.weights_xres,       sizeof(uint));
+    ofs.write((const char *) &data.header.weights_yres,       sizeof(uint));
+
+    // Write block data
+    ofs.write((const char *) data.functions.data(), data.functions.size() * sizeof(float));
+    ofs.write((const char *) data.weights.data(), data.weights.size() * sizeof(float));
+
+    ofs.close();
+  }
+
+  SpectralData load_spectral_data(const fs::path &path) {
+    met_trace();
+
+    return { };
+  }
 } // namespace met::io
