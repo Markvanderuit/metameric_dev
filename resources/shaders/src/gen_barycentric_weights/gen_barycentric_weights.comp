@@ -1,8 +1,9 @@
 #version 460 core
 
 #include <guard.glsl>
+#include <math.glsl>
 
-#define Weights float[16]
+#define Wght float[16]
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -10,10 +11,10 @@ layout(std430)             buffer;
 layout(std140)             uniform;
 
 // Shader storage buffer declarations
-layout(binding = 1) restrict readonly  buffer b_0 { vec3    data[]; } b_posi;
-layout(binding = 1) restrict readonly  buffer b_1 { vec3    data[]; } b_vert;
-layout(binding = 2) restrict readonly  buffer b_2 { uvec3   data[]; } b_elem;
-layout(binding = 3) restrict writeonly buffer b_3 { Weights data[]; } b_bary;
+layout(binding = 0) restrict readonly  buffer b_0 { vec3  data[]; } b_vert;
+layout(binding = 1) restrict readonly  buffer b_1 { uvec3 data[]; } b_elem;
+layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_posi;
+layout(binding = 3) restrict writeonly buffer b_3 { Wght  data[]; } b_bary;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
@@ -22,25 +23,113 @@ layout(binding = 0) uniform u_0 {
   uint n_elems;
 } b_size;
 
-// Hardcoded constants describing triangle mesh layout
-const uint n_elems = b_size.n_elems;
-const uint n_verts = 3;
+// Define to perform commonly occuring iteration
+#define weights_iter(__b) for (uint __b = 0; __b < 16; ++__b)
 
-Weights mean_value_coords(in vec3 x) {
+Wght constr_weights(in float f) {
+  Wght w;
+  weights_iter(i) w[i] = f;
+  return w;
+}
+
+Wght mean_value_coords(in vec3 x) {
+  // Constants describing triangle mesh layout
+  const uint n_elems = b_size.n_elems;
+  const uint n_verts = 3;
+
   // Global results
-  Weights w;
-  float total_w = 0.f;
+  Wght total_w = constr_weights(0.f);
+  float total_w_sum = 0.f;
 
   // Per triangle:
   for (uint j = 0; j < n_elems; ++j) {
     const uvec3 verts = b_elem.data[j];
     
-    // Local results
-    float local_w = 0.f;
-    
-    // ... 
+    // Compute |p - x| and normalized (p - x) / |p - x|
+    float d[n_verts];
+    vec3  u[n_verts];
+    for (uint i = 0; i < n_verts; ++i) {
+      vec3 p = b_vert.data[verts[i]];
+      d[i] = length(p - x);
+      u[i] = (p - x) / d[i];
 
+      // Fallback: x lies close-to or on vertex, return that value directly
+      if (d[i] < M_EPS) {
+        Wght single_w = constr_weights(0.f);
+        single_w[verts[i]] = 1.f;
+        return single_w;
+      }
+    }
+
+    // Spherical triangle data
+    float theta[n_verts];
+    float h = 0.f;
+    for (uint i = 0; i < n_verts; ++i) {
+      uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
+
+      theta[i] = 2.f * asin(length(u[ip] - u[im]) / 2.f);
+      h += theta[i];
+    }
+    h /= 2.f;
+
+    // Fallback: x lies on triangle, use 2D barycentric coordinates
+    if (M_PI - h < M_EPS) {
+      float local_w[n_verts];
+      float local_w_sum = 0.f;
+      for (uint i = 0; i < n_verts; ++i) {
+        uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
+        local_w[i] = sin(theta[i]) * d[im] * d[ip];
+        local_w_sum += local_w[i];
+      }
+      Wght single_w = constr_weights(0.f);
+      for (uint i = 0; i < n_verts; ++i) {
+        single_w[verts[i]] = local_w[i] / local_w_sum;
+      }
+      return single_w;
+    }
+
+    float c[n_verts];
+    float s[n_verts];
+    float det = determinant((mat3(u[0], u[1], u[2])));
+    for (uint i = 0; i < n_verts; ++i) {
+      uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
+
+      c[i] = (2.f * sin(h) * sin(h - theta[i])) 
+          / (sin(theta[ip]) * sin(theta[im]))
+          - 1.f;
+      s[i] = sign(det) * sqrt(1.f - (c[i] * c[i]));
+    }
+
+    // Fallback: x lies outside triangle but on same plane, return nothing
+    bool x_continue = false;
+    for (uint i = 0; i < n_verts; ++i) {
+      if (abs(s[i]) < M_EPS)
+        x_continue = true;
+    }
+
+    if (x_continue)
+      continue;
+
+    float local_w[n_verts];
+    float local_w_sum = 0.f;
+    for (uint i = 0; i < n_verts; ++i) {
+      uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
+
+      local_w[i] = (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
+                 / (d[i] * sin(theta[ip]) * s[im]);
+      local_w_sum += local_w[i];
+    }
+
+    // Sum together weights
+    for (uint i = 0; i < n_verts; ++i) {
+      total_w[verts[i]] += local_w[i]; // / local_w_sum;
+    }
   }
+
+  // Normalize and return weights
+  weights_iter(i) total_w_sum += total_w[i];
+  weights_iter(i) total_w[i] /= total_w_sum;
+  return total_w;
 }
 
 void main() {

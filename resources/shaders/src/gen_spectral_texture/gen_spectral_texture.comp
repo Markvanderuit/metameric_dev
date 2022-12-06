@@ -3,42 +3,34 @@
 #include <guard.glsl>
 #include <spectrum_invoc.glsl>
 
+#define Wght float[16]
+#define Spec InSpec
+
 layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
 
-layout(binding = 0, std430) restrict readonly  buffer b_0 { vec3   b_0_color_gamut[4];     };
-layout(binding = 1, std430) restrict readonly  buffer b_1 { InSpec b_1_spectral_gamut[4];  };
-layout(binding = 2, std430) restrict readonly  buffer b_2 { vec3   b_2_color_texture[];    };
-layout(binding = 3, std430) restrict writeonly buffer b_3 { InSpec b_3_spectral_texture[]; };
+layout(binding = 0) restrict readonly  buffer b_0 { Spec data[]; } b_spectra_in;
+layout(binding = 1) restrict readonly  buffer b_1 { Wght data[]; } b_weights_in;
+layout(binding = 2) restrict writeonly buffer b_2 { Spec data[]; } b_spectra_out;
 
-layout(location = 0) uniform uint u_n;
-layout(location = 1) uniform mat3 u_barycentric_transform;
-
-vec4 to_barycentric(in vec3 p) {
-  // TODO preprocess this matrix+vector in uniforms instead
-  mat3 t = inverse(mat3(b_0_color_gamut[0] - b_0_color_gamut[3],
-                        b_0_color_gamut[1] - b_0_color_gamut[3],
-                        b_0_color_gamut[2] - b_0_color_gamut[3]));
-  vec3 abc = t * (p - b_0_color_gamut[3]);
-  return vec4(abc, 1.f - hsum(abc));
-}
+// Uniform buffer declarations
+layout(binding = 0) uniform u_0 {
+  uint n;
+  uint n_verts;
+  uint n_elems;
+} b_size;
 
 void main() {
   const uint i = gl_GlobalInvocationID.x;
-  guard(i < u_n);
+  guard(i < b_size.n);
+  
+  Wght w = b_weights_in.data[i];
+  Spec s = in_spectrum(0.f);
 
-  /*
-    1. Obtain a value at i in the color texture.
-    2. Compute the barycentric coordinates of this value in the color gamut
-    3. Multiply the spectra in the spectral gamut based on the coordinates
-    4. Store the value at i in the spectral texture
-  */
+  for (uint j = 0; j < b_size.n_verts; ++j) {
+    s = in_add(s, in_mul(b_spectra_in.data[j], w[j]));
+  }
 
-  vec4 abcd = to_barycentric(b_2_color_texture[i]);
-
-  InSpec sd = in_mul(b_1_spectral_gamut[0], abcd[0]);
-         sd = in_add(sd, in_mul(b_1_spectral_gamut[1], abcd[1]));
-         sd = in_add(sd, in_mul(b_1_spectral_gamut[2], abcd[2]));
-         sd = in_add(sd, in_mul(b_1_spectral_gamut[3], abcd[3]));
-
-  b_3_spectral_texture[i] = in_clamp(sd, 0.f, 1.f);
+  b_spectra_out.data[i] = s;
 }

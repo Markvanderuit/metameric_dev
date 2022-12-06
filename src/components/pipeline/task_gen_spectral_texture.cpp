@@ -21,12 +21,18 @@ namespace met {
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     const uint generate_n       = e_rgb_texture.size().prod();
+    const uint generate_ndiv    = ceil_div(generate_n, 256u);
     const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(wavelength_samples, 4u));
 
     // Initialize objects for clustered shader call
+    m_program = {{ .type = gl::ShaderType::eCompute,
+                   .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv_opt",
+                   .is_spirv_binary = true }};
     m_program_cl = {{ .type = gl::ShaderType::eCompute,
                       .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_mvc_cl.comp.spv_opt",
                       .is_spirv_binary = true }};
+    m_dispatch = { .groups_x = generate_ndiv, 
+                   .bindable_program = &m_program }; 
     m_dispatch_cl = { .groups_x = generate_ndiv_cl, 
                       .bindable_program = &m_program_cl }; 
 
@@ -53,6 +59,7 @@ namespace met {
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
     auto &e_colr_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
     auto &e_elem_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
+    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
     
     // Update uniform data
     m_uniform_map->n       = e_app_data.loaded_texture.size().prod();
@@ -60,7 +67,7 @@ namespace met {
     m_uniform_map->n_elems = e_app_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
 
-    // Bind resources to buffer targets
+    /* // Bind resources to buffer targets
     e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     e_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
@@ -70,6 +77,16 @@ namespace met {
     
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::dispatch_compute(m_dispatch_cl);
+    gl::dispatch_compute(m_dispatch_cl); */
+
+    // Bind resources to buffer targets
+    e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    i_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
+    
+    // Dispatch shader to generate spectral data
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+    gl::dispatch_compute(m_dispatch);
   }
 } // namespace met
