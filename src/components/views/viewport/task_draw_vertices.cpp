@@ -14,7 +14,7 @@ namespace met {
   constexpr uint  max_vertices     = 16u;
   constexpr float deselected_psize = 0.005f;
   constexpr float mouseover_psize  = 0.015f;
-  constexpr float selected_psize   = 0.015f;
+  constexpr float selected_psize   = 0.01f;
 
   constexpr std::array<float, 2 * 4> verts = { -1.f, -1.f, 1.f, -1.f, 1.f,  1.f, -1.f,  1.f };
   constexpr std::array<uint, 2 * 3>  elems = { 0, 1, 2, 2, 3, 0 };

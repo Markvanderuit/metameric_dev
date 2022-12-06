@@ -131,8 +131,8 @@ namespace met {
 
       // Handle edit mode selection window
       constexpr auto window_flags = 
-        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar | 
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove  | ImGuiWindowFlags_NoFocusOnAppearing;
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
       eig::Array2f edit_size = { 300.f, 0.f };
       eig::Array2f edit_posi = { viewport_offs.x() + viewport_size.x() - edit_size.x() - 16.f, viewport_offs.y() + 16.f };
       ImGui::SetNextWindowPos(edit_posi);
@@ -145,15 +145,13 @@ namespace met {
         ImGui::RadioButton("Edge",   &m, static_cast<int>(detail::ViewportInputMode::eEdge));
         ImGui::SameLine();
         ImGui::RadioButton("Face",   &m, static_cast<int>(detail::ViewportInputMode::eFace));
+
+        // Reset selections if edit mode was changed
         if (auto mode = detail::ViewportInputMode(m); mode != i_mode) {
-          // Reset selections
-          info.get_resource<std::vector<uint>>("viewport_input_vert", "selection").clear();
-          info.get_resource<std::vector<uint>>("viewport_input_elem", "selection").clear();
+          e_selection_vert.clear();
+          e_selection_elem.clear();
           i_mode = mode;
         }
-
-        constexpr
-        auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
 
         // Given vertex edit mode and a potential selection, display options
         if (i_mode == detail::ViewportInputMode::eVertex && e_selection_vert.size() == 1) {
