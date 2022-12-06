@@ -19,7 +19,7 @@ namespace met {
 
     // Specify a default mappings buffer that can hold a appropriate nr. of mappings
     m_max_maps = nr_maps;
-    info.emplace_resource<gl::Buffer>("buffer_mapp", { .size = m_max_maps * sizeof(Mapp), .flags = buffer_flags });
+    info.emplace_resource<gl::Buffer>("mapp_buffer", { .size = m_max_maps * sizeof(Mapp), .flags = buffer_flags });
   }
   
   void GenSpectralMappingsTask::eval(detail::TaskEvalInfo &info) {
@@ -27,7 +27,7 @@ namespace met {
 
     // Get shared resources
     auto &e_vector_mapp = info.get_resource<ApplicationData>(global_key, "app_data").loaded_mappings;
-    auto &i_buffer_mapp = info.get_resource<gl::Buffer>("buffer_mapp");
+    auto &i_buffer_mapp = info.get_resource<gl::Buffer>("mapp_buffer");
     auto &e_state_mapp  = info.get_resource<std::vector<CacheState>>("project_state", "mappings");
 
     if (e_vector_mapp.size() > m_max_maps) {

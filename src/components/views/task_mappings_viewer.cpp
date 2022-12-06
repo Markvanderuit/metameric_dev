@@ -32,7 +32,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_spectrum_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
+    auto &e_spectrum_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spec_buffer");
     auto &e_tex_data        = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     // Compute sample position in texture dependent on mouse position in image

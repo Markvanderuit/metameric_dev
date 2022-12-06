@@ -26,8 +26,8 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    auto &e_gamut_vert = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
-    auto &e_gamut_elem = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_elem_unal");
+    auto &e_gamut_vert = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
+    auto &e_gamut_elem = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
 
     // Setup program for colored element draw
     m_program = {{ .type = gl::ShaderType::eVertex, .path = "resources/shaders/viewport/draw_gamut.vert" },
@@ -66,8 +66,8 @@ namespace met {
                                 
     // Get shared resources 
     auto &e_viewport_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_gamut_vert       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
-    auto &e_gamut_elem       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_elem_unal");
+    auto &e_gamut_vert       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
+    auto &e_gamut_elem       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
     auto &e_gamut_selection  = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
     auto &e_gamut_mouseover = info.get_resource<std::vector<uint>>("viewport_input_elem", "mouseover");
 

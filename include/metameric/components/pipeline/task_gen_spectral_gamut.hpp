@@ -4,9 +4,13 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  struct GenSpectralGamutTask : public detail::AbstractTask {
-    Colr c = 0.f;
+  class GenSpectralGamutTask : public detail::AbstractTask {
+    std::span<Spec>           m_spec_map;
+    std::span<AlColr>         m_colr_map;
+    std::span<eig::Array3u>   m_elem_unal_map;
+    std::span<eig::AlArray3u> m_elem_map;
 
+  public:
     GenSpectralGamutTask(const std::string &);
     void init(detail::TaskInitInfo &) override;
     void dstr(detail::TaskDstrInfo &) override;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <filesystem>
 #include <string>
 
@@ -16,9 +17,9 @@ namespace met {
 
     /* Data block for spectral texture export format */
     struct SpectralDataHeader {
-      float wavelength_min    = MET_WAVELENGTH_MIN;
-      float wavelength_max    = MET_WAVELENGTH_MAX;
-      uint wavelength_samples = MET_WAVELENGTH_SAMPLES;
+      float wavelength_min    = wavelength_min;
+      float wavelength_max    = wavelength_max;
+      uint wavelength_samples = wavelength_samples;
       uint function_count;
       uint weights_xres;
       uint weights_yres;

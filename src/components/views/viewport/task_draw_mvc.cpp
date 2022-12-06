@@ -81,8 +81,8 @@ namespace met {
     auto &e_app_data      = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_color_gamut_c = e_app_data.project_data.gamut_colr_i;
     auto &e_arcball       = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
-    auto &e_elems_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_elem");
+    auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
+    auto &e_elems_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),

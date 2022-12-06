@@ -32,7 +32,7 @@ namespace met {
     m_dispatch_cl = { .groups_x = mapping_ndiv_sg, .bindable_program = &m_program_cl };
 
     // Create color buffer output for this task
-    info.emplace_resource<gl::Buffer>("color_buffer", {
+    info.emplace_resource<gl::Buffer>("colr_buffer", {
       .size  = (size_t) mapping_n * sizeof(eig::AlArray3f),
       .flags = gl::BufferCreateFlags::eMapRead 
     });
@@ -52,9 +52,9 @@ namespace met {
     m_init_stale = false;
 
     // Get shared resources
-    auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spectrum_buffer");
-    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "buffer_mapp");
-    auto &i_colr_buffer = info.get_resource<gl::Buffer>("color_buffer");
+    auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spec_buffer");
+    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mapp_buffer");
+    auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Bind buffer resources to ssbo targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
@@ -80,7 +80,7 @@ namespace met {
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
     m_texture_subtasks.init(name(), info, e_mappings_n,
-      [=](auto &, uint i) { return TextureSubTask({ fmt::format("gen_color_mapping_{}", i), "color_buffer" },
+      [=](auto &, uint i) { return TextureSubTask({ fmt::format("gen_color_mapping_{}", i), "colr_buffer" },
                                                   { fmt::format("gen_color_mapping_texture_{}", i), "texture" },
                                                   { .size = e_texture_size }); },
       [](auto &, uint i) { return fmt::format("gen_color_mapping_texture_{}", i); });

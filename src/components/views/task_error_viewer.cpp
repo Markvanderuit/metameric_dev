@@ -15,9 +15,9 @@ namespace met {
 
     // Get shared resources
     auto &e_tex_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
-    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
-    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "color_buffer");
-    auto &i_color_error  = info.get_resource<gl::Buffer>("color_buffer");
+    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_spectral_texture", "colr_buffer");
+    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
+    auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
@@ -62,9 +62,9 @@ namespace met {
 
   void ErrorViewerTask::eval_error(detail::TaskEvalInfo &info) {
     // Get shared resources
-    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
-    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "color_buffer");
-    auto &i_color_error  = info.get_resource<gl::Buffer>("color_buffer");
+    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_spectral_texture", "colr_buffer");
+    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
+    auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Bind resources to buffer targets
     e_color_input.bind_to(gl::BufferTargetType::eShaderStorage,  0);
@@ -116,10 +116,10 @@ namespace met {
     m_error_program.uniform("u_n", generate_n);
 
     // Insert buffer object to hold error data
-    info.emplace_resource<gl::Buffer>("color_buffer", { .size = generate_n * sizeof(AlColr) });
+    info.emplace_resource<gl::Buffer>("colr_buffer", { .size = generate_n * sizeof(AlColr) });
 
     // Insert subtask to handle buffer->texture conversion
-    TextureSubtask subtask({ name(), "color_buffer" },
+    TextureSubtask subtask({ name(), "colr_buffer" },
                            { fmt::format(texture_fmt, name()), "texture" },
                            { .size = e_tex_data.size() });
     info.insert_task_after(name(), std::move(subtask));

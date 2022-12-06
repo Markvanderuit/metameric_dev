@@ -32,7 +32,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "color_buffer");
+    auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "colr_buffer");
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture.vert" },
@@ -66,7 +66,7 @@ namespace met {
 
     // Get shared resources 
     auto &e_arcball      = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_error_buffer = info.get_resource<gl::Buffer>("error_viewer", "color_buffer");
+    auto &e_error_buffer = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

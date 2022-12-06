@@ -8,6 +8,7 @@
 #include <ranges>
 
 namespace met {
+  constexpr uint max_vertices        = 16u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -35,8 +36,9 @@ namespace met {
     m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
 
     // Initialize main color and spectral texture buffers
-    info.emplace_resource<gl::Buffer>("color_buffer", {  .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info.emplace_resource<gl::Buffer>("spectrum_buffer", { .size  = sizeof(Spec) * generate_n });
+    info.emplace_resource<gl::Buffer>("colr_buffer", {  .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
+    info.emplace_resource<gl::Buffer>("spec_buffer", { .size  = sizeof(Spec) * generate_n });
+    info.emplace_resource<gl::Buffer>("bary_buffer", { .size = 16 * sizeof(float) * generate_n });
   }
 
   void GenSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
@@ -47,27 +49,27 @@ namespace met {
     guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources
-    auto &e_app_data      = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_color_gamut_c = e_app_data.project_data.gamut_colr_i;
-    auto &e_spect_gamut_s = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_spec");
-    auto &i_color_texture = info.get_resource<gl::Buffer>("color_buffer");
-    auto &i_spect_texture = info.get_resource<gl::Buffer>("spectrum_buffer");
-    auto &e_color_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_colr");
-    auto &e_elems_gamut   = info.get_resource<gl::Buffer>("gen_spectral_gamut", "buffer_elem");
+    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_gamut_colr_i = e_app_data.project_data.gamut_colr_i;
+    auto &i_colr_bufer   = info.get_resource<gl::Buffer>("colr_buffer");
+    auto &i_spec_buffer  = info.get_resource<gl::Buffer>("spec_buffer");
+    auto &e_spec_buffer  = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
+    auto &e_colr_buffer  = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
+    auto &e_elems_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
     
     // Update uniform data
     m_uniform_map->n = e_app_data.loaded_texture.size().prod();
-    m_uniform_map->n_verts = e_color_gamut_c.size();
+    m_uniform_map->n_verts = e_gamut_colr_i.size();
     m_uniform_map->n_elems = e_app_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
 
     // Bind resources to buffer targets
-    e_spect_gamut_s.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_color_gamut.bind_to(gl::BufferTargetType::eShaderStorage,   1);
-    e_elems_gamut.bind_to(gl::BufferTargetType::eShaderStorage,   2);
-    i_color_texture.bind_to(gl::BufferTargetType::eShaderStorage, 3);
-    i_spect_texture.bind_to(gl::BufferTargetType::eShaderStorage, 4);
-    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
+    e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  0);
+    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  1);
+    e_elems_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    i_colr_bufer.bind_to(gl::BufferTargetType::eShaderStorage,   3);
+    i_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  4);
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,     0);
     
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
