@@ -1,0 +1,50 @@
+#version 460 core
+
+#include <guard.glsl>
+
+#define Weights float[16]
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
+
+// Shader storage buffer declarations
+layout(binding = 1) restrict readonly  buffer b_0 { vec3    data[]; } b_posi;
+layout(binding = 1) restrict readonly  buffer b_1 { vec3    data[]; } b_vert;
+layout(binding = 2) restrict readonly  buffer b_2 { uvec3   data[]; } b_elem;
+layout(binding = 3) restrict writeonly buffer b_3 { Weights data[]; } b_bary;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform u_0 {
+  uint n;
+  uint n_verts;
+  uint n_elems;
+} b_size;
+
+// Hardcoded constants describing triangle mesh layout
+const uint n_elems = b_size.n_elems;
+const uint n_verts = 3;
+
+Weights mean_value_coords(in vec3 x) {
+  // Global results
+  Weights w;
+  float total_w = 0.f;
+
+  // Per triangle:
+  for (uint j = 0; j < n_elems; ++j) {
+    const uvec3 verts = b_elem.data[j];
+    
+    // Local results
+    float local_w = 0.f;
+    
+    // ... 
+
+  }
+}
+
+void main() {
+  const uint i = gl_GlobalInvocationID.x;
+  guard(i < b_size.n);
+  b_bary.data[i] = mean_value_coords(b_posi.data[i]);;
+}
