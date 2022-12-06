@@ -16,6 +16,8 @@ namespace met {
     bool handle_save(detail::TaskEvalInfo &info);
     bool handle_save_as(detail::TaskEvalInfo &info);
 
+    bool handle_export(detail::TaskEvalInfo &info);
+
     void handle_close_safe(detail::TaskEvalInfo &info);
     void handle_close(detail::TaskEvalInfo &info);
     

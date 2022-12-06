@@ -106,6 +106,17 @@ namespace met {
     }
     return false;
   }
+
+  bool WindowTask::handle_export(detail::TaskEvalInfo &info) {
+    met_trace_full();
+
+    if (fs::path path; detail::save_dialog(path, ".met")) {
+      // ...
+      return true;
+    }
+
+    return false;
+  }
   
   void WindowTask::handle_close_safe(detail::TaskEvalInfo &info) {
     met_trace_full();
@@ -192,6 +203,10 @@ namespace met {
 
         if (ImGui::MenuItem("Save", nullptr, nullptr, enable_save))     { handle_save(info);    }
         if (ImGui::MenuItem("Save as...", nullptr, nullptr, is_loaded)) { handle_save_as(info); }
+
+        ImGui::Separator(); 
+
+        if (ImGui::MenuItem("Export", nullptr, nullptr, is_loaded)) { handle_export(info); }
 
         ImGui::Separator(); 
 
