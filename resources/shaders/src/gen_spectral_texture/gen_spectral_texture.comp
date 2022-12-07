@@ -3,13 +3,17 @@
 #include <guard.glsl>
 #include <spectrum_invoc.glsl>
 
-#define Wght float[16]
+const uint n_verts_max = 16;
+
+#define Wght float[n_verts_max]
 #define Spec InSpec
 
+// General layout rule declarations
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
 layout(std140)             uniform;
 
+// Shader storage buffer declarations
 layout(binding = 0) restrict readonly  buffer b_0 { Spec data[]; } b_spectra_in;
 layout(binding = 1) restrict readonly  buffer b_1 { Wght data[]; } b_weights_in;
 layout(binding = 2) restrict writeonly buffer b_2 { Spec data[]; } b_spectra_out;
@@ -21,16 +25,30 @@ layout(binding = 0) uniform u_0 {
   uint n_elems;
 } b_size;
 
+// Shared memory declarations
+shared Spec s_spectra_in[n_verts_max];
+
+void load_shared() {
+  const uint i = gl_LocalInvocationID.x / wavelength_samples;
+  const uint j = gl_LocalInvocationID.x % wavelength_samples;
+
+  if (i < b_size.n_verts && j < wavelength_samples)
+    s_spectra_in[i][j] = b_spectra_in.data[i][j];
+
+  barrier();
+  memoryBarrierShared();
+}
+
 void main() {
   const uint i = gl_GlobalInvocationID.x;
   guard(i < b_size.n);
   
+  load_shared();
+
+  // Compute spectral texture values; this is just a dense matrix multiplication
   Wght w = b_weights_in.data[i];
   Spec s = in_spectrum(0.f);
-
-  for (uint j = 0; j < b_size.n_verts; ++j) {
-    s = in_add(s, in_mul(b_spectra_in.data[j], w[j]));
-  }
-
+  for (uint j = 0; j < b_size.n_verts; ++j)
+    s = in_add(s, in_mul(s_spectra_in[j], w[j]));
   b_spectra_out.data[i] = s;
 }
