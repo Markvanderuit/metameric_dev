@@ -4,6 +4,7 @@
 #include <math.glsl>
 
 const uint n_verts_max = 16;
+const uint n_elems_max = 32;
 
 #define Wght float[n_verts_max]
 
@@ -13,10 +14,10 @@ layout(std430)             buffer;
 layout(std140)             uniform;
 
 // Shader storage buffer declarations
-layout(binding = 0) restrict readonly  buffer b_0 { vec3  data[]; } b_vert;
-layout(binding = 1) restrict readonly  buffer b_1 { uvec3 data[]; } b_elem;
-layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_posi;
-layout(binding = 3) restrict writeonly buffer b_3 { Wght  data[]; } b_bary;
+layout(binding = 0) restrict readonly  buffer b_0 { vec3  data[]; } b_vert_in;
+layout(binding = 1) restrict readonly  buffer b_1 { uvec3 data[]; } b_elem_in;
+layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_posi_in;
+layout(binding = 3) restrict writeonly buffer b_3 { Wght  data[]; } b_bary_out;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
@@ -24,6 +25,23 @@ layout(binding = 0) uniform u_0 {
   uint n_verts;
   uint n_elems;
 } b_size;
+
+// Shared memory declarations
+shared vec3  s_verts_in[n_verts_max];
+shared uvec3 s_elems_in[n_elems_max];
+
+void load_shared_data() {
+  const uint i = gl_LocalInvocationID.x;
+
+  if (i < b_size.n_verts)
+    s_verts_in[i] = b_vert_in.data[i];
+    
+  if (i < b_size.n_elems)
+    s_elems_in[i] = b_elem_in.data[i];
+  
+  barrier();
+  memoryBarrierShared();
+}
 
 // Define to perform commonly occuring iteration
 #define weights_iter(__b) for (uint __b = 0; __b < n_verts_max; ++__b)
@@ -45,13 +63,13 @@ Wght mean_value_coords(in vec3 x) {
 
   // Per triangle:
   for (uint j = 0; j < n_elems; ++j) {
-    const uvec3 verts = b_elem.data[j];
+    const uvec3 verts = s_elems_in[j];
     
     // Compute |p - x| and normalized (p - x) / |p - x|
     float d[n_verts];
     vec3  u[n_verts];
     for (uint i = 0; i < n_verts; ++i) {
-      vec3 p = b_vert.data[verts[i]];
+      vec3 p = s_verts_in[verts[i]];
       d[i] = length(p - x);
       u[i] = (p - x) / d[i];
 
@@ -137,5 +155,8 @@ Wght mean_value_coords(in vec3 x) {
 void main() {
   const uint i = gl_GlobalInvocationID.x;
   guard(i < b_size.n);
-  b_bary.data[i] = mean_value_coords(b_posi.data[i]);;
+
+  load_shared_data();
+
+  b_bary_out.data[i] = mean_value_coords(b_posi_in.data[i]);;
 }
