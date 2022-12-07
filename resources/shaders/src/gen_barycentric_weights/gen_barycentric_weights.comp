@@ -4,7 +4,7 @@
 #include <math.glsl>
 
 const uint n_verts_max = 16;
-const uint n_elems_max = 32;
+const uint n_elems_max = 24;
 
 #define Wght float[n_verts_max]
 
@@ -35,7 +35,7 @@ void load_shared_data() {
 
   if (i < b_size.n_verts)
     s_verts_in[i] = b_vert_in.data[i];
-    
+
   if (i < b_size.n_elems)
     s_elems_in[i] = b_elem_in.data[i];
   
@@ -111,38 +111,32 @@ Wght mean_value_coords(in vec3 x) {
     float c[n_verts];
     float s[n_verts];
     float det = determinant((mat3(u[0], u[1], u[2])));
+    bool  x_continue = false;
     for (uint i = 0; i < n_verts; ++i) {
       uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
 
       c[i] = (2.f * sin(h) * sin(h - theta[i])) 
-          / (sin(theta[ip]) * sin(theta[im]))
-          - 1.f;
+           / (sin(theta[ip]) * sin(theta[im]))
+           - 1.f;
       s[i] = sign(det) * sqrt(1.f - (c[i] * c[i]));
-    }
 
-    // Fallback: x lies outside triangle but on same plane, return nothing
-    bool x_continue = false;
-    for (uint i = 0; i < n_verts; ++i) {
-      if (abs(s[i]) < M_EPS)
+      // Fallback: x lies outside triangle but on same plane, return nothing
+      if (abs(s[i]) < M_EPS) {
         x_continue = true;
+        break;
+      }
     }
 
+    // Fallback ends here
     if (x_continue)
       continue;
 
-    float local_w[n_verts];
-    float local_w_sum = 0.f;
+    // Sum together weights
     for (uint i = 0; i < n_verts; ++i) {
       uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
 
-      local_w[i] = (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
-                 / (d[i] * sin(theta[ip]) * s[im]);
-      local_w_sum += local_w[i];
-    }
-
-    // Sum together weights
-    for (uint i = 0; i < n_verts; ++i) {
-      total_w[verts[i]] += local_w[i]; // / local_w_sum;
+      total_w[verts[i]] += (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
+                         / (d[i] * sin(theta[ip]) * s[im]);
     }
   }
 
