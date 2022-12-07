@@ -3,7 +3,9 @@
 #include <guard.glsl>
 #include <math.glsl>
 
-#define Wght float[16]
+const uint n_verts_max = 16;
+
+#define Wght float[n_verts_max]
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -24,7 +26,7 @@ layout(binding = 0) uniform u_0 {
 } b_size;
 
 // Define to perform commonly occuring iteration
-#define weights_iter(__b) for (uint __b = 0; __b < 16; ++__b)
+#define weights_iter(__b) for (uint __b = 0; __b < n_verts_max; ++__b)
 
 Wght constr_weights(in float f) {
   Wght w;

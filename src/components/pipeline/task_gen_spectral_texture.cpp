@@ -29,7 +29,8 @@ namespace met {
                    .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv_opt",
                    .is_spirv_binary = true }};
     m_program_cl = {{ .type = gl::ShaderType::eCompute,
-                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_mvc_cl.comp.spv_opt",
+                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv_opt",
+                      // .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_mvc_cl.comp.spv_opt",
                       .is_spirv_binary = true }};
     m_dispatch = { .groups_x = generate_ndiv, 
                    .bindable_program = &m_program }; 
@@ -87,6 +88,6 @@ namespace met {
     
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::dispatch_compute(m_dispatch);
+    gl::dispatch_compute(m_dispatch_cl);
   }
 } // namespace met

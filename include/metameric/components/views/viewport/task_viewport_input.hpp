@@ -146,6 +146,10 @@ namespace met {
         ImGui::SameLine();
         ImGui::RadioButton("Face",   &m, static_cast<int>(detail::ViewportInputMode::eFace));
 
+        ImGui::Separator();
+        ImGui::Value("Vertices", static_cast<uint>(e_verts.size()));
+        ImGui::Value("Faces", static_cast<uint>(e_elems.size()));
+
         // Reset selections if edit mode was changed
         if (auto mode = detail::ViewportInputMode(m); mode != i_mode) {
           e_selection_vert.clear();
