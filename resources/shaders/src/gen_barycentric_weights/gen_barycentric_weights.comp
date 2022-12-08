@@ -5,6 +5,8 @@
 
 const uint n_verts_max = 16;
 const uint n_elems_max = 24;
+const uvec3 _ip = uvec3(1, 2, 0);
+const uvec3 _im = uvec3(2, 0, 1);
 
 #define Wght float[n_verts_max]
 
@@ -29,21 +31,13 @@ layout(binding = 0) uniform u_0 {
 // Shared memory declarations
 shared vec3  s_verts_in[n_verts_max];
 shared uvec3 s_elems_in[n_elems_max];
-// TODO
-// Set up a shared memory system s.t. 4 vertices work on one point x, but share all mesh point data
-// this allows you to use 16.5 Kb per 256 invocation workgroup, which SHOULD fit in shared memory
-// and even allows you to remove s_verts_in/s_elems_in from shared memory eventually. It won't be
-// needed after u and p are computed
 
 void load_shared_data() {
   const uint i = gl_LocalInvocationID.x;
-
   if (i < b_size.n_verts)
     s_verts_in[i] = b_vert_in.data[i];
-
   if (i < b_size.n_elems)
     s_elems_in[i] = b_elem_in.data[i];
-  
   barrier();
   memoryBarrierShared();
 }
@@ -57,119 +51,117 @@ Wght constr_weights(in float f) {
   return w;
 }
 
-Wght mean_value_coords(in vec3 x) {
-  // Constants describing triangle mesh layout
-  const uint n_elems = b_size.n_elems;
-  const uint n_verts = 3;
+float sum_weights(in Wght w) {
+  float f;
+  weights_iter(i) f += w[i];
+  return f;
+}
 
-  // Global results
-  Wght total_w = constr_weights(0.f);
-  float total_w_sum = 0.f;
+void scatter_add_weights(inout Wght w, in vec3 w_, in uvec3 i) {
+  w[i[0]] += w_[0];
+  w[i[1]] += w_[1];
+  w[i[2]] += w_[2];
+}
 
-  float d[n_verts_max];
-  vec3  u[n_verts_max];
-  for (uint i = 0; i < b_size.n_verts; ++i) {
-    vec3 p = s_verts_in[i];
+vec3 shift(in vec3 v, in uvec3 i) { return vec3(v[i[0]], v[i[1]], v[i[2]]); }
+uvec3 shift(in uvec3 v, in uvec3 i) {  return uvec3(v[i[0]], v[i[1]], v[i[2]]); }
+
+// Enum flags for per-triangle MVC computation return type
+#define MVCReturnOnVertex   0x01u
+#define MVCReturnOnTriangle 0x02u
+#define MVCReturnOnPlane    0x04u
+#define MVCReturnCorrect    0x08u
+
+// Return result for per-triangle MVC computation
+struct MVCReturnObject {
+  vec3 weight;
+  uint type;
+};
+
+MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
+  MVCReturnObject result = MVCReturnObject(vec3(0), MVCReturnOnVertex);
+
+  // Compute per-vertex data
+  vec3 d, u[3];
+  for (uint i = 0; i < 3; ++i) {
+    vec3 p = s_verts_in[v[i]];
+
     d[i] = length(p - x);
     u[i] = (p - x) / d[i];
 
+    // Fallback: x lies near or on vertex, return value directly
     if (d[i] < M_EPS) {
-      Wght single_w = constr_weights(0.f);
-      single_w[i] = 1.f;
-      return single_w;
+      result.weight[i] = 1;
+      result.type = MVCReturnOnVertex;
+      return result;
     }
   }
 
-  // Per triangle:
-  for (uint j = 0; j < n_elems; ++j) {
-    const uvec3 verts = s_elems_in[j];
+  // Compute spherical triangle data
+  vec3 theta = 2.f * asin(.5f * vec3(length(u[1] - u[2]), 
+                                      length(u[2] - u[0]), 
+                                      length(u[0] - u[1])));
     
-    /* // Compute |p - x| and normalized (p - x) / |p - x|
-    float d[n_verts];
-    vec3  u[n_verts];
-    for (uint i = 0; i < n_verts; ++i) {
-      vec3 p = s_verts_in[verts[i]];
-      d[i] = length(p - x);
-      u[i] = (p - x) / d[i];
+  // Fallback: x lies near or on triangle, use 2D barycentric coordinates
+  float h = .5f * hsum(theta);
+  if (M_PI - h < M_EPS) {
+    result.weight = sin(theta) * shift(d, _ip) * shift(d, _im);
+    result.weight /= hsum(result.weight);
+    result.type = MVCReturnOnTriangle;
+    return result;
+  }
 
-      // Fallback: x lies close-to or on vertex, return that value directly
-      if (d[i] < M_EPS) {
-        Wght single_w = constr_weights(0.f);
-        single_w[verts[i]] = 1.f;
-        return single_w;
-      }
-    } */
+  vec3 sin_theta = sin(theta);
+  vec3 c = (2.f * sin(h) * sin(h - theta)) 
+          / (shift(sin_theta, _ip) * shift(sin_theta, _im)) 
+          - 1.f;
+  vec3 s = sign(determinant((mat3(u[0], u[1], u[2])))) 
+          * sqrt(1.f - c * c);
 
-    // Spherical triangle data
-    float theta[n_verts];
-    float h = 0.f;
-    for (uint i = 0; i < n_verts; ++i) {
-      uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
+  // Fallback: x lies on triangle's plane but way outside triangle, ignore weights
+  if (any(lessThan(abs(s), vec3(M_EPS)))) {
+    result.type = MVCReturnOnPlane;
+    return result;
+  }
 
-      theta[i] = 2.f * asin(length(u[verts[ip]] - u[verts[im]]) / 2.f);
-      h += theta[i];
-    }
-    h /= 2.f;
+  // Compute actual weights as we are somewhere inside
+  result.weight = (theta - 
+                   shift(c, _ip) * shift(theta, _im) - 
+                   shift(c, _im) * shift(theta, _ip))
+                / (d * shift(sin_theta, _ip) * shift(s, _im));
+  result.type = MVCReturnCorrect;
+  return result;
+}
 
-    // Fallback: x lies on triangle, use 2D barycentric coordinates
-    if (M_PI - h < M_EPS) {
-      float local_w[n_verts];
-      float local_w_sum = 0.f;
-      for (uint i = 0; i < n_verts; ++i) {
-        uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
-        local_w[i] = sin(theta[i]) * d[verts[im]] * d[verts[ip]];
-        local_w_sum += local_w[i];
-      }
-      Wght single_w = constr_weights(0.f);
-      for (uint i = 0; i < n_verts; ++i) {
-        single_w[verts[i]] = local_w[i] / local_w_sum;
-      }
-      return single_w;
-    }
+Wght mean_value_coords_total(in vec3 x) {
+  Wght weight = constr_weights(0.f);
 
-    float c[n_verts];
-    float s[n_verts];
-    float det = determinant((mat3(u[verts[0]], u[verts[1]], u[verts[2]])));
-    bool  x_continue = false;
-    for (uint i = 0; i < n_verts; ++i) {
-      uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
-
-      c[i] = (2.f * sin(h) * sin(h - theta[i])) 
-           / (sin(theta[ip]) * sin(theta[im]))
-           - 1.f;
-      s[i] = sign(det) * sqrt(1.f - (c[i] * c[i]));
-
-      // Fallback: x lies outside triangle but on same plane, return nothing
-      if (abs(s[i]) < M_EPS) {
-        x_continue = true;
-        break;
-      }
-    }
-
-    // Fallback ends here
-    if (x_continue)
+  for (uint j = 0; j < b_size.n_elems; ++j) {
+    const uvec3 v = s_elems_in[j];
+    MVCReturnObject result = mean_value_coords_per_tri(x, v);
+    
+    // Catch special case which returns no value
+    if (result.type == MVCReturnOnPlane)
       continue;
 
-    // Sum together weights
-    for (uint i = 0; i < n_verts; ++i) {
-      uint ip = (i + 1) % n_verts, im = (i + 2) % n_verts;
-
-      total_w[verts[i]] += (theta[i] - c[ip] * theta[im] - c[im] * theta[ip])
-                         / (d[verts[i]] * sin(theta[ip]) * s[im]);
+    // Catch special cases which return their own value directly
+    if (result.type == MVCReturnOnVertex || result.type == MVCReturnOnTriangle) {
+      weight = constr_weights(0.f);
+      scatter_add_weights(weight, result.weight, v);
+      return weight;
     }
+
+    scatter_add_weights(weight, result.weight, v);
   }
 
-  // Normalize and return weights
-  weights_iter(i) total_w_sum += total_w[i];
-  weights_iter(i) total_w[i] /= total_w_sum;
-  return total_w;
+  float wsum = sum_weights(weight);
+  weights_iter(i) weight[i] /= wsum;
+  return weight;
 }
 
 void main() {
   const uint i = gl_GlobalInvocationID.x;
   guard(i < b_size.n);
-
   load_shared_data();
-
-  b_bary_out.data[i] = mean_value_coords(b_posi_in.data[i]);;
+  b_bary_out.data[i] = mean_value_coords_total(b_posi_in.data[i]);;
 }
