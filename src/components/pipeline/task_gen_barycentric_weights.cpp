@@ -7,7 +7,6 @@
 #include <ranges>
 
 namespace met {
-  constexpr uint max_vertices        = 16u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -36,15 +35,15 @@ namespace met {
 
     // Initialize buffer holding barycentric weights
     info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info.emplace_resource<gl::Buffer>("bary_buffer", { .size = max_vertices * sizeof(float) * generate_n });
+    info.emplace_resource<gl::Buffer>("bary_buffer", { .size = barycentric_weights * sizeof(float) * generate_n });
   }
 
   void GenBarycentricWeightsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    /* // Continue only on relevant state change
+    // Continue only on relevant state change
     auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_colr_i");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; })); */
+    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Get shared resources
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");

@@ -11,7 +11,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr uint  max_vertices     = 16u;
   constexpr float deselected_psize = 0.005f;
   constexpr float mouseover_psize  = 0.015f;
   constexpr float selected_psize   = 0.01f;
@@ -38,7 +37,7 @@ namespace met {
                  { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_vertices.frag" }};
 
     // Setup sizes buffer using mapping flags
-    std::vector<float> input_sizes(max_vertices, deselected_psize);
+    std::vector<float> input_sizes(barycentric_weights, deselected_psize);
     m_size_buffer = {{ .data = cnt_span<const std::byte>(input_sizes), .flags = buffer_create_flags }};
     m_size_map = cast_span<float>(m_size_buffer.map(buffer_access_flags));
 

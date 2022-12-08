@@ -2,13 +2,13 @@
 
 #include <guard.glsl>
 #include <math.glsl>
+#include <spectrum.glsl>
 
-const uint n_verts_max = 16;
 const uint n_elems_max = 24;
 const uvec3 _ip = uvec3(1, 2, 0);
 const uvec3 _im = uvec3(2, 0, 1);
 
-#define Wght float[n_verts_max]
+#define Wght float[barycentric_weights]
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -29,7 +29,7 @@ layout(binding = 0) uniform u_0 {
 } b_size;
 
 // Shared memory declarations
-shared vec3  s_verts_in[n_verts_max];
+shared vec3  s_verts_in[barycentric_weights];
 shared uvec3 s_elems_in[n_elems_max];
 
 void load_shared_data() {
@@ -43,7 +43,7 @@ void load_shared_data() {
 }
 
 // Define to perform commonly occuring iteration
-#define weights_iter(__b) for (uint __b = 0; __b < n_verts_max; ++__b)
+#define weights_iter(__b) for (uint __b = 0; __b < b_size.n_verts; ++__b)
 
 Wght constr_weights(in float f) {
   Wght w;

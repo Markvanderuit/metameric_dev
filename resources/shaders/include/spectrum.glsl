@@ -1,12 +1,13 @@
 #ifndef SPECTRUM_CONSTANTS_GLSL_GUARD
 #define SPECTRUM_CONSTANTS_GLSL_GUARD
 
-// Define metameric's spectral range layout
+// Define metameric's spectral layout
 const float wavelength_min         = MET_WAVELENGTH_MIN;
 const float wavelength_max         = MET_WAVELENGTH_MAX;
 const uint  wavelength_samples     = MET_WAVELENGTH_SAMPLES;
+const uint  barycentric_weights    = MET_BARYCENTRIC_WEIGHTS;
 
-// Define derived variables from metameric's spectral range layout
+// Define derived variables from metameric's spectral layout
 const float wavelength_range       = wavelength_max - wavelength_min;
 const float wavelength_ssize       = wavelength_range / float(wavelength_samples);
 const float wavelength_ssinv       = float(wavelength_samples) / wavelength_range;

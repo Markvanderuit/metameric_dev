@@ -9,10 +9,8 @@
 #include <spectrum_invoc.glsl>
 #include <spectrum_cluster.glsl>
 
-const uint n_verts_max = 16;
-
 // Use shorthand for clustered types
-#define Wght float[n_verts_max]
+#define Wght float[barycentric_weights]
 #define Spec ClSpec
 
 // General layout rule declarations
@@ -33,7 +31,7 @@ layout(binding = 0) uniform u_0 {
 } b_size;
 
 // Shared memory declarations
-shared InSpec s_spectra_in[n_verts_max];
+shared InSpec s_spectra_in[barycentric_weights];
 shared Wght   s_weights_in[gl_WorkGroupSize.x / cl_spectrum_invc_n];
 
 void load_shared_spectra() {
