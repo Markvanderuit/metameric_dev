@@ -14,6 +14,8 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
+constexpr unsigned barycentric_weights = 8;
+
 /* Header block for spectral texture import format */
 struct SpectralDataHeader {
   float    wvl_min;
@@ -118,9 +120,43 @@ public:
   }
   
   UnpolarizedSpectrum eval(const SurfaceInteraction3f &si, Mask active) const override {
+    using Weight = Vector<Float, barycentric_weights>;
+    
+    if constexpr (!dr::is_array_v<Mask>)
+      active = true;
+
     MI_MASKED_FUNCTION(ProfilerPhase::TextureEvaluate, active);
 
-    return 0.f;
+    // Guard against unsupported rendering modes (really, only spectral is supported)
+    if constexpr (!is_spectral_v<Spectrum>)
+      Throw("A metameric texture was used in a non-spectral rendering pipeline!");
+
+    // Guard against inactive evaluations
+    if (dr::none_or<false>(active))
+      return dr::zeros<UnpolarizedSpectrum>();
+
+    Point2f uv = m_transform.transform_affine(si.uv);
+
+    Weight wght = 0.f;
+    dr::Array<Weight, 4> funcs = { 0, 0, 0, 0 };
+    
+    if (m_accel) {
+      m_wght.eval(uv, wght.data(), active);
+      for (unsigned i = 0; i < 4; ++i)
+        m_func.eval(si.wavelengths[i], funcs[i].data(), active);
+    } else {
+      m_wght.eval_nonaccel(uv, wght.data(), active);
+      for (unsigned i = 0; i < 4; ++i)
+        m_func.eval_nonaccel(si.wavelengths[i], funcs[i].data(), active);
+    }
+
+    Spectrum s;
+    s[0] = dr::dot(wght, funcs[0]); 
+    s[1] = dr::dot(wght, funcs[1]); 
+    s[2] = dr::dot(wght, funcs[2]); 
+    s[3] = dr::dot(wght, funcs[3]); 
+
+    return s;
   }
   
   Float eval_1(const SurfaceInteraction3f &si, Mask active = true) const override {
