@@ -63,7 +63,7 @@ public:
     fs->read<unsigned>(data.header.wght_yres);
 
     Log(Info, "Metameric texture header data loaded\n");
-    Log(Info, "wvl_min = %f\nwvl_max = %f\nwvl_samples = %d\nfunc_count = %d\n, wght_xres = %d\n, wght_yres = %d\n",
+    Log(Info, "wvl_min = %f\nwvl_max = %f\nwvl_samples = %d\nfunc_count = %d\nwght_xres = %d\nwght_yres = %d\n",
       data.header.wvl_min, data.header.wvl_max, data.header.wvl_samples, 
       data.header.func_count, data.header.wght_xres, data.header.wght_yres);
 
@@ -103,7 +103,7 @@ public:
     m_accel = props.get<bool>("accel", true);
 
     // Instantiate class objects
-    size_t wght_shape[3] = { data.header.wght_xres, data.header.wght_yres, data.header.func_count };
+    size_t wght_shape[3] = { data.header.wght_yres, data.header.wght_xres, data.header.func_count };
     size_t func_shape[2] = { data.header.wvl_samples, data.header.func_count };
     m_wght = { TensorXf(data.weights.data(), 3, wght_shape), 
       m_accel, m_accel, filter_mode, wrap_mode };
@@ -139,15 +139,22 @@ public:
 
     Weight wght = 0.f;
     dr::Array<Weight, 4> funcs = { 0, 0, 0, 0 };
-    
     if (m_accel) {
       m_wght.eval(uv, wght.data(), active);
-      for (unsigned i = 0; i < 4; ++i)
-        m_func.eval(si.wavelengths[i], funcs[i].data(), active);
+      m_func.eval((si.wavelengths[0] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
+                  funcs[0].data(), active);
+      m_func.eval((si.wavelengths[1] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
+                  funcs[1].data(), active);
+      m_func.eval((si.wavelengths[2] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
+                  funcs[2].data(), active);
+      m_func.eval((si.wavelengths[3] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
+                  funcs[3].data(), active);
     } else {
       m_wght.eval_nonaccel(uv, wght.data(), active);
-      for (unsigned i = 0; i < 4; ++i)
-        m_func.eval_nonaccel(si.wavelengths[i], funcs[i].data(), active);
+      for (unsigned i = 0; i < 4; ++i) {
+        auto wvl_uv = (si.wavelengths[i] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN);
+        m_func.eval_nonaccel(wvl_uv, funcs[i].data(), active);
+      }
     }
 
     Spectrum s;
@@ -155,7 +162,6 @@ public:
     s[1] = dr::dot(wght, funcs[1]); 
     s[2] = dr::dot(wght, funcs[2]); 
     s[3] = dr::dot(wght, funcs[3]); 
-
     return s;
   }
   
