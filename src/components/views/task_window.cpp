@@ -1,3 +1,4 @@
+#include <metameric/core/io.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/schedule.hpp>
@@ -6,8 +7,10 @@
 #include <metameric/components/views/task_create_project.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/window.hpp>
+#include <ranges>
 
 namespace met {
   /* Titles and ImGui IDs used to spawn modals */
@@ -110,8 +113,52 @@ namespace met {
   bool WindowTask::handle_export(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    if (fs::path path; detail::save_dialog(path, ".met")) {
-      // ...
+    if (fs::path path; detail::save_dialog(path, "met")) {
+      using AlWeight = eig::Array<float, barycentric_weights, 1>;
+
+      // Get shared resources
+      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_prj_data = e_app_data.project_data;
+      auto &e_wght_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+      auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
+
+      // Used sizes
+      const uint func_count = static_cast<uint>(e_prj_data.gamut_colr_i.size());
+      const auto weights_res    = e_app_data.loaded_texture.size();
+
+      // Temporary dynamic storage buffers to handle large copy
+      gl::Buffer wght_buffer = {{ .size = e_wght_buffer.size(), .flags = gl::BufferCreateFlags::eStorageClient }};
+      gl::Buffer spec_buffer = {{ .size = e_spec_buffer.size(), .flags = gl::BufferCreateFlags::eStorageClient }};
+      e_wght_buffer.copy_to(wght_buffer);
+      e_spec_buffer.copy_to(spec_buffer);
+
+      // Obtain padded weight data from buffers
+      std::vector<AlWeight> bary_data(wght_buffer.size() / sizeof(AlWeight));
+      wght_buffer.get(cnt_span<std::byte>(bary_data));
+
+      // Copy weights without padding to wght_data_out
+      std::vector<float> wght_data_out(bary_data.size() * func_count);
+      #pragma omp parallel for
+      for (int i = 0; i < bary_data.size(); ++i) {
+        std::span<float> out(wght_data_out.data() + i * func_count, func_count);
+        std::copy(bary_data[i].begin(), bary_data[i].begin() + func_count, out.begin());
+      }
+
+      // Obtain (already unpadded) weight data from buffers
+      std::vector<Spec> spec_data_out(spec_buffer.size() / sizeof(Spec));
+      spec_buffer.get(cnt_span<std::byte>(spec_data_out));
+
+      // Save data to specified filepath
+      io::save_spectral_data({
+        .header = {
+          .func_count = func_count, 
+          .wght_xres = weights_res.x(), 
+          .wght_yres = weights_res.y()
+        },
+        .functions = cnt_span<float>(spec_data_out), 
+        .weights = cnt_span<float>(wght_data_out)
+      }, io::path_with_ext(path, ".met"));
+
       return true;
     }
 
