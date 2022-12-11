@@ -14,6 +14,7 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
+// Maximum nr. of supported barycentric weights
 constexpr unsigned barycentric_weights = 8;
 
 /* Header block for spectral texture import format */
@@ -75,6 +76,28 @@ public:
     fs->read_array<float>(data.functions.data(), data.functions.size());
     fs->read_array<float>(data.weights.data(), data.weights.size());
 
+    // Obtain padded weight data
+    std::vector<float> wght_data(data.header.wght_yres * data.header.wght_xres * barycentric_weights, 0.f);
+    #pragma omp parallel for
+    for (int i = 0; i < data.header.wght_yres * data.header.wght_xres; ++i) {
+      std::copy(data.weights.data() + i * data.header.func_count,
+                data.weights.data() + (i + 1) * data.header.func_count,
+                wght_data.data() + i * barycentric_weights);
+    }
+
+    // Obtain scattered function data
+    std::vector<float> func_data(data.header.wvl_samples * barycentric_weights, 0.f);
+    #pragma omp parallel for
+    for (int j = 0; j < data.header.func_count; ++j) {
+      for (int i = 0; i < data.header.wvl_samples; ++i) {
+        func_data[i * barycentric_weights + j] = data.functions[j * data.header.wvl_samples + i];
+      }
+    }
+
+    // Wavelength data
+    m_spectral_sub = data.header.wvl_min;
+    m_spectral_div = data.header.wvl_max - data.header.wvl_min;
+
     // Read filter mode
     std::string filter_mode_str = props.string("filter_type", "bilinear");
     dr::FilterMode filter_mode;
@@ -102,13 +125,14 @@ public:
     // Read acceleration mode
     m_accel = props.get<bool>("accel", true);
 
+    // Read clamping mode
+    m_clamp = props.eet<bool>("clamp", true);
+
     // Instantiate class objects
-    size_t wght_shape[3] = { data.header.wght_yres, data.header.wght_xres, data.header.func_count };
-    size_t func_shape[2] = { data.header.wvl_samples, data.header.func_count };
-    m_wght = { TensorXf(data.weights.data(), 3, wght_shape), 
-      m_accel, m_accel, filter_mode, wrap_mode };
-    m_func = { TensorXf(data.functions.data(), 2, func_shape), 
-      m_accel, m_accel, dr::FilterMode::Linear, dr::WrapMode::Clamp };
+    size_t wght_shape[3] = { data.header.wght_yres, data.header.wght_xres, barycentric_weights };
+    size_t func_shape[2] = { data.header.wvl_samples,                      barycentric_weights };
+    m_wght = { TensorXf(wght_data.data(), 3, wght_shape), m_accel, m_accel, filter_mode, wrap_mode };
+    m_func = { TensorXf(func_data.data(), 2, func_shape), m_accel, m_accel, dr::FilterMode::Linear, dr::WrapMode::Clamp };
   }
 
   void traverse(TraversalCallback *callback) override {
@@ -137,31 +161,38 @@ public:
 
     Point2f uv = m_transform.transform_affine(si.uv);
 
+    // Sample weights and functions for relevant UV and wavelengths
     Weight wght = 0.f;
     dr::Array<Weight, 4> funcs = { 0, 0, 0, 0 };
+    auto wvls = (si.wavelengths - m_spectral_sub) / m_spectral_div;
     if (m_accel) {
       m_wght.eval(uv, wght.data(), active);
-      m_func.eval((si.wavelengths[0] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
-                  funcs[0].data(), active);
-      m_func.eval((si.wavelengths[1] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
-                  funcs[1].data(), active);
-      m_func.eval((si.wavelengths[2] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
-                  funcs[2].data(), active);
-      m_func.eval((si.wavelengths[3] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN), 
-                  funcs[3].data(), active);
+      m_func.eval(wvls[0], funcs[0].data(), active);
+      m_func.eval(wvls[1], funcs[1].data(), active);
+      m_func.eval(wvls[2], funcs[2].data(), active);
+      m_func.eval(wvls[3], funcs[3].data(), active);
     } else {
       m_wght.eval_nonaccel(uv, wght.data(), active);
-      for (unsigned i = 0; i < 4; ++i) {
-        auto wvl_uv = (si.wavelengths[i] - MI_CIE_MIN) / (MI_CIE_MAX - MI_CIE_MIN);
-        m_func.eval_nonaccel(wvl_uv, funcs[i].data(), active);
-      }
+      m_func.eval_nonaccel(wvls[0], funcs[0].data(), active);
+      m_func.eval_nonaccel(wvls[1], funcs[1].data(), active);
+      m_func.eval_nonaccel(wvls[2], funcs[2].data(), active);
+      m_func.eval_nonaccel(wvls[3], funcs[3].data(), active);
     }
 
-    Spectrum s;
-    s[0] = dr::dot(wght, funcs[0]); 
-    s[1] = dr::dot(wght, funcs[1]); 
-    s[2] = dr::dot(wght, funcs[2]); 
-    s[3] = dr::dot(wght, funcs[3]); 
+    // Assemble spectral reflectance as dot product of weights and functions
+    UnpolarizedSpectrum s;
+    if (m_clamp) {
+      s[0] = dr::clamp(dr::dot(wght, funcs[0]), 0.f, 1.f);
+      s[1] = dr::clamp(dr::dot(wght, funcs[1]), 0.f, 1.f);
+      s[2] = dr::clamp(dr::dot(wght, funcs[2]), 0.f, 1.f);
+      s[3] = dr::clamp(dr::dot(wght, funcs[3]), 0.f, 1.f);
+    } else {
+      s[0] = dr::dot(wght, funcs[0]);
+      s[1] = dr::dot(wght, funcs[1]);
+      s[2] = dr::dot(wght, funcs[2]);
+      s[3] = dr::dot(wght, funcs[3]);
+    }
+
     return s;
   }
   
@@ -246,9 +277,11 @@ protected:
   Texture2f         m_wght;
   Texture1f         m_func;
   ScalarTransform3f m_transform;
+  bool              m_clamp;
   bool              m_accel;
   Float             m_mean;
   std::string       m_name;
+  Float             m_spectral_sub, m_spectral_div;
 
   // Optional: distribution for importance sampling
   mutable std::mutex m_mutex;

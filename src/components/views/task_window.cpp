@@ -126,27 +126,27 @@ namespace met {
       const uint func_count = static_cast<uint>(e_prj_data.gamut_colr_i.size());
       const auto weights_res    = e_app_data.loaded_texture.size();
 
-      // Temporary dynamic storage buffers to handle large copy
-      gl::Buffer wght_buffer = {{ .size = e_wght_buffer.size(), .flags = gl::BufferCreateFlags::eStorageClient }};
-      gl::Buffer spec_buffer = {{ .size = e_spec_buffer.size(), .flags = gl::BufferCreateFlags::eStorageClient }};
-      e_wght_buffer.copy_to(wght_buffer);
-      e_spec_buffer.copy_to(spec_buffer);
+      // Insert barriers for the following operations
+      gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 
+                                gl::BarrierFlags::eShaderStorageBuffer | 
+                                gl::BarrierFlags::eClientMappedBuffer  );
 
       // Obtain padded weight data from buffers
-      std::vector<AlWeight> bary_data(wght_buffer.size() / sizeof(AlWeight));
-      wght_buffer.get(cnt_span<std::byte>(bary_data));
+      std::vector<AlWeight> bary_data(e_wght_buffer.size() / sizeof(AlWeight));
+      e_wght_buffer.get(cnt_span<std::byte>(bary_data));
 
       // Copy weights without padding to wght_data_out
       std::vector<float> wght_data_out(bary_data.size() * func_count);
       #pragma omp parallel for
       for (int i = 0; i < bary_data.size(); ++i) {
+        std::span<float> in(bary_data[i].data(), func_count);
         std::span<float> out(wght_data_out.data() + i * func_count, func_count);
-        std::copy(bary_data[i].begin(), bary_data[i].begin() + func_count, out.begin());
+        std::copy(range_iter(in), out.begin());
       }
 
-      // Obtain (already unpadded) weight data from buffers
-      std::vector<Spec> spec_data_out(spec_buffer.size() / sizeof(Spec));
-      spec_buffer.get(cnt_span<std::byte>(spec_data_out));
+      // Obtain (already unpadded) function data from buffers
+      std::vector<Spec> spec_data_out(e_spec_buffer.size() / sizeof(Spec));
+      e_spec_buffer.get(cnt_span<std::byte>(spec_data_out));
 
       // Save data to specified filepath
       io::save_spectral_data({
