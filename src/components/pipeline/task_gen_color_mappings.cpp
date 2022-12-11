@@ -80,9 +80,11 @@ namespace met {
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
     m_texture_subtasks.init(name(), info, e_mappings_n,
-      [=](auto &, uint i) { return TextureSubTask({ fmt::format("gen_color_mapping_{}", i), "colr_buffer" },
-                                                  { fmt::format("gen_color_mapping_texture_{}", i), "texture" },
-                                                  { .size = e_texture_size }); },
+      [=](auto &, uint i) -> TextureSubTask { 
+        return {{ .input_key    = { fmt::format("gen_color_mapping_{}", i), "colr_buffer" },
+                  .output_key   = { fmt::format("gen_color_mapping_texture_{}", i), "texture" },
+                  .texture_info = { .size = e_texture_size }}}; 
+      },
       [](auto &, uint i) { return fmt::format("gen_color_mapping_texture_{}", i); });
 
     // Add subtasks to perform mapping

@@ -119,9 +119,9 @@ namespace met {
     info.emplace_resource<gl::Buffer>("colr_buffer", { .size = generate_n * sizeof(AlColr) });
 
     // Insert subtask to handle buffer->texture conversion
-    TextureSubtask subtask({ name(), "colr_buffer" },
-                           { fmt::format(texture_fmt, name()), "texture" },
-                           { .size = e_tex_data.size() });
+    TextureSubtask subtask = {{ .input_key    = { name(), "colr_buffer" },
+                                .output_key   = { fmt::format(texture_fmt, name()), "texture" },
+                                .texture_info = { .size = e_tex_data.size() }}};
     info.insert_task_after(name(), std::move(subtask));
   }
 
@@ -174,11 +174,11 @@ namespace met {
         m_resample_size = resample_size;
 
         // Remove previous resample subtask and insert a new one
-        ResampleSubtask subtask({ texture_subtask_name, "texture"             },
-                                { resample_subtask_name, "texture"            },
-                                { .size = resample_size                       },
-                                { .min_filter = gl::SamplerMinFilter::eLinear ,
-                                  .mag_filter = gl::SamplerMagFilter::eLinear });
+        ResampleSubtask subtask = {{ .input_key    = { texture_subtask_name, "texture"             },
+                                     .output_key   = { resample_subtask_name, "texture"            },
+                                     .texture_info = { .size = resample_size                       },
+                                     .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+                                                       .mag_filter = gl::SamplerMagFilter::eLinear }}};
         info.remove_task(resample_subtask_name);
         info.insert_task_after(texture_subtask_name, std::move(subtask));
       }

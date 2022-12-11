@@ -10,23 +10,24 @@ namespace met {
   constexpr auto mapping_subtask_fmt  = FMT_COMPILE("gen_color_mapping_texture_{}");
   constexpr auto resample_fmt = FMT_COMPILE("mappings_viewer_resample_{}");
 
-  // Lambda captures of texture_size parameter and outputs
-  // capture to add a resample task
-  constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
-    return [=](detail::AbstractTaskInfo &, uint i) {
-      using ResampleTaskType = detail::TextureResampleTask<gl::Texture2d4f>;
-      return ResampleTaskType({ fmt::format(mapping_subtask_fmt, i), "texture"  }, 
-                              { fmt::format(resample_fmt, i), "texture" },
-                              { .size = texture_size                            }, 
-                              { .min_filter = gl::SamplerMinFilter::eLinear,
-                                .mag_filter = gl::SamplerMagFilter::eLinear     });
+  namespace detail {
+    // Lambda captures of texture_size parameter and outputs
+    // capture to add a resample task
+    constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
+      return [=](detail::AbstractTaskInfo &, uint i) -> detail::TextureResampleTask<gl::Texture2d4f> {
+        return {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
+                  .output_key   = { fmt::format(resample_fmt, i), "texture"        },
+                  .texture_info = { .size = texture_size                           },
+                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+                                    .mag_filter = gl::SamplerMagFilter::eLinear    }}};
+      };
     };
-  };
 
-  // Lambda capture to remove a resample task
-  constexpr auto resample_subtask_rmv = [](detail::AbstractTaskInfo &, uint i) {
-    return fmt::format(resample_fmt, i);
-  };
+    // Lambda capture to remove a resample task
+    constexpr auto resample_subtask_rmv = [](detail::AbstractTaskInfo &, uint i) {
+      return fmt::format(resample_fmt, i);
+    };
+  } // namespace detail
 
   void MappingsViewerTask::eval_tooltip_copy(detail::TaskEvalInfo &info, uint texture_i) {
     met_trace_full();
@@ -71,7 +72,7 @@ namespace met {
     
     Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
     Spec power       = e_mapping.apply_power(reflectance);
-    Colr power_rgb   = e_mapping.apply_color(reflectance);
+    Colr power_rgb   = linear_srgb_to_gamma_srgb(e_mapping.apply_color(reflectance));
 
     // Plot rest of tooltip
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
@@ -144,7 +145,8 @@ namespace met {
       if (auto resample_size = texture_size.cast<uint>().max(1u); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
-        m_resample_tasks.init(name(), info, e_mappings_n, resample_subtask_add(m_resample_size), resample_subtask_rmv);
+        m_resample_tasks.init(name(), info, e_mappings_n, 
+          detail::resample_subtask_add(m_resample_size), detail::resample_subtask_rmv);
       } else {
         // Adjust nr. of spawned tasks to correct number
         m_resample_tasks.eval(info, e_mappings_n);
