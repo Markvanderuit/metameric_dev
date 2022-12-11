@@ -26,11 +26,11 @@ namespace met {
   namespace io {
     // Load 2d rgb(a) texture from disk
     template <typename T>
-    Texture2d<T> load_texture2d(const fs::path &path);
+    Texture2d<T> load_texture2d(const fs::path &path, bool srgb_to_lrgb = false);
 
     // Write 2d rgb/a texture to disk
     template <typename T>
-    void save_texture2d(const fs::path &path, const Texture2d<T> &texture);
+    void save_texture2d(const fs::path &path, const Texture2d<T> &texture, bool lrgb_to_srgb = false);
 
     // Convert to aligned/unaligned backed types
     Texture2d3f    as_unaligned(const Texture2d3f_al &aligned);
@@ -48,7 +48,7 @@ namespace met {
   } // namespace io
   
   /**
-   * Helper object to create texture object.
+   * Helper object to create texture object for a given size or with provided data.
    */
   template <typename T, uint D>
   struct TextureCreateInfo {
@@ -57,16 +57,18 @@ namespace met {
   };
   
   /**
-   * Helper object to load texture object from disk.
+   * Helper object to load texture object from disk, potentially with 
+   * gamma to linear rgb conversion.
    */
   struct TextureLoadInfo {
     fs::path path;
+    bool     srgb_to_lrgb = false;
   };
   
   /**
    * Underlying data block for texture objects
    */
-  template <typename T, uint D>
+  template <typename T, uint D> 
   struct TextureBlock {
   protected:
     using vect              = eig::Array<uint, D, 1>;
@@ -131,7 +133,7 @@ namespace met {
     : Base(info) { }
 
     Texture2d(TextureLoadInfo info)
-    : Texture2d(io::load_texture2d<T>(info.path)) { }
+    : Texture2d(io::load_texture2d<T>(info.path, info.srgb_to_lrgb)) { }
 
     /* data accessors */
 
@@ -157,7 +159,8 @@ namespace met {
 
     /* miscellaneous */
 
-    inline void swap(Texture2d &o) {
+    inline
+    void swap(Texture2d &o) {
       met_trace();
       using std::swap;
       Base::swap(o);

@@ -142,14 +142,18 @@ namespace met {
   template <typename Float>
   constexpr inline
   Float gamma_srgb_to_linear_srgb_f(Float f) {
-    return f <= 0.003130 ? f * 12.92 : std::pow<Float>(f, 1.0 / 2.4) * 1.055 - 0.055;
+    return f <= 0.04045 
+         ? f / 12.92 
+         : std::pow<Float>((f + 0.055) / 1.055, 2.4);
   }
 
   // Convert a linear sRGB value to gamma-corrected sRGB
   template <typename Float>
   constexpr inline
   Float linear_srgb_to_gamma_srgb_f(Float f) {
-    return f <= 0.04045 ? f / 12.92 : std::pow<Float>((f + 0.055) / 1.055, 2.4);
+    return f <= 0.003130
+         ? f * 12.92 
+         : std::pow<Float>(f, 1.0 / 2.4) * 1.055 - 0.055;
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB

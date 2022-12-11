@@ -20,18 +20,20 @@ namespace met {
   : m_size(info.size), m_data(info.size.prod()) {
     met_trace();
     met_trace_alloc(m_data.data(), m_data.size() * sizeof(T));
-    guard(!info.data.empty());
-    std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
+
+    if (!info.data.empty())
+      std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
   }
 
   template <typename T, uint D>
   TextureBlock<T, D>::~TextureBlock() {
+    met_trace();
     met_trace_free(m_data.data());
   }
 
   namespace io {
     template <typename T>
-    Texture2d<T> load_texture2d(const fs::path &path) {
+    Texture2d<T> load_texture2d(const fs::path &path, bool srgb_to_lrgb) {
       met_trace();
 
       // Check that file path exists
@@ -60,6 +62,7 @@ namespace met {
       std::transform(std::execution::par_unseq,
         data_byte.begin(), data_byte.end(), data_float.begin(),
         [](std::byte b) { return static_cast<float>(b) / 255.f; });
+        // [](std::byte b) { return std::powf(static_cast<float>(b) / 255.f, 2.2f); });
 
       // Perform channel-correct copy/transform into texture data
       if (c == 3) {
@@ -83,12 +86,24 @@ namespace met {
       }
 
       stbi_image_free(data_ptr);
+
+      // Strip linear sRGB gamma if requested
+      if (srgb_to_lrgb)
+        to_lrgb(texture);
+
       return texture;
     }
 
     template <typename T>
-    void save_texture2d(const fs::path &path, const Texture2d<T> &texture) {
+    void save_texture2d(const fs::path &path, const Texture2d<T> &texture_, bool lrgb_to_srgb) {
       met_trace();
+
+      // Operate on a copy as gamma may need to be applied
+      Texture2d<T> texture({ .size = texture_.size(), .data = texture_.data() });
+
+      // Apply linear sRGB gamma if requested
+      if (lrgb_to_srgb)
+        to_srgb(texture);
 
       const char *pstr = path.string().c_str();
       auto size = texture.size();
@@ -204,10 +219,10 @@ namespace met {
     template Texture2d<eig::Array4f> as_lrgb<eig::Array4f>(const Texture2d<eig::Array4f> &);
     template Texture2d<eig::AlArray3f> as_lrgb<eig::AlArray3f>(const Texture2d<eig::AlArray3f> &);
 
-    template Texture2d<eig::Array3f>   load_texture2d<eig::Array3f>(const fs::path &);
-    template Texture2d<eig::Array4f>   load_texture2d<eig::Array4f>(const fs::path &);
+    template Texture2d<eig::Array3f> load_texture2d<eig::Array3f>(const fs::path &, bool);
+    template Texture2d<eig::Array4f> load_texture2d<eig::Array4f>(const fs::path &, bool);
     
-    template void save_texture2d<eig::Array3f>(const fs::path &, const Texture2d<eig::Array3f> &);
-    template void save_texture2d<eig::Array4f>(const fs::path &, const Texture2d<eig::Array4f> &);
+    template void save_texture2d<eig::Array3f>(const fs::path &, const Texture2d<eig::Array3f> &, bool);
+    template void save_texture2d<eig::Array4f>(const fs::path &, const Texture2d<eig::Array4f> &, bool);
   } // namespace io
 } // namespace met

@@ -49,7 +49,7 @@ namespace met {
 
   void ApplicationData::create(const fs::path &texture_path) {
     // Forward loaded texture to ApplicationData::create(Texture2d3f &&)
-    create(Texture2d3f {{ .path = texture_path }});
+    create(io::load_texture2d<Colr>(texture_path, true));
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
@@ -70,14 +70,14 @@ namespace met {
     project_state = ProjectState::eSaved;
     project_path  = io::path_with_ext(save_path, ".json");
     io::save_project(project_path, project_data);
-    io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture);
+    io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture, true);
   }
 
   void ApplicationData::load(const fs::path &load_path) {
     project_state  = ProjectState::eSaved;
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
-    loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"));
+    loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
 
     // Reset undo/redo history
     mods  = { };
