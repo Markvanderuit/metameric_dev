@@ -35,26 +35,26 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_target_texture  = info.get_resource<gl::Texture2d3f>(m_parent, "draw_texture");
+      auto &e_draw_texture    = info.get_resource<gl::Texture2d4f>(m_parent, "draw_texture");
       auto &i_frame_buffer    = info.get_resource<gl::Framebuffer>("frame_buffer");
       auto &i_frame_buffer_ms = info.get_resource<gl::Framebuffer>("frame_buffer_ms");
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
-      if (!i_frame_buffer.is_init() || (e_target_texture.size() != m_color_buffer_ms.size()).any()) {
-        m_color_buffer_ms = {{ .size = e_target_texture.size().max(1) }};
-        m_depth_buffer_ms = {{ .size = e_target_texture.size().max(1) }};
+      if (!i_frame_buffer.is_init() || (e_draw_texture.size() != m_color_buffer_ms.size()).any()) {
+        m_color_buffer_ms = {{ .size = e_draw_texture.size().max(1) }};
+        m_depth_buffer_ms = {{ .size = e_draw_texture.size().max(1) }};
         i_frame_buffer_ms = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_ms },
                              { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer_ms }};
-        i_frame_buffer    = {{ .type = gl::FramebufferType::eColor, .attachment = &e_target_texture }};
+        i_frame_buffer    = {{ .type = gl::FramebufferType::eColor, .attachment = &e_draw_texture }};
       }
 
       // Clear framebuffer target for next subtasks
-      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, eig::Array4f(0.f));
+      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
       i_frame_buffer_ms.clear(gl::FramebufferType::eDepth, 1.f);
       i_frame_buffer_ms.bind();
 
       // Specify viewport for next subtasks
-      gl::state::set_viewport(e_target_texture.size());
+      gl::state::set_viewport(e_draw_texture.size());
     }
   };
 } // namespace  met

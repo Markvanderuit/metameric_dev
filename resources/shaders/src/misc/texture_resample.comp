@@ -17,6 +17,6 @@ void main() {
 
   const vec2 p = (vec2(i) + vec2(0.5)) / vec2(u_size);
   const vec4 v = texture(u_sampler, p);
-
+  
   imageStore(b_0_color_out, ivec2(i), bool(u_lrgb_to_srgb) ? lrgb_to_srgb(v) : v);
 }

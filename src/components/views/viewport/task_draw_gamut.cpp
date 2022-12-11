@@ -12,9 +12,9 @@
 
 namespace met {
   constexpr uint  max_elements    = 16u;
-  constexpr float deselected_opac = 0.05f;
-  constexpr float mouseover_opac  = 0.35f;
-  constexpr float selected_opac   = 0.25f;
+  constexpr float deselected_opac = 0.01f;
+  constexpr float mouseover_opac  = 0.2f;
+  constexpr float selected_opac   = 0.1f;
 
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;

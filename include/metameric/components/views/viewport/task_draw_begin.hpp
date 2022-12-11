@@ -32,7 +32,7 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_draw_texture      = info.get_resource<gl::Texture2d3f>("viewport_begin", "draw_texture");
+      auto &e_draw_texture      = info.get_resource<gl::Texture2d4f>("viewport_begin", "draw_texture");
       auto &i_frame_buffer      = info.get_resource<gl::Framebuffer>("frame_buffer");
       auto &i_frame_buffer_msaa = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
 
@@ -46,7 +46,7 @@ namespace met {
       }
 
       // Clear framebuffer target for next subtasks
-      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array4f(0.f));
+      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
       i_frame_buffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
       i_frame_buffer_msaa.bind();
 

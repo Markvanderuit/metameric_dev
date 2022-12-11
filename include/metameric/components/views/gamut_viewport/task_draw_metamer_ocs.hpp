@@ -121,7 +121,7 @@ namespace met {
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());    
 
       // Dispatch draw
-      m_program.uniform("u_alpha", .66f);
+      m_program.uniform("u_alpha", 1.f);
       gl::dispatch_draw(m_hull_dispatch);
       m_program.uniform("u_alpha", 1.f);
       gl::dispatch_draw(m_point_dispatch);

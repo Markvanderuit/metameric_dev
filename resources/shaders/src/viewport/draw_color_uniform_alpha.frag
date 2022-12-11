@@ -11,5 +11,5 @@ layout(location = 0) out vec4 value_out;
 layout(location = 3) uniform float u_alpha = 1.f;
 
 void main() {
-  value_out = vec4(vec3(0.5f) + value_in, u_alpha);
+  value_out = vec4(value_in, u_alpha);
 }

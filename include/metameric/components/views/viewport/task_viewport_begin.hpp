@@ -18,14 +18,16 @@ namespace met {
       met_trace_full();
 
       // Share resources
-      info.emplace_resource<gl::Texture2d3f>("draw_texture", { .size = 1 });
+      info.emplace_resource<gl::Texture2d4f>("draw_texture",      { .size = 1 });
+      info.emplace_resource<gl::Texture2d4f>("draw_texture_srgb", { .size = 1 });
     }
     
     void eval(detail::TaskEvalInfo &info) override {
       met_trace_full();
 
       // Get shared resources
-      auto &i_draw_texture = info.get_resource<gl::Texture2d3f>("draw_texture");
+      auto &i_draw_texture_lrgb = info.get_resource<gl::Texture2d4f>("draw_texture");
+      auto &i_draw_texture_srgb = info.get_resource<gl::Texture2d4f>("draw_texture_srgb");
 
       // Declare scoped ImGui style state
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
@@ -39,13 +41,14 @@ namespace met {
       // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      if (!i_draw_texture.is_init() || (i_draw_texture.size() != viewport_size.cast<uint>()).all()) {
-        i_draw_texture = {{ .size = viewport_size.cast<uint>() }};
+      if (!i_draw_texture_lrgb.is_init() || (i_draw_texture_lrgb.size() != viewport_size.cast<uint>()).all()) {
+        i_draw_texture_lrgb = {{ .size = viewport_size.cast<uint>() }};
+        i_draw_texture_srgb = {{ .size = viewport_size.cast<uint>() }};
       }
 
       // Insert image, applying viewport texture to viewport; texture can be safely drawn 
       // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-      ImGui::Image(ImGui::to_ptr(i_draw_texture.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+      ImGui::Image(ImGui::to_ptr(i_draw_texture_srgb.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
 
       // Note: Main viewport window end is post-pended in task_viewport_end.hpp
     }

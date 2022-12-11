@@ -28,8 +28,9 @@ namespace met {
       met_trace_full();
 
       // Share resources
-      info.emplace_resource<gl::Texture2d3f>("draw_texture", { .size = 1 });
-      info.emplace_resource<detail::Arcball>("arcball",      { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
+      info.emplace_resource<gl::Texture2d4f>("draw_texture",      { .size = 1 });
+      info.emplace_resource<gl::Texture2d4f>("draw_texture_srgb", { .size = 1 });
+      info.emplace_resource<detail::Arcball>("arcball",           { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
       // Add subtasks in reverse order
       info.emplace_task_after<DrawEndTask>(name(), name() + "_draw_end", name());
@@ -117,23 +118,36 @@ namespace met {
       uint l_gamut_mapp_j = e_gamut_mapp_j[i];
 
       // Compute resulting color and error
-      Colr gamut_actual = e_mappings[e_gamut_mapp_i[i]].apply_color(gamut_spec);
-      Colr gamut_error  = (gamut_actual - gamut_colr_i).abs();
+      Colr gamut_colr_j = gamut_colr_i + gamut_offs_j;
+      Colr gamut_actual_i = e_mappings[e_gamut_mapp_i[i]].apply_color(gamut_spec);
+      Colr gamut_actual_j = e_mappings[e_gamut_mapp_j[i]].apply_color(gamut_spec);
+      Colr gamut_error_i  = (gamut_actual_i - gamut_colr_i).abs();
+      Colr gamut_error_j  = (gamut_actual_j - gamut_colr_j).abs();
+
+      // Get gamma-corrected colors
+      Colr gamut_colr_i_srgb = linear_srgb_to_gamma_srgb(gamut_colr_i);
+      Colr gamut_colr_j_srgb = linear_srgb_to_gamma_srgb(gamut_colr_j);
+      Colr gamut_actual_i_srgb = linear_srgb_to_gamma_srgb(gamut_actual_i);
+      Colr gamut_actual_j_srgb = linear_srgb_to_gamma_srgb(gamut_actual_j);
 
       // Plot of solved-for reflectance
       ImGui::PlotLines("Reflectance", gamut_spec.data(), gamut_spec.rows(), 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
 
       ImGui::Separator();
 
-      ImGui::Text("Color input");
-      ImGui::ColorEdit3("Value",  gamut_colr_i.data(), ImGuiColorEditFlags_Float);
-      ImGui::ColorEdit3("Offset", gamut_offs_j.data(), ImGuiColorEditFlags_Float);
+      ImGui::Text("Color values");
+      ImGui::ColorEdit3("Value 0", gamut_colr_i_srgb.data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Value 1", gamut_colr_j_srgb.data(), ImGuiColorEditFlags_Float);
   
       ImGui::Separator();
 
-      ImGui::Text("Color output");
-      ImGui::ColorEdit3("Value", gamut_actual.data(), ImGuiColorEditFlags_Float);
-      ImGui::ColorEdit3("Error", gamut_error.data(), ImGuiColorEditFlags_Float);
+      ImGui::Text("Color roundtrip");
+      ImGui::ColorEdit3("Value, 0", gamut_actual_i_srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      ImGui::SameLine();
+      ImGui::ColorEdit3("Value, 1", gamut_actual_j_srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      ImGui::ColorEdit3("Error, 0", gamut_error_i.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      ImGui::SameLine();
+      ImGui::ColorEdit3("Error, 1", gamut_error_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
 
       ImGui::Separator();
 
@@ -163,14 +177,14 @@ namespace met {
       if (l_gamut_mapp_i != e_gamut_mapp_i[i]) {
         e_app_data.touch({
           .name = "Change gamut mapping 0",
-          .redo = [edit = l_gamut_mapp_i,                j = i](auto &data) { data.gamut_mapp_i[j] = edit; },
+          .redo = [edit = l_gamut_mapp_i,    j = i](auto &data) { data.gamut_mapp_i[j] = edit; },
           .undo = [edit = e_gamut_mapp_i[i], j = i](auto &data) { data.gamut_mapp_i[j] = edit; }
         });
       }
       if (l_gamut_mapp_j != e_gamut_mapp_j[i]) {
         e_app_data.touch({
           .name = "Change gamut mapping 1",
-          .redo = [edit = l_gamut_mapp_j,                j = i](auto &data) { data.gamut_mapp_j[j] = edit; },
+          .redo = [edit = l_gamut_mapp_j,    j = i](auto &data) { data.gamut_mapp_j[j] = edit; },
           .undo = [edit = e_gamut_mapp_j[i], j = i](auto &data) { data.gamut_mapp_j[j] = edit; }
         });
       }
@@ -180,7 +194,8 @@ namespace met {
       met_trace_full();
         
       // Get shared resources
-      auto &i_draw_texture = info.get_resource<gl::Texture2d3f>("draw_texture");
+      auto &i_draw_texture      = info.get_resource<gl::Texture2d4f>("draw_texture");
+      auto &i_draw_texture_srgb = info.get_resource<gl::Texture2d4f>("draw_texture_srgb");
       auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
 
       // Compute viewport size minus ImGui's tab bars etc
@@ -189,12 +204,13 @@ namespace met {
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       eig::Array2f texture_size  = viewport_size.x();
       if (!i_draw_texture.is_init() || (i_draw_texture.size() != viewport_size.cast<uint>()).all()) {
-        i_draw_texture = {{ .size = texture_size.cast<uint>() }};
+        i_draw_texture      = {{ .size = texture_size.cast<uint>() }};
+        i_draw_texture_srgb = {{ .size = texture_size.cast<uint>() }};
       }
 
       // Insert image, applying viewport texture to viewport; texture can be safely drawn 
       // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-      ImGui::Image(ImGui::to_ptr(i_draw_texture.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+      ImGui::Image(ImGui::to_ptr(i_draw_texture_srgb.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
       
       // Handle input
       if (ImGui::IsItemHovered()) {
@@ -211,7 +227,7 @@ namespace met {
       // Get shared resources
       auto &io        = ImGui::GetIO();
       auto &i_arcball = info.get_resource<detail::Arcball>("arcball");
-      auto &i_texture = info.get_resource<gl::Texture2d3f>("draw_texture");
+      auto &i_texture = info.get_resource<gl::Texture2d4f>("draw_texture");
 
       // Update camera info: aspect ratio, scroll delta, move delta
       i_arcball.m_aspect = i_texture.size().x() / i_texture.size().y();

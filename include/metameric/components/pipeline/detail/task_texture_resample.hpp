@@ -69,6 +69,7 @@ namespace met::detail {
       auto &e_rsrc = info.get_resource<TextureType>(m_info.input_key.first, m_info.input_key.second);
       auto &i_rsrc = info.get_resource<TextureType>(m_info.output_key.second);
 
+      // Bind resources
       m_sampler.bind_to(0);
       e_rsrc.bind_to(gl::TextureTargetType::eTextureUnit,    0);
       i_rsrc.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);

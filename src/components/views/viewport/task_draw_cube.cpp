@@ -59,7 +59,7 @@ namespace met {
 
     // Set constant uniforms
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
-    m_program.uniform("u_value",        Colr(1.f));
+    m_program.uniform("u_value",       eig::Array4f(1));
   }
 
   void ViewportDrawCubeTask::eval(detail::TaskEvalInfo &info) {
