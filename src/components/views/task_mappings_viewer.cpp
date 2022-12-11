@@ -19,7 +19,8 @@ namespace met {
                   .output_key   = { fmt::format(resample_fmt, i), "texture"        },
                   .texture_info = { .size = texture_size                           },
                   .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                    .mag_filter = gl::SamplerMagFilter::eLinear    }}};
+                                    .mag_filter = gl::SamplerMagFilter::eLinear    },
+                  .lrgb_to_srgb = true                                             }};
       };
     };
 

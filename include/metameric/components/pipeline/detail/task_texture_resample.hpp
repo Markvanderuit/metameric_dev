@@ -15,10 +15,11 @@ namespace met::detail {
     using TextureInfo = TextureType::InfoType;
     using SamplerInfo = gl::Sampler::InfoType;
 
-    StringPair input_key;           // Key to input resource
-    StringPair output_key;          // Key to output resource (key.first is task name)
-    TextureInfo texture_info = {};  // Info about output gl texture object
-    SamplerInfo sampler_info = {};  // Info about internal gl sampler object
+    StringPair input_key;             // Key to input resource
+    StringPair output_key;            // Key to output resource (key.first is task name)
+    TextureInfo texture_info = {};    // Info about output gl texture object
+    SamplerInfo sampler_info = {};    // Info about internal gl sampler object
+    bool        lrgb_to_srgb = false; // Perform gamma correction during resampling
   };
 
   template <class TextureType>
@@ -55,7 +56,8 @@ namespace met::detail {
 
       // Set these uniforms once
       m_program.uniform("u_size", dispatch_n);
-      m_program.uniform("u_sampler", 0); // Texture unit 0 will be bound
+      m_program.uniform("u_sampler", 0);
+      m_program.uniform("u_lrgb_to_srgb", static_cast<uint>(m_info.lrgb_to_srgb));
     }
 
     void eval(detail::TaskEvalInfo &info) override {
