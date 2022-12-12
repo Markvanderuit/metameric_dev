@@ -3,7 +3,6 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/views/mappings_viewer/task_mapping_popout.hpp>
 #include <small_gl/texture.hpp>
 
 namespace met {

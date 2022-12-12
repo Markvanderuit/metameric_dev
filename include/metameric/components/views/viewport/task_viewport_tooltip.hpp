@@ -4,9 +4,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
-#include <metameric/components/views/gamut_viewport/task_draw_begin.hpp>
-#include <metameric/components/views/gamut_viewport/task_draw_metamer_ocs.hpp>
-#include <metameric/components/views/gamut_viewport/task_draw_end.hpp>
+#include <metameric/components/views/viewport/task_draw_color_solid.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/texture.hpp>
@@ -32,10 +30,8 @@ namespace met {
       info.emplace_resource<gl::Texture2d4f>("draw_texture_srgb", { .size = 1 });
       info.emplace_resource<detail::Arcball>("arcball",           { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
-      // Add subtasks in reverse order
-      info.emplace_task_after<DrawEndTask>(name(), name() + "_draw_end", name());
-      info.emplace_task_after<DrawMetamerOCSTask>(name(), name() + "_draw_metamer_ocs", name());
-      info.emplace_task_after<DrawBeginTask>(name(), name() + "_draw_begin", name());
+      // Add subtasks
+      info.emplace_task_after<DrawColorSolidTask>(name(), name() + "_draw_color_solid", name());
 
       // Start with gizmo inactive
       m_is_gizmo_used = false;
@@ -45,9 +41,7 @@ namespace met {
       met_trace_full();
 
       // Remove subtasks
-      info.remove_task(name() + "_draw_begin");
-      info.remove_task(name() + "_draw_metamer_ocs");
-      info.remove_task(name() + "_draw_end");
+      info.remove_task(name() + "_draw_color_solid");
     }
 
     void eval(detail::TaskEvalInfo &info) override {

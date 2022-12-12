@@ -60,7 +60,6 @@ namespace met {
     m_opac_buffer.unmap();
   }
 
-
   void ViewportDrawGamutTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
                                 
