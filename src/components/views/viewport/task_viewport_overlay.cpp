@@ -28,7 +28,6 @@ namespace met {
 
     // Share resources
     info.emplace_resource<uint>("weight_mapping", 0);
-    info.emplace_resource<gl::Texture2d4f>("lrgb_weights_target",     { .size = 1 });
     info.emplace_resource<gl::Texture2d4f>("srgb_weights_target",     { .size = 1 });
     info.emplace_resource<gl::Texture2d4f>("lrgb_color_solid_target", { .size = 1 });
     info.emplace_resource<gl::Texture2d4f>("srgb_color_solid_target", { .size = 1 });
@@ -278,7 +277,6 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &i_lrgb_target    = info.get_resource<gl::Texture2d4f>("lrgb_weights_target");
     auto &i_srgb_target    = info.get_resource<gl::Texture2d4f>("srgb_weights_target");
     auto &i_weight_mapping = info.get_resource<uint>("weight_mapping");
     auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -290,8 +288,7 @@ namespace met {
     eig::Array2f texture_size  = viewport_size.x();
 
     // (Re-)create viewport texture if necessary; attached framebuffers are resized in subtask
-    if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).all()) {
-      i_lrgb_target = {{ .size = texture_size.cast<uint>() }};
+    if (!i_srgb_target.is_init() || (i_srgb_target.size() != viewport_size.cast<uint>()).all()) {
       i_srgb_target = {{ .size = texture_size.cast<uint>() }};
     }
 

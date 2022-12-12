@@ -2,8 +2,6 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
-#include <small_gl/buffer.hpp>
-#include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
 
@@ -56,10 +54,11 @@ namespace met {
     m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_unif_map = &m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
 
-    // Initialize buffer resources
-    info.emplace_resource<gl::Buffer>("sum_buffer", { .size = sizeof(float) * dispatch_n });
+    // Initialize buffer and texture for storing intermediate results
+    m_buffer  = {{ .size = sizeof(float) * dispatch_n }};
+    m_texture = {{ .size = dispatch_texture_n }};
     
-    m_mapping_i_cache = 0;
+    m_mapping_i_cache = -1;
     m_selection_cache = { };
   }
 
@@ -70,23 +69,21 @@ namespace met {
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_mapping_i   = info.get_resource<uint>(m_parent, "weight_mapping");
     auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
-    guard(e_selection.size() != m_selection_cache.size() || e_mapping_i != m_mapping_i_cache
-        ||!std::ranges::equal(e_selection, m_selection_cache)
-        || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    guard(e_mapping_i != m_mapping_i_cache
+      ||!std::ranges::equal(e_selection, m_selection_cache)
+      || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Update local cache variables
     m_selection_cache = e_selection;
     m_mapping_i_cache = e_mapping_i;
     
     // Continue only if a selection is currently active
-    guard(!m_selection_cache.empty());
+    guard(m_mapping_i_cache >= 0 && !m_selection_cache.empty());
 
     // Get shared resources
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
     auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", e_mapping_i), "colr_buffer");
-    auto &i_sums_buffer = info.get_resource<gl::Buffer>("sum_buffer");
-    auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_weights_target");
     auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_weights_target");
 
     // Update uniform data for upcoming sum computation
@@ -105,7 +102,7 @@ namespace met {
 
     // Bind resources to buffer targets for upcoming sum computation
     e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    i_sums_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    m_buffer.bind_to(gl::BufferTargetType::eShaderStorage,      1);
     m_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
 
     // Dispatch shader to perform sum comutation
@@ -113,15 +110,15 @@ namespace met {
     gl::dispatch_compute(m_dispatch);
 
     // Bind resources to buffer targets for upcoming buffer-to-texture conversion
-    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage,   0);
-    i_sums_buffer.bind_to(gl::BufferTargetType::eShaderStorage,   1);
-    e_lrgb_target.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
+    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    m_buffer.bind_to(gl::BufferTargetType::eShaderStorage,      1);
+    m_texture.bind_to(gl::TextureTargetType::eImageWriteOnly,   0);
 
-    // Dispatch shader to move data into texture
+    // Dispatch shader to move data into texture format
     gl::dispatch_compute(m_texture_dispatch);
 
     // Bind relevant resources to texture/image/sampler units for the coming compute operation
-    e_lrgb_target.bind_to(gl::TextureTargetType::eTextureUnit,    0);
+    m_texture.bind_to(gl::TextureTargetType::eTextureUnit,        0);
     e_srgb_target.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
     m_srgb_sampler.bind_to(0);
 
