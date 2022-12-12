@@ -35,18 +35,18 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_draw_texture      = info.get_resource<gl::Texture2d4f>("viewport_begin", "draw_texture");
-      auto &e_draw_texture_srgb = info.get_resource<gl::Texture2d4f>("viewport_begin", "draw_texture_srgb");
-      auto &e_frame_buffer      = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
-      auto &e_frame_buffer_ms   = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
+      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "lrgb_target");
+      auto &e_srgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "srgb_target");
+      auto &e_frame_buffer    = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
+      auto &e_frame_buffer_ms = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
 
       // Blit color results into the single-sampled framebuffer with attached target draw_texture
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer);
       constexpr auto blit_flags = gl::FramebufferMaskFlags::eColor | gl::FramebufferMaskFlags::eDepth;
-      e_frame_buffer_ms.blit_to(e_frame_buffer, e_draw_texture.size(), 0u, e_draw_texture.size(), 0u, blit_flags);
+      e_frame_buffer_ms.blit_to(e_frame_buffer, e_lrgb_target.size(), 0u, e_lrgb_target.size(), 0u, blit_flags);
 
       // Set dispatch size correctly depending on texture size
-      eig::Array2u dispatch_n    = e_draw_texture_srgb.size();
+      eig::Array2u dispatch_n    = e_srgb_target.size();
       eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
       m_dispatch = { .groups_x = dispatch_ndiv.x(),
                      .groups_y = dispatch_ndiv.y(),
@@ -55,8 +55,8 @@ namespace met {
 
       // Bind resources
       m_sampler.bind_to(0);
-      e_draw_texture.bind_to(gl::TextureTargetType::eTextureUnit,         0);
-      e_draw_texture_srgb.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
+      e_lrgb_target.bind_to(gl::TextureTargetType::eTextureUnit,    0);
+      e_srgb_target.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
 
       // Dispatch shader, applying gamma correction to obtain final results in draw_texture_srgb
       gl::dispatch_compute(m_dispatch);

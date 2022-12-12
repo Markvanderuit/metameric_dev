@@ -13,8 +13,8 @@ namespace met {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1, gl::RenderbufferType::eMultisample>;
 
     // Framebuffer attachments
-    Colorbuffer m_color_buffer_msaa;
-    Depthbuffer m_depth_buffer_msaa;
+    Colorbuffer m_color_buffer_ms;
+    Depthbuffer m_depth_buffer_ms;
     
   public:
     ViewportDrawBeginTask(const std::string &name)
@@ -32,25 +32,26 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_draw_texture      = info.get_resource<gl::Texture2d4f>("viewport_begin", "draw_texture");
-      auto &i_frame_buffer      = info.get_resource<gl::Framebuffer>("frame_buffer");
-      auto &i_frame_buffer_msaa = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
+      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "lrgb_target");
+      auto &i_frame_buffer    = info.get_resource<gl::Framebuffer>("frame_buffer");
+      auto &i_frame_buffer_ms = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
-      if (!i_frame_buffer.is_init() || (e_draw_texture.size() != m_color_buffer_msaa.size()).any()) {
-        m_color_buffer_msaa = {{ .size = e_draw_texture.size().max(1) }};
-        m_depth_buffer_msaa = {{ .size = e_draw_texture.size().max(1) }};
-        i_frame_buffer_msaa = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_msaa },
-                               { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer_msaa }};
-        i_frame_buffer      = {{ .type = gl::FramebufferType::eColor, .attachment = &e_draw_texture }};
+      if (!i_frame_buffer.is_init() || (e_lrgb_target.size() != m_color_buffer_ms.size()).any()) {
+        m_color_buffer_ms = {{ .size = e_lrgb_target.size().max(1) }};
+        m_depth_buffer_ms = {{ .size = e_lrgb_target.size().max(1) }};
+        i_frame_buffer_ms = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_ms },
+                             { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer_ms }};
+        i_frame_buffer    = {{ .type = gl::FramebufferType::eColor, .attachment = &e_lrgb_target }};
       }
 
       // Clear framebuffer target for next subtasks
-      i_frame_buffer_msaa.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
-      i_frame_buffer_msaa.clear(gl::FramebufferType::eDepth, 1.f);
-      i_frame_buffer_msaa.bind();
+      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
+      i_frame_buffer_ms.clear(gl::FramebufferType::eDepth, 1.f);
+      i_frame_buffer_ms.bind();
 
       // Specify viewport for next subtasks
-      gl::state::set_viewport(e_draw_texture.size());    }
+      gl::state::set_viewport(m_color_buffer_ms.size());    
+    }
   };
 } // namespace met

@@ -26,9 +26,9 @@ namespace met {
       met_trace_full();
 
       // Share resources
-      info.emplace_resource<gl::Texture2d4f>("draw_texture",      { .size = 1 });
-      info.emplace_resource<gl::Texture2d4f>("draw_texture_srgb", { .size = 1 });
-      info.emplace_resource<detail::Arcball>("arcball",           { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
+      info.emplace_resource<gl::Texture2d4f>("lrgb_target", { .size = 1 });
+      info.emplace_resource<gl::Texture2d4f>("srgb_target", { .size = 1 });
+      info.emplace_resource<detail::Arcball>("arcball",     { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
       // Add subtasks
       info.emplace_task_after<DrawColorSolidTask>(name(), name() + "_draw_color_solid", name());
@@ -188,8 +188,8 @@ namespace met {
       met_trace_full();
         
       // Get shared resources
-      auto &i_draw_texture      = info.get_resource<gl::Texture2d4f>("draw_texture");
-      auto &i_draw_texture_srgb = info.get_resource<gl::Texture2d4f>("draw_texture_srgb");
+      auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_target");
+      auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_target");
       auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
 
       // Compute viewport size minus ImGui's tab bars etc
@@ -197,14 +197,14 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       eig::Array2f texture_size  = viewport_size.x();
-      if (!i_draw_texture.is_init() || (i_draw_texture.size() != viewport_size.cast<uint>()).all()) {
-        i_draw_texture      = {{ .size = texture_size.cast<uint>() }};
-        i_draw_texture_srgb = {{ .size = texture_size.cast<uint>() }};
+      if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).all()) {
+        i_lrgb_target  = {{ .size = texture_size.cast<uint>() }};
+        i_srgb_target = {{ .size = texture_size.cast<uint>() }};
       }
 
       // Insert image, applying viewport texture to viewport; texture can be safely drawn 
       // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-      ImGui::Image(ImGui::to_ptr(i_draw_texture_srgb.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+      ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
       
       // Handle input
       if (ImGui::IsItemHovered()) {
@@ -219,15 +219,15 @@ namespace met {
       met_trace_full();
       
       // Get shared resources
-      auto &io        = ImGui::GetIO();
-      auto &i_arcball = info.get_resource<detail::Arcball>("arcball");
-      auto &i_texture = info.get_resource<gl::Texture2d4f>("draw_texture");
+      auto &io            = ImGui::GetIO();
+      auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
+      auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_target");
 
       // Update camera info: aspect ratio, scroll delta, move delta
-      i_arcball.m_aspect = i_texture.size().x() / i_texture.size().y();
+      i_arcball.m_aspect = i_lrgb_target.size().x() / i_lrgb_target.size().y();
       i_arcball.set_dist_delta(io.MouseWheel);
       if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
-        i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / i_texture.size().cast<float>());
+        i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / i_lrgb_target.size().cast<float>());
       i_arcball.update_matrices();
     }
 
