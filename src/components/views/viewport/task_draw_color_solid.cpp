@@ -35,6 +35,11 @@ namespace met {
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
 
+    // Load shader program objects
+    m_draw_program = {{ .type = gl::ShaderType::eVertex, .path = "resources/shaders/viewport/draw_color_array.vert" },
+                      { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
+    m_srgb_program = {{ .type = gl::ShaderType::eCompute, .path = "resources/shaders/misc/texture_resample.comp" }};
+
     // Create dispatch objects to summarize draw/compute operations
     m_chull_dispatch = { .type = gl::PrimitiveType::eTriangles,
                          .vertex_count = (uint) (m_chull_elems.size() / sizeof(uint)),
@@ -49,11 +54,6 @@ namespace met {
     // Create sampler object used in gamma correction step
     m_srgb_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
 
-    // Load shader program objects
-    m_draw_program = {{ .type = gl::ShaderType::eVertex, .path = "resources/shaders/viewport/draw_color_array.vert" },
-                      { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
-    m_srgb_program = {{ .type = gl::ShaderType::eCompute, .path = "resources/shaders/misc/texture_resample.comp" }};
-    
     // Set these uniforms once
     m_draw_program.uniform("u_alpha", 1.f);
     m_srgb_program.uniform("u_sampler", 0);
@@ -73,8 +73,8 @@ namespace met {
     guard(e_gamut_idx >= 0);
 
     // Get shared resources
-    auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_target");
-    auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_target");
+    auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
+    auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_color_solid_target");
     auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
     auto &e_arcball     = info.get_resource<detail::Arcball>(m_parent, "arcball");
     auto &e_ocs_centr   = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_gamut_idx];

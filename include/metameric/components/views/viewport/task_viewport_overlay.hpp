@@ -1,17 +1,8 @@
 #pragma once
 
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
-#include <metameric/components/views/viewport/task_draw_color_solid.hpp>
-#include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/views/detail/arcball.hpp>
-#include <small_gl/texture.hpp>
-#include <small_gl/utility.hpp>
-#include <ImGuizmo.h>
-#include <numeric>
-#include <ranges>
 
 namespace met {
   class ViewportOverlayTask : public detail::AbstractTask {

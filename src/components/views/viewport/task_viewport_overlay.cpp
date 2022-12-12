@@ -1,4 +1,15 @@
+#include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/viewport/task_viewport_overlay.hpp>
+#include <metameric/components/views/viewport/task_draw_color_solid.hpp>
+#include <metameric/components/views/viewport/task_draw_weights.hpp>
+#include <small_gl/texture.hpp>
+#include <small_gl/utility.hpp>
+#include <ImGuizmo.h>
+#include <numeric>
+#include <ranges>
 
 namespace met {
   constexpr auto window_flags = ImGuiWindowFlags_AlwaysAutoResize 
@@ -16,12 +27,16 @@ namespace met {
     met_trace_full();
 
     // Share resources
-    info.emplace_resource<gl::Texture2d4f>("lrgb_target", { .size = 1 });
-    info.emplace_resource<gl::Texture2d4f>("srgb_target", { .size = 1 });
-    info.emplace_resource<detail::Arcball>("arcball",     { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
+    info.emplace_resource<uint>("weight_mapping", 0);
+    info.emplace_resource<gl::Texture2d4f>("lrgb_weights_target",     { .size = 1 });
+    info.emplace_resource<gl::Texture2d4f>("srgb_weights_target",     { .size = 1 });
+    info.emplace_resource<gl::Texture2d4f>("lrgb_color_solid_target", { .size = 1 });
+    info.emplace_resource<gl::Texture2d4f>("srgb_color_solid_target", { .size = 1 });
+    info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
     info.emplace_task_after<DrawColorSolidTask>(name(), name() + "_draw_color_solid", name());
+    info.emplace_task_after<DrawWeightsTask>(name(), name() + "_draw_weights", name());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -31,6 +46,7 @@ namespace met {
     met_trace_full();
 
     // Remove subtasks
+    info.remove_task(name() + "_draw_weights");
     info.remove_task(name() + "_draw_color_solid");
   }
 
@@ -89,7 +105,6 @@ namespace met {
       view_size.y() = 0.f;
       
       // Set window state for next window
-      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
       
@@ -187,8 +202,8 @@ namespace met {
         
     // Get shared resources
     auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
-    auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_target");
-    auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_target");
+    auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_color_solid_target");
+    auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_color_solid_target");
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection")[0];
     auto &e_ocs_center  = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_selection];
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -260,6 +275,39 @@ namespace met {
   }
 
   void ViewportOverlayTask::eval_overlay_weights(detail::TaskEvalInfo &info) {
+    met_trace_full();
+
+    // Get shared resources
+    auto &i_lrgb_target    = info.get_resource<gl::Texture2d4f>("lrgb_weights_target");
+    auto &i_srgb_target    = info.get_resource<gl::Texture2d4f>("srgb_weights_target");
+    auto &i_weight_mapping = info.get_resource<uint>("weight_mapping");
+    auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings       = e_app_data.project_data.mappings;
     
+    // Compute viewport size minus ImGui's tab bars etc
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    eig::Array2f texture_size  = viewport_size.x();
+
+    // (Re-)create viewport texture if necessary; attached framebuffers are resized in subtask
+    if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).all()) {
+      i_lrgb_target = {{ .size = texture_size.cast<uint>() }};
+      i_srgb_target = {{ .size = texture_size.cast<uint>() }};
+    }
+
+    // Insert mapping selector for which color mapping is used in the weights overlay
+    i_weight_mapping = std::min(i_weight_mapping, static_cast<uint>(e_mappings.size() - 1));
+    if (ImGui::BeginCombo("#Mapping", e_mappings[i_weight_mapping].first.c_str())) {
+      for (uint i = 0; i < e_mappings.size(); ++i) {
+        if (ImGui::Selectable(e_mappings[i].first.c_str(), i == i_weight_mapping)) {
+          i_weight_mapping = i;
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    // Insert image, applying viewport texture to viewport; texture can be safely drawn 
+    // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
+    ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
   }
 } // namespace met

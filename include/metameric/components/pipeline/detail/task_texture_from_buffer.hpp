@@ -46,7 +46,7 @@ namespace met::detail {
 
       // Initialize objects for texture-to-texture resampling
       m_program = {{ .type = gl::ShaderType::eCompute,
-                     .path = "resources/shaders/misc/buffer_to_texture.comp" }};
+                     .path = "resources/shaders/misc/buffer_to_texture_rgba32f.comp" }};
       m_dispatch = { .groups_x = dispatch_ndiv.x(),
                      .groups_y = dispatch_ndiv.y(),
                      .bindable_program = &m_program };
