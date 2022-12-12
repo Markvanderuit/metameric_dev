@@ -2,7 +2,6 @@
 build*/
 .DS_Store
 .vscode/
-imgui.ini
 
 # Prerequisites
 *.d

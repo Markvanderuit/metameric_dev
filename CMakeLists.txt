@@ -63,6 +63,7 @@ find_package(TBB       CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
+find_package(ZLIB      REQUIRED)
 
 # Include third party shader-related libraries provided through vcpkg
 find_package(glslang             CONFIG REQUIRED)
@@ -245,6 +246,7 @@ target_link_libraries(core PUBLIC
   nlohmann_json::nlohmann_json
   ${OPENMESH_LIBRARIES}
   TBB::tbb
+  ZLIB::ZLIB
 )
 target_include_directories(core PUBLIC
   ${STB_INCLUDE_DIRS}

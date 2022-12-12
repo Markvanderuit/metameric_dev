@@ -24,7 +24,8 @@
     "openmesh",
     "stb",
     "tbb",
-    "tracy"
+    "tracy",
+    "zlib"
   ],
   "features" : { }
 }

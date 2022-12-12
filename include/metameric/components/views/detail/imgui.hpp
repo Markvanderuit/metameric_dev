@@ -12,16 +12,6 @@
   operator met::eig::Array2i() const { return {                    \
     static_cast<int>(x), static_cast<int>(y) }; }
 
-/* #define IM_VEC4_CLASS_EXTRA                                   \
-  ImVec4(const glm::ivec4 &v) :                               \
-  x(v[0]), y(v[1]), z(v[2]), w(v[3]) { }                      \
-  ImVec4(const glm::vec4 &v)                                  \
-  : x(v[0]), y(v[1]), z(v[2]), w(v[3]) { }                    \
-  operator glm::vec4() const { return { x, y, z, w }; }       \
-  operator glm::ivec4() const { return {                      \
-    static_cast<int>(x), static_cast<int>(y),                 \
-    static_cast<int>(z), static_cast<int>(w)}; } */
-
 #include <metameric/core/math.hpp>
 #include <small_gl/fwd.hpp>
 #include <imgui.h>
