@@ -47,22 +47,6 @@ namespace met {
       return generate_data(mesh);
     }
 
-    /* MeshReturnType collapse_elem(const std::vector<eig::Array3f> &verts,
-                                 const std::vector<eig::Array3u> &elems,
-                                 uint i) {
-      // Generate openmesh representation to perform mesh operations
-      auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(verts, elems);
-                      
-      // Acquire handle to relevant collapsable face and vertices
-      auto fh = mesh.face_handle(i);
-      auto [vh0, vh1, vh2] = mesh.fv_range(fh).to_array<3>();
-
-      auto [eh0, eh1, eh2] = mesh.fe_range(fh).to_array<3>();
-
-      mesh.garbage_collection();
-      return generate_data(mesh);           
-    } */
-
     MeshReturnType collapse_vert(const std::vector<eig::Array3f> &verts,
                                  const std::vector<eig::Array3u> &elems,
                                  uint i) {
@@ -92,7 +76,7 @@ namespace met {
     
       // Add subtasks
       info.emplace_task_after<ViewportInputVertTask>(name(), name() + "_vert");
-      info.emplace_task_after<ViewportInputEdgeTask>(name(), name() + "_edge");
+      // info.emplace_task_after<ViewportInputEdgeTask>(name(), name() + "_edge");
       info.emplace_task_after<ViewportInputElemTask>(name(), name() + "_elem");
 
       // Share resources
@@ -105,7 +89,7 @@ namespace met {
 
       // Remove subtasks
       info.remove_task(name() + "_vert");
-      info.remove_task(name() + "_edge");
+      // info.remove_task(name() + "_edge");
       info.remove_task(name() + "_elem");
     }
 
@@ -141,8 +125,6 @@ namespace met {
         // Handle edit mode flags
         int m = static_cast<int>(i_mode);
         ImGui::RadioButton("Vertex", &m, static_cast<int>(detail::ViewportInputMode::eVertex));
-        ImGui::SameLine();
-        ImGui::RadioButton("Edge",   &m, static_cast<int>(detail::ViewportInputMode::eEdge));
         ImGui::SameLine();
         ImGui::RadioButton("Face",   &m, static_cast<int>(detail::ViewportInputMode::eFace));
 
