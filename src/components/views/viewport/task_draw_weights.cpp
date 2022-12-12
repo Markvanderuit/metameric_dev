@@ -69,10 +69,12 @@ namespace met {
     // Continue only on relevant state change
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_mapping_i   = info.get_resource<uint>(m_parent, "weight_mapping");
-    auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_colr_i");
+    auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
     guard(e_selection.size() != m_selection_cache.size() || e_mapping_i != m_mapping_i_cache
         ||!std::ranges::equal(e_selection, m_selection_cache)
         || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+
+    // Update local cache variables
     m_selection_cache = e_selection;
     m_mapping_i_cache = e_mapping_i;
     

@@ -297,7 +297,7 @@ namespace met {
 
     // Insert mapping selector for which color mapping is used in the weights overlay
     i_weight_mapping = std::min(i_weight_mapping, static_cast<uint>(e_mappings.size() - 1));
-    if (ImGui::BeginCombo("#Mapping", e_mappings[i_weight_mapping].first.c_str())) {
+    if (ImGui::BeginCombo("Mapping", e_mappings[i_weight_mapping].first.c_str())) {
       for (uint i = 0; i < e_mappings.size(); ++i) {
         if (ImGui::Selectable(e_mappings[i].first.c_str(), i == i_weight_mapping)) {
           i_weight_mapping = i;
