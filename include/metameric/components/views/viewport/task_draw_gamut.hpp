@@ -8,19 +8,29 @@
 
 namespace met {
   class ViewportDrawGamutTask : public detail::AbstractTask {
-    // Caches to detect buffer/selection changes
-    uint              m_gamut_vert_cache;
-    std::vector<uint> m_gamut_select_cache;
-    std::vector<uint> m_gamut_msover_cache;
+    // Cache objects to detect state changes in UI components
+    uint              m_buffer_object_cache;
+    std::vector<uint> m_vert_select_cache;
+    std::vector<uint> m_vert_msover_cache;
+    std::vector<uint> m_elem_select_cache;
+    std::vector<uint> m_elem_msover_cache;
 
-    // Local components to have individual opacities for selections/mouseovers
-    gl::Buffer       m_opac_buffer;
-    std::span<float> m_opac_map;
+    // Local buffer to store individual opacities/sizes for vertex/element selection/mouseover;
+    // each buffer is mapped for flushable changes
+    gl::Buffer        m_vert_size_buffer;
+    gl::Buffer        m_elem_opac_buffer;
+    std::span<float>  m_vert_size_map;
+    std::span<float>  m_elem_opac_map;
 
-    // Gamut draw components
-    gl::Array    m_array;
-    gl::Program  m_program;
-    gl::DrawInfo m_draw;
+    // Graphics draw components
+    gl::Array    m_vert_array;
+    gl::Array    m_elem_array;
+    gl::Buffer   m_inst_vert_buffer;
+    gl::Buffer   m_inst_elem_buffer;
+    gl::Program  m_vert_program;
+    gl::Program  m_elem_program;
+    gl::DrawInfo m_vert_draw;
+    gl::DrawInfo m_elem_draw;
 
   public:
     ViewportDrawGamutTask(const std::string &);
