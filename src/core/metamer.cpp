@@ -3,6 +3,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <omp.h>
+#include <fmt/ranges.h>
 #include <algorithm>
 #include <execution>
 #include <unordered_set>
@@ -120,5 +121,49 @@ namespace met {
     }
 
     return detail::remove_identical_points(output);
+  }
+
+  
+  std::vector<Colr> generate_gamut(const std::vector<Wght> &weights,
+                                   const std::vector<Colr> &samples) {
+    const uint W = weights[0].size();
+    const uint M = 3 * weights.size();
+    const uint N = 3 * W;
+
+    // Initialize parameter object for LP solver with expected matrix sizes
+    LPParameters params(M, N);
+    params.method    = LPMethod::ePrimal;
+    params.scaling   = true;
+    params.objective = LPObjective::eMinimize;
+
+    eig::ArrayXd A_(W, 1);
+    std::ranges::copy(weights[0], A_.begin());
+
+    // Specify constraints A*x = b
+    params.A.fill(0.0);
+    for (uint i = 0; i < weights.size(); ++i) {
+      eig::ArrayXd A_(W, 1);
+      std::ranges::copy(weights[i], A_.begin());
+      
+      params.A.block(3 * i + 0, 0,     1, W) = A_.transpose();
+      params.A.block(3 * i + 1, W,     1, W) = A_.transpose();
+      params.A.block(3 * i + 2, 2 * W, 1, W) = A_.transpose();
+      params.b.block(3 * i,     0,     3, 1) = samples[i].cast<double>(); 
+    }
+
+    // Set boundary constraints
+    // params.x_l =-.67f;
+    // params.x_u = .67f;
+
+    // Solve for original colors and separate these into return format
+    auto x = lp_solve(params).cast<float>().eval();
+    // fmt::print("A_ = {}\n", A_);
+    // fmt::print("A = {}\n", params.A.row(0));
+    // fmt::print("x = {}\n", x);
+    // fmt::print("params.b = {}\n", params.b);
+    std::vector<Colr> v(W);
+    for (uint i = 0; i < W; ++i)
+      v[i] = Colr(x[i], x[W + i], x[2 * W + i]);
+    return v;
   }
 } // namespace met

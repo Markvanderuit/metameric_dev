@@ -22,4 +22,7 @@ namespace met {
                                       const CMFS   &system_j,
                                       const Colr   &signal_i,
                                       const std::vector<eig::Array<float, 6, 1>> &samples);
+  using Wght = std::vector<float>;
+  std::vector<Colr> generate_gamut(const std::vector<Wght> &weights,
+                                   const std::vector<Colr> &samples);
 } // namespace met

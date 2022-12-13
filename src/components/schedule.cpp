@@ -35,6 +35,9 @@
 // State changes
 #include <small_gl/framebuffer.hpp>
 
+// TODO remove
+#include <metameric/core/metamer.hpp>
+
 namespace met {
   template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
@@ -129,6 +132,85 @@ namespace met {
     });
   }
 
+  
+  template <typename Scheduler>
+  void submit_schedule_test(Scheduler &scheduler) {
+    scheduler.emplace_task<LambdaTask>("debug_idea", [&](auto &info) {
+      // Get shared resources
+      auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+      auto &e_colr_i_buffer = info.get_resource<gl::Buffer>("gen_color_mapping_0", "colr_buffer");
+      auto &e_colr_j_buffer = info.get_resource<gl::Buffer>("gen_color_mapping_1", "colr_buffer");
+      auto &e_gamut_spec  = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
+      auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_prj_data    = e_app_data.project_data;
+
+      // Get barycentric weights of (first) pixel
+      std::array<float, barycentric_weights> bary_weights;
+      e_bary_buffer.get(cnt_span<std::byte>(bary_weights), bary_weights.size() * sizeof(float));
+
+      // Assemble resulting spectrum and baseline color
+      Spec s = 0;
+      Colr colr_i = 0, colr_j = 0, offs = 0;
+      for (uint i = 0; i < e_gamut_spec.size(); ++i) {
+        s += e_gamut_spec[i] * bary_weights[i];
+        colr_i += e_prj_data.gamut_colr_i[i] * bary_weights[i];
+        colr_j += (e_prj_data.gamut_colr_i[i] + e_prj_data.gamut_offs_j[i]) * bary_weights[i];
+        offs += e_prj_data.gamut_offs_j[i] * bary_weights[i];
+      }
+
+      // Compute roundtrip colors
+      Colr colr_i_rt = e_app_data.loaded_mappings[0].apply_color(s);
+      Colr colr_j_rt = e_app_data.loaded_mappings[1].apply_color(s);
+      Colr offs_rt = colr_j_rt - colr_i;
+
+      // Output info
+      if (ImGui::Begin("Debug idea view")) {
+        ImGui::PlotLines("Reflectance", s.data(), wavelength_samples, 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
+        ImGui::Separator();
+        ImGui::ColorEdit3("Color i", linear_srgb_to_gamma_srgb(colr_i).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color j", linear_srgb_to_gamma_srgb(colr_j).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Offset", offs.data(), ImGuiColorEditFlags_Float);
+        ImGui::Separator();
+        ImGui::ColorEdit3("Color i, roundtrip", linear_srgb_to_gamma_srgb(colr_i_rt).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Color j, roundtrip", linear_srgb_to_gamma_srgb(colr_j_rt).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Offset, roundtrip", offs_rt.data(), ImGuiColorEditFlags_Float);
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Fire!")) {
+
+          std::vector<Wght> _weights(5);
+          std::vector<Colr> _samples(5);
+          uint offset = 0;
+          for (auto &w : _weights) {
+            Wght _w(5);
+            e_bary_buffer.get(cnt_span<std::byte>(_w), _w.size() * sizeof(float), offset);
+            offset += 128 * barycentric_weights * sizeof(float);
+            w = _w;
+          }
+          offset = 0;
+          for (auto &s : _samples) {
+            AlColr sample_i, sample_j;
+            e_colr_i_buffer.get(cnt_span<std::byte>(sample_i), sizeof(AlColr), offset);
+            e_colr_j_buffer.get(cnt_span<std::byte>(sample_j), sizeof(AlColr), offset);
+            offset += 128 * sizeof(AlColr);
+            s = (sample_j - sample_i).eval();
+          }
+          
+          fmt::print("weights = {}\n", _weights);
+          fmt::print("samples = {}\n", _samples);
+
+          
+          e_prj_data.gamut_offs_j = { };
+          fmt::print("old = {}\n", e_prj_data.gamut_offs_j);
+          e_prj_data.gamut_offs_j = generate_gamut(_weights, _samples);
+          fmt::print("new = {}\n", e_prj_data.gamut_offs_j);
+        }
+      }
+      ImGui::End();
+    });
+  }
+
   template <typename Scheduler>
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
@@ -154,7 +236,8 @@ namespace met {
 
     // Insert temporary unimportant tasks
     // submit_schedule_debug(scheduler);
-    
+    submit_schedule_test(scheduler);
+
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }
   
