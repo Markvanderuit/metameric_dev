@@ -175,7 +175,7 @@ namespace met {
     auto vf = mesh.vf_range(vh).to_vector();
     auto f0 = vf[0];
     auto vi = *f0.vertices().begin();
-
+    // f0.del
     // mesh.normal(f0).
     // auto vs = vf.to_set();
 

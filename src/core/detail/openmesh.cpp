@@ -79,6 +79,7 @@ namespace OpenMesh::Decimater {
       uint i = 2;
       for (auto fh : f0) {
         guard_continue(fh.idx() != fl.idx() && fh.idx() != fr.idx());
+        // if (fh.deleted()) fmt::print("Oh no\n");
 
         auto n = mesh.normal(fh), p = mesh.point(*fh.vertices().begin());
         params.A.row(i) = met::to_eig<float, 3>(n).cast<double>();
@@ -87,6 +88,7 @@ namespace OpenMesh::Decimater {
       }
       for (auto fh : f1) {
         guard_continue(fh.idx() != fl.idx() && fh.idx() != fr.idx());
+        // if (fh.deleted()) fmt::print("Oh no\n");
 
         auto n = mesh.normal(fh), p = mesh.point(*fh.vertices().begin());
         params.A.row(i) = met::to_eig<float, 3>(n).cast<double>();
