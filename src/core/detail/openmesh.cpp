@@ -2,12 +2,12 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/detail/openmesh.hpp>
 #include <vector>
-#include <unordered_set>
 #if defined(OM_CC_MIPS)
 #include <float.h>
 #else
 #include <cfloat>
 #endif
+#include <fmt/ranges.h>
 
 /* 
 eig::Vector3f solve_for_vertex(const std::vector<RealizedTriangle> &triangles,
@@ -39,10 +39,66 @@ namespace OpenMesh::Decimater {
     template <class MeshT>
     Vec3f solve_for_position(const CollapseInfoT<MeshT> &ci,
                              const Vec3f                &min_v = { 0, 0, 0 },
-                             const Vec3f                &nax_v = { 1, 1, 1 }) {
+                             const Vec3f                &max_v = { 1, 1, 1 }) {
+      auto &mesh = ci.mesh;
+      auto &v0   = ci.v0;
+      auto &v1   = ci.v1;
+
+      // Left and right faces
+      auto &fl   = ci.fl;
+      auto &fr   = ci.fr;
+
+      // Handles to surrounding faces
+      auto f0 = mesh.vf_range(v0).to_vector();
+      auto f1 = mesh.vf_range(v1).to_vector();
+
+      // Initialize parameter object for LP solver with expected matrix sizes
+      const uint N = 3;
+      const uint M = f0.size() + f1.size() - 2; // 2 faces overlapping
+      met::LPParameters params(M, N);
+      params.method    = met::LPMethod::ePrimal;
+      params.objective = met::LPObjective::eMinimize;
+      params.x_l       = met::to_eig<float, 3>(min_v).cast<double>();
+      params.x_u       = met::to_eig<float, 3>(max_v).cast<double>();
+
+      // Fill constraint matrices: left face
+      {
+        auto nl = mesh.normal(fl), pl = mesh.point(ci.vl);
+        params.A.row(0) = met::to_eig<float, 3>(nl).cast<double>();
+        params.b[0] = nl.dot(pl);
+      }
+
+      // Fill constraint matrices: right face
+      {
+        auto nr = mesh.normal(fr), pr = mesh.point(ci.vr);
+        params.A.row(1) = met::to_eig<float, 3>(nr).cast<double>();
+        params.b[1] = nr.dot(pr);
+      }
       
+      // Fill constraint matrices: remaining faces
+      uint i = 2;
+      for (auto fh : f0) {
+        guard_continue(fh.idx() != fl.idx() && fh.idx() != fr.idx());
+
+        auto n = mesh.normal(fh), p = mesh.point(*fh.vertices().begin());
+        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>();
+        params.b[i] = n.dot(p);
+        i++;
+      }
+      for (auto fh : f1) {
+        guard_continue(fh.idx() != fl.idx() && fh.idx() != fr.idx());
+
+        auto n = mesh.normal(fh), p = mesh.point(*fh.vertices().begin());
+        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>();
+        params.b[i] = n.dot(p);
+        i++;
+      }
+
       
-      return 0.5f * (ci.p0 + ci.p1);
+      auto p = met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval());
+      fmt::print("{}\n", p);
+      return p;
+      // return 0.5f * (ci.p0 + ci.p1);
     }
   } // namespace detail
 

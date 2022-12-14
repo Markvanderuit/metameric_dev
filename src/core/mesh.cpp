@@ -170,6 +170,18 @@ namespace met {
     return mesh;
   }
 
+  void test_func(HalfedgeMesh &mesh) {
+    auto vh = *mesh.vertices().begin();
+    auto vf = mesh.vf_range(vh).to_vector();
+    auto f0 = vf[0];
+    auto vi = *f0.vertices().begin();
+
+    // mesh.normal(f0).
+    // auto vs = vf.to_set();
+
+    // mesh.vf_ra
+  }
+
   /* Forward declarations over common OpenMesh types and Array3f/AlArray3f */
   
   // generate_data
