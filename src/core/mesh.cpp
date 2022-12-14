@@ -2,8 +2,8 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <OpenMesh/Tools/Subdivider/Uniform/LoopT.hh>
-#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
+// #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <array>
 #include <algorithm>
 #include <execution>
@@ -152,7 +152,8 @@ namespace met {
     auto mesh = input_mesh;
 
     using Mesh = decltype(mesh);
-    using DecT = typename omesh::Decimater::DecimaterT<Mesh>;
+    // using DecT = typename omesh::Decimater::DecimaterT<Mesh>;
+    using DecT = typename omesh::Decimater::VolumePreservingDecimater<Mesh>;
     using ModT = typename omesh::Decimater::ModQuadricT<Mesh>::Handle;
 
     DecT decimater(mesh);
