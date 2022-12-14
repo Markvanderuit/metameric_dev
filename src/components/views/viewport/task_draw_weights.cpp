@@ -58,8 +58,9 @@ namespace met {
     m_buffer  = {{ .size = sizeof(float) * dispatch_n }};
     m_texture = {{ .size = dispatch_texture_n }};
     
-    m_mapping_i_cache = -1;
-    m_selection_cache = { };
+    m_srgb_target_cache = 0;
+    m_mapping_i_cache   = -1;
+    m_selection_cache   = { };
   }
 
   void DrawWeightsTask::eval(detail::TaskEvalInfo &info) {
@@ -69,13 +70,16 @@ namespace met {
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_mapping_i   = info.get_resource<uint>(m_parent, "weight_mapping");
     auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
+    auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_weights_target");
     guard(e_mapping_i != m_mapping_i_cache
+      || e_srgb_target.object() != m_srgb_target_cache
       ||!std::ranges::equal(e_selection, m_selection_cache)
       || std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
 
     // Update local cache variables
-    m_selection_cache = e_selection;
-    m_mapping_i_cache = e_mapping_i;
+    m_srgb_target_cache = e_srgb_target.object();
+    m_selection_cache   = e_selection;
+    m_mapping_i_cache   = e_mapping_i;
     
     // Continue only if a selection is currently active
     guard(m_mapping_i_cache >= 0 && !m_selection_cache.empty());
@@ -84,7 +88,6 @@ namespace met {
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
     auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", e_mapping_i), "colr_buffer");
-    auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_weights_target");
 
     // Update uniform data for upcoming sum computation
     m_unif_map->n       = e_app_data.loaded_texture.size().prod();
@@ -106,7 +109,10 @@ namespace met {
     m_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
 
     // Dispatch shader to perform sum comutation
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer |
+                             gl::BarrierFlags::eUniformBuffer       |
+                             gl::BarrierFlags::eBufferUpdate        |
+                             gl::BarrierFlags::eClientMappedBuffer);
     gl::dispatch_compute(m_dispatch);
 
     // Bind resources to buffer targets for upcoming buffer-to-texture conversion
@@ -115,6 +121,8 @@ namespace met {
     m_texture.bind_to(gl::TextureTargetType::eImageWriteOnly,   0);
 
     // Dispatch shader to move data into texture format
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer|
+                             gl::BarrierFlags::eShaderImageAccess);
     gl::dispatch_compute(m_texture_dispatch);
 
     // Bind relevant resources to texture/image/sampler units for the coming compute operation
@@ -123,6 +131,9 @@ namespace met {
     m_srgb_sampler.bind_to(0);
 
     // Dispatch shader to perform resampling and gamma correction
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer |
+                             gl::BarrierFlags::eTextureFetch        |
+                             gl::BarrierFlags::eShaderImageAccess);
     gl::dispatch_compute(m_srgb_dispatch);
   }
 } // namespace met
