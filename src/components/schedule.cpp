@@ -236,7 +236,7 @@ namespace met {
 
     // Insert temporary unimportant tasks
     // submit_schedule_debug(scheduler);
-    submit_schedule_test(scheduler);
+    // submit_schedule_test(scheduler);
 
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }

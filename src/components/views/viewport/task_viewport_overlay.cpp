@@ -35,7 +35,7 @@ namespace met {
 
     // Add subtask to handle metamer set draw
     info.emplace_task_after<DrawColorSolidTask>(name(), name() + "_draw_color_solid", name());
-    info.emplace_task_after<DrawWeightsTask>(name(), name() + "_draw_weights", name());
+    info.emplace_task_after<DrawWeightsTask>(name(),    name() + "_draw_weights",     name());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -107,7 +107,7 @@ namespace met {
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
       
-      if (ImGui::Begin("Vertex weights", NULL, window_flags | ImGuiWindowFlags_NoTitleBar)) {
+      if (ImGui::Begin("Affected region", NULL, window_flags | ImGuiWindowFlags_NoTitleBar)) {
         eval_overlay_weights(info);
       }
         
@@ -156,6 +156,7 @@ namespace met {
     ImGui::SameLine();
     ImGui::ColorEdit3("Error, 1", gamut_error_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
     ImGui::Separator();
+    ImGui::Spacing();
 
     // Selector for first mapping index, operating on a local copy
     uint l_gamut_mapp_i = e_gamut_mapp_i[i];
@@ -288,9 +289,17 @@ namespace met {
     eig::Array2f texture_size  = viewport_size.x();
 
     // (Re-)create viewport texture if necessary; attached framebuffers are resized in subtask
-    if (!i_srgb_target.is_init() || (i_srgb_target.size() != viewport_size.cast<uint>()).all()) {
+    if (!i_srgb_target.is_init() || (i_srgb_target.size() != texture_size.cast<uint>()).all()) {
       i_srgb_target = {{ .size = texture_size.cast<uint>() }};
     }
+    
+    // Insert image, applying viewport texture to viewport; texture can be safely drawn 
+    // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
+    ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
 
     // Insert mapping selector for which color mapping is used in the weights overlay
     i_weight_mapping = std::min(i_weight_mapping, static_cast<uint>(e_mappings.size() - 1));
@@ -302,9 +311,5 @@ namespace met {
       }
       ImGui::EndCombo();
     }
-
-    // Insert image, applying viewport texture to viewport; texture can be safely drawn 
-    // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-    ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
   }
 } // namespace met

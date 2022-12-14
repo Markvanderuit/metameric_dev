@@ -6,8 +6,8 @@
 #define FLT_MIN 1.175494351e-38
 
 // Define math constants
-#define M_PI  3.1415926538f
-#define M_EPS 0.000001f
+#define M_PI  3.14159265f
+#define M_EPS 0.00000001f
 
 // Rounded-up division functions
 
