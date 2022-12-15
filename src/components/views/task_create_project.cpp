@@ -40,7 +40,6 @@ namespace met {
       m_input_path.clear();
     }
   }
-
   
   void CreateProjectTask::insert_progress_warning(detail::TaskEvalInfo &info) {
     if (ImGui::BeginPopupModal("Warning: unsaved progress")) {
