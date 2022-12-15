@@ -53,18 +53,22 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_state_gamut  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_prj_data  = e_app_data.project_data;
+    auto &e_prj_state = e_app_data.project_state;
+    guard(e_prj_state.any_verts == CacheFlag::eStale);
+
+    auto &e_state_gamut  = info.get_resource<std::vector<CacheFlag>>("project_state", "gamut_summary");
+    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheFlag::eStale; }));
 
     // Get shared resources
-    auto &e_state_elems  = info.get_resource<std::vector<CacheState>>("project_state", "gamut_elems");
+    auto &e_state_elems  = info.get_resource<std::vector<CacheFlag>>("project_state", "gamut_elems");
     auto &i_gamut_spec   = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_colr_buffer  = info.get_resource<gl::Buffer>("colr_buffer");
     auto &i_spec_buffer  = info.get_resource<gl::Buffer>("spec_buffer");
     auto &i_elem_buffer  = info.get_resource<gl::Buffer>("elem_buffer");
     auto &i_elem_buffer_ = info.get_resource<gl::Buffer>("elem_buffer_unal");
     auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_app_data.project_data;
     auto &e_gamut_colr_i = e_proj_data.gamut_colr_i;
     auto &e_gamut_elems  = e_proj_data.gamut_elems;
@@ -93,7 +97,7 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < i_gamut_spec.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
-      guard_continue(e_state_gamut[i] == CacheState::eStale);
+      guard_continue(e_state_gamut[i] == CacheFlag::eStale);
       
       // Generate new metameric spectrum for given color systems and expected color signals
       std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(i_gamut_spec[i]),
@@ -107,9 +111,9 @@ namespace met {
 
     // Describe ranges over stale gamut vertex/elements
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_gamut_colr_i.size()))
-                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheState::eStale; });
+                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheFlag::eStale; });
     auto elem_range = std::views::iota(0u, static_cast<uint>(e_state_elems.size()))
-                    | std::views::filter([&](uint i) { return e_state_elems[i] == CacheState::eStale; });
+                    | std::views::filter([&](uint i) { return e_state_elems[i] == CacheFlag::eStale; });
 
     // Push stale gamut vertex data to gpu
     for (uint i : vert_range) {

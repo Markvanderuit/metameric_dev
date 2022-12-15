@@ -66,7 +66,7 @@ namespace met {
 
   bool CreateProjectTask::create_project_safe(detail::TaskEvalInfo &info) {
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    if (e_app_data.project_state == ProjectState::eUnsaved || e_app_data.project_state == ProjectState::eNew) {
+    if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
     } else if (!fs::exists(m_input_path)) {

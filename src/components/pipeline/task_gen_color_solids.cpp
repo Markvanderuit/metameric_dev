@@ -97,8 +97,8 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    auto &e_state_gamut = info.get_resource<std::vector<CacheFlag>>("project_state", "gamut_summary");
+    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheFlag::eStale; }));
 
     // Get shared resources
     auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -121,7 +121,7 @@ namespace met {
 
     // Describe ranges over stale gamut vertices
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_gamut_colr_i.size()))
-                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheState::eStale; });
+                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheFlag::eStale; });
 
     // For each vertex of the gamut shape
     for (uint i : vert_range) {

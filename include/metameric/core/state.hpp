@@ -9,42 +9,83 @@
 
 namespace met {
   /* Save states in which project data can exist */
-  enum class ProjectState {
+  enum class SaveFlag {
     eUnloaded, // Project is not currently loaded
     eNew,      // Project has no previous save, is newly created
     eSaved,    // Project has previous save, and has not been modified
     eUnsaved,  // Project has previous save, and has been modified
   };
 
-  /* Cache states in which project data values can exist throughout the program pipeline */
-  enum class CacheState : uint {
-    eStale = 0,  // Data is stale, pipeline should recompute dependent values
+  /* Cache states in which project data values*/
+  enum class CacheFlag : uint {
+    eStale = 0, // Data is modified, pipeline should recompute dependent values
     eFresh = 1  // Data is up to date
   };
-  met_declare_bitflag(CacheState);
+  met_declare_bitflag(CacheFlag);
 
   /* Wrapper object to hold saveable project data */
   struct ProjectData {
-    /* Set of keys of cmfs/illuminants that together describe a stored spectral mapping */
+  public: /* internal data structures */
+    // Set of keys of cmfs/illuminants together describing a stored color system
     struct Mapp {
       std::string cmfs, illuminant;
       uint        n_scatters; // stored directly
     };
 
-    // Default constr. provides sensible default values
-    ProjectData();
+    // Data structure for a single vertex of the project's convex hull mesh
+    struct Vert {
+      Colr colr_i; // The expected vertex color under a primary color system
+      uint mapp_i; // Index of the selected primary color system
+      std::vector<Colr> colr_j; // The expected vertex colors under secondary color systems
+      std::vector<uint> mapp_j; // Indices of the selected primary color systemss
+    };
 
-    // Current mappings and gamuts used for rgb->spectral conversion
-    std::vector<eig::Array3u> gamut_elems;  // Triangle connections describing a convex hull
-    std::vector<Colr>         gamut_colr_i; // Gamut vertex values under primary color system
-    std::vector<Colr>         gamut_offs_j; // Gamut value offsets under secondary color system
-    std::vector<uint>         gamut_mapp_i; // Gamut vertex index of selected primary color system 
-    std::vector<uint>         gamut_mapp_j; // Gamut vertex index of selected secondary color system
+    // Data structure for a triangle element of the project's convex hull mesh
+    using Elem = eig::Array3u;
+    
+  public: /* public data */
+    // Convex hull data structure used for rgb->spectral uplifting
+    std::vector<Elem> gamut_elems;  // Triangle connections describing a convex hull
+    std::vector<Vert> gamut_verts;  // Gamut vertex values under specified color system   
 
     // List of named user-loaded or program-provided mappings, illuminants, and cmfs
     std::vector<std::pair<std::string, Spec>> illuminants;
     std::vector<std::pair<std::string, CMFS>> cmfs;
     std::vector<std::pair<std::string, Mapp>> mappings;
+
+    // TODO DEPRECATE
+    std::vector<Colr> gamut_colr_i; // Gamut vertex values under primary color system
+    std::vector<Colr> gamut_offs_j; // Gamut value offsets under secondary color system
+    std::vector<uint> gamut_mapp_i; // Gamut vertex index of selected primary color system 
+    std::vector<uint> gamut_mapp_j; // Gamut vertex index of selected secondary color system
+  
+  public: /* public methods */
+    // Default constr. provides sensible default values
+    ProjectData();
+  };
+
+  struct ProjectState {
+    struct CacheVert {
+      CacheFlag any;
+      CacheFlag any_colr_j;
+      CacheFlag any_mapp_j;
+
+      CacheFlag colr_i;
+      CacheFlag mapp_i;
+
+      std::vector<CacheFlag> colr_j;
+      std::vector<CacheFlag> mapp_j;
+    };
+
+  public:
+    CacheFlag any;
+    CacheFlag any_verts;
+    CacheFlag any_elems;
+    CacheFlag any_mapps;
+
+    std::vector<CacheVert> verts;
+    std::vector<CacheFlag> elems;
+    std::vector<CacheFlag> mapps;
   };
 
   /* Wrapper object to hold a modification to project data */
@@ -61,8 +102,9 @@ namespace met {
     /* Project (saved) components */
 
     fs::path     project_path;
+    SaveFlag     project_save = SaveFlag::eUnloaded; 
     ProjectData  project_data;
-    ProjectState project_state = ProjectState::eUnloaded; 
+    ProjectState project_state;
 
     /* History modification components */
 

@@ -5,6 +5,7 @@
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <ranges>
 
 namespace met {
   constexpr uint chull_vertex_count = 5;
@@ -21,10 +22,16 @@ namespace met {
 
   ProjectData::ProjectData() {
     // Provide an initial example gamut for now
-    gamut_elems  = { eig::Array3u { 2, 0, 1 },
-                     eig::Array3u { 0, 3, 1 },
-                     eig::Array3u { 2, 1, 3 },
-                     eig::Array3u { 0, 2, 3 }};
+    gamut_elems = { Elem { 2, 0, 1 },
+                    Elem { 0, 3, 1 },
+                    Elem { 2, 1, 3 },
+                    Elem { 0, 2, 3 }};
+    gamut_verts = { Vert { .colr_i = { .75f, .40f, .25f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } },
+                    Vert { .colr_i = { .68f, .49f, .58f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } },
+                    Vert { .colr_i = { .50f, .58f, .39f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } },
+                    Vert { .colr_i = { .35f, .30f, .34f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } } };
+
+    // TODO Deprecate
     gamut_colr_i = { Colr { .75f, .40f, .25f },
                      Colr { .68f, .49f, .58f },
                      Colr { .50f, .58f, .39f },
@@ -53,7 +60,7 @@ namespace met {
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
-    project_state  = ProjectState::eNew;
+    project_save  = SaveFlag::eNew;
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
@@ -67,14 +74,14 @@ namespace met {
   }
   
   void ApplicationData::save(const fs::path &save_path) {
-    project_state = ProjectState::eSaved;
+    project_save = SaveFlag::eSaved;
     project_path  = io::path_with_ext(save_path, ".json");
     io::save_project(project_path, project_data);
     io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture, true);
   }
 
   void ApplicationData::load(const fs::path &load_path) {
-    project_state  = ProjectState::eSaved;
+    project_save  = SaveFlag::eSaved;
     project_path   = io::path_with_ext(load_path, ".json");
     project_data   = io::load_project(project_path);
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
@@ -97,8 +104,8 @@ namespace met {
     mods.resize(mod_i);
     mods.push_back(mod);   
     
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_save == SaveFlag::eSaved) {
+      project_save = SaveFlag::eUnsaved;
     }
   }
 
@@ -109,8 +116,8 @@ namespace met {
     mod_i += 1;
     mods[mod_i].redo(project_data);
 
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_save == SaveFlag::eSaved) {
+      project_save = SaveFlag::eUnsaved;
     }
   }
 
@@ -121,13 +128,13 @@ namespace met {
     mods[mod_i].undo(project_data);
     mod_i -= 1;
 
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_save == SaveFlag::eSaved) {
+      project_save = SaveFlag::eUnsaved;
     }
   }
 
   void ApplicationData::unload() {
-    project_state = ProjectState::eUnloaded;
+    project_save = SaveFlag::eUnloaded;
     project_path  = "";
     project_data  = { };
 
@@ -152,6 +159,12 @@ namespace met {
 
     // Assign new default gamut matching the convex hull
     project_data.gamut_elems  = elems;
+    project_data.gamut_verts.resize(verts.size());
+    std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
+      return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { }, .mapp_j = { } };
+    });
+    
+    // TODO Deprecate
     project_data.gamut_colr_i = verts;
     project_data.gamut_offs_j = std::vector<Colr>(verts.size(), Colr(0.f));
     project_data.gamut_mapp_i = std::vector<uint>(verts.size(), 0);

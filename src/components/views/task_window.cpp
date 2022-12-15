@@ -92,7 +92,7 @@ namespace met {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    if (e_app_data.project_state == ProjectState::eNew) {
+    if (e_app_data.project_save == SaveFlag::eNew) {
       return handle_save_as(info);
     } else {
       e_app_data.save(e_app_data.project_path);
@@ -169,8 +169,8 @@ namespace met {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    if (e_app_data.project_state == ProjectState::eUnsaved 
-     || e_app_data.project_state == ProjectState::eNew) {
+    if (e_app_data.project_save == SaveFlag::eUnsaved 
+     || e_app_data.project_save == SaveFlag::eNew) {
       m_open_close_modal = true;
     } else {
       handle_close(info);
@@ -196,8 +196,8 @@ namespace met {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    if (e_app_data.project_state == ProjectState::eUnsaved 
-     || e_app_data.project_state == ProjectState::eNew) {
+    if (e_app_data.project_save == SaveFlag::eUnsaved 
+     || e_app_data.project_save == SaveFlag::eNew) {
       m_open_exit_modal = true;
     } else {
       handle_exit(info);
@@ -234,9 +234,9 @@ namespace met {
       
       if (ImGui::BeginMenu("File")) {
         auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-        const bool is_loaded   = e_app_data.project_state != ProjectState::eUnloaded;
-        const bool enable_save = e_app_data.project_state != ProjectState::eSaved 
-          && e_app_data.project_state != ProjectState::eNew && is_loaded;
+        const bool is_loaded   = e_app_data.project_save != SaveFlag::eUnloaded;
+        const bool enable_save = e_app_data.project_save != SaveFlag::eSaved 
+          && e_app_data.project_save != SaveFlag::eNew && is_loaded;
         
         /* Main section follows */
 
