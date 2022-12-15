@@ -40,17 +40,19 @@ namespace OpenMesh::Decimater {
     Vec3f solve_for_position(const CollapseInfoT<MeshT> &ci,
                              const Vec3f                &min_v = { 0, 0, 0 },
                              const Vec3f                &max_v = { 1, 1, 1 }) {
+      guard(ci.p0 != ci.p1, ci.p0);
+      return 0.5f * (ci.p0 + ci.p1);
+
+      
       auto &mesh = ci.mesh;
-      auto &v0   = ci.v0;
-      auto &v1   = ci.v1;
 
       // Left and right faces
       auto &fl   = ci.fl;
       auto &fr   = ci.fr;
 
       // Handles to surrounding faces
-      auto f0 = mesh.vf_range(v0).to_vector();
-      auto f1 = mesh.vf_range(v1).to_vector();
+      auto f0 = mesh.vf_range(ci.v0).to_vector();
+      auto f1 = mesh.vf_range(ci.v1).to_vector();
 
       // Initialize parameter object for LP solver with expected matrix sizes
       const uint N = 3;
@@ -79,7 +81,6 @@ namespace OpenMesh::Decimater {
       uint i = 2;
       for (auto fh : f0) {
         guard_continue(fh.idx() != fl.idx() && fh.idx() != fr.idx());
-        // if (fh.deleted()) fmt::print("Oh no\n");
 
         auto n = mesh.normal(fh), p = mesh.point(*fh.vertices().begin());
         params.A.row(i) = met::to_eig<float, 3>(n).cast<double>();
@@ -88,7 +89,6 @@ namespace OpenMesh::Decimater {
       }
       for (auto fh : f1) {
         guard_continue(fh.idx() != fl.idx() && fh.idx() != fr.idx());
-        // if (fh.deleted()) fmt::print("Oh no\n");
 
         auto n = mesh.normal(fh), p = mesh.point(*fh.vertices().begin());
         params.A.row(i) = met::to_eig<float, 3>(n).cast<double>();
@@ -98,14 +98,13 @@ namespace OpenMesh::Decimater {
 
       
       auto p = met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval());
-      fmt::print("{}\n", p);
+      fmt::print("p = {}\n", p);
       return p;
-      // return 0.5f * (ci.p0 + ci.p1);
     }
   } // namespace detail
 
-  template <class Mesh>
-  VolumePreservingDecimater<Mesh>::VolumePreservingDecimater(Mesh& _mesh)
+  template <class Mesh, template <typename> typename CollapseFunc>
+  CollapsingDecimater<Mesh, CollapseFunc>::CollapsingDecimater(Mesh& _mesh)
   : BaseDecimaterT<Mesh>(_mesh),
     mesh_(_mesh),
   #if (defined(_MSC_VER) && (_MSC_VER >= 1800)) || __cplusplus > 199711L || defined( __GXX_EXPERIMENTAL_CXX0X__ )
@@ -120,16 +119,16 @@ namespace OpenMesh::Decimater {
     mesh_.add_property(heap_position_);
   }
 
-  template <class Mesh>
-  VolumePreservingDecimater<Mesh>::~VolumePreservingDecimater() {
+  template <class Mesh, template <typename> typename CollapseFunc>
+  CollapsingDecimater<Mesh, CollapseFunc>::~CollapsingDecimater() {
     // private vertex properties
     mesh_.remove_property(collapse_target_);
     mesh_.remove_property(priority_);
     mesh_.remove_property(heap_position_);
   }
 
-  template<class Mesh>
-  void VolumePreservingDecimater<Mesh>::heap_vertex(VertexHandle _vh) {
+  template<class Mesh, template <typename> typename CollapseFunc>
+  void CollapsingDecimater<Mesh, CollapseFunc>::heap_vertex(VertexHandle _vh) {
     float prio, best_prio(FLT_MAX);
     typename Mesh::HalfedgeHandle heh, collapse_target;
 
@@ -171,8 +170,8 @@ namespace OpenMesh::Decimater {
     }
   }
 
-  template<class Mesh>
-  size_t VolumePreservingDecimater<Mesh>::decimate(size_t _n_collapses, bool _only_selected) {
+  template<class Mesh, template <typename> typename CollapseFunc>
+  size_t CollapsingDecimater<Mesh, CollapseFunc>::decimate(size_t _n_collapses, bool _only_selected) {
     if (!this->is_initialized())
       return 0;
 
@@ -238,14 +237,14 @@ namespace OpenMesh::Decimater {
       // pre-processing
       this->preprocess_collapse(ci);
 
-      // Solve for new volume-preserving position around half-edge
-      auto p_new = detail::solve_for_position(ci);
+      // Obtain collapsed position
+      auto p_new = CollapseFunction::collapse(ci);
 
       // perform collapse
       mesh_.collapse(v0v1);
       ++n_collapses;
 
-      // Update remaining vertex to center
+      // Set collapsed position
       mesh_.point(ci.v1) = p_new;
 
       if (update_normals)
@@ -279,8 +278,8 @@ namespace OpenMesh::Decimater {
     return n_collapses;
   }
 
-  template<class Mesh>
-  size_t VolumePreservingDecimater<Mesh>::decimate_to_faces(size_t _nv, size_t _nf, bool _only_selected) {
+  template<class Mesh, template <typename> typename CollapseFunc>
+  size_t CollapsingDecimater<Mesh, CollapseFunc>::decimate_to_faces(size_t _nv, size_t _nf, bool _only_selected) {
     if (!this->is_initialized())
       return 0;
 
@@ -388,7 +387,10 @@ namespace OpenMesh::Decimater {
 
   /* explicit temlate instantiations */
   
-  template class VolumePreservingDecimater<met::BaselineMesh>;
-  template class VolumePreservingDecimater<met::FNormalMesh>;
-  template class VolumePreservingDecimater<met::HalfedgeMesh>;
+  template class CollapsingDecimater<met::BaselineMesh, DefaultCollapseFunction>;
+  template class CollapsingDecimater<met::FNormalMesh,  DefaultCollapseFunction>;
+  template class CollapsingDecimater<met::HalfedgeMesh, DefaultCollapseFunction>;
+  template class CollapsingDecimater<met::BaselineMesh, AverageCollapseFunction>;
+  template class CollapsingDecimater<met::FNormalMesh,  AverageCollapseFunction>;
+  template class CollapsingDecimater<met::HalfedgeMesh, AverageCollapseFunction>;
 } // namespace OpenMesh::Decimater

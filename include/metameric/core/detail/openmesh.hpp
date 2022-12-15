@@ -29,25 +29,49 @@ namespace met {
 } // namespace met
 
 namespace OpenMesh::Decimater {
+  // Collapse one vertex into another
+  template <typename Mesh>
+  struct DefaultCollapseFunction {
+    typedef CollapseInfoT<Mesh> CollapseInfo;
+    typedef Mesh::Point         Point;
+    
+    static
+    Point collapse(const CollapseInfo &ci) {
+      return ci.p1;
+    }
+  };
+
+  // Collapse a pair of vertices into their average
+  template <typename Mesh>
+  struct AverageCollapseFunction {
+    typedef CollapseInfoT<Mesh> CollapseInfo;
+    typedef Mesh::Point         Point;
+    
+    static
+    Point collapse(const CollapseInfo &ci) {
+      return 0.5f * (ci.p0 + ci.p1);
+    }
+  };
+  
   /**
-   * Implementation of volume preserving mesh decimater, integrating with the decimater system
+   * Implementation of mesh decimater with configurable collapse function, integrating with the decimater system
    * used in OpenMesh. Mostly copy of OpenNesh's DecimaterT class, barring minor changes.
    * https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh/-/blob/master/src/OpenMesh/Tools/Decimater/DecimaterT.hh
   */
-  template <typename MeshT>
-  class VolumePreservingDecimater : virtual public BaseDecimaterT<MeshT> {
+  template <typename Mesh, template <typename> typename CollapseFunct = DefaultCollapseFunction>
+  class CollapsingDecimater : virtual public BaseDecimaterT<Mesh> {
   public: /* public types */
-    typedef VolumePreservingDecimater<MeshT> Self;
-    typedef MeshT                            Mesh;
-    typedef CollapseInfoT<MeshT>             CollapseInfo;
-    typedef ModBaseT<MeshT>                  Module;
-    typedef std::vector< Module* >           ModuleList;
-    typedef typename ModuleList::iterator    ModuleListIterator;
+    typedef CollapseInfoT<Mesh>                      CollapseInfo;
+    typedef CollapseFunct<Mesh>                      CollapseFunction;
+    typedef ModBaseT<Mesh>                           Module;
+    typedef std::vector< Module* >                   ModuleList;
+    typedef typename ModuleList::iterator            ModuleListIterator;
+    typedef CollapsingDecimater<Mesh, CollapseFunct> Self;
 
   public: /* public methods */
     // Constr/destr
-    explicit VolumePreservingDecimater(Mesh& _mesh);
-    ~VolumePreservingDecimater();
+    explicit CollapsingDecimater(Mesh& _mesh);
+    ~CollapsingDecimater();
 
     size_t decimate(size_t _n_collapses = 0, bool _only_selected = false);
     size_t decimate_to_faces(size_t _n_vertices=0, size_t _n_faces=0 , bool _only_selected = false);

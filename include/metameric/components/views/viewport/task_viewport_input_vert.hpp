@@ -97,10 +97,10 @@ namespace met {
           std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(i_selection));
         }
 
-        // Left-click selects a gamut position
+        // Left-click selects a single gamut position
         if (io.MouseClicked[0] && (i_selection.empty() || !ImGuizmo::IsOver())) {
           i_selection.clear();
-          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near, std::back_inserter(i_selection));
+          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near | std::views::take(1), std::back_inserter(i_selection));
         }
       }
 

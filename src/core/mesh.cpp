@@ -3,7 +3,11 @@
 #include <metameric/core/detail/trace.hpp>
 #include <OpenMesh/Tools/Subdivider/Uniform/LoopT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
-// #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/ModNormalDeviationT.hh>
+#include <OpenMesh/Tools/Decimater/ModNormalFlippingT.hh>
+#include <OpenMesh/Tools/Decimater/ModEdgeLengthT.hh>
+#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/MixedDecimaterT.hh>
 #include <array>
 #include <algorithm>
 #include <execution>
@@ -148,38 +152,47 @@ namespace met {
   template <typename Traits>
   TriMesh<Traits> simplify(const TriMesh<Traits> &input_mesh, uint max_vertices) {
     met_trace();
+    namespace odec = omesh::Decimater;
+    using Mesh = TriMesh<Traits>;
     
-    auto mesh = input_mesh;
+    // Operate on a copy of the input mesh
+    Mesh mesh = input_mesh;
 
-    using Mesh = decltype(mesh);
-    // using DecT = typename omesh::Decimater::DecimaterT<Mesh>;
-    using DecT = typename omesh::Decimater::VolumePreservingDecimater<Mesh>;
-    using ModT = typename omesh::Decimater::ModQuadricT<Mesh>::Handle;
+    // First, collapse all shortest edges into their average to a hardcoded minimum
+    {
+      using Decimater = odec::CollapsingDecimater<Mesh, odec::AverageCollapseFunction>;
+      using Mod       = odec::ModEdgeLengthT<Mesh>::Handle;
 
-    DecT decimater(mesh);
-    ModT mod;
+      Decimater dec(mesh);
+      Mod mod;
 
-    decimater.add(mod);
-    decimater.module(mod).unset_max_err();
+      dec.add(mod);
+      dec.module(mod).set_binary(false);
+        
+      dec.initialize();
+      dec.decimate_to(std::max(max_vertices, 16u));
 
-    decimater.initialize();
-    decimater.decimate_to(max_vertices);
+      mesh.garbage_collection();
+    }
     
-    mesh.garbage_collection();
+    // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
+    {
+      using Decimater = odec::CollapsingDecimater<Mesh, odec::DefaultCollapseFunction>;
+      using Mod       = odec::ModQuadricT<Mesh>::Handle;
+
+      Decimater dec(mesh);
+      Mod mod;
+
+      dec.add(mod);
+      dec.module(mod).unset_max_err();
+
+      dec.initialize();
+      dec.decimate_to(max_vertices);
+
+      mesh.garbage_collection();
+    }
 
     return mesh;
-  }
-
-  void test_func(HalfedgeMesh &mesh) {
-    auto vh = *mesh.vertices().begin();
-    auto vf = mesh.vf_range(vh).to_vector();
-    auto f0 = vf[0];
-    auto vi = *f0.vertices().begin();
-    // f0.del
-    // mesh.normal(f0).
-    // auto vs = vf.to_set();
-
-    // mesh.vf_ra
   }
 
   /* Forward declarations over common OpenMesh types and Array3f/AlArray3f */
