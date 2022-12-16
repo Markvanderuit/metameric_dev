@@ -29,4 +29,18 @@ namespace met {
     std::vector<CacheStale> elems;
     std::vector<CacheStale> mapps;
   };
+
+  /* Wrapper objecct for tracking changes to viewport in program pipeline; e.g. vertex selection */
+  struct ViewportState {
+    using CacheStale = bool;
+
+    // Vertex selection in viewport
+    CacheStale vert_selection;
+
+    // Element selection in viewport
+    CacheStale elem_selection;
+
+    // Constraint selection in viewport overlay
+    CacheStale cstr_selection;
+  };
 } // namespace met

@@ -134,7 +134,141 @@ namespace met {
 
     return detail::remove_identical_points(output);
   }
+  
+  std::vector<Colr> generate_boundary_i(const BBasis &basis,
+                                       std::span<const CMFS> systems_i,
+                                       std::span<const Colr> signals_i,
+                                       const CMFS &system_j,
+                                       std::span<const eig::ArrayXf> samples) {
+    met_trace();
 
+    using Syst = eig::Matrix<float, 3, wavelength_bases>;
+    
+    // Generate color system spectra for basis function parameters
+    auto csys_j = (system_j.transpose() * basis).eval();
+    auto csys_i = std::vector<Syst>(systems_i.size());
+    std::ranges::transform(systems_i, csys_i.begin(),
+      [&](const auto &m) { return (m.transpose() * basis).eval(); });    
+
+    // Initialize parameter object for LP solver, given expected matrix sizes
+    constexpr uint N = wavelength_bases;
+    const     uint M = 3 * csys_i.size() + 2 * wavelength_samples;
+    LPParameters params(M, N);
+    params.objective = LPObjective::eMinimize;
+    params.method    = LPMethod::eDual;
+    params.scaling   = true;
+
+    // Add color system constraints
+    for (uint i = 0; i < csys_i.size(); ++i) {
+      params.A.block<3, N>(3 * i, 0) = csys_i[i].cast<double>();
+      params.b.block<3, 1>(3 * i, 0) = signals_i[i].cast<double>();
+    }
+
+    // Add [0, 1] bounds constraints
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = basis.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = basis.cast<double>();
+    params.b.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = Spec(0.0).cast<double>();
+    params.b.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = Spec(1.0).cast<double>();
+    params.r.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = LPCompare::eGE;
+    params.r.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = LPCompare::eLE;
+
+    // Obtain orthogonal basis functions through SVD of color system matrix
+    eig::MatrixXf S(N, 3 + 3 * csys_i.size());
+    for (uint i = 0; i < csys_i.size(); ++i)
+      S.block<N, 3>(0, 3 * i) = csys_i[i].transpose();
+    S.block<N, 3>(0, 3 * csys_i.size()) = csys_j.transpose();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+    // Define return object
+    std::vector<Colr> output(samples.size());
+
+    // Parallel solve for basis function weights defining OCS boundary spectra
+    #pragma omp parallel
+    {
+      LPParameters local_params = params;
+      #pragma omp for
+      for (int i = 0; i < samples.size(); ++i) {
+        local_params.C = (U * samples[i].matrix()).cast<double>().eval();
+        BSpec w = lp_solve(local_params).cast<float>().eval();
+        output[i] = csys_j * w;
+      }
+    }
+
+    return detail::remove_identical_points(output);
+  }
+                                      
+  std::vector<Colr> generate_boundary_mult(const BBasis                 &basis,
+                                           const CMFS                   &system_i,
+                                           const Colr                   &signal_i,
+                                           std::span<const CMFS>         systems_j,
+                                           std::span<const eig::ArrayXf> samples) {
+    met_trace();
+
+    using CSys = eig::Matrix<float, 3, wavelength_bases>;
+
+    // Fixed color system spectra for basis parameters
+    CSys csys_i = (system_i.transpose() * basis).eval();
+    std::vector<CSys> csys_j(systems_j.size());
+    std::ranges::transform(systems_j, csys_j.begin(),
+      [&basis](const auto &system_j) { return (system_j.transpose() * basis).eval(); });
+
+    // Initialize parameter object for LP solver with expected matrix sizes
+    constexpr uint N = wavelength_bases, 
+                   M = 3 + 2 * wavelength_samples;
+    LPParameters params(M, N);
+    params.method = LPMethod::eDual;
+
+    // Specify constraints
+    params.A = (eig::Matrix<float, M, N>() << 
+      csys_i, 
+      basis, 
+      basis
+    ).finished().cast<double>().eval();
+    params.b = (eig::Matrix<float, M, 1>() << 
+      signal_i, 
+      Spec(0.f), 
+      Spec(1.f)
+    ).finished().cast<double>().eval();
+    params.r.block<wavelength_samples, 1>(3, 0)                      = LPCompare::eGE;
+    params.r.block<wavelength_samples, 1>(3 + wavelength_samples, 0) = LPCompare::eLE;
+
+    // Obtain orthogonal basis functions through SVD of color system matrix
+    eig::MatrixXf S(N, 3 + 3 * csys_j.size());
+    S.block<N, 3>(0, 0) = csys_i.transpose();
+    for (uint j = 0; j < csys_j.size(); ++j)
+      S.block<N, 3>(0, 3 + 3 * j) = csys_j[j].transpose();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+    // Define return object
+    std::vector<Colr> output(samples.size());
+
+    // Parallel solve for basis function weights defining OCS boundary spectra
+    #pragma omp parallel
+    {
+      LPParameters local_params = params;
+      #pragma omp for
+      for (int i = 0; i < samples.size(); ++i) {
+        local_params.C = (S * samples[i].matrix()).cast<double>().eval();
+        BSpec w = lp_solve(local_params).cast<float>().eval();
+        if (csys_j.size() > 1) {
+          Colr colr_i = csys_i * w;
+          Colr colr_j_0 = csys_j[0] * w;
+          Colr colr_j_1 = csys_j[1] * w;
+          fmt::print("i={} - j_0={} - j_1={}\n", colr_i, colr_j_0, colr_j_1);
+          output[i] = csys_j[1] * w;
+        } else {
+          output[i] = csys_j[0] * w;
+        }
+        
+      }
+    }
+
+    return detail::remove_identical_points(output);
+  }
   
   std::vector<Colr> generate_gamut(const std::vector<Wght> &weights,
                                    const std::vector<Colr> &samples) {

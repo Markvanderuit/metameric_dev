@@ -76,7 +76,8 @@ namespace met {
   
   void StateTask::init(detail::TaskInitInfo &info) {
     met_trace();
-    info.insert_resource<ProjectState>("pipeline_state", { });
+    info.insert_resource<ProjectState>("pipeline_state",  { });
+    info.insert_resource<ViewportState>("viewport_state", { });
   }
 
   void StateTask::eval(detail::TaskEvalInfo &info) {
@@ -86,15 +87,19 @@ namespace met {
 
     // Get shared resources
     auto &i_pipe_state = info.get_resource<ProjectState>("pipeline_state");
+    auto &i_view_state = info.get_resource<ViewportState>("viewport_state");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
+    auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_elem_selct = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
+    auto &e_cstr_selct = info.get_resource<int>("viewport_overlay", "constr_selection");
 
     // Iterate over all project data
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.gamut_verts, m_verts);
     i_pipe_state.elems = detail::compare_and_set_all_eig(e_proj_data.gamut_elems, m_elems);
     i_pipe_state.mapps = detail::compare_and_set_all(e_appl_data.loaded_mappings, m_mapps);
 
-    // Post-process fill in some gaps 
+    // Post-process fill in some gaps in project state
     for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
       auto &vert_state = i_pipe_state.verts[i];
       auto &vert_data  = e_proj_data.gamut_verts[i];
@@ -111,11 +116,16 @@ namespace met {
       vert_state.any = vert_state.colr_i | vert_state.mapp_i | vert_state.any_colr_j | vert_state.any_mapp_j;
     }
 
-    // Set summary flags over all vertices/elements
+    // Set summary flags over all vertices/elements in project state
     i_pipe_state.any_mapps = std::reduce(range_iter(i_pipe_state.mapps), false, reduce_stale);
     i_pipe_state.any_elems = std::reduce(range_iter(i_pipe_state.elems), false, reduce_stale);
     i_pipe_state.any_verts = std::reduce(range_iter(i_pipe_state.verts), false, 
       [](const auto &a, const auto &b) { return a | b.any; });
     i_pipe_state.any = i_pipe_state.any_mapps | i_pipe_state.any_elems | i_pipe_state.any_verts;
+
+    // Iterate over all selection data
+    i_view_state.vert_selection = std::ranges::any_of(detail::compare_and_set_all(e_vert_selct, m_vert_selct), [](auto v) { return v; });
+    i_view_state.elem_selection = std::ranges::any_of(detail::compare_and_set_all(e_elem_selct, m_elem_selct), [](auto v) { return v; });
+    i_view_state.cstr_selection = detail::compare_and_set(e_cstr_selct, m_cstr_selct);
   }
 } // namespace met

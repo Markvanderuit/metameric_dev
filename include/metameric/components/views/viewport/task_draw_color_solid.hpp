@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
@@ -26,7 +27,10 @@ namespace met {
 
     // State information
     std::string m_parent;
-    int         m_gamut_idx;
+
+    // Convex hull mesh generation data
+    HalfedgeMesh m_sphere_mesh;
+    HalfedgeMesh m_csolid_mesh;
 
     // (Multisampled) framebuffer and attachments
     Colorbuffer     m_color_buffer_ms;

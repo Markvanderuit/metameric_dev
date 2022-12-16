@@ -11,6 +11,11 @@ namespace met {
     std::vector<ProjectData::Vert> m_verts;
     std::vector<Mapp>              m_mapps;
 
+    // Copies of view selection data to check for and report state changes
+    std::vector<uint> m_vert_selct;
+    std::vector<uint> m_elem_selct;
+    int               m_cstr_selct;
+
   public:
     StateTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;

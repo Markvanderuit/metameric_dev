@@ -16,34 +16,61 @@
 #include <unordered_map>
 
 namespace met {
-  constexpr uint n_samples = 32; // Nr. of samples for OCS generation
-  constexpr uint n_subdivs = 4; // Nr. of subdivisions for input sphere
+  constexpr uint n_constraints = 4;  // Maximum nr. of secondary color constraints
+  constexpr uint n_samples     = 32; // Nr. of samples for OCS generation
+  constexpr uint n_subdivs     = 4;  // Nr. of subdivisions for input sphere
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
     // distributed over a gaussian distribution
-    template <uint N>
-    eig::Array<float, N, 1> inv_gaussian_cdf(const eig::Array<float, N, 1> &x) {
+    auto inv_gaussian_cdf(const auto &x) {
       met_trace();
-      
-      using ArrayNf = eig::Array<float, N, 1>;
-
-      auto y = (ArrayNf(1.f) - x * x).max(.0001f).log().eval();
+      auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
       auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
       return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
     }
     
     // Given a random vector in RN bounded to [-1, 1], return a uniformly
     // distributed point on the unit sphere
-    template <uint N>
-    eig::Array<float, N, 1> inv_unit_sphere_cdf(const eig::Array<float, N, 1> &x) {
+    auto inv_unit_sphere_cdf(const auto &x) {
       met_trace();
-      return inv_gaussian_cdf<N>(x).matrix().normalized().eval();
+      return inv_gaussian_cdf(x).matrix().normalized().eval();
+    }
+
+    // Generate a set of random, uniformly distributed unit vectors in RN
+    std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_samples, uint n_dims) {
+      met_trace();
+
+      using SeedTy = std::random_device::result_type;
+
+      // Generate separate seeds for each thread's rng
+      std::random_device rd;
+      std::vector<SeedTy> seeds(omp_get_max_threads());
+      for (auto &s : seeds) s = rd();
+
+      std::vector<eig::ArrayXf> unit_dirs(n_samples);
+
+      #pragma omp parallel
+      {
+        // Initialize separate random number generator per thread
+        std::mt19937 rng(seeds[omp_get_thread_num()]);
+        std::uniform_real_distribution<float> distr(-1.f, 1.f);
+
+        // Draw samples for this thread's range
+        #pragma omp for
+        for (int i = 0; i < unit_dirs.size(); ++i) {
+          eig::ArrayXf v(n_dims);
+          for (auto &f : v) f = distr(rng);
+          unit_dirs[i] = detail::inv_unit_sphere_cdf(v);
+        }
+      }
+
+      return unit_dirs;
     }
 
     // Generate a set of random, uniformly distributed unit vectors in RN
     template <uint N>
-    std::vector<eig::Array<float, N, 1>> generate_unit_dirs(uint n_samples) {
+    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
       met_trace();
       
       using ArrayNf = eig::Array<float, N, 1>;
@@ -66,7 +93,7 @@ namespace met {
         for (int i = 0; i < unit_dirs.size(); ++i) {
           ArrayNf v;
           for (auto &f : v) f = distr(rng);
-          unit_dirs[i] = detail::inv_unit_sphere_cdf<N>(v);
+          unit_dirs[i] = detail::inv_unit_sphere_cdf(v);
         }
       }
 
@@ -80,75 +107,66 @@ namespace met {
   void GenColorSolidsTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
-    // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
-    
-    // Generate reused 6d samples and a uv sphere mesh for faster OCS generation
-    m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
-    m_sphere_mesh = generate_spheroid<HalfedgeMeshTraits>(n_subdivs);
+    // Generate reused 6/9/12/X dimensional samples for color solid sampling
+    for (uint i = 1; i <= n_constraints; ++i) {
+      const uint dims = 3 + 3 * i;
+      info.insert_resource(fmt::format("samples_{}", i), detail::gen_unit_dirs_x(n_samples, dims));
+    }
 
     // Register resources to hold convex hull data for each vertex of the gamut shape
-    info.insert_resource("ocs_points", std::vector<std::vector<eig::AlArray3f>>());
-    info.insert_resource("ocs_centers", std::vector<Colr>());
-    info.insert_resource("ocs_chulls", std::vector<HalfedgeMesh>());
+    info.insert_resource("csol_data", std::vector<eig::AlArray3f>());
+    info.insert_resource("csol_cntr", Colr(0.f));
   }
   
   void GenColorSolidsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
+    // Continue only if vertex/constraint selection is sensible
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
+    guard(e_vert_slct.size() == 1 && e_cstr_slct != -1);
+
     // Continue only on relevant state change
+    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.any_verts);
+    guard(e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection);
+
+    fmt::print("Generating color solid! vert = {}, cstr = {}\n", e_vert_slct[0], e_cstr_slct);
 
     // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data  = e_appl_data.project_data;
-    auto &e_verts     = e_prj_data.gamut_verts;
-    auto &e_specs     = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
     auto &e_basis     = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    auto &i_ocs_data  = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("ocs_points");
-    auto &i_ocs_cntrs = info.get_resource<std::vector<Colr>>("ocs_centers");
-    auto &i_ocs_hulls = info.get_resource<std::vector<HalfedgeMesh>>("ocs_chulls");
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_vert      = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
+    auto &e_mapp      = e_appl_data.loaded_mappings;
+    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[e_vert_slct[0]];
+    auto &i_csol_data = info.get_resource<std::vector<eig::AlArray3f>>("csol_data");
+    auto &i_csol_cntr = info.get_resource<Colr>("csol_cntr");
 
-    // Deal with resized vertex count in gamut's convex hull
-    if (e_verts.size() != i_ocs_data.size()) {
-      i_ocs_data.resize(e_verts.size());
-      i_ocs_cntrs.resize(e_verts.size());
-      i_ocs_hulls.resize(e_verts.size());
-    }
+    // Gather color system spectra and corresponding signals
+    // The primary color system and color signal are added first
+    // All secondary color systems and signals are added after, until the one given by e_cstr_index
+    std::vector<CMFS> cmfs_i = { e_mapp[e_vert.mapp_i].finalize(e_spec) };
+    std::vector<Colr> sign_i = { e_vert.colr_i };
+    std::copy(e_vert.colr_j.begin(), e_vert.colr_j.begin() + e_cstr_slct, std::back_inserter(sign_i));
+    std::transform(e_vert.mapp_j.begin(), e_vert.mapp_j.begin() + e_cstr_slct, std::back_inserter(cmfs_i),
+      [&](uint j) { return e_mapp[j].finalize(e_spec); });
 
-    // Describe ranges over stale gamut vertices with secondary mappings
-    // TODO: Remedy this shit!
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
-                    | std::views::filter([&](uint i) { return e_pipe_state.verts[i].any; })
-                    | std::views::filter([&](uint i) { return !e_verts[i].mapp_j.empty(); });
+    // The selected constraint is the varying component, for which we generate a metamer boundary
+    CMFS cmfs_j = e_mapp[e_vert.mapp_j[e_cstr_slct]].finalize(e_spec);
 
-    // For each vertex of the gamut shape that has secondary mappings
-    for (uint i : vert_range) {
-      auto &vert = e_verts[i];
+    // Obtain 6/9/12/X dimensional random unit vectors for the given configration
+    const auto &i_samples = info.get_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
 
-      // Generate color system spectra
-      CMFS cmfs_i = e_appl_data.loaded_mappings[vert.mapp_i].finalize(e_specs[i]);
-      CMFS cmfs_j = e_appl_data.loaded_mappings[vert.mapp_j[0]].finalize(e_specs[i]);
+    // Generate points on metamer set boundary
+    auto basis  = e_basis.rightCols(wavelength_bases);
+    auto points = generate_boundary_i(basis, cmfs_i, sign_i, cmfs_j, i_samples);
 
-      // Generate points on metamer set boundary
-      auto basis  = e_basis.rightCols(wavelength_bases);
-      auto points = generate_boundary(basis, cmfs_i, cmfs_j, vert.colr_i, m_sphere_samples);
-
-      // Store in aligned format // TODO generate in aligned format
-      i_ocs_data[i] = std::vector<eig::AlArray3f>(range_iter(points));
-      
-      // Compute center of metamer set boundary
-      constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
-      i_ocs_cntrs[i] = std::reduce(std::execution::par_unseq, range_iter(i_ocs_data[i]), 
-        eig::AlArray3f(0.f), f_add) / static_cast<float>(i_ocs_data[i].size());
-    }
-
-    // Process convex hull generation worklist in parallel
-    std::vector<uint> vert_indices(range_iter(vert_range));
-    std::for_each(std::execution::par_unseq, range_iter(vert_indices), [&](uint i) {
-      i_ocs_hulls[i] = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(i_ocs_data[i], m_sphere_mesh);
-    });
+    // Store in aligned format // TODO generate in aligned format, you numbskull
+    i_csol_data = std::vector<eig::AlArray3f>(range_iter(points));
+    
+    // Compute center of metamer set boundary
+    constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+    i_csol_cntr = std::reduce(std::execution::par_unseq, range_iter(i_csol_data), 
+      eig::AlArray3f(0.f), f_add) / static_cast<float>(i_csol_data.size());
   }
 } // namespace met

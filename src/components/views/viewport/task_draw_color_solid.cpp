@@ -9,7 +9,7 @@
 #include <metameric/components/views/viewport/task_draw_color_solid.hpp>
 
 namespace met {
-  constexpr uint n_spheroid_subdivs  = 4;
+  constexpr uint n_sphere_subdivs  = 4;
 
   DrawColorSolidTask::DrawColorSolidTask(const std::string &name, const std::string &parent)
   : detail::AbstractTask(name, true),
@@ -19,11 +19,11 @@ namespace met {
     met_trace_full();
 
     // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
-    const HalfedgeMesh spheroid = generate_spheroid<HalfedgeMeshTraits>(n_spheroid_subdivs);
+    m_sphere_mesh = generate_spheroid<HalfedgeMeshTraits>(n_sphere_subdivs);
 
     // Allocate buffer objects with predetermined maximum sizes
-    m_chull_verts = {{ .size = spheroid.n_vertices() * sizeof(eig::AlArray3f), .flags = gl::BufferCreateFlags::eStorageDynamic }};
-    m_chull_elems = {{ .size = spheroid.n_faces() * sizeof(eig::Array3u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    m_chull_verts = {{ .size = m_sphere_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    m_chull_elems = {{ .size = m_sphere_mesh.n_faces() * sizeof(eig::Array3u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
     // Create array objects for convex hull mesh draw and straightforward point draw
     m_chull_array = {{
@@ -59,27 +59,25 @@ namespace met {
     m_draw_program.uniform("u_alpha", 1.f);
     m_srgb_program.uniform("u_sampler", 0);
     m_srgb_program.uniform("u_lrgb_to_srgb", true);
-
-    // Set selection cache to "none"
-    m_gamut_idx = -1;
   }
 
   void DrawColorSolidTask::eval(detail::TaskEvalInfo &info) { 
     met_trace_full();
   
-    // Verify that a gamut vertex is even selected in the viewport before continuing, as this window
-    // is otherwise not visible
-    auto &e_gamut_ind = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    int   e_gamut_idx = e_gamut_ind.size() == 1 ? e_gamut_ind[0] : -1;
-    guard(e_gamut_idx >= 0);
+    // Verify that vertex and constraint are selected before continuing, as this draw operation
+    // is otherwise not even visible
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
+    guard(e_vert_slct.size() == 1 && e_cstr_slct >= 0);
 
     // Get shared resources
-    auto &e_appl_state  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
+    auto &e_view_state  = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
     auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_color_solid_target");
     auto &e_arcball     = info.get_resource<detail::Arcball>(m_parent, "arcball");
-    auto &e_ocs_centr   = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_gamut_idx];
+    auto &e_csol_cntr   = info.get_resource<Colr>("gen_color_solids", "csol_cntr");
 
     // (Re-)create framebuffers. Multisampled framebuffer uses multisampled renderbuffers as 
     // attachments, while the non-multisampled framebuffer targets the lrgb texture for output;
@@ -99,17 +97,18 @@ namespace met {
       m_srgb_program.uniform("u_size", dispatch_n);
     }
 
-    // (Re-)create convex hull mesh data. If the selected gamut vertex has in any way changed, a new
+    // (Re-)create convex hull mesh data. If the selected vertex/constraint has in any way changed, a new
     // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    if (m_gamut_idx != e_gamut_idx || e_pipe_state.verts[e_gamut_idx].any) {
-      m_gamut_idx = e_gamut_idx;
+    if (e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any) {
+      // Get color solid data, if available
+      auto &e_csol_data = info.get_resource<std::vector<eig::AlArray3f>>("gen_color_solids", "csol_data");
+      guard(!e_csol_data.empty());
 
-      // Get shared resources and obtain mesh data
-      auto &e_ocs_hull = info.get_resource<std::vector<HalfedgeMesh>>("gen_color_solids", "ocs_chulls")[m_gamut_idx];
-      auto &e_ocs_data = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("gen_color_solids", "ocs_points")[m_gamut_idx];
-      auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(e_ocs_hull);
+      // Generate convex hull mesh and convert to buffer format
+      m_csolid_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(e_csol_data, m_sphere_mesh);
+      auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(m_csolid_mesh);
 
-      // Copy new data to buffer and adjust draw settings as the mesh may be smaller
+      // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
       m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
       m_chull_elems.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
       m_chull_dispatch.vertex_count = elems.size() * 3;
@@ -132,7 +131,7 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
     // Set model/camera translations to center viewport on convex hull
-    eig::Affine3f transl(eig::Translation3f(-e_ocs_centr.matrix().eval()));
+    eig::Affine3f transl(eig::Translation3f(-e_csol_cntr.matrix().eval()));
     m_draw_program.uniform("u_model_matrix",  transl.matrix());
     m_draw_program.uniform("u_camera_matrix", e_arcball.full().matrix());  
 

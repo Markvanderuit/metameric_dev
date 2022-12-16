@@ -10,6 +10,7 @@
 #include <ImGuizmo.h>
 #include <numeric>
 #include <ranges>
+#include <utility>
 
 namespace met {
   constexpr auto window_flags = ImGuiWindowFlags_AlwaysAutoResize 
@@ -28,6 +29,7 @@ namespace met {
     met_trace_full();
 
     // Share resources
+    info.emplace_resource<int>("constr_selection", -1);
     info.emplace_resource<uint>("weight_mapping", 0);
     info.emplace_resource<gl::Texture2d4f>("srgb_weights_target",     { .size = 1 });
     info.emplace_resource<gl::Texture2d4f>("lrgb_color_solid_target", { .size = 1 });
@@ -53,9 +55,16 @@ namespace met {
   void ViewportOverlayTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Only spawn any of these tooltips on non-empty gamut selection
-    auto &e_gamut_index = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    guard(!e_gamut_index.empty());
+    // Adjust tooltip settings based on current selection
+    auto &e_selection  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &i_cstr_slct = info.get_resource<int>("constr_selection");
+    
+    if (e_selection.size() != 1) {
+      i_cstr_slct = -1;
+    }
+
+    // Only spawn any tooltips on non-empty gamut selection
+    guard(!e_selection.empty());
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -67,7 +76,7 @@ namespace met {
                 //  view_size = { overlay_width * ImGui::GetIO().DisplayFramebufferScale.x, 0.f };
     
     // Spawn window with selection info if one or more vertices are selected
-    for (const uint &i : e_gamut_index) {
+    for (const uint &i : e_selection) {
       view_size.y() = 0.f;
       
       // Set window state for next window
@@ -86,7 +95,7 @@ namespace met {
     }
 
     // Spawn window for metamer set editing if there is one vertex selected
-    if (e_gamut_index.size() == 1) {
+    if (e_selection.size() == 1 && i_cstr_slct >= 0) {
       view_size.y() = 0.f;
 
       // Set window state for next window
@@ -95,7 +104,7 @@ namespace met {
       ImGui::SetNextWindowSize(view_size);
       
       if (ImGui::Begin("Metamer set", NULL, window_flags | ImGuiWindowFlags_NoTitleBar)) {
-        eval_overlay_color_solid(info);
+        eval_overlay_color_solid(info, e_selection[0]);
       }
         
       // Capture window size to offset next window by this amount
@@ -129,28 +138,32 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
+    auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_vert      = e_proj_data.gamut_verts[i];
-    auto &e_mapp      = e_proj_data.mappings;
-    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
+    auto &e_vert       = e_proj_data.gamut_verts[i];
+    auto &e_mapp       = e_proj_data.mappings;
+    auto &e_spec       = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
     
     // Plot reflectances
     ImGui::PlotLines("Reflectance", e_spec.data(), wavelength_samples, 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
 
     // Plot vertex settings for primary color
-    if (ImGui::CollapsingHeader("Primary Color")) {
+    if (ImGui::CollapsingHeader("Primary Color", ImGuiTreeNodeFlags_DefaultOpen)) {
       Colr colr_i  = e_vert.colr_i;
       Colr rtrip_i = e_appl_data.loaded_mappings[e_vert.mapp_i].apply_color(e_spec);
       Colr error_i = (rtrip_i - colr_i).abs().eval();
       
-      ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float);
-      ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_i).data(), ImGuiColorEditFlags_Float);
-      ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      ImGui::SameLine();
+      ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_i).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      ImGui::SameLine();
+      ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
 
       // Selector for primary color mapping index, operating on a local copy
       uint l_mapp_i = e_vert.mapp_i;
-      if (ImGui::BeginCombo("Mapping", e_mapp[l_mapp_i].first.c_str())) {
+      ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.9f);
+      if (ImGui::BeginCombo("##Mapping", e_mapp[l_mapp_i].first.c_str())) {
         for (uint j = 0; j < e_mapp.size(); ++j) {
           if (ImGui::Selectable(e_mapp[j].first.c_str(), j == l_mapp_i)) {
             l_mapp_i = j;
@@ -171,19 +184,29 @@ namespace met {
 
     // Plot vertex settings for secondary colors
     for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+      auto constraint_name = fmt::format("Secondary {} ({} -> {})",
+        j, 
+        e_proj_data.mappings[e_vert.mapp_i].first,
+        e_proj_data.mappings[e_vert.mapp_j[j]].first);
+      auto constraint_id = fmt::format("constraint{}", j);
+      
       bool color_visible = true;
-      if (ImGui::CollapsingHeader(fmt::format("Secondary color {}", j).c_str(), &color_visible)) {
+      if (ImGui::CollapsingHeader(constraint_name.c_str(), &color_visible, ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::PushID(constraint_id.c_str());
+
         Colr colr_j  = e_vert.colr_j[j];
         Colr rtrip_j = e_appl_data.loaded_mappings[e_vert.mapp_j[j]].apply_color(e_spec);
         Colr error_j = (rtrip_j - colr_j).abs().eval();
 
-        ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_j).data(),  ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_j).data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_j).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_j).data(),  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+        ImGui::SameLine();
+        ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_j).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+        ImGui::SameLine();
+        ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_j).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
 
         // Selector for secondary color mapping index, operating on a local copy
         uint l_mapp_j = e_vert.mapp_j[j];
-        if (ImGui::BeginCombo(fmt::format("Mapping {}", j).c_str(), e_mapp[l_mapp_j].first.c_str())) {
+        if (ImGui::BeginCombo("##Mapping", e_mapp[l_mapp_j].first.c_str())) {
           for (uint k = 0; k < e_mapp.size(); ++k) {
             if (ImGui::Selectable(e_mapp[k].first.c_str(), k == l_mapp_j)) {
               l_mapp_j = k;
@@ -200,6 +223,44 @@ namespace met {
             .undo = [edit = e_vert.mapp_j[j], i = i, j = j](auto &data) { data.gamut_verts[i].mapp_j[j] = edit; }
           });
         }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Edit")) {
+          i_cstr_slct  = j;
+          fmt::print("{}\n", j);
+        }
+
+        // Button to move constraint up
+        if (j > 0) ImGui::SameLine();
+        if (j > 0 && ImGui::ArrowButton("up", ImGuiDir_Up)) {
+          e_appl_data.touch({
+            .name = "Swapped constraint mappings",
+            .redo = [i = i, j = j](auto &data) {  
+              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j - 1]);
+              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j - 1]);
+            },
+            .undo = [i = i, j = j](auto &data) {  
+              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j - 1]);
+              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j - 1]);
+            }
+          });
+        }
+        if (j < e_vert.colr_j.size() - 1) ImGui::SameLine();
+        if (j < e_vert.colr_j.size() - 1 && ImGui::ArrowButton("down", ImGuiDir_Down)) {
+          e_appl_data.touch({
+            .name = "Swapped constraint mappings",
+            .redo = [i = i, j = j](auto &data) {  
+              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j + 1]);
+              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j + 1]);
+            },
+            .undo = [i = i, j = j](auto &data) {  
+              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j + 1]);
+              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j + 1]);
+            }
+          });
+        }
+
+        ImGui::PopID();
       }
 
       // Secondary color was deleted, register changes to constraint data
@@ -228,21 +289,24 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskEvalInfo &info) {
+  void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskEvalInfo &info, uint i) {
     met_trace_full();
         
     // Get shared resources
+    auto &i_cstr_slct   = info.get_resource<int>("constr_selection");
     auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
     auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_color_solid_target");
     auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_color_solid_target");
-    auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection")[0];
-    auto &e_ocs_center  = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_selection];
+    auto &e_csol_cntr   = info.get_resource<Colr>("gen_color_solids", "csol_cntr");
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_vert        = e_proj_data.gamut_verts[e_selection];
+    auto &e_vert        = e_appl_data.project_data.gamut_verts[i];
 
     // Only continue if at least one secondary color mapping is present
     guard(!e_vert.colr_j.empty());
+    
+    // Ensure constraint selection is viable, in case a constraint was deleted
+    if (i_cstr_slct >= e_vert.colr_j.size())
+      i_cstr_slct = e_vert.colr_j.size() - 1;
 
     // Compute viewport size minus ImGui's tab bars etc
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -273,8 +337,7 @@ namespace met {
     }
 
     // Anchor position for ocs gizmo is colr + offset, minus center offset 
-    // TODO fix this properly
-    eig::Vector3f trf_trnsl = e_vert.colr_j[0] - e_ocs_center;
+    eig::Vector3f trf_trnsl = e_vert.colr_j[i_cstr_slct] - e_csol_cntr;
     eig::Affine3f trf_basic = eig::Affine3f(eig::Translation3f(trf_trnsl));
     eig::Affine3f trf_delta = eig::Affine3f::Identity();
 
@@ -287,13 +350,13 @@ namespace met {
     
     // Register gizmo use start, cache current offset position
     if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-      m_colr_prev = e_vert.colr_j[0];
+      m_colr_prev = e_vert.colr_j[i_cstr_slct];
       m_is_gizmo_used = true;
     }
 
     // Register gizmo use
     if (ImGuizmo::IsUsing())
-    e_vert.colr_j[0] = (trf_delta * e_vert.colr_j[0].matrix()).array();
+      e_vert.colr_j[i_cstr_slct] = (trf_delta * e_vert.colr_j[i_cstr_slct].matrix()).array();
 
     // Register gizmo use end, update positions
     if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
@@ -302,8 +365,12 @@ namespace met {
       // Register data edit as drag finishes
       e_appl_data.touch({ 
         .name = "Move gamut offsets", 
-        .redo = [edit = e_vert.colr_j[0], i = e_selection, j = 0](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }, 
-        .undo = [edit = m_colr_prev,      i = e_selection, j = 0](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }
+        .redo = [edit = e_vert.colr_j[i_cstr_slct], 
+                 i = i, 
+                 j = i_cstr_slct](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }, 
+        .undo = [edit = m_colr_prev,                 
+                 i = i, 
+                 j = i_cstr_slct](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }
       });
     }
   }
