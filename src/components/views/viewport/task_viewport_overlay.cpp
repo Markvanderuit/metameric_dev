@@ -129,10 +129,10 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data  = e_app_data.project_data;
-    auto &e_vert      = e_prj_data.gamut_verts[i];
-    auto &e_mapp      = e_prj_data.mappings;
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data  = e_appl_data.project_data;
+    auto &e_vert      = e_proj_data.gamut_verts[i];
+    auto &e_mapp      = e_proj_data.mappings;
     auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
     
     // Plot reflectances
@@ -141,7 +141,7 @@ namespace met {
     // Plot vertex settings for primary color
     if (ImGui::CollapsingHeader("Primary Color")) {
       Colr colr_i  = e_vert.colr_i;
-      Colr rtrip_i = e_app_data.loaded_mappings[e_vert.mapp_i].apply_color(e_spec);
+      Colr rtrip_i = e_appl_data.loaded_mappings[e_vert.mapp_i].apply_color(e_spec);
       Colr error_i = (rtrip_i - colr_i).abs().eval();
       
       ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float);
@@ -161,7 +161,7 @@ namespace met {
       
       // Register potential changes to mapping data
       if (l_mapp_i != e_vert.mapp_i) {
-        e_app_data.touch({
+        e_appl_data.touch({
           .name = "Change mapping index",
           .redo = [edit = l_mapp_i,      i = i](auto &data) { data.gamut_verts[i].mapp_i = edit; },
           .undo = [edit = e_vert.mapp_i, i = i](auto &data) { data.gamut_verts[i].mapp_i = edit; }
@@ -174,7 +174,7 @@ namespace met {
       bool color_visible = true;
       if (ImGui::CollapsingHeader(fmt::format("Secondary color {}", j).c_str(), &color_visible)) {
         Colr colr_j  = e_vert.colr_j[j];
-        Colr rtrip_j = e_app_data.loaded_mappings[e_vert.mapp_j[j]].apply_color(e_spec);
+        Colr rtrip_j = e_appl_data.loaded_mappings[e_vert.mapp_j[j]].apply_color(e_spec);
         Colr error_j = (rtrip_j - colr_j).abs().eval();
 
         ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_j).data(),  ImGuiColorEditFlags_Float);
@@ -194,7 +194,7 @@ namespace met {
 
         // Register potential changes to constraint data
         if (l_mapp_j != e_vert.mapp_j[j]) {
-          e_app_data.touch({
+          e_appl_data.touch({
             .name = "Change constraint mapping",
             .redo = [edit = l_mapp_j,         i = i, j = j](auto &data) { data.gamut_verts[i].mapp_j[j] = edit; },
             .undo = [edit = e_vert.mapp_j[j], i = i, j = j](auto &data) { data.gamut_verts[i].mapp_j[j] = edit; }
@@ -204,7 +204,7 @@ namespace met {
 
       // Secondary color was deleted, register changes to constraint data
       if (!color_visible) {
-        e_app_data.touch({
+        e_appl_data.touch({
             .name = "Delete color constraint",
             .redo = [i = i, j = j](auto &data) { 
               data.gamut_verts[i].colr_j.erase(data.gamut_verts[i].colr_j.begin() + j); 
@@ -218,7 +218,7 @@ namespace met {
     ImGui::Spacing();
     ImGui::Separator();
     if (ImGui::Button("Add constraint")) {
-        e_app_data.touch({
+        e_appl_data.touch({
             .name = "Add color constraint",
             .redo = [i = i](auto &data) { 
               data.gamut_verts[i].colr_j.push_back(data.gamut_verts[i].colr_i); 
@@ -237,9 +237,9 @@ namespace met {
     auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_color_solid_target");
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection")[0];
     auto &e_ocs_center  = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_selection];
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data    = e_app_data.project_data;
-    auto &e_vert        = e_prj_data.gamut_verts[e_selection];
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data   = e_appl_data.project_data;
+    auto &e_vert        = e_proj_data.gamut_verts[e_selection];
 
     // Only continue if at least one secondary color mapping is present
     guard(!e_vert.colr_j.empty());
@@ -300,7 +300,7 @@ namespace met {
       m_is_gizmo_used = false;
       
       // Register data edit as drag finishes
-      e_app_data.touch({ 
+      e_appl_data.touch({ 
         .name = "Move gamut offsets", 
         .redo = [edit = e_vert.colr_j[0], i = e_selection, j = 0](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }, 
         .undo = [edit = m_colr_prev,      i = e_selection, j = 0](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }
@@ -314,8 +314,8 @@ namespace met {
     // Get shared resources
     auto &i_srgb_target    = info.get_resource<gl::Texture2d4f>("srgb_weights_target");
     auto &i_weight_mapping = info.get_resource<uint>("weight_mapping");
-    auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings       = e_app_data.project_data.mappings;
+    auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings       = e_appl_data.project_data.mappings;
     
     // Compute viewport size minus ImGui's tab bars etc
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())

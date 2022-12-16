@@ -89,18 +89,30 @@ namespace met {
     auto csys_j = (system_j.transpose() * basis).eval();
 
     // Initialize parameter object for LP solver with expected matrix sizes
-    constexpr uint N = wavelength_bases, M = 3 + 2 * wavelength_samples;
+    constexpr uint N = wavelength_bases, 
+                   M = 3 + 2 * wavelength_samples;
     LPParameters params(M, N);
     params.method = LPMethod::eDual;
 
     // Specify constraints
-    params.A = (eig::Matrix<float, M, N>() << csys_i, basis, basis).finished().cast<double>().eval();
-    params.b = (eig::Matrix<float, M, 1>() << signal_i, Spec(0.f), Spec(1.f)).finished().cast<double>().eval();
+    params.A = (eig::Matrix<float, M, N>() << 
+      csys_i, 
+      basis, 
+      basis
+    ).finished().cast<double>().eval();
+    params.b = (eig::Matrix<float, M, 1>() << 
+      signal_i, 
+      Spec(0.f), 
+      Spec(1.f)
+    ).finished().cast<double>().eval();
     params.r.block<wavelength_samples, 1>(3, 0)                      = LPCompare::eGE;
     params.r.block<wavelength_samples, 1>(3 + wavelength_samples, 0) = LPCompare::eLE;
 
     // Obtain orthogonal basis functions through SVD of dual color system matrix
-    eig::Matrix<float, N, 6> S = (eig::Matrix<float, N, 6>() << csys_i.transpose(), csys_j.transpose()).finished();
+    eig::Matrix<float, N, 6> S = (eig::Matrix<float, N, 6>() << 
+      csys_i.transpose(), 
+      csys_j.transpose()
+    ).finished();
     eig::JacobiSVD<eig::Matrix<float, N, 6>> svd;
     svd.compute(S, eig::ComputeFullV);
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();

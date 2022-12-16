@@ -45,7 +45,7 @@ namespace met {
     // Method settings
     LPMethod    method    = LPMethod::ePrimal;
     LPObjective objective = LPObjective::eMinimize;
-    bool        scaling   = false;
+    bool        scaling   = true;
 
     // Rows and cols
     uint M, N;
