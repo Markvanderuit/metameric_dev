@@ -11,7 +11,7 @@
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
-#include <metameric/components/misc/task_project_state.hpp>
+#include <metameric/components/misc/task_state.hpp>
 
 // Pipeline tasks
 #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
@@ -39,7 +39,7 @@
 #include <metameric/core/metamer.hpp>
 
 namespace met {
-  template <typename Scheduler>
+ /*  template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
     scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
     scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
@@ -130,10 +130,9 @@ namespace met {
       
       ImGui::End();
     });
-  }
-
+  } */
   
-  template <typename Scheduler>
+  /* template <typename Scheduler>
   void submit_schedule_test(Scheduler &scheduler) {
     scheduler.emplace_task<LambdaTask>("debug_idea", [&](auto &info) {
       // Get shared resources
@@ -209,18 +208,18 @@ namespace met {
       }
       ImGui::End();
     });
-  }
+  } */
 
   template <typename Scheduler>
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
-    scheduler.emplace_task<ProjectStateTask>("project_state");
+    scheduler.emplace_task<StateTask>("state");
 
     // The following tasks define the color->spectrum uplifting pipeline
-    scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");
-    scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");
-    scheduler.emplace_task<GenBarycentricWeightsTask>("gen_barycentric_weights");
-    scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
+    scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");     // X
+    scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");           // 
+    scheduler.emplace_task<GenBarycentricWeightsTask>("gen_barycentric_weights"); //
+    scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");       // 
 
     // The following tasks define view pipeline necessities
     scheduler.emplace_task<GenColorSolidsTask>("gen_color_solids");

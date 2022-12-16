@@ -1,6 +1,7 @@
 #include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <small_gl/utility.hpp>
@@ -40,8 +41,7 @@ namespace met {
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
 
-    // Initialize main color and spectral texture buffers
-    info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
+    // Initialize main spectral texture buffer
     info.emplace_resource<gl::Buffer>("spec_buffer", { .size  = sizeof(Spec) * generate_n });
   }
 
@@ -49,35 +49,20 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    guard(e_pipe_state.any);
 
     // Get shared resources
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &i_colr_bufer  = info.get_resource<gl::Buffer>("colr_buffer");
-    auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
-    auto &e_colr_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
-    auto &e_elem_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+    auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
     
     // Update uniform data
-    m_uniform_map->n       = e_app_data.loaded_texture.size().prod();
-    m_uniform_map->n_verts = e_app_data.project_data.gamut_colr_i.size();
-    m_uniform_map->n_elems = e_app_data.project_data.gamut_elems.size();
+    m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+    m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
+    m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
-
-    /* // Bind resources to buffer targets
-    e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    e_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    i_colr_bufer.bind_to(gl::BufferTargetType::eShaderStorage,  3);
-    i_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 4);
-    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
-    
-    // Dispatch shader to generate spectral data
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-    gl::dispatch_compute(m_dispatch_cl); */
 
     // Bind resources to buffer targets
     e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);

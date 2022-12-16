@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <nlohmann/json_fwd.hpp>
 

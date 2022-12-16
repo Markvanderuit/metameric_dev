@@ -4,7 +4,7 @@
 #include <metameric/core/pca.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
@@ -45,7 +45,7 @@ namespace met {
 
     void init_schedule(LinearScheduler &scheduler) {
       auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
-      if (app_data.project_state == ProjectState::eSaved) {
+      if (app_data.project_save == SaveFlag::eSaved) {
         submit_schedule_main(scheduler);
       } else {
         submit_schedule_empty(scheduler);

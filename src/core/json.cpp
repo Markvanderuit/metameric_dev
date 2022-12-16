@@ -25,12 +25,23 @@ namespace met {
     js["n_scatters"] = v.n_scatters;
   }
 
+  void from_json(const json &js, ProjectData::Vert &v) {
+    v.colr_i = js.at("colr_i").get<Colr>();
+    v.mapp_i = js.at("mapp_i").get<uint>();
+    v.colr_j = js.at("colr_j").get<std::vector<Colr>>();
+    v.mapp_j = js.at("mapp_j").get<std::vector<uint>>();
+  }
+
+  void to_json(json &js, const ProjectData::Vert &v) {
+    js["colr_i"] = v.colr_i;
+    js["mapp_i"] = v.mapp_i;
+    js["colr_j"] = v.colr_j;
+    js["mapp_j"] = v.mapp_j;
+  }
+
   void from_json(const json &js, ProjectData &v) {
-    v.gamut_elems  = js.at("gamut_elems").get<std::vector<eig::Array3u>>();
-    v.gamut_colr_i = js.at("gamut_colr_i").get<std::vector<Colr>>();
-    v.gamut_offs_j = js.at("gamut_offs_j").get<std::vector<Colr>>();
-    v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::vector<uint>>();
-    v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::vector<uint>>();
+    v.gamut_elems  = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
+    v.gamut_verts  = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
     v.mappings     = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapp>>>();
     v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
@@ -38,10 +49,7 @@ namespace met {
 
   void to_json(json &js, const ProjectData &v) {
     js["gamut_elems"]  = v.gamut_elems;
-    js["gamut_colr_i"] = v.gamut_colr_i;
-    js["gamut_offs_j"] = v.gamut_offs_j;
-    js["gamut_mapp_i"] = v.gamut_mapp_i;
-    js["gamut_mapp_j"] = v.gamut_mapp_j;
+    js["gamut_verts"]  = v.gamut_verts;
     js["mappings"]     = v.mappings;
     js["cmfs"]         = v.cmfs;
     js["illuminants"]  = v.illuminants;

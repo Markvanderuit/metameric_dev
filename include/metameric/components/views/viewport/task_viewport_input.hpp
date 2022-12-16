@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
@@ -103,8 +103,8 @@ namespace met {
       auto &e_selection_vert = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
       auto &e_selection_elem = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
       auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_proj_data      = e_app_data.project_data;
-      auto &e_verts          = e_app_data.project_data.gamut_colr_i;
+      auto &e_prj_data       = e_app_data.project_data;
+      auto &e_verts          = e_app_data.project_data.gamut_verts;
       auto &e_elems          = e_app_data.project_data.gamut_elems;
 
       // Compute viewport offs, size minus ImGui's tab bars etc
@@ -144,30 +144,22 @@ namespace met {
           ImGui::Separator();
           if (ImGui::Button("Collapse vertex")) {
             // Obtain mesh data with the collapsed vertex
-            auto [verts, elems] = detail::collapse_vert(e_verts, e_elems, e_selection_vert[0]);
+            std::vector<Colr> colrs_i;
+            std::ranges::transform(e_verts, std::back_inserter(colrs_i), [](const auto &v) { return v.colr_i; });
+            auto [_, elems] = detail::collapse_vert(colrs_i, e_elems, e_selection_vert[0]);
             
             // Apply data modification to project
             e_app_data.touch({
               .name = "Collapse vertex",
-              .redo = [colr_i = verts,
-                       elems  = elems,
-                       i      = e_selection_vert[0]](auto &data) {
+              .redo = [elems = elems,
+                       i     = e_selection_vert[0]](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_colr_i = colr_i;
-                data.gamut_offs_j.erase(data.gamut_offs_j.begin() + i);
-                data.gamut_mapp_i.erase(data.gamut_mapp_i.begin() + i);
-                data.gamut_mapp_j.erase(data.gamut_mapp_j.begin() + i);
+                data.gamut_verts.erase(data.gamut_verts.begin() + i);
               },
               .undo = [elems  = e_elems,
-                       colr_i = e_verts,
-                       offs_j = e_proj_data.gamut_offs_j,
-                       mapp_i = e_proj_data.gamut_mapp_i,
-                       mapp_j = e_proj_data.gamut_mapp_j](auto &data) {
+                       verts  = e_verts](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_colr_i = colr_i;
-                data.gamut_offs_j = offs_j;
-                data.gamut_mapp_i = mapp_i;
-                data.gamut_mapp_j = mapp_j;
+                data.gamut_verts  = verts;
               }
             });
 
@@ -183,29 +175,27 @@ namespace met {
           ImGui::Separator();
           if (ImGui::Button("Subdivide face")) {
             // Obtain mesh data with the subdivided face
-            auto [verts, elems] = detail::subdivide_elem(e_verts, e_elems, e_selection_elem[0]);
+            std::vector<Colr> colrs_i;
+            std::ranges::transform(e_verts, std::back_inserter(colrs_i), [](const auto &v) { return v.colr_i; });
+            auto [verts, elems] = detail::subdivide_elem(colrs_i, e_elems, e_selection_elem[0]);
 
             // Apply data modification to project
             e_app_data.touch({
               .name = "Subdivide face",
-              .redo = [colr_i = verts, 
-                       elems  = elems](auto &data) {
+              .redo = [verts = verts, 
+                       elems = elems](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_colr_i = colr_i;
-                data.gamut_offs_j.resize(colr_i.size(), Colr(0));
-                data.gamut_mapp_i.resize(colr_i.size(), 0);
-                data.gamut_mapp_j.resize(colr_i.size(), 1);
+                data.gamut_verts.resize(verts.size(), {
+                  .colr_i = verts[verts.size() - 1],
+                  .mapp_i = 0,
+                  .colr_j = { },
+                  .mapp_j = { }
+                });
               },
               .undo = [elems  = e_elems,
-                       colr_i = e_verts,
-                       offs_j = e_proj_data.gamut_offs_j,
-                       mapp_i = e_proj_data.gamut_mapp_i,
-                       mapp_j = e_proj_data.gamut_mapp_j](auto &data) {
+                       verts = e_verts](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_colr_i = colr_i;
-                data.gamut_offs_j = offs_j;
-                data.gamut_mapp_i = mapp_i;
-                data.gamut_mapp_j = mapp_j;
+                data.gamut_verts  = verts;
               },
             });
 
@@ -213,9 +203,9 @@ namespace met {
             e_selection_vert.clear(); 
             e_selection_elem.clear();
           }
-          if (ImGui::Button("Collapse face")) {
+          /* if (ImGui::Button("Collapse face")) {
 
-          }
+          } */
         }
       }
       ImGui::End();

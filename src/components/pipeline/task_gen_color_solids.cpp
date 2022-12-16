@@ -1,11 +1,12 @@
-#include <metameric/components/pipeline/task_gen_color_solids.hpp>
-#include <metameric/core/detail/trace.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
+#include <metameric/core/detail/trace.hpp>
+#include <metameric/components/pipeline/task_gen_color_solids.hpp>
 #include <omp.h>
 #include <algorithm>
 #include <execution>
@@ -80,8 +81,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_app_data.project_data;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
     
     // Generate reused 6d samples and a uv sphere mesh for faster OCS generation
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
@@ -97,41 +98,43 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_state_gamut = info.get_resource<std::vector<CacheState>>("project_state", "gamut_summary");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheState::eStale; }));
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    guard(e_pipe_state.any_verts);
 
     // Get shared resources
-    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data    = e_app_data.project_data;
-    auto &e_gamut_colr_i = e_proj_data.gamut_colr_i;
-    auto &e_gamut_mapp_i = e_proj_data.gamut_mapp_i;
-    auto &e_gamut_mapp_j = e_proj_data.gamut_mapp_j;
-    auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    auto &e_gamut_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
-    auto &i_ocs_data     = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("ocs_points");
-    auto &i_ocs_cntrs    = info.get_resource<std::vector<Colr>>("ocs_centers");
-    auto &i_ocs_hulls    = info.get_resource<std::vector<HalfedgeMesh>>("ocs_chulls");
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_prj_data  = e_appl_data.project_data;
+    auto &e_verts     = e_prj_data.gamut_verts;
+    auto &e_specs     = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
+    auto &e_basis     = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &i_ocs_data  = info.get_resource<std::vector<std::vector<eig::AlArray3f>>>("ocs_points");
+    auto &i_ocs_cntrs = info.get_resource<std::vector<Colr>>("ocs_centers");
+    auto &i_ocs_hulls = info.get_resource<std::vector<HalfedgeMesh>>("ocs_chulls");
 
-    // Deal with resized gamut
-    if (e_gamut_colr_i.size() != i_ocs_data.size()) {
-      i_ocs_data.resize(e_gamut_colr_i.size());
-      i_ocs_cntrs.resize(e_gamut_colr_i.size());
-      i_ocs_hulls.resize(e_gamut_colr_i.size());
+    // Deal with resized vertex count in gamut's convex hull
+    if (e_verts.size() != i_ocs_data.size()) {
+      i_ocs_data.resize(e_verts.size());
+      i_ocs_cntrs.resize(e_verts.size());
+      i_ocs_hulls.resize(e_verts.size());
     }
 
-    // Describe ranges over stale gamut vertices
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_gamut_colr_i.size()))
-                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheState::eStale; });
+    // Describe ranges over stale gamut vertices with secondary mappings
+    // TODO: Remedy this shit!
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
+                    | std::views::filter([&](uint i) { return e_pipe_state.verts[i].any; })
+                    | std::views::filter([&](uint i) { return !e_verts[i].mapp_j.empty(); });
 
-    // For each vertex of the gamut shape
+    // For each vertex of the gamut shape that has secondary mappings
     for (uint i : vert_range) {
+      auto &vert = e_verts[i];
+
       // Generate color system spectra
-      CMFS cmfs_i = e_app_data.loaded_mappings[e_gamut_mapp_i[i]].finalize(e_gamut_spec[i]);
-      CMFS cmfs_j = e_app_data.loaded_mappings[e_gamut_mapp_j[i]].finalize(e_gamut_spec[i]);
+      CMFS cmfs_i = e_appl_data.loaded_mappings[vert.mapp_i].finalize(e_specs[i]);
+      CMFS cmfs_j = e_appl_data.loaded_mappings[vert.mapp_j[0]].finalize(e_specs[i]);
 
       // Generate points on metamer set boundary
       auto basis  = e_basis.rightCols(wavelength_bases);
-      auto points = generate_boundary(basis, cmfs_i, cmfs_j, e_gamut_colr_i[i], m_sphere_samples);
+      auto points = generate_boundary(basis, cmfs_i, cmfs_j, vert.colr_i, m_sphere_samples);
 
       // Store in aligned format // TODO generate in aligned format
       i_ocs_data[i] = std::vector<eig::AlArray3f>(range_iter(points));

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
@@ -16,7 +16,7 @@ namespace met {
   constexpr float selector_near_distance = 12.f;
 
   class ViewportInputVertTask : public detail::AbstractTask {
-    std::vector<Colr> m_verts_prev;
+    std::vector<Colr> m_colrs_prev;
     bool              m_is_gizmo_used;
     
   public:
@@ -49,13 +49,17 @@ namespace met {
       auto &i_arcball   = info.get_resource<detail::Arcball>("viewport_input", "arcball");
       auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_app_data.project_data;
-      auto &e_verts     = e_app_data.project_data.gamut_colr_i;
+      auto &e_verts     = e_app_data.project_data.gamut_verts;
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+
+      // Get vertex colors from vertices
+      std::vector<Colr> colrs_i;
+      std::ranges::transform(e_verts, std::back_inserter(colrs_i), [](const auto &v) { return v.colr_i; });
       
       // If gizmo is not used or active, handle selection/highlighting
       if ((!ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) || !m_is_gizmo_used) {
@@ -63,11 +67,11 @@ namespace met {
         auto selector_ul = eig::Array2f(io.MouseClickedPos[1]).min(eig::Array2f(io.MousePos)).eval();
         auto selector_br = eig::Array2f(io.MouseClickedPos[1]).max(eig::Array2f(io.MousePos)).eval();
         auto selector_rectangle = std::views::filter([&](uint i) {
-          eig::Array2f p = eig::world_to_window_space(e_verts[i], i_arcball.full(), viewport_offs, viewport_size);
+          eig::Array2f p = eig::world_to_window_space(colrs_i[i], i_arcball.full(), viewport_offs, viewport_size);
           return p.max(selector_ul).min(selector_br).isApprox(p);
         });
         auto selector_near = std::views::filter([&](uint i) {
-          eig::Vector2f p = eig::world_to_window_space(e_verts[i], i_arcball.full(), viewport_offs, viewport_size);
+          eig::Vector2f p = eig::world_to_window_space(colrs_i[i], i_arcball.full(), viewport_offs, viewport_size);
           return (p - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance;
         });
 
@@ -114,8 +118,9 @@ namespace met {
       constexpr
       auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
       auto selected_verts = i_selection | std::views::transform(i_get(e_verts));
-      Colr selected_centr = std::reduce(range_iter(selected_verts), Colr(0.f)) 
-                          / static_cast<float>(selected_verts.size()); 
+      Colr selected_centr = std::reduce(range_iter(selected_verts), Colr(0.f),
+        [](const auto &c, const auto &v) { return c + v.colr_i; }) 
+        / static_cast<float>(selected_verts.size()); 
 
       // ImGuizmo manipulator operates on a transform; to obtain translation
       // distance, we transform a point prior to transformation update
@@ -135,14 +140,14 @@ namespace met {
 
       // Register gizmo use start, cache current vertex positions
       if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-        m_verts_prev = e_verts;
+        m_colrs_prev = colrs_i;
         m_is_gizmo_used = true;
       }
       
       // Register gizmo use
       if (ImGuizmo::IsUsing())
-        std::ranges::for_each(selected_verts, [&](Colr &p) { 
-          p = (trf_delta * p.matrix()).array().min(1.f).max(0.f);
+        std::ranges::for_each(selected_verts, [&](auto &v) { 
+          v.colr_i = (trf_delta * v.colr_i.matrix()).array().min(1.f).max(0.f);
         });
 
       // Register gizmo use end, update to new vertex positions
@@ -150,8 +155,11 @@ namespace met {
         // Register data edit as drag finishes
         e_app_data.touch({ 
           .name = "Move gamut points", 
-          .redo = [edit = e_verts ](auto &data) { data.gamut_colr_i = edit; }, 
-          .undo = [edit = m_verts_prev](auto &data) { data.gamut_colr_i = edit; }
+          .redo = [edit = e_verts](auto &data) { data.gamut_verts = edit; }, 
+          .undo = [edit = m_colrs_prev](auto &data) { 
+            for (uint i = 0; i < edit.size(); ++i)
+              data.gamut_verts[i].colr_i = edit[i];
+          }
         });
         m_is_gizmo_used = false;
       }

@@ -1,10 +1,11 @@
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <ranges>
 
 namespace met {
   constexpr uint chull_vertex_count = 5;
@@ -21,20 +22,14 @@ namespace met {
 
   ProjectData::ProjectData() {
     // Provide an initial example gamut for now
-    gamut_elems  = { eig::Array3u { 2, 0, 1 },
-                     eig::Array3u { 0, 3, 1 },
-                     eig::Array3u { 2, 1, 3 },
-                     eig::Array3u { 0, 2, 3 }};
-    gamut_colr_i = { Colr { .75f, .40f, .25f },
-                     Colr { .68f, .49f, .58f },
-                     Colr { .50f, .58f, .39f },
-                     Colr { .35f, .30f, .34f }};
-    gamut_offs_j = { Colr { 0.f, 0.f, 0.f },
-                     Colr { 0.f, 0.f, 0.f },
-                     Colr { 0.f, 0.f, 0.f },
-                     Colr { 0.f, 0.f, 0.f }};
-    gamut_mapp_i = { 0, 0, 0, 0 };
-    gamut_mapp_j = { 1, 1, 1, 1 };
+    gamut_elems = { Elem { 2, 0, 1 },
+                    Elem { 0, 3, 1 },
+                    Elem { 2, 1, 3 },
+                    Elem { 0, 2, 3 }};
+    gamut_verts = { Vert { .colr_i = { .75f, .40f, .25f }, .mapp_i = 0, .colr_j = { Colr { .75f, .40f, .25f } }, .mapp_j = { 1 } },
+                    Vert { .colr_i = { .68f, .49f, .58f }, .mapp_i = 0, .colr_j = { Colr { .68f, .49f, .58f } }, .mapp_j = { 1 } },
+                    Vert { .colr_i = { .50f, .58f, .39f }, .mapp_i = 0, .colr_j = { Colr { .50f, .58f, .39f } }, .mapp_j = { 1 } },
+                    Vert { .colr_i = { .35f, .30f, .34f }, .mapp_i = 0, .colr_j = { Colr { .35f, .30f, .34f } }, .mapp_j = { 1 } } };
 
     // Instantiate loaded components with sensible default values
     mappings = {{ "D65", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}, 
@@ -53,7 +48,7 @@ namespace met {
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
-    project_state  = ProjectState::eNew;
+    project_save  = SaveFlag::eNew;
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
@@ -66,17 +61,17 @@ namespace met {
     load_chull_gamut();
   }
   
-  void ApplicationData::save(const fs::path &save_path) {
-    project_state = ProjectState::eSaved;
-    project_path  = io::path_with_ext(save_path, ".json");
-    io::save_project(project_path, project_data);
+  void ApplicationData::save(const fs::path &path) {
+    project_save = SaveFlag::eSaved;
+    project_path  = io::path_with_ext(path, ".json");
+    io::save_json(project_path, project_data);
     io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture, true);
   }
 
-  void ApplicationData::load(const fs::path &load_path) {
-    project_state  = ProjectState::eSaved;
-    project_path   = io::path_with_ext(load_path, ".json");
-    project_data   = io::load_project(project_path);
+  void ApplicationData::load(const fs::path &path) {
+    project_save  = SaveFlag::eSaved;
+    project_path   = io::path_with_ext(path, ".json");
+    project_data   = io::load_json(path).get<ProjectData>();
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
 
     // Reset undo/redo history
@@ -97,8 +92,8 @@ namespace met {
     mods.resize(mod_i);
     mods.push_back(mod);   
     
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_save == SaveFlag::eSaved) {
+      project_save = SaveFlag::eUnsaved;
     }
   }
 
@@ -109,8 +104,8 @@ namespace met {
     mod_i += 1;
     mods[mod_i].redo(project_data);
 
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_save == SaveFlag::eSaved) {
+      project_save = SaveFlag::eUnsaved;
     }
   }
 
@@ -121,13 +116,13 @@ namespace met {
     mods[mod_i].undo(project_data);
     mod_i -= 1;
 
-    if (project_state == ProjectState::eSaved) {
-      project_state = ProjectState::eUnsaved;
+    if (project_save == SaveFlag::eSaved) {
+      project_save = SaveFlag::eUnsaved;
     }
   }
 
   void ApplicationData::unload() {
-    project_state = ProjectState::eUnloaded;
+    project_save = SaveFlag::eUnloaded;
     project_path  = "";
     project_data  = { };
 
@@ -138,10 +133,39 @@ namespace met {
     mod_i = -1;
   }
 
+  namespace detail {
+    Spec load_illuminant(const ProjectData &data, std::string_view key) {
+      const auto it = std::ranges::find_if(data.illuminants, 
+        [&key](auto &p) { return key == p.first; });
+      debug::check_expr_rel(it != data.illuminants.end(), 
+        fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
+      return it->second; 
+    }
+
+    CMFS load_cmfs(const ProjectData &data, std::string_view key) {
+      const auto it = std::ranges::find_if(data.cmfs, 
+        [&key](auto &p) { return key == p.first; });
+      debug::check_expr_rel(it != data.cmfs.end(), 
+        fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
+      return it->second; 
+    }
+
+    Mapp load_mapping(const ProjectData &data, std::string_view key) {
+      const auto it = std::ranges::find_if(data.mappings, 
+        [&key](auto &p) { return key == p.first; });
+      debug::check_expr_rel(it != data.mappings.end(), 
+        fmt::format("Could not load spectral mapping from project data; name was \"{}\"", key));
+      const auto &mapping = it->second;
+      return { .cmfs      = load_cmfs(data, mapping.cmfs),
+              .illuminant = load_illuminant(data, mapping.illuminant),
+              .n_scatters = mapping.n_scatters };
+    }
+  } // namespace detail
+
   void ApplicationData::load_mappings() {
     loaded_mappings = { };
     std::ranges::transform(project_data.mappings, std::back_inserter(loaded_mappings), 
-      [&](auto &p) { return load_mapping(p.first); });
+      [&](auto &p) { return detail::load_mapping(project_data, p.first); });
   }
   
   void ApplicationData::load_chull_gamut() {
@@ -152,36 +176,9 @@ namespace met {
 
     // Assign new default gamut matching the convex hull
     project_data.gamut_elems  = elems;
-    project_data.gamut_colr_i = verts;
-    project_data.gamut_offs_j = std::vector<Colr>(verts.size(), Colr(0.f));
-    project_data.gamut_mapp_i = std::vector<uint>(verts.size(), 0);
-    project_data.gamut_mapp_j = std::vector<uint>(verts.size(), 1);
-  }
-
-  Spec ApplicationData::load_illuminant(const std::string &key) const {
-    const auto it = std::ranges::find_if(project_data.illuminants, 
-      [&key](auto &p) { return key == p.first; });
-    debug::check_expr_rel(it != project_data.illuminants.end(), 
-      fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
-    return it->second; 
-  }
-
-  CMFS ApplicationData::load_cmfs(const std::string &key) const {
-    const auto it = std::ranges::find_if(project_data.cmfs, 
-      [&key](auto &p) { return key == p.first; });
-    debug::check_expr_rel(it != project_data.cmfs.end(), 
-      fmt::format("Could not load color matching functions from project data; name was \"{}\"", key));
-    return it->second; 
-  }
-
-  Mapp ApplicationData::load_mapping(const std::string &key) const {
-    const auto it = std::ranges::find_if(project_data.mappings, 
-      [&key](auto &p) { return key == p.first; });
-    debug::check_expr_rel(it != project_data.mappings.end(), 
-      fmt::format("Could not load spectral mapping from project data; name was \"{}\"", key));
-    const auto &mapping = it->second;
-    return { .cmfs       = load_cmfs(mapping.cmfs),
-             .illuminant = load_illuminant(mapping.illuminant),
-             .n_scatters = mapping.n_scatters };
+    project_data.gamut_verts.resize(verts.size());
+    std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
+      return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { c }, .mapp_j = { 1 } };
+    });
   }
 } // namespace met

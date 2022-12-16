@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/ray.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
@@ -15,7 +15,7 @@
 
 namespace met {
   class ViewportInputElemTask : public detail::AbstractTask {
-    std::vector<Colr> m_verts_prev;
+    std::vector<Colr> m_colrs_prev;
     bool              m_is_gizmo_used;
 
   public:
@@ -37,7 +37,7 @@ namespace met {
       met_trace_full();
 
       // If active window is not hovered or we are not in face  mode, exit early
-      auto &e_mode      = info.get_resource<detail::ViewportInputMode>("viewport_input", "mode");
+      auto &e_mode = info.get_resource<detail::ViewportInputMode>("viewport_input", "mode");
       guard(e_mode == detail::ViewportInputMode::eFace);
       guard(ImGui::IsItemHovered());
 
@@ -48,8 +48,8 @@ namespace met {
       auto &e_selection_vert = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
       auto &i_arcball        = info.get_resource<detail::Arcball>("viewport_input", "arcball");
       auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_proj_data      = e_app_data.project_data;
-      auto &e_verts          = e_app_data.project_data.gamut_colr_i;
+      auto &e_prj_data       = e_app_data.project_data;
+      auto &e_verts          = e_app_data.project_data.gamut_verts;
       auto &e_elems          = e_app_data.project_data.gamut_elems;
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
@@ -58,10 +58,14 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
+      // Get vertex colors from vertices
+      std::vector<Colr> colrs_i;
+      std::ranges::transform(e_verts, std::back_inserter(colrs_i), [](const auto &v) { return v.colr_i; });
+
       // Generate and fire a camera ray against the gamut's triangle elements
       auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
       auto camera_ray = i_arcball.generate_ray(screen_pos);
-      auto ray_query = ray_trace_nearest_elem(camera_ray, e_verts, e_elems);
+      auto ray_query = ray_trace_nearest_elem(camera_ray, colrs_i, e_elems);
 
       // Apply mouseover on every iteration
       i_mouseover.clear();
@@ -98,8 +102,9 @@ namespace met {
 
       // Range over- and center of selected vertices belonging to triangle
       auto selected_verts = e_selection_vert | std::views::transform(i_get(e_verts));
-      Colr selected_centr = std::reduce(range_iter(selected_verts), Colr(0.f)) 
-                          / static_cast<float>(selected_verts.size()); 
+      Colr selected_centr = std::reduce(range_iter(selected_verts), Colr(0.f),
+        [](const auto &c, const auto &v) { return c + v.colr_i; }) 
+        / static_cast<float>(selected_verts.size()); 
 
       // ImGuizmo manipulator operates on a transform; to obtain translation
       // distance, we transform a point prior to transformation update
@@ -119,14 +124,14 @@ namespace met {
 
       // Register gizmo use start, cache current vertex positions
       if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-        m_verts_prev = e_verts;
+        m_colrs_prev = colrs_i;
         m_is_gizmo_used = true;
       }
       
       // Register gizmo use
       if (ImGuizmo::IsUsing())
-        std::ranges::for_each(selected_verts, [&](Colr &p) { 
-          p = (trf_delta * p.matrix()).array().min(1.f).max(0.f);
+        std::ranges::for_each(selected_verts, [&](auto &v) { 
+          v.colr_i = (trf_delta * v.colr_i.matrix()).array().min(1.f).max(0.f);
         });
 
       // Register gizmo use end, update to new vertex positions
@@ -134,8 +139,11 @@ namespace met {
         // Register data edit as drag finishes
         e_app_data.touch({ 
           .name = "Move gamut points", 
-          .redo = [edit = e_verts ](auto &data) { data.gamut_colr_i = edit; }, 
-          .undo = [edit = m_verts_prev](auto &data) { data.gamut_colr_i = edit; }
+          .redo = [edit = e_verts ](auto &data) { data.gamut_verts = edit; }, 
+          .undo = [edit = m_colrs_prev](auto &data) { 
+            for (uint i = 0; i < edit.size(); ++i)
+              data.gamut_verts[i].colr_i = edit[i];
+          }
         });
         m_is_gizmo_used = false;
       }

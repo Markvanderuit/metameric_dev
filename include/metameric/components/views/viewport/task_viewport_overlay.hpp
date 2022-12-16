@@ -1,13 +1,13 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
 
 namespace met {
   class ViewportOverlayTask : public detail::AbstractTask {
-    std::vector<Colr> m_offs_prev;
-    bool              m_is_gizmo_used;
+    Colr m_colr_prev;
+    bool m_is_gizmo_used;
     
   public:
     ViewportOverlayTask(const std::string &name);
