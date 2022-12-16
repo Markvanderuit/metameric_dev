@@ -27,10 +27,10 @@ namespace met {
 
     // Submit shared resources 
     info.insert_resource<std::vector<Spec>>("gamut_spec", { });
-    info.insert_resource<gl::Buffer>("colr_buffer", { });
-    info.insert_resource<gl::Buffer>("spec_buffer", { });
-    info.insert_resource<gl::Buffer>("elem_buffer", { });
-    info.insert_resource<gl::Buffer>("elem_buffer_unal", { });
+    info.insert_resource<gl::Buffer>("vert_buffer",       { });
+    info.insert_resource<gl::Buffer>("spec_buffer",       { });
+    info.insert_resource<gl::Buffer>("elem_buffer",       { });
+    info.insert_resource<gl::Buffer>("elem_buffer_unal",  { });
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
@@ -38,13 +38,13 @@ namespace met {
 
     // Get shared resources
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
-    auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
+    auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
     auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
     auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal");
 
     // Unmap buffers
     if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped()) i_spec_buffer.unmap();
-    if (i_colr_buffer.is_init() && i_colr_buffer.is_mapped()) i_colr_buffer.unmap();
+    if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped()) i_vert_buffer.unmap();
     if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped()) i_elem_buffer.unmap();
     if (i_elem_buffer_.is_init() && i_elem_buffer_.is_mapped()) i_elem_buffer_.unmap();
   }
@@ -54,79 +54,83 @@ namespace met {
 
     // Continue only on relevant state change
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data  = e_app_data.project_data;
     auto &e_prj_state = e_app_data.project_state;
     guard(e_prj_state.any_verts == CacheFlag::eStale);
-
-    auto &e_state_gamut  = info.get_resource<std::vector<CacheFlag>>("project_state", "gamut_summary");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheFlag::eStale; }));
-
+    
     // Get shared resources
-    auto &e_state_elems  = info.get_resource<std::vector<CacheFlag>>("project_state", "gamut_elems");
-    auto &i_gamut_spec   = info.get_resource<std::vector<Spec>>("gamut_spec");
-    auto &i_colr_buffer  = info.get_resource<gl::Buffer>("colr_buffer");
-    auto &i_spec_buffer  = info.get_resource<gl::Buffer>("spec_buffer");
-    auto &i_elem_buffer  = info.get_resource<gl::Buffer>("elem_buffer");
-    auto &i_elem_buffer_ = info.get_resource<gl::Buffer>("elem_buffer_unal");
-    auto &e_basis        = info.get_resource<BMatrixType>(global_key, "pca_basis");
-    auto &e_proj_data    = e_app_data.project_data;
-    auto &e_gamut_colr_i = e_proj_data.gamut_colr_i;
-    auto &e_gamut_elems  = e_proj_data.gamut_elems;
+    auto &e_prj_data    = e_app_data.project_data;
+    auto &e_elems       = e_prj_data.gamut_elems;
+    auto &e_verts       = e_prj_data.gamut_verts;
+    auto &e_basis       = info.get_resource<BMatrixType>(global_key, "pca_basis");
+    auto &i_specs       = info.get_resource<std::vector<Spec>>("gamut_spec");
+    auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
+    auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
+    auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal");
+    auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
 
-    // Resize spectrum data vector and re-create gamut buffers in case of nr. of vertices changes
-    if (e_gamut_colr_i.size() != i_gamut_spec.size()) {
-      i_gamut_spec.resize(e_gamut_colr_i.size());
+    // Resize spectrum data and re-create buffers if nr. of vertices changes
+    if (e_verts.size() != i_specs.size()) {
+      i_specs.resize(e_verts.size());
 
-      if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped()) i_spec_buffer.unmap();
-      if (i_colr_buffer.is_init() && i_colr_buffer.is_mapped()) i_colr_buffer.unmap();
-      if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped()) i_elem_buffer.unmap();
+      if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped())   i_spec_buffer.unmap();
+      if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped())   i_vert_buffer.unmap();
+      if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped())   i_elem_buffer.unmap();
       if (i_elem_buffer_.is_init() && i_elem_buffer_.is_mapped()) i_elem_buffer_.unmap();
       
-      i_spec_buffer = {{ .size  = e_gamut_colr_i.size() * sizeof(Spec),          .flags = buffer_create_flags }};
-      i_colr_buffer = {{ .size  = e_gamut_colr_i.size() * sizeof(AlColr),        .flags = buffer_create_flags }};
-      i_elem_buffer = {{ .size  = e_gamut_elems.size() * sizeof(eig::AlArray3u), .flags = buffer_create_flags }};
-      i_elem_buffer_= {{ .size  = e_gamut_elems.size() * sizeof(eig::Array3u),   .flags = buffer_create_flags }};
+      i_spec_buffer = {{ .size  = e_verts.size() * sizeof(Spec),           .flags = buffer_create_flags }};
+      i_vert_buffer = {{ .size  = e_verts.size() * sizeof(AlColr),         .flags = buffer_create_flags }};
+      i_elem_buffer = {{ .size  = e_elems.size() * sizeof(eig::AlArray3u), .flags = buffer_create_flags }};
+      i_elem_buffer_= {{ .size  = e_elems.size() * sizeof(eig::Array3u),   .flags = buffer_create_flags }};
       
       m_spec_map = cast_span<Spec>(i_spec_buffer.map(buffer_access_flags));
-      m_colr_map = cast_span<AlColr>(i_colr_buffer.map(buffer_access_flags));
+      m_vert_map = cast_span<AlColr>(i_vert_buffer.map(buffer_access_flags));
       m_elem_map = cast_span<eig::AlArray3u>(i_elem_buffer.map(buffer_access_flags));
       m_elem_unal_map= cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
     }
 
-    // Generate spectra at gamut color positions
+    // Generate spectra at gamut color positions in parallel
     #pragma omp parallel for
-    for (int i = 0; i < i_gamut_spec.size(); ++i) {
+    for (int i = 0; i < i_specs.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
-      guard_continue(e_state_gamut[i] == CacheFlag::eStale);
-      
-      // Generate new metameric spectrum for given color systems and expected color signals
-      std::array<CMFS, 2> systems = { e_app_data.loaded_mappings[e_proj_data.gamut_mapp_i[i]].finalize(i_gamut_spec[i]),
-                                      e_app_data.loaded_mappings[e_proj_data.gamut_mapp_j[i]].finalize(i_gamut_spec[i]) };
-      std::array<Colr, 2> signals = { e_proj_data.gamut_colr_i[i], 
-                                     (e_proj_data.gamut_colr_i[i] + e_proj_data.gamut_offs_j[i]).eval() };
-      
+      guard_continue(e_prj_state.verts[i].any == CacheFlag::eStale);
+
+      // Relevant vertex data
+      auto &vert = e_prj_data.gamut_verts[i];   
+      Spec &spec = i_specs[i];
+
+      // Obtain color system spectra for this vertex
+      std::vector<CMFS> systems(1 + vert.colr_j.size());
+      systems[0] = e_app_data.loaded_mappings[vert.mapp_i].finalize(spec);
+      std::ranges::transform(vert.mapp_j, systems.begin() + 1, 
+        [&](uint j) { return e_app_data.loaded_mappings[j].finalize(spec); });
+
+      // Obtain corresponding color signal for each color system
+      std::vector<Colr> signals(1 + vert.colr_j.size());
+      signals[0] = vert.colr_i;
+      std::ranges::copy(vert.colr_j, signals.begin() + 1);
+
       // Generate new spectrum given the above systems+signals as solver constraints
-      i_gamut_spec[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
+      i_specs[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
     }
 
-    // Describe ranges over stale gamut vertex/elements
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_gamut_colr_i.size()))
-                    | std::views::filter([&](uint i) { return e_state_gamut[i] == CacheFlag::eStale; });
-    auto elem_range = std::views::iota(0u, static_cast<uint>(e_state_elems.size()))
-                    | std::views::filter([&](uint i) { return e_state_elems[i] == CacheFlag::eStale; });
+    // Describe ranges over stale gamut vertices/elements
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_prj_state.verts.size()))
+                    | std::views::filter([&](uint i) { return e_prj_state.verts[i].any == CacheFlag::eStale; });
+    auto elem_range = std::views::iota(0u, static_cast<uint>(e_prj_state.elems.size()))
+                    | std::views::filter([&](uint i) { return e_prj_state.elems[i] == CacheFlag::eStale; });
 
     // Push stale gamut vertex data to gpu
     for (uint i : vert_range) {
-      m_colr_map[i] = e_proj_data.gamut_colr_i[i];
-      m_spec_map[i] = i_gamut_spec[i];
-      i_colr_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
+      m_vert_map[i] = e_prj_data.gamut_verts[i].colr_i;
+      m_spec_map[i] = i_specs[i];
+      i_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
       i_spec_buffer.flush(sizeof(Spec), i * sizeof(Spec));
     }
     
     // Push stale gamut element data to gpu
     for (uint i : elem_range) {
-      m_elem_map[i]      = e_proj_data.gamut_elems[i];
-      m_elem_unal_map[i] = e_proj_data.gamut_elems[i];
+      m_elem_map[i]      = e_prj_data.gamut_elems[i];
+      m_elem_unal_map[i] = e_prj_data.gamut_elems[i];
       i_elem_buffer.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
       i_elem_buffer_.flush(sizeof(eig::Array3u), i * sizeof(eig::Array3u));
     }

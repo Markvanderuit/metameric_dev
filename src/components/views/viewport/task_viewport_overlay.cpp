@@ -17,6 +17,7 @@ namespace met {
     | ImGuiWindowFlags_NoResize  | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoFocusOnAppearing;
 
+  constexpr float    overlay_width   = 400.f;
   constexpr float    overlay_spacing = 16.f;
   const eig::Array2f overlay_padding = 16.f;
 
@@ -61,12 +62,15 @@ namespace met {
                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Track these positions/sizes so overtays are evenly spaced
-    eig::Array2f view_posi = viewport_offs + overlay_padding, view_size = 0.f;
+    eig::Array2f view_posi = viewport_offs + overlay_padding, view_size = { overlay_width, 0.f };
 
     // Spawn window with selection info if one or more vertices are selected
     for (const uint &i : e_gamut_index) {
+      view_size.y() = 0.f;
+      
       // Set window state for next window
       ImGui::SetNextWindowPos(view_posi);
+      ImGui::SetNextWindowSize(view_size);
       
       if (ImGui::Begin(fmt::format("Vertex {}", i).c_str(), nullptr, window_flags)) {
         eval_overlay_vertex(info, i);
@@ -123,77 +127,101 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_gamut_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
-    auto &e_app_data     = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data     = e_app_data.project_data;
-    auto &e_gamut_mapp_i = e_prj_data.gamut_mapp_i;
-    auto &e_gamut_mapp_j = e_prj_data.gamut_mapp_j;
-    auto &e_mapping_data = e_prj_data.mappings;
-
-    // Compute expected offset color, roundtrip color, roundtrip error
-    Colr gamut_colr_i = e_prj_data.gamut_colr_i[i], gamut_colr_j = gamut_colr_i + e_prj_data.gamut_offs_j[i];
-    Colr gamut_actual_i = e_app_data.loaded_mappings[e_gamut_mapp_i[i]].apply_color(e_gamut_spec[i]);
-    Colr gamut_actual_j = e_app_data.loaded_mappings[e_gamut_mapp_j[i]].apply_color(e_gamut_spec[i]);
-    Colr gamut_error_i  = (gamut_actual_i - gamut_colr_i).abs();
-    Colr gamut_error_j  = (gamut_actual_j - gamut_colr_j).abs();
-
+    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_prj_data  = e_app_data.project_data;
+    auto &e_vert      = e_prj_data.gamut_verts[i];
+    auto &e_mapp      = e_prj_data.mappings;
+    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
+    
     // Plot reflectances
-    ImGui::PlotLines("Reflectance", e_gamut_spec[i].data(), wavelength_samples, 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
-    ImGui::Separator();
+    ImGui::PlotLines("Reflectance", e_spec.data(), wavelength_samples, 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
 
-    // Plot expected color values
-    ImGui::Text("Color values");
-    ImGui::ColorEdit3("Value 0", linear_srgb_to_gamma_srgb(gamut_colr_i).data(), ImGuiColorEditFlags_Float);
-    ImGui::ColorEdit3("Value 1", linear_srgb_to_gamma_srgb(gamut_colr_j).data(), ImGuiColorEditFlags_Float);
-    ImGui::Separator();
+    // Plot vertex settings for primary color
+    if (ImGui::CollapsingHeader("Primary Color")) {
+      Colr colr_i  = e_vert.colr_i;
+      Colr rtrip_i = e_app_data.loaded_mappings[e_vert.mapp_i].apply_color(e_spec);
+      Colr error_i = (rtrip_i - colr_i).abs();
+      ImGui::ColorEdit3("Value", linear_srgb_to_gamma_srgb(colr_i).data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_i).data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Error", linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float);
 
-    // Plot roundtrip color values
-    ImGui::Text("Color roundtrip");
-    ImGui::ColorEdit3("Value, 0", linear_srgb_to_gamma_srgb(gamut_actual_i).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-    ImGui::SameLine();
-    ImGui::ColorEdit3("Value, 1", linear_srgb_to_gamma_srgb(gamut_actual_j).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-    ImGui::ColorEdit3("Error, 0", gamut_error_i.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-    ImGui::SameLine();
-    ImGui::ColorEdit3("Error, 1", gamut_error_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-    ImGui::Separator();
+      // Selector for primary color mapping index, operating on a local copy
+      uint l_mapp_i = e_vert.mapp_i;
+      if (ImGui::BeginCombo("Mapping", e_mapp[l_mapp_i].first.c_str())) {
+        for (uint j = 0; j < e_mapp.size(); ++j) {
+          if (ImGui::Selectable(e_mapp[j].first.c_str(), j == l_mapp_i)) {
+            l_mapp_i = j;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      
+      // Register potential changes to mapping data
+      if (l_mapp_i != e_vert.mapp_i) {
+        e_app_data.touch({
+          .name = "Change mapping index",
+          .redo = [edit = l_mapp_i,      i = i](auto &data) { data.gamut_verts[i].mapp_i = edit; },
+          .undo = [edit = e_vert.mapp_i, i = i](auto &data) { data.gamut_verts[i].mapp_i = edit; }
+        });
+      }
+    }
+
+    // Plot vertex settings for secondary colors
+    for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+      bool color_visible = true;
+      if (ImGui::CollapsingHeader(fmt::format("Secondary color {}", j).c_str(), &color_visible)) {
+        Colr colr_j  = e_vert.colr_j[j];
+        Colr rtrip_j = e_app_data.loaded_mappings[e_vert.mapp_j[j]].apply_color(e_spec);
+        Colr error_j = (rtrip_j - colr_j).abs();
+
+        ImGui::ColorEdit3("Value", linear_srgb_to_gamma_srgb(colr_j).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_j).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Error", linear_srgb_to_gamma_srgb(error_j).data(), ImGuiColorEditFlags_Float);
+
+        // Selector for secondary color mapping index, operating on a local copy
+        uint l_mapp_j = e_vert.mapp_j[j];
+        if (ImGui::BeginCombo(fmt::format("Mapping {}", j).c_str(), e_mapp[l_mapp_j].first.c_str())) {
+          for (uint k = 0; k < e_mapp.size(); ++k) {
+            if (ImGui::Selectable(e_mapp[k].first.c_str(), k == l_mapp_j)) {
+              l_mapp_j = k;
+            }
+          }
+          ImGui::EndCombo();
+        }
+
+        // Register potential changes to constraint data
+        if (l_mapp_j != e_vert.mapp_j[j]) {
+          e_app_data.touch({
+            .name = "Change constraint mapping",
+            .redo = [edit = l_mapp_j,         i = i, j = j](auto &data) { data.gamut_verts[i].mapp_j[j] = edit; },
+            .undo = [edit = e_vert.mapp_j[j], i = i, j = j](auto &data) { data.gamut_verts[i].mapp_j[j] = edit; }
+          });
+        }
+      }
+
+      // Secondary color was deleted, register changes to constraint data
+      if (!color_visible) {
+        e_app_data.touch({
+            .name = "Delete color constraint",
+            .redo = [i = i, j = j](auto &data) { 
+              data.gamut_verts[i].colr_j.erase(data.gamut_verts[i].colr_j.begin() + j); 
+              data.gamut_verts[i].mapp_j.erase(data.gamut_verts[i].mapp_j.begin() + j); 
+            }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.gamut_verts[i] = edit; }
+        });
+      }
+    }
+
+    // Spawn button to add an extra constraint, if necessary
     ImGui::Spacing();
-
-    // Selector for first mapping index, operating on a local copy
-    uint l_gamut_mapp_i = e_gamut_mapp_i[i];
-    if (ImGui::BeginCombo("Mapping 0", e_mapping_data[l_gamut_mapp_i].first.c_str())) {
-      for (uint j = 0; j < e_mapping_data.size(); ++j) {
-        if (ImGui::Selectable(e_mapping_data[j].first.c_str(), j == l_gamut_mapp_i)) {
-          l_gamut_mapp_i = j;
-        }
-      }
-      ImGui::EndCombo();
-    }
-
-    // Selector for second mapping index, operating on a local copy
-    uint l_gamut_mapp_j = e_gamut_mapp_j[i];
-    if (ImGui::BeginCombo("Mapping 1", e_mapping_data[l_gamut_mapp_j].first.c_str())) {
-      for (uint j = 0; j < e_mapping_data.size(); ++j) {
-        if (ImGui::Selectable(e_mapping_data[j].first.c_str(), j == l_gamut_mapp_j)) {
-          l_gamut_mapp_j = j;
-        }
-      }
-      ImGui::EndCombo();
-    }
-
-    // If changes to local copies were made, register a data edit
-    if (l_gamut_mapp_i != e_gamut_mapp_i[i]) {
-      e_app_data.touch({
-        .name = "Change gamut mapping 0",
-        .redo = [edit = l_gamut_mapp_i,    j = i](auto &data) { data.gamut_mapp_i[j] = edit; },
-        .undo = [edit = e_gamut_mapp_i[i], j = i](auto &data) { data.gamut_mapp_i[j] = edit; }
-      });
-    }
-    if (l_gamut_mapp_j != e_gamut_mapp_j[i]) {
-      e_app_data.touch({
-        .name = "Change gamut mapping 1",
-        .redo = [edit = l_gamut_mapp_j,    j = i](auto &data) { data.gamut_mapp_j[j] = edit; },
-        .undo = [edit = e_gamut_mapp_j[i], j = i](auto &data) { data.gamut_mapp_j[j] = edit; }
-      });
+    ImGui::Separator();
+    if (ImGui::Button("Add constraint")) {
+        e_app_data.touch({
+            .name = "Add color constraint",
+            .redo = [i = i](auto &data) { 
+              data.gamut_verts[i].colr_j.push_back(data.gamut_verts[i].colr_i); 
+              data.gamut_verts[i].mapp_j.push_back(0); 
+            }, .undo = [edit = e_vert,  i = i](auto &data) { data.gamut_verts[i] = edit; }
+        });
     }
   }
 
@@ -207,9 +235,11 @@ namespace met {
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection")[0];
     auto &e_ocs_center  = info.get_resource<std::vector<Colr>>("gen_color_solids", "ocs_centers")[e_selection];
     auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data   = e_app_data.project_data;
-    auto &e_vert        = e_proj_data.gamut_colr_i;
-    auto &e_offs        = e_proj_data.gamut_offs_j;
+    auto &e_prj_data    = e_app_data.project_data;
+    auto &e_vert        = e_prj_data.gamut_verts[e_selection];
+
+    // Only continue if at least one secondary color mapping is present
+    guard(!e_vert.colr_j.empty());
 
     // Compute viewport size minus ImGui's tab bars etc
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -240,7 +270,8 @@ namespace met {
     }
 
     // Anchor position for ocs gizmo is colr + offset, minus center offset 
-    eig::Vector3f trf_trnsl = e_vert[e_selection] + e_offs[e_selection] - e_ocs_center;
+    // TODO fix this properly
+    eig::Vector3f trf_trnsl = e_vert.colr_j[0] - e_ocs_center;
     eig::Affine3f trf_basic = eig::Affine3f(eig::Translation3f(trf_trnsl));
     eig::Affine3f trf_delta = eig::Affine3f::Identity();
 
@@ -253,13 +284,13 @@ namespace met {
     
     // Register gizmo use start, cache current offset position
     if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-      m_offs_prev = e_offs;
+      m_colr_prev = e_vert.colr_j[0];
       m_is_gizmo_used = true;
     }
 
     // Register gizmo use
     if (ImGuizmo::IsUsing())
-    e_offs[e_selection] = (trf_delta * e_offs[e_selection].matrix()).array();
+    e_vert.colr_j[0] = (trf_delta * e_vert.colr_j[0].matrix()).array();
 
     // Register gizmo use end, update positions
     if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
@@ -268,8 +299,8 @@ namespace met {
       // Register data edit as drag finishes
       e_app_data.touch({ 
         .name = "Move gamut offsets", 
-        .redo = [edit = e_offs](auto &data) { data.gamut_offs_j = edit; }, 
-        .undo = [edit = m_offs_prev](auto &data) { data.gamut_offs_j = edit; }
+        .redo = [edit = e_vert.colr_j[0], i = e_selection, j = 0](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }, 
+        .undo = [edit = m_colr_prev,      i = e_selection, j = 0](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }
       });
     }
   }

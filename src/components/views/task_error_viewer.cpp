@@ -15,7 +15,7 @@ namespace met {
 
     // Get shared resources
     auto &e_tex_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
-    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_spectral_texture", "colr_buffer");
+    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
     auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
@@ -62,7 +62,7 @@ namespace met {
 
   void ErrorViewerTask::eval_error(detail::TaskEvalInfo &info) {
     // Get shared resources
-    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_spectral_texture", "colr_buffer");
+    auto &e_color_input  = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
     auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 

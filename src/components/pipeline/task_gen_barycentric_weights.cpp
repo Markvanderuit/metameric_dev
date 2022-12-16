@@ -42,26 +42,26 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_state_gamut = info.get_resource<std::vector<CacheFlag>>("project_state", "gamut_colr_i");
-    guard(std::ranges::any_of(e_state_gamut, [](auto s) { return s == CacheFlag::eStale; }));
+    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_prj_state = e_app_data.project_state;
+    guard(e_prj_state.any_verts == CacheFlag::eStale);
 
     // Get shared resources
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_colr_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
+    auto &e_vert_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
     auto &e_elem_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
-    auto &i_colr_bufer  = info.get_resource<gl::Buffer>("colr_buffer");
+    auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
     auto &i_bary_buffer = info.get_resource<gl::Buffer>("bary_buffer");
     
     // Update uniform data
     m_uniform_map->n       = e_app_data.loaded_texture.size().prod();
-    m_uniform_map->n_verts = e_app_data.project_data.gamut_colr_i.size();
+    m_uniform_map->n_verts = e_app_data.project_data.gamut_verts.size();
     m_uniform_map->n_elems = e_app_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
 
     // Bind resources to buffer targets
-    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_colr_bufer.bind_to(gl::BufferTargetType::eShaderStorage,  2);
+    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
     i_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
 

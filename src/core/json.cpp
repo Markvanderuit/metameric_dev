@@ -45,12 +45,6 @@ namespace met {
     v.mappings     = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapp>>>();
     v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
-
-    // TODO Deprecate
-    v.gamut_colr_i = js.at("gamut_colr_i").get<std::vector<Colr>>();
-    v.gamut_offs_j = js.at("gamut_offs_j").get<std::vector<Colr>>();
-    v.gamut_mapp_i = js.at("gamut_mapp_i").get<std::vector<uint>>();
-    v.gamut_mapp_j = js.at("gamut_mapp_j").get<std::vector<uint>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
@@ -59,12 +53,6 @@ namespace met {
     js["mappings"]     = v.mappings;
     js["cmfs"]         = v.cmfs;
     js["illuminants"]  = v.illuminants;
-
-    // TODO Deprecate
-    js["gamut_colr_i"] = v.gamut_colr_i;
-    js["gamut_offs_j"] = v.gamut_offs_j;
-    js["gamut_mapp_i"] = v.gamut_mapp_i;
-    js["gamut_mapp_j"] = v.gamut_mapp_j;
   }
 } // namespace met
 

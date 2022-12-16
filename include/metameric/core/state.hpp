@@ -53,12 +53,6 @@ namespace met {
     std::vector<std::pair<std::string, CMFS>> cmfs;
     std::vector<std::pair<std::string, Mapp>> mappings;
 
-    // TODO DEPRECATE
-    std::vector<Colr> gamut_colr_i; // Gamut vertex values under primary color system
-    std::vector<Colr> gamut_offs_j; // Gamut value offsets under secondary color system
-    std::vector<uint> gamut_mapp_i; // Gamut vertex index of selected primary color system 
-    std::vector<uint> gamut_mapp_j; // Gamut vertex index of selected secondary color system
-  
   public: /* public methods */
     // Default constr. provides sensible default values
     ProjectData();

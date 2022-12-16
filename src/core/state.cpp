@@ -26,22 +26,10 @@ namespace met {
                     Elem { 0, 3, 1 },
                     Elem { 2, 1, 3 },
                     Elem { 0, 2, 3 }};
-    gamut_verts = { Vert { .colr_i = { .75f, .40f, .25f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } },
-                    Vert { .colr_i = { .68f, .49f, .58f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } },
-                    Vert { .colr_i = { .50f, .58f, .39f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } },
-                    Vert { .colr_i = { .35f, .30f, .34f }, .mapp_i = 0, .colr_j = { }, .mapp_j = { } } };
-
-    // TODO Deprecate
-    gamut_colr_i = { Colr { .75f, .40f, .25f },
-                     Colr { .68f, .49f, .58f },
-                     Colr { .50f, .58f, .39f },
-                     Colr { .35f, .30f, .34f }};
-    gamut_offs_j = { Colr { 0.f, 0.f, 0.f },
-                     Colr { 0.f, 0.f, 0.f },
-                     Colr { 0.f, 0.f, 0.f },
-                     Colr { 0.f, 0.f, 0.f }};
-    gamut_mapp_i = { 0, 0, 0, 0 };
-    gamut_mapp_j = { 1, 1, 1, 1 };
+    gamut_verts = { Vert { .colr_i = { .75f, .40f, .25f }, .mapp_i = 0, .colr_j = { Colr { .75f, .40f, .25f } }, .mapp_j = { 1 } },
+                    Vert { .colr_i = { .68f, .49f, .58f }, .mapp_i = 0, .colr_j = { Colr { .68f, .49f, .58f } }, .mapp_j = { 1 } },
+                    Vert { .colr_i = { .50f, .58f, .39f }, .mapp_i = 0, .colr_j = { Colr { .50f, .58f, .39f } }, .mapp_j = { 1 } },
+                    Vert { .colr_i = { .35f, .30f, .34f }, .mapp_i = 0, .colr_j = { Colr { .35f, .30f, .34f } }, .mapp_j = { 1 } } };
 
     // Instantiate loaded components with sensible default values
     mappings = {{ "D65", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}, 
@@ -161,14 +149,8 @@ namespace met {
     project_data.gamut_elems  = elems;
     project_data.gamut_verts.resize(verts.size());
     std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
-      return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { }, .mapp_j = { } };
+      return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { c }, .mapp_j = { 1 } };
     });
-    
-    // TODO Deprecate
-    project_data.gamut_colr_i = verts;
-    project_data.gamut_offs_j = std::vector<Colr>(verts.size(), Colr(0.f));
-    project_data.gamut_mapp_i = std::vector<uint>(verts.size(), 0);
-    project_data.gamut_mapp_j = std::vector<uint>(verts.size(), 1);
   }
 
   Spec ApplicationData::load_illuminant(const std::string &key) const {

@@ -123,7 +123,7 @@ namespace met {
       auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
 
       // Used sizes
-      const uint func_count = static_cast<uint>(e_prj_data.gamut_colr_i.size());
+      const uint func_count = static_cast<uint>(e_prj_data.gamut_verts.size());
       const auto weights_res    = e_app_data.loaded_texture.size();
 
       // Insert barriers for the following operations

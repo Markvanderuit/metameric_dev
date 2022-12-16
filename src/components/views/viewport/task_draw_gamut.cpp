@@ -34,7 +34,7 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    auto &e_verts = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
+    auto &e_verts = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
     auto &e_elems = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
 
     // Setup sizes/opacities buffers and instantiate relevant mappings
@@ -105,8 +105,8 @@ namespace met {
                                 
     // Get shared resources 
     auto &e_arcball     = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_verts  = info.get_resource<gl::Buffer>("gen_spectral_gamut", "colr_buffer");
-    auto &e_elems  = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
+    auto &e_verts       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
+    auto &e_elems       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
     auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
     auto &e_elem_select = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
