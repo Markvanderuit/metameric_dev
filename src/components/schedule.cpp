@@ -11,7 +11,7 @@
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
-#include <metameric/components/misc/task_project_state.hpp>
+#include <metameric/components/misc/task_state.hpp>
 
 // Pipeline tasks
 #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
@@ -213,7 +213,7 @@ namespace met {
   template <typename Scheduler>
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
-    scheduler.emplace_task<PipelineStateTask>("project_state");
+    scheduler.emplace_task<StateTask>("state");
 
     // The following tasks define the color->spectrum uplifting pipeline
     scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");     // X

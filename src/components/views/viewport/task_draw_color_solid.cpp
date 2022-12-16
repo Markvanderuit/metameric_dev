@@ -1,7 +1,8 @@
+#include <metameric/core/data.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -73,8 +74,8 @@ namespace met {
     guard(e_gamut_idx >= 0);
 
     // Get shared resources
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_state   = e_app_data.project_state;
+    auto &e_appl_state  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
     auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_color_solid_target");
     auto &e_arcball     = info.get_resource<detail::Arcball>(m_parent, "arcball");
@@ -100,7 +101,7 @@ namespace met {
 
     // (Re-)create convex hull mesh data. If the selected gamut vertex has in any way changed, a new
     // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    if (m_gamut_idx != e_gamut_idx || e_prj_state.verts[e_gamut_idx].any) {
+    if (m_gamut_idx != e_gamut_idx || e_pipe_state.verts[e_gamut_idx].any) {
       m_gamut_idx = e_gamut_idx;
 
       // Get shared resources and obtain mesh data

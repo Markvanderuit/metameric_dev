@@ -71,15 +71,15 @@ namespace met {
     }
   }
   
-  PipelineStateTask::PipelineStateTask(const std::string &name)
+  StateTask::StateTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
-  void PipelineStateTask::init(detail::TaskInitInfo &info) {
+  void StateTask::init(detail::TaskInitInfo &info) {
     met_trace();
     info.insert_resource<ProjectState>("pipeline_state", { });
   }
 
-  void PipelineStateTask::eval(detail::TaskEvalInfo &info) {
+  void StateTask::eval(detail::TaskEvalInfo &info) {
     met_trace();
 
     constexpr auto reduce_stale = [](auto a, auto b) { return a | b; };

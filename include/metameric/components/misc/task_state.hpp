@@ -4,7 +4,7 @@
 #include <metameric/core/data.hpp>
 
 namespace met {
-  class PipelineStateTask : public detail::AbstractTask {
+  class StateTask : public detail::AbstractTask {
     // Copies of data available in ProjectData and ApplicationData
     // to check for and report state changes
     std::vector<ProjectData::Elem> m_elems;
@@ -12,7 +12,7 @@ namespace met {
     std::vector<Mapp>              m_mapps;
 
   public:
-    PipelineStateTask(const std::string &name);
+    StateTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };

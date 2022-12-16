@@ -1,7 +1,8 @@
-#include <metameric/components/views/viewport/task_draw_weights.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
+#include <metameric/core/detail/trace.hpp>
+#include <metameric/components/views/viewport/task_draw_weights.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
 
@@ -67,15 +68,15 @@ namespace met {
     met_trace_full();
     
     // Continue only on relevant state change
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_state   = e_app_data.project_state;
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_mapping_i   = info.get_resource<uint>(m_parent, "weight_mapping");
     auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_weights_target");
     guard(e_mapping_i != m_mapping_i_cache
       || e_srgb_target.object() != m_srgb_target_cache
       ||!std::ranges::equal(e_selection, m_selection_cache)
-      || e_prj_state.any_verts);
+      || e_pipe_state.any_verts);
 
     // Update local cache variables
     m_srgb_target_cache = e_srgb_target.object();
@@ -90,8 +91,8 @@ namespace met {
     auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", e_mapping_i), "colr_buffer");
 
     // Update uniform data for upcoming sum computation
-    m_unif_map->n       = e_app_data.loaded_texture.size().prod();
-    m_unif_map->n_verts = e_app_data.project_data.gamut_verts.size();
+    m_unif_map->n       = e_appl_data.loaded_texture.size().prod();
+    m_unif_map->n_verts = e_appl_data.project_data.gamut_verts.size();
     std::ranges::fill(m_unif_map->selection, eig::Array4u(0));
     std::ranges::for_each(e_selection, [&](uint i) { m_unif_map->selection[i] = 1; });
     m_unif_buffer.flush();

@@ -17,7 +17,7 @@ namespace met {
     | ImGuiWindowFlags_NoResize  | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoFocusOnAppearing;
 
-  constexpr float    overlay_width   = 400.f;
+  constexpr float    overlay_width   = 256.f;
   constexpr float    overlay_spacing = 16.f;
   const eig::Array2f overlay_padding = 16.f;
 
@@ -62,8 +62,10 @@ namespace met {
                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Track these positions/sizes so overtays are evenly spaced
-    eig::Array2f view_posi = viewport_offs + overlay_padding, view_size = { overlay_width, 0.f };
-
+    eig::Array2f view_posi = viewport_offs + overlay_padding, 
+                 view_size = { 0.f, 0.f };
+                //  view_size = { overlay_width * ImGui::GetIO().DisplayFramebufferScale.x, 0.f };
+    
     // Spawn window with selection info if one or more vertices are selected
     for (const uint &i : e_gamut_index) {
       view_size.y() = 0.f;
@@ -140,10 +142,11 @@ namespace met {
     if (ImGui::CollapsingHeader("Primary Color")) {
       Colr colr_i  = e_vert.colr_i;
       Colr rtrip_i = e_app_data.loaded_mappings[e_vert.mapp_i].apply_color(e_spec);
-      Colr error_i = (rtrip_i - colr_i).abs();
-      ImGui::ColorEdit3("Value", linear_srgb_to_gamma_srgb(colr_i).data(), ImGuiColorEditFlags_Float);
+      Colr error_i = (rtrip_i - colr_i).abs().eval();
+      
+      ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float);
       ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_i).data(), ImGuiColorEditFlags_Float);
-      ImGui::ColorEdit3("Error", linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float);
 
       // Selector for primary color mapping index, operating on a local copy
       uint l_mapp_i = e_vert.mapp_i;
@@ -172,11 +175,11 @@ namespace met {
       if (ImGui::CollapsingHeader(fmt::format("Secondary color {}", j).c_str(), &color_visible)) {
         Colr colr_j  = e_vert.colr_j[j];
         Colr rtrip_j = e_app_data.loaded_mappings[e_vert.mapp_j[j]].apply_color(e_spec);
-        Colr error_j = (rtrip_j - colr_j).abs();
+        Colr error_j = (rtrip_j - colr_j).abs().eval();
 
-        ImGui::ColorEdit3("Value", linear_srgb_to_gamma_srgb(colr_j).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_j).data(),  ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_j).data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("Error", linear_srgb_to_gamma_srgb(error_j).data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_j).data(), ImGuiColorEditFlags_Float);
 
         // Selector for secondary color mapping index, operating on a local copy
         uint l_mapp_j = e_vert.mapp_j[j];

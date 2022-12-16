@@ -4,6 +4,7 @@
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <small_gl/buffer.hpp>
 #include <ranges>
 
@@ -24,15 +25,15 @@ namespace met {
   
   void GenSpectralMappingsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
+    
+    // Continue only on relevant state change
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    guard(e_pipe_state.any_mapps);
 
     // Get shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings = e_app_data.loaded_mappings;
-    auto &e_state    = e_app_data.project_state;
-    auto &i_buffer   = info.get_resource<gl::Buffer>("mapp_buffer");
-
-    // Continue only on relevant state change
-    guard(e_state.any_mapps);
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings  = e_appl_data.loaded_mappings;
+    auto &i_buffer    = info.get_resource<gl::Buffer>("mapp_buffer");
     
     if (e_mappings.size() > m_max_maps) {
       // If the maximum allowed nr. of mappings is exceeded, re-allocate with room to spare
@@ -45,7 +46,7 @@ namespace met {
     } else {
       // Update specific, stale mapping data
       for (uint i = 0; i < e_mappings.size(); ++i) {
-        guard_continue(e_state.mapps[i]);
+        guard_continue(e_pipe_state.mapps[i]);
         i_buffer  .set(obj_span<const std::byte>(e_mappings[i]), sizeof(Mapp), i * sizeof(Mapp));
       }
     }

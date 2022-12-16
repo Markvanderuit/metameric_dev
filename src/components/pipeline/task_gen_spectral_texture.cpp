@@ -2,6 +2,7 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
@@ -48,19 +49,19 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_state = e_app_data.project_state;
-    guard(e_prj_state.any);
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    guard(e_pipe_state.any);
 
     // Get shared resources
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
     
     // Update uniform data
-    m_uniform_map->n       = e_app_data.loaded_texture.size().prod();
-    m_uniform_map->n_verts = e_app_data.project_data.gamut_verts.size();
-    m_uniform_map->n_elems = e_app_data.project_data.gamut_elems.size();
+    m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+    m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
+    m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
 
     // Bind resources to buffer targets
