@@ -1,12 +1,12 @@
-#include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/knn.hpp>
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
 #include <small_gl/buffer.hpp>
 #include <algorithm>
 #include <execution>
@@ -53,14 +53,14 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_state = e_app_data.project_state;
-    guard(e_prj_state.any_verts);
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    guard(e_pipe_state.any_verts);
     
     // Get shared resources
-    auto &e_prj_data    = e_app_data.project_data;
-    auto &e_elems       = e_prj_data.gamut_elems;
-    auto &e_verts       = e_prj_data.gamut_verts;
+    auto &e_proj_data   = e_appl_data.project_data;
+    auto &e_elems       = e_proj_data.gamut_elems;
+    auto &e_verts       = e_proj_data.gamut_verts;
     auto &e_basis       = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &i_specs       = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
@@ -92,17 +92,17 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < i_specs.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
-      guard_continue(e_prj_state.verts[i].any);
+      guard_continue(e_pipe_state.verts[i].any);
 
       // Relevant vertex data
-      auto &vert = e_prj_data.gamut_verts[i];   
+      auto &vert = e_proj_data.gamut_verts[i];   
       Spec &spec = i_specs[i];
 
       // Obtain color system spectra for this vertex
       std::vector<CMFS> systems(1 + vert.colr_j.size());
-      systems[0] = e_app_data.loaded_mappings[vert.mapp_i].finalize(spec);
+      systems[0] = e_appl_data.loaded_mappings[vert.mapp_i].finalize(spec);
       std::ranges::transform(vert.mapp_j, systems.begin() + 1, 
-        [&](uint j) { return e_app_data.loaded_mappings[j].finalize(spec); });
+        [&](uint j) { return e_appl_data.loaded_mappings[j].finalize(spec); });
 
       // Obtain corresponding color signal for each color system
       std::vector<Colr> signals(1 + vert.colr_j.size());
@@ -114,14 +114,14 @@ namespace met {
     }
 
     // Describe ranges over stale gamut vertices/elements
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_prj_state.verts.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_prj_state.verts[i].any; });
-    auto elem_range = std::views::iota(0u, static_cast<uint>(e_prj_state.elems.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_prj_state.elems[i]; });
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
+                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i].any; });
+    auto elem_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.elems.size()))
+                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.elems[i]; });
 
     // Push stale gamut vertex data to gpu
     for (uint i : vert_range) {
-      m_vert_map[i] = e_prj_data.gamut_verts[i].colr_i;
+      m_vert_map[i] = e_proj_data.gamut_verts[i].colr_i;
       m_spec_map[i] = i_specs[i];
       i_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
       i_spec_buffer.flush(sizeof(Spec), i * sizeof(Spec));
@@ -129,8 +129,8 @@ namespace met {
     
     // Push stale gamut element data to gpu
     for (uint i : elem_range) {
-      m_elem_map[i]      = e_prj_data.gamut_elems[i];
-      m_elem_unal_map[i] = e_prj_data.gamut_elems[i];
+      m_elem_map[i]      = e_proj_data.gamut_elems[i];
+      m_elem_unal_map[i] = e_proj_data.gamut_elems[i];
       i_elem_buffer.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
       i_elem_buffer_.flush(sizeof(eig::Array3u), i * sizeof(eig::Array3u));
     }

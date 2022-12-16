@@ -1,10 +1,9 @@
 #pragma once
 
-#include <metameric/core/utility.hpp>
 #include <vector>
 
 namespace met {
-  /* Wrapper object for tracking changes to project data in program pipeline */
+  /* Wrapper object for tracking changes to project data throughout program pipeline */
   struct ProjectState {
     using CacheStale = bool;
 
@@ -30,4 +29,4 @@ namespace met {
     std::vector<CacheStale> elems;
     std::vector<CacheStale> mapps;
   };
-} // namespace 
+} // namespace met

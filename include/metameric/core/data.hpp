@@ -1,7 +1,6 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>
 #include <functional>
@@ -58,7 +57,6 @@ namespace met {
     // Saved project data
     fs::path     project_path;
     ProjectData  project_data;
-    ProjectState project_state;
     SaveFlag     project_save = SaveFlag::eUnloaded; 
 
     // Unsaved application data

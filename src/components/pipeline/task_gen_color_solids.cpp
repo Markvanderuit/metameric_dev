@@ -1,11 +1,12 @@
-#include <metameric/components/pipeline/task_gen_color_solids.hpp>
-#include <metameric/core/detail/trace.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
+#include <metameric/core/detail/trace.hpp>
+#include <metameric/components/pipeline/task_gen_color_solids.hpp>
 #include <omp.h>
 #include <algorithm>
 #include <execution>
@@ -80,8 +81,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_app_data.project_data;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
     
     // Generate reused 6d samples and a uv sphere mesh for faster OCS generation
     m_sphere_samples = detail::generate_unit_dirs<6>(n_samples);
@@ -97,12 +98,12 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_state = e_app_data.project_state;
-    guard(e_prj_state.any_verts);
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    guard(e_pipe_state.any_verts);
 
     // Get shared resources
-    auto &e_prj_data  = e_app_data.project_data;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_prj_data  = e_appl_data.project_data;
     auto &e_verts     = e_prj_data.gamut_verts;
     auto &e_specs     = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
     auto &e_basis     = info.get_resource<BMatrixType>(global_key, "pca_basis");
@@ -119,8 +120,8 @@ namespace met {
 
     // Describe ranges over stale gamut vertices with secondary mappings
     // TODO: Remedy this shit!
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_prj_state.verts.size()))
-                    | std::views::filter([&](uint i) { return e_prj_state.verts[i].any; })
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
+                    | std::views::filter([&](uint i) { return e_pipe_state.verts[i].any; })
                     | std::views::filter([&](uint i) { return !e_verts[i].mapp_j.empty(); });
 
     // For each vertex of the gamut shape that has secondary mappings
@@ -128,8 +129,8 @@ namespace met {
       auto &vert = e_verts[i];
 
       // Generate color system spectra
-      CMFS cmfs_i = e_app_data.loaded_mappings[vert.mapp_i].finalize(e_specs[i]);
-      CMFS cmfs_j = e_app_data.loaded_mappings[vert.mapp_j[0]].finalize(e_specs[i]);
+      CMFS cmfs_i = e_appl_data.loaded_mappings[vert.mapp_i].finalize(e_specs[i]);
+      CMFS cmfs_j = e_appl_data.loaded_mappings[vert.mapp_j[0]].finalize(e_specs[i]);
 
       // Generate points on metamer set boundary
       auto basis  = e_basis.rightCols(wavelength_bases);

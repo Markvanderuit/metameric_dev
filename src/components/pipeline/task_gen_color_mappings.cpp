@@ -1,4 +1,5 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <small_gl/utility.hpp>
@@ -13,12 +14,12 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_parser   = info.get_resource<glp::Parser>(global_key, "glsl_parser");
     
     // Determine dispatch group size
     const uint mapping_cl      = ceil_div(wavelength_samples, 4u);
-    const uint mapping_n       = e_app_data.loaded_texture.size().prod();
+    const uint mapping_n       = e_appl_data.loaded_texture.size().prod();
     const uint mapping_ndiv_sg = ceil_div(mapping_n, 256u / mapping_cl);
 
     // Set up uniform buffer
@@ -44,9 +45,9 @@ namespace met {
     met_trace_full();
 
     // Generate color texture only on relevant state changes
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_state = e_app_data.project_state;
-    guard(m_init_stale || e_prj_state.mapps[m_mapping_i] || e_prj_state.any_verts);
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    guard(m_init_stale || e_pipe_state.mapps[m_mapping_i] || e_pipe_state.any_verts);
     m_init_stale = false;
 
     // Get shared resources
@@ -72,9 +73,9 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    uint e_mappings_n   = e_app_data.loaded_mappings.size();
-    auto e_texture_size = e_app_data.loaded_texture.size();
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    uint e_mappings_n   = e_appl_data.loaded_mappings.size();
+    auto e_texture_size = e_appl_data.loaded_texture.size();
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
     m_texture_subtasks.init(name(), info, e_mappings_n,
@@ -103,8 +104,8 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    uint e_mappings_n = e_app_data.loaded_mappings.size();
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    uint e_mappings_n = e_appl_data.loaded_mappings.size();
 
     // Adjust nr. of subtasks
     m_texture_subtasks.eval(info, e_mappings_n);

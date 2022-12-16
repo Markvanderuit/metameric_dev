@@ -213,7 +213,7 @@ namespace met {
   template <typename Scheduler>
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
-    scheduler.emplace_task<ProjectStateTask>("project_state");
+    scheduler.emplace_task<PipelineStateTask>("project_state");
 
     // The following tasks define the color->spectrum uplifting pipeline
     scheduler.emplace_task<GenSpectralMappingsTask>("gen_spectral_mappings");     // X
