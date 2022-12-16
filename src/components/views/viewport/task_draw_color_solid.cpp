@@ -1,7 +1,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -100,7 +100,7 @@ namespace met {
 
     // (Re-)create convex hull mesh data. If the selected gamut vertex has in any way changed, a new
     // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    if (m_gamut_idx != e_gamut_idx || e_prj_state.verts[e_gamut_idx].any == CacheFlag::eStale) {
+    if (m_gamut_idx != e_gamut_idx || e_prj_state.verts[e_gamut_idx].any) {
       m_gamut_idx = e_gamut_idx;
 
       // Get shared resources and obtain mesh data

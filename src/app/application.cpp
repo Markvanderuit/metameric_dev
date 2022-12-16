@@ -4,7 +4,7 @@
 #include <metameric/core/pca.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>

@@ -1,4 +1,4 @@
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <small_gl/utility.hpp>
@@ -46,7 +46,7 @@ namespace met {
     // Generate color texture only on relevant state changes
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_state = e_app_data.project_state;
-    guard(m_init_stale || e_prj_state.mapps[m_mapping_i] == CacheFlag::eStale || e_prj_state.any_verts == CacheFlag::eStale);
+    guard(m_init_stale || e_prj_state.mapps[m_mapping_i] || e_prj_state.any_verts);
     m_init_stale = false;
 
     // Get shared resources

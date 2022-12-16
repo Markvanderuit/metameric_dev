@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <string>
 
 namespace met {

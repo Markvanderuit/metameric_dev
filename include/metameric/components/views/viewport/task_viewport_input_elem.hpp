@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/ray.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>

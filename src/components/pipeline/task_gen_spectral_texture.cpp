@@ -1,7 +1,7 @@
 #include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
@@ -50,7 +50,7 @@ namespace met {
     // Continue only on relevant state change
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_state = e_app_data.project_state;
-    guard(e_prj_state.any == CacheFlag::eStale);
+    guard(e_prj_state.any);
 
     // Get shared resources
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");

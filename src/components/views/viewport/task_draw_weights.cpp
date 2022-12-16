@@ -1,6 +1,6 @@
 #include <metameric/components/views/viewport/task_draw_weights.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <ranges>
@@ -75,7 +75,7 @@ namespace met {
     guard(e_mapping_i != m_mapping_i_cache
       || e_srgb_target.object() != m_srgb_target_cache
       ||!std::ranges::equal(e_selection, m_selection_cache)
-      || e_prj_state.any_verts == CacheFlag::eStale);
+      || e_prj_state.any_verts);
 
     // Update local cache variables
     m_srgb_target_cache = e_srgb_target.object();

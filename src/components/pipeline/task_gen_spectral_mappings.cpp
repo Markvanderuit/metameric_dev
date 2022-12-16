@@ -3,7 +3,7 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <small_gl/buffer.hpp>
 #include <ranges>
 
@@ -32,7 +32,7 @@ namespace met {
     auto &i_buffer   = info.get_resource<gl::Buffer>("mapp_buffer");
 
     // Continue only on relevant state change
-    guard(e_state.any_mapps == CacheFlag::eStale);
+    guard(e_state.any_mapps);
     
     if (e_mappings.size() > m_max_maps) {
       // If the maximum allowed nr. of mappings is exceeded, re-allocate with room to spare
@@ -45,7 +45,7 @@ namespace met {
     } else {
       // Update specific, stale mapping data
       for (uint i = 0; i < e_mappings.size(); ++i) {
-        guard_continue(e_state.mapps[i] == CacheFlag::eStale);
+        guard_continue(e_state.mapps[i]);
         i_buffer  .set(obj_span<const std::byte>(e_mappings[i]), sizeof(Mapp), i * sizeof(Mapp));
       }
     }

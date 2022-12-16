@@ -30,18 +30,6 @@ namespace met {
   using AlSpec = eig::AlArray<float, wavelength_samples>;
   using AlColr = eig::AlArray<float, 3>;
 
-  namespace io {
-    // Load a discrete spectral distribution from sequentially increasing wvl/value data
-    Spec spectrum_from_data(std::span<const float> wvls, 
-                            std::span<const float> values);
-
-    // Load a discrete trio of color matching functions from sequentially increasing wvl/value data
-    CMFS cmfs_from_data(std::span<const float> wvls, 
-                        std::span<const float> values_x,
-                        std::span<const float> values_y,
-                        std::span<const float> values_z);
-  }
-
   /* Define color matching functions, SPD models, etc. */
   namespace models {
     // Linear color space transformations
@@ -60,6 +48,18 @@ namespace met {
     extern Spec emitter_cie_ledb1;    // CIE standard illuminant LED-B1; blue LED
     extern Spec emitter_cie_ledrgb1;  // CIE standard illuminant LED-RGB1; R/G/B LEDs
   } // namespace models
+  
+  namespace io {
+    // Load a discrete spectral distribution from sequentially increasing wvl/value data
+    Spec spectrum_from_data(std::span<const float> wvls, 
+                            std::span<const float> values);
+
+    // Load a discrete trio of color matching functions from sequentially increasing wvl/value data
+    CMFS cmfs_from_data(std::span<const float> wvls, 
+                        std::span<const float> values_x,
+                        std::span<const float> values_y,
+                        std::span<const float> values_z);
+  } // namespace io
 
   // Given a spectral bin, obtain the relevant central wavelength
   constexpr inline

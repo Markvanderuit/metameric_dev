@@ -5,7 +5,7 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <omp.h>
 #include <algorithm>
 #include <execution>
@@ -99,7 +99,7 @@ namespace met {
     // Continue only on relevant state change
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_state = e_app_data.project_state;
-    guard(e_prj_state.any_verts == CacheFlag::eStale);
+    guard(e_prj_state.any_verts);
 
     // Get shared resources
     auto &e_prj_data  = e_app_data.project_data;
@@ -120,7 +120,7 @@ namespace met {
     // Describe ranges over stale gamut vertices with secondary mappings
     // TODO: Remedy this shit!
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_prj_state.verts.size()))
-                    | std::views::filter([&](uint i) { return e_prj_state.verts[i].any == CacheFlag::eStale; })
+                    | std::views::filter([&](uint i) { return e_prj_state.verts[i].any; })
                     | std::views::filter([&](uint i) { return !e_verts[i].mapp_j.empty(); });
 
     // For each vertex of the gamut shape that has secondary mappings

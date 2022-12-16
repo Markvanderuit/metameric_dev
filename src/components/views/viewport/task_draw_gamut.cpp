@@ -1,6 +1,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/viewport/task_draw_gamut.hpp>

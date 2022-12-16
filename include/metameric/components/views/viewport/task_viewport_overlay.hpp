@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
 
 namespace met {

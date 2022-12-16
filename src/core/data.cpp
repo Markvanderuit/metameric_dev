@@ -1,4 +1,4 @@
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/mesh.hpp>
@@ -61,17 +61,17 @@ namespace met {
     load_chull_gamut();
   }
   
-  void ApplicationData::save(const fs::path &save_path) {
+  void ApplicationData::save(const fs::path &path) {
     project_save = SaveFlag::eSaved;
-    project_path  = io::path_with_ext(save_path, ".json");
-    io::save_project(project_path, project_data);
+    project_path  = io::path_with_ext(path, ".json");
+    io::save_json(project_path, project_data);
     io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture, true);
   }
 
-  void ApplicationData::load(const fs::path &load_path) {
+  void ApplicationData::load(const fs::path &path) {
     project_save  = SaveFlag::eSaved;
-    project_path   = io::path_with_ext(load_path, ".json");
-    project_data   = io::load_project(project_path);
+    project_path   = io::path_with_ext(path, ".json");
+    project_data   = io::load_json(path).get<ProjectData>();
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
 
     // Reset undo/redo history
@@ -133,10 +133,39 @@ namespace met {
     mod_i = -1;
   }
 
+  namespace detail {
+    Spec load_illuminant(const ProjectData &data, std::string_view key) {
+      const auto it = std::ranges::find_if(data.illuminants, 
+        [&key](auto &p) { return key == p.first; });
+      debug::check_expr_rel(it != data.illuminants.end(), 
+        fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
+      return it->second; 
+    }
+
+    CMFS load_cmfs(const ProjectData &data, std::string_view key) {
+      const auto it = std::ranges::find_if(data.cmfs, 
+        [&key](auto &p) { return key == p.first; });
+      debug::check_expr_rel(it != data.cmfs.end(), 
+        fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
+      return it->second; 
+    }
+
+    Mapp load_mapping(const ProjectData &data, std::string_view key) {
+      const auto it = std::ranges::find_if(data.mappings, 
+        [&key](auto &p) { return key == p.first; });
+      debug::check_expr_rel(it != data.mappings.end(), 
+        fmt::format("Could not load spectral mapping from project data; name was \"{}\"", key));
+      const auto &mapping = it->second;
+      return { .cmfs      = load_cmfs(data, mapping.cmfs),
+              .illuminant = load_illuminant(data, mapping.illuminant),
+              .n_scatters = mapping.n_scatters };
+    }
+  } // namespace detail
+
   void ApplicationData::load_mappings() {
     loaded_mappings = { };
     std::ranges::transform(project_data.mappings, std::back_inserter(loaded_mappings), 
-      [&](auto &p) { return load_mapping(p.first); });
+      [&](auto &p) { return detail::load_mapping(project_data, p.first); });
   }
   
   void ApplicationData::load_chull_gamut() {
@@ -151,32 +180,5 @@ namespace met {
     std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
       return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { c }, .mapp_j = { 1 } };
     });
-  }
-
-  Spec ApplicationData::load_illuminant(const std::string &key) const {
-    const auto it = std::ranges::find_if(project_data.illuminants, 
-      [&key](auto &p) { return key == p.first; });
-    debug::check_expr_rel(it != project_data.illuminants.end(), 
-      fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
-    return it->second; 
-  }
-
-  CMFS ApplicationData::load_cmfs(const std::string &key) const {
-    const auto it = std::ranges::find_if(project_data.cmfs, 
-      [&key](auto &p) { return key == p.first; });
-    debug::check_expr_rel(it != project_data.cmfs.end(), 
-      fmt::format("Could not load color matching functions from project data; name was \"{}\"", key));
-    return it->second; 
-  }
-
-  Mapp ApplicationData::load_mapping(const std::string &key) const {
-    const auto it = std::ranges::find_if(project_data.mappings, 
-      [&key](auto &p) { return key == p.first; });
-    debug::check_expr_rel(it != project_data.mappings.end(), 
-      fmt::format("Could not load spectral mapping from project data; name was \"{}\"", key));
-    const auto &mapping = it->second;
-    return { .cmfs       = load_cmfs(mapping.cmfs),
-             .illuminant = load_illuminant(mapping.illuminant),
-             .n_scatters = mapping.n_scatters };
   }
 } // namespace met

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <array>
 #include <vector>
 
@@ -15,6 +15,7 @@ namespace met {
 
   public:
     ProjectStateTask(const std::string &name);
+    void init(detail::TaskInitInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 } // namespace met

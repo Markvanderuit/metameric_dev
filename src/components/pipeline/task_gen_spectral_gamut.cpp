@@ -5,7 +5,7 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/state.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <small_gl/buffer.hpp>
 #include <algorithm>
@@ -55,7 +55,7 @@ namespace met {
     // Continue only on relevant state change
     auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_prj_state = e_app_data.project_state;
-    guard(e_prj_state.any_verts == CacheFlag::eStale);
+    guard(e_prj_state.any_verts);
     
     // Get shared resources
     auto &e_prj_data    = e_app_data.project_data;
@@ -92,7 +92,7 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < i_specs.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
-      guard_continue(e_prj_state.verts[i].any == CacheFlag::eStale);
+      guard_continue(e_prj_state.verts[i].any);
 
       // Relevant vertex data
       auto &vert = e_prj_data.gamut_verts[i];   
@@ -115,9 +115,9 @@ namespace met {
 
     // Describe ranges over stale gamut vertices/elements
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_prj_state.verts.size()))
-                    | std::views::filter([&](uint i) { return e_prj_state.verts[i].any == CacheFlag::eStale; });
+                    | std::views::filter([&](uint i) -> bool { return e_prj_state.verts[i].any; });
     auto elem_range = std::views::iota(0u, static_cast<uint>(e_prj_state.elems.size()))
-                    | std::views::filter([&](uint i) { return e_prj_state.elems[i] == CacheFlag::eStale; });
+                    | std::views::filter([&](uint i) -> bool { return e_prj_state.elems[i]; });
 
     // Push stale gamut vertex data to gpu
     for (uint i : vert_range) {
