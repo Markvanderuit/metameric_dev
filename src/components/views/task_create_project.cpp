@@ -13,15 +13,43 @@ namespace met {
   void CreateProjectTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr)) {
       // Define text input to obtain path and
       // simple '...' button for file selection to obtain path
       ImGui::Text("Path to input texture...");
       ImGui::InputText("##NewProjectPathInputs", &m_input_path);
       ImGui::SameLine();
+
+      // Load button
       if (fs::path path; ImGui::Button("...") && detail::load_dialog(path)) {
         m_input_path = path.string();
+
+        // Load image without gamma correction applied. Copy this image to gpu for direct display,
+        auto host_image   = io::load_texture2d<Colr>(path);
+        auto device_image = gl::Texture2d3f {{ .size = host_image.size(),
+                                               .data = cast_span<const float>(host_image.data()) }};
+
+        // Then apply gamma correction after for rest of program pipeline
+        io::to_lrgb(host_image);
+
+        // Push on list of input data
+        m_image_data.push_back({
+          .path        = path, 
+          .host_data   = std::move(host_image), 
+          .device_data = std::move(device_image)
+        });
       }
+
+      ImGui::SpacedSeparator();
+
+      if (ImGui::BeginChild("Added images", { 0, ImGui::GetContentRegionAvail().y - 52.f })) {
+        for (const auto &data : m_image_data) {
+          auto fnane = data.path.filename().string();
+          ImGui::Text(fnane.c_str());
+          ImGui::Image(ImGui::to_ptr(data.device_data.object()), { 240, 240 });
+        }
+      }
+      ImGui::EndChild();
 
       ImGui::SpacedSeparator();
 

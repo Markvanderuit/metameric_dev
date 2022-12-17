@@ -1,12 +1,75 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/misc/task_state.hpp>
+#include <functional>
 #include <numeric>
+#include <tuple>
+#include <type_traits>
 
 namespace met {
   namespace detail {
-    using Vert      = ProjectData::Vert;
     using CacheVert = ProjectState::CacheVert;
+    using CompareTuple = std::tuple<std::vector<bool>, bool>;
+
+    template <typename T>
+    bool compare_func(const T &in, T &out) {
+      guard(out != in, false);
+      out = in;
+      return true;
+    }
+
+    template <typename T, typename T_>
+    bool compare_func(const std::pair<T, T_> &in, std::pair<T, T_> &out) {
+      return compare_func(in.first, out.first) || compare_func(in.second, out.second);
+    }
+
+    template <>
+    bool compare_func<ProjectData::Mapp>(const ProjectData::Mapp &in, ProjectData::Mapp &out) {
+      guard(in.cmfs != out.cmfs || in.illuminant != out.illuminant, false);
+      out = in;
+      return true;
+    }
+
+    template <>
+    bool compare_func<CMFS>(const CMFS &in, CMFS &out) {
+      guard(!out.isApprox(in), false);
+      out = in;
+      return true;
+    }
+
+    template <>
+    bool compare_func<Spec>(const Spec &in, Spec &out) {
+      guard(!out.isApprox(in), false);
+      out = in;
+      return true;
+    }
+
+    template <>
+    bool compare_func<eig::Array3f>(const eig::Array3f &in, eig::Array3f &out) {
+      guard(!out.isApprox(in), false);
+      out = in;
+      return true;
+    }
+
+    template <>
+    bool compare_func<eig::Array3u>(const eig::Array3u &in, eig::Array3u &out) {
+      guard(!out.isApprox(in), false);
+      out = in;
+      return true;
+    }
+
+    template <typename T>
+    CompareTuple compare_state(const std::vector<T> &in,
+                                          std::vector<T> &out) {
+      std::vector<bool> state(in.size(), true);
+      if (in.size() != out.size()) {
+        out = in;
+        return { state, true };
+      }
+      for (uint i = 0; i < in.size(); ++i)
+        state[i] = compare_func(in[i], out[i]);
+      return { state,  std::reduce(range_iter(state), false, std::logical_or<bool>()) };
+    }
     
     constexpr 
     bool compare_and_set(const auto &in, auto &out) {
@@ -58,19 +121,17 @@ namespace met {
       return state;
     }
 
-    constexpr
-    CacheVert compare_and_set_vert(const Vert &in, Vert &out) {
+    CacheVert compare_and_set_vert(const ProjectData::Vert &in, ProjectData::Vert &out) {
       CacheVert state;
-      state.colr_i = compare_and_set_eig(in.colr_i, out.colr_i);
-      state.mapp_i = compare_and_set(in.mapp_i, out.mapp_i);
-      state.colr_j = compare_and_set_all_eig(in.colr_j, out.colr_j);
-      state.mapp_j = compare_and_set_all(in.mapp_j, out.mapp_j);
+      state.colr_i = compare_func(in.colr_i, out.colr_i);
+      state.mapp_i = compare_func(in.mapp_i, out.mapp_i);
+      state.colr_j = std::get<0>(compare_state(in.colr_j, out.colr_j));
+      state.mapp_j = std::get<0>(compare_state(in.mapp_j, out.mapp_j));
       return state;
     }
 
-    constexpr
-    std::vector<CacheVert> compare_and_set_all_vert(const std::vector<Vert> &in,
-                                                          std::vector<Vert> &out) {
+    std::vector<CacheVert> compare_and_set_all_vert(const std::vector<ProjectData::Vert> &in,
+                                                          std::vector<ProjectData::Vert> &out) {
       std::vector<CacheVert> state(in.size());
       if (in.size() != out.size())
         out.resize(in.size());
@@ -107,8 +168,12 @@ namespace met {
 
     // Iterate over all project data
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.gamut_verts, m_verts);
-    i_pipe_state.elems = detail::compare_and_set_all_eig(e_proj_data.gamut_elems, m_elems);
-    i_pipe_state.mapps = detail::compare_and_set_all(e_appl_data.loaded_mappings, m_mapps);
+
+    // Iterate over illuminant data
+    std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
+    std::tie(i_pipe_state.cmfs,  i_pipe_state.any_cmfs)  = detail::compare_state(e_proj_data.cmfs, m_cmfs);
+    std::tie(i_pipe_state.elems, i_pipe_state.any_elems) = detail::compare_state(e_proj_data.gamut_elems, m_elems);
+    std::tie(i_pipe_state.mapps, i_pipe_state.any_mapps) = detail::compare_state(e_proj_data.mappings, m_mapps);
 
     // Post-process fill in some gaps in project state
     for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
@@ -128,17 +193,19 @@ namespace met {
     }
 
     // Set summary flags over all vertices/elements in project state
-    i_pipe_state.any_mapps = std::reduce(range_iter(i_pipe_state.mapps), false, reduce_stale);
-    i_pipe_state.any_elems = std::reduce(range_iter(i_pipe_state.elems), false, reduce_stale);
     i_pipe_state.any_verts = std::reduce(range_iter(i_pipe_state.verts), false, 
       [](const auto &a, const auto &b) { return a | b.any; });
-    i_pipe_state.any = i_pipe_state.any_mapps | i_pipe_state.any_elems | i_pipe_state.any_verts;
+    i_pipe_state.any = i_pipe_state.any_mapps | 
+                       i_pipe_state.any_elems | 
+                       i_pipe_state.any_verts |
+                       i_pipe_state.any_cmfs  |
+                       i_pipe_state.any_illuminants;
 
     // Iterate over all selection data
-    i_view_state.vert_selection = detail::compare_and_set_reduce(e_vert_selct, m_vert_selct);
-    i_view_state.vert_mouseover = detail::compare_and_set_reduce(e_vert_mover, m_vert_mover);
-    i_view_state.elem_selection = detail::compare_and_set_reduce(e_elem_selct, m_elem_selct);
-    i_view_state.elem_mouseover = detail::compare_and_set_reduce(e_elem_mover, m_elem_mover);
-    i_view_state.cstr_selection = detail::compare_and_set(e_cstr_selct, m_cstr_selct);
+    i_view_state.vert_selection = std::get<1>(detail::compare_state(e_vert_selct, m_vert_selct));
+    i_view_state.vert_mouseover = std::get<1>(detail::compare_state(e_vert_mover, m_vert_mover));
+    i_view_state.elem_selection = std::get<1>(detail::compare_state(e_elem_selct, m_elem_selct));
+    i_view_state.elem_mouseover = std::get<1>(detail::compare_state(e_elem_mover, m_elem_mover));
+    i_view_state.cstr_selection = detail::compare_func(e_cstr_selct, m_cstr_selct);
   }
 } // namespace met

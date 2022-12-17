@@ -4,8 +4,9 @@
 #include <metameric/core/texture.hpp>
 #include <filesystem>
 #include <functional>
-#include <vector>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace met {
   /* Save states in which project data can exist */
@@ -19,12 +20,6 @@ namespace met {
   /* Wrapper object to hold all saveable project data */
   struct ProjectData {
   public: /* internal data structures */
-    // Set of keys of cmfs/illuminants together describing a stored color system
-    struct Mapp {
-      std::string cmfs, illuminant;
-      uint        n_scatters; // stored directly
-    };
-
     // Data structure for a single vertex of the project's convex hull mesh
     struct Vert {
       Colr colr_i; // The expected vertex color under a primary color system
@@ -33,22 +28,33 @@ namespace met {
       std::vector<uint> mapp_j; // Indices of the selected primary color systemss
     };
 
+    // Set of indices of cmfs/illuminants together describing a stored color system
+    struct Mapp {  uint cmfs, illuminant; };
+
     // Data structure for a triangle element of the project's convex hull mesh
     using Elem = eig::Array3u;
     
   public: /* public data */
     // Convex hull data structure used for rgb->spectral uplifting
-    std::vector<Elem> gamut_elems;  // Triangle connections describing a convex hull
     std::vector<Vert> gamut_verts;  // Gamut vertex values under specified color system   
+    std::vector<Elem> gamut_elems;  // Triangle connections describing a convex hull
+    std::vector<Mapp> mappings;
 
-    // List of named user-loaded or program-provided mappings, illuminants, and cmfs
+    // Named user- or program-provided illuminants and color matching functions
     std::vector<std::pair<std::string, Spec>> illuminants;
     std::vector<std::pair<std::string, CMFS>> cmfs;
-    std::vector<std::pair<std::string, Mapp>> mappings;
 
   public: /* public methods */
     // Default constr. provides sensible default values
     ProjectData();
+
+    // Obtain spectral data of a certain stored mapping
+    met::Mapp mapping_data(uint i) const;
+    met::Mapp mapping_data(Mapp m) const;
+    
+    // Obtain a pretty-printed name describing a certain stored mapping
+    std::string mapping_name(uint i) const { return mapping_name(mappings[i]); }
+    std::string mapping_name(Mapp m) const { return fmt::format("{}, {}", cmfs[m.cmfs].first, illuminants[m.illuminant].first); }
   };
 
   /* Wrapper to hold all major application data */
@@ -61,7 +67,6 @@ namespace met {
 
     // Unsaved application data
     Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
-    std::vector<Mapp>   loaded_mappings; // Spectral mappings extracted from project data
 
   public: /* public create/load/save methods */
     void create(Texture2d3f &&texture);         // Create project from texture data
@@ -87,7 +92,6 @@ namespace met {
     void undo();                  // Step back one modification
 
   public: /* misc public methods */
-    void load_mappings(); // Reload relevant mappings/spectra/color systems from underlying data
     void load_chull_gamut(); // Re-create project gamut based on a convex hull approximation of the input texture
   };
 } // namespace met

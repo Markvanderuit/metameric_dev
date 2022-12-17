@@ -3,7 +3,6 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <omp.h>
-#include <fmt/ranges.h>
 #include <algorithm>
 #include <execution>
 #include <unordered_set>
@@ -77,7 +76,7 @@ namespace met {
     return basis * 0.5f * (minv + maxv);
   }
   
-  std::vector<Colr> generate_boundary(const BBasis                               &basis,
+  /* std::vector<Colr> generate_boundary(const BBasis                               &basis,
                                       const CMFS                                 &system_i,
                                       const CMFS                                 &system_j,
                                       const Colr                                 &signal_i,
@@ -133,7 +132,7 @@ namespace met {
     }
 
     return detail::remove_identical_points(output);
-  }
+  } */
   
   std::vector<Colr> generate_boundary_i(const BBasis &basis,
                                        std::span<const CMFS> systems_i,
@@ -199,7 +198,7 @@ namespace met {
     return detail::remove_identical_points(output);
   }
                                       
-  std::vector<Colr> generate_boundary_mult(const BBasis                 &basis,
+ /*  std::vector<Colr> generate_boundary_mult(const BBasis                 &basis,
                                            const CMFS                   &system_i,
                                            const Colr                   &signal_i,
                                            std::span<const CMFS>         systems_j,
@@ -268,7 +267,7 @@ namespace met {
     }
 
     return detail::remove_identical_points(output);
-  }
+  } */
   
   std::vector<Colr> generate_gamut(const std::vector<Wght> &weights,
                                    const std::vector<Colr> &samples) {

@@ -2,7 +2,6 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
-#include <compare>
 
 namespace met {
   /* Define metameric's spectral range layout */
@@ -26,11 +25,37 @@ namespace met {
   using UnalSpec = eig::Array<float, wavelength_samples, 1, eig::DontAlign>;
   using UnalColr = eig::Array<float, 3, 1, eig::DontAlign>;
 
-  /* 16-byte aligned types */
+  /* Forcibly aligned types */
   using AlSpec = eig::AlArray<float, wavelength_samples>;
   using AlColr = eig::AlArray<float, 3>;
+  
+  /* Spectral mapping object defines how a reflectance-to-color conversion is performed */
+  struct Mapp {
+    /* Mapping components */
 
-  /* Define color matching functions, SPD models, etc. */
+    UnalCMFS cmfs;       // Color matching or sensor response functions
+    UnalSpec illuminant; // Illuminant under which observation is performed
+
+    /* Mapping functions */
+
+    // Simplify the CMFS/illuminant into color system spectra
+    CMFS finalize() const {
+      auto cmfs_col = cmfs.array().colwise();
+      float k = 1.f / (cmfs_col * illuminant).col(1).sum();
+      return k * (cmfs_col * illuminant);
+    }
+    
+    // Obtain a color by applying this spectral mapping
+    Colr apply_color(const Spec &sd) const {
+      return finalize().transpose() * sd.matrix();
+    }
+
+    bool operator==(const Mapp &o) const {
+      return cmfs == o.cmfs && illuminant.matrix() == o.illuminant.matrix();
+    }
+  };
+
+  /* Define pre-included color matching functions, SPD models, etc. */
   namespace models {
     // Linear color space transformations
     extern eig::Matrix3f xyz_to_srgb_transform;
@@ -48,18 +73,6 @@ namespace met {
     extern Spec emitter_cie_ledb1;    // CIE standard illuminant LED-B1; blue LED
     extern Spec emitter_cie_ledrgb1;  // CIE standard illuminant LED-RGB1; R/G/B LEDs
   } // namespace models
-  
-  namespace io {
-    // Load a discrete spectral distribution from sequentially increasing wvl/value data
-    Spec spectrum_from_data(std::span<const float> wvls, 
-                            std::span<const float> values);
-
-    // Load a discrete trio of color matching functions from sequentially increasing wvl/value data
-    CMFS cmfs_from_data(std::span<const float> wvls, 
-                        std::span<const float> values_x,
-                        std::span<const float> values_y,
-                        std::span<const float> values_z);
-  } // namespace io
 
   // Given a spectral bin, obtain the relevant central wavelength
   constexpr inline
@@ -72,70 +85,7 @@ namespace met {
   constexpr inline
   size_t index_at_wavelength(float wvl) {
     debug::check_expr_dbg(wvl >= wavelength_min && wvl <= wavelength_max, fmt::format("wavelength {} out of range", wvl));
-    const uint i = static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv);
-    return std::min(i, wavelength_samples - 1);
-  }
-  
-  /* Spectral mapping object defines how a reflectance-to-color conversion is performed */
-  struct SpectralMapping {
-    /* Mapping components */
-
-    UnalCMFS cmfs       = models::cmfs_cie_xyz;    // Color matching or sensor response functions
-    UnalSpec illuminant = models::emitter_cie_d65; // Illuminant under which observation is performed
-    uint n_scatters     = 0;                       // Nr. of indirect scatterings of reflectance
-
-    /* Mapping functions */
-
-    CMFS finalize() const {
-      auto cmfs_col = cmfs.array().colwise();
-      float k = 1.f / (cmfs_col * illuminant).col(1).sum();
-      return k * (cmfs_col * illuminant);
-    }
-
-    // Given a known reflectance, simplify the CMFS/illuminant/indirections into a single object
-    CMFS finalize(const Spec &sd) const {
-      auto cmfs_col = cmfs.array().colwise();
-
-      // If n_scatters > 0, multiply illuminant by reflectance to simulate
-      // repeated scattering of indirect lighting
-      Spec e = illuminant * (n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval());
-
-      // Normalization factor is applied over the unscattered illuminant
-      float k = 1.f / (cmfs_col * illuminant).col(1).sum();
-
-      return k * (cmfs_col * e);
-    }
-
-    // Obtain a color by applying this spectral mapping
-    Colr apply_color(const Spec &sd) const {
-      return finalize(sd).transpose() * sd.matrix();
-    }
-
-    // Obtain power by applying this mapping's illuminant
-    Spec apply_power(const Spec &sd) const {
-      Spec e = illuminant * (n_scatters == 0 ? 1.f : sd.pow(n_scatters).eval());
-      return e * sd;
-    }
-
-    bool operator==(const SpectralMapping &o) const {
-      return cmfs == o.cmfs && 
-             illuminant.matrix() == o.illuminant.matrix() && 
-             n_scatters == o.n_scatters;
-    }
-  };
-  
-  // Shorthand for consistency
-  using Mapp = SpectralMapping;
-
-  // Convert a spectral reflectance distr. to a color under a given mapping
-  inline
-  Colr reflectance_to_color(const Spec &sd, const Mapp &m = Mapp()) {
-    return m.apply_color(sd);
-  }
-
-  inline
-  Spec reflectance_to_power(const Spec &sd, const Mapp &m = Mapp()) {
-    return m.apply_power(sd);
+    return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB

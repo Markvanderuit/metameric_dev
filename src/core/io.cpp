@@ -93,6 +93,82 @@ namespace met::io {
     ofs.close();
   }
 
+  Spec load_spec(const fs::path &path) {
+    met_trace();
+
+    // Output data blocks
+    std::vector<float> wvls, values;
+
+    // Read spectrum file as string, and parse line by line
+    std::stringstream line__ss(load_string(path));
+    std::string line;
+    while (std::getline(line__ss, line)) {
+      auto split_line = line | std::views::split(' ');
+      auto split_vect = std::vector<std::string>(range_iter(split_line));
+
+      // Skip empty and commented lines
+      guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
+
+      wvls.push_back(std::stof(split_vect[0]));
+      values.push_back(std::stof(split_vect[1]));
+    }
+
+    return spectrum_from_data(wvls, values);
+  }
+
+  void save_spec(const fs::path &path, const Spec &s) {
+    met_trace();
+
+    // Get spectral data split into blocks
+    auto [wvls, values] = spectrum_to_data(s);
+
+    // Parse split data into string format
+    std::stringstream ss;
+    for (uint i = 0; i < wvls.size(); ++i)
+      ss << fmt::format("{} {}\n", wvls[i], values[i]);
+
+    return save_string(path, ss.str());
+  }
+
+  CMFS load_cmfs(const fs::path &path) {
+    met_trace();
+
+    // Output data blocks
+    std::vector<float> wvls, values_x, values_y, values_z;
+
+    // Read spectrum file as string, and parse line by line
+    std::stringstream line__ss(load_string(path));
+    std::string line;
+    while (std::getline(line__ss, line)) {
+      auto split_line = line | std::views::split(' ');
+      auto split_vect = std::vector<std::string>(range_iter(split_line));
+
+      // Skip empty and commented lines
+      guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
+
+      wvls.push_back(std::stof(split_vect[0]));
+      values_x.push_back(std::stof(split_vect[1]));
+      values_y.push_back(std::stof(split_vect[2]));
+      values_z.push_back(std::stof(split_vect[3]));
+    }
+
+    return cmfs_from_data(wvls, values_x, values_y, values_z);
+  }
+
+  void save_cmfs(const fs::path &path, const CMFS &s) {
+    met_trace();
+
+    // Get spectral data split into blocks
+    auto [wvls, values_x, values_y, values_z] = cmfs_to_data(s);
+
+    // Parse split data into string format
+    std::stringstream ss;
+    for (uint i = 0; i < wvls.size(); ++i)
+      ss << fmt::format("{} {} {} {}\n", wvls[i], values_x[i], values_y[i], values_z[i]);
+
+    return save_string(path, ss.str());
+  }
+
   void save_spectral_data(const SpectralData &data, const fs::path &path) {
     met_trace();
     
@@ -114,9 +190,77 @@ namespace met::io {
     ofs.close();
   }
 
-  SpectralData load_spectral_data(const fs::path &path) {
+  // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::eval(...) from libcore/spectrum.cpp
+  Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values) {
     met_trace();
 
-    return { };
+    float data_wvl_min = wvls[0],
+          data_wvl_max = wvls[wvls.size() - 1];
+
+    Spec s = 0.f;
+    for (size_t i = 0; i < wavelength_samples; ++i) {
+      float spec_wvl_min = i * wavelength_ssize + wavelength_min,
+            spec_wvl_max = spec_wvl_min + wavelength_ssize;
+
+      // Determine accessible range of wavelengths
+      float wvl_min = std::max(spec_wvl_min, data_wvl_min),
+            wvl_max = std::min(spec_wvl_max, data_wvl_max);
+      guard_continue(wvl_max > wvl_min);
+
+      // Find the starting index using binary search (Thanks for the idea, Mitsuba people!)
+      ptrdiff_t pos = std::max(std::ranges::lower_bound(wvls, wvl_min) - wvls.begin(),
+                              static_cast<ptrdiff_t>(1)) - 1;
+      
+      // Step through the provided data and integrate trapezoids
+      for (; pos + 1 < wvls.size() && wvls[pos] < wvl_max; ++pos) {
+        float wvl_a   = wvls[pos],
+              value_a = values[pos],
+              clamp_a = std::max(wvl_a, wvl_min);
+        float wvl_b   = wvls[pos + 1],
+              value_b = values[pos + 1],
+              clamp_b = std::min(wvl_b, wvl_max);
+        guard_continue(clamp_b > clamp_a);
+
+        float inv_ab = 1.f / (wvl_b - wvl_a);
+        float interp_a = std::lerp(value_a, value_b, (clamp_a - wvl_a) * inv_ab),
+              interp_b = std::lerp(value_a, value_b, (clamp_b - wvl_a) * inv_ab);
+
+        s[i] += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
+      }
+      s[i] /= wavelength_ssize;
+    }
+
+    return s.eval();
+  }
+ 
+  CMFS cmfs_from_data(std::span<const float> wvls, std::span<const float> values_x,
+                      std::span<const float> values_y, std::span<const float> values_z) {
+    met_trace();
+    return (CMFS() << spectrum_from_data(wvls, values_x),
+                      spectrum_from_data(wvls, values_y),
+                      spectrum_from_data(wvls, values_z)).finished();
+  }
+  
+  std::array<std::vector<float>, 2> spectrum_to_data(const Spec &s) {
+    std::vector<float> wvls(wavelength_samples);
+    std::vector<float> values(wavelength_samples);
+
+    std::ranges::transform(std::views::iota(0u, wavelength_samples), wvls.begin(), wavelength_at_index);
+    std::ranges::copy(s, values.begin());
+
+    return { wvls, values };
+  }
+
+  std::array<std::vector<float>, 4> cmfs_to_data(const CMFS &s) {
+    std::vector<float> wvls(wavelength_samples);
+    std::vector<float> values_x(wavelength_samples), 
+      values_y(wavelength_samples), values_z(wavelength_samples);
+    
+    std::ranges::transform(std::views::iota(0u, wavelength_samples), wvls.begin(), wavelength_at_index);
+    std::ranges::copy(s.col(0), values_x.begin());
+    std::ranges::copy(s.col(1), values_y.begin());
+    std::ranges::copy(s.col(2), values_z.begin());
+    
+    return { wvls, values_x, values_y, values_z };
   }
 } // namespace met::io

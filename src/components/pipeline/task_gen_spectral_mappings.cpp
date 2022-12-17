@@ -32,23 +32,20 @@ namespace met {
 
     // Get shared resources
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings  = e_appl_data.loaded_mappings;
+    auto &e_proj_data = e_appl_data.project_data;
     auto &i_buffer    = info.get_resource<gl::Buffer>("mapp_buffer");
     
-    if (e_mappings.size() > m_max_maps) {
+    if (e_proj_data.mappings.size() > m_max_maps) {
       // If the maximum allowed nr. of mappings is exceeded, re-allocate with room to spare
-      m_max_maps = e_mappings.size() + nr_maps;
-      i_buffer   = {{ .size = m_max_maps * sizeof(Mapp), .flags = buffer_flags }};
-
-      // Re-upload entire mapping data in one go
-      auto span = cnt_span<const std::byte>(e_mappings);
-      i_buffer  .set(span, span.size_bytes());
-    } else {
-      // Update specific, stale mapping data
-      for (uint i = 0; i < e_mappings.size(); ++i) {
-        guard_continue(e_pipe_state.mapps[i]);
-        i_buffer  .set(obj_span<const std::byte>(e_mappings[i]), sizeof(Mapp), i * sizeof(Mapp));
-      }
+      m_max_maps = e_proj_data.mappings.size() + nr_maps;
+      i_buffer = {{ .size = m_max_maps * sizeof(Mapp), .flags = buffer_flags }};
+    }
+    
+    // Update specific, stale mapping data
+    for (uint i = 0; i < e_proj_data.mappings.size(); ++i) {
+      guard_continue(e_pipe_state.mapps[i]);
+      Mapp data = e_proj_data.mapping_data(i);
+      i_buffer.set(obj_span<const std::byte>(data), sizeof(Mapp), i * sizeof(Mapp));
     }
   }
 } // namespace met

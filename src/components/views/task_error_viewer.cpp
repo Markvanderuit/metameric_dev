@@ -14,7 +14,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_tex_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_text_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
     auto &e_color_input  = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
     auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
@@ -23,8 +23,8 @@ namespace met {
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
                            - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
                            / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
-    m_tooltip_pixel = (mouse_pos * e_tex_data.size().cast<float>()).cast<int>();
-    const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
+    m_tooltip_pixel = (mouse_pos * e_text_data.size().cast<float>()).cast<int>();
+    const size_t sample_i = e_text_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant reflectance data to current available buffers
     e_color_input.copy_to(m_tooltip_buffers[m_tooltip_cycle_i].in_a, sizeof(AlColr), sizeof(AlColr) * sample_i);
@@ -102,10 +102,10 @@ namespace met {
     m_tooltip_cycle_i = 0;
 
     // Get externally shared resources
-    auto &e_tex_data = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_text_data = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     // Initialize error computation components
-    const uint generate_n    = e_tex_data.size().prod();
+    const uint generate_n    = e_text_data.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u);
     m_error_program = {{ .type = gl::ShaderType::eCompute,
                          .path = "resources/shaders/misc/buffer_error.comp" }};
@@ -121,7 +121,7 @@ namespace met {
     // Insert subtask to handle buffer->texture conversion
     TextureSubtask subtask = {{ .input_key    = { name(), "colr_buffer" },
                                 .output_key   = { fmt::format(texture_fmt, name()), "texture" },
-                                .texture_info = { .size = e_tex_data.size() }}};
+                                .texture_info = { .size = e_text_data.size() }}};
     info.insert_task_after(name(), std::move(subtask));
   }
 
@@ -139,10 +139,10 @@ namespace met {
 
     if (ImGui::Begin("Error viewer")) {
       // Get shared resources
-      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_tex_data = e_app_data.loaded_texture;
-      auto &e_prj_data = e_app_data.project_data;
-      auto &e_mappings = e_prj_data.mappings;
+      auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_text_data = e_appl_data.loaded_texture;
+      auto &e_proj_data = e_appl_data.project_data;
+      auto &e_mappings  = e_proj_data.mappings;
 
       // Get subtask names
       auto texture_subtask_name  = fmt::format(texture_fmt, name());
@@ -152,9 +152,9 @@ namespace met {
       bool handle_toolip = false;
       
       // 0. Introduce settings
-      if (ImGui::BeginCombo("Selected mapping", e_mappings[m_mapping_i].first.c_str())) {
+      if (ImGui::BeginCombo("Selected mapping", e_proj_data.mapping_name(m_mapping_i).c_str())) {
         for (uint i = 0; i < e_mappings.size(); ++i) {
-          if (ImGui::Selectable(e_mappings[i].first.c_str(), i == m_mapping_i)) {
+          if (ImGui::Selectable(e_proj_data.mapping_name(i).c_str(), i == m_mapping_i)) {
             m_mapping_i = i;
           }
         }
@@ -167,7 +167,7 @@ namespace met {
       // 2. Handle texture resampling subtask
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
-      eig::Array2f texture_size = viewport_size * e_tex_data.size().y() / e_tex_data.size().x()
+      eig::Array2f texture_size = viewport_size * e_text_data.size().y() / e_text_data.size().x()
                                 * 0.95f;;
 
       if (auto resample_size = texture_size.cast<uint>().max(1u); !resample_size.isApprox(m_resample_size)) {

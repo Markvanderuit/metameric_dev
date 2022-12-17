@@ -55,9 +55,9 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mapping  = e_app_data.loaded_mappings[texture_i];
-    
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+
     // Spawn tooltip
     ImGui::BeginTooltip();
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
@@ -70,15 +70,16 @@ namespace met {
       fence.cpu_wait();
     }
     
+    Mapp mapp        = e_proj_data.mapping_data(texture_i);
     Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
-    Spec power       = e_mapping.apply_power(reflectance);
-    Colr power_rgb   = linear_srgb_to_gamma_srgb(e_mapping.apply_color(reflectance));
+    Spec power       = mapp.illuminant * reflectance;
+    Colr power_rgb   = linear_srgb_to_gamma_srgb(mapp.apply_color(reflectance));
 
     // Plot rest of tooltip
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-      nullptr, 0.f, e_mapping.illuminant.maxCoeff(), { 0.f, 64.f });
+      nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
     ImGui::ColorEdit3("Power (rgb)", power_rgb.data(), ImGuiColorEditFlags_Float);
     ImGui::Separator();
     ImGui::Value("Minimum", reflectance.minCoeff(), "%.16f");
@@ -127,18 +128,17 @@ namespace met {
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
-      auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_prj_data  = e_app_data.project_data;
-      auto &e_mappings  = e_prj_data.mappings;
-      uint e_mappings_n = e_app_data.loaded_mappings.size();
+      auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data = e_appl_data.project_data;
+      uint e_mappings_n = e_proj_data.mappings.size();
 
       // Set up drawing a nr. of textures in a column-based layout; determine texture res.
       uint n_cols = 2;
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       eig::Array2f texture_size = viewport_size
-                                 * e_app_data.loaded_texture.size().y()
-                                 / e_app_data.loaded_texture.size().x()
+                                 * e_appl_data.loaded_texture.size().y()
+                                 / e_appl_data.loaded_texture.size().x()
                                  * 0.95f / static_cast<float>(n_cols);
                                  
       // If texture size has changed, respawn texture resample tasks
@@ -156,7 +156,7 @@ namespace met {
       m_tooltip_mapping_i = -1;
       
       // Iterate n_cols, n_rows, and n_mappings
-      for (uint i = 0, i_col = 0; i < e_mappings.size(); ++i) {
+      for (uint i = 0, i_col = 0; i < e_mappings_n; ++i) {
         // Generate name of task holding texture data
         auto subtask_tex_key = fmt::format(resample_fmt, i);
         
@@ -167,7 +167,7 @@ namespace met {
 
         // Draw image
         ImGui::BeginGroup();
-        ImGui::Text(e_mappings[i].first.c_str());
+        ImGui::Text(e_proj_data.mapping_name(i).c_str());
         ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
         
         // Set id for tooltip after loop is over, and start data copy
@@ -185,7 +185,7 @@ namespace met {
         i_col++;
         if (i_col >= n_cols) {
           i_col = 0;
-        } else if (i < e_mappings.size() - 1) {
+        } else if (i < e_mappings_n - 1) {
           ImGui::SameLine();
         }
       }

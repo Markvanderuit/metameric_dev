@@ -17,15 +17,25 @@ namespace met {
       std::vector<bool> mapp_j;
     };
 
+    struct CacheMapp {
+      bool any;
+      bool cmfs;
+      bool illuminant;
+    };
+
   public:
     bool any;
+    bool any_illuminants;
+    bool any_cmfs;
     bool any_verts;
     bool any_elems;
     bool any_mapps;
 
     std::vector<CacheVert> verts;
-    std::vector<bool> elems;
-    std::vector<bool> mapps;
+    std::vector<bool>      elems;
+    std::vector<bool>      mapps;
+    std::vector<bool>      illuminants;
+    std::vector<bool>      cmfs;
   };
 
   /* Wrapper objecct for tracking changes to viewport in program pipeline; e.g. vertex selection */

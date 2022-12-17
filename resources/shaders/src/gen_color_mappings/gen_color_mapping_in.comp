@@ -28,7 +28,7 @@ void main() {
   InMapp m  = b_mapp.data[u_mapping_i];
 
   // Construct and apply color mapping
-  InCMFS cs = finalize_mapp(m, sd);
+  InCMFS cs = finalize_mapp(m);
   vec3   v  = in_mmul(cs, sd);
 
   // Store resulting color

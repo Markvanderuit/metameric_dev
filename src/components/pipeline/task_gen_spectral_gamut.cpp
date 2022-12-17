@@ -96,13 +96,11 @@ namespace met {
 
       // Relevant vertex data
       auto &vert = e_proj_data.gamut_verts[i];   
-      Spec &spec = i_specs[i];
 
       // Obtain color system spectra for this vertex
-      std::vector<CMFS> systems(1 + vert.colr_j.size());
-      systems[0] = e_appl_data.loaded_mappings[vert.mapp_i].finalize(spec);
-      std::ranges::transform(vert.mapp_j, systems.begin() + 1, 
-        [&](uint j) { return e_appl_data.loaded_mappings[j].finalize(spec); });
+      std::vector<CMFS> systems = { e_proj_data.mapping_data(vert.mapp_i).finalize() };
+      std::ranges::transform(vert.mapp_j, std::back_inserter(systems), 
+        [&](uint j) { return e_proj_data.mapping_data(j).finalize(); });
 
       // Obtain corresponding color signal for each color system
       std::vector<Colr> signals(1 + vert.colr_j.size());

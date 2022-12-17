@@ -84,7 +84,7 @@ namespace met {
     // Load shader program objects
     m_vert_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_vertices.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_vertices.frag" }};
-    m_elem_program = {{ .type = gl::ShaderType::eVertex, .path = "resources/shaders/viewport/draw_gamut.vert" },
+    m_elem_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_gamut.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_gamut.frag" }};
 
     // Set non-changing uniform values

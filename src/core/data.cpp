@@ -32,14 +32,22 @@ namespace met {
                     Vert { .colr_i = { .35f, .30f, .34f }, .mapp_i = 0, .colr_j = { Colr { .35f, .30f, .34f } }, .mapp_j = { 1 } } };
 
     // Instantiate loaded components with sensible default values
-    mappings = {{ "D65", { .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 }}, 
-                { "FL11", { .cmfs = "CIE XYZ->sRGB", .illuminant = "FL11", .n_scatters = 0 }}};
-    cmfs = {{ "CIE XYZ",       models::cmfs_cie_xyz },
-            { "CIE XYZ->sRGB", models::cmfs_srgb    }};
+    mappings    = {{ .cmfs = 0, .illuminant = 0 }, 
+                   { .cmfs = 0, .illuminant = 1 }};
+    cmfs        = {{ "CIE XYZ->sRGB", models::cmfs_srgb    }};
     illuminants = {{ "D65",  models::emitter_cie_d65  },
                    { "E",    models::emitter_cie_e    },
                    { "FL2",  models::emitter_cie_fl2  },
                    { "FL11", models::emitter_cie_fl11 }};
+  }
+
+  Mapp ProjectData::mapping_data(uint i) const {
+    return mapping_data(mappings[i]);
+  }
+
+  Mapp ProjectData::mapping_data(Mapp m) const {
+    return { .cmfs = cmfs[m.cmfs].second,
+             .illuminant = illuminants[m.illuminant].second };
   }
 
   void ApplicationData::create(const fs::path &texture_path) {
@@ -57,7 +65,6 @@ namespace met {
     mods  = { };
     mod_i = -1;
 
-    load_mappings();
     load_chull_gamut();
   }
   
@@ -77,8 +84,6 @@ namespace met {
     // Reset undo/redo history
     mods  = { };
     mod_i = -1;
-    
-    load_mappings();
   }
 
   void ApplicationData::touch(ProjectMod &&mod) {
@@ -127,13 +132,12 @@ namespace met {
     project_data  = { };
 
     loaded_texture  = { };
-    loaded_mappings = { };
     
     mods  = { };
     mod_i = -1;
   }
 
-  namespace detail {
+ /*  namespace detail {
     Spec load_illuminant(const ProjectData &data, std::string_view key) {
       const auto it = std::ranges::find_if(data.illuminants, 
         [&key](auto &p) { return key == p.first; });
@@ -150,23 +154,11 @@ namespace met {
       return it->second; 
     }
 
-    Mapp load_mapping(const ProjectData &data, std::string_view key) {
-      const auto it = std::ranges::find_if(data.mappings, 
-        [&key](auto &p) { return key == p.first; });
-      debug::check_expr_rel(it != data.mappings.end(), 
-        fmt::format("Could not load spectral mapping from project data; name was \"{}\"", key));
-      const auto &mapping = it->second;
+    Mapp load_mapping(const ProjectData &data, ProjectData::Mapp mapping) {
       return { .cmfs      = load_cmfs(data, mapping.cmfs),
-              .illuminant = load_illuminant(data, mapping.illuminant),
-              .n_scatters = mapping.n_scatters };
+              .illuminant = load_illuminant(data, mapping.illuminant) };
     }
-  } // namespace detail
-
-  void ApplicationData::load_mappings() {
-    loaded_mappings = { };
-    std::ranges::transform(project_data.mappings, std::back_inserter(loaded_mappings), 
-      [&](auto &p) { return detail::load_mapping(project_data, p.first); });
-  }
+  } // namespace detail */
   
   void ApplicationData::load_chull_gamut() {
     // Instantiate decimated approximate convex hull to place initial project gamut vertices

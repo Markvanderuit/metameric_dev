@@ -14,15 +14,13 @@ namespace met {
   } // namespace io
 
   void from_json(const json &js, ProjectData::Mapp &v) {
-    v.cmfs       = js.at("cmfs").get<std::string>();
-    v.illuminant = js.at("illuminant").get<std::string>();
-    v.n_scatters = js.at("n_scatters").get<uint>();
+    v.cmfs       = js.at("cmfs").get<uint>();
+    v.illuminant = js.at("illuminant").get<uint>();
   }
 
   void to_json(json &js, const ProjectData::Mapp &v) {
     js["cmfs"]       = v.cmfs;
     js["illuminant"] = v.illuminant;
-    js["n_scatters"] = v.n_scatters;
   }
 
   void from_json(const json &js, ProjectData::Vert &v) {
@@ -42,7 +40,7 @@ namespace met {
   void from_json(const json &js, ProjectData &v) {
     v.gamut_elems  = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
     v.gamut_verts  = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
-    v.mappings     = js.at("mappings").get<std::vector<std::pair<std::string, ProjectData::Mapp>>>();
+    v.mappings     = js.at("mappings").get<std::vector<ProjectData::Mapp>>();
     v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }

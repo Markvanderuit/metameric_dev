@@ -13,20 +13,15 @@ namespace met {
   using BCMFS  = eig::Matrix<float, wavelength_bases, 3>;
   using BSpec  = eig::Matrix<float, wavelength_bases, 1>;
 
-  struct ColorBoundaryData {
-    std::vector<Colr> boundary_points;
-
-  };
-
   Spec generate(const BBasis         &basis,
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals);
 
-  std::vector<Colr> generate_boundary(const BBasis &basis,
+ /*  std::vector<Colr> generate_boundary(const BBasis &basis,
                                       const CMFS   &system_i,
                                       const CMFS   &system_j,
                                       const Colr   &signal_i,
-                                      const std::vector<eig::Array<float, 6, 1>> &samples);
+                                      const std::vector<eig::Array<float, 6, 1>> &samples); */
   
   std::vector<Colr> generate_boundary_i(const BBasis &basis,
                                        std::span<const CMFS> systems_i,
@@ -34,11 +29,11 @@ namespace met {
                                        const CMFS &system_j,
                                        std::span<const eig::ArrayXf> samples);
 
-  std::vector<Colr> generate_boundary_mult(const BBasis                 &basis,
+ /*  std::vector<Colr> generate_boundary_mult(const BBasis                 &basis,
                                            const CMFS                   &system_i,
                                            const Colr                   &signal_i,
                                            std::span<const CMFS>         systems_j,
-                                           std::span<const eig::ArrayXf> samples);
+                                           std::span<const eig::ArrayXf> samples); */
 
   using Wght = std::vector<float>;
   std::vector<Colr> generate_gamut(const std::vector<Wght> &weights,

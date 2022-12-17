@@ -14,62 +14,45 @@ namespace met {
     met_trace_full();
 
     // Get external shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings = e_app_data.project_data.mappings;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings = e_appl_data.project_data.mappings;
 
     // Make a copy of the mapping data and add a new default mapping
     auto cp_mappings = e_mappings;
-    cp_mappings.push_back({ default_mapping_title + std::to_string(cp_mappings.size()), {
-      .cmfs = "CIE XYZ->sRGB", .illuminant = "D65", .n_scatters = 0 
-    }});
+    cp_mappings.push_back({ .cmfs = 0, .illuminant = 0 });
 
     // Register data edit
-    e_app_data.touch({ 
+    e_appl_data.touch({ 
       .name = "Add mapping",
-      .redo = [&e_app_data, edit = cp_mappings](auto &data) { 
-        data.mappings = edit; 
-        e_app_data.load_mappings();
-      }, 
-      .undo = [&e_app_data, edit = e_mappings](auto &data) { 
-        data.mappings = edit; 
-        e_app_data.load_mappings();
-      }
+      .redo = [&e_appl_data, edit = cp_mappings](auto &data) { data.mappings = edit; }, 
+      .undo = [&e_appl_data, edit = e_mappings](auto &data) { data.mappings = edit; }
     });
 
     // Set selection to newly added item
     m_selected_i         = e_mappings.size() - 1;
-    auto &[key, mapping] = e_mappings[m_selected_i];
-    m_selected_key       = key;
-    m_selected_mapping   = mapping;
+    m_selected_mapping   = e_mappings[m_selected_i];
   }
 
   void MappingsEditorTask::remove_mapping(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Get external shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings = e_app_data.project_data.mappings;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings = e_appl_data.project_data.mappings;
 
     // Make a copy of the mapping data and remove the current selected mapping
     auto cp_mappings = e_mappings;
     cp_mappings.erase(cp_mappings.begin() + m_selected_i);
 
     // Register data edit
-    e_app_data.touch({ 
+    e_appl_data.touch({ 
       .name = "Remove mapping",
-      .redo = [&e_app_data, edit = cp_mappings](auto &data) {
-        data.mappings = edit;
-        e_app_data.load_mappings();
-      }, 
-      .undo = [&e_app_data, edit = e_mappings](auto &data) {
-        data.mappings = edit;
-        e_app_data.load_mappings();
-      }
+      .redo = [&e_appl_data, edit = cp_mappings](auto &data) { data.mappings = edit; }, 
+      .undo = [&e_appl_data, edit = e_mappings](auto &data) { data.mappings = edit; }
     });
 
     // Clear selection
     m_selected_i       = -1;
-    m_selected_key     = "";
     m_selected_mapping = {};
   }
 
@@ -77,24 +60,18 @@ namespace met {
     met_trace_full();
 
     // Get external shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings = e_app_data.project_data.mappings;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_mappings = e_appl_data.project_data.mappings;
 
     // Define data before/after edit
-    auto redo_pair = std::pair<std::string, ProjectData::Mapp> { m_selected_key, m_selected_mapping };
-    auto undo_pair = e_mappings[m_selected_i];
+    auto redo = m_selected_mapping;
+    auto undo = e_mappings[m_selected_i];
 
     // Register data edit
-    e_app_data.touch({ 
+    e_appl_data.touch({ 
       .name = "Change mapping",
-      .redo = [&e_app_data, i = m_selected_i, edit = redo_pair](auto &data) { 
-        data.mappings[i] = edit;
-        e_app_data.load_mappings(); 
-      },
-      .undo = [&e_app_data, i = m_selected_i, edit = undo_pair](auto &data) { 
-        data.mappings[i] = edit;
-        e_app_data.load_mappings(); 
-      }
+      .redo = [&e_appl_data, i = m_selected_i, edit = redo](auto &data) { data.mappings[i] = edit; },
+      .undo = [&e_appl_data, i = m_selected_i, edit = undo](auto &data) { data.mappings[i] = edit; }
     });
   }
   
@@ -105,17 +82,16 @@ namespace met {
     auto &e_mappings = info.get_resource<ApplicationData>(global_key, "app_data").project_data.mappings;
 
     // Reset to stored data of selected mapping
-    auto &[key, mapping] = e_mappings[m_selected_i];
-    m_selected_key      = key;
-    m_selected_mapping  = mapping;
+    m_selected_mapping  = e_mappings[m_selected_i];
   }
 
   void MappingsEditorTask::draw_list(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Get external shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_mappings = e_app_data.project_data.mappings;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+    auto &e_mappings  = e_proj_data.mappings;
 
     // Content area width determines list width
     float window_width = ImGui::GetWindowContentRegionMax().x 
@@ -134,12 +110,10 @@ namespace met {
     // Draw list box for selecting a mapping, box label is hidden
     if (ImGui::BeginListBox("##SpectralMappingsListBox", { list_width, 0.f })) {
       for (uint i = 0; i < e_mappings.size(); ++i) {
-        auto &[key, mapping] = e_mappings[i];
-        if (ImGui::Selectable(key.c_str(), m_selected_i == i)) {
+        if (ImGui::Selectable(e_proj_data.mapping_name(i).c_str(), m_selected_i == i)) {
           // Apply selection
           m_selected_i       = i;
-          m_selected_key     = key;
-          m_selected_mapping = mapping;
+          m_selected_mapping = e_mappings[i];
         }
       }
       ImGui::EndListBox();
@@ -161,9 +135,11 @@ namespace met {
     met_trace_full();
 
     // Get external shared resources
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_prj_data = e_app_data.project_data;
-    auto &e_mappings = e_prj_data.mappings;
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data   = e_appl_data.project_data;
+    auto &e_mappings    = e_proj_data.mappings;
+    auto &e_cmfs        = e_proj_data.cmfs;
+    auto &e_illuminants = e_proj_data.illuminants;
 
     // Content area width determines selection width as remaining space
     float window_width = ImGui::GetWindowContentRegionMax().x 
@@ -179,33 +155,25 @@ namespace met {
     ImGui::Text("Edit selected");
     ImGui::Spacing();
 
-    // Draw mapping name edit widget
-    ImGui::InputText("Name", &m_selected_key);
-
     // Draw CMFS selector widget
-    if (ImGui::BeginCombo("CMFS", m_selected_mapping.cmfs.c_str())) {
-      for (auto &[key, _] : e_prj_data.cmfs) {
-        if (ImGui::Selectable(key.c_str(), m_selected_mapping.cmfs == key)) {
-          m_selected_mapping.cmfs = key;
+    if (ImGui::BeginCombo("CMFS", e_cmfs[m_selected_mapping.cmfs].first.c_str())) {
+      for (uint i = 0; i < e_cmfs.size(); ++i) {
+        if (ImGui::Selectable(e_cmfs[i].first.c_str(), m_selected_mapping.cmfs == i)) {
+          m_selected_mapping.cmfs = i;
         }
       }
       ImGui::EndCombo();
     }
 
     // Draw illuminant selector widget
-    if (ImGui::BeginCombo("Illuminant", m_selected_mapping.illuminant.c_str())) {
-      for (auto &[key, _] : e_prj_data.illuminants) {
-        if (ImGui::Selectable(key.c_str(), m_selected_mapping.illuminant == key)) {
-          m_selected_mapping.illuminant = key;
+    if (ImGui::BeginCombo("Illuminant", e_illuminants[m_selected_mapping.illuminant].first.c_str())) {
+      for (uint i = 0; i < e_illuminants.size(); ++i) {
+        if (ImGui::Selectable(e_illuminants[i].first.c_str(), m_selected_mapping.illuminant == i)) {
+          m_selected_mapping.illuminant = i;
         }
       }
       ImGui::EndCombo();
     }
-
-    // Scattering depth selector slider; between 0 and 8 should suffice?
-    uint scatter_min = 0, scatter_max = 8;
-    ImGui::SliderScalar("Scatters", ImGuiDataType_U32,
-      &(m_selected_mapping.n_scatters), &scatter_min, &scatter_max);
 
     // Draw buttons to apply/reset changes to stored mapping
     if (ImGui::Button("Apply")) { change_mapping(info); }
@@ -235,11 +203,12 @@ namespace met {
 
     if (ImGui::Begin("Mappings editor")) {      
       // Get shared resources
-      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &selected_i = info.get_resource<int>("selected_i");
+      auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data = e_appl_data.project_data;
+      auto &selected_i  = info.get_resource<int>("selected_i");
 
       // Handle external selection key
-      if (selected_i != -1 && selected_i < e_app_data.loaded_mappings.size()) {
+      if (selected_i != -1 && selected_i < e_proj_data.mappings.size()) {
         m_selected_i = selected_i;
       }
       selected_i = -1;

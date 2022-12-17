@@ -5,11 +5,12 @@
 
 namespace met {
   class StateTask : public detail::AbstractTask {
-    // Copies of data available in ProjectData and ApplicationData
-    // to check for and report state changes
-    std::vector<ProjectData::Elem> m_elems;
-    std::vector<ProjectData::Vert> m_verts;
-    std::vector<Mapp>              m_mapps;
+    // Copies of project data to check for and report state changes
+    std::vector<ProjectData::Elem>            m_elems;
+    std::vector<ProjectData::Vert>            m_verts;
+    std::vector<ProjectData::Mapp>            m_mapps;
+    std::vector<std::pair<std::string, CMFS>> m_cmfs;
+    std::vector<std::pair<std::string, Spec>> m_illuminants;
 
     // Copies of view selection data to check for and report state changes
     std::vector<uint> m_vert_selct;

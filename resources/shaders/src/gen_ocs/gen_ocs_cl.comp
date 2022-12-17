@@ -54,8 +54,6 @@ void load_mapp_shared_in() {
     s_mapping.cmfs[j][i] = b_mapp.data[mapping_i].cmfs[j][i];
   if (j == 0 && i < wavelength_samples)  
     s_mapping.illuminant[i] = b_mapp.data[mapping_i].illuminant[i];
-  if (j == 0 && i == 0) 
-    s_mapping.n_scatters = b_mapp.data[mapping_i].n_scatters;
   
   memoryBarrierShared();
   barrier();

@@ -110,8 +110,8 @@ namespace met {
       bool window_open = true;
       auto window_name = fmt::format("Editing {} ({} -> {})",
         i_cstr_slct, 
-        e_proj_data.mappings[e_verts[e_selection[0]].mapp_i].first,
-        e_proj_data.mappings[e_verts[e_selection[0]].mapp_j[i_cstr_slct]].first);
+        e_proj_data.mapping_name(e_verts[e_selection[0]].mapp_i),
+        e_proj_data.mapping_name(e_verts[e_selection[0]].mapp_j[i_cstr_slct]));
       
       if (ImGui::Begin(window_name.c_str(), &window_open, window_flags)) {
         eval_overlay_color_solid(info, e_selection[0]);
@@ -156,7 +156,6 @@ namespace met {
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
     auto &e_vert       = e_proj_data.gamut_verts[i];
-    auto &e_mapp       = e_proj_data.mappings;
     auto &e_spec       = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
     
     // Plot reflectances
@@ -164,8 +163,9 @@ namespace met {
 
     // Plot vertex settings for primary color
     if (ImGui::CollapsingHeader("Primary Color", ImGuiTreeNodeFlags_DefaultOpen)) {
+      Mapp mapp    = e_proj_data.mapping_data(e_vert.mapp_i);
       Colr colr_i  = e_vert.colr_i;
-      Colr rtrip_i = e_appl_data.loaded_mappings[e_vert.mapp_i].apply_color(e_spec);
+      Colr rtrip_i = mapp.apply_color(e_spec);
       Colr error_i = (rtrip_i - colr_i).abs().eval();
       
       ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
@@ -177,9 +177,9 @@ namespace met {
       // Selector for primary color mapping index, operating on a local copy
       uint l_mapp_i = e_vert.mapp_i;
       ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.9f);
-      if (ImGui::BeginCombo("##Mapping", e_mapp[l_mapp_i].first.c_str())) {
-        for (uint j = 0; j < e_mapp.size(); ++j) {
-          if (ImGui::Selectable(e_mapp[j].first.c_str(), j == l_mapp_i)) {
+      if (ImGui::BeginCombo("##Mapping", e_proj_data.mapping_name(l_mapp_i).c_str())) {
+        for (uint j = 0; j < e_proj_data.mappings.size(); ++j) {
+          if (ImGui::Selectable(e_proj_data.mapping_name(j).c_str(), j == l_mapp_i)) {
             l_mapp_i = j;
           }
         }
@@ -200,16 +200,17 @@ namespace met {
     for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
       auto constraint_name = fmt::format("Secondary {} ({} -> {})",
         j, 
-        e_proj_data.mappings[e_vert.mapp_i].first,
-        e_proj_data.mappings[e_vert.mapp_j[j]].first);
+        e_proj_data.mapping_name(e_vert.mapp_i),
+        e_proj_data.mapping_name(e_vert.mapp_j[j]));
       auto constraint_id = fmt::format("constraint{}", j);
       
       bool color_visible = true;
       if (ImGui::CollapsingHeader(constraint_name.c_str(), &color_visible, ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::PushID(constraint_id.c_str());
 
+        Mapp mapp    = e_proj_data.mapping_data(e_vert.mapp_j[j]);
         Colr colr_j  = e_vert.colr_j[j];
-        Colr rtrip_j = e_appl_data.loaded_mappings[e_vert.mapp_j[j]].apply_color(e_spec);
+        Colr rtrip_j = mapp.apply_color(e_spec);
         Colr error_j = (rtrip_j - colr_j).abs().eval();
 
         ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_j).data(),  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
@@ -220,9 +221,9 @@ namespace met {
 
         // Selector for secondary color mapping index, operating on a local copy
         uint l_mapp_j = e_vert.mapp_j[j];
-        if (ImGui::BeginCombo("##Mapping", e_mapp[l_mapp_j].first.c_str())) {
-          for (uint k = 0; k < e_mapp.size(); ++k) {
-            if (ImGui::Selectable(e_mapp[k].first.c_str(), k == l_mapp_j)) {
+        if (ImGui::BeginCombo("##Mapping", e_proj_data.mapping_name(l_mapp_j).c_str())) {
+          for (uint k = 0; k < e_proj_data.mappings.size(); ++k) {
+            if (ImGui::Selectable(e_proj_data.mapping_name(k).c_str(), k == l_mapp_j)) {
               l_mapp_j = k;
             }
           }
@@ -409,7 +410,8 @@ namespace met {
     // Get shared resources
     auto &i_srgb_target    = info.get_resource<gl::Texture2d4f>("srgb_weights_target");
     auto &i_weight_mapping = info.get_resource<uint>("weight_mapping");
-    auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data      = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data      = e_appl_data.project_data;
     auto &e_mappings       = e_appl_data.project_data.mappings;
     
     // Compute viewport size minus ImGui's tab bars etc
@@ -430,9 +432,9 @@ namespace met {
 
     // Insert mapping selector for which color mapping is used in the weights overlay
     i_weight_mapping = std::min(i_weight_mapping, static_cast<uint>(e_mappings.size() - 1));
-    if (ImGui::BeginCombo("Mapping", e_mappings[i_weight_mapping].first.c_str())) {
+    if (ImGui::BeginCombo("Mapping", e_proj_data.mapping_name(i_weight_mapping).c_str())) {
       for (uint i = 0; i < e_mappings.size(); ++i) {
-        if (ImGui::Selectable(e_mappings[i].first.c_str(), i == i_weight_mapping)) {
+        if (ImGui::Selectable(e_proj_data.mapping_name(i).c_str(), i == i_weight_mapping)) {
           i_weight_mapping = i;
         }
       }

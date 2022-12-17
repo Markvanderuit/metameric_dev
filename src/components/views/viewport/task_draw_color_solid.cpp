@@ -37,9 +37,9 @@ namespace met {
     }};
 
     // Load shader program objects
-    m_draw_program = {{ .type = gl::ShaderType::eVertex, .path = "resources/shaders/viewport/draw_color_array.vert" },
+    m_draw_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_array.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
-    m_srgb_program = {{ .type = gl::ShaderType::eCompute, .path = "resources/shaders/misc/texture_resample.comp" }};
+    m_srgb_program = {{ .type = gl::ShaderType::eCompute,  .path = "resources/shaders/misc/texture_resample.comp" }};
 
     // Create dispatch objects to summarize draw/compute operations
     m_chull_dispatch = { .type = gl::PrimitiveType::eTriangles,

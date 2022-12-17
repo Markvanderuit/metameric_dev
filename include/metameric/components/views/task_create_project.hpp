@@ -1,16 +1,27 @@
 #pragma once
 
 #include <metameric/core/data.hpp>
+#include <metameric/core/io.hpp>
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/texture.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <small_gl/texture.hpp>
 #include <string>
 
 namespace met {
   class CreateProjectTask : public detail::AbstractTask {
     std::string m_input_path;
     std::string m_view_title;
+
+    // Image data
+    struct ImageData {
+      fs::path        path;
+      Texture2d3f     host_data;
+      gl::Texture2d3f device_data;
+    };
+    std::vector<ImageData> m_image_data;
 
     // Modal spawning functions
     void insert_progress_warning(detail::TaskEvalInfo &info);
