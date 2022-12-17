@@ -61,30 +61,31 @@ namespace met {
     
     m_srgb_target_cache = 0;
     m_mapping_i_cache   = -1;
-    m_selection_cache   = { };
   }
 
   void DrawWeightsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
     
     // Continue only on relevant state change
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
-    auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_view_state  = info.get_resource<ViewportState>("state", "viewport_state");
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_mapping_i   = info.get_resource<uint>(m_parent, "weight_mapping");
     auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_weights_target");
     guard(e_mapping_i != m_mapping_i_cache
       || e_srgb_target.object() != m_srgb_target_cache
-      ||!std::ranges::equal(e_selection, m_selection_cache)
+      || e_view_state.vert_selection
       || e_pipe_state.any_verts);
 
     // Update local cache variables
     m_srgb_target_cache = e_srgb_target.object();
-    m_selection_cache   = e_selection;
     m_mapping_i_cache   = e_mapping_i;
     
+    // TODO move down
+    auto &e_selection   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+
     // Continue only if a selection is currently active
-    guard(m_mapping_i_cache >= 0 && !m_selection_cache.empty());
+    guard(m_mapping_i_cache >= 0 && !e_selection.empty());
 
     // Get shared resources
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");

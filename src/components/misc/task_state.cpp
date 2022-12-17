@@ -9,23 +9,34 @@ namespace met {
     using CacheVert = ProjectState::CacheVert;
     
     constexpr 
-    ProjectState::CacheStale compare_and_set(const auto &in, auto &out) {
+    bool compare_and_set(const auto &in, auto &out) {
       guard(out != in, false);
       out = in;
       return true;
     }
 
     constexpr 
-    ProjectState::CacheStale compare_and_set_eig(const auto &in, auto &out) {
+    bool compare_and_set_eig(const auto &in, auto &out) {
       guard(!out.isApprox(in), false);
       out = in;
       return true;
     }
 
     constexpr
-    std::vector<ProjectState::CacheStale> compare_and_set_all(const auto &in,
-                                                     auto &out) {
-      std::vector<ProjectState::CacheStale> state(in.size(), true);
+    bool compare_and_set_reduce(const auto &in, auto &out) {
+      if (in.size() != out.size()) {
+        out = in;
+        return true;
+      }
+      bool state = false;
+      for (uint i = 0; i < in.size(); ++i)
+        state |= compare_and_set(in[i], out[i]);
+      return state;
+    }
+
+    constexpr
+    std::vector<bool> compare_and_set_all(const auto &in, auto &out) {
+      std::vector<bool> state(in.size(), true);
       if (in.size() != out.size()) {
         out = in;
         return state;
@@ -36,9 +47,8 @@ namespace met {
     }
 
     constexpr
-    std::vector<ProjectState::CacheStale> compare_and_set_all_eig(const auto &in,
-                                                         auto &out) {
-      std::vector<ProjectState::CacheStale> state(in.size(), true);
+    std::vector<bool> compare_and_set_all_eig(const auto &in, auto &out) {
+      std::vector<bool> state(in.size(), true);
       if (in.size() != out.size()) {
         out = in;
         return state;
@@ -49,8 +59,7 @@ namespace met {
     }
 
     constexpr
-    CacheVert compare_and_set_vert(const Vert &in,
-                                         Vert &out) {
+    CacheVert compare_and_set_vert(const Vert &in, Vert &out) {
       CacheVert state;
       state.colr_i = compare_and_set_eig(in.colr_i, out.colr_i);
       state.mapp_i = compare_and_set(in.mapp_i, out.mapp_i);
@@ -91,7 +100,9 @@ namespace met {
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
     auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
     auto &e_elem_selct = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
+    auto &e_elem_mover = info.get_resource<std::vector<uint>>("viewport_input_elem", "mouseover");
     auto &e_cstr_selct = info.get_resource<int>("viewport_overlay", "constr_selection");
 
     // Iterate over all project data
@@ -124,8 +135,10 @@ namespace met {
     i_pipe_state.any = i_pipe_state.any_mapps | i_pipe_state.any_elems | i_pipe_state.any_verts;
 
     // Iterate over all selection data
-    i_view_state.vert_selection = std::ranges::any_of(detail::compare_and_set_all(e_vert_selct, m_vert_selct), [](auto v) { return v; });
-    i_view_state.elem_selection = std::ranges::any_of(detail::compare_and_set_all(e_elem_selct, m_elem_selct), [](auto v) { return v; });
+    i_view_state.vert_selection = detail::compare_and_set_reduce(e_vert_selct, m_vert_selct);
+    i_view_state.vert_mouseover = detail::compare_and_set_reduce(e_vert_mover, m_vert_mover);
+    i_view_state.elem_selection = detail::compare_and_set_reduce(e_elem_selct, m_elem_selct);
+    i_view_state.elem_mouseover = detail::compare_and_set_reduce(e_elem_mover, m_elem_mover);
     i_view_state.cstr_selection = detail::compare_and_set(e_cstr_selct, m_cstr_selct);
   }
 } // namespace met

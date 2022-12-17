@@ -131,8 +131,6 @@ namespace met {
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     guard(e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection);
 
-    fmt::print("Generating color solid! vert = {}, cstr = {}\n", e_vert_slct[0], e_cstr_slct);
-
     // Get shared resources
     auto &e_basis     = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");

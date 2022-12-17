@@ -1,6 +1,7 @@
-#include <metameric/core/spectrum.hpp>
-#include <metameric/core/texture.hpp>
 #include <metameric/core/data.hpp>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
+#include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/viewport/task_draw_gamut.hpp>
@@ -104,13 +105,10 @@ namespace met {
     met_trace_full();
                                 
     // Get shared resources 
-    auto &e_arcball     = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_verts       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
-    auto &e_elems       = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
-    auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
-    auto &e_elem_select = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
-    auto &e_elem_msover = info.get_resource<std::vector<uint>>("viewport_input_elem", "mouseover");
+    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_verts      = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
+    auto &e_elems      = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
+    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
 
     // Update array object handles in case gamut buffer was resized (and likely reallocated)
     if (m_buffer_object_cache != e_verts.object()) {
@@ -125,29 +123,25 @@ namespace met {
     }
 
     // Update size data based on selected vertices, if a state change occurred
-    if (!std::ranges::equal(m_vert_select_cache, e_vert_select) || !std::ranges::equal(m_vert_msover_cache, e_vert_msover)) {
-      std::ranges::fill(m_vert_size_map, vert_deslct_size);
+    if (e_view_state.vert_selection || e_view_state.vert_mouseover) {
+      auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+      auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
 
+      std::ranges::fill(m_vert_size_map, vert_deslct_size);
       std::ranges::for_each(e_vert_msover, [&](uint i) { m_vert_size_map[i] = vert_msover_size; });
       std::ranges::for_each(e_vert_select, [&](uint i) { m_vert_size_map[i] = vert_select_size; });
-
       m_vert_size_buffer.flush();
-
-      m_vert_select_cache = e_vert_select;
-      m_vert_msover_cache = e_vert_msover;
     }
 
     // Update opacity data based on selected elements, if a state change occurred
-    if (!std::ranges::equal(m_elem_select_cache, e_elem_select) || !std::ranges::equal(m_elem_msover_cache, e_elem_msover)) {
-      std::ranges::fill(m_elem_opac_map, elem_deslct_opac);
+    if (e_view_state.elem_selection || e_view_state.elem_mouseover) {
+      auto &e_elem_select = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
+      auto &e_elem_msover = info.get_resource<std::vector<uint>>("viewport_input_elem", "mouseover");
 
+      std::ranges::fill(m_elem_opac_map, elem_deslct_opac);
       std::ranges::for_each(e_elem_msover, [&](uint i) { m_elem_opac_map[i] = elem_msover_opac; });
       std::ranges::for_each(e_elem_select, [&](uint i) { m_elem_opac_map[i] = elem_select_opac; });
-
       m_elem_opac_buffer.flush();
-
-      m_elem_msover_cache = e_elem_msover;
-      m_elem_select_cache = e_elem_select;
     }
     
     // Update relevant program uniforms for coming draw operations

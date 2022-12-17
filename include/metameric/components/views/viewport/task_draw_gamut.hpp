@@ -9,11 +9,7 @@
 namespace met {
   class ViewportDrawGamutTask : public detail::AbstractTask {
     // Cache objects to detect state changes in UI components
-    uint              m_buffer_object_cache;
-    std::vector<uint> m_vert_select_cache;
-    std::vector<uint> m_vert_msover_cache;
-    std::vector<uint> m_elem_select_cache;
-    std::vector<uint> m_elem_msover_cache;
+    uint m_buffer_object_cache;
 
     // Local buffer to store individual opacities/sizes for vertex/element selection/mouseover;
     // each buffer is mapped for flushable changes

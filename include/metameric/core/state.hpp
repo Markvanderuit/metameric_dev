@@ -5,42 +5,40 @@
 namespace met {
   /* Wrapper object for tracking changes to project data throughout program pipeline */
   struct ProjectState {
-    using CacheStale = bool;
-
     struct CacheVert {
-      CacheStale any;
-      CacheStale any_colr_j;
-      CacheStale any_mapp_j;
+      bool any;
+      bool any_colr_j;
+      bool any_mapp_j;
 
-      CacheStale colr_i;
-      CacheStale mapp_i;
+      bool colr_i;
+      bool mapp_i;
 
-      std::vector<CacheStale> colr_j;
-      std::vector<CacheStale> mapp_j;
+      std::vector<bool> colr_j;
+      std::vector<bool> mapp_j;
     };
 
   public:
-    CacheStale any;
-    CacheStale any_verts;
-    CacheStale any_elems;
-    CacheStale any_mapps;
+    bool any;
+    bool any_verts;
+    bool any_elems;
+    bool any_mapps;
 
     std::vector<CacheVert> verts;
-    std::vector<CacheStale> elems;
-    std::vector<CacheStale> mapps;
+    std::vector<bool> elems;
+    std::vector<bool> mapps;
   };
 
   /* Wrapper objecct for tracking changes to viewport in program pipeline; e.g. vertex selection */
   struct ViewportState {
-    using CacheStale = bool;
-
     // Vertex selection in viewport
-    CacheStale vert_selection;
+    bool vert_selection;
+    bool vert_mouseover;
 
     // Element selection in viewport
-    CacheStale elem_selection;
+    bool elem_selection;
+    bool elem_mouseover;
 
     // Constraint selection in viewport overlay
-    CacheStale cstr_selection;
+    bool cstr_selection;
   };
 } // namespace met

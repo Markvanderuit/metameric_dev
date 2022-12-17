@@ -56,8 +56,11 @@ namespace met {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
-    auto &e_selection  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &i_cstr_slct = info.get_resource<int>("constr_selection");
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+    auto &e_verts     = e_proj_data.gamut_verts;
     
     if (e_selection.size() != 1) {
       i_cstr_slct = -1;
@@ -99,13 +102,24 @@ namespace met {
       view_size.y() = 0.f;
 
       // Set window state for next window
-      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      // auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
+
+      // Window open flag, and window title
+      bool window_open = true;
+      auto window_name = fmt::format("Editing {} ({} -> {})",
+        i_cstr_slct, 
+        e_proj_data.mappings[e_verts[e_selection[0]].mapp_i].first,
+        e_proj_data.mappings[e_verts[e_selection[0]].mapp_j[i_cstr_slct]].first);
       
-      if (ImGui::Begin("Metamer set", NULL, window_flags | ImGuiWindowFlags_NoTitleBar)) {
+      if (ImGui::Begin(window_name.c_str(), &window_open, window_flags)) {
         eval_overlay_color_solid(info, e_selection[0]);
       }
+
+      // Window was closed, deselect constraint
+      if (!window_open)
+        i_cstr_slct = -1;
         
       // Capture window size to offset next window by this amount
       view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
@@ -225,10 +239,8 @@ namespace met {
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Edit")) {
+        if (ImGui::Button("Edit"))
           i_cstr_slct  = j;
-          fmt::print("{}\n", j);
-        }
 
         // Button to move constraint up
         if (j > 0) ImGui::SameLine();
@@ -276,16 +288,20 @@ namespace met {
     }
 
     // Spawn button to add an extra constraint, if necessary
-    ImGui::Spacing();
-    ImGui::Separator();
-    if (ImGui::Button("Add constraint")) {
-        e_appl_data.touch({
-            .name = "Add color constraint",
-            .redo = [i = i](auto &data) { 
-              data.gamut_verts[i].colr_j.push_back(data.gamut_verts[i].colr_i); 
-              data.gamut_verts[i].mapp_j.push_back(0); 
-            }, .undo = [edit = e_vert,  i = i](auto &data) { data.gamut_verts[i] = edit; }
-        });
+    ImGui::SpacedSeparator();
+    if (ImGui::Button("Add color constraint")) {
+      // Submit data to add color constraint
+      e_appl_data.touch({
+          .name = "Add color constraint",
+          .redo = [i = i](auto &data) { 
+            data.gamut_verts[i].colr_j.push_back(data.gamut_verts[i].colr_i); 
+            data.gamut_verts[i].mapp_j.push_back(0); 
+          }, .undo = [edit = e_vert,  i = i](auto &data) { data.gamut_verts[i] = edit; }
+      });
+
+      // Set displayed constraint in viewport to this constraint, iff a constraint was selected
+      if (i_cstr_slct != -1)
+        i_cstr_slct = e_vert.colr_j.size() - 1;
     }
   }
 
@@ -322,53 +338,65 @@ namespace met {
     // Insert image, applying viewport texture to viewport; texture can be safely drawn 
     // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
     ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
-      
-    // Ensure mouse is over window for the following section
-    guard(ImGui::IsItemHovered());
+    if (ImGui::IsItemHovered()) {
+      // If gizmo is not in use, process input to update camera
+      if (!ImGuizmo::IsUsing()) {
+        auto &io = ImGui::GetIO();
+        i_arcball.m_aspect = i_lrgb_target.size().x() / i_lrgb_target.size().y();
+        i_arcball.set_dist_delta(io.MouseWheel);
+        if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
+          i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / i_lrgb_target.size().cast<float>());
+        i_arcball.update_matrices();
+      }
 
-    // If gizmo is not in use, process input to update camera
-    if (!ImGuizmo::IsUsing()) {
-      auto &io = ImGui::GetIO();
-      i_arcball.m_aspect = i_lrgb_target.size().x() / i_lrgb_target.size().y();
-      i_arcball.set_dist_delta(io.MouseWheel);
-      if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
-        i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / i_lrgb_target.size().cast<float>());
-      i_arcball.update_matrices();
+      // Anchor position for ocs gizmo is colr + offset, minus center offset 
+      eig::Vector3f trf_trnsl = e_vert.colr_j[i_cstr_slct] - e_csol_cntr;
+      eig::Affine3f trf_basic = eig::Affine3f(eig::Translation3f(trf_trnsl));
+      eig::Affine3f trf_delta = eig::Affine3f::Identity();
+
+      // Insert ImGuizmo manipulator at anchor position
+      eig::Vector2f rmin = ImGui::GetItemRectMin(), rmax = ImGui::GetItemRectSize();
+      ImGuizmo::SetRect(rmin.x(), rmin.y(), rmax.x(), rmax.y());
+      ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+      ImGuizmo::Manipulate(i_arcball.view().data(), i_arcball.proj().data(), 
+        ImGuizmo::OPERATION::TRANSLATE, ImGuizmo::MODE::LOCAL, trf_basic.data(), trf_delta.data());
+      
+      // Register gizmo use start, cache current offset position
+      if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
+        m_colr_prev = e_vert.colr_j[i_cstr_slct];
+        m_is_gizmo_used = true;
+      }
+
+      // Register gizmo use
+      if (ImGuizmo::IsUsing())
+        e_vert.colr_j[i_cstr_slct] = (trf_delta * e_vert.colr_j[i_cstr_slct].matrix()).array();
+
+      // Register gizmo use end, update positions
+      if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
+        m_is_gizmo_used = false;
+        
+        // Register data edit as drag finishes
+        e_appl_data.touch({ 
+          .name = "Move gamut offsets", 
+          .redo = [edit = e_vert.colr_j[i_cstr_slct], 
+                  i = i, 
+                  j = i_cstr_slct](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }, 
+          .undo = [edit = m_colr_prev,                 
+                  i = i, 
+                  j = i_cstr_slct](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }
+        });
+      }
     }
 
-    // Anchor position for ocs gizmo is colr + offset, minus center offset 
-    eig::Vector3f trf_trnsl = e_vert.colr_j[i_cstr_slct] - e_csol_cntr;
-    eig::Affine3f trf_basic = eig::Affine3f(eig::Translation3f(trf_trnsl));
-    eig::Affine3f trf_delta = eig::Affine3f::Identity();
-
-    // Insert ImGuizmo manipulator at anchor position
-    eig::Vector2f rmin = ImGui::GetItemRectMin(), rmax = ImGui::GetItemRectSize();
-    ImGuizmo::SetRect(rmin.x(), rmin.y(), rmax.x(), rmax.y());
-    ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-    ImGuizmo::Manipulate(i_arcball.view().data(), i_arcball.proj().data(), 
-      ImGuizmo::OPERATION::TRANSLATE, ImGuizmo::MODE::LOCAL, trf_basic.data(), trf_delta.data());
-    
-    // Register gizmo use start, cache current offset position
-    if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-      m_colr_prev = e_vert.colr_j[i_cstr_slct];
-      m_is_gizmo_used = true;
-    }
-
-    // Register gizmo use
-    if (ImGuizmo::IsUsing())
-      e_vert.colr_j[i_cstr_slct] = (trf_delta * e_vert.colr_j[i_cstr_slct].matrix()).array();
-
-    // Register gizmo use end, update positions
-    if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
-      m_is_gizmo_used = false;
-      
-      // Register data edit as drag finishes
+    // Add button to move gamut offset back to the metamer boundary's centroid
+    ImGui::SpacedSeparator();
+    if (ImGui::Button("Center value")) {
       e_appl_data.touch({ 
-        .name = "Move gamut offsets", 
-        .redo = [edit = e_vert.colr_j[i_cstr_slct], 
+        .name = "Center gamut offsets", 
+        .redo = [edit = e_csol_cntr, 
                  i = i, 
                  j = i_cstr_slct](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }, 
-        .undo = [edit = m_colr_prev,                 
+        .undo = [edit = e_vert.colr_j[i_cstr_slct],                 
                  i = i, 
                  j = i_cstr_slct](auto &data) { data.gamut_verts[i].colr_j[j] = edit; }
       });
@@ -398,9 +426,7 @@ namespace met {
     // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
     ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::SpacedSeparator();
 
     // Insert mapping selector for which color mapping is used in the weights overlay
     i_weight_mapping = std::min(i_weight_mapping, static_cast<uint>(e_mappings.size() - 1));

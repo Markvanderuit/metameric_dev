@@ -21,7 +21,6 @@ namespace met {
     std::string       m_parent;
     uint              m_srgb_target_cache;
     int               m_mapping_i_cache;
-    std::vector<uint> m_selection_cache;
 
     // Weight sum computation components
     gl::ComputeInfo m_dispatch;

@@ -13,7 +13,9 @@ namespace met {
 
     // Copies of view selection data to check for and report state changes
     std::vector<uint> m_vert_selct;
+    std::vector<uint> m_vert_mover;
     std::vector<uint> m_elem_selct;
+    std::vector<uint> m_elem_mover;
     int               m_cstr_selct;
 
   public:
