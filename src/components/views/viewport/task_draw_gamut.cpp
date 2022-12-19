@@ -62,8 +62,7 @@ namespace met {
     }};
     m_elem_array =  {{ 
       .buffers = {{ .buffer = &e_verts,  .index = 0, .stride = sizeof(eig::AlArray3f) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-      .elements = &e_elems 
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
     }};
 
     // Setup dispatch objects summarizing both draw operations

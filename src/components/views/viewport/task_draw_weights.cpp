@@ -27,12 +27,11 @@ namespace met {
     const eig::Array2u dispatch_texture_ndiv = ceil_div(dispatch_texture_n, 16u);
 
     // Initialize objects for shader call
+    m_texture_program = {{ .type = gl::ShaderType::eCompute,
+                           .path = "resources/shaders/viewport/draw_weights_to_texture.comp" }};
     m_program = {{ .type = gl::ShaderType::eCompute,
                    .path = "resources/shaders/viewport/draw_weights.comp.spv_opt",
                    .is_spirv_binary = true }};
-    m_texture_program = {{ .type = gl::ShaderType::eCompute,
-                           .path = "resources/shaders/viewport/draw_weights_to_texture.comp.spv_opt",
-                           .is_spirv_binary = true }};
     m_srgb_program = {{ .type = gl::ShaderType::eCompute, .path = "resources/shaders/misc/texture_resample.comp" }};
     
     // Create dispatch objects to summarize compute operations

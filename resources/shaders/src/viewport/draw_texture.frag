@@ -1,5 +1,7 @@
 #version 460 core
 
+layout(early_fragment_tests) in;
+
 layout(location = 0) in  vec2 in_value_vert;
 layout(location = 1) in  vec3 in_value_colr;
 layout(location = 0) out vec4 out_value_colr;
