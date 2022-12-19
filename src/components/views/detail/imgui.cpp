@@ -1,16 +1,20 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/window.hpp>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_internal.h>
 #include <ImGuizmo.h>
+#include <implot.h>
 #include <fmt/core.h>
 
 namespace ImGui {
   static bool appl_imgui_init = false;
   static std::string appl_imgui_ini_path  = "resources/misc/imgui.ini";
   static std::string appl_imgui_font_path = "resources/misc/atkinson_hyperlegible.ttf";
-  
+  static ImVector<ImRect> s_GroupPanelLabelStack;
+
   void Init(const gl::Window &window, bool dark_mode) {
     guard(!appl_imgui_init);
     appl_imgui_init = true;
@@ -18,6 +22,7 @@ namespace ImGui {
     // Initialize ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
 
     // Apply requested application color scheme
     if (dark_mode) {
@@ -52,6 +57,7 @@ namespace ImGui {
     guard(appl_imgui_init);
     appl_imgui_init = false;
     
+    ImPlot::DestroyContext();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -87,32 +93,32 @@ namespace ImGui {
     }
   }
 
-struct InputTextCallback_UserData{
-  std::string*            Str;
-  ImGuiInputTextCallback  ChainCallback;
-  void*                   ChainCallbackUserData;
-};
+  struct InputTextCallback_UserData{
+    std::string*            Str;
+    ImGuiInputTextCallback  ChainCallback;
+    void*                   ChainCallbackUserData;
+  };
 
-static int InputTextCallback(ImGuiInputTextCallbackData* data)
-{
-    InputTextCallback_UserData* user_data = (InputTextCallback_UserData*)data->UserData;
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-    {
-        // Resize string callback
-        // If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
-        std::string* str = user_data->Str;
-        IM_ASSERT(data->Buf == str->c_str());
-        str->resize(data->BufTextLen);
-        data->Buf = (char*)str->c_str();
-    }
-    else if (user_data->ChainCallback)
-    {
-        // Forward to user callback, if any
-        data->UserData = user_data->ChainCallbackUserData;
-        return user_data->ChainCallback(data);
-    }
-    return 0;
-}
+  static int InputTextCallback(ImGuiInputTextCallbackData* data)
+  {
+      InputTextCallback_UserData* user_data = (InputTextCallback_UserData*)data->UserData;
+      if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+      {
+          // Resize string callback
+          // If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
+          std::string* str = user_data->Str;
+          IM_ASSERT(data->Buf == str->c_str());
+          str->resize(data->BufTextLen);
+          data->Buf = (char*)str->c_str();
+      }
+      else if (user_data->ChainCallback)
+      {
+          // Forward to user callback, if any
+          data->UserData = user_data->ChainCallbackUserData;
+          return user_data->ChainCallback(data);
+      }
+      return 0;
+  }
 
   bool InputText(const char* label, std::string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
     IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);

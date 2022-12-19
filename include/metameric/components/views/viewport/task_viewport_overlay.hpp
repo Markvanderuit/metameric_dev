@@ -18,6 +18,7 @@ namespace met {
 
     void eval_overlay_vertex(detail::TaskEvalInfo &info, uint i);
     void eval_overlay_color_solid(detail::TaskEvalInfo &info, uint i);
+    void eval_overlay_plot(detail::TaskEvalInfo &info);
     void eval_overlay_weights(detail::TaskEvalInfo &info);
   };
 } // namespace met

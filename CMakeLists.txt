@@ -56,6 +56,7 @@ find_package(fmt       CONFIG REQUIRED)
 find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
+find_package(implot    CONFIG REQUIRED)
 find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(openmesh  CONFIG REQUIRED)
@@ -267,6 +268,7 @@ target_link_libraries(components PUBLIC
   small_gl
   imgui::imgui
   imguizmo::imguizmo
+  implot::implot
   unofficial::nativefiledialog::nfd
 )
 add_dependencies(components shaders_preprocess misc_copy)

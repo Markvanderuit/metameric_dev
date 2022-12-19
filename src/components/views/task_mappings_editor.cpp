@@ -4,7 +4,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  constexpr float list_width_relative  = 0.33f;
+  constexpr float list_width_relative  = 0.45f;
   constexpr float list_width_max       = 150.f;
   constexpr float select_right_padding = -32.f;
   const static ImVec2      add_button_size       = { 16.f, 16.f };
@@ -94,8 +94,7 @@ namespace met {
     auto &e_mappings  = e_proj_data.mappings;
 
     // Content area width determines list width
-    float window_width = ImGui::GetWindowContentRegionMax().x 
-                       - ImGui::GetWindowContentRegionMin().x;
+    float window_width = ImGui::GetContentRegionAvail().x;
     float list_width   = std::min(list_width_relative * window_width, list_width_max);
 
     // Begin list draw group
@@ -142,8 +141,7 @@ namespace met {
     auto &e_illuminants = e_proj_data.illuminants;
 
     // Content area width determines selection width as remaining space
-    float window_width = ImGui::GetWindowContentRegionMax().x 
-                       - ImGui::GetWindowContentRegionMin().x;
+    float window_width = ImGui::GetContentRegionAvail().x;
     float list_width   = std::min(list_width_relative * window_width, list_width_max);
 
     // Begin selection draw group

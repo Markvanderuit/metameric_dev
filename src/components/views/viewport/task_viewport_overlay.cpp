@@ -8,17 +8,29 @@
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <ImGuizmo.h>
+#include <implot.h>
 #include <numeric>
 #include <ranges>
 #include <utility>
 
 namespace met {
-  constexpr auto window_flags = ImGuiWindowFlags_AlwaysAutoResize 
-    | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar
-    | ImGuiWindowFlags_NoResize  | ImGuiWindowFlags_NoMove
+  constexpr auto window_first_flags 
+    = ImGuiWindowFlags_NoDocking
+    | ImGuiWindowFlags_NoMove
+    | ImGuiWindowFlags_NoFocusOnAppearing;
+  constexpr auto window_flags 
+    = ImGuiWindowFlags_AlwaysAutoResize 
+    | ImGuiWindowFlags_NoDocking 
+    | ImGuiWindowFlags_NoResize  
+    | ImGuiWindowFlags_NoMove
+    | ImGuiWindowFlags_NoFocusOnAppearing;
+  constexpr auto window_vertices_flags 
+    = ImGuiWindowFlags_AlwaysAutoResize
+    | ImGuiWindowFlags_NoDocking 
+    | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoFocusOnAppearing;
 
-  constexpr float    overlay_width   = 256.f;
+  constexpr float    overlay_width   = 525.f;
   constexpr float    overlay_spacing = 16.f;
   const eig::Array2f overlay_padding = 16.f;
 
@@ -56,18 +68,19 @@ namespace met {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
-    auto &e_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &i_cstr_slct = info.get_resource<int>("constr_selection");
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data = e_appl_data.project_data;
     auto &e_verts     = e_proj_data.gamut_verts;
     
-    if (e_selection.size() != 1) {
+    // Clear constraint selection if multiple vertices are selected
+    if (e_vert_slct.size() != 1) {
       i_cstr_slct = -1;
     }
 
     // Only spawn any tooltips on non-empty gamut selection
-    guard(!e_selection.empty());
+    guard(!e_vert_slct.empty());
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -76,18 +89,24 @@ namespace met {
     // Track these positions/sizes so overtays are evenly spaced
     eig::Array2f view_posi = viewport_offs + overlay_padding, 
                  view_size = { 0.f, 0.f };
-                //  view_size = { overlay_width * ImGui::GetIO().DisplayFramebufferScale.x, 0.f };
-    
-    // Spawn window with selection info if one or more vertices are selected
-    for (const uint &i : e_selection) {
-      view_size.y() = 0.f;
-      
-      // Set window state for next window
+                 view_size = { overlay_width / ImGui::GetIO().DisplayFramebufferScale.x, 0.f };
+
+    // Spawn window with vertex info if one or more vertices are selected
+    {
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
-      
-      if (ImGui::Begin(fmt::format("Vertex {}", i).c_str(), nullptr, window_flags)) {
-        eval_overlay_vertex(info, i);
+      ImGui::SetNextWindowSizeConstraints({ overlay_width, 0.f }, { overlay_width, overlay_width });
+      view_size.y() = 0.f;
+      if (ImGui::Begin("Vertex settings", nullptr, window_vertices_flags)) {
+        if (e_vert_slct.size() == 1) {
+          eval_overlay_vertex(info, e_vert_slct[0]);
+        } else {
+          for (uint i : e_vert_slct) {
+            if (ImGui::CollapsingHeader(fmt::format("Vertex {}", i).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+              eval_overlay_vertex(info, i);
+            }
+          }
+        }
       }
 
       // Capture window size to offset next window by this amount
@@ -96,9 +115,28 @@ namespace met {
 
       ImGui::End();
     }
+    
+    // Spawn window for reflectance plot display
+    {
+      view_size.y() = 0.f;
+
+      // Set window state for next window
+      ImGui::SetNextWindowPos(view_posi);
+      ImGui::SetNextWindowSize(view_size);
+
+      if (ImGui::Begin("Vertex reflectances", nullptr, window_flags)) {
+        eval_overlay_plot(info);
+      }
+        
+      // Capture window size to offset next window by this amount
+      view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
+      view_posi.y() += view_size.y() + overlay_spacing;
+
+      ImGui::End();
+    }
 
     // Spawn window for metamer set editing if there is one vertex selected
-    if (e_selection.size() == 1 && i_cstr_slct >= 0) {
+    if (e_vert_slct.size() == 1 && i_cstr_slct >= 0) {
       view_size.y() = 0.f;
 
       // Set window state for next window
@@ -110,11 +148,11 @@ namespace met {
       bool window_open = true;
       auto window_name = fmt::format("Editing {} ({} -> {})",
         i_cstr_slct, 
-        e_proj_data.mapping_name(e_verts[e_selection[0]].mapp_i),
-        e_proj_data.mapping_name(e_verts[e_selection[0]].mapp_j[i_cstr_slct]));
+        e_proj_data.mapping_name(e_verts[e_vert_slct[0]].mapp_i),
+        e_proj_data.mapping_name(e_verts[e_vert_slct[0]].mapp_j[i_cstr_slct]));
       
       if (ImGui::Begin(window_name.c_str(), &window_open, window_flags)) {
-        eval_overlay_color_solid(info, e_selection[0]);
+        eval_overlay_color_solid(info, e_vert_slct[0]);
       }
 
       // Window was closed, deselect constraint
@@ -136,7 +174,7 @@ namespace met {
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
       
-      if (ImGui::Begin("Affected region", NULL, window_flags | ImGuiWindowFlags_NoTitleBar)) {
+      if (ImGui::Begin("Vertex influences", NULL, window_flags)) {
         eval_overlay_weights(info);
       }
         
@@ -150,33 +188,52 @@ namespace met {
 
   void ViewportOverlayTask::eval_overlay_vertex(detail::TaskEvalInfo &info, uint i) {
     met_trace_full();
+    ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
     // Get shared resources
+    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
     auto &e_vert       = e_proj_data.gamut_verts[i];
     auto &e_spec       = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
-    
-    // Plot reflectances
-    ImGui::PlotLines("Reflectance", e_spec.data(), wavelength_samples, 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
+
+    // Local state
+    float mapp_width, edit3_width;
 
     // Plot vertex settings for primary color
-    if (ImGui::CollapsingHeader("Primary Color", ImGuiTreeNodeFlags_DefaultOpen)) {
+    {
       Mapp mapp    = e_proj_data.mapping_data(e_vert.mapp_i);
       Colr colr_i  = e_vert.colr_i;
       Colr rtrip_i = mapp.apply_color(e_spec);
       Colr error_i = (rtrip_i - colr_i).abs().eval();
-      
-      ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-      ImGui::SameLine();
-      ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_i).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-      ImGui::SameLine();
-      ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
 
+      edit3_width = ImGui::GetContentRegionAvail().x * .485f;
+      ImGui::BeginGroup();
+      ImGui::AlignTextToFramePadding();
+      ImGui::BeginGroup();
+      ImGui::Text("Vertex color");
+      ImGui::SetNextItemWidth(edit3_width);
+      ImGui::ColorEdit3("##Value", linear_srgb_to_gamma_srgb(colr_i).data(),  ImGuiColorEditFlags_Float);
+      ImGui::EndGroup();
+      ImGui::SameLine();
+      ImGui::AlignTextToFramePadding();
+      ImGui::BeginGroup();
+      ImGui::Text("Roundtrip error");
+      ImGui::SetNextItemWidth(edit3_width);
+      ImGui::ColorEdit3("##Error", linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float);
+      ImGui::EndGroup();
+      ImGui::EndGroup();
+      mapp_width = ImGui::GetItemRectSize().x;
+    }
+
+    ImGui::Separator();
+
+    {
       // Selector for primary color mapping index, operating on a local copy
+      ImGui::Text("Vertex mapping");
+      ImGui::SetNextItemWidth(mapp_width);
       uint l_mapp_i = e_vert.mapp_i;
-      ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.9f);
       if (ImGui::BeginCombo("##Mapping", e_proj_data.mapping_name(l_mapp_i).c_str())) {
         for (uint j = 0; j < e_proj_data.mappings.size(); ++j) {
           if (ImGui::Selectable(e_proj_data.mapping_name(j).c_str(), j == l_mapp_i)) {
@@ -196,31 +253,27 @@ namespace met {
       }
     }
 
-    // Plot vertex settings for secondary colors
-    for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
-      auto constraint_name = fmt::format("Secondary {} ({} -> {})",
-        j, 
-        e_proj_data.mapping_name(e_vert.mapp_i),
-        e_proj_data.mapping_name(e_vert.mapp_j[j]));
-      auto constraint_id = fmt::format("constraint{}", j);
-      
-      bool color_visible = true;
-      if (ImGui::CollapsingHeader(constraint_name.c_str(), &color_visible, ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::PushID(constraint_id.c_str());
+    ImGui::Separator();
 
-        Mapp mapp    = e_proj_data.mapping_data(e_vert.mapp_j[j]);
-        Colr colr_j  = e_vert.colr_j[j];
-        Colr rtrip_j = mapp.apply_color(e_spec);
-        Colr error_j = (rtrip_j - colr_j).abs().eval();
+    if (!e_vert.colr_j.empty()) {
+      ImGui::AlignTextToFramePadding();
 
-        ImGui::ColorEdit3("Value",     linear_srgb_to_gamma_srgb(colr_j).data(),  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-        ImGui::SameLine();
-        ImGui::ColorEdit3("Roundtrip", linear_srgb_to_gamma_srgb(rtrip_j).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-        ImGui::SameLine();
-        ImGui::ColorEdit3("Error",     linear_srgb_to_gamma_srgb(error_j).data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      // Coming column widths
+      const float constr_total_width = ImGui::GetContentRegionAvail().x;
+      const float constr_mapp_width  = 0.5f * constr_total_width;
+      const float constr_colr_width  = .15f * constr_total_width;
+      const float constr_edit_width  = .15f * constr_total_width;
+      const float constr_arrw_width  = .15f * constr_total_width;
+      const float constr_clse_width  = .05f * constr_total_width;
+
+      // Mapping selector
+      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_mapp_width); ImGui::Text("Constraint mapping");
+      for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+        ImGui::PushID(j);
 
         // Selector for secondary color mapping index, operating on a local copy
         uint l_mapp_j = e_vert.mapp_j[j];
+        ImGui::PushItemWidth(constr_mapp_width);
         if (ImGui::BeginCombo("##Mapping", e_proj_data.mapping_name(l_mapp_j).c_str())) {
           for (uint k = 0; k < e_proj_data.mappings.size(); ++k) {
             if (ImGui::Selectable(e_proj_data.mapping_name(k).c_str(), k == l_mapp_j)) {
@@ -229,6 +282,7 @@ namespace met {
           }
           ImGui::EndCombo();
         }
+        ImGui::PopItemWidth();
 
         // Register potential changes to constraint data
         if (l_mapp_j != e_vert.mapp_j[j]) {
@@ -239,71 +293,110 @@ namespace met {
           });
         }
 
-        ImGui::SameLine();
-        if (ImGui::Button("Edit"))
-          i_cstr_slct  = j;
+        ImGui::PopID();
+      }
+      ImGui::EndGroup();  ImGui::SameLine();
 
-        // Button to move constraint up
-        if (j > 0) ImGui::SameLine();
-        if (j > 0 && ImGui::ArrowButton("up", ImGuiDir_Up)) {
-          e_appl_data.touch({
-            .name = "Swapped constraint mappings",
-            .redo = [i = i, j = j](auto &data) {  
-              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j - 1]);
-              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j - 1]);
-            },
-            .undo = [i = i, j = j](auto &data) {  
-              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j - 1]);
-              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j - 1]);
-            }
-          });
+      // Value/error
+      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_colr_width); ImGui::Text("Value, err");
+      for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+        ImGui::PushID(j);
+
+        Mapp mapp    = e_proj_data.mapping_data(e_vert.mapp_j[j]);
+        Colr colr_j  = e_vert.colr_j[j];
+        Colr rtrip_j = mapp.apply_color(e_spec);
+        Colr error_j = (rtrip_j - colr_j).abs().eval();
+
+        ImGui::ColorEdit3(fmt::format("##value{}", j).c_str(), 
+          linear_srgb_to_gamma_srgb(colr_j).data(),  
+          ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+        ImGui::SameLine();
+        ImGui::ColorEdit3(fmt::format("##error{}", j).c_str(), 
+          linear_srgb_to_gamma_srgb(error_j).data(), 
+          ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+
+        ImGui::PopID();
+      }
+      ImGui::EndGroup();  ImGui::SameLine();
+
+      // Edit buttons
+      ImGui::PushItemWidth(constr_edit_width); ImGui::BeginGroup(); ImGui::Text("");
+      if (e_vert_slct.size() > 1) ImGui::BeginDisabled();
+      for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+        ImGui::PushID(j);
+        if (ImGui::Button("Edit")) {
+          i_cstr_slct  = j;
         }
-        if (j < e_vert.colr_j.size() - 1) ImGui::SameLine();
-        if (j < e_vert.colr_j.size() - 1 && ImGui::ArrowButton("down", ImGuiDir_Down)) {
-          e_appl_data.touch({
-            .name = "Swapped constraint mappings",
-            .redo = [i = i, j = j](auto &data) {  
-              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j + 1]);
-              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j + 1]);
-            },
-            .undo = [i = i, j = j](auto &data) {  
-              std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j + 1]);
-              std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j + 1]);
-            }
-          });
+        ImGui::PopID();
+      }
+      if (e_vert_slct.size() > 1) ImGui::EndDisabled();
+      ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
+    
+      // Up/down buttons
+      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_arrw_width); ImGui::Text("");
+      for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+        ImGui::PushID(j);
+
+        if (j == 0) ImGui::BeginDisabled();
+        if (ImGui::ArrowButton("up", ImGuiDir_Up)) {
+          e_appl_data.touch({ .name = "Swapped constraint mappings", .redo = [i = i, j = j](auto &data) {  
+            std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j - 1]);
+            std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j - 1]);
+          },.undo = [i = i, j = j](auto &data) {  
+            std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j - 1]);
+            std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j - 1]);
+          }});
+        }
+        if (j == 0) ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        
+        if (j == e_vert.colr_j.size() - 1) ImGui::BeginDisabled();
+        if (ImGui::ArrowButton("down", ImGuiDir_Down)) {
+          e_appl_data.touch({ .name = "Swapped constraint mappings", .redo = [i = i, j = j](auto &data) {  
+            std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j + 1]);
+            std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j + 1]);
+          },.undo = [i = i, j = j](auto &data) {  
+            std::swap(data.gamut_verts[i].colr_j[j], data.gamut_verts[i].colr_j[j + 1]);
+            std::swap(data.gamut_verts[i].mapp_j[j], data.gamut_verts[i].mapp_j[j + 1]);
+          }});
+        }
+        if (j == e_vert.colr_j.size() - 1) ImGui::EndDisabled();
+
+        ImGui::PopID();
+      }
+      ImGui::EndGroup();  ImGui::SameLine();
+
+      // Close button
+      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_clse_width); ImGui::Text("");
+      for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
+        ImGui::PushID(j);
+
+        if (ImGui::Button("X")) {
+          e_appl_data.touch({ .name = "Delete color constraint", .redo = [i = i, j = j](auto &data) { 
+            data.gamut_verts[i].colr_j.erase(data.gamut_verts[i].colr_j.begin() + j); 
+            data.gamut_verts[i].mapp_j.erase(data.gamut_verts[i].mapp_j.begin() + j); 
+          }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.gamut_verts[i] = edit; }});
         }
 
         ImGui::PopID();
       }
-
-      // Secondary color was deleted, register changes to constraint data
-      if (!color_visible) {
-        e_appl_data.touch({
-            .name = "Delete color constraint",
-            .redo = [i = i, j = j](auto &data) { 
-              data.gamut_verts[i].colr_j.erase(data.gamut_verts[i].colr_j.begin() + j); 
-              data.gamut_verts[i].mapp_j.erase(data.gamut_verts[i].mapp_j.begin() + j); 
-            }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.gamut_verts[i] = edit; }
-        });
-      }
+      ImGui::EndGroup();
     }
 
     // Spawn button to add an extra constraint, if necessary
-    ImGui::SpacedSeparator();
-    if (ImGui::Button("Add color constraint")) {
-      // Submit data to add color constraint
-      e_appl_data.touch({
-          .name = "Add color constraint",
-          .redo = [i = i](auto &data) { 
-            data.gamut_verts[i].colr_j.push_back(data.gamut_verts[i].colr_i); 
-            data.gamut_verts[i].mapp_j.push_back(0); 
-          }, .undo = [edit = e_vert,  i = i](auto &data) { data.gamut_verts[i] = edit; }
-      });
+    if (ImGui::Button("Add constraint")) {
+      e_appl_data.touch({ .name = "Add color constraint", .redo = [i = i](auto &data) { 
+        data.gamut_verts[i].colr_j.push_back(data.gamut_verts[i].colr_i); 
+        data.gamut_verts[i].mapp_j.push_back(0); 
+      }, .undo = [edit = e_vert,  i = i](auto &data) { data.gamut_verts[i] = edit; }});
 
       // Set displayed constraint in viewport to this constraint, iff a constraint was selected
       if (i_cstr_slct != -1)
         i_cstr_slct = e_vert.colr_j.size() - 1;
     }
+
+    ImGui::PopID(); // i
   }
 
   void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskEvalInfo &info, uint i) {
@@ -403,6 +496,40 @@ namespace met {
       });
     }
   }
+
+  void ViewportOverlayTask::eval_overlay_plot(detail::TaskEvalInfo &info) {
+    met_trace_full();
+
+    // Get shared resources
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+    auto &i_cstr_slct = info.get_resource<int>("constr_selection");
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert        = e_appl_data.project_data.gamut_verts;
+    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
+
+    if (ImPlot::BeginPlot("##Reflectance", { -1.f, 192.f, }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+      // Get wavelength values for x-axis in plot
+      Spec x_values;
+      for (uint i = 0; i < x_values.size(); ++i)
+        x_values[i] = wavelength_at_index(i);
+
+      // Setup minimal format for coming line plots
+      ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+      ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+      ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0, 1.0, ImPlotCond_Always);
+
+      // Plot each vertex
+      for (uint i : e_vert_slct) {
+        auto c = linear_srgb_to_gamma_srgb(e_vert[i].colr_i);
+        ImPlot::SetNextLineStyle({ c.x(), c.y(), c.z(), 1.f });
+        ImPlot::PlotLine(fmt::format("Vertex {}", i).c_str(), x_values.data(), e_spec[i].data(), wavelength_samples);
+      }
+      
+      ImPlot::EndPlot();
+    }
+  }
+
 
   void ViewportOverlayTask::eval_overlay_weights(detail::TaskEvalInfo &info) {
     met_trace_full();

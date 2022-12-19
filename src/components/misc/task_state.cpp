@@ -168,8 +168,6 @@ namespace met {
 
     // Iterate over all project data
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.gamut_verts, m_verts);
-
-    // Iterate over illuminant data
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
     std::tie(i_pipe_state.cmfs,  i_pipe_state.any_cmfs)  = detail::compare_state(e_proj_data.cmfs, m_cmfs);
     std::tie(i_pipe_state.elems, i_pipe_state.any_elems) = detail::compare_state(e_proj_data.gamut_elems, m_elems);
@@ -182,9 +180,8 @@ namespace met {
       
       // If mapping state has become stale, this influenced the flag inside of a vertex as well
       vert_state.mapp_i |= i_pipe_state.mapps[vert_data.mapp_i];
-      for (uint j = 0; j < vert_state.mapp_j.size(); ++j) {
+      for (uint j = 0; j < vert_state.mapp_j.size(); ++j)
         vert_state.mapp_j[j] = vert_state.mapp_j[j] | i_pipe_state.mapps[vert_data.mapp_j[j]];
-      }
       
       // Set summary flags per vertex
       vert_state.any_colr_j = std::reduce(range_iter(vert_state.colr_j), false, reduce_stale);
