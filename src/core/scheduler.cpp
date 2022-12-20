@@ -102,8 +102,17 @@ namespace met {
 
   void LinearScheduler::clear_tasks() {
     met_trace();
-    std::erase_if(_rsrc_registry, [&](const auto &p) { return p.first != global_key; });
-    _task_registry.clear();
+
+    // Gather key names from all tasks
+    std::vector<KeyType> keys(_task_registry.size());
+    std::ranges::transform(_task_registry, keys.begin(), [](const auto &task) { return task->name(); });
+
+    // Deregister all tasks safely; some tasks remove their own subtasks upon destruction
+    for (auto &key : keys) 
+      deregister_task(key);
+    
+    // Remove all resources not marked with global_key, though there should be none due to deregister_task
+    std::erase_if(_rsrc_registry, [&](const auto &pair) { return pair.first != global_key; });
   }
 
   void LinearScheduler::clear_global() {
