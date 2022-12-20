@@ -30,7 +30,7 @@ namespace met {
     | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoFocusOnAppearing;
 
-  constexpr float    overlay_width   = 525.f;
+  constexpr float    overlay_width   = 500.f;
   constexpr float    overlay_spacing = 16.f;
   const eig::Array2f overlay_padding = 16.f;
 
@@ -260,10 +260,10 @@ namespace met {
 
       // Coming column widths
       const float constr_total_width = ImGui::GetContentRegionAvail().x;
-      const float constr_mapp_width  = 0.5f * constr_total_width;
-      const float constr_colr_width  = .15f * constr_total_width;
-      const float constr_edit_width  = .15f * constr_total_width;
-      const float constr_arrw_width  = .15f * constr_total_width;
+      const float constr_mapp_width  = .45f * constr_total_width;
+      const float constr_colr_width  = .125f * constr_total_width;
+      const float constr_edit_width  = .1f * constr_total_width;
+      const float constr_arrw_width  = .1f * constr_total_width;
       const float constr_clse_width  = .05f * constr_total_width;
 
       // Mapping selector
