@@ -1,10 +1,9 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_create_project.hpp>
+#include <small_gl/window.hpp>
 
 namespace met {
-  namespace detail {
-
-  } // namespace detail
+  constexpr float img_rel_width = 256.f;
   
   CreateProjectTask::CreateProjectTask(const std::string &name, const std::string &view_title)
   : detail::AbstractTask(name),
@@ -13,19 +12,22 @@ namespace met {
   void CreateProjectTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
-
+    // ...
   }
 
   void CreateProjectTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
 
-
+    // ...
   }
 
   void CreateProjectTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr)) {
+    // Get shared resources
+    auto &e_window = info.get_resource<gl::Window>(global_key, "window");
+
+    if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       // Define text input to obtain path and
       // simple '...' button for file selection to obtain path
       ImGui::Text("Path to input texture...");
@@ -53,44 +55,69 @@ namespace met {
       }
 
       ImGui::SpacedSeparator();
+      
+      const float child_height = (img_rel_width + 80.f) * e_window.content_scale();
+      if (ImGui::BeginChild("Added images", { 2.f * child_height, child_height }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
+        ImGui::AlignTextToFramePadding();
 
-      if (ImGui::BeginChild("Added images", { 0, ImGui::GetContentRegionAvail().y - 52.f }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
+        // Track id of image to erase after full draw
+        int erased_image = -1;
+
         for (uint i = 0; i < m_imag_data.size(); ++i) {
-
           auto &img = m_imag_data[i];
 
-          // Begin wrapper group around image
-          ImGui::PushID(fmt::format("image_{}", i).c_str());
-          ImGui::BeginGroup();
+          const float img_width  = img_rel_width * e_window.content_scale();
+          const float img_height = img_width * (img.host_data.size().x() / img.host_data.size().y());
 
-          ImGui::Text(img.name.c_str());
-          ImGui::Image(ImGui::to_ptr(img.device_data.object()), { 240, 240 });
-          
-          if (ImGui::BeginCombo("CMFS", m_proj_data.cmfs[img.cmfs].first.c_str())) {
-            for (uint j = 0; j < m_proj_data.cmfs.size(); ++j) {
-              if (ImGui::Selectable(m_proj_data.cmfs[j].first.c_str(), j == img.cmfs)) {
-                img.cmfs = j;
-              }
-            }
-            ImGui::EndCombo();
-          }
-          
-          if (ImGui::BeginCombo("Illuminant", m_proj_data.illuminants[img.illuminant].first.c_str())) {
-            for (uint j = 0; j < m_proj_data.illuminants.size(); ++j) {
-              if (ImGui::Selectable(m_proj_data.illuminants[j].first.c_str(), j == img.illuminant)) {
-                img.illuminant = j;
-              }
-            }
-            ImGui::EndCombo();
-          }
+          // Begin wrapper group around image and related content
+          if (ImGui::BeginChild(fmt::format("image_{}", i).c_str(), { img_width, 0 }, false)) {
+            // Image title
+            ImGui::Text(img.name.c_str());
 
-          // End wrapper group around image
-          ImGui::EndGroup();
-          ImGui::PopID();
+            // Image delete button at end of line
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+            if (ImGui::SmallButton("X")) {
+              erased_image = i;
+            }
+
+            // Plot image in full pre-calculated width/height
+            ImGui::Image(ImGui::to_ptr(img.device_data.object()), { img_width, img_height });
+            
+            // Selector for color matching functions
+            ImGui::PushItemWidth(img_width * 0.65f);
+            if (ImGui::BeginCombo("CMFS", m_proj_data.cmfs[img.cmfs].first.c_str())) {
+              for (uint j = 0; j < m_proj_data.cmfs.size(); ++j) {
+                if (ImGui::Selectable(m_proj_data.cmfs[j].first.c_str(), j == img.cmfs)) {
+                  img.cmfs = j;
+                }
+              }
+              ImGui::EndCombo();
+            }
+            ImGui::PopItemWidth();
+            
+            // Selector for illuminant SPD
+            ImGui::PushItemWidth(img_width * 0.65f);
+            if (ImGui::BeginCombo("Illuminant", m_proj_data.illuminants[img.illuminant].first.c_str())) {
+              for (uint j = 0; j < m_proj_data.illuminants.size(); ++j) {
+                if (ImGui::Selectable(m_proj_data.illuminants[j].first.c_str(), j == img.illuminant)) {
+                  img.illuminant = j;
+                }
+              }
+              ImGui::EndCombo();
+            }
+            ImGui::PopItemWidth();
+
+            ImGui::EndChild();
+          } // End wrapper group around image
+          // ImGui::EndGroup();
+          // ImGui::PopID();
 
           if (i < m_imag_data.size() - 1)
             ImGui::SameLine();
         }
+
+        if (erased_image != -1)
+          m_imag_data.erase(m_imag_data.begin() + m_imag_data);
       }
       ImGui::EndChild();
 

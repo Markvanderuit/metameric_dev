@@ -25,7 +25,7 @@ namespace met {
     if (ImGui::Begin("Spectra editor")) {
       ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
-      // Get external shared resources
+      // Get shared resources
       auto &e_window      = info.get_resource<gl::Window>(global_key, "window");
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data   = e_appl_data.project_data;
