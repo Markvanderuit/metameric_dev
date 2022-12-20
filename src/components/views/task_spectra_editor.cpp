@@ -10,7 +10,7 @@
 
 namespace met {
   constexpr auto plot_flags        = ImPlotFlags_NoFrame | ImPlotFlags_NoMenus;
-  constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
+  constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
   constexpr auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
 
   SpectraEditorTask::SpectraEditorTask(const std::string &name)
@@ -18,8 +18,10 @@ namespace met {
 
   void SpectraEditorTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
-    
+
     if (ImGui::Begin("Spectra editor")) {
+      ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
+
       // Get external shared resources
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data   = e_appl_data.project_data;
@@ -33,15 +35,14 @@ namespace met {
         x_values[i] = wavelength_at_index(i);
 
       if (ImGui::CollapsingHeader("Data", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-
         if (ImGui::TreeNodeEx("Illuminants", ImGuiTreeNodeFlags_DefaultOpen)) {
           for (uint i = 0; i < e_illuminants.size(); ++i) {
             auto &[key, illuminant] = e_illuminants[i];
             if (ImGui::TreeNodeEx(key.c_str())) {
               if (ImPlot::BeginPlot("##Illuminant", { -1.f, 192.f, }, plot_flags)) {
                 ImPlot::SetupAxes("Wavelength", "Value", plot_x_axis_flags, plot_y_axis_flags);
-                ImPlot::PlotLine("##pot_line", x_values.data(), illuminant.data(), wavelength_samples);
+                ImPlot::PlotLine("##plot_line", x_values.data(), illuminant.data(), wavelength_samples);
+                ImPlot::PlotShaded("##plot_line", x_values.data(), illuminant.data(), wavelength_samples);
                 ImPlot::EndPlot();
               }
               ImGui::TreePop();
@@ -60,6 +61,9 @@ namespace met {
                 ImPlot::PlotLine("x", x_values.data(), cmfs_x.data(), wavelength_samples);
                 ImPlot::PlotLine("y", x_values.data(), cmfs_y.data(), wavelength_samples);
                 ImPlot::PlotLine("z", x_values.data(), cmfs_z.data(), wavelength_samples);
+                ImPlot::PlotShaded("x", x_values.data(), cmfs_x.data(), wavelength_samples);
+                ImPlot::PlotShaded("y", x_values.data(), cmfs_y.data(), wavelength_samples);
+                ImPlot::PlotShaded("z", x_values.data(), cmfs_z.data(), wavelength_samples);
                 ImPlot::EndPlot();
               }
               ImGui::TreePop();
@@ -163,6 +167,8 @@ namespace met {
           });
         }
       }
+      
+      ImPlot::PopStyleVar();
     }
     ImGui::End();
   }
