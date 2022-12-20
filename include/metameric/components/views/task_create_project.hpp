@@ -12,16 +12,24 @@
 
 namespace met {
   class CreateProjectTask : public detail::AbstractTask {
+    // Structure to hold input image data before project creation
+    struct ImageData {
+      std::string     name;
+
+      // Input image, and gpu version for rendering
+      Texture2d3f     host_data;
+      gl::Texture2d3f device_data;
+
+      // Mapping data
+      uint cmfs, illuminant;
+    };
+
+    std::vector<ImageData> m_imag_data;
+    ProjectData            m_proj_data;
+
     std::string m_input_path;
     std::string m_view_title;
 
-    // Image data
-    struct ImageData {
-      fs::path        path;
-      Texture2d3f     host_data;
-      gl::Texture2d3f device_data;
-    };
-    std::vector<ImageData> m_image_data;
 
     // Modal spawning functions
     void insert_progress_warning(detail::TaskEvalInfo &info);
@@ -33,6 +41,8 @@ namespace met {
 
   public:
     CreateProjectTask(const std::string &name, const std::string &view_title);
+    void init(detail::TaskInitInfo &info) override;
+    void dstr(detail::TaskDstrInfo &info) override;
     void eval(detail::TaskEvalInfo &info) override;
   };
 } // namespace met

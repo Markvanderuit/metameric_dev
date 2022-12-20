@@ -10,6 +10,18 @@ namespace met {
   : detail::AbstractTask(name),
     m_view_title(view_title) { }
 
+  void CreateProjectTask::init(detail::TaskInitInfo &info) {
+    met_trace_full();
+
+
+  }
+
+  void CreateProjectTask::dstr(detail::TaskDstrInfo &info) {
+    met_trace_full();
+
+
+  }
+
   void CreateProjectTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
@@ -33,8 +45,8 @@ namespace met {
         io::to_lrgb(host_image);
 
         // Push on list of input data
-        m_image_data.push_back({
-          .path        = path, 
+        m_imag_data.push_back({
+          .name        = path.filename().replace_extension().string(), 
           .host_data   = std::move(host_image), 
           .device_data = std::move(device_image)
         });
@@ -42,11 +54,27 @@ namespace met {
 
       ImGui::SpacedSeparator();
 
-      if (ImGui::BeginChild("Added images", { 0, ImGui::GetContentRegionAvail().y - 52.f })) {
-        for (const auto &data : m_image_data) {
-          auto fnane = data.path.filename().string();
-          ImGui::Text(fnane.c_str());
-          ImGui::Image(ImGui::to_ptr(data.device_data.object()), { 240, 240 });
+      if (ImGui::BeginChild("Added images", { 0, ImGui::GetContentRegionAvail().y - 52.f }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
+        for (uint i = 0; i < m_imag_data.size(); ++i) {
+          auto &img = m_imag_data[i];
+          ImGui::BeginGroup();
+          
+          ImGui::Text(img.name.c_str());
+          ImGui::Image(ImGui::to_ptr(img.device_data.object()), { 240, 240 });
+          
+          if (ImGui::BeginCombo("CMFS", "test_cmfs")) {
+            // TODO continue here
+            ImGui::EndCombo();
+          }
+
+          if (ImGui::BeginCombo("Illuminant", "test_illm")) {
+            // TODO continue here
+            ImGui::EndCombo();
+          }
+
+          ImGui::EndGroup();
+          if (i < m_imag_data.size() - 1)
+            ImGui::SameLine();
         }
       }
       ImGui::EndChild();
@@ -54,18 +82,21 @@ namespace met {
       ImGui::SpacedSeparator();
 
       // Define create/cancel buttons to handle results 
-      if (ImGui::Button("Create") && create_project_safe(info)) { ImGui::CloseAnyPopupIfOpen(); }
+      if (ImGui::Button("Create") && create_project_safe(info)) { 
+        ImGui::CloseAnyPopupIfOpen();
+        info.remove_task(name());
+      }
       ImGui::SameLine();      
-      if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
+      if (ImGui::Button("Cancel")) { 
+        ImGui::CloseCurrentPopup();
+        info.remove_task(name());
+      }
 
       // Insert modals
       insert_file_warning();
       insert_progress_warning(info);
 
       ImGui::EndPopup();
-    } else {
-      // Clear window data when not shown
-      m_input_path.clear();
     }
   }
   
