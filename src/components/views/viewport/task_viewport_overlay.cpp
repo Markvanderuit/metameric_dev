@@ -31,6 +31,7 @@ namespace met {
     | ImGuiWindowFlags_NoFocusOnAppearing;
 
   constexpr float    overlay_width   = 500.f;
+  constexpr float    overlay_height  = 768.f;
   constexpr float    overlay_spacing = 16.f;
   const eig::Array2f overlay_padding = 16.f;
 
@@ -95,7 +96,7 @@ namespace met {
     {
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
-      ImGui::SetNextWindowSizeConstraints({ overlay_width, 0.f }, { overlay_width, overlay_width });
+      ImGui::SetNextWindowSizeConstraints({ overlay_width, 0.f }, { overlay_width, overlay_height });
       view_size.y() = 0.f;
       if (ImGui::Begin("Vertex settings", nullptr, window_vertices_flags)) {
         if (e_vert_slct.size() == 1) {
@@ -553,7 +554,7 @@ namespace met {
     
     // Insert image, applying viewport texture to viewport; texture can be safely drawn 
     // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-    ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+    ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), texture_size);
 
     ImGui::SpacedSeparator();
 

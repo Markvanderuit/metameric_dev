@@ -28,42 +28,13 @@ namespace met {
 
   void WindowTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
-    
-    info.emplace_task_after<CreateProjectTask>(name(), name() + create_modal_name, create_modal_title);
-
-    // Modal subtask to handle safe exiting of program
-    info.emplace_task_after<LambdaTask>(name(), name() + close_modal_name, [&](auto &info) {
-      if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
-        ImGui::SpacedSeparator();
-        if (ImGui::Button("Save and exit") && handle_save(info)) { handle_exit(info); } 
-        ImGui::SameLine();
-        if (ImGui::Button("Exit without saving")) { handle_exit(info); }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
-        ImGui::EndPopup();
-      }
-    });
-
-    // Modal subtask to handle safe closing of project
-    info.emplace_task_after<LambdaTask>(name(), name() + exit_modal_name, [&](auto &info) {
-      if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
-        ImGui::SpacedSeparator();
-        if (ImGui::Button("Save and close") && handle_save(info)) { handle_close(info); } 
-        ImGui::SameLine();
-        if (ImGui::Button("Close without saving")) { handle_close(info); }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
-        ImGui::EndPopup();
-      }
-    });
+    // ...
   }
 
   void WindowTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
     
-    // Remove modal subtasks
+    // Remove straggling modal subtasks if they exist
     info.remove_task(name() + create_modal_name);
     info.remove_task(name() + close_modal_name);
     info.remove_task(name() + exit_modal_name);
@@ -281,10 +252,45 @@ namespace met {
     // Create an explicit dock space over the entire window's viewport, excluding the menu bar
     ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
-    // Spawn requested modal views
-    if (m_open_create_modal) { ImGui::OpenPopup(create_modal_title.c_str()); }
-    if (m_open_close_modal)  { ImGui::OpenPopup(close_modal_title.c_str()); }
-    if (m_open_exit_modal)   { ImGui::OpenPopup(exit_modal_title.c_str()); }
+    // Spawn create modal
+    if (m_open_create_modal) { 
+      info.emplace_task_after<CreateProjectTask>(name(), name() + create_modal_name, create_modal_title);
+      ImGui::OpenPopup(create_modal_title.c_str()); 
+    }
+
+    // Spawn close modal
+    if (m_open_close_modal)  { 
+      info.emplace_task_after<LambdaTask>(name(), name() + close_modal_name, [&](auto &info) {
+        if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+          ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
+          ImGui::SpacedSeparator();
+          if (ImGui::Button("Save and close") && handle_save(info)) { handle_close(info); } 
+          ImGui::SameLine();
+          if (ImGui::Button("Close without saving")) { handle_close(info); }
+          ImGui::SameLine();
+          if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
+          ImGui::EndPopup();
+        }
+      });
+      ImGui::OpenPopup(close_modal_title.c_str()); 
+    }
+
+    // Spawm exit modal
+    if (m_open_exit_modal)   { 
+      info.emplace_task_after<LambdaTask>(name(), name() + exit_modal_name, [&](auto &info) {
+        if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+          ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
+          ImGui::SpacedSeparator();
+          if (ImGui::Button("Save and exit") && handle_save(info)) { handle_exit(info); } 
+          ImGui::SameLine();
+          if (ImGui::Button("Exit without saving")) { handle_exit(info); }
+          ImGui::SameLine();
+          if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
+          ImGui::EndPopup();
+        }
+      });
+      ImGui::OpenPopup(exit_modal_title.c_str()); 
+    }
 
     if ((uint) info.signal_flags) {
       ImGui::DrawFrame();
