@@ -6,6 +6,7 @@
 #include <metameric/components/views/viewport/task_draw_color_solid.hpp>
 #include <metameric/components/views/viewport/task_draw_weights.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/window.hpp>
 #include <small_gl/utility.hpp>
 #include <ImGuizmo.h>
 #include <implot.h>
@@ -14,10 +15,6 @@
 #include <utility>
 
 namespace met {
-  constexpr auto window_first_flags 
-    = ImGuiWindowFlags_NoDocking
-    | ImGuiWindowFlags_NoMove
-    | ImGuiWindowFlags_NoFocusOnAppearing;
   constexpr auto window_flags 
     = ImGuiWindowFlags_AlwaysAutoResize 
     | ImGuiWindowFlags_NoDocking 
@@ -30,10 +27,12 @@ namespace met {
     | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoFocusOnAppearing;
 
-  constexpr float    overlay_width   = 500.f;
-  constexpr float    overlay_height  = 768.f;
-  constexpr float    overlay_spacing = 16.f;
-  const eig::Array2f overlay_padding = 16.f;
+  // Size constants, independent of window scale
+  constexpr float    overlay_width       = 300.f;
+  constexpr float    overlay_vert_height = 512.f;
+  constexpr float    overlay_plot_height = 128.f;
+  constexpr float    overlay_spacing     = 8.f;
+  const eig::Array2f overlay_padding     = 8.f;
 
   ViewportOverlayTask::ViewportOverlayTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
@@ -69,6 +68,7 @@ namespace met {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
+    auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
     auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &i_cstr_slct = info.get_resource<int>("constr_selection");
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -88,22 +88,25 @@ namespace met {
                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Track these positions/sizes so overtays are evenly spaced
-    eig::Array2f view_posi = viewport_offs + overlay_padding, 
-                 view_size = { 0.f, 0.f };
-                 view_size = { overlay_width / ImGui::GetIO().DisplayFramebufferScale.x, 0.f };
+    eig::Array2f view_posi = viewport_offs + overlay_padding * e_window.content_scale(), 
+                 view_size = { overlay_width * e_window.content_scale(), 0.f },
+                 view_minv = { overlay_width * e_window.content_scale(), 0.f},
+                 view_maxv = { overlay_width * e_window.content_scale(), overlay_vert_height * e_window.content_scale() };
 
     // Spawn window with vertex info if one or more vertices are selected
     {
+      // Dictate hard size bounds
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
-      ImGui::SetNextWindowSizeConstraints({ overlay_width, 0.f }, { overlay_width, overlay_height });
+      ImGui::SetNextWindowSizeConstraints(view_minv, view_maxv);
       view_size.y() = 0.f;
+
       if (ImGui::Begin("Vertex settings", nullptr, window_vertices_flags)) {
         if (e_vert_slct.size() == 1) {
           eval_overlay_vertex(info, e_vert_slct[0]);
         } else {
           for (uint i : e_vert_slct) {
-            if (ImGui::CollapsingHeader(fmt::format("Vertex {}", i).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (ImGui::CollapsingHeader(fmt::format("Vertex {}", i).c_str())) {
               eval_overlay_vertex(info, i);
             }
           }
@@ -112,7 +115,7 @@ namespace met {
 
       // Capture window size to offset next window by this amount
       view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
-      view_posi.y() += view_size.y() + overlay_spacing;
+      view_posi.y() += view_size.y() + overlay_spacing * e_window.content_scale();
 
       ImGui::End();
     }
@@ -131,7 +134,7 @@ namespace met {
         
       // Capture window size to offset next window by this amount
       view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
-      view_posi.y() += view_size.y() + overlay_spacing;
+      view_posi.y() += view_size.y() + overlay_spacing * e_window.content_scale();
 
       ImGui::End();
     }
@@ -141,7 +144,6 @@ namespace met {
       view_size.y() = 0.f;
 
       // Set window state for next window
-      // auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
 
@@ -162,7 +164,7 @@ namespace met {
         
       // Capture window size to offset next window by this amount
       view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
-      view_posi.y() += view_size.y() + overlay_spacing;
+      view_posi.y() += view_size.y() + overlay_spacing * e_window.content_scale();
 
       ImGui::End();
     }
@@ -181,7 +183,7 @@ namespace met {
         
       // Capture window size to offset next window by this amount
       view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
-      view_posi.y() += view_size.y() + overlay_spacing;
+      view_posi.y() += view_size.y() + overlay_spacing * e_window.content_scale();
 
       ImGui::End();
     }
@@ -261,8 +263,8 @@ namespace met {
 
       // Coming column widths
       const float constr_total_width = ImGui::GetContentRegionAvail().x;
-      const float constr_mapp_width  = .45f * constr_total_width;
-      const float constr_colr_width  = .125f * constr_total_width;
+      const float constr_mapp_width  = .4f * constr_total_width;
+      const float constr_colr_width  = .1f * constr_total_width;
       const float constr_edit_width  = .1f * constr_total_width;
       const float constr_arrw_width  = .1f * constr_total_width;
       const float constr_clse_width  = .05f * constr_total_width;
@@ -502,6 +504,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
+    auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data = e_appl_data.project_data;
     auto &i_cstr_slct = info.get_resource<int>("constr_selection");
@@ -509,7 +512,10 @@ namespace met {
     auto &e_vert        = e_appl_data.project_data.gamut_verts;
     auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
 
-    if (ImPlot::BeginPlot("##Reflectance", { -1.f, 192.f, }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+    const ImVec2 refl_size = { -1.f, overlay_plot_height * e_window.content_scale() };
+    const auto   refl_flag = ImPlotFlags_NoInputs | ImPlotFlags_NoFrame;
+
+    if (ImPlot::BeginPlot("##Reflectance", refl_size, refl_flag)) {
       // Get wavelength values for x-axis in plot
       Spec x_values;
       for (uint i = 0; i < x_values.size(); ++i)

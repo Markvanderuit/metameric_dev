@@ -6,9 +6,12 @@
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
+#include <small_gl/window.hpp>
 #include <implot.h>
 
 namespace met {
+  constexpr float plot_height      = 128.f;
+  constexpr auto leaf_flags        = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_SpanFullWidth;
   constexpr auto plot_flags        = ImPlotFlags_NoFrame | ImPlotFlags_NoMenus;
   constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
   constexpr auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
@@ -23,6 +26,7 @@ namespace met {
       ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
       // Get external shared resources
+      auto &e_window      = info.get_resource<gl::Window>(global_key, "window");
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data   = e_appl_data.project_data;
       auto &e_illuminants = e_proj_data.illuminants;
@@ -37,26 +41,82 @@ namespace met {
       if (ImGui::CollapsingHeader("Data", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::TreeNodeEx("Illuminants", ImGuiTreeNodeFlags_DefaultOpen)) {
           for (uint i = 0; i < e_illuminants.size(); ++i) {
+            ImGui::PushID(fmt::format("illuminant_data_{}", i).c_str());
+
+            // Get illuminant data
             auto &[key, illuminant] = e_illuminants[i];
-            if (ImGui::TreeNodeEx(key.c_str())) {
-              if (ImPlot::BeginPlot("##Illuminant", { -1.f, 192.f, }, plot_flags)) {
+                                  
+            // Draw bulleted leaf node, wrapped in group for hover detection;
+            // inside sits a button to delete the relevant spectrum
+            ImGui::BeginGroup();
+            ImGui::Bullet();
+            ImGui::Text(key.c_str());
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+            if (ImGui::SmallButton("X")) e_appl_data.touch({ 
+              .name = "Deleted illuminant",
+              .redo = [i = i](auto &data) { 
+                data.illuminants.erase(data.illuminants.begin() + i);
+                for (auto &[_, illm] : data.mappings) {
+                  if (illm > 0 && illm >= i) illm--;
+                }
+              },
+              .undo = [illm = e_illuminants, mapp = e_mappings](auto &data) { 
+                data.illuminants = illm;
+                data.mappings    = mapp;
+              }
+            });
+            ImGui::EndGroup();
+            
+            // Plot spectral data on tooltip hover over group
+            if (ImGui::IsItemHovered()) {
+              ImGui::BeginTooltip();
+              if (ImPlot::BeginPlot(key.c_str(), { 0., plot_height * e_window.content_scale() }, plot_flags)) {
                 ImPlot::SetupAxes("Wavelength", "Value", plot_x_axis_flags, plot_y_axis_flags);
                 ImPlot::PlotLine("##plot_line", x_values.data(), illuminant.data(), wavelength_samples);
                 ImPlot::PlotShaded("##plot_line", x_values.data(), illuminant.data(), wavelength_samples);
                 ImPlot::EndPlot();
               }
-              ImGui::TreePop();
+              ImGui::EndTooltip();
             }
-          }
+
+            ImGui::PopID();
+          } // for (uint i)
           ImGui::TreePop();
         }
         
         if (ImGui::TreeNodeEx("Color matching functions", ImGuiTreeNodeFlags_DefaultOpen)) {
           for (uint i = 0; i < e_cmfs.size(); ++i) {
+            ImGui::PushID(fmt::format("cmfs_data_{}", i).c_str());
+            
+            // Get cmfs column data separately, as it is stored row-major
             auto &[key, cmfs] = e_cmfs[i];
             Spec cmfs_x = cmfs.col(0), cmfs_y = cmfs.col(1), cmfs_z = cmfs.col(2);
-            if (ImGui::TreeNodeEx(key.c_str())) {
-              if (ImPlot::BeginPlot("##Illuminant", { -1.f, 192.f, }, plot_flags)) {
+            
+            // Draw bulleted leaf node, wrapped in group for hover detection;
+            // inside sits a button to delete the relevant spectrum
+            ImGui::BeginGroup();
+            ImGui::Bullet();
+            ImGui::Text(key.c_str());
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+            if (ImGui::SmallButton("X")) e_appl_data.touch({ 
+              .name = "Deleted cmfs",
+              .redo = [i = i](auto &data) { 
+                data.cmfs.erase(data.cmfs.begin() + i);
+                for (auto &[cmfs, _] : data.mappings) {
+                  if (cmfs > 0 && cmfs >= i) cmfs--;
+                }
+              },
+              .undo = [cmfs = e_cmfs, mapp = e_mappings](auto &data) { 
+                data.cmfs     = cmfs;
+                data.mappings = mapp;
+              }
+            });
+            ImGui::EndGroup();
+
+            // Plot spectral data on tooltip hover over group
+            if (ImGui::IsItemHovered()) {
+              ImGui::BeginTooltip();
+              if (ImPlot::BeginPlot(key.c_str(), { 0., plot_height * e_window.content_scale() }, plot_flags)) {
                 ImPlot::SetupAxes("Wavelength", "Value", plot_x_axis_flags, plot_y_axis_flags);
                 ImPlot::PlotLine("x", x_values.data(), cmfs_x.data(), wavelength_samples);
                 ImPlot::PlotLine("y", x_values.data(), cmfs_y.data(), wavelength_samples);
@@ -66,9 +126,11 @@ namespace met {
                 ImPlot::PlotShaded("z", x_values.data(), cmfs_z.data(), wavelength_samples);
                 ImPlot::EndPlot();
               }
-              ImGui::TreePop();
+              ImGui::EndTooltip();
             }
-          }
+
+            ImGui::PopID();
+          } // for (uint i)
           ImGui::TreePop();
         }
 

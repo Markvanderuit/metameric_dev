@@ -29,8 +29,7 @@ namespace met {
 
     std::string m_input_path;
     std::string m_view_title;
-
-
+    
     // Modal spawning functions
     void insert_progress_warning(detail::TaskEvalInfo &info);
     void insert_file_warning();

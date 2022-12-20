@@ -11,6 +11,7 @@
 #include <metameric/components/views/viewport/task_viewport_input_vert.hpp>
 #include <metameric/components/views/viewport/task_viewport_input_edge.hpp>
 #include <metameric/components/views/viewport/task_viewport_input_elem.hpp>
+#include <small_gl/window.hpp>
 #include <ImGuizmo.h>
 #include <algorithm>
 #include <functional>
@@ -18,6 +19,10 @@
 #include <ranges>
 
 namespace met {
+  // Size constants, independent of window scale
+  const float overlay_padding = 8.f;
+  const float overlay_width   = 128.f;
+
   namespace detail {
     using MeshReturnType = std::pair<
       std::vector<eig::Array3f>, 
@@ -98,6 +103,7 @@ namespace met {
                       
       // Get shared resources
       auto &io               = ImGui::GetIO();
+      auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
       auto &i_arcball        = info.get_resource<detail::Arcball>("arcball");
       auto &i_mode           = info.get_resource<detail::ViewportInputMode>("mode");
       auto &e_selection_vert = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
@@ -117,10 +123,15 @@ namespace met {
       constexpr auto window_flags = 
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
-      eig::Array2f edit_size = { 300.f, 0.f };
-      eig::Array2f edit_posi = { viewport_offs.x() + viewport_size.x() - edit_size.x() - 16.f, viewport_offs.y() + 16.f };
-      ImGui::SetNextWindowPos(edit_posi);
-      ImGui::SetNextWindowSize(edit_size);
+
+      float actual_padding = overlay_padding * e_window.content_scale();
+      eig::Array2f overlay_size = { overlay_width * e_window.content_scale() , 0.f };
+      eig::Array2f overlay_offs = { viewport_offs.x() - actual_padding + viewport_size.x() - overlay_size.x(), 
+                                    viewport_offs.y() + actual_padding };
+
+      ImGui::SetNextWindowPos(overlay_offs);
+      ImGui::SetNextWindowSize(overlay_size);
+      
       if (ImGui::Begin("Edit mode", nullptr, window_flags)) {
         // Handle edit mode flags
         int m = static_cast<int>(i_mode);
@@ -203,9 +214,6 @@ namespace met {
             e_selection_vert.clear(); 
             e_selection_elem.clear();
           }
-          /* if (ImGui::Button("Collapse face")) {
-
-          } */
         }
       }
       ImGui::End();

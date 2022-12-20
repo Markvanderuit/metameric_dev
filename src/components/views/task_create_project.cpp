@@ -56,23 +56,38 @@ namespace met {
 
       if (ImGui::BeginChild("Added images", { 0, ImGui::GetContentRegionAvail().y - 52.f }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
         for (uint i = 0; i < m_imag_data.size(); ++i) {
+
           auto &img = m_imag_data[i];
+
+          // Begin wrapper group around image
+          ImGui::PushID(fmt::format("image_{}", i).c_str());
           ImGui::BeginGroup();
-          
+
           ImGui::Text(img.name.c_str());
           ImGui::Image(ImGui::to_ptr(img.device_data.object()), { 240, 240 });
           
-          if (ImGui::BeginCombo("CMFS", "test_cmfs")) {
-            // TODO continue here
+          if (ImGui::BeginCombo("CMFS", m_proj_data.cmfs[img.cmfs].first.c_str())) {
+            for (uint j = 0; j < m_proj_data.cmfs.size(); ++j) {
+              if (ImGui::Selectable(m_proj_data.cmfs[j].first.c_str(), j == img.cmfs)) {
+                img.cmfs = j;
+              }
+            }
+            ImGui::EndCombo();
+          }
+          
+          if (ImGui::BeginCombo("Illuminant", m_proj_data.illuminants[img.illuminant].first.c_str())) {
+            for (uint j = 0; j < m_proj_data.illuminants.size(); ++j) {
+              if (ImGui::Selectable(m_proj_data.illuminants[j].first.c_str(), j == img.illuminant)) {
+                img.illuminant = j;
+              }
+            }
             ImGui::EndCombo();
           }
 
-          if (ImGui::BeginCombo("Illuminant", "test_illm")) {
-            // TODO continue here
-            ImGui::EndCombo();
-          }
-
+          // End wrapper group around image
           ImGui::EndGroup();
+          ImGui::PopID();
+
           if (i < m_imag_data.size() - 1)
             ImGui::SameLine();
         }
