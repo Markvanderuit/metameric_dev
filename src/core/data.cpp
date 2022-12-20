@@ -34,7 +34,7 @@ namespace met {
     // Instantiate loaded components with sensible default values
     mappings    = {{ .cmfs = 0, .illuminant = 0 }, 
                    { .cmfs = 0, .illuminant = 1 }};
-    cmfs        = {{ "CIE XYZ->sRGB", models::cmfs_srgb    }};
+    cmfs        = {{ "CIE XYZ", models::cmfs_cie_xyz  }};
     illuminants = {{ "D65",  models::emitter_cie_d65  },
                    { "E",    models::emitter_cie_e    },
                    { "FL2",  models::emitter_cie_fl2  },

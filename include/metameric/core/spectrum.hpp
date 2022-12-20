@@ -29,15 +29,31 @@ namespace met {
   using AlSpec = eig::AlArray<float, wavelength_samples>;
   using AlColr = eig::AlArray<float, 3>;
   
+  /* Define pre-included color matching functions, SPD models, etc. */
+  namespace models {
+    // Linear color space transformations
+    extern eig::Matrix3f xyz_to_srgb_transform;
+    extern eig::Matrix3f srgb_to_xyz_transform;
+
+    // Color matching functions
+    extern CMFS cmfs_cie_xyz; // CIE 1931 2 deg. color matching functions
+
+    // Illuminant spectra
+    extern Spec emitter_cie_e;        // CIE standard illuminant E, equal energy
+    extern Spec emitter_cie_d65;      // CIE standard illuminant D65, noon daylight
+    extern Spec emitter_cie_fl2;      // CIE standard illuminant FL2
+    extern Spec emitter_cie_fl11;     // CIE standard illuminant FL11
+    extern Spec emitter_cie_ledb1;    // CIE standard illuminant LED-B1; blue LED
+    extern Spec emitter_cie_ledrgb1;  // CIE standard illuminant LED-RGB1; R/G/B LEDs
+  } // namespace models
+  
   /* Spectral mapping object defines how a reflectance-to-color conversion is performed */
   struct Mapp {
-    /* Mapping components */
-
+  public: /* mapping data */
     UnalCMFS cmfs;       // Color matching or sensor response functions
     UnalSpec illuminant; // Illuminant under which observation is performed
 
-    /* Mapping functions */
-
+  public:/* Mapping functions */
     // Simplify the CMFS/illuminant into color system spectra
     CMFS finalize() const {
       auto cmfs_col = cmfs.array().colwise();
@@ -54,25 +70,6 @@ namespace met {
       return cmfs == o.cmfs && illuminant.matrix() == o.illuminant.matrix();
     }
   };
-
-  /* Define pre-included color matching functions, SPD models, etc. */
-  namespace models {
-    // Linear color space transformations
-    extern eig::Matrix3f xyz_to_srgb_transform;
-    extern eig::Matrix3f srgb_to_xyz_transform;
-
-    // Color matching functions
-    extern CMFS cmfs_cie_xyz; // CIE 1931 2 deg. color matching functions
-    extern CMFS cmfs_srgb;    // Shorthand for ((srgb_to_xyz_transform * cmfs_cie_xyz))
-
-    // Illuminant spectra
-    extern Spec emitter_cie_e;        // CIE standard illuminant E, equal energy
-    extern Spec emitter_cie_d65;      // CIE standard illuminant D65, noon daylight
-    extern Spec emitter_cie_fl2;      // CIE standard illuminant FL2
-    extern Spec emitter_cie_fl11;     // CIE standard illuminant FL11
-    extern Spec emitter_cie_ledb1;    // CIE standard illuminant LED-B1; blue LED
-    extern Spec emitter_cie_ledrgb1;  // CIE standard illuminant LED-RGB1; R/G/B LEDs
-  } // namespace models
 
   // Given a spectral bin, obtain the relevant central wavelength
   constexpr inline

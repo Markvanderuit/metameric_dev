@@ -75,7 +75,7 @@ namespace met {
         internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
 
       // Test PCA generation using a bunch of randomly chosen vectors
-      Mapp mapp = { .cmfs = models::cmfs_srgb, .illuminant = models::emitter_cie_d65 };
+      Mapp mapp = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
       std::vector<Spec> pca_input(32768);
       #pragma omp parallel for
       for (int i = 0; i < pca_input.size(); ++i)

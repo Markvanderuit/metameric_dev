@@ -17,8 +17,9 @@ namespace met {
                                          { 0.019334f, 0.119193f, 0.950227f }};
 
     // Color matching functions
-    CMFS cmfs_cie_xyz = io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z);
-    CMFS cmfs_srgb    = (xyz_to_srgb_transform * cmfs_cie_xyz.transpose()).transpose();
+    CMFS cmfs_cie_xyz = (xyz_to_srgb_transform * 
+                         io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z).transpose()
+                        ).transpose();
 
     // Illuminant spectra
     Spec emitter_cie_e       = 1.f;
