@@ -25,7 +25,6 @@
 
 // View tasks
 #include <metameric/components/views/task_error_viewer.hpp>
-#include <metameric/components/views/task_mappings_editor.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_viewport.hpp>
@@ -39,10 +38,10 @@
 #include <metameric/core/metamer.hpp>
 
 namespace met {
- /*  template <typename Scheduler>
+  template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
-    scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
-    scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
+    /* scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
+    scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); }); */
 
     // Temporary window to show runtime schedule
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
@@ -56,7 +55,7 @@ namespace met {
       ImGui::End();
     });
 
-    // Temporary window to plot some timings
+    /* // Temporary window to plot some timings
     scheduler.emplace_task<LambdaTask>("imgui_delta", [](auto &info) {
       if (ImGui::Begin("Imgui timings")) {
         auto &e_window = info.get_resource<gl::Window>(global_key, "window");
@@ -73,9 +72,9 @@ namespace met {
         ImGui::LabelText("Mouse position (glfw)", "%.1f, %.1f", input.mouse_position.x(), input.mouse_position.y());
       }
       ImGui::End();
-    });
+    }); */
 
-    // Temporary window to plot some distributions
+    /* // Temporary window to plot some distributions
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &) {
       if (ImGui::Begin("Model plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -97,9 +96,9 @@ namespace met {
           wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
       }
       ImGui::End();
-    });
+    }); */
 
-    // Temporary window to plot pca components
+    /* // Temporary window to plot pca components
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
       if (ImGui::Begin("PCA inputs")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -127,10 +126,9 @@ namespace met {
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         }
       }
-      
       ImGui::End();
-    });
-  } */
+    }); */
+  }
   
   /* template <typename Scheduler>
   void submit_schedule_test(Scheduler &scheduler) {
@@ -229,12 +227,11 @@ namespace met {
     scheduler.emplace_task<WindowTask>("window");
     scheduler.emplace_task<ViewportTask>("viewport");
     scheduler.emplace_task<SpectraEditorTask>("spectra_editor");
-    scheduler.emplace_task<MappingsEditorTask>("mappings_editor");
     scheduler.emplace_task<MappingsViewerTask>("mappings_viewer");
     scheduler.emplace_task<ErrorViewerTask>("error_viewer");
 
     // Insert temporary unimportant tasks
-    // submit_schedule_debug(scheduler);
+    submit_schedule_debug(scheduler);
     // submit_schedule_test(scheduler);
 
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
