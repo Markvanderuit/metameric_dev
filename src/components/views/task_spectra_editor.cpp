@@ -10,7 +10,7 @@
 #include <implot.h>
 
 namespace met {
-  constexpr float plot_height      = 128.f;
+  constexpr float plot_height      = 96.f;
   constexpr auto leaf_flags        = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_SpanFullWidth;
   constexpr auto plot_flags        = ImPlotFlags_NoFrame | ImPlotFlags_NoMenus;
   constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;

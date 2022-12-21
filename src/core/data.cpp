@@ -91,7 +91,10 @@ namespace met {
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
     auto chull_simp = simplify(chull_mesh, info.n_vertices);
     auto [verts, elems] = generate_data(chull_simp);
+
+    // Store results with approximate values
     project_data.gamut_elems = elems;
+    project_data.gamut_verts.resize(verts.size());
     std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
       return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { }, .mapp_j = { } };
     });

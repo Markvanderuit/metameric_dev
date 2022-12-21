@@ -158,9 +158,9 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
 
-    // Handle element draw; cull front faces
+    // Handle element draw; cull faces
     {
-      auto scoped_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp, true) };
+      auto scoped_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp, false) };
       m_elem_opac_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0u);
       m_elem_program.uniform("u_use_opacity", true);
       gl::dispatch_draw(m_elem_draw);
