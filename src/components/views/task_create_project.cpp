@@ -3,7 +3,7 @@
 #include <small_gl/window.hpp>
 
 namespace met {
-  constexpr float img_rel_width = 256.f;
+  constexpr float img_rel_width = 192.f;
   
   CreateProjectTask::CreateProjectTask(const std::string &name, const std::string &view_title)
   : detail::AbstractTask(name),
@@ -26,15 +26,15 @@ namespace met {
 
     // Get shared resources
     auto &e_window = info.get_resource<gl::Window>(global_key, "window");
-
+    
     if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      ImGui::ShowMetricsWindow();
+      
       // Define text input to obtain path and
       // simple '...' button for file selection to obtain path
       ImGui::Text("Path to input texture...");
       ImGui::InputText("##NewProjectPathInputs", &m_input_path);
       ImGui::SameLine();
-
-      // Load button
       if (fs::path path; ImGui::Button("...") && detail::load_dialog(path)) {
         m_input_path = path.string();
 
@@ -57,7 +57,7 @@ namespace met {
       ImGui::SpacedSeparator();
       
       const float child_height = (img_rel_width + 80.f) * e_window.content_scale();
-      if (ImGui::BeginChild("Added images", { 2.f * child_height, child_height }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
+      if (ImGui::BeginChild("Added images", { 2 * child_height, child_height }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
         ImGui::AlignTextToFramePadding();
 
         // Track id of image to erase after full draw
@@ -75,7 +75,7 @@ namespace met {
             ImGui::Text(img.name.c_str());
 
             // Image delete button at end of line
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f * e_window.content_scale());
             if (ImGui::SmallButton("X")) {
               erased_image = i;
             }
@@ -107,17 +107,18 @@ namespace met {
             }
             ImGui::PopItemWidth();
 
-            ImGui::EndChild();
           } // End wrapper group around image
-          // ImGui::EndGroup();
+          ImGui::EndChild();
+
           // ImGui::PopID();
+          // ImGui::EndGroup();
 
           if (i < m_imag_data.size() - 1)
             ImGui::SameLine();
         }
 
         if (erased_image != -1)
-          m_imag_data.erase(m_imag_data.begin() + m_imag_data);
+          m_imag_data.erase(m_imag_data.begin() + erased_image);
       }
       ImGui::EndChild();
 

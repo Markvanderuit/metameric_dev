@@ -12,6 +12,8 @@
 
 namespace met {
   class CreateProjectTask : public detail::AbstractTask {
+    std::string m_view_title;
+    
     // Structure to hold input image data before project creation
     struct ImageData {
       std::string     name;
@@ -28,7 +30,6 @@ namespace met {
     ProjectData            m_proj_data;
 
     std::string m_input_path;
-    std::string m_view_title;
     
     // Modal spawning functions
     void insert_progress_warning(detail::TaskEvalInfo &info);
