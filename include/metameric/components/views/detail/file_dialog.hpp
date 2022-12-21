@@ -5,5 +5,6 @@
 
 namespace met::detail {
   bool load_dialog(fs::path &path, const std::string &type_filter = "");
+  bool load_dialog_mult(std::vector<fs::path> &paths, const std::string &type_filter = "");
   bool save_dialog(fs::path &path, const std::string &type_filter = "");
 } // namespace met::detail

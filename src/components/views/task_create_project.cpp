@@ -3,7 +3,7 @@
 #include <small_gl/window.hpp>
 
 namespace met {
-  constexpr float img_rel_width = 192.f;
+  constexpr float img_rel_width = 128.f;
   
   CreateProjectTask::CreateProjectTask(const std::string &name, const std::string &view_title)
   : detail::AbstractTask(name),
@@ -11,14 +11,12 @@ namespace met {
 
   void CreateProjectTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
-
-    // ...
+    m_proj_data = { };
   }
 
   void CreateProjectTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
-
-    // ...
+    m_proj_data = { };
   }
 
   void CreateProjectTask::eval(detail::TaskEvalInfo &info) {
@@ -28,30 +26,33 @@ namespace met {
     auto &e_window = info.get_resource<gl::Window>(global_key, "window");
     
     if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::ShowMetricsWindow();
+      // Image selector
+      if (std::vector<fs::path> paths; ImGui::Button("Load images...") && detail::load_dialog_mult(paths)) {
+        for (const fs::path &path : paths) {
+          // Load image without gamma correction applied. Copy this image to gpu for direct display,
+          auto host_image   = io::load_texture2d<Colr>(path);
+          auto device_image = gl::Texture2d3f {{ .size = host_image.size(),
+                                                 .data = cast_span<const float>(host_image.data()) }};
+
+          // Then apply gamma correction after for rest of program pipeline
+          io::to_lrgb(host_image);
+
+          // Push on list of input 
+          m_proj_data.images.push_back({ .image = std::move(host_image),
+                                         .cmfs = 0,
+                                         .illuminant = 0 });
+          m_imag_data.push_back({ path.filename().replace_extension().string(), std::move(device_image) });
+        }
+      }
       
-      // Define text input to obtain path and
-      // simple '...' button for file selection to obtain path
-      ImGui::Text("Path to input texture...");
-      ImGui::InputText("##NewProjectPathInputs", &m_input_path);
       ImGui::SameLine();
-      if (fs::path path; ImGui::Button("...") && detail::load_dialog(path)) {
-        m_input_path = path.string();
-
-        // Load image without gamma correction applied. Copy this image to gpu for direct display,
-        auto host_image   = io::load_texture2d<Colr>(path);
-        auto device_image = gl::Texture2d3f {{ .size = host_image.size(),
-                                               .data = cast_span<const float>(host_image.data()) }};
-
-        // Then apply gamma correction after for rest of program pipeline
-        io::to_lrgb(host_image);
-
-        // Push on list of input data
-        m_imag_data.push_back({
-          .name        = path.filename().replace_extension().string(), 
-          .host_data   = std::move(host_image), 
-          .device_data = std::move(device_image)
-        });
+      if (std::vector<fs::path> paths; ImGui::Button("Load illuminants...") && detail::load_dialog_mult(paths)) {
+        // ...
+      }
+      
+      ImGui::SameLine();
+      if (std::vector<fs::path> paths; ImGui::Button("Load cmfs...") && detail::load_dialog_mult(paths)) {
+        // ...
       }
 
       ImGui::SpacedSeparator();
@@ -63,16 +64,17 @@ namespace met {
         // Track id of image to erase after full draw
         int erased_image = -1;
 
-        for (uint i = 0; i < m_imag_data.size(); ++i) {
-          auto &img = m_imag_data[i];
+        for (uint i = 0; i < m_proj_data.images.size(); ++i) {
+          const auto &[name, img] = m_imag_data[i];
+          auto &img_data = m_proj_data.images[i];
 
           const float img_width  = img_rel_width * e_window.content_scale();
-          const float img_height = img_width * (img.host_data.size().x() / img.host_data.size().y());
+          const float img_height = img_width * (img.size().x() / img.size().y());
 
           // Begin wrapper group around image and related content
           if (ImGui::BeginChild(fmt::format("image_{}", i).c_str(), { img_width, 0 }, false)) {
             // Image title
-            ImGui::Text(img.name.c_str());
+            ImGui::Text(name.c_str());
 
             // Image delete button at end of line
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f * e_window.content_scale());
@@ -81,14 +83,14 @@ namespace met {
             }
 
             // Plot image in full pre-calculated width/height
-            ImGui::Image(ImGui::to_ptr(img.device_data.object()), { img_width, img_height });
+            ImGui::Image(ImGui::to_ptr(img.object()), { img_width, img_height });
             
             // Selector for color matching functions
-            ImGui::PushItemWidth(img_width * 0.65f);
-            if (ImGui::BeginCombo("CMFS", m_proj_data.cmfs[img.cmfs].first.c_str())) {
+            ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+            if (ImGui::BeginCombo("##cmfs_selector", m_proj_data.cmfs[img_data.cmfs].first.c_str())) {
               for (uint j = 0; j < m_proj_data.cmfs.size(); ++j) {
-                if (ImGui::Selectable(m_proj_data.cmfs[j].first.c_str(), j == img.cmfs)) {
-                  img.cmfs = j;
+                if (ImGui::Selectable(m_proj_data.cmfs[j].first.c_str(), j == img_data.cmfs)) {
+                  img_data.cmfs = j;
                 }
               }
               ImGui::EndCombo();
@@ -96,11 +98,11 @@ namespace met {
             ImGui::PopItemWidth();
             
             // Selector for illuminant SPD
-            ImGui::PushItemWidth(img_width * 0.65f);
-            if (ImGui::BeginCombo("Illuminant", m_proj_data.illuminants[img.illuminant].first.c_str())) {
+            ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+            if (ImGui::BeginCombo("##illuminant_selector", m_proj_data.illuminants[img_data.illuminant].first.c_str())) {
               for (uint j = 0; j < m_proj_data.illuminants.size(); ++j) {
-                if (ImGui::Selectable(m_proj_data.illuminants[j].first.c_str(), j == img.illuminant)) {
-                  img.illuminant = j;
+                if (ImGui::Selectable(m_proj_data.illuminants[j].first.c_str(), j == img_data.illuminant)) {
+                  img_data.illuminant = j;
                 }
               }
               ImGui::EndCombo();
@@ -117,18 +119,22 @@ namespace met {
             ImGui::SameLine();
         }
 
-        if (erased_image != -1)
+        if (erased_image != -1) {
           m_imag_data.erase(m_imag_data.begin() + erased_image);
+          m_proj_data.images.erase(m_proj_data.images.begin() + erased_image);
+        }
       }
       ImGui::EndChild();
 
       ImGui::SpacedSeparator();
 
       // Define create/cancel buttons to handle results 
+      if (m_proj_data.images.empty()) ImGui::BeginDisabled();
       if (ImGui::Button("Create") && create_project_safe(info)) { 
         ImGui::CloseAnyPopupIfOpen();
         info.remove_task(name());
       }
+      if (m_proj_data.images.empty()) ImGui::EndDisabled();
       ImGui::SameLine();      
       if (ImGui::Button("Cancel")) { 
         ImGui::CloseCurrentPopup();
@@ -136,7 +142,6 @@ namespace met {
       }
 
       // Insert modals
-      insert_file_warning();
       insert_progress_warning(info);
 
       ImGui::EndPopup();
@@ -155,24 +160,15 @@ namespace met {
       if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
     }
   }
-  
-  void CreateProjectTask::insert_file_warning() {
-    if (ImGui::BeginPopup("Warning: file not found", 0)) {
-      ImGui::Text("The following file could not be found: %s", m_input_path.c_str());
-      ImGui::SpacedSeparator();
-      if (ImGui::Button("Continue")) { ImGui::CloseCurrentPopup(); }
-      ImGui::EndPopup();
-    }
-  }
 
   bool CreateProjectTask::create_project_safe(detail::TaskEvalInfo &info) {
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
-    } else if (!fs::exists(m_input_path)) {
+    /* } else if (!fs::exists(m_input_path)) {
       ImGui::OpenPopup("Warning: file not found", 0);
-      return false;
+      return false; */
     } else {
       return create_project(info);
     }
@@ -180,7 +176,7 @@ namespace met {
 
   bool CreateProjectTask::create_project(detail::TaskEvalInfo &info) {
     // Create a new project
-    info.get_resource<ApplicationData>(global_key, "app_data").create(m_input_path);
+    info.get_resource<ApplicationData>(global_key, "app_data").create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
     info.signal_flags = detail::TaskSignalFlags::eClearTasks;
