@@ -40,7 +40,7 @@ namespace met {
 
     // Setup sizes/opacities buffers and instantiate relevant mappings
     std::vector<float> vert_input_sizes(barycentric_weights, vert_deslct_size);
-    std::vector<float> elem_input_opacs(barycentric_weights, elem_deslct_opac);
+    std::vector<float> elem_input_opacs(2 * barycentric_weights, elem_deslct_opac);
     m_vert_size_buffer = {{ .data = cnt_span<const std::byte>(vert_input_sizes), .flags = buffer_create_flags }};
     m_elem_opac_buffer = {{ .data = cnt_span<const std::byte>(elem_input_opacs), .flags = buffer_create_flags }};
     m_vert_size_map = cast_span<float>(m_vert_size_buffer.map(buffer_access_flags));
@@ -118,7 +118,7 @@ namespace met {
       m_elem_array.attach_elements(e_elems);
       
       m_vert_draw.instance_count = static_cast<uint>(e_verts.size() / sizeof(eig::AlArray3f));
-      m_elem_draw.vertex_count = static_cast<uint>(e_elems.size() / sizeof(uint));
+      m_elem_draw.vertex_count   = static_cast<uint>(e_elems.size() / sizeof(uint));
     }
 
     // Update size data based on selected vertices, if a state change occurred
@@ -160,7 +160,7 @@ namespace met {
 
     // Handle element draw; cull faces
     {
-      auto scoped_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp, false) };
+      auto scoped_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp, true) };
       m_elem_opac_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0u);
       m_elem_program.uniform("u_use_opacity", true);
       gl::dispatch_draw(m_elem_draw);

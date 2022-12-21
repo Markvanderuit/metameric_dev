@@ -157,7 +157,6 @@ namespace met {
     
     // Operate on a copy of the input mesh
     Mesh mesh = input_mesh;
-
     // First, collapse all shortest edges into their average to a hardcoded minimum
     {
       using Decimater = odec::CollapsingDecimater<Mesh, odec::AverageCollapseFunction>;
@@ -168,6 +167,7 @@ namespace met {
 
       dec.add(mod);
       dec.module(mod).set_binary(false);
+      dec.module(mod).set_edge_length(FLT_MAX);
         
       dec.initialize();
       dec.decimate_to(std::max(max_vertices, 16u));

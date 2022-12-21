@@ -85,7 +85,7 @@ namespace met {
       m_spec_map = cast_span<Spec>(i_spec_buffer.map(buffer_access_flags));
       m_vert_map = cast_span<AlColr>(i_vert_buffer.map(buffer_access_flags));
       m_elem_map = cast_span<eig::AlArray3u>(i_elem_buffer.map(buffer_access_flags));
-      m_elem_unal_map= cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
+      m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
     }
 
     // Generate spectra at gamut color positions in parallel
