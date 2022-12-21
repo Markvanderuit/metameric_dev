@@ -1,3 +1,4 @@
+#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -68,17 +69,13 @@ namespace met {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
-    auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &i_cstr_slct = info.get_resource<int>("constr_selection");
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
-    auto &e_verts     = e_proj_data.gamut_verts;
-    
-    // Clear constraint selection if multiple vertices are selected
-    if (e_vert_slct.size() != 1) {
-      i_cstr_slct = -1;
-    }
+    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
+    auto &e_window     = info.get_resource<gl::Window>(global_key, "window");
+    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data  = e_appl_data.project_data;
+    auto &e_verts      = e_proj_data.gamut_verts;
 
     // Only spawn any tooltips on non-empty gamut selection
     guard(!e_vert_slct.empty());
@@ -380,6 +377,10 @@ namespace met {
             data.gamut_verts[i].colr_j.erase(data.gamut_verts[i].colr_j.begin() + j); 
             data.gamut_verts[i].mapp_j.erase(data.gamut_verts[i].mapp_j.begin() + j); 
           }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.gamut_verts[i] = edit; }});
+
+          // Sanitize selected constraint in case this was deleted
+          i_cstr_slct = std::min(i_cstr_slct, 
+                                  static_cast<int>(e_vert.colr_j.size() - 1));
         }
 
         ImGui::PopID();

@@ -37,8 +37,8 @@ namespace met {
 
     // Add UI subtasks in reverse order
     info.emplace_task_after<ViewportEndTask>(name(),     name() + viewport_end_name);
-    info.emplace_task_after<ViewportOverlayTask>(name(), name() + viewport_overlay_name);
     info.emplace_task_after<ViewportInputTask>(name(),   name() + viewport_input_name);
+    info.emplace_task_after<ViewportOverlayTask>(name(), name() + viewport_overlay_name);
     info.emplace_task_after<ViewportBeginTask>(name(),   name() + viewport_begin_name);
   }
 

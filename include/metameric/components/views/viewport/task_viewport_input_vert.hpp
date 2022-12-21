@@ -46,6 +46,7 @@ namespace met {
       auto &io          = ImGui::GetIO();
       auto &i_selection = info.get_resource<std::vector<uint>>("selection");
       auto &i_mouseover = info.get_resource<std::vector<uint>>("mouseover");
+      auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
       auto &i_arcball   = info.get_resource<detail::Arcball>("viewport_input", "arcball");
       auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_app_data.project_data;
@@ -113,6 +114,12 @@ namespace met {
         m_is_gizmo_used = false;
         return;
       }
+
+      // Sanitize constraint selection index in viewport overlay
+      e_cstr_slct = i_selection.empty()
+                  ? -1
+                  : std::min(e_cstr_slct, 
+                             static_cast<int>(e_verts[i_selection[0]].colr_j.size() - 1));
 
       // Range over- and center of selected gamut positions
       constexpr
