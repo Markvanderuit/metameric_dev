@@ -17,6 +17,24 @@ namespace met {
     eUnsaved,  // Project has previous save, and has been modified
   };
 
+  struct ProjectCreateInfo {
+    struct ImageData {
+      Texture2d3f image;
+      uint cmfs, illuminant;
+    };
+
+    // Default constructor to fill in standard illuminants/cmfs
+    ProjectCreateInfo();
+    
+    // Input uplifting information
+    std::vector<ImageData> images; // Input images with known color system mappings
+    uint n_vertices;               // Intended nr. of vertices for convex hull estimation
+    
+    // Input spectral information
+    std::vector<std::pair<std::string, Spec>> illuminants;
+    std::vector<std::pair<std::string, CMFS>> cmfs;
+  };
+
   /* Wrapper object to hold all saveable project data */
   struct ProjectData {
   public: /* internal data structures */
@@ -69,6 +87,7 @@ namespace met {
     Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
 
   public: /* public create/load/save methods */
+    void create(ProjectCreateInfo &&info);      // Create project from info object
     void create(Texture2d3f &&texture);         // Create project from texture data
     void create(const fs::path &texture_path);  // Create project from texture at path
     void load(const fs::path &path);            // Load project data from path

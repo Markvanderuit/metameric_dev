@@ -3,6 +3,7 @@
 #include <metameric/core/json.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <ranges>
@@ -20,7 +21,17 @@ namespace met {
     }
   } // namespace io
 
+  ProjectCreateInfo::ProjectCreateInfo()
+  : n_vertices(4),
+    illuminants({{ "D65",  models::emitter_cie_d65  },
+                 { "E",    models::emitter_cie_e    },
+                 { "FL2",  models::emitter_cie_fl2  },
+                 { "FL11", models::emitter_cie_fl11 }}),
+    cmfs({{ "CIE XYZ", models::cmfs_cie_xyz  }}) { }
+
   ProjectData::ProjectData() {
+    met_trace();
+    
     // Provide an initial example gamut for now
     gamut_elems = { Elem { 2, 0, 1 },
                     Elem { 0, 3, 1 },
@@ -42,21 +53,69 @@ namespace met {
   }
 
   Mapp ProjectData::mapping_data(uint i) const {
+    met_trace();
     return mapping_data(mappings[i]);
   }
 
   Mapp ProjectData::mapping_data(Mapp m) const {
+    met_trace();
     return { .cmfs = cmfs[m.cmfs].second,
              .illuminant = illuminants[m.illuminant].second };
   }
+  
+  
+  void ApplicationData::create(ProjectCreateInfo &&info) {
+    met_trace();
 
+    debug::check_expr_rel(!info.images.empty(), "ProjectCreateInfo::images must not be empty");
+
+    // Reset project data
+    project_save   = SaveFlag::eNew;
+    project_path   = ""; // TBD on first save
+    project_data   = ProjectData();
+
+    // Reset undo/redo history
+    mods  = { };
+    mod_i = -1;
+
+    // Copy over cmfs/illuminants
+    project_data.cmfs        = info.cmfs;
+    project_data.illuminants = info.illuminants;
+    project_data.mappings.clear();
+    for (auto &image : info.images)
+      project_data.mappings.push_back({ .cmfs       = image.cmfs, 
+                                        .illuminant = image.illuminant });
+
+    // Quick approximation
+    loaded_texture = std::move(info.images[0].image);
+    auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
+    auto chull_simp = simplify(chull_mesh, info.n_vertices);
+    auto [verts, elems] = generate_data(chull_simp);
+    project_data.gamut_elems = elems;
+    std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
+      return ProjectData::Vert { .colr_i = c, .mapp_i = 0, .colr_j = { }, .mapp_j = { } };
+    });
+
+    /* 1. Compute a convex hull around the baseline texture */
+
+    /* 2. Pick a random subset of pixels in the texture */
+
+    /* 3. Generate barycentric weights of this subset w.r.t. the hull */
+
+    /* 4. Compute new gamut constraints for each secondary mapping
+          w.r.t. the barycentric weights  */
+  }
+
+  // Forward loaded texture to ApplicationData::create(Texture2d3f &&)
   void ApplicationData::create(const fs::path &texture_path) {
-    // Forward loaded texture to ApplicationData::create(Texture2d3f &&)
+    met_trace();
     create(io::load_texture2d<Colr>(texture_path, true));
   }
 
   void ApplicationData::create(Texture2d3f &&texture) {
-    project_save  = SaveFlag::eNew;
+    met_trace();
+
+    project_save   = SaveFlag::eNew;
     project_path   = ""; // TBD on first save
     project_data   = ProjectData();
     loaded_texture = std::move(texture);
@@ -69,14 +128,19 @@ namespace met {
   }
   
   void ApplicationData::save(const fs::path &path) {
+    met_trace();
+
     project_save = SaveFlag::eSaved;
-    project_path  = io::path_with_ext(path, ".json");
+    project_path = io::path_with_ext(path, ".json");
+
     io::save_json(project_path, project_data);
     io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture, true);
   }
 
   void ApplicationData::load(const fs::path &path) {
-    project_save  = SaveFlag::eSaved;
+    met_trace();
+
+    project_save   = SaveFlag::eSaved;
     project_path   = io::path_with_ext(path, ".json");
     project_data   = io::load_json(path).get<ProjectData>();
     loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
@@ -87,6 +151,8 @@ namespace met {
   }
 
   void ApplicationData::touch(ProjectMod &&mod) {
+    met_trace();
+
     // Apply change
     mod.redo(project_data);
 
@@ -103,9 +169,10 @@ namespace met {
   }
 
   void ApplicationData::redo() {
-    fmt::print("redo {} -> {}\n", mod_i, mod_i + 1);
+    met_trace();
     
     guard(mod_i < (int(mods.size()) - 1));
+    
     mod_i += 1;
     mods[mod_i].redo(project_data);
 
@@ -115,9 +182,10 @@ namespace met {
   }
 
   void ApplicationData::undo() {
-    fmt::print("undo {} -> {}\n", mod_i, mod_i - 1);
-
+    met_trace();
+    
     guard(mod_i >= 0);
+
     mods[mod_i].undo(project_data);
     mod_i -= 1;
 
@@ -127,6 +195,8 @@ namespace met {
   }
 
   void ApplicationData::unload() {
+    met_trace();
+
     project_save = SaveFlag::eUnloaded;
     project_path  = "";
     project_data  = { };
@@ -136,31 +206,10 @@ namespace met {
     mods  = { };
     mod_i = -1;
   }
-
- /*  namespace detail {
-    Spec load_illuminant(const ProjectData &data, std::string_view key) {
-      const auto it = std::ranges::find_if(data.illuminants, 
-        [&key](auto &p) { return key == p.first; });
-      debug::check_expr_rel(it != data.illuminants.end(), 
-        fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
-      return it->second; 
-    }
-
-    CMFS load_cmfs(const ProjectData &data, std::string_view key) {
-      const auto it = std::ranges::find_if(data.cmfs, 
-        [&key](auto &p) { return key == p.first; });
-      debug::check_expr_rel(it != data.cmfs.end(), 
-        fmt::format("Could not load spectrum from project data; name was \"{}\"", key));
-      return it->second; 
-    }
-
-    Mapp load_mapping(const ProjectData &data, ProjectData::Mapp mapping) {
-      return { .cmfs      = load_cmfs(data, mapping.cmfs),
-              .illuminant = load_illuminant(data, mapping.illuminant) };
-    }
-  } // namespace detail */
   
   void ApplicationData::load_chull_gamut() {
+    met_trace();
+
     // Instantiate decimated approximate convex hull to place initial project gamut vertices
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
     auto chull_simp = simplify(chull_mesh, chull_vertex_count);
