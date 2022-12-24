@@ -41,7 +41,7 @@ namespace met {
         eval_data_section(info);
       
       // Define create/cancel buttons to handle results 
-      ImGui::SpacedSeparator();
+      ImGui::Separator();
       if (m_proj_data.images.empty()) ImGui::BeginDisabled();
       if (ImGui::Button("Create") && create_project_safe(info)) { 
         ImGui::CloseAnyPopupIfOpen();
@@ -56,8 +56,9 @@ namespace met {
       
       // Define convex hull vertex slider
       uint min_chull_v = 4, max_chull_v = barycentric_weights;
-      ImGui::SameLine();
-      ImGui::SliderScalar("Convex hull vertices", ImGuiDataType_U32, 
+      ImGui::SameLine(0.f, -48.f * e_window.content_scale());
+      ImGui::SetNextItemWidth(-48.f * e_window.content_scale());
+      ImGui::SliderScalar("Vertices", ImGuiDataType_U32, 
         &m_proj_data.n_vertices, &min_chull_v, &max_chull_v);
 
       // Insert modals
@@ -183,7 +184,7 @@ namespace met {
         ImGui::BeginGroup();
         ImGui::Bullet();
         ImGui::Text(key.c_str());
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f * e_window.content_scale());
         if (ImGui::SmallButton("X")) {
           m_proj_data.illuminants.erase(m_proj_data.illuminants.begin() + i);
           for (auto &image : m_proj_data.images)
@@ -221,7 +222,7 @@ namespace met {
         ImGui::BeginGroup();
         ImGui::Bullet();
         ImGui::Text(key.c_str());
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f * e_window.content_scale());
         if (ImGui::SmallButton("X")) {
           m_proj_data.cmfs.erase(m_proj_data.cmfs.begin() + i);
           for (auto &image : m_proj_data.images)
@@ -275,7 +276,7 @@ namespace met {
   void CreateProjectTask::eval_progress_modal(detail::TaskEvalInfo &info) {
     if (ImGui::BeginPopupModal("Warning: unsaved progress")) {
       ImGui::Text("If you continue, you may lose unsaved progress.");
-      ImGui::SpacedSeparator();
+      ImGui::Separator();
       if (ImGui::Button("Continue")) {
         create_project(info);
         ImGui::CloseCurrentPopup();

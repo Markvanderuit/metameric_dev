@@ -182,9 +182,8 @@ namespace met::detail {
     /* miscellaneous, debug info */
 
     // Return const list of current tasks
-    const std::vector<TaskType>& tasks() const {
-      return m_appl_task_registry;
-    }
+    const ApplTaskVecType& tasks() const { return m_appl_task_registry; }
+    const ApplRsrcMapType& resources() const { return m_appl_rsrc_registry; }
 
     // String output of current task schedule
     std::vector<KeyType> schedule_list() const {

@@ -11,7 +11,7 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
   DrawWeightsTask::DrawWeightsTask(const std::string &name, const std::string &parent)
-  : detail::AbstractTask(name),
+  : detail::AbstractTask(name, true),
     m_parent(parent) { }
   
   void DrawWeightsTask::init(detail::TaskInitInfo &info) {

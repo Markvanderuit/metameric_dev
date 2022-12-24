@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <execution>
 #include <unordered_set>
+#include <fmt/ranges.h>
 
 namespace met {
   namespace detail {
@@ -297,15 +298,15 @@ namespace met {
     }
 
     // Set boundary constraints
-    // params.x_l =-.67f;
-    // params.x_u = .67f;
+    params.x_l = 0.f;
+    params.x_u = 1.f;
+
+    fmt::print("A = {}\n", params.A.reshaped().eval());
+    fmt::print("b = {}\n", params.b.reshaped().eval());
+    fmt::print("C = {}\n", params.C);
 
     // Solve for original colors and separate these into return format
     auto x = lp_solve(params).cast<float>().eval();
-    // fmt::print("A_ = {}\n", A_);
-    // fmt::print("A = {}\n", params.A.row(0));
-    // fmt::print("x = {}\n", x);
-    // fmt::print("params.b = {}\n", params.b);
     std::vector<Colr> v(W);
     for (uint i = 0; i < W; ++i)
       v[i] = Colr(x[i], x[W + i], x[2 * W + i]);

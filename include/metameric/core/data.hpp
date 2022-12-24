@@ -63,9 +63,6 @@ namespace met {
     std::vector<std::pair<std::string, CMFS>> cmfs;
 
   public: /* public methods */
-    // Default constr. provides sensible default values
-    ProjectData();
-
     // Obtain spectral data of a certain stored mapping
     met::Mapp mapping_data(uint i) const;
     met::Mapp mapping_data(Mapp m) const;
@@ -87,12 +84,10 @@ namespace met {
     Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
 
   public: /* public create/load/save methods */
-    void create(ProjectCreateInfo &&info);      // Create project from info object
-    void create(Texture2d3f &&texture);         // Create project from texture data
-    void create(const fs::path &texture_path);  // Create project from texture at path
-    void load(const fs::path &path);            // Load project data from path
-    void save(const fs::path &path);            // Save project data to path
-    void unload();                              // Unload project data
+    void create(ProjectCreateInfo &&info); // Create project from info object
+    void load(const fs::path &path);       // Load project data from path
+    void save(const fs::path &path);       // Save project data to path
+    void unload();                         // Unload project data
   
   public: /* project history and data modification */
     struct ProjectMod {

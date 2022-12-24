@@ -46,10 +46,23 @@ namespace met {
     // Temporary window to show runtime schedule
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
       if (ImGui::Begin("Schedule")) {
-        for (auto &t : scheduler.tasks()) {
-          if (t->is_subtask()) ImGui::Indent();
-          ImGui::Text(t->name().c_str());
-          if (t->is_subtask()) ImGui::Unindent();
+        const auto &tasks = scheduler.tasks();
+        const auto &resources = scheduler.resources();
+
+        for (const auto &task : tasks) {
+          if (task->is_subtask()) ImGui::Indent();
+          std::string name = task->name();
+          if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+            ImGui::TreePop();
+          }
+          if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            if (resources.contains(name)) {
+              ImGui::Value("Resources", static_cast<int>(resources.at(name).size()));
+            }
+            ImGui::EndTooltip();
+          }
+          if (task->is_subtask()) ImGui::Unindent();
         }
       }
       ImGui::End();
@@ -130,7 +143,7 @@ namespace met {
     }); */
   }
   
-  /* template <typename Scheduler>
+  template <typename Scheduler>
   void submit_schedule_test(Scheduler &scheduler) {
     scheduler.emplace_task<LambdaTask>("debug_idea", [&](auto &info) {
       // Get shared resources
@@ -175,7 +188,6 @@ namespace met {
         ImGui::Separator();
 
         if (ImGui::Button("Fire!")) {
-
           std::vector<Wght> _weights(5);
           std::vector<Colr> _samples(5);
           uint offset = 0;
@@ -206,7 +218,7 @@ namespace met {
       }
       ImGui::End();
     });
-  } */
+  }
 
   template <typename Scheduler>
   void submit_schedule_main<Scheduler>(Scheduler &scheduler) {

@@ -99,8 +99,8 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
 
   // Compute spherical triangle data
   vec3 theta = 2.f * asin(.5f * vec3(length(u[1] - u[2]), 
-                                      length(u[2] - u[0]), 
-                                      length(u[0] - u[1])));
+                                     length(u[2] - u[0]), 
+                                     length(u[0] - u[1])));
     
   // Fallback: x lies near or on triangle, use 2D barycentric coordinates
   float h = .5f * hsum(theta);

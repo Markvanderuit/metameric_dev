@@ -12,15 +12,18 @@ namespace met {
     using KeyType  = std::string;
     using RsrcType = std::shared_ptr<detail::AbstractResource>;
     using TaskType = std::shared_ptr<detail::AbstractTask>;
+    using RsrcRegs = std::unordered_map<KeyType, std::unordered_map<KeyType, RsrcType>>;
+    using TaskRegs = std::vector<TaskType>;
     
-    std::unordered_map<KeyType, std::unordered_map<KeyType, RsrcType>> _rsrc_registry;
-    std::vector<TaskType>                                              _task_registry;
+  private: /* private members */
+    RsrcRegs _rsrc_registry;
+    TaskRegs _task_registry;
 
+  private: /* private methods */
     void register_task(const KeyType &prev, TaskType &&task);
     void deregister_task(const KeyType &key);
 
-  public:
-
+  public: /* public methods */
     /* scheduling */
 
     void run();
@@ -85,10 +88,9 @@ namespace met {
     void clear_global(); // Clear global resources
     void clear_all();    // Clear tasks and resources 
 
-    // Return const list of current tasks
-    const std::vector<TaskType>& tasks() const {
-      return _task_registry;
-    }
+    // Return const registries
+    const TaskRegs& tasks() const { return _task_registry; }
+    const RsrcRegs& resources() const { return _rsrc_registry; }
     
     // String output of current task schedule
     std::vector<std::string> schedule_list() const {
