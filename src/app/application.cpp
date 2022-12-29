@@ -80,9 +80,10 @@ namespace met {
       #pragma omp parallel for
       for (int i = 0; i < pca_input.size(); ++i)
         pca_input[i] = internal_sd[128 * i];
-      auto pca_basis = eigen_vectors(covariance_matrix(pca_input));
-      scheduler.insert_resource<BMatrixType>("pca_basis", std::move(pca_basis));
-      scheduler.insert_resource<std::vector<Spec>>("pca_input", std::move(pca_input));
+
+      // Obtain and store basis functions
+      auto basis = eigen_vectors(covariance_matrix(pca_input));
+      scheduler.get_resource<ApplicationData>(global_key, "app_data").loaded_basis = basis;
     }
   } // namespace detail                          
 

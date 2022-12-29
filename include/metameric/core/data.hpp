@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>
@@ -81,7 +82,8 @@ namespace met {
     SaveFlag     project_save = SaveFlag::eUnloaded; 
 
     // Unsaved application data
-    Texture2d3f         loaded_texture;  // RGB texture image extracted from project data
+    Texture2d3f loaded_texture; // Primary RGB texture image extracted from project data
+    BMatrixType loaded_basis;   // Spectral basis functions obtained through PCA
 
   public: /* public create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object

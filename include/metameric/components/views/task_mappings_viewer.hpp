@@ -31,6 +31,7 @@ namespace met {
     void eval_tooltip_copy(detail::TaskEvalInfo &info, uint texture_i);
     void eval_tooltip(detail::TaskEvalInfo &info, uint texture_i);
     void eval_popout(detail::TaskEvalInfo &info, uint texture_i);
+    void eval_save(detail::TaskEvalInfo &info, uint texture_i);
 
   public:
     MappingsViewerTask(const std::string &name);

@@ -1,8 +1,11 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/io.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/file_dialog.hpp>
+#include <implot.h>
 #include <small_gl/texture.hpp>
 
 namespace met {
@@ -85,13 +88,59 @@ namespace met {
     ImGui::Value("Minimum", reflectance.minCoeff(), "%.16f");
     ImGui::Value("Maximum", reflectance.maxCoeff(), "%.16f");
     ImGui::Value("Valid", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
-    // ImGui::Separator();
-    // ImGui::Text("Hint: double-click image to show it in a window");
+
+    
+
+    // TODO: remove
+    /* {
+      using WSpec  = eig::Matrix<float, barycentric_weights, 1>;
+
+      // Get shared resources
+      auto &e_bary_buff = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+      auto &e_tex_data  = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+
+      // Compute sample position in texture dependent on mouse position in image
+      eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
+                            - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
+                            / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
+      const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
+
+      // Copy element data over
+      WSpec weight;
+      e_bary_buff.get(cnt_span<std::byte>(weight), sizeof(WSpec), sizeof(WSpec) * sample_i);
+      if (weight.array().isNaN().any()) {
+        // Plot stuff
+        ImGui::Separator();
+        if (ImPlot::BeginPlot("Weight", { 0, 0 })) {
+          ImPlot::SetupAxesLimits(0.0, 7.0, -1.0, 1.0, ImPlotCond_Always);
+          ImPlot::PlotLine("##bary", weight.data(), weight.size());
+          ImPlot::EndPlot();
+        }
+      }
+    } */
+
     ImGui::EndTooltip();
   }
 
   void MappingsViewerTask::eval_popout(detail::TaskEvalInfo &info, uint texture_i) {
     // ...
+  }
+
+  void MappingsViewerTask::eval_save(detail::TaskEvalInfo &info, uint texture_i) {
+    if (fs::path path; detail::save_dialog(path, "bmp")) {
+      // Get shared resources
+      auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
+      auto &e_colr_buffer = info.get_resource<gl::Buffer>(color_task_key, "colr_buffer");
+      auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+
+      // Obtain cpu-side texture
+      Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
+      e_colr_buffer.get(cast_span<std::byte>(texture_al.data()));
+
+      // Remove padding bytes and apply gamma correction, then save to disk
+      Texture2d3f texture = io::as_srgb(io::as_unaligned(texture_al));
+      io::save_texture2d(io::path_with_ext(path, "bmp"), texture);
+    }
   }
 
   MappingsViewerTask::MappingsViewerTask(const std::string &name)
@@ -157,6 +206,8 @@ namespace met {
       
       // Iterate n_cols, n_rows, and n_mappings
       for (uint i = 0, i_col = 0; i < e_mappings_n; ++i) {
+        ImGui::PushID(fmt::format("mapping_viewer_texture_{}", i).c_str());
+
         // Generate name of task holding texture data
         auto subtask_tex_key = fmt::format(resample_fmt, i);
         
@@ -167,7 +218,13 @@ namespace met {
 
         // Draw image
         ImGui::BeginGroup();
+
+        // Header line
         ImGui::Text(e_proj_data.mapping_name(i).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Export")) eval_save(info, i);
+        
+        // Main image
         ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
         
         // Set id for tooltip after loop is over, and start data copy
@@ -188,6 +245,8 @@ namespace met {
         } else if (i < e_mappings_n - 1) {
           ImGui::SameLine();
         }
+
+        ImGui::PopID();
       }
 
       // Handle tooltip after data copy is hopefully completed

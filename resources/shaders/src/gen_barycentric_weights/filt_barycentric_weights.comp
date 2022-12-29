@@ -1,0 +1,84 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <math.glsl>
+#include <spectrum.glsl>
+
+#define Wght float[barycentric_weights]
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
+
+// Shader storage buffer declarations
+layout(binding = 0) restrict readonly  buffer b_0 { Wght data[]; } b_bary_in;
+layout(binding = 1) restrict writeonly buffer b_1 { Wght data[]; } b_bary_out;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform u_0 {
+  uint  n;
+  uint  n_verts;
+  uvec2 wh;
+} b_size;
+
+// Define to perform commonly occuring iteration
+#define weights_iter(__b) for (uint __b = 0; __b < b_size.n_verts; ++__b)
+
+float sum_weight(in Wght w) {
+  float f;
+  weights_iter(i) f += w[i];
+  return f;
+}
+
+bool any_nan(in Wght w) {
+  bool b = false;
+  weights_iter(i) b = b || isnan(w[i]);
+  return b;
+}
+
+Wght constr_weight(in float f) {
+  Wght w;
+  weights_iter(i) w[i] = f;
+  return w;
+}
+
+Wght add_weight(in Wght a, in Wght b) {
+  weights_iter(i) a[i] += b[i];
+  return a;
+}
+
+Wght mul_weight(in Wght a, float f) {
+  weights_iter(i) a[i] *= f;
+  return a;
+}
+
+void main() {
+  const uint i = gl_GlobalInvocationID.x;
+  guard(i < b_size.n);
+
+  Wght wght = b_bary_in.data[i];
+
+  // float wsum = sum_weight(wght);
+  // if (any_nan(wght) || wsum == 0.f) {
+  //   // wght = constr_weight(0.f);
+
+  //   // int j_[4];
+  //   // j_[0] = int(i) - 1;
+  //   // j_[1] = int(i) + 1;
+  //   // j_[2] = int(i) - int(b_size.wh.x);
+  //   // j_[3] = int(i) + int(b_size.wh.x);
+
+  //   // for (uint j = 0; j < 4; ++j) {
+  //   //   int k = j_[j];
+  //   //   guard_continue(k >= 0 && k < b_size.n);
+  //   //   Wght other = b_bary_in.data[k];
+  //   //   guard_continue(any_nan(other));
+  //   //   wght = add_weight(wght,other);
+  //   // }
+  //   // // wght = mul_weight(wght, 0.25f);
+  //   // wght = mul_weight(wght, 1.f / sum_weight(wght));
+  // }
+
+  b_bary_out.data[i] = wght;
+}

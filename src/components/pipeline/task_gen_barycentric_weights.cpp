@@ -29,14 +29,32 @@ namespace met {
                    .is_spirv_binary = true }};
     m_dispatch = { .groups_x = generate_ndiv, 
                    .bindable_program = &m_program }; 
+
+    // Initialize objects for filter shader call
+    m_filt_program = {{ .type = gl::ShaderType::eCompute,
+                        .path = "resources/shaders/gen_barycentric_weights/filt_barycentric_weights.comp.spv_opt",
+                        .is_spirv_binary = true }};
+    m_filt_dispatch = { .groups_x = generate_ndiv, 
+                        .bindable_program = &m_filt_program }; 
                    
-    // Initialize uniform buffer and writeable, flushable mapping
+    // Initialize uniform buffers and writeable, flushable mappings
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_filt_uniform_buffer = {{ .size = sizeof(FiltUniformBuffer), .flags = buffer_create_flags }};
+    m_filt_uniform_map = &m_filt_uniform_buffer.map_as<FiltUniformBuffer>(buffer_access_flags)[0];
 
     // Initialize buffer holding barycentric weights
     info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
+    // info.emplace_resource<gl::Buffer>("filt_buffer", { .size = barycentric_weights * sizeof(float) * generate_n });
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = barycentric_weights * sizeof(float) * generate_n });
+  }
+
+  void GenBarycentricWeightsTask::dstr(detail::TaskDstrInfo &info) {
+    met_trace_full();
+
+    // Unmap buffers
+    if (m_uniform_buffer.is_init() && m_uniform_buffer.is_mapped()) m_uniform_buffer.unmap();
+    if (m_filt_uniform_buffer.is_init() && m_filt_uniform_buffer.is_mapped()) m_filt_uniform_buffer.unmap();
   }
 
   void GenBarycentricWeightsTask::eval(detail::TaskEvalInfo &info) {
@@ -51,6 +69,7 @@ namespace met {
     auto &e_vert_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
     auto &e_elem_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
+    // auto &i_filt_buffer = info.get_resource<gl::Buffer>("filt_buffer");
     auto &i_bary_buffer = info.get_resource<gl::Buffer>("bary_buffer");
     
     // Update uniform data
@@ -58,6 +77,12 @@ namespace met {
     m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
     m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
+
+    // Update uniform data
+    m_filt_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+    m_filt_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
+    m_filt_uniform_map->wh      = e_appl_data.loaded_texture.size();
+    m_filt_uniform_buffer.flush();
 
     // Bind resources to buffer targets
     e_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
@@ -69,5 +94,14 @@ namespace met {
     // Dispatch shader to generate spectral data
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_dispatch);
+
+    // // Bind resources to buffer targets
+    // i_filt_buffer.bind_to(gl::BufferTargetType::eShaderStorage,   0);
+    // i_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage,   1);
+    // m_filt_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
+
+    // // Dispatch shader to generate spectral data
+    // gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+    // gl::dispatch_compute(m_filt_dispatch);
   }
 } // namespace met

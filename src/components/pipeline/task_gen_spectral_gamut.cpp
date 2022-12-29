@@ -61,7 +61,6 @@ namespace met {
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_elems       = e_proj_data.gamut_elems;
     auto &e_verts       = e_proj_data.gamut_verts;
-    auto &e_basis       = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &i_specs       = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
     auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
@@ -88,6 +87,8 @@ namespace met {
       m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
     }
 
+    auto basis = e_appl_data.loaded_basis.rightCols(wavelength_bases);
+
     // Generate spectra at gamut color positions in parallel
     #pragma omp parallel for
     for (int i = 0; i < i_specs.size(); ++i) {
@@ -108,7 +109,7 @@ namespace met {
       std::ranges::copy(vert.colr_j, signals.begin() + 1);
 
       // Generate new spectrum given the above systems+signals as solver constraints
-      i_specs[i] = generate(e_basis.rightCols(wavelength_bases), systems, signals);
+      i_specs[i] = generate(basis, systems, signals);
     }
 
     // Describe ranges over stale gamut vertices/elements

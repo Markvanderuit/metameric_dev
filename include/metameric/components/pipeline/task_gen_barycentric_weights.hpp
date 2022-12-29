@@ -13,14 +13,26 @@ namespace met {
       uint n_elems; // Nr. of elements defining surrounding hull
     };
 
+    struct FiltUniformBuffer {
+      uint n;          // Nr. of points to dispatch computation for
+      uint n_verts;    // Nr. of vertices defining surrounding hull
+      eig::Array2u wh; // Texture resolution
+    };
+
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;
 
+    gl::ComputeInfo     m_filt_dispatch;
+    gl::Program         m_filt_program;
+    gl::Buffer          m_filt_uniform_buffer;
+    FiltUniformBuffer  *m_filt_uniform_map;
+
   public:
     GenBarycentricWeightsTask(const std::string &name);
     void init(detail::TaskInitInfo &) override;
+    void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 } // namespace met

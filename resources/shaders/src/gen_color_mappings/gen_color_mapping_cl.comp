@@ -71,5 +71,5 @@ void main() {
   
   // Sture results using first invocation
   if (cl_bin_elect())
-    b_colr.data[i] = v;
+    b_colr.data[i] = clamp(v, 0, 1);
 }

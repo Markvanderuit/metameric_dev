@@ -158,7 +158,8 @@ namespace met {
     
     // Operate on a copy of the input mesh
     Mesh mesh = input_mesh;
-    // First, collapse all shortest edges into their average to a hardcoded minimum
+
+    // First, quickly collapse all very short edges into their average to a hardcoded minimum
     {
       using Decimater = odec::CollapsingDecimater<Mesh, odec::AverageCollapseFunction>;
       using Mod       = odec::ModEdgeLengthT<Mesh>::Handle;
@@ -168,17 +169,17 @@ namespace met {
 
       dec.add(mod);
       dec.module(mod).set_binary(false);
-      dec.module(mod).set_edge_length(FLT_MAX);
+      dec.module(mod).set_edge_length(0.05f);
         
       dec.initialize();
       dec.decimate_to(std::max(max_vertices, 16u));
 
       mesh.garbage_collection();
     }
-    
+
     // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
     {
-      using Decimater = odec::CollapsingDecimater<Mesh, odec::DefaultCollapseFunction>;
+      using Decimater = odec::CollapsingDecimater<Mesh, odec::VolumeCollapseFunction>;
       using Mod       = odec::ModQuadricT<Mesh>::Handle;
 
       Decimater dec(mesh);
@@ -195,72 +196,6 @@ namespace met {
 
     return mesh;
   }
-
-  
-  /* template <typename Traits, typename T>
-  std::vector<eig::ArrayXf> generate_barycentric_weights(const TriMesh<Traits> &mesh, std::span<const T> points) {
-    enum class MVCReturnFlag { eOnVertex, eOnTriangle, eOnPlane, eCorrect };
-    struct MVCReturnObject {
-      eig::ArrayXf weight;
-      MVCReturnFlag flag;
-    };
-
-    std::vector<eig::ArrayXf> weights(points.size());
-    std::transform(std::execution::par_unseq, range_iter(points), weights.begin(), [&mesh](const auto &x) {
-      constexpr float eps = 0.0000001f;
-      const uint n = mesh.n_vertices();
-
-      // Final weight object
-      eig::ArrayXf weight = eig::ArrayXf::Zero(n);
-      
-      // Per vertex distance and length
-      std::vector<eig::Vector3f> u(n);
-      std::vector<float>         d(n);
-
-      // Compute u, d
-      std::ranges::transform(mesh.vertices(), u.begin(), [&](const auto &vh) {
-        return (to_eig<float, 3>(mesh.point(vh)).array() - x).eval();
-      });
-      std::ranges::transform(u, d.begin(), [](auto &v) {
-        float f = v.norm();
-        v /= f;
-        return f;
-      });
-
-      // Fallback: check if x lies on/near vertex, and return immediately
-      for (uint i = 0; i < n; ++i) {
-        if (d[i] < eps) {
-          weight[i] = 1.f;
-          return weight;
-        }
-      }
-      
-      // Iterate over mesh triangles
-      for (auto fh : mesh.faces()) {
-        // Obtain indices of triangle vertices
-        auto [vh0, vh1, vh2]  = fh.vertices().to_array<3>();
-        auto [i0, i1, i2]     = std::array<3, int> { vh0.idx(), vh1.idx(), vh2.idx() };
-        auto [im0, im1, im2]  = std::array<3, int> { i2, i0, i1 }; // Previous index
-        auto [ip0, ip1, ip2]  = std::array<3, int> { i1, i2, i0 }; // Next index
-
-        // Compute spherical triangle theta
-        eig::Vector3f theta  = 2.f * (.5f 
-          * (eig::Vector3f() << (u[i1] - u[i2]).norm(), 
-                                (u[i2] - u[i0]).norm(), 
-                                (u[i0] - u[i1]).norm()).finished()).array().asin();
-        
-        // Fallback: x lies on or near triangle, employ 2d barycentric coordinates
-        float h = .5f * theta.sum();
-        if (std::numbers::pi_v<float> - h < eps) {
-          // ...
-        }
-      }
-
-      return weight;
-    });
-
-    return weights;
-  } */
 
   /* Forward declarations over common OpenMesh types and Array3f/AlArray3f */
   

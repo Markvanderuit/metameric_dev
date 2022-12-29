@@ -132,7 +132,6 @@ namespace met {
     guard(e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection);
 
     // Get shared resources
-    auto &e_basis     = info.get_resource<BMatrixType>(global_key, "pca_basis");
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data = e_appl_data.project_data;
     auto &e_vert      = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
@@ -155,7 +154,7 @@ namespace met {
     const auto &i_samples = info.get_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
 
     // Generate points on metamer set boundary
-    auto basis  = e_basis.rightCols(wavelength_bases);
+    auto basis  = e_appl_data.loaded_basis.rightCols(wavelength_bases);
     auto points = generate_boundary_i(basis, cmfs_i, sign_i, cmfs_j, i_samples);
 
     // Store in aligned format // TODO generate in aligned format, you numbskull

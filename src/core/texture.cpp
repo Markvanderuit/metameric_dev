@@ -98,10 +98,9 @@ namespace met {
     void save_texture2d(const fs::path &path, const Texture2d<T> &texture_, bool lrgb_to_srgb) {
       met_trace();
 
-      // Operate on a copy as gamma may need to be applied
+      // Operate on a copy as gamma may need to be applied;
+      // apply linear sRGB gamma if requested
       Texture2d<T> texture({ .size = texture_.size(), .data = texture_.data() });
-
-      // Apply linear sRGB gamma if requested
       if (lrgb_to_srgb)
         to_srgb(texture);
 
@@ -119,7 +118,7 @@ namespace met {
       const auto ext = path.extension();
       int ret = 0;
       if (ext == ".png") {
-        ret = stbi_write_png(pstr, size.x(), size.y(), c, byte_data.data(), 8 * 4 * size.x());
+        ret = stbi_write_png(pstr, size.x(), size.y(), c, byte_data.data(), size.x() * c);
       } else if (ext == ".jpg") {
         ret = stbi_write_jpg(pstr, size.x(), size.y(), c, byte_data.data(), 0);
       } else if (ext == ".bmp") {

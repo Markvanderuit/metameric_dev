@@ -52,6 +52,32 @@ namespace OpenMesh::Decimater {
       return 0.5f * (ci.p0 + ci.p1);
     }
   };
+
+  // Collapse a pair of vertices in a volume-preserving manner
+  template <typename Mesh>
+  struct VolumeCollapseFunction {
+    typedef CollapseInfoT<Mesh> CollapseInfo;
+    typedef Mesh::Point         Point;
+
+    static Point collapse(const CollapseInfo &ci);
+  };
+
+/*   template <typename Mesh>
+  class ModVolumeT : public ModBaseT<Mesh> {
+  public:
+    DECIMATING_MODULE(ModVolumeT, Mesh);
+
+  public:
+    explicit ModVolumeT(Mesh &_mesh)
+    : Base(_mesh, false) {
+      unset_max_err();
+    }
+
+  public:
+    virtual void initialize(void) override;
+
+
+  }; */
   
   /**
    * Implementation of mesh decimater with configurable collapse function, integrating with the decimater system

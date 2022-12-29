@@ -43,11 +43,12 @@ void load_shared_data() {
 }
 
 // Define to perform commonly occuring iteration
-#define weights_iter(__b) for (uint __b = 0; __b < b_size.n_verts; ++__b)
+#define weights_iter(__b)      for (uint __b = 0; __b < b_size.n_verts; ++__b)
+#define weights_iter_full(__b) for (uint __b = 0; __b < barycentric_weights; ++__b)
 
 Wght constr_weights(in float f) {
   Wght w;
-  weights_iter(i) w[i] = f;
+  weights_iter_full(i) w[i] = f;
   return w;
 }
 
@@ -79,7 +80,7 @@ struct MVCReturnObject {
 };
 
 MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
-  MVCReturnObject result = MVCReturnObject(vec3(0), MVCReturnOnVertex);
+  MVCReturnObject result;
 
   // Compute per-vertex data
   vec3 d, u[3];
@@ -87,14 +88,15 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
     vec3 p = s_verts_in[v[i]];
 
     d[i] = length(p - x);
-    u[i] = (p - x) / d[i];
 
     // Fallback: x lies near or on vertex, return value directly
-    if (d[i] < M_EPS) {
+    if (d[i] <= M_EPS) {
       result.weight[i] = 1;
       result.type = MVCReturnOnVertex;
       return result;
     }
+
+    u[i] = normalize(p - x);
   }
 
   // Compute spherical triangle data
@@ -104,9 +106,8 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
     
   // Fallback: x lies near or on triangle, use 2D barycentric coordinates
   float h = .5f * hsum(theta);
-  if (M_PI - h < M_EPS) {
+  if (M_PI - h <= M_EPS) {
     result.weight = sin(theta) * shift(d, _ip) * shift(d, _im);
-    result.weight /= hsum(result.weight);
     result.type = MVCReturnOnTriangle;
     return result;
   }
@@ -115,8 +116,8 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
   vec3 c = (2.f * sin(h) * sin(h - theta)) 
           / (shift(sin_theta, _ip) * shift(sin_theta, _im)) 
           - 1.f;
-  vec3 s = sign(determinant((mat3(u[0], u[1], u[2])))) 
-          * sqrt(1.f - c * c);
+  vec3 s = sign(determinant(transpose(mat3(u[0], u[1], u[2])))) 
+         * sqrt(1.f - c * c);
 
   // Fallback: x lies on triangle's plane but way outside triangle, ignore weights
   if (any(lessThan(abs(s), vec3(M_EPS)))) {
@@ -144,18 +145,23 @@ Wght mean_value_coords_total(in vec3 x) {
     if (result.type == MVCReturnOnPlane)
       continue;
 
+    // Catch NANs and set respective weight to zero
+    if (any(isnan(result.weight)))
+      continue;
+
     // Catch special cases which return their own value directly
     if (result.type == MVCReturnOnVertex || result.type == MVCReturnOnTriangle) {
       weight = constr_weights(0.f);
       scatter_add_weights(weight, result.weight, v);
-      return weight;
+      break;
     }
 
     scatter_add_weights(weight, result.weight, v);
   }
 
   float wsum = sum_weights(weight);
-  weights_iter(i) weight[i] /= wsum;
+  if (wsum != 0.f)
+    weights_iter(i) weight[i] /= wsum;
   return weight;
 }
 

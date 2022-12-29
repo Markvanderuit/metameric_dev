@@ -53,9 +53,9 @@ namespace met {
     debug::check_expr_rel(!info.images.empty(), "ProjectCreateInfo::images must not be empty");
 
     // Reset project data
-    project_save   = SaveFlag::eNew;
-    project_path   = ""; // TBD on first save
-    project_data   = ProjectData();
+    project_save = SaveFlag::eNew;
+    project_path = ""; // TBD on first save
+    project_data = ProjectData();
 
     // Reset undo/redo history
     mods  = { };
@@ -69,7 +69,7 @@ namespace met {
       project_data.mappings.push_back({ .cmfs       = image.cmfs, 
                                         .illuminant = image.illuminant });
 
-    // Move b texture into application - not project - data; stored in separate file
+    // Move texture into application - not project - data; stored in separate file
     loaded_texture = std::move(info.images[0].image);
     info.images.erase(info.images.begin()); // Youch
 
@@ -78,7 +78,7 @@ namespace met {
     auto chull_simp = simplify(chull_mesh, info.n_vertices);
     auto [verts, elems] = generate_data(chull_simp);
 
-    uint n_samples = 64;
+    uint n_samples = 16;
 
     std::vector<Wght> weights;
     std::vector<Colr> samples;
@@ -112,8 +112,7 @@ namespace met {
       for (uint i = 0; i < constr_values.size(); ++i) {
         auto img_span = info.images[i].image.data();
         constr_values[i] = std::vector<Colr>(n_samples);
-        std::ranges::transform(subset_indices, constr_values[i].begin(), 
-          [&](uint i) { return img_span[i]; });
+        std::ranges::transform(subset_indices, constr_values[i].begin(), [&](uint i) { return img_span[i]; });
       }
     }
 
@@ -159,32 +158,105 @@ namespace met {
       bary_buffer.get(cnt_span<std::byte>(aligned_weights));      
     }
 
-    /* 4. Compute new gamut constraints for each secondary mapping
-          w.r.t. the barycentric weights  */
+    /* 4. Solve for spectra for each constraint */
+    std::vector<Spec> image_spectra;
     {
-      // Obtain unaligned weights
-      std::vector<std::vector<float>> weights;
-      std::ranges::transform(aligned_weights, std::back_inserter(weights), [&](const auto &v) {
-        std::vector<float> w(verts.size());
-        std::copy(v.begin(), v.begin() + w.size(), w.begin());
-        return w;
-      });
+      auto basis = loaded_basis.rightCols(wavelength_bases);
 
-      fmt::print("weights {}\n", weights);
+      // Gather color system spectra for all mappings
+      std::vector<CMFS> systems(project_data.mappings.size());
+      for (uint i = 0; i < systems.size(); ++i)
+        systems[i] = project_data.mapping_data(i).finalize();
 
-      // For each set of constraints
+      image_spectra.resize(n_samples);
+      for (uint i = 0; i < n_samples; ++i) {
+        // Gather color signals spectra for all mappings
+        std::vector<Colr> signals = { subset_values[i] };
+        for (uint j = 0; j < constr_values.size(); ++j)
+          signals.push_back(constr_values[j][i]);
+
+        // Perform solve step
+        image_spectra[i] = generate(basis, systems, signals).min(1.f).max(0.f).eval();
+        Colr c = project_data.mapping_data(0).apply_color(image_spectra[i]);
+        fmt::print("{} -> {}\n", subset_values[i], c);
+      }
+    }
+
+    /* 5. Solve for spectra at the gamut vertex positions based on
+          these samples. */
+    /* std::vector<Spec> gamut_spectra;
+    {
+      // Copy over weights to correct format (fix this later)
+      std::vector<WSpec> weights(aligned_weights.size());
+      std::ranges::copy(aligned_weights, weights.begin());
+
+      // Assemble info struct
+      GenerateSpectralGamutInfo info = {
+        .basis   = loaded_basis.rightCols(wavelength_bases),
+        .system  = project_data.mapping_data(0).finalize(),
+        .gamut   = verts,
+        .weights = weights,
+        .samples = image_spectra
+      };
+
+      // Perform solver step
+      gamut_spectra = generate_gamut(info);
+      gamut_spectra.resize(verts.size());
+    } */
+
+    /* 5. Solve for spectra at the gamut vertex positions based on
+          these samples. */
+    std::vector<Spec> gamut_spectra;
+    {
+      GenerateGamutInfo info = {
+        .basis   = loaded_basis.rightCols(wavelength_bases),
+        .gamut   = verts,
+        .systems = std::vector<CMFS>(project_data.mappings.size()),
+        .signals = std::vector<GenerateGamutInfo::Signal>(n_samples)
+      };
+
+      // Transform mappings
+      for (uint i = 0; i < project_data.mappings.size(); ++i)
+        info.systems[i] = project_data.mapping_data(i).finalize();
+
+      // Add baseline samples
+      for (uint i = 0; i < n_samples; ++i)
+        info.signals[i] = { .colr_v = subset_values[i],
+                            .bary_v = aligned_weights[i],
+                            .syst_i = 0 };
+
+      // Add constraint samples
       for (uint i = 0; i < constr_values.size(); ++i) {
-        fmt::print("constr_values {} = {}\n", i + 1, constr_values[i]);
+        const auto &values = constr_values[i];
+        for (uint j = 0; j < n_samples; ++j)
+          info.signals.push_back({
+            .colr_v = values[j],
+            .bary_v = aligned_weights[j],
+            .syst_i = i + 1
+          });
+      }
 
-        // Solve for constrained gamut
-        std::vector<Colr> constraint_gamut = generate_gamut(weights, constr_values[i]);
-        fmt::print("gamut {} = {}\n", i + 1, constraint_gamut);
+      gamut_spectra = generate_gamut(info);
+      gamut_spectra.resize(verts.size());
+    }
 
-        // Assign data to each vertex
-        for (uint j = 0; j < constraint_gamut.size(); ++j) {
-          auto &vert = project_data.gamut_verts[j];
-          vert.colr_j.push_back(constraint_gamut[j]);
-          vert.mapp_j.push_back(i + 1); // 0 is base image, which was removed from the list
+    fmt::print("gamut_spectra :\n");
+    for (auto &s : gamut_spectra)
+      fmt::print("\t{}\n", s);
+    
+    /* 6. Obtain constraint color offsets from these spectra by simply
+          applying each color system */
+    {
+      for (uint i = 0; i < gamut_spectra.size(); ++i) {
+        const Spec &sd = gamut_spectra[i];
+        auto &vert     = project_data.gamut_verts[i];
+
+        Colr colr_new = project_data.mapping_data(project_data.mappings[0]).apply_color(sd);
+        fmt::print("{} -> {}\n", vert.colr_i, colr_new);
+        vert.colr_i = colr_new;
+        for (uint j = 1; j < project_data.mappings.size(); ++j) {
+          vert.colr_j.push_back(project_data.mapping_data(project_data.mappings[j]).apply_color(sd));
+          vert.mapp_j.push_back(j);
         }
       }
     }
