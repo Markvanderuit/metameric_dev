@@ -159,7 +159,7 @@ namespace met {
     }
 
     /* 4. Solve for spectra for each constraint */
-    std::vector<Spec> image_spectra;
+    /* std::vector<Spec> image_spectra;
     {
       auto basis = loaded_basis.rightCols(wavelength_bases);
 
@@ -180,7 +180,7 @@ namespace met {
         Colr c = project_data.mapping_data(0).apply_color(image_spectra[i]);
         fmt::print("{} -> {}\n", subset_values[i], c);
       }
-    }
+    } */
 
     /* 5. Solve for spectra at the gamut vertex positions based on
           these samples. */

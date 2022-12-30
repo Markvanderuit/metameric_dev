@@ -141,10 +141,10 @@ namespace met {
     return detail::remove_identical_points(output);
   }
 
+  // row/col expansion shorthand for a given eigen matrix
+  #define rowcol(mat) decltype(mat)::RowsAtCompileTime, decltype(mat)::ColsAtCompileTime
+  
   std::vector<Spec> generate_gamut(const GenerateSpectralGamutInfo &info) {
-    // row/col expansion shorthand for a given eigen matrix
-    #define rowcol(mat) decltype(mat)::RowsAtCompileTime, decltype(mat)::ColsAtCompileTime
-    
     // Constant shorthands
     constexpr uint n_bary = barycentric_weights;
     constexpr uint n_spec = wavelength_samples;
@@ -183,14 +183,11 @@ namespace met {
     // Add constraints to ensure resulting spectra remain bounded near original gamut positions
     const auto gamut_csys = (info.system.transpose() * info.basis).cast<double>().eval();
     const uint l_gamut_offs = info.samples.size() * n_spec;
-    // const uint u_gamut_offs = l_gamut_offs + info.gamut.size() * n_colr;
     for (uint i = 0; i < info.gamut.size(); ++i) {
       params.A.block<rowcol(gamut_csys)>(l_gamut_offs + i * n_colr, i * n_base) = gamut_csys;
-      // params.A.block<rowcol(gamut_csys)>(u_gamut_offs + i * n_colr, i * n_base) = gamut_csys;
 
       auto b = info.gamut[i].cast<double>().eval();
       params.b.block<rowcol(b)>(l_gamut_offs + i * n_colr, 0) = (b - gamut_err).max(0.0).eval();
-      // params.b.block<rowcol(b)>(u_gamut_offs + i * n_colr, 0) = (b + gamut_err).min(1.0).eval();
     }
     params.r.block(l_gamut_offs, 0, info.gamut.size() * n_colr, 1) = LPCompare::eEQ;
     // params.r.block(u_gamut_offs, 0, info.gamut.size() * n_colr, 1) = LPCompare::eLE;
@@ -247,21 +244,11 @@ namespace met {
       const Signal &sign = info.signals[i];
       for (uint j = 0; j < n_bary; ++j) {
         auto A = (info.systems[sign.syst_i].transpose() * info.basis * sign.bary_v[j]).cast<double>().eval();
-        params.A.block(
-          i * n_colr,
-          j * n_base,
-          decltype(A)::RowsAtCompileTime,
-          decltype(A)::ColsAtCompileTime
-        ) = A;
+        params.A.block(i * n_colr, j * n_base, rowcol(A)) = A;
       }
       
       auto b = sign.colr_v.cast<double>().eval();
-      params.b.block(
-        i * n_colr,
-        0,
-        decltype(b)::RowsAtCompileTime,
-        decltype(b)::ColsAtCompileTime
-      ) = b;
+      params.b.block(i * n_colr, 0, rowcol(b)) = b;
     }
 
     // Add constraints to ensure resulting spectra reproduce gamut positions exactly
@@ -269,19 +256,8 @@ namespace met {
     const uint gamut_offs = info.signals.size() * n_colr;
     for (uint i = 0; i < info.gamut.size(); ++i) {
       auto b = info.gamut[i].cast<double>().eval();
-
-      params.A.block(
-        gamut_offs + i * n_colr,
-        i * n_base,
-          decltype(gamut_csys)::RowsAtCompileTime,
-          decltype(gamut_csys)::ColsAtCompileTime
-      ) = gamut_csys;
-      params.b.block(
-        gamut_offs + i * n_colr,
-        0,
-        decltype(b)::RowsAtCompileTime,
-        decltype(b)::ColsAtCompileTime
-      ) = b;
+      params.A.block(gamut_offs + i * n_colr, i * n_base, rowcol(gamut_csys)) = gamut_csys;
+      params.b.block(gamut_offs + i * n_colr, 0, rowcol(b)) = b;
     }
 
     // Add constraints to limit resulting spectra to [0, 1]
@@ -289,18 +265,8 @@ namespace met {
     const uint u_offs = l_offs + n_bary * n_spec;
     const auto basis = info.basis.cast<double>().eval();
     for (uint i = 0; i < n_bary; ++i) {
-      params.A.block(
-        l_offs + i * n_spec,
-        i * n_base,
-        decltype(basis)::RowsAtCompileTime,
-        decltype(basis)::ColsAtCompileTime
-      ) = basis;
-      params.A.block(
-        u_offs + i * n_spec,
-        i * n_base,
-        decltype(basis)::RowsAtCompileTime,
-        decltype(basis)::ColsAtCompileTime
-      ) = basis;
+      params.A.block(l_offs + i * n_spec, i * n_base, rowcol(basis)) = basis;
+      params.A.block(u_offs + i * n_spec, i * n_base, rowcol(basis)) = basis;
     }
     params.b.block(l_offs, 0, n_bary * n_spec, 1) = 0.0;
     params.b.block(u_offs, 0, n_bary * n_spec, 1) = 1.0;
