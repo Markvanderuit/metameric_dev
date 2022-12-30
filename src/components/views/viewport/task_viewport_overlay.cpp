@@ -314,7 +314,8 @@ namespace met {
         Colr error_j = (rtrip_j - colr_j).abs().eval();
 
         ImGui::ColorEdit3(fmt::format("##value{}", j).c_str(), 
-          linear_srgb_to_gamma_srgb(colr_j).data(),  
+          (colr_j).data(),  
+          // linear_srgb_to_gamma_srgb(colr_j).data(),  
           ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
         ImGui::SameLine();
         ImGui::ColorEdit3(fmt::format("##error{}", j).c_str(), 

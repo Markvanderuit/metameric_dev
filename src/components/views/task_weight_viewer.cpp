@@ -65,11 +65,12 @@ namespace met {
       // Determine texture size
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
-      eig::Array2f texture_size  = viewport_size * (e_txtr_data.size()[1] / e_txtr_data.size()[0]);
+      float texture_aspect = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
+      auto texture_size    = (viewport_size * texture_aspect).cast<uint>().max(1u).eval();
 
       // Check if the resample subtask needs readjusting for a resized output texture
-      if (auto size = texture_size.cast<uint>().max(1u); !size.isApprox(m_texture_size)) {
-        m_texture_size = size;
+      if (!texture_size.isApprox(m_texture_size)) {
+        m_texture_size = texture_size;
 
         // Define new resample subtask
         ResampleSubtask task = {{ .input_key  = { fmt::format(sub_texture_fmt, name()), "colr_texture" },

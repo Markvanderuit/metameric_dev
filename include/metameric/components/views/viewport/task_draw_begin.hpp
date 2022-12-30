@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/data.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
@@ -32,6 +33,7 @@ namespace met {
       met_trace_full();
     
       // Get shared resources 
+      auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "lrgb_target");
       auto &i_frame_buffer    = info.get_resource<gl::Framebuffer>("frame_buffer");
       auto &i_frame_buffer_ms = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
@@ -45,8 +47,12 @@ namespace met {
         i_frame_buffer    = {{ .type = gl::FramebufferType::eColor, .attachment = &e_lrgb_target }};
       }
 
+      eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+                              ? eig::Array4f { 0, 0, 0, 1 } 
+                              : ImGui::GetStyleColorVec4(ImGuiCol_ChildBg);
+
       // Clear framebuffer target for next subtasks
-      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
+      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, clear_colr);
       i_frame_buffer_ms.clear(gl::FramebufferType::eDepth, 1.f);
       i_frame_buffer_ms.bind();
 

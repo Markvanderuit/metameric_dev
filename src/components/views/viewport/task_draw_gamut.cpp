@@ -35,8 +35,9 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    auto &e_verts = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
-    auto &e_elems = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_verts     = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
+    auto &e_elems     = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
 
     // Setup sizes/opacities buffers and instantiate relevant mappings
     std::vector<float> vert_input_sizes(barycentric_weights, vert_deslct_size);
@@ -86,9 +87,14 @@ namespace met {
     m_elem_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_gamut.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_gamut.frag" }};
 
+    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+                            ? 1
+                            : eig::Array4f { 0, 0, 0, 1 };
+
     // Set non-changing uniform values
     m_elem_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
     m_elem_program.uniform("u_offset",       .25f);
+    m_vert_program.uniform("u_value", clear_colr);
 
     m_buffer_object_cache = e_verts.object();
   }

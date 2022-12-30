@@ -73,6 +73,11 @@ namespace met {
     std::string mapping_name(Mapp m) const { return fmt::format("{}, {}", cmfs[m.cmfs].first, illuminants[m.illuminant].first); }
   };
 
+  enum class ApplicationColorMode {
+    eDark,
+    eLight
+  };
+
   /* Wrapper to hold all major application data */
   struct ApplicationData {
   public: /* public data */
@@ -82,8 +87,9 @@ namespace met {
     SaveFlag     project_save = SaveFlag::eUnloaded; 
 
     // Unsaved application data
-    Texture2d3f loaded_texture; // Primary RGB texture image extracted from project data
-    BMatrixType loaded_basis;   // Spectral basis functions obtained through PCA
+    Texture2d3f         loaded_texture; // Primary RGB texture image extracted from project data
+    BMatrixType         loaded_basis;   // Spectral basis functions obtained through PCA
+    ApplicationColorMode color_mode;     // Application theming
 
   public: /* public create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object

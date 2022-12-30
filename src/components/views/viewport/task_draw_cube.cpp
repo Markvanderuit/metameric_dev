@@ -1,3 +1,4 @@
+#include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
@@ -38,6 +39,9 @@ namespace met {
   void ViewportDrawCubeTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
+    // Get shared resources
+    auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_uniform.vert" },
                  { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color.frag" }};
@@ -57,9 +61,13 @@ namespace met {
       .bindable_program = &m_program
     };
 
+    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+                            ? 1
+                            : eig::Array4f { 0, 0, 0, 1 };
+                            
     // Set constant uniforms
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
-    m_program.uniform("u_value",       eig::Array4f(1));
+    m_program.uniform("u_value",      clear_colr);
   }
 
   void ViewportDrawCubeTask::eval(detail::TaskEvalInfo &info) {

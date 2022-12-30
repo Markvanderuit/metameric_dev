@@ -32,6 +32,10 @@ namespace met {
     HalfedgeMesh m_sphere_mesh;
     HalfedgeMesh m_csolid_mesh;
 
+    // Constraint-point draw components
+    gl::Buffer           m_quad_verts;
+    gl::Buffer           m_quad_elems;
+    
     // (Multisampled) framebuffer and attachments
     Colorbuffer     m_color_buffer_ms;
     Depthbuffer     m_depth_buffer_ms;
@@ -43,8 +47,11 @@ namespace met {
     gl::Buffer    m_chull_elems;
     gl::Array     m_point_array;
     gl::Array     m_chull_array;
+    gl::Array     m_cnstr_array;
+    gl::DrawInfo  m_cnstr_dispatch;
     gl::DrawInfo  m_point_dispatch;
     gl::DrawInfo  m_chull_dispatch;
+    gl::Program   m_cnstr_program;
     gl::Program   m_draw_program;
 
     // Gamma correction components

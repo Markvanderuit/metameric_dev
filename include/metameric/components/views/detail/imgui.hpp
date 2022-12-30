@@ -12,6 +12,16 @@
   operator met::eig::Array2i() const { return {                    \
     static_cast<int>(x), static_cast<int>(y) }; }
 
+#define IM_VEC4_CLASS_EXTRA                                        \
+  operator met::eig::Vector4f() const { return { x, y, z, w }; }   \
+  operator met::eig::Vector4i() const { return {                   \
+    static_cast<int>(x), static_cast<int>(y),                      \
+    static_cast<int>(z), static_cast<int>(w) }; }                  \
+  operator met::eig::Array4f() const { return { x, y, z, w }; }    \
+  operator met::eig::Array4i() const { return {                    \
+    static_cast<int>(x), static_cast<int>(y),                      \
+    static_cast<int>(z), static_cast<int>(w) }; }
+
 #include <metameric/core/math.hpp>
 #include <small_gl/fwd.hpp>
 #include <imgui.h>

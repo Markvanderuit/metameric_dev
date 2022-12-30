@@ -27,13 +27,13 @@ namespace met {
     void init_state(LinearScheduler &scheduler, ApplicationCreateInfo info) {
       met_trace();
       
-      ApplicationData state;      
+      ApplicationData data = { .color_mode = info.color_mode };
       if (!info.project_path.empty()) {
-        state.load(info.project_path);
+        data.load(info.project_path);
       } else {
-        state.unload();
+        data.unload();
       }
-      scheduler.insert_resource("app_data", std::move(state));
+      scheduler.insert_resource("app_data", std::move(data));
     }
 
     void init_parser(LinearScheduler &scheduler) {
@@ -115,7 +115,7 @@ namespace met {
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
 
-    ImGui::Init(window, info.color_mode == AppliationColorMode::eDark);
+    ImGui::Init(window, info.color_mode == ApplicationColorMode::eDark);
     
     // Initialize major application components on startup
     detail::init_parser(scheduler);

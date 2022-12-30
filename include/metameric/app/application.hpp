@@ -1,13 +1,9 @@
 #pragma once
 
+#include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 
 namespace met {
-  enum class AppliationColorMode {
-    eDark,
-    eLight
-  };
-
   struct ApplicationCreateInfo {
     // In case of a new project load
     fs::path database_path = "";
@@ -16,7 +12,7 @@ namespace met {
     fs::path project_path = "";
 
     // Application color theme
-    AppliationColorMode color_mode = AppliationColorMode::eDark;
+    ApplicationColorMode color_mode = ApplicationColorMode::eDark;
   };
 
   // Initialize and run the metameric application
