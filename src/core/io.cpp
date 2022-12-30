@@ -103,6 +103,7 @@ namespace met::io {
     std::stringstream line__ss(load_string(path));
     std::string line;
     while (std::getline(line__ss, line)) {
+      std::ranges::replace(line, '\t', ' ');
       auto split_line = line | std::views::split(' ');
       auto split_vect = std::vector<std::string>(range_iter(split_line));
 
