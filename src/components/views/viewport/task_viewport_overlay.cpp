@@ -51,7 +51,6 @@ namespace met {
 
     // Add subtask to handle metamer set draw
     info.emplace_task_after<DrawColorSolidTask>(name(), name() + "_draw_color_solid", name());
-    info.emplace_task_after<DrawWeightsTask>(name(),    name() + "_draw_weights",     name());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -61,7 +60,6 @@ namespace met {
     met_trace_full();
 
     // Remove subtasks
-    info.remove_task(name() + "_draw_weights");
     info.remove_task(name() + "_draw_color_solid");
   }
 
@@ -77,8 +75,12 @@ namespace met {
     auto &e_proj_data  = e_appl_data.project_data;
     auto &e_verts      = e_proj_data.gamut_verts;
 
-    // Only spawn any tooltips on non-empty gamut selection
+    // Only spawn any tooltips on non-empty gamut selection; only allow constraint selection
+    // on a single vertex
     guard(!e_vert_slct.empty());
+    if (e_vert_slct.size() > 1) {
+      i_cstr_slct = -1;
+    }
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -146,9 +148,8 @@ namespace met {
 
       // Window open flag, and window title
       bool window_open = true;
-      auto window_name = fmt::format("Editing {} ({} -> {})",
+      auto window_name = fmt::format("Editing {}: {}",
         i_cstr_slct, 
-        e_proj_data.mapping_name(e_verts[e_vert_slct[0]].mapp_i),
         e_proj_data.mapping_name(e_verts[e_vert_slct[0]].mapp_j[i_cstr_slct]));
       
       if (ImGui::Begin(window_name.c_str(), &window_open, window_flags)) {
@@ -166,7 +167,7 @@ namespace met {
       ImGui::End();
     }
 
-    // Spawn window for selection display
+    /* // Spawn window for selection display
     {
       view_size.y() = 0.f;
       
@@ -183,7 +184,7 @@ namespace met {
       view_posi.y() += view_size.y() + overlay_spacing * e_window.content_scale();
 
       ImGui::End();
-    }
+    } */
   }
 
   void ViewportOverlayTask::eval_overlay_vertex(detail::TaskEvalInfo &info, uint i) {
@@ -488,6 +489,8 @@ namespace met {
 
     // Add button to move gamut offset back to the metamer boundary's centroid
     ImGui::SpacedSeparator();
+    ImGui::ColorEdit3("(linear)", e_vert.colr_j[i_cstr_slct].data(), ImGuiColorEditFlags_Float);
+
     if (ImGui::Button("Center value")) {
       e_appl_data.touch({ 
         .name = "Center gamut offsets", 
@@ -537,7 +540,6 @@ namespace met {
       ImPlot::EndPlot();
     }
   }
-
 
   void ViewportOverlayTask::eval_overlay_weights(detail::TaskEvalInfo &info) {
     met_trace_full();

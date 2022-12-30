@@ -25,6 +25,7 @@
 
 // View tasks
 #include <metameric/components/views/task_error_viewer.hpp>
+#include <metameric/components/views/task_weight_viewer.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_viewport.hpp>
@@ -241,6 +242,7 @@ namespace met {
     scheduler.emplace_task<SpectraEditorTask>("spectra_editor");
     scheduler.emplace_task<MappingsViewerTask>("mappings_viewer");
     scheduler.emplace_task<ErrorViewerTask>("error_viewer");
+    scheduler.emplace_task<WeightViewerTask>("weight_viewer");
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);
