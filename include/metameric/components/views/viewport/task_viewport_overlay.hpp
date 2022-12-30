@@ -7,7 +7,9 @@
 namespace met {
   class ViewportOverlayTask : public detail::AbstractTask {
     Colr m_colr_prev;
-    bool m_is_gizmo_used;
+    bool m_is_gizmo_used;     // Gizmo use state
+    bool m_is_vert_edit_used; // Color edit use state
+    bool m_is_cstr_edit_used; // Cnstr edit use state
     
   public:
     ViewportOverlayTask(const std::string &name);
@@ -19,6 +21,5 @@ namespace met {
     void eval_overlay_vertex(detail::TaskEvalInfo &info, uint i);
     void eval_overlay_color_solid(detail::TaskEvalInfo &info, uint i);
     void eval_overlay_plot(detail::TaskEvalInfo &info);
-    void eval_overlay_weights(detail::TaskEvalInfo &info);
   };
 } // namespace met
