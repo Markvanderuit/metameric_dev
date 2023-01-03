@@ -4,12 +4,12 @@
 #include <metameric/app/application.hpp>
 
 int main() {
-  try {
+  /* try { */
     met::create_application({ .database_path = "database.mat",
-                              .color_mode    = met::ApplicationColorMode::eLight });
-  } catch (const std::exception &e) {
+                              .color_mode    = met::ApplicationColorMode::eDark });
+  /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  }
+  } */
   return EXIT_SUCCESS;
 }

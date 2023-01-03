@@ -169,7 +169,7 @@ namespace met {
 
       dec.add(mod);
       dec.module(mod).set_binary(false);
-      dec.module(mod).set_edge_length(0.05f);
+      dec.module(mod).set_edge_length(0.025f);
         
       dec.initialize();
       dec.decimate_to(std::max(max_vertices, 16u));

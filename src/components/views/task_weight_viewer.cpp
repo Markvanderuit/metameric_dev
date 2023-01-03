@@ -66,7 +66,7 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       float texture_aspect = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
-      auto texture_size    = (viewport_size * texture_aspect).cast<uint>().max(1u).eval();
+      auto texture_size    = (viewport_size * texture_aspect).max(1.f).cast<uint>().eval();
 
       // Check if the resample subtask needs readjusting for a resized output texture
       if (!texture_size.isApprox(m_texture_size)) {
@@ -98,7 +98,9 @@ namespace met {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
-    guard(e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection);
+    bool activate_flag = e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection;
+    info.get_resource<bool>(fmt::format(sub_texture_fmt, name()), "activate_flag") = activate_flag;
+    guard(activate_flag);
 
     // Continue only if vertex selection is non-empty
     // otherwise, blacken output texture and return

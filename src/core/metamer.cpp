@@ -224,6 +224,10 @@ namespace met {
     constexpr uint n_base = wavelength_bases;
     constexpr uint n_colr = 3;
 
+    // Relative importance weights
+    constexpr double vertex_roundtrip_w = 2.f;
+    constexpr double sample_roundtrip_w = .5f;
+
     // Common matrix sizes
     constexpr uint N = n_bary * n_base;
     const     uint M = info.signals.size() * n_colr 
@@ -232,35 +236,37 @@ namespace met {
     
     // Initialize parameter object for LP solver with expected matrix sizes
     LPParameters params(M, N);
-    params.method    = LPMethod::ePrimal;
+    params.method    = LPMethod::eDual;
     params.scaling   = true;
     params.objective = LPObjective::eMinimize;
+    // params.x_l       = -4.0;
+    // params.x_u       =  4.0;
 
     // Clear untouched matrix values to 0
     params.A.fill(0.0);
 
-    // Add constraints to ensure resulting spectra produce the given colors
+    // Add roundtrip constraints for seed samples
     for (uint i = 0; i < info.signals.size(); ++i) {
       const Signal &sign = info.signals[i];
       for (uint j = 0; j < n_bary; ++j) {
         auto A = (info.systems[sign.syst_i].transpose() * info.basis * sign.bary_v[j]).cast<double>().eval();
-        params.A.block(i * n_colr, j * n_base, rowcol(A)) = A;
+        params.A.block(i * n_colr, j * n_base, rowcol(A)) = A * sample_roundtrip_w;
       }
       
       auto b = sign.colr_v.cast<double>().eval();
-      params.b.block(i * n_colr, 0, rowcol(b)) = b;
+      params.b.block(i * n_colr, 0, rowcol(b)) = b * sample_roundtrip_w;
     }
 
-    // Add constraints to ensure resulting spectra reproduce gamut positions exactly
+    // Add roundtrip constraints for gamut vertex positions
     const auto gamut_csys = (info.systems[0].transpose() * info.basis).cast<double>().eval();
     const uint gamut_offs = info.signals.size() * n_colr;
     for (uint i = 0; i < info.gamut.size(); ++i) {
       auto b = info.gamut[i].cast<double>().eval();
-      params.A.block(gamut_offs + i * n_colr, i * n_base, rowcol(gamut_csys)) = gamut_csys;
-      params.b.block(gamut_offs + i * n_colr, 0, rowcol(b)) = b;
+      params.A.block(gamut_offs + i * n_colr, i * n_base, rowcol(gamut_csys)) = gamut_csys * vertex_roundtrip_w;
+      params.b.block(gamut_offs + i * n_colr, 0, rowcol(b)) = b * vertex_roundtrip_w;
     }
 
-    // Add constraints to limit resulting spectra to [0, 1]
+    // Add boundedness constraints for resulting spectra
     const uint l_offs = gamut_offs + info.gamut.size() * n_colr;
     const uint u_offs = l_offs + n_bary * n_spec;
     const auto basis = info.basis.cast<double>().eval();
@@ -274,6 +280,7 @@ namespace met {
     params.r.block(u_offs, 0, n_bary * n_spec, 1) = LPCompare::eLE;
 
     // Run solver and pray; cast result back to float
+    // fmt::print("A = {}\n", params.A.reshaped());
     auto x = lp_solve(params).cast<float>().eval();
 
     // Obtain basis function weights from solution and compute resulting spectra

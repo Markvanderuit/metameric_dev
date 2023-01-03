@@ -47,7 +47,9 @@ namespace met {
     // Generate color texture only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    guard(m_init_stale || e_pipe_state.mapps[m_mapping_i] || e_pipe_state.any_verts);
+    bool activate_flag = m_init_stale || e_pipe_state.mapps[m_mapping_i] || e_pipe_state.any_verts;
+    info.get_resource<bool>(fmt::format("gen_color_mapping_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
+    guard(activate_flag);
     m_init_stale = false;
 
     // Get shared resources

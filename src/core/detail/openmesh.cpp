@@ -54,9 +54,9 @@ namespace OpenMesh::Decimater {
       // Initialize parameter object for LP solver with expected matrix sizes
       met::LPParameters params(M, N);
       params.method    = met::LPMethod::ePrimal;
-      params.objective = met::LPObjective::eMinimize;
-      params.x_l       = met::to_eig<float, 3>(min_v).cast<double>().eval();
-      params.x_u       = met::to_eig<float, 3>(max_v).cast<double>().eval();
+      params.objective = met::LPObjective::eMaximize;
+      // params.x_l       = met::to_eig<float, 3>(min_v).cast<double>().eval();
+      // params.x_u       = met::to_eig<float, 3>(max_v).cast<double>().eval();
       params.r         = met::LPCompare::eEQ;
 
       uint i = 0;
@@ -104,6 +104,7 @@ namespace OpenMesh::Decimater {
       }
       
       auto v = met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval());
+      fmt::print("{} <-> {} : {}\n", ci.p0, ci.p1, v);
       guard(v != Vec3f(0), 0.5f * (ci.p0 + ci.p1));
       return v;
     }

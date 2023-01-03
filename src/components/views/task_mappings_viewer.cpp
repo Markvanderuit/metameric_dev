@@ -186,12 +186,12 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       eig::Array2f texture_size = viewport_size
-                                 * e_appl_data.loaded_texture.size().y()
-                                 / e_appl_data.loaded_texture.size().x()
+                                 * e_appl_data.loaded_texture.size().cast<float>().y()
+                                 / e_appl_data.loaded_texture.size().cast<float>().x()
                                  * 0.95f / static_cast<float>(n_cols);
                                  
       // If texture size has changed, respawn texture resample tasks
-      if (auto resample_size = texture_size.cast<uint>().max(1u); !resample_size.isApprox(m_resample_size)) {
+      if (auto resample_size = texture_size.max(1.f).cast<uint>(); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
         m_resample_tasks.init(name(), info, e_mappings_n, 
@@ -220,6 +220,7 @@ namespace met {
         ImGui::BeginGroup();
 
         // Header line
+        ImGui::SetNextItemWidth(texture_size.x() * 0.6);
         ImGui::Text(e_proj_data.mapping_name(i).c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton("Export")) eval_save(info, i);

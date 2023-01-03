@@ -266,9 +266,9 @@ namespace met {
 
       // Coming column widths
       const float constr_total_width = ImGui::GetContentRegionAvail().x;
-      const float constr_mapp_width  = .4f * constr_total_width;
+      const float constr_mapp_width  = .35f * constr_total_width;
       const float constr_colr_width  = .1f * constr_total_width;
-      const float constr_edit_width  = .1f * constr_total_width;
+      const float constr_edit_width  = .15f * constr_total_width;
       const float constr_arrw_width  = .1f * constr_total_width;
       const float constr_clse_width  = .05f * constr_total_width;
 
@@ -328,15 +328,17 @@ namespace met {
 
       // Edit buttons
       ImGui::PushItemWidth(constr_edit_width); ImGui::BeginGroup(); ImGui::Text("");
-      if (e_vert_slct.size() > 1) ImGui::BeginDisabled();
+      // if (e_vert_slct.size() > 1) ImGui::BeginDisabled();
       for (uint j = 0; j < e_vert.colr_j.size(); ++j) {
         ImGui::PushID(j);
-        if (ImGui::Button("Edit")) {
+        bool is_editing = i_cstr_slct == j && e_vert_slct[0] == i;
+        if (ImGui::Button(is_editing ? "Editing" : "Edit")) {
           i_cstr_slct  = j;
+          e_vert_slct = { i };
         }
         ImGui::PopID();
       }
-      if (e_vert_slct.size() > 1) ImGui::EndDisabled();
+      // if (e_vert_slct.size() > 1) ImGui::EndDisabled();
       ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
     
       // Up/down buttons

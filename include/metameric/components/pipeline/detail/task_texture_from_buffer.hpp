@@ -39,6 +39,7 @@ namespace met::detail {
 
       // Emplace texture resource using provided info object
       info.emplace_resource<TextureType, TextureType::InfoType>(m_info.output_key.second, m_info.texture_info);
+      info.emplace_resource<bool>("activate_flag", false);
       
       // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
       eig::Array2u dispatch_n    = m_info.texture_info.size;
@@ -59,6 +60,7 @@ namespace met::detail {
       met_trace_full();
 
       guard(info.has_resource(m_info.input_key.first, m_info.input_key.second));
+      guard(info.get_resource<bool>("activate_flag"));
 
       // Get shared resources
       auto &e_rsrc = info.get_resource<gl::Buffer>(m_info.input_key.first, m_info.input_key.second);

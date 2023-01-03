@@ -17,24 +17,12 @@ namespace met {
   Spec generate(const BBasis         &basis,
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals);
-
- /*  std::vector<Colr> generate_boundary(const BBasis &basis,
-                                      const CMFS   &system_i,
-                                      const CMFS   &system_j,
-                                      const Colr   &signal_i,
-                                      const std::vector<eig::Array<float, 6, 1>> &samples); */
   
   std::vector<Colr> generate_boundary_i(const BBasis &basis,
                                        std::span<const CMFS> systems_i,
                                        std::span<const Colr> signals_i,
                                        const CMFS &system_j,
                                        std::span<const eig::ArrayXf> samples);
-
- /*  std::vector<Colr> generate_boundary_mult(const BBasis                 &basis,
-                                           const CMFS                   &system_i,
-                                           const Colr                   &signal_i,
-                                           std::span<const CMFS>         systems_j,
-                                           std::span<const eig::ArrayXf> samples); */
 
   using Wght = std::vector<float>;
 
@@ -66,16 +54,4 @@ namespace met {
   // see GenerateGamutInfo for necessary information.
   // Note: returns barycentric_weights spectra; the last (padding) spectra should be ignored
   std::vector<Spec> generate_gamut(const GenerateGamutInfo &info);
-
-  std::vector<Spec> generate_gamut(const BBasis            &basis,
-                                   const std::vector<Wght> &weights,
-                                   const std::vector<Colr> &samples,
-                                   const CMFS              &sample_system);
-
-  std::vector<Spec> generate_gamut(const BBasis            &basis,
-                                   const std::vector<Wght> &weights,
-                                   const std::vector<Spec> &samples);
-
-  std::vector<Colr> generate_gamut(const std::vector<Wght> &weights,
-                                   const std::vector<Colr> &samples);
 } // namespace met

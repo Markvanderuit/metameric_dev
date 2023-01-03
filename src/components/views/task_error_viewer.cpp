@@ -1,11 +1,14 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/window.hpp>
 
 namespace met {
+  constexpr float tooltip_width = 256.f;
   constexpr auto texture_fmt  = FMT_COMPILE("{}_gen_texture");
   constexpr auto resample_fmt = FMT_COMPILE("{}_gen_resample");
   constexpr auto mapping_fmt  = FMT_COMPILE("gen_color_mapping_{}");
@@ -14,17 +17,17 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_text_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_txtr_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
     auto &e_color_input  = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
-    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
+    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, 0), "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
                            - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
                            / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
-    m_tooltip_pixel = (mouse_pos * e_text_data.size().cast<float>()).cast<int>();
-    const size_t sample_i = e_text_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
+    m_tooltip_pixel = (mouse_pos * e_txtr_data.size().cast<float>()).cast<int>();
+    const size_t sample_i = e_txtr_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant reflectance data to current available buffers
     e_color_input.copy_to(m_tooltip_buffers[m_tooltip_cycle_i].in_a, sizeof(AlColr), sizeof(AlColr) * sample_i);
@@ -39,12 +42,16 @@ namespace met {
   void ErrorViewerTask::eval_tooltip(detail::TaskEvalInfo &info) {
     met_trace_full();
 
+    // Get shared resources
+    auto &e_window = info.get_resource<gl::Window>(global_key, "window");
+
     // Spawn tooltip
     ImGui::BeginTooltip();
+    ImGui::SetNextItemWidth(tooltip_width * e_window.content_scale());
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
     ImGui::Separator();
 
-    // Acquire output error data, which should by now be copied into the a buffer
+    // Acquire output error data, which should by now be copied into the current buffer
     // Check fence for this buffer, however, in case this is not the case
     m_tooltip_cycle_i = (m_tooltip_cycle_i + 1) % m_tooltip_buffers.size();
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init()) {
@@ -53,17 +60,33 @@ namespace met {
     auto &color_maps = m_tooltip_maps[m_tooltip_cycle_i];
 
     // Plot rest of tooltip
-    ImGui::ColorEdit3("Input", color_maps.in_a[0].data(), ImGuiColorEditFlags_Float);
-    ImGui::ColorEdit3("Mapping", color_maps.in_b[0].data(), ImGuiColorEditFlags_Float);
-    ImGui::Separator();
-    ImGui::ColorEdit3("Error (abs)", color_maps.out[0].data(), ImGuiColorEditFlags_Float);
+    ImGui::AlignTextToFramePadding();
+    ImGui::BeginGroup();
+    ImGui::PushItemWidth(tooltip_width * e_window.content_scale() * .485);
+    ImGui::BeginGroup();
+    ImGui::Text("Input color (lRGB)");
+    ImGui::ColorEdit3("##Value", color_maps.in_a[0].data(),  ImGuiColorEditFlags_Float);
+    ImGui::EndGroup();
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::Text("Roundtrip error");
+    ImGui::ColorEdit3("##Error", color_maps.out[0].data(), ImGuiColorEditFlags_Float);
+    ImGui::EndGroup();
+    ImGui::PopItemWidth();
+    ImGui::EndGroup();
     ImGui::EndTooltip();
   }
 
   void ErrorViewerTask::eval_error(detail::TaskEvalInfo &info) {
+    // Continue only on relevant state changes
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    bool activate_flag = info.get_resource<ProjectState>("state", "pipeline_state").any_verts;
+    info.get_resource<bool>(fmt::format(texture_fmt, name()), "activate_flag") = activate_flag;
+    guard(activate_flag);
+
     // Get shared resources
     auto &e_color_input  = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
-    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, m_mapping_i), "colr_buffer");
+    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, 0), "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Bind resources to buffer targets
@@ -82,8 +105,7 @@ namespace met {
   void ErrorViewerTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
-    m_resample_size = 1;
-    m_mapping_i     = 0;
+    m_texture_size = 1;
 
     // Initialize a set of rolling buffers for the tooltip, and map these for reading
     constexpr auto create_flags = gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapRead;
@@ -102,10 +124,10 @@ namespace met {
     m_tooltip_cycle_i = 0;
 
     // Get externally shared resources
-    auto &e_text_data = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_txtr_data = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     // Initialize error computation components
-    const uint generate_n    = e_text_data.size().prod();
+    const uint generate_n    = e_txtr_data.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u);
     m_error_program = {{ .type = gl::ShaderType::eCompute,
                          .path = "resources/shaders/misc/buffer_error.comp" }};
@@ -120,8 +142,8 @@ namespace met {
 
     // Insert subtask to handle buffer->texture conversion
     TextureSubtask subtask = {{ .input_key    = { name(), "colr_buffer" },
-                                .output_key   = { fmt::format(texture_fmt, name()), "texture" },
-                                .texture_info = { .size = e_text_data.size() }}};
+                                .output_key   = { fmt::format(texture_fmt, name()), "colr_texture" },
+                                .texture_info = { .size = e_txtr_data.size() }}};
     info.insert_task_after(name(), std::move(subtask));
   }
 
@@ -140,7 +162,7 @@ namespace met {
     if (ImGui::Begin("Error viewer")) {
       // Get shared resources
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_text_data = e_appl_data.loaded_texture;
+      auto &e_txtr_data = e_appl_data.loaded_texture;
       auto &e_proj_data = e_appl_data.project_data;
       auto &e_mappings  = e_proj_data.mappings;
 
@@ -150,16 +172,6 @@ namespace met {
 
       // Local state
       bool handle_toolip = false;
-      
-      // 0. Introduce settings
-      if (ImGui::BeginCombo("Selected mapping", e_proj_data.mapping_name(m_mapping_i).c_str())) {
-        for (uint i = 0; i < e_mappings.size(); ++i) {
-          if (ImGui::Selectable(e_proj_data.mapping_name(i).c_str(), i == m_mapping_i)) {
-            m_mapping_i = i;
-          }
-        }
-        ImGui::EndCombo();
-      }
 
       // 1. Handle error computation
       eval_error(info);
@@ -167,16 +179,17 @@ namespace met {
       // 2. Handle texture resampling subtask
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
-      eig::Array2f texture_size = viewport_size * e_text_data.size().y() / e_text_data.size().x()
-                                * 0.95f;;
+      float texture_aspect = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
+      auto texture_size    = (viewport_size * texture_aspect).max(1.f).cast<uint>().eval();
 
-      if (auto resample_size = texture_size.cast<uint>().max(1u); !resample_size.isApprox(m_resample_size)) {
-        m_resample_size = resample_size;
+      // Check if the resample subtask needs readjusting for a resized output texture
+      if (!texture_size.isApprox(m_texture_size)) {
+        m_texture_size = texture_size;
 
         // Remove previous resample subtask and insert a new one
-        ResampleSubtask subtask = {{ .input_key    = { texture_subtask_name, "texture"             },
-                                     .output_key   = { resample_subtask_name, "texture"            },
-                                     .texture_info = { .size = resample_size                       },
+        ResampleSubtask subtask = {{ .input_key    = { texture_subtask_name, "colr_texture"        },
+                                     .output_key   = { resample_subtask_name, "colr_texture"       },
+                                     .texture_info = { .size = m_texture_size                      },
                                      .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
                                                        .mag_filter = gl::SamplerMagFilter::eLinear }}};
         info.remove_task(resample_subtask_name);
@@ -184,10 +197,10 @@ namespace met {
       }
 
       // 3. Display ImGui components to show error and select mapping
-      if (info.has_resource(resample_subtask_name, "texture")) {
-        auto &e_texture = info.get_resource<gl::Texture2d4f>(resample_subtask_name, "texture");
+      if (info.has_resource(resample_subtask_name, "colr_texture")) {
+        auto &e_texture = info.get_resource<gl::Texture2d4f>(resample_subtask_name, "colr_texture");
 
-        ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
+        ImGui::Image(ImGui::to_ptr(e_texture.object()), m_texture_size.cast<float>().eval());
 
         // 4. Signal tooltip and start data copy
         if (ImGui::IsItemHovered()) {

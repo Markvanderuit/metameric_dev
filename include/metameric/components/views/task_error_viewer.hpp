@@ -33,7 +33,7 @@ namespace met {
     // Local state
     uint         m_mapping_i;     // Current selected mapping
     eig::Array2i m_tooltip_pixel; // Selected pixel in tooltip
-    eig::Array2u m_resample_size; // Current output size of texture
+    eig::Array2u m_texture_size; // Current output size of texture
 
     // Components for error computation
     gl::Program     m_error_program;
