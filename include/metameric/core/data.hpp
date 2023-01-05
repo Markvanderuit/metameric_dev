@@ -82,14 +82,14 @@ namespace met {
   struct ApplicationData {
   public: /* public data */
     // Saved project data
-    fs::path     project_path;
-    ProjectData  project_data;
-    SaveFlag     project_save = SaveFlag::eUnloaded; 
+    ProjectData project_data;
+    fs::path    project_path;
+    SaveFlag    project_save = SaveFlag::eUnloaded; 
 
     // Unsaved application data
-    Texture2d3f         loaded_texture; // Primary RGB texture image extracted from project data
-    BMatrixType         loaded_basis;   // Spectral basis functions obtained through PCA
-    ApplicationColorMode color_mode;     // Application theming
+    Texture2d3f loaded_texture; // Primary RGB texture image extracted from project data
+    BMatrixType loaded_basis;   // Spectral basis functions obtained through PCA
+    ApplicationColorMode color_mode; // Application theming
 
   public: /* public create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object
