@@ -6,6 +6,7 @@
 #include <OpenMesh/Core/Mesh/Attributes.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include <OpenMesh/Tools/Utils/HeapT.hh>
+#include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 #include <OpenMesh/Tools/Decimater/BaseDecimaterT.hh>
 #include <memory>
 #include <ranges>
@@ -62,22 +63,37 @@ namespace OpenMesh::Decimater {
     static Point collapse(const CollapseInfo &ci);
   };
 
-/*   template <typename Mesh>
-  class ModVolumeT : public ModBaseT<Mesh> {
+  template <typename MeshT>
+  class ModVolumeT : public ModBaseT<MeshT> {
   public:
-    DECIMATING_MODULE(ModVolumeT, Mesh);
+    DECIMATING_MODULE(ModVolumeT, MeshT, Volume);
 
   public:
-    explicit ModVolumeT(Mesh &_mesh)
-    : Base(_mesh, false) {
-      unset_max_err();
+    explicit ModVolumeT(MeshT &mesh)
+    : Base(mesh, false),
+      m_mesh(Base::mesh()) {
+      m_mesh.add_property(m_vertex);
+      m_mesh.add_property(m_volume);
+    }
+
+    virtual ~ModVolumeT() {
+      m_mesh.remove_property(m_vertex);
+      m_mesh.remove_property(m_volume);
     }
 
   public:
-    virtual void initialize(void) override;
+    virtual void initialize() override;
+    virtual float collapse_priority(const CollapseInfoT<MeshT>& ci) override;
+    virtual void postprocess_collapse(const CollapseInfoT<MeshT>& _ci) override;
 
+  private:
+    // Reference to mesh
+    Mesh &m_mesh;
 
-  }; */
+    // Half-edge properties to handle a volume-preserving collapse data
+    HPropHandleT<Vec3f> m_vertex; // Solved vertex position for potential collapse
+    HPropHandleT<float> m_volume; // Added volume given said collapse
+  };
   
   /**
    * Implementation of mesh decimater with configurable collapse function, integrating with the decimater system

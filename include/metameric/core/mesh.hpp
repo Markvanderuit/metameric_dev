@@ -56,5 +56,12 @@ namespace met {
   TriMesh<Traits> simplify(const TriMesh<Traits> &mesh, uint max_vertices);
 
   template <typename Traits, typename T = eig::AlArray3f>
-  TriMesh<Traits> generate_convex_hull(std::span<const T> points, const TriMesh<Traits> &spheroid_mesh = generate_spheroid<Traits>());
+  TriMesh<Traits> generate_convex_hull(std::span<const T> points);
+  
+  template <typename T = eig::AlArray3f>
+  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_convex_hull(std::span<const T> points);
+
+  template <typename Traits, typename T = eig::AlArray3f>
+  TriMesh<Traits> generate_convex_hull_approx(std::span<const T> points, 
+    const TriMesh<Traits> &spheroid_mesh = generate_spheroid<Traits>());
 } // namespace met

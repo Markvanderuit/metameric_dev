@@ -17,10 +17,10 @@ option(met_enable_dbg_exceptions "Enable debug exceptions on release" ON)
 option(met_enable_tracy          "Enable Tracy support"               ON)
 
 # Define Metameric's spectral layout
-set(MET_WAVELENGTH_MIN    400) # Minimum wavelength of spectral range
-set(MET_WAVELENGTH_MAX    700) # Maximum wavelength of spectral range
-set(MET_WAVELENGTH_SAMPLES 31) # Nr. of bins discretizing spectral range
-set(MET_BARYCENTRIC_WEIGHTS 8) # Maximum nr. of barycentric weights supported
+set(MET_WAVELENGTH_MIN      400) # Minimum wavelength of spectral range
+set(MET_WAVELENGTH_MAX      700) # Maximum wavelength of spectral range
+set(MET_WAVELENGTH_SAMPLES   31) # Nr. of bins discretizing spectral range
+set(MET_BARYCENTRIC_WEIGHTS  16) # Maximum nr. of barycentric weights supported
 
 # Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -79,6 +79,9 @@ find_package(SPIRV-Tools-opt     CONFIG REQUIRED)
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
 option(gl_enable_tracy          "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
+
+# Include third party quickhull library directly
+add_subdirectory(third_party/quickhull)
 
 # Configuration output info
 message(STATUS "Metameric : debug exceptions    = ${met_enable_dbg_exceptions}")
@@ -246,6 +249,7 @@ target_link_libraries(core PUBLIC
   meshoptimizer::meshoptimizer
   nlohmann_json::nlohmann_json
   ${OPENMESH_LIBRARIES}
+  quickhull
   TBB::tbb
   ZLIB::ZLIB
 )

@@ -7,113 +7,123 @@
 #else
 #include <cfloat>
 #endif
-#include <fmt/ranges.h>
-
-/* 
-eig::Vector3f solve_for_vertex(const std::vector<RealizedTriangle> &triangles,
-                                const eig::Vector3f &min_v = 0.f,
-                                const eig::Vector3f &max_v = 1.f) {
-  met_trace();
-
-  // Initialize parameter object for LP solver with expected matrix sizes
-  LPParameters params(triangles.size(), 3);
-  params.method    = LPMethod::ePrimal;
-  params.objective = LPObjective::eMinimize;
-  params.x_l       = min_v.cast<double>();
-  params.x_u       = max_v.cast<double>();
-
-  // Fill constraint matrices
-  for (uint i = 0; i < triangles.size(); ++i) {
-    eig::Vector3d n = (triangles[i].n).cast<double>().eval();
-    params.A.row(i) = n;
-    params.b[i] = n.dot(triangles[i].p0.cast<double>());
-  }
-
-  // Return minimized solution
-  return lp_solve(params).cast<float>().eval();
-} 
-*/
 
 namespace OpenMesh::Decimater {
   namespace detail {
+    
     template <class MeshT>
-    Vec3f solve_for_position(const CollapseInfoT<MeshT> &ci,
-                             const Vec3f                &min_v = { 0, 0, 0 },
-                             const Vec3f                &max_v = { 1, 1, 1 }) {
-      guard(ci.p0 != ci.p1, ci.p0);
+    std::pair<float, Vec3f> volume_solve(const MeshT &mesh,
+                                        const typename MeshT::HalfedgeHandle &v0v1,
+                                        const Vec3f &min_v = { 0, 0, 0 },
+                                        const Vec3f &max_v = { 1, 1, 1 }) {
+      auto v1v0 = mesh.opposite_halfedge_handle(v0v1);
 
-      auto &mesh = ci.mesh;
+      // Vertex handles, positions
+      auto v0 = mesh.to_vertex_handle(v1v0), v1 = mesh.to_vertex_handle(v0v1);
+      auto p0 = mesh.point(v0), p1 = mesh.point(v1);
+      guard(p0 != p1, { 0.f, p1 });
 
-      // Handles to surrounding faces
-      auto f0 = mesh.vf_range(ci.v0).to_vector(), f1 = mesh.vf_range(ci.v1).to_vector();
+      // Left/right face handles
+      auto fl = mesh.face_handle(v0v1), fr = mesh.face_handle(v1v0);
+
+      // Merge handles to surrounding faces
+      auto f0 = mesh.vf_range(v0).to_vector(), f1 = mesh.vf_range(v1).to_vector();
+      std::vector<decltype(f0)::value_type> fm(f0.size() + f1.size() - 2);
+      std::copy(range_iter(f0), fm.begin());
+      std::copy_if(range_iter(f1), fm.begin() + f0.size(), 
+        [&fl, &fr](auto h) { return h.idx() != fl.idx() && h.idx() != fr.idx(); });
 
       // Expected matrix sizes
       const uint N = 3;
-      const uint M = f0.size() + f1.size() - 2; // 2 faces overlapping
+      const uint M = fm.size(); // + 6;
       
       // Initialize parameter object for LP solver with expected matrix sizes
       met::LPParameters params(M, N);
       params.method    = met::LPMethod::ePrimal;
-      params.objective = met::LPObjective::eMaximize;
-      // params.x_l       = met::to_eig<float, 3>(min_v).cast<double>().eval();
-      // params.x_u       = met::to_eig<float, 3>(max_v).cast<double>().eval();
-      params.r         = met::LPCompare::eEQ;
+      params.objective = met::LPObjective::eMinimize;
+      params.r         = met::LPCompare::eGE;
 
-      uint i = 0;
+      // Iterate settings
+      Vec3f n_sum = { 0, 0, 0 };
+      Vec3f v_base = 0.5f * (p0 + p1);
 
-      // Fill constraint matrices
-      for (auto fh : f0) {
-        guard_continue(fh.idx() != ci.fl.idx());
-
-        // Get vertex positions and edge lengths
-        std::array<Vec3f, 3> p;
-        std::array<float, 3> d;
-        std::ranges::transform(fh.vertices(), p.begin(), [&](auto vh) { return mesh.point(vh); }); 
-        for (uint i = 0; i < 3; ++i) d[i] = (p[(i + 1) % 3] - p[i]).length();
-
-        // Compute triangle area
-        auto s = 0.5f * (d[0] + d[1] + d[2]);
-        auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
-
-        auto n = (A / 3.f) * mesh.normal(fh);
-
-        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>().eval();
-        params.b[i]     = n.dot(p[0]);
-
-        i++;
-      }
-      for (auto fh : f1) {
-        guard_continue(fh.idx() != ci.fr.idx());
-
-        // Get vertex positions and edge lengths
-        std::array<Vec3f, 3> p;
-        std::array<float, 3> d;
-        std::ranges::transform(fh.vertices(), p.begin(), [&](auto vh) { return mesh.point(vh); }); 
-        for (uint i = 0; i < 3; ++i) d[i] = (p[(i + 1) % 3] - p[i]).length();
-
-        // Compute triangle area
-        auto s = 0.5f * (d[0] + d[1] + d[2]);
-        auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
-
-        auto n = (A / 3.f) * mesh.normal(fh);
-
-        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>().eval();
-        params.b[i]     = n.dot(p[0]);
-
-        i++;
-      }
+      // Fill constraint matrices describing boundedness
+     /*  params.A.block(0, 0, 3, 3) = Eigen::Vector3d(-1).asDiagonal();
+      params.A.block(3, 0, 3, 3) = Eigen::Vector3d(1).asDiagonal();
+      params.r.block(0, 0, 3, 1) = met::LPCompare::eLE;
+      params.r.block(3, 0, 3, 1) = met::LPCompare::eLE;
+      params.b.block(0, 0, 3, 1) = met::to_eig<float, 3>(v_base).cast<double>().eval();
+      params.b.block(3, 0, 3, 1) = met::to_eig<float, 3>(Vec3f(1) - v_base).cast<double>().eval(); */
       
-      auto v = met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval());
-      fmt::print("{} <-> {} : {}\n", ci.p0, ci.p1, v);
-      guard(v != Vec3f(0), 0.5f * (ci.p0 + ci.p1));
-      return v;
+      // Fill constraint matrices describing added volume, which must be zero or positive
+      uint i = 0; // 6;
+      for (auto fh : fm) {
+        // Get vertex positions and edge lengths
+        std::array<Vec3f, 3> p;
+        std::array<float, 3> d;
+        std::ranges::transform(fh.vertices(), p.begin(), [&](auto vh) { return mesh.point(vh); }); 
+        for (uint i = 0; i < 3; ++i) d[i] = (p[(i + 1) % 3] - p[i]).length();
+
+        // Skip collapsed triangles
+        guard_continue(std::ranges::none_of(d, [](float f) { return f == 0.f; }));
+
+        // Compute triangle area
+        auto s = 0.5f * (d[0] + d[1] + d[2]);
+        auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
+        auto n = (A / 3.f) * mesh.calc_face_normal(fh);
+
+        n_sum += n;
+
+        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>().eval();
+        params.b[i]     = n.dot(p[0] - v_base);
+
+        i++;
+      }
+
+      // Set minimization constraint, run solver, and pray 
+      params.C = met::to_eig<float, 3>(n_sum).cast<double>().eval();
+      auto vertex = met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval()) + v_base;
+      
+      // Clamp output to rgb cube for now; 
+      // TODO: there's no need to do this in xyz
+      vertex = vertex.min({ 1, 1, 1 }).max({ 0, 0, 0 }); 
+      // vertex = vertex.max({ 0, 0, 0 }); // Clamp negative values
+
+      float volume = 0.f;
+      for (auto fh : fm) {
+        // Get vertex positions and edge lengths
+        std::array<Vec3f, 3> p;
+        std::array<float, 3> d;
+        std::ranges::transform(fh.vertices(), p.begin(), [&](auto vh) { return mesh.point(vh); }); 
+        for (uint i = 0; i < 3; ++i) d[i] = (p[(i + 1) % 3] - p[i]).length();
+
+        // Skip collapsed triangles
+        guard_continue(std::ranges::none_of(d, [](float f) { return f == 0.f; }));
+
+        // Compute triangle area
+        auto s = 0.5f * (d[0] + d[1] + d[2]);
+        auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
+        auto n = (A / 3.f) * mesh.calc_face_normal(fh);
+
+        volume += n.dot(vertex - p[0]);
+      }
+
+      // fmt::print("\tSolved for {} with volume {}\n", vertex, volume);
+
+      return { volume, vertex };
+    }
+
+    template <class MeshT>
+    Vec3f solve_for_position(const CollapseInfoT<MeshT> &ci,
+                             const Vec3f                &min_v = { 0, 0, 0 },
+                             const Vec3f                &max_v = { 1, 1, 1 }) {
+      return volume_solve(ci.mesh, ci.v0v1, min_v, max_v).second;
     }
   } // namespace detail
 
   template <typename Mesh>
   Mesh::Point VolumeCollapseFunction<Mesh>::collapse(const CollapseInfo &ci) {
     return detail::solve_for_position(ci);
-    // return 0.5f * (ci.p0 + ci.p1);
   }
 
   template <class Mesh, template <typename> typename CollapseFunc>
@@ -398,8 +408,59 @@ namespace OpenMesh::Decimater {
     return n_collapses;
   }
 
-  /* explicit temlate instantiations */
+  template <typename MeshT>
+  void ModVolumeT<MeshT>::initialize() {
+    // Solve volume-preserving vertex and resulting added volume for each half-edge
+    for (auto eh : m_mesh.edges()) {
+      // Relevant half-edges
+      auto v0v1 = eh.h0(), v1v0 = eh.h1();
+
+      // Solve for one half-edge, results should be identical for both
+      auto solve = detail::volume_solve<MeshT>(m_mesh, v0v1);
+
+      std::tie(m_mesh.property(m_volume, v0v1), 
+               m_mesh.property(m_vertex, v0v1)) = solve;
+      std::tie(m_mesh.property(m_volume, v1v0), 
+               m_mesh.property(m_vertex, v1v0)) = solve;
+    }
+  }
   
+  template <typename MeshT>
+  float ModVolumeT<MeshT>::collapse_priority(const CollapseInfoT<MeshT>& ci) {
+    // Return pre-computed added volume, should this half-edge be collapsed
+    auto volume = m_mesh.property(m_volume, ci.v0v1);
+    return volume >= 0.f ? volume : float(Base::ILLEGAL_COLLAPSE);
+  }
+  
+  template <typename MeshT>
+  void ModVolumeT<MeshT>::postprocess_collapse(const CollapseInfoT<MeshT>& ci) {
+    // Assign volume-preserving position to remaining uncollapsed vertex position
+    m_mesh.point(ci.v1) = m_mesh.property(m_vertex, ci.v0v1);
+
+    // fmt::print("Collapsed he {}, volume added {}\n", 
+      // ci.v0v1.idx(), m_mesh.property(m_volume, ci.v0v1));
+
+    // Rerun solve for each affected half-edge
+    // fmt::print("Re-solving for {}\n", m_mesh.ve_range(ci.v1).to_vector().size());
+    for (auto eh : m_mesh.ve_range(ci.v1)) {
+      // Relevant half-edges
+      auto v0v1 = eh.h0(), v1v0 = eh.h1();
+
+      // Solve for one half-edge, results should be identical for both
+      auto solve = detail::volume_solve(m_mesh, v0v1);
+
+      std::tie(m_mesh.property(m_volume, v0v1), 
+               m_mesh.property(m_vertex, v0v1)) = solve;
+      std::tie(m_mesh.property(m_volume, v1v0), 
+               m_mesh.property(m_vertex, v1v0)) = solve;
+    }
+  }
+
+  /* explicit temlate instantiations */
+
+  template class ModVolumeT<met::BaselineMesh>;
+  template class ModVolumeT<met::FNormalMesh>;
+  template class ModVolumeT<met::HalfedgeMesh>;
   template class CollapsingDecimater<met::BaselineMesh, DefaultCollapseFunction>;
   template class CollapsingDecimater<met::FNormalMesh,  DefaultCollapseFunction>;
   template class CollapsingDecimater<met::HalfedgeMesh, DefaultCollapseFunction>;

@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/texture.hpp>
 
 namespace met {
   constexpr static uint wavelength_bases  = 12;
@@ -26,32 +27,32 @@ namespace met {
 
   using Wght = std::vector<float>;
 
-  /* Info struct for generation of a spectral gamut, given preliminary information */
-  struct GenerateSpectralGamutInfo {
-    BBasis             basis;   // Spectral basis functions
+  /* Info struct for generation of a gamut, given spectral information */
+  struct GenerateGamutSpectrumInfo {
+    BBasis            &basis;   // Spectral basis functions
     CMFS               system;  // Color system spectra describing the expected gamut
     std::vector<Colr>  gamut;   // Approximate color coordinates of the expected gamut
     std::vector<WSpec> weights; // Approximate barycentric coordinates inside the expected gamut
     std::vector<Spec>  samples; // Sample spectral distributions in the expected gamut
   };
-  std::vector<Spec> generate_gamut(const GenerateSpectralGamutInfo &info);
 
-  /* Info struct for generation of a spectral gamut, given preliminary information */
-  struct GenerateGamutInfo {
+  /* Info struct for generation of a gamut, given color constraint information */
+  struct GenerateGamutConstraintInfo {
     struct Signal {
       Colr  colr_v; // Color signal
       WSpec bary_v; // Approximate barycentric coords. of the signal in the expected gamut
       uint  syst_i; // Color system index for this given color signal
     };
 
-    BBasis              basis;   // Spectral basis functions
+    BBasis             &basis;   // Spectral basis functions
     std::vector<Colr>   gamut;   // Known gamut
     std::vector<CMFS>   systems; // Color systems
     std::vector<Signal> signals; // Color signals and corresponding information
   };
 
-  // Generate a spectral gamut by solving a linear programming problem;
-  // see GenerateGamutInfo for necessary information.
-  // Note: returns barycentric_weights spectra; the last (padding) spectra should be ignored
-  std::vector<Spec> generate_gamut(const GenerateGamutInfo &info);
+  // Generate a gamut solution using a linear programming problem; ee GenerateGamut*Info 
+  // above for necessary information. Note: returns n=barycentric_weights spectra; 
+  // the last (padded) spectra should be ignored
+  std::vector<Spec> generate_gamut(const GenerateGamutSpectrumInfo &info);
+  std::vector<Spec> generate_gamut(const GenerateGamutConstraintInfo &info);
 } // namespace met

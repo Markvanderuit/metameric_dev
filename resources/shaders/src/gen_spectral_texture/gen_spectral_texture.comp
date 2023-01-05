@@ -77,11 +77,9 @@ void main() {
 
   Spec s = Spec(0);
   
-  for (uint j = 0; j < b_size.n_verts; ++j) {
-    // uint wght_half = uint(s_weights_in[i_][j] * 65536.f);
-    // float wght_float = float(wght_half) / 65536.f;
+  for (uint j = 0; j < b_size.n_verts; ++j)
     s += s_weights_in[i_][j] * load_spec_in(j);
-  }
     
-  store_spec_out(clamp(s, Spec(0), Spec(1)), i);
+  store_spec_out(s, i);
+  // store_spec_out(clamp(s, Spec(0), Spec(1)), i);
 }

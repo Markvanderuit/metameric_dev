@@ -112,8 +112,5 @@ namespace met {
     void touch(ProjectMod &&mod); // Submit a modification to project data
     void redo();                  // Step forward one modification
     void undo();                  // Step back one modification
-
-  public: /* misc public methods */
-    void load_chull_gamut(); // Re-create project gamut based on a convex hull approximation of the input texture
   };
 } // namespace met

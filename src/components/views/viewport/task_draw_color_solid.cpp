@@ -140,7 +140,7 @@ namespace met {
       guard(!e_csol_data.empty());
 
       // Generate convex hull mesh and convert to buffer format
-      m_csolid_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(e_csol_data, m_sphere_mesh);
+      m_csolid_mesh = generate_convex_hull_approx<HalfedgeMeshTraits, eig::AlArray3f>(e_csol_data, m_sphere_mesh);
       auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(m_csolid_mesh);
 
       // Copy data to buffers and adjust dispatch settings as the mesh may be smaller

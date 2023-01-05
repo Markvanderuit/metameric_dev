@@ -28,6 +28,9 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
+  constexpr float max_vert_support = 4096; // barycentric_weights;
+  constexpr float max_elem_support = 4096; // 2 * barycentric_weights;
+
   ViewportDrawGamutTask::ViewportDrawGamutTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
@@ -40,8 +43,8 @@ namespace met {
     auto &e_elems     = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer_unal");
 
     // Setup sizes/opacities buffers and instantiate relevant mappings
-    std::vector<float> vert_input_sizes(barycentric_weights, vert_deslct_size);
-    std::vector<float> elem_input_opacs(2 * barycentric_weights, elem_deslct_opac);
+    std::vector<float> vert_input_sizes(max_vert_support, vert_deslct_size);
+    std::vector<float> elem_input_opacs(max_elem_support, elem_deslct_opac);
     m_vert_size_buffer = {{ .data = cnt_span<const std::byte>(vert_input_sizes), .flags = buffer_create_flags }};
     m_elem_opac_buffer = {{ .data = cnt_span<const std::byte>(elem_input_opacs), .flags = buffer_create_flags }};
     m_vert_size_map = cast_span<float>(m_vert_size_buffer.map(buffer_access_flags));
@@ -157,7 +160,7 @@ namespace met {
     m_elem_program.uniform("u_camera_matrix", camera_matrix);
 
     // Set OpenGL state for coming draw operations
-    gl::state::set_op(gl::CullOp::eFront);
+    gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false),

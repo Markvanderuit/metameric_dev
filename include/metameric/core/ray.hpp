@@ -89,7 +89,7 @@ namespace met {
       
       // Test if intersected plane is front-facing
       float n_dot_d = n.dot(ray.d);
-      guard_continue(n_dot_d < 0.f);
+      guard_continue(n_dot_d > 0.f);
 
       // Test if intersection point is closer than current t
       float t = ((a + b + c) / 3.f - ray.o).dot(n) / n_dot_d;

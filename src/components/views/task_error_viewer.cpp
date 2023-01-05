@@ -80,7 +80,7 @@ namespace met {
   void ErrorViewerTask::eval_error(detail::TaskEvalInfo &info) {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    bool activate_flag = info.get_resource<ProjectState>("state", "pipeline_state").any_verts;
+    bool activate_flag = e_pipe_state.any;
     info.get_resource<bool>(fmt::format(texture_fmt, name()), "activate_flag") = activate_flag;
     guard(activate_flag);
 

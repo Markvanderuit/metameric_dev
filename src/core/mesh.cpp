@@ -6,8 +6,12 @@
 #include <OpenMesh/Tools/Decimater/ModNormalDeviationT.hh>
 #include <OpenMesh/Tools/Decimater/ModNormalFlippingT.hh>
 #include <OpenMesh/Tools/Decimater/ModEdgeLengthT.hh>
+#include <OpenMesh/Tools/Decimater/ModAspectRatioT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/MixedDecimaterT.hh>
+#include <OpenMesh/Tools/Smoother/JacobiLaplaceSmootherT.hh>
+#include <OpenMesh/Core/Utils/Property.hh>
+#include <quickhull/QuickHull.hpp>
 #include <array>
 #include <algorithm>
 #include <execution>
@@ -38,6 +42,23 @@ namespace met {
 
     constexpr
     auto eig_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+
+    template <typename T>
+    constexpr
+    auto omesh_hash = [](const auto &v) {
+      size_t seed = 0;
+      for (size_t i = 0; i < 3; ++i) {
+        auto elem = v[i];
+        seed ^= std::hash<T>()(v[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      }
+      return seed;
+    };
+
+    template <typename T>
+    constexpr
+    auto vert_hash = [](const auto &vert) {
+      return std::hash<T>(vert.idx());
+    };
   } // namespace detail
 
   template <typename Traits, typename T>
@@ -88,8 +109,8 @@ namespace met {
 
     std::array<V, 6> verts = { V(-1.f, 0.f, 0.f ), V( 0.f,-1.f, 0.f ), V( 0.f, 0.f,-1.f ),
                                V( 1.f, 0.f, 0.f ), V( 0.f, 1.f, 0.f ), V( 0.f, 0.f, 1.f ) };
-    std::array<E, 8> elems = { E(0, 1, 2), E(3, 2, 1), E(0, 5, 1), E(3, 1, 5),
-                               E(0, 4, 5), E(3, 5, 4), E(0, 2, 4), E(3, 4, 2) };
+    std::array<E, 8> elems = { E(0, 2, 1), E(3, 1, 2), E(0, 1, 5), E(3, 5, 1),
+                               E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
 
     return generate_from_data<Traits>(std::span<const V> { verts }, std::span<const E> { elems });
   }
@@ -121,7 +142,72 @@ namespace met {
   }
 
   template <typename Traits, typename T>
-  TriMesh<Traits> generate_convex_hull(std::span<const T> points, const TriMesh<Traits> &spheroid_mesh) {
+  TriMesh<Traits> generate_convex_hull(std::span<const T> points) {
+    met_trace();
+
+    using namespace quickhull;
+
+    using Vector3f = quickhull::Vector3<float>;
+    auto vector_span = cnt_span<const Vector3f>(points);
+
+    QuickHull<float> builder;
+    auto chull = builder.getConvexHull(vector_span.data(), vector_span.size(), false, false);
+
+    const auto& elems = chull.getIndexBuffer();
+    const auto& verts = chull.getVertexBuffer();
+
+    std::vector<T> out_verts(verts.size());
+    for (uint i = 0; i < verts.size(); ++i) {
+      auto v = verts[i];
+      out_verts[i] = { v.x, v.y, v.z };
+    }
+
+    // std::ranges::copy(verts, cnt_span<Vector3f>(out_verts));
+
+    std::vector<eig::Array3u> out_elems(elems.size() / 3);
+    for (uint i = 0; i < elems.size() / 3; ++i)
+      out_elems[i] = { static_cast<uint>(elems[3 * i]),  
+                       static_cast<uint>(elems[3 * i + 1]), 
+                       static_cast<uint>(elems[3 * i + 2]) };
+    
+    return generate_from_data<Traits>(std::span<const T> { out_verts },
+                                      std::span<const eig::Array3u> { out_elems });
+  }
+  
+  template <typename T>
+  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_convex_hull(std::span<const T> points) {
+    met_trace();
+
+    using namespace quickhull;
+
+    using Vector3f = quickhull::Vector3<float>;
+    auto vector_span = cnt_span<const Vector3f>(points);
+
+    QuickHull<float> builder;
+    auto chull = builder.getConvexHull(vector_span.data(), vector_span.size(), true, false);
+
+    const auto& elems = chull.getIndexBuffer();
+    const auto& verts = chull.getVertexBuffer();
+
+    std::vector<T> out_verts(verts.size());
+    for (uint i = 0; i < verts.size(); ++i) {
+      auto v = verts[i];
+      out_verts[i] = { v.x, v.y, v.z };
+    }
+
+    // std::ranges::copy(verts, cnt_span<Vector3f>(out_verts));
+
+    std::vector<eig::Array3u> out_elems(elems.size() / 3);
+    for (uint i = 0; i < elems.size() / 3; ++i)
+      out_elems[i] = { static_cast<uint>(elems[3 * i]),  
+                       static_cast<uint>(elems[3 * i + 1]), 
+                       static_cast<uint>(elems[3 * i + 2]) };
+
+    return { out_verts, out_elems };
+  }
+
+  template <typename Traits, typename T>
+  TriMesh<Traits> generate_convex_hull_approx(std::span<const T> points, const TriMesh<Traits> &spheroid_mesh) {
     met_trace();
 
     auto mesh = spheroid_mesh;
@@ -155,38 +241,47 @@ namespace met {
     met_trace();
     namespace odec = omesh::Decimater;
     using Mesh = TriMesh<Traits>;
-    
+    using Prop = omesh::HPropHandleT<omesh::Vec3f>;
+
     // Operate on a copy of the input mesh
     Mesh mesh = input_mesh;
+    
+    Prop volume_prop;
+    mesh.add_property(volume_prop);
 
-    // First, quickly collapse all very short edges into their average to a hardcoded minimum
+    // First, quickly collapse all very short edges into their average to a hardcoded minimum;
+    // given that convex hull generation is relatively accurate, this likely does not affect anything
+    fmt::print("Begin length collapse: {}\n", mesh.n_vertices());
     {
-      using Decimater = odec::CollapsingDecimater<Mesh, odec::AverageCollapseFunction>;
-      using Mod       = odec::ModEdgeLengthT<Mesh>::Handle;
+      // using Decimater  = odec::CollapsingDecimater<Mesh, odec::AverageCollapseFunction>;
+      using ModEdgeLen = odec::ModEdgeLengthT<Mesh>::Handle;
+      using Decimater  = odec::DecimaterT<Mesh>;
 
       Decimater dec(mesh);
-      Mod mod;
+      ModEdgeLen mod_edge_len;
 
-      dec.add(mod);
-      dec.module(mod).set_binary(false);
-      dec.module(mod).set_edge_length(0.025f);
-        
+      dec.add(mod_edge_len);
+      dec.module(mod_edge_len).set_binary(false);
+      dec.module(mod_edge_len).set_edge_length(0.005f); // not zero, but just up to reasonable precision
+
       dec.initialize();
-      dec.decimate_to(std::max(max_vertices, 16u));
+      dec.decimate();
 
       mesh.garbage_collection();
     }
+    fmt::print("End length collapse: {}\n", mesh.n_vertices());
 
     // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
+    fmt::print("Attempting collapse: {} -> {}\n", mesh.n_vertices(), max_vertices);
     {
-      using Decimater = odec::CollapsingDecimater<Mesh, odec::VolumeCollapseFunction>;
-      using Mod       = odec::ModQuadricT<Mesh>::Handle;
+      using Decimater = odec::DecimaterT<Mesh>;
+      using ModVolume = odec::ModVolumeT<Mesh>::Handle;
+      using ModNormal = odec::ModNormalFlippingT<Mesh>::Handle;
 
       Decimater dec(mesh);
-      Mod mod;
+      ModVolume volume_mod;
 
-      dec.add(mod);
-      dec.module(mod).unset_max_err();
+      dec.add(volume_mod);
 
       dec.initialize();
       dec.decimate_to(max_vertices);
@@ -241,19 +336,24 @@ namespace met {
   template
   HalfedgeMesh generate_spheroid<HalfedgeMeshTraits>(uint);
   
-  // generate_convex_hull
+  // generate_convex_hull_approx
   template
-  BaselineMesh generate_convex_hull<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const BaselineMesh &);
+  BaselineMesh generate_convex_hull_approx<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const BaselineMesh &);
   template
-  FNormalMesh generate_convex_hull<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const FNormalMesh &);
+  FNormalMesh generate_convex_hull_approx<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const FNormalMesh &);
   template
-  HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const HalfedgeMesh &);
+  HalfedgeMesh generate_convex_hull_approx<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const HalfedgeMesh &);
   template
-  BaselineMesh generate_convex_hull<BaselineMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const BaselineMesh &);
+  BaselineMesh generate_convex_hull_approx<BaselineMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const BaselineMesh &);
   template
-  FNormalMesh generate_convex_hull<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const FNormalMesh &);
+  FNormalMesh generate_convex_hull_approx<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const FNormalMesh &);
   template
-  HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const HalfedgeMesh &);
+  HalfedgeMesh generate_convex_hull_approx<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const HalfedgeMesh &);
+
+  template
+  HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>);
+  template
+  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
 
   // simplify
   template
