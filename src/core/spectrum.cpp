@@ -15,11 +15,24 @@ namespace met {
     eig::Matrix3f srgb_to_xyz_transform {{ 0.412453f, 0.357580f, 0.180423f },
                                          { 0.212671f, 0.715160f, 0.072169f },
                                          { 0.019334f, 0.119193f, 0.950227f }};
-
+    eig::Matrix3f xyz_to_rec709_transform {{ 3.2409699419f,-1.5373831776f,-0.4986107603 },
+                                           {-0.9692436363f, 1.8759675015f, 0.0415550574 },
+                                           { 0.0556300797f,-0.2039769589f, 1.0569715142 }};
+    eig::Matrix3f xyz_to_rec2020_transform {{ 1.7166511880f,-0.3556707838f,-0.2533662814f },
+                                            {-0.6666843518f, 1.6164812366f, 0.0157685458f },
+                                            { 0.0176398574f,-0.0427706133f, 0.9421031212f }};
+    eig::Matrix3f xyz_to_ap1_transform {{ 1.6410233797f,-0.3248032942f,-0.2364246952f },
+                                        {-0.6636628587f, 1.6153315917f, 0.0167563477f },
+                                        { 0.0117218943f,-0.0082844420f, 0.9883948585f }};
+    eig::Matrix3f rec2020_to_xyz_transform = xyz_to_rec2020_transform.inverse().eval();
+    eig::Matrix3f rec709_to_xyz_transform = xyz_to_rec709_transform.inverse().eval();
+    eig::Matrix3f ap1_to_xyz_transform = xyz_to_ap1_transform.inverse().eval();
+    
     // Color matching functions
     CMFS cmfs_cie_xyz = (xyz_to_srgb_transform * 
                          io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z).transpose()
                         ).transpose();
+    // CMFS cmfs_cie_xyz = io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z);
 
     // Illuminant spectra
     Spec emitter_cie_e       = 1.f;

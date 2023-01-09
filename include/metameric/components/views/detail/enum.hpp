@@ -5,6 +5,7 @@ namespace met::detail {
   enum class ViewportInputMode : uint {
     eVertex = 0u,
     eEdge   = 1u,
-    eFace   = 2u
+    eFace   = 2u,
+    eSample = 3u
   };
 } // met::detail

@@ -76,7 +76,7 @@ namespace met {
 
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    uint e_mappings_n   = e_appl_data.project_data.mappings.size();
+    uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
     auto e_texture_size = e_appl_data.loaded_texture.size();
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
@@ -107,7 +107,7 @@ namespace met {
     
     // Get shared resources
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    uint e_mappings_n = e_appl_data.project_data.mappings.size();
+    uint e_mappings_n = e_appl_data.project_data.color_systems.size();
 
     // Adjust nr. of subtasks
     m_texture_subtasks.eval(info, e_mappings_n);

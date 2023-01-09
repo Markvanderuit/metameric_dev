@@ -31,7 +31,7 @@ namespace met {
       auto &e_proj_data   = e_appl_data.project_data;
       auto &e_illuminants = e_proj_data.illuminants;
       auto &e_cmfs        = e_proj_data.cmfs;
-      auto &e_mappings    = e_proj_data.mappings;
+      auto &e_csys        = e_proj_data.color_systems;
 
       // Get wavelength values for x-axis in plots
       Spec x_values;
@@ -56,13 +56,13 @@ namespace met {
               .name = "Deleted illuminant",
               .redo = [i = i](auto &data) { 
                 data.illuminants.erase(data.illuminants.begin() + i);
-                for (auto &[_, illm] : data.mappings) {
+                for (auto &[_, illm] : data.color_systems) {
                   if (illm > 0 && illm >= i) illm--;
                 }
               },
-              .undo = [illm = e_illuminants, mapp = e_mappings](auto &data) { 
+              .undo = [illm = e_illuminants, csys = e_csys](auto &data) { 
                 data.illuminants = illm;
-                data.mappings    = mapp;
+                data.color_systems = csys;
               }
             });
             ImGui::EndGroup();
@@ -102,13 +102,13 @@ namespace met {
               .name = "Deleted cmfs",
               .redo = [i = i](auto &data) { 
                 data.cmfs.erase(data.cmfs.begin() + i);
-                for (auto &[cmfs, _] : data.mappings) {
+                for (auto &[cmfs, _] : data.color_systems) {
                   if (cmfs > 0 && cmfs >= i) cmfs--;
                 }
               },
-              .undo = [cmfs = e_cmfs, mapp = e_mappings](auto &data) { 
-                data.cmfs     = cmfs;
-                data.mappings = mapp;
+              .undo = [cmfs = e_cmfs, csys = e_csys](auto &data) { 
+                data.cmfs = cmfs;
+                data.color_systems = csys;
               }
             });
             ImGui::EndGroup();
@@ -148,7 +148,7 @@ namespace met {
         }
       }
       
-      if (ImGui::CollapsingHeader("Mappings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (ImGui::CollapsingHeader("Color systems", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::AlignTextToFramePadding();
 
         // Coming column widths
@@ -158,18 +158,18 @@ namespace met {
 
         // CMFS selectors
         ImGui::BeginGroup(); ImGui::PushItemWidth(selec_width); ImGui::Text("CMFS"); ImGui::Separator();
-        for (uint i = 0; i < e_mappings.size(); ++i) {
+        for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("cmfs_selector_{}", i).c_str());
           
-          auto &[cmfs_i, _] = e_mappings[i];
+          auto &[cmfs_i, _] = e_csys[i];
           
           if (ImGui::BeginCombo("##CMFS", e_cmfs[cmfs_i].first.c_str())) {
             for (uint j = 0; j < e_cmfs.size(); ++j)
               if (ImGui::Selectable(e_cmfs[j].first.c_str(), cmfs_i == j)) 
                 e_appl_data.touch({ 
-                  .name = "Modify mapping", 
-                  .redo = [i = i, j = j](auto &data) { data.mappings[i].cmfs = j; },
-                  .undo = [i = i, j = cmfs_i](auto &data) {  data.mappings[i].cmfs = j; 
+                  .name = "Modify color system", 
+                  .redo = [i = i, j = j](auto &data) { data.color_systems[i].cmfs = j; },
+                  .undo = [i = i, j = cmfs_i](auto &data) {  data.color_systems[i].cmfs = j; 
                 }});
             ImGui::EndCombo();
           }
@@ -180,18 +180,18 @@ namespace met {
 
         // Illuminant selectors
         ImGui::BeginGroup(); ImGui::PushItemWidth(selec_width); ImGui::Text("Illuminant"); ImGui::Separator();
-        for (uint i = 0; i < e_mappings.size(); ++i) {
+        for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("illm_selector_{}", i).c_str());
 
-          auto &[_, illum_i] = e_mappings[i];
+          auto &[_, illum_i] = e_csys[i];
 
           if (ImGui::BeginCombo("##Illuminant", e_illuminants[illum_i].first.c_str())) {
             for (uint j = 0; j < e_illuminants.size(); ++j)
               if (ImGui::Selectable(e_illuminants[j].first.c_str(), illum_i == j)) 
                 e_appl_data.touch({ 
-                  .name = "Modify mapping", 
-                  .redo = [i = i, j = j](auto &data) { data.mappings[i].illuminant = j; },
-                  .undo = [i = i, j = illum_i](auto &data) {  data.mappings[i].illuminant = j; 
+                  .name = "Modify color system", 
+                  .redo = [i = i, j = j](auto &data) { data.color_systems[i].illuminant = j; },
+                  .undo = [i = i, j = illum_i](auto &data) {  data.color_systems[i].illuminant = j; 
                 }});
             ImGui::EndCombo();
           }
@@ -202,16 +202,16 @@ namespace met {
 
         // Delete buttons
         ImGui::BeginGroup(); ImGui::PushItemWidth(delet_width); ImGui::Text(""); ImGui::Separator();
-        for (uint i = 0; i < e_mappings.size(); ++i) {
-          ImGui::PushID(fmt::format("mapp_delete_{}", i).c_str());
+        for (uint i = 0; i < e_csys.size(); ++i) {
+          ImGui::PushID(fmt::format("csys_delete_{}", i).c_str());
           if (ImGui::Button("X")) {
-            e_appl_data.touch({ .name = "Delete mapping", .redo = [i = i](auto &data) {
-              data.mappings.erase(data.mappings.begin() + i);
+            e_appl_data.touch({ .name = "Delete color system", .redo = [i = i](auto &data) {
+              data.color_systems.erase(data.color_systems.begin() + i);
               for (auto &vert : data.gamut_verts)
-                for (uint &j : vert.mapp_j) if (j >= i) 
+                for (uint &j : vert.csys_j) if (j >= i) 
                   j--;
-            }, .undo = [edit = e_mappings, verts = e_proj_data.gamut_verts](auto &data) { 
-              data.mappings = edit;
+            }, .undo = [edit = e_csys, verts = e_proj_data.gamut_verts](auto &data) { 
+              data.color_systems = edit;
               data.gamut_verts = verts;
             }});
           }
@@ -221,11 +221,11 @@ namespace met {
 
         // Add button
         ImGui::Separator();
-        if (ImGui::Button("Add mapping")) {
+        if (ImGui::Button("Add color system")) {
           e_appl_data.touch({
-            .name = "Add mapping",
-            .redo = [](auto &data) { data.mappings.push_back({ 0, 0 }); },
-            .undo = [](auto &data) { data.mappings.pop_back(); }
+            .name = "Add color system",
+            .redo = [](auto &data) { data.color_systems.push_back({ 0, 0 }); },
+            .undo = [](auto &data) { data.color_systems.pop_back(); }
           });
         }
       }

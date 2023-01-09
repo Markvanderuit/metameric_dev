@@ -59,7 +59,7 @@ namespace met {
       params.b.block<3, 1>(3 * i, 0) = signals[i].cast<double>().eval();
     }
 
-    // Add constraints to restrict resulting spectra are bounded to [0, 1]
+    // Add constraints to ensure resulting spectra are bounded to [0, 1]
     const uint offs_l = 3 * systems.size();
     const uint offs_u = offs_l + wavelength_samples;
     params.A.block<wavelength_samples, N>(offs_l, 0) = basis.cast<double>().eval();
@@ -143,7 +143,50 @@ namespace met {
 
   // row/col expansion shorthand for a given eigen matrix
   #define rowcol(mat) decltype(mat)::RowsAtCompileTime, decltype(mat)::ColsAtCompileTime
-  
+
+  std::vector<Colr> generate_gamut(const GenerateGamutSimpleInfo &info) {
+    const uint n_bary = info.bary_weights;
+    const uint n_colr = 3;
+    const uint N = n_bary * n_colr;
+    const uint M = info.samples.size() * n_colr;
+    
+    // Initialize parameter object for LP solver with expected matrix sizes
+    LPParameters params(M, N);
+    params.method    = LPMethod::ePrimal;
+    params.scaling   = true;
+    params.objective = LPObjective::eMinimize;
+
+    // Clear untouched matrix values to 0
+    params.A.fill(0.0);
+
+    // Add constraints to ensure weighted combinations produce the given samples
+    for (uint i = 0; i < info.samples.size(); ++i) {
+      for (uint j = 0; j < n_bary; ++j) {
+        double w = info.weights[i][j];
+        auto A = (eig::Matrix3d() << w, 0, 0, 0, w, 0, 0, 0, w).finished();
+        fmt::print("A = {}\n", A.reshaped());
+        params.A.block(i * n_colr, j * n_colr, rowcol(A)) = A;
+      }
+      auto b = info.samples[i].cast<double>().eval();
+      fmt::print("b = {}\n", b.reshaped());
+      params.b.block(i * n_colr, 0, rowcol(b)) = b;
+    }
+
+    // Run solver and pray; cast results back to float
+    params.objective = LPObjective::eMinimize;
+    auto x_min = lp_solve(params).cast<float>().eval();
+    // params.objective = LPObjective::eMaximize;
+    // auto x_max = lp_solve(params).cast<float>().eval();
+
+    // Obtain resulting set of colors
+    std::vector<Colr> out(n_bary);
+    for (uint i = 0; i < n_bary; ++i)
+      out[i] = x_min.block<n_colr, 1>(i * n_colr, 0);
+      // out[i] = 0.5 * (x_min.block<n_colr, 1>(i * n_colr, 0) + x_max.block<n_colr, 1>(i * n_colr, 0));
+
+    return out;
+  } 
+
   std::vector<Spec> generate_gamut(const GenerateGamutSpectrumInfo &info) {
     // Constant shorthands
     constexpr uint n_bary = barycentric_weights;
@@ -167,7 +210,6 @@ namespace met {
     // Clear untouched matrix values to 0
     params.A.fill(0.0);
     
-    // Add constraints to ensure weighted combinations produce the given samples
     // Add recovery constraints for seed samples
     for (uint i = 0; i < info.samples.size(); ++i) {
       for (uint j = 0; j < n_bary; ++j) {
@@ -235,7 +277,7 @@ namespace met {
     
     // Initialize parameter object for LP solver with expected matrix sizes
     LPParameters params(M, N);
-    params.method    = LPMethod::eDual;
+    params.method    = LPMethod::ePrimal;
     params.scaling   = true;
     params.objective = LPObjective::eMinimize;
 
@@ -285,9 +327,10 @@ namespace met {
     // Obtain basis function weights from solution and compute resulting spectra
     std::vector<Spec> out(n_bary);
     for (uint i = 0; i < n_bary; ++i) {
-      out[i] = (0.5 * (
-        info.basis * BSpec(x_min.block<n_base, 1>(n_base * i, 0)) + 
-        info.basis * BSpec(x_max.block<n_base, 1>(n_base * i, 0))
+      out[i] = (1.f * (
+        info.basis * BSpec(x_min.block<n_base, 1>(n_base * i, 0))
+        //  + 
+        // info.basis * BSpec(x_max.block<n_base, 1>(n_base * i, 0))
       )).cwiseMax(0.f).cwiseMin(1.f).eval();
     }
     

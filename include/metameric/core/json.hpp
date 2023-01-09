@@ -19,8 +19,8 @@ namespace met {
   void to_json(json &js, const ProjectData &v);
 
   /* json (de)serializations for ProjectData::Mapp type must be declared in met scope*/
-  void from_json(const json &js, ProjectData::Mapp &v);
-  void to_json(json &js, const ProjectData::Mapp &v);
+  void from_json(const json &js, ProjectData::CSys &v);
+  void to_json(json &js, const ProjectData::CSys &v);
 } // namespace met
 
 /* json (de)serializations for specific Eigen types must be declared in Eigen scope */

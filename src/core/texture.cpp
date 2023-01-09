@@ -113,7 +113,11 @@ namespace met {
       std::vector<std::byte> byte_data(data.size());
       std::transform(std::execution::par_unseq,
         data.begin(), data.end(), byte_data.begin(),
-        [](float f) { return static_cast<std::byte>(f * 255.f); });
+        [](float f) { 
+          auto b = static_cast<std::byte>(std::clamp(f * 256.f, 0.f, 255.f));
+          // fmt::print("{} -> {}\n", b, f);
+          return b; // static_cast<std::byte>(std::max(f * 256.f, 0.f)); 
+        });
       
       const auto ext = path.extension();
       int ret = 0;

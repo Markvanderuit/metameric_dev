@@ -73,51 +73,21 @@ namespace met {
       fence.cpu_wait();
     }
     
-    Mapp mapp        = e_proj_data.mapping_data(texture_i);
+    ColrSystem mapp        = e_proj_data.csys(texture_i);
     Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
     Spec power       = mapp.illuminant * reflectance;
-    Colr power_rgb   = linear_srgb_to_gamma_srgb(mapp.apply_color(reflectance));
+    Colr color       = mapp.apply_color(reflectance);
 
     // Plot rest of tooltip
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
       nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
-    ImGui::ColorEdit3("Power (rgb)", power_rgb.data(), ImGuiColorEditFlags_Float);
+    ImGui::ColorEdit3("Color (lRGB)", color.data(), ImGuiColorEditFlags_Float);
     ImGui::Separator();
     ImGui::Value("Minimum", reflectance.minCoeff(), "%.16f");
     ImGui::Value("Maximum", reflectance.maxCoeff(), "%.16f");
     ImGui::Value("Valid", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
-
-    
-
-    // TODO: remove
-    /* {
-      using WSpec  = eig::Matrix<float, barycentric_weights, 1>;
-
-      // Get shared resources
-      auto &e_bary_buff = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
-      auto &e_tex_data  = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
-
-      // Compute sample position in texture dependent on mouse position in image
-      eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
-                            - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
-                            / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
-      const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
-
-      // Copy element data over
-      WSpec weight;
-      e_bary_buff.get(cnt_span<std::byte>(weight), sizeof(WSpec), sizeof(WSpec) * sample_i);
-      if (weight.array().isNaN().any()) {
-        // Plot stuff
-        ImGui::Separator();
-        if (ImPlot::BeginPlot("Weight", { 0, 0 })) {
-          ImPlot::SetupAxesLimits(0.0, 7.0, -1.0, 1.0, ImPlotCond_Always);
-          ImPlot::PlotLine("##bary", weight.data(), weight.size());
-          ImPlot::EndPlot();
-        }
-      }
-    } */
 
     ImGui::EndTooltip();
   }
@@ -179,7 +149,7 @@ namespace met {
       // Get shared resources
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_appl_data.project_data;
-      uint e_mappings_n = e_proj_data.mappings.size();
+      uint e_mappings_n = e_proj_data.color_systems.size();
 
       // Set up drawing a nr. of textures in a column-based layout; determine texture res.
       uint n_cols = 2;
@@ -221,7 +191,7 @@ namespace met {
 
         // Header line
         ImGui::SetNextItemWidth(texture_size.x() * 0.6);
-        ImGui::Text(e_proj_data.mapping_name(i).c_str());
+        ImGui::Text(e_proj_data.csys_name(i).c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton("Export")) eval_save(info, i);
         

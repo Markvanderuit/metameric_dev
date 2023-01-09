@@ -75,11 +75,13 @@ namespace met {
         internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
 
       // Test PCA generation using a bunch of randomly chosen vectors
-      Mapp mapp = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
-      std::vector<Spec> pca_input(32768);
+      ColrSystem mapp = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
+      std::vector<Spec> pca_input(128);
+      // std::vector<Spec> pca_input(32768);
       #pragma omp parallel for
       for (int i = 0; i < pca_input.size(); ++i)
-        pca_input[i] = internal_sd[128 * i];
+        pca_input[i] = internal_sd[32768 * i];
+        // pca_input[i] = internal_sd[128 * i];
 
       // Obtain and store basis functions
       auto basis = eigen_vectors(covariance_matrix(pca_input));

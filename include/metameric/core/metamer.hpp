@@ -27,6 +27,13 @@ namespace met {
 
   using Wght = std::vector<float>;
 
+  /* Info struct for simplified, unbounded generation of a gamut, given spectral information */
+  struct GenerateGamutSimpleInfo {
+    uint               bary_weights;
+    std::vector<WSpec> weights; // Approximate barycentric coordinates inside the expected gamut
+    std::vector<Colr>  samples; // Sample colors inside the expected gamut
+  };
+
   /* Info struct for generation of a gamut, given spectral information */
   struct GenerateGamutSpectrumInfo {
     BBasis            &basis;   // Spectral basis functions
@@ -53,6 +60,7 @@ namespace met {
   // Generate a gamut solution using a linear programming problem; ee GenerateGamut*Info 
   // above for necessary information. Note: returns n=barycentric_weights spectra; 
   // the last (padded) spectra should be ignored
+  std::vector<Colr> generate_gamut(const GenerateGamutSimpleInfo &info);
   std::vector<Spec> generate_gamut(const GenerateGamutSpectrumInfo &info);
   std::vector<Spec> generate_gamut(const GenerateGamutConstraintInfo &info);
 } // namespace met

@@ -114,8 +114,8 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
 
   vec3 sin_theta = sin(theta);
   vec3 c = (2.f * sin(h) * sin(h - theta)) 
-          / (shift(sin_theta, _ip) * shift(sin_theta, _im)) 
-          - 1.f;
+         / (shift(sin_theta, _ip) * shift(sin_theta, _im)) 
+         - 1.f;
   vec3 s = sign(determinant(transpose(mat3(u[0], u[1], u[2])))) 
          * sqrt(1.f - c * c);
 
@@ -166,8 +166,9 @@ Wght mean_value_coords_total(in vec3 x) {
 }
 
 void main() {
+  load_shared_data();
+  
   const uint i = gl_GlobalInvocationID.x;
   guard(i < b_size.n);
-  load_shared_data();
   b_bary_out.data[i] = mean_value_coords_total(b_posi_in.data[i]);;
 }

@@ -253,7 +253,6 @@ namespace met {
     // given that convex hull generation is relatively accurate, this likely does not affect anything
     fmt::print("Begin length collapse: {}\n", mesh.n_vertices());
     {
-      // using Decimater  = odec::CollapsingDecimater<Mesh, odec::AverageCollapseFunction>;
       using ModEdgeLen = odec::ModEdgeLengthT<Mesh>::Handle;
       using Decimater  = odec::DecimaterT<Mesh>;
 
@@ -274,14 +273,14 @@ namespace met {
     // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
     fmt::print("Attempting collapse: {} -> {}\n", mesh.n_vertices(), max_vertices);
     {
-      using Decimater = odec::DecimaterT<Mesh>;
+      using Decimater  = odec::CollapsingDecimater<Mesh, odec::DefaultCollapseFunction>;
       using ModVolume = odec::ModVolumeT<Mesh>::Handle;
-      using ModNormal = odec::ModNormalFlippingT<Mesh>::Handle;
 
       Decimater dec(mesh);
       ModVolume volume_mod;
 
       dec.add(volume_mod);
+      // dec.module(volume_mod).set_maximum_volume(0.001f);
 
       dec.initialize();
       dec.decimate_to(max_vertices);

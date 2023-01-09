@@ -11,10 +11,10 @@ namespace met {
       bool any_mapp_j;
 
       bool colr_i;
-      bool mapp_i;
+      bool csys_i;
 
       std::vector<bool> colr_j;
-      std::vector<bool> mapp_j;
+      std::vector<bool> csys_j;
     };
 
     struct CacheMapp {
@@ -28,10 +28,12 @@ namespace met {
     bool any_illuminants;
     bool any_cmfs;
     bool any_verts;
+    bool any_samps;
     bool any_elems;
     bool any_mapps;
 
     std::vector<CacheVert> verts;
+    std::vector<CacheVert> samps;
     std::vector<bool>      elems;
     std::vector<bool>      mapps;
     std::vector<bool>      illuminants;
@@ -47,6 +49,10 @@ namespace met {
     // Element selection in viewport
     bool elem_selection;
     bool elem_mouseover;
+
+    // Sample selection in viewport
+    bool samp_selection;
+    bool samp_mouseover;
 
     // Constraint selection in viewport overlay
     bool cstr_selection;

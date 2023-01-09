@@ -24,7 +24,7 @@ namespace met {
     }
 
     template <>
-    bool compare_func<ProjectData::Mapp>(const ProjectData::Mapp &in, ProjectData::Mapp &out) {
+    bool compare_func<ProjectData::CSys>(const ProjectData::CSys &in, ProjectData::CSys &out) {
       guard(in.cmfs != out.cmfs || in.illuminant != out.illuminant, false);
       out = in;
       return true;
@@ -60,7 +60,7 @@ namespace met {
 
     template <typename T>
     CompareTuple compare_state(const std::vector<T> &in,
-                                          std::vector<T> &out) {
+                                     std::vector<T> &out) {
       std::vector<bool> state(in.size(), true);
       if (in.size() != out.size()) {
         out = in;
@@ -124,9 +124,10 @@ namespace met {
     CacheVert compare_and_set_vert(const ProjectData::Vert &in, ProjectData::Vert &out) {
       CacheVert state;
       state.colr_i = compare_func(in.colr_i, out.colr_i);
-      state.mapp_i = compare_func(in.mapp_i, out.mapp_i);
-      state.colr_j = std::get<0>(compare_state(in.colr_j, out.colr_j));
-      state.mapp_j = std::get<0>(compare_state(in.mapp_j, out.mapp_j));
+      state.csys_i = compare_func(in.csys_i, out.csys_i);
+      std::tie(state.colr_j, state.any_colr_j) = compare_state(in.colr_j, out.colr_j);
+      std::tie(state.csys_j, state.any_mapp_j) = compare_state(in.csys_j, out.csys_j);
+      state.any = state.colr_i || state.csys_i || state.any_colr_j || state.any_mapp_j;
       return state;
     }
 
@@ -164,14 +165,17 @@ namespace met {
     auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
     auto &e_elem_selct = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
     auto &e_elem_mover = info.get_resource<std::vector<uint>>("viewport_input_elem", "mouseover");
+    auto &e_samp_selct = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
+    auto &e_samp_mover = info.get_resource<std::vector<uint>>("viewport_input_samp", "mouseover");
     auto &e_cstr_selct = info.get_resource<int>("viewport_overlay", "constr_selection");
 
     // Iterate over all project data
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.gamut_verts, m_verts);
+    i_pipe_state.samps = detail::compare_and_set_all_vert(e_proj_data.sample_verts, m_samps);
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
     std::tie(i_pipe_state.cmfs,  i_pipe_state.any_cmfs)  = detail::compare_state(e_proj_data.cmfs, m_cmfs);
     std::tie(i_pipe_state.elems, i_pipe_state.any_elems) = detail::compare_state(e_proj_data.gamut_elems, m_elems);
-    std::tie(i_pipe_state.mapps, i_pipe_state.any_mapps) = detail::compare_state(e_proj_data.mappings, m_mapps);
+    std::tie(i_pipe_state.mapps, i_pipe_state.any_mapps) = detail::compare_state(e_proj_data.color_systems, m_mapps);
 
     // Post-process fill in some gaps in project state
     for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
@@ -179,19 +183,38 @@ namespace met {
       auto &vert_data  = e_proj_data.gamut_verts[i];
       
       // If mapping state has become stale, this influenced the flag inside of a vertex as well
-      vert_state.mapp_i |= i_pipe_state.mapps[vert_data.mapp_i];
-      for (uint j = 0; j < vert_state.mapp_j.size(); ++j)
-        vert_state.mapp_j[j] = vert_state.mapp_j[j] | i_pipe_state.mapps[vert_data.mapp_j[j]];
+      vert_state.csys_i |= i_pipe_state.mapps[vert_data.csys_i];
+      for (uint j = 0; j < vert_state.csys_j.size(); ++j)
+        vert_state.csys_j[j] = vert_state.csys_j[j] | i_pipe_state.mapps[vert_data.csys_j[j]];
       
-      // Set summary flags per vertex
-      vert_state.any_colr_j = std::reduce(range_iter(vert_state.colr_j), false, reduce_stale);
-      vert_state.any_mapp_j = std::reduce(range_iter(vert_state.mapp_j), false, reduce_stale);
-      vert_state.any = vert_state.colr_i | vert_state.mapp_i | vert_state.any_colr_j | vert_state.any_mapp_j;
+      // Update summary flags per vertex
+      vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, reduce_stale);
+      vert_state.any_mapp_j |= std::reduce(range_iter(vert_state.csys_j), false, reduce_stale);
+      vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_mapp_j;
+    }
+
+    for (uint i = 0; i < i_pipe_state.samps.size(); ++i) {
+      auto &samp_state = i_pipe_state.samps[i];
+      auto &samp_data  = e_proj_data.sample_verts[i];
+      
+      // If mapping state has become stale, this influenced the flag inside of a sample as well
+      samp_state.csys_i |= i_pipe_state.mapps[samp_data.csys_i];
+      for (uint j = 0; j < samp_state.csys_j.size(); ++j)
+        samp_state.csys_j[j] = samp_state.csys_j[j] | i_pipe_state.mapps[samp_data.csys_j[j]];
+
+      // Update summary flags per sample
+      samp_state.any_colr_j |= std::reduce(range_iter(samp_state.colr_j), false, reduce_stale);
+      samp_state.any_mapp_j |= std::reduce(range_iter(samp_state.csys_j), false, reduce_stale);
+      samp_state.any        |= samp_state.colr_i || samp_state.csys_i || samp_state.any_colr_j || samp_state.any_mapp_j;
     }
 
     // Set summary flags over all vertices/elements in project state
     i_pipe_state.any_verts = std::reduce(range_iter(i_pipe_state.verts), false, 
       [](const auto &a, const auto &b) { return a | b.any; });
+    i_pipe_state.any_samps = std::reduce(range_iter(i_pipe_state.samps), false, 
+      [](const auto &a, const auto &b) { return a | b.any; });
+    
+    // Set giant summary flag; samples are excluded as they are only stored, not processed
     i_pipe_state.any = i_pipe_state.any_mapps | 
                        i_pipe_state.any_elems | 
                        i_pipe_state.any_verts |
@@ -203,6 +226,8 @@ namespace met {
     i_view_state.vert_mouseover = std::get<1>(detail::compare_state(e_vert_mover, m_vert_mover));
     i_view_state.elem_selection = std::get<1>(detail::compare_state(e_elem_selct, m_elem_selct));
     i_view_state.elem_mouseover = std::get<1>(detail::compare_state(e_elem_mover, m_elem_mover));
+    i_view_state.samp_selection = std::get<1>(detail::compare_state(e_samp_selct, m_samp_selct));
+    i_view_state.samp_mouseover = std::get<1>(detail::compare_state(e_samp_mover, m_samp_mover));
     i_view_state.cstr_selection = detail::compare_func(e_cstr_selct, m_cstr_selct);
   }
 } // namespace met

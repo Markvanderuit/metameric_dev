@@ -11,6 +11,7 @@
 #include <metameric/components/views/viewport/task_viewport_input_vert.hpp>
 #include <metameric/components/views/viewport/task_viewport_input_edge.hpp>
 #include <metameric/components/views/viewport/task_viewport_input_elem.hpp>
+#include <metameric/components/views/viewport/task_viewport_input_sample.hpp>
 #include <small_gl/window.hpp>
 #include <ImGuizmo.h>
 #include <algorithm>
@@ -21,7 +22,7 @@
 namespace met {
   // Size constants, independent of window scale
   const float overlay_padding = 8.f;
-  const float overlay_width   = 128.f;
+  const float overlay_width   = 192.f;
 
   namespace detail {
     using MeshReturnType = std::pair<
@@ -83,6 +84,7 @@ namespace met {
       info.emplace_task_after<ViewportInputVertTask>(name(), name() + "_vert");
       // info.emplace_task_after<ViewportInputEdgeTask>(name(), name() + "_edge");
       info.emplace_task_after<ViewportInputElemTask>(name(), name() + "_elem");
+      info.emplace_task_after<ViewportInputSampleTask>(name(), name() + "_samp");
 
       // Share resources
       info.emplace_resource<detail::ViewportInputMode>("mode", detail::ViewportInputMode::eVertex);
@@ -96,6 +98,7 @@ namespace met {
       info.remove_task(name() + "_vert");
       // info.remove_task(name() + "_edge");
       info.remove_task(name() + "_elem");
+      info.remove_task(name() + "_samp");
     }
 
     void eval(detail::TaskEvalInfo &info) override {
@@ -103,15 +106,17 @@ namespace met {
                       
       // Get shared resources
       auto &io               = ImGui::GetIO();
-      auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
+      auto &e_window         = info.get_resource<gl::Window>(global_key, "window");
       auto &i_arcball        = info.get_resource<detail::Arcball>("arcball");
       auto &i_mode           = info.get_resource<detail::ViewportInputMode>("mode");
       auto &e_selection_vert = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
       auto &e_selection_elem = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
-      auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_prj_data       = e_app_data.project_data;
-      auto &e_verts          = e_app_data.project_data.gamut_verts;
-      auto &e_elems          = e_app_data.project_data.gamut_elems;
+      auto &e_selection_samp = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
+      auto &e_appl_data      = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data      = e_appl_data.project_data;
+      auto &e_verts          = e_appl_data.project_data.gamut_verts;
+      auto &e_elems          = e_appl_data.project_data.gamut_elems;
+      auto &e_samples        = e_appl_data.project_data.sample_verts;
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -138,15 +143,19 @@ namespace met {
         ImGui::RadioButton("Vertex", &m, static_cast<int>(detail::ViewportInputMode::eVertex));
         ImGui::SameLine();
         ImGui::RadioButton("Face",   &m, static_cast<int>(detail::ViewportInputMode::eFace));
+        ImGui::SameLine();
+        ImGui::RadioButton("Sample",   &m, static_cast<int>(detail::ViewportInputMode::eSample));
 
         ImGui::Separator();
         ImGui::Value("Vertices", static_cast<uint>(e_verts.size()));
         ImGui::Value("Faces", static_cast<uint>(e_elems.size()));
+        ImGui::Value("Samples", static_cast<uint>(e_samples.size()));
 
         // Reset selections if edit mode was changed
         if (auto mode = detail::ViewportInputMode(m); mode != i_mode) {
           e_selection_vert.clear();
           e_selection_elem.clear();
+          e_selection_samp.clear();
           i_mode = mode;
         }
 
@@ -160,7 +169,7 @@ namespace met {
             auto [_, elems] = detail::collapse_vert(colrs_i, e_elems, e_selection_vert[0]);
             
             // Apply data modification to project
-            e_app_data.touch({
+            e_appl_data.touch({
               .name = "Collapse vertex",
               .redo = [elems = elems,
                        i     = e_selection_vert[0]](auto &data) {
@@ -191,16 +200,16 @@ namespace met {
             auto [verts, elems] = detail::subdivide_elem(colrs_i, e_elems, e_selection_elem[0]);
 
             // Apply data modification to project
-            e_app_data.touch({
+            e_appl_data.touch({
               .name = "Subdivide face",
               .redo = [verts = verts, 
                        elems = elems](auto &data) {
                 data.gamut_elems  = elems;
                 data.gamut_verts.resize(verts.size(), {
                   .colr_i = verts[verts.size() - 1],
-                  .mapp_i = 0,
+                  .csys_i = 0,
                   .colr_j = { },
-                  .mapp_j = { }
+                  .csys_j = { }
                 });
               },
               .undo = [elems  = e_elems,
@@ -213,6 +222,39 @@ namespace met {
             // Clear selection to prevent issues down the line with non-existent data being selected
             e_selection_vert.clear(); 
             e_selection_elem.clear();
+          }
+        }
+
+        if (i_mode == detail::ViewportInputMode::eSample) {
+          // Add sample button
+          ImGui::Separator();
+          if (ImGui::Button("Add sample")) {
+            ProjectData::Vert sample = { .colr_i = 0.5, .csys_i = 0 };
+            e_appl_data.touch({
+              .name = "Add sample",
+              .redo = [sample = sample](auto &data) { data.sample_verts.push_back(sample); },
+              .undo = [sample = sample](auto &data) { data.sample_verts.pop_back(); }
+            });
+          }
+
+          // Remove sample button, disabled on empty samples
+          ImGui::SameLine();
+          if (e_selection_samp.empty()) ImGui::BeginDisabled();
+          if (ImGui::Button("Remove sample(s)")) {
+            debug::check_expr_rel(false, "Unimplemented!");
+          }
+          if (e_selection_samp.empty()) ImGui::EndDisabled();
+
+          // Solver button
+          ImGui::Separator();
+          if (ImGui::Button("Fit convex hull")) {
+            e_appl_data.refit_convex_hull();
+          }
+          if (!e_samples.empty()) {
+            ImGui::SameLine();
+            if (ImGui::Button("Fit samples")) {
+              e_appl_data.solve_samples();
+            }
           }
         }
       }

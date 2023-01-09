@@ -28,7 +28,7 @@ namespace met {
     ProjectCreateInfo();
     
     // Input uplifting information
-    std::vector<ImageData> images; // Input images with known color system mappings
+    std::vector<ImageData> images; // Input images with known color systems
     uint n_vertices;               // Intended nr. of vertices for convex hull estimation
     
     // Input spectral information
@@ -42,35 +42,36 @@ namespace met {
     // Data structure for a single vertex of the project's convex hull mesh
     struct Vert {
       Colr colr_i; // The expected vertex color under a primary color system
-      uint mapp_i; // Index of the selected primary color system
+      uint csys_i; // Index of the selected primary color system
       std::vector<Colr> colr_j; // The expected vertex colors under secondary color systems
-      std::vector<uint> mapp_j; // Indices of the selected primary color systemss
+      std::vector<uint> csys_j; // Indices of the selected secondary color systems
     };
 
     // Set of indices of cmfs/illuminants together describing a stored color system
-    struct Mapp {  uint cmfs, illuminant; };
+    struct CSys { uint cmfs, illuminant; };
 
     // Data structure for a triangle element of the project's convex hull mesh
     using Elem = eig::Array3u;
     
   public: /* public data */
     // Convex hull data structure used for rgb->spectral uplifting
-    std::vector<Vert> gamut_verts;  // Gamut vertex values under specified color system   
-    std::vector<Elem> gamut_elems;  // Triangle connections describing a convex hull
-    std::vector<Mapp> mappings;
+    std::vector<Vert> gamut_verts;   // Gamut vertex data  
+    std::vector<Elem> gamut_elems;   // Gamut element data, forming a convex hull
+    std::vector<Vert> sample_verts;  // Sample vertex data, used to seed the gamut vertex 
+    std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
 
     // Named user- or program-provided illuminants and color matching functions
     std::vector<std::pair<std::string, Spec>> illuminants;
     std::vector<std::pair<std::string, CMFS>> cmfs;
 
   public: /* public methods */
-    // Obtain spectral data of a certain stored mapping
-    met::Mapp mapping_data(uint i) const;
-    met::Mapp mapping_data(Mapp m) const;
+    // Obtain spectral data of a certain color system
+    ColrSystem csys(uint i) const;
+    ColrSystem csys(CSys m) const;
     
-    // Obtain a pretty-printed name describing a certain stored mapping
-    std::string mapping_name(uint i) const { return mapping_name(mappings[i]); }
-    std::string mapping_name(Mapp m) const { return fmt::format("{}, {}", cmfs[m.cmfs].first, illuminants[m.illuminant].first); }
+    // Obtain a pretty-printed name describing a certain color system
+    std::string csys_name(uint i) const { return csys_name(color_systems[i]); }
+    std::string csys_name(CSys m) const { return fmt::format("{}, {}", cmfs[m.cmfs].first, illuminants[m.illuminant].first); }
   };
 
   enum class ApplicationColorMode {
@@ -112,5 +113,9 @@ namespace met {
     void touch(ProjectMod &&mod); // Submit a modification to project data
     void redo();                  // Step forward one modification
     void undo();                  // Step back one modification
+
+  public: /* project solve functions */
+    void refit_convex_hull();
+    void solve_samples();
   };
 } // namespace met

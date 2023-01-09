@@ -59,21 +59,11 @@ namespace met {
     }
     auto &color_maps = m_tooltip_maps[m_tooltip_cycle_i];
 
-    // Plot rest of tooltip
-    ImGui::AlignTextToFramePadding();
-    ImGui::BeginGroup();
-    ImGui::PushItemWidth(tooltip_width * e_window.content_scale() * .485);
-    ImGui::BeginGroup();
-    ImGui::Text("Input color (lRGB)");
-    ImGui::ColorEdit3("##Value", color_maps.in_a[0].data(),  ImGuiColorEditFlags_Float);
-    ImGui::EndGroup();
-    ImGui::SameLine();
-    ImGui::BeginGroup();
-    ImGui::Text("Roundtrip error");
-    ImGui::ColorEdit3("##Error", color_maps.out[0].data(), ImGuiColorEditFlags_Float);
-    ImGui::EndGroup();
-    ImGui::PopItemWidth();
-    ImGui::EndGroup();
+    // Plot tooltip values
+    ImGui::ColorEdit3("Input color (lRGB)", color_maps.in_a[0].data(),  ImGuiColorEditFlags_Float);
+    ImGui::ColorEdit3("Roundtrip color (lRGB)", color_maps.in_b[0].data(),  ImGuiColorEditFlags_Float);
+    ImGui::ColorEdit3("Roundtrip error (abs)", color_maps.out[0].data(), ImGuiColorEditFlags_Float);
+    
     ImGui::EndTooltip();
   }
 
@@ -164,7 +154,7 @@ namespace met {
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_txtr_data = e_appl_data.loaded_texture;
       auto &e_proj_data = e_appl_data.project_data;
-      auto &e_mappings  = e_proj_data.mappings;
+      auto &e_mappings  = e_proj_data.color_systems;
 
       // Get subtask names
       auto texture_subtask_name  = fmt::format(texture_fmt, name());
@@ -187,13 +177,13 @@ namespace met {
         m_texture_size = texture_size;
 
         // Remove previous resample subtask and insert a new one
-        ResampleSubtask subtask = {{ .input_key    = { texture_subtask_name, "colr_texture"        },
-                                     .output_key   = { resample_subtask_name, "colr_texture"       },
-                                     .texture_info = { .size = m_texture_size                      },
-                                     .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                                       .mag_filter = gl::SamplerMagFilter::eLinear }}};
+        ResampleSubtask task = {{ .input_key    = { texture_subtask_name, "colr_texture"        },
+                                  .output_key   = { resample_subtask_name, "colr_texture"       },
+                                  .texture_info = { .size = m_texture_size                      },
+                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+                                                    .mag_filter = gl::SamplerMagFilter::eLinear }}};
         info.remove_task(resample_subtask_name);
-        info.insert_task_after(texture_subtask_name, std::move(subtask));
+        info.insert_task_after(texture_subtask_name, std::move(task));
       }
 
       // 3. Display ImGui components to show error and select mapping

@@ -71,7 +71,8 @@ namespace OpenMesh::Decimater {
   public:
     explicit ModVolumeT(MeshT &mesh)
     : Base(mesh, false),
-      m_mesh(Base::mesh()) {
+      m_mesh(Base::mesh()) ,
+      m_maximum_volume(std::numeric_limits<float>::max()) {
       m_mesh.add_property(m_vertex);
       m_mesh.add_property(m_volume);
     }
@@ -86,13 +87,19 @@ namespace OpenMesh::Decimater {
     virtual float collapse_priority(const CollapseInfoT<MeshT>& ci) override;
     virtual void postprocess_collapse(const CollapseInfoT<MeshT>& _ci) override;
 
-  private:
+    float maximum_volume() const { return m_maximum_volume; }
+    void set_maximum_volume(float f) { m_maximum_volume = f; }
+
+  private: /* private data */
     // Reference to mesh
     Mesh &m_mesh;
 
     // Half-edge properties to handle a volume-preserving collapse data
     HPropHandleT<Vec3f> m_vertex; // Solved vertex position for potential collapse
     HPropHandleT<float> m_volume; // Added volume given said collapse
+
+    // Clamped maximum allowed added volume per collapse
+    float m_maximum_volume;
   };
   
   /**

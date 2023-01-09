@@ -33,7 +33,13 @@ namespace met {
   namespace models {
     // Linear color space transformations
     extern eig::Matrix3f xyz_to_srgb_transform;
+    extern eig::Matrix3f xyz_to_rec709_transform;
+    extern eig::Matrix3f xyz_to_rec2020_transform;
+    extern eig::Matrix3f xyz_to_ap1_transform;
     extern eig::Matrix3f srgb_to_xyz_transform;
+    extern eig::Matrix3f rec709_to_xyz_transform;
+    extern eig::Matrix3f rec2020_to_xyz_transform;
+    extern eig::Matrix3f ap1_to_xyz_transform;
 
     // Color matching functions
     extern CMFS cmfs_cie_xyz; // CIE 1931 2 deg. color matching functions
@@ -46,11 +52,20 @@ namespace met {
     extern Spec emitter_cie_ledb1;    // CIE standard illuminant LED-B1; blue LED
     extern Spec emitter_cie_ledrgb1;  // CIE standard illuminant LED-RGB1; R/G/B LEDs
   } // namespace models
+
+  /* Linear trichromatic color space described as a linear transformation to/from CIE XYZ  */
+  struct ColrSpace {
+    eig::Matrix3f xyz_to_rgb_transform;
+    eig::Matrix3f rgb_to_xyz_transform;
+
+    Colr to_xyz(Colr c) const { return rgb_to_xyz_transform * c.matrix(); }
+    Colr to_rgb(Colr c) { return xyz_to_rgb_transform * c.matrix(); }
+  };
   
-  /* Spectral mapping object defines how a reflectance-to-color conversion is performed */
-  struct Mapp {
+  /* System object defining how a reflectance-to-color conversion is ultimately performed */
+  struct ColrSystem {
   public: /* mapping data */
-    UnalCMFS cmfs;       // Color matching or sensor response functions
+    UnalCMFS cmfs;       // Color matching or sensor response functions, defining the observer
     UnalSpec illuminant; // Illuminant under which observation is performed
 
   public:/* Mapping functions */
@@ -66,7 +81,7 @@ namespace met {
       return finalize().transpose() * sd.matrix();
     }
 
-    bool operator==(const Mapp &o) const {
+    bool operator==(const ColrSystem &o) const {
       return cmfs == o.cmfs && illuminant.matrix() == o.illuminant.matrix();
     }
   };

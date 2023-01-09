@@ -121,34 +121,39 @@ namespace met {
   void GenColorSolidsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Continue only if vertex/constraint selection is sensible
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    // Continue only if constraint/sample selection is sensible
     auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
-    guard(e_vert_slct.size() == 1 && e_cstr_slct != -1);
+    guard(e_cstr_slct != -1);
 
     // Continue only on relevant state change
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_samp_slct = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection);
+    guard((!e_vert_slct.empty() && (e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection)) ||
+          (!e_samp_slct.empty() && (e_pipe_state.samps[e_samp_slct[0]].any || e_view_state.samp_selection)) || 
+          e_view_state.cstr_selection);
+    bool is_sample = !e_samp_slct.empty();
 
     // Get shared resources
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data = e_appl_data.project_data;
-    auto &e_vert      = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
+    auto &e_vert      = is_sample ? e_appl_data.project_data.sample_verts[e_samp_slct[0]]
+                                  : e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
     auto &i_csol_data = info.get_resource<std::vector<eig::AlArray3f>>("csol_data");
     auto &i_csol_cntr = info.get_resource<Colr>("csol_cntr");
 
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
     // All secondary color systems and signals are added after, until the one given by e_cstr_index
-    std::vector<CMFS> cmfs_i = { e_proj_data.mapping_data(e_vert.mapp_i).finalize() };
+    std::vector<CMFS> cmfs_i = { e_proj_data.csys(e_vert.csys_i).finalize() };
     std::vector<Colr> sign_i = { e_vert.colr_i };
     std::copy(e_vert.colr_j.begin(), e_vert.colr_j.begin() + e_cstr_slct, std::back_inserter(sign_i));
-    std::transform(e_vert.mapp_j.begin(), e_vert.mapp_j.begin() + e_cstr_slct, std::back_inserter(cmfs_i),
-      [&](uint j) { return e_proj_data.mapping_data(j).finalize(); });
+    std::transform(e_vert.csys_j.begin(), e_vert.csys_j.begin() + e_cstr_slct, std::back_inserter(cmfs_i),
+      [&](uint j) { return e_proj_data.csys(j).finalize(); });
 
     // The selected constraint is the varying component, for which we generate a metamer boundary
-    CMFS cmfs_j = e_proj_data.mapping_data(e_vert.mapp_j[e_cstr_slct]).finalize();
+    CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize();
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
     const auto &i_samples = info.get_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));

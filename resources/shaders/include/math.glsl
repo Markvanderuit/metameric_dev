@@ -7,7 +7,7 @@
 
 // Define math constants
 #define M_PI  3.14159265f
-#define M_EPS 0.000001f
+#define M_EPS 0.00000001f
 
 // Rounded-up division functions
 

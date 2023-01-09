@@ -13,34 +13,35 @@ namespace met {
     }
   } // namespace io
 
-  void from_json(const json &js, ProjectData::Mapp &v) {
+  void from_json(const json &js, ProjectData::CSys &v) {
     v.cmfs       = js.at("cmfs").get<uint>();
     v.illuminant = js.at("illuminant").get<uint>();
   }
 
-  void to_json(json &js, const ProjectData::Mapp &v) {
+  void to_json(json &js, const ProjectData::CSys &v) {
     js["cmfs"]       = v.cmfs;
     js["illuminant"] = v.illuminant;
   }
 
   void from_json(const json &js, ProjectData::Vert &v) {
     v.colr_i = js.at("colr_i").get<Colr>();
-    v.mapp_i = js.at("mapp_i").get<uint>();
+    v.csys_i = js.at("csys_i").get<uint>();
     v.colr_j = js.at("colr_j").get<std::vector<Colr>>();
-    v.mapp_j = js.at("mapp_j").get<std::vector<uint>>();
+    v.csys_j = js.at("csys_j").get<std::vector<uint>>();
   }
 
   void to_json(json &js, const ProjectData::Vert &v) {
     js["colr_i"] = v.colr_i;
-    js["mapp_i"] = v.mapp_i;
+    js["csys_i"] = v.csys_i;
     js["colr_j"] = v.colr_j;
-    js["mapp_j"] = v.mapp_j;
+    js["csys_j"] = v.csys_j;
   }
 
   void from_json(const json &js, ProjectData &v) {
     v.gamut_elems  = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
     v.gamut_verts  = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
-    v.mappings     = js.at("mappings").get<std::vector<ProjectData::Mapp>>();
+    v.sample_verts = js.at("sample_verts").get<std::vector<ProjectData::Vert>>();
+    v.color_systems     = js.at("mappings").get<std::vector<ProjectData::CSys>>();
     v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }
@@ -48,7 +49,8 @@ namespace met {
   void to_json(json &js, const ProjectData &v) {
     js["gamut_elems"]  = v.gamut_elems;
     js["gamut_verts"]  = v.gamut_verts;
-    js["mappings"]     = v.mappings;
+    js["sample_verts"] = v.sample_verts;
+    js["mappings"]     = v.color_systems;
     js["cmfs"]         = v.cmfs;
     js["illuminants"]  = v.illuminants;
   }

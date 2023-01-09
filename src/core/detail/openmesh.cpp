@@ -10,7 +10,6 @@
 
 namespace OpenMesh::Decimater {
   namespace detail {
-    
     template <class MeshT>
     std::pair<float, Vec3f> volume_solve(const MeshT &mesh,
                                         const typename MeshT::HalfedgeHandle &v0v1,
@@ -48,15 +47,14 @@ namespace OpenMesh::Decimater {
       Vec3f v_base = 0.5f * (p0 + p1);
 
       // Fill constraint matrices describing boundedness
-     /*  params.A.block(0, 0, 3, 3) = Eigen::Vector3d(-1).asDiagonal();
-      params.A.block(3, 0, 3, 3) = Eigen::Vector3d(1).asDiagonal();
-      params.r.block(0, 0, 3, 1) = met::LPCompare::eLE;
-      params.r.block(3, 0, 3, 1) = met::LPCompare::eLE;
+     /*  params.r.block(0, 0, 6, 1) = met::LPCompare::eLE;
+      params.A.block(0, 0, 3, 3) = (Eigen::Matrix3d() << -1, 0, 0, 0, -1, 0, 0, 0, -1).finished();
       params.b.block(0, 0, 3, 1) = met::to_eig<float, 3>(v_base).cast<double>().eval();
+      params.A.block(3, 0, 3, 3) = (Eigen::Matrix3d() << 1, 0, 0, 0, 1, 0, 0, 0, 1).finished();
       params.b.block(3, 0, 3, 1) = met::to_eig<float, 3>(Vec3f(1) - v_base).cast<double>().eval(); */
-      
+
       // Fill constraint matrices describing added volume, which must be zero or positive
-      uint i = 0; // 6;
+      uint i = 0;
       for (auto fh : fm) {
         // Get vertex positions and edge lengths
         std::array<Vec3f, 3> p;
@@ -70,20 +68,26 @@ namespace OpenMesh::Decimater {
         // Compute triangle area
         auto s = 0.5f * (d[0] + d[1] + d[2]);
         auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
-        auto n = (A / 3.f) * mesh.calc_face_normal(fh);
+        auto n = mesh.calc_face_normal(fh);
+        auto An = (A / 3.f) * n;
 
         n_sum += n;
 
-        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>().eval();
-        params.b[i]     = n.dot(p[0] - v_base);
+        // Positive volume
+        params.A.row(i) = met::to_eig<float, 3>(An).cast<double>().eval();
+        params.r[i]     = met::LPCompare::eGE;
+        params.b[i]     = An.dot(p[0] - v_base);
 
         i++;
       }
 
-      // Set minimization constraint, run solver, and pray 
+      // Minimize the solution vertex with respect to triangle normals, which places it
+      // on their intersecting planes
       params.C = met::to_eig<float, 3>(n_sum).cast<double>().eval();
-      auto vertex = met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval()) + v_base;
       
+      // Set minimization constraint, run solver, and pray 
+      auto vertex = v_base + met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval());
+
       // Clamp output to rgb cube for now; 
       // TODO: there's no need to do this in xyz
       vertex = vertex.min({ 1, 1, 1 }).max({ 0, 0, 0 }); 
@@ -107,8 +111,6 @@ namespace OpenMesh::Decimater {
 
         volume += n.dot(vertex - p[0]);
       }
-
-      // fmt::print("\tSolved for {} with volume {}\n", vertex, volume);
 
       return { volume, vertex };
     }
@@ -172,7 +174,7 @@ namespace OpenMesh::Decimater {
 
     // target found -> put vertex on heap
     if (collapse_target.is_valid()) {
-      //     std::clog << "  added|updated" << std::endl;
+          // std::clog << "  added|updated" << std::endl;
       mesh_.property(collapse_target_, _vh) = collapse_target;
       mesh_.property(priority_, _vh)        = best_prio;
 
@@ -184,7 +186,7 @@ namespace OpenMesh::Decimater {
 
     // not valid -> remove from heap
     else {
-      //     std::clog << "  n/a|removed" << std::endl;
+          // std::clog << "  n/a|removed" << std::endl;
       if (heap_->is_stored(_vh))
         heap_->remove(_vh);
 
@@ -270,24 +272,40 @@ namespace OpenMesh::Decimater {
       // Set collapsed position
       mesh_.point(ci.v1) = p_new;
 
-      if (update_normals)
-      {
-        // update triangle normals
+      // post-process collapse
+      this->postprocess_collapse(ci);
+
+      // update triangle normals
+      if (update_normals) {
         vf_it = mesh_.vf_iter(ci.v1);
         for (; vf_it.is_valid(); ++vf_it)
           if (!mesh_.status(*vf_it).deleted())
             mesh_.set_normal(*vf_it, mesh_.calc_face_normal(*vf_it));
       }
 
-      // post-process collapse
-      this->postprocess_collapse(ci);
+      // update heap; new vertex and surrounding supports needs refitting
+      heap_vertex(ci.v1);
+      for (auto vh : mesh_.vv_range(ci.v1)) {
+        met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
+        assert(!mesh_.status(vh).deleted());
+        if (!_only_selected  || mesh_.status(vh).selected() )
+          heap_vertex(vh);
+
+        // Given volume metric, support of support also needs refitting 
+        for (auto vh_ : mesh_.vv_range(vh)) {
+          guard_continue(vh_.idx() != vh.idx());
+          assert(!mesh_.status(vh_).deleted());
+          if (!_only_selected || mesh_.status(vh_).selected() )
+            heap_vertex(vh_);
+        }
+      }
 
       // update heap (former one ring of decimated vertex)
-      for (s_it = support.begin(), s_end = support.end(); s_it != s_end; ++s_it) {
+      /* for (s_it = support.begin(), s_end = support.end(); s_it != s_end; ++s_it) {
         assert(!mesh_.status(*s_it).deleted());
         if (!_only_selected  || mesh_.status(*s_it).selected() )
           heap_vertex(*s_it);
-      }
+      } */
 
       // notify observer and stop if the observer requests it
       if (!this->notify_observer(n_collapses))
@@ -389,6 +407,37 @@ namespace OpenMesh::Decimater {
       // post-process collapse
       this->postprocess_collapse(ci);
 
+      // Update heap (remaining, moved vertex and its one ring)
+      // heap_vertex(ci.v0);
+      heap_vertex(ci.v1);
+     /*  for (auto vh : mesh_.vv_range(ci.v1)) {
+        assert(!mesh_.status(vh).deleted());
+        if (!_only_selected  || mesh_.status(vh).selected() ) {
+          fmt::print("\theaping {}\n", vh.idx());
+          heap_vertex(vh);
+        }
+      }
+      for (auto vh : mesh_.vv_range(ci.v0)) {
+        met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
+        assert(!mesh_.status(vh).deleted());
+        if (!_only_selected  || mesh_.status(vh).selected() ) {
+          fmt::print("\theaping {}\n", vh.idx());
+          heap_vertex(vh);
+        }
+      } */
+      for (auto vh : mesh_.vv_range(ci.v1)) {
+        met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
+        assert(!mesh_.status(vh).deleted());
+        if (!_only_selected  || mesh_.status(vh).selected() )
+          heap_vertex(vh);
+        for (auto vh_ : mesh_.vv_range(ci.v1)) {
+          guard_continue(vh_.idx() != ci.v1.idx());
+          assert(!mesh_.status(vh_).deleted());
+          if (!_only_selected  || mesh_.status(vh_).selected() )
+            heap_vertex(vh_);
+        }
+      }
+
       // update heap (former one ring of decimated vertex)
       for (s_it = support.begin(), s_end = support.end(); s_it != s_end; ++s_it) {
         assert(!mesh_.status(*s_it).deleted());
@@ -429,7 +478,9 @@ namespace OpenMesh::Decimater {
   float ModVolumeT<MeshT>::collapse_priority(const CollapseInfoT<MeshT>& ci) {
     // Return pre-computed added volume, should this half-edge be collapsed
     auto volume = m_mesh.property(m_volume, ci.v0v1);
-    return volume >= 0.f ? volume : float(Base::ILLEGAL_COLLAPSE);
+    return (volume >= 0.f) 
+      ? volume 
+      : float(Base::ILLEGAL_COLLAPSE);
   }
   
   template <typename MeshT>
@@ -437,22 +488,21 @@ namespace OpenMesh::Decimater {
     // Assign volume-preserving position to remaining uncollapsed vertex position
     m_mesh.point(ci.v1) = m_mesh.property(m_vertex, ci.v0v1);
 
-    // fmt::print("Collapsed he {}, volume added {}\n", 
-      // ci.v0v1.idx(), m_mesh.property(m_volume, ci.v0v1));
+    // Rerun solve for each edge around affected vertex support
+    for (auto vh : m_mesh.vv_range(ci.v1)) {
+      for (auto eh : m_mesh.ve_range(vh)) {
+        // Relevant half-edges
+        auto v0v1 = eh.h0(), v1v0 = eh.h1();
 
-    // Rerun solve for each affected half-edge
-    // fmt::print("Re-solving for {}\n", m_mesh.ve_range(ci.v1).to_vector().size());
-    for (auto eh : m_mesh.ve_range(ci.v1)) {
-      // Relevant half-edges
-      auto v0v1 = eh.h0(), v1v0 = eh.h1();
+        // Solve for one half-edge, results should be identical for both
+        auto solve = detail::volume_solve(m_mesh, v0v1);
 
-      // Solve for one half-edge, results should be identical for both
-      auto solve = detail::volume_solve(m_mesh, v0v1);
-
-      std::tie(m_mesh.property(m_volume, v0v1), 
-               m_mesh.property(m_vertex, v0v1)) = solve;
-      std::tie(m_mesh.property(m_volume, v1v0), 
-               m_mesh.property(m_vertex, v1v0)) = solve;
+        // Store resulting volume/vertex in halfedge properties
+        std::tie(m_mesh.property(m_volume, v0v1), 
+                m_mesh.property(m_vertex, v0v1)) = solve;
+        std::tie(m_mesh.property(m_volume, v1v0), 
+                m_mesh.property(m_vertex, v1v0)) = solve;
+      }
     }
   }
 
