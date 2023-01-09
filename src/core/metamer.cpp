@@ -96,7 +96,7 @@ namespace met {
     constexpr uint N = wavelength_bases;
     const     uint M = 3 * csys_i.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
-    params.objective = LPObjective::eMinimize;
+    params.objective = LPObjective::eMaximize;
     params.method    = LPMethod::eDual;
     params.scaling   = true;
 
