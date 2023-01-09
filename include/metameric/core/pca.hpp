@@ -15,9 +15,6 @@ namespace met {
     return eigen_vectors(cov).rightCols(Components);
   }
 
-  // SMatrix pca(const std::vector<Spec> &spectra);
-  // std::vector<Spec> pca_components(const std::vector<Spec> &spectra);
-  
   eig::Matrix<float, 13, 16> orthogonal_complement(const CMFS &csys, const SMatrix &bases);
 
   template <uint N, uint M>

@@ -17,8 +17,7 @@
 
 namespace met {
   constexpr uint n_constraints = 4;  // Maximum nr. of secondary color constraints
-  constexpr uint n_samples     = 32; // Nr. of samples for OCS generation
-  constexpr uint n_subdivs     = 4;  // Nr. of subdivisions for input sphere
+  constexpr uint n_samples     = 64; // Nr. of samples for OCS generation
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -114,7 +113,8 @@ namespace met {
     }
 
     // Register resources to hold convex hull data for each vertex of the gamut shape
-    info.insert_resource("csol_data", std::vector<eig::AlArray3f>());
+    info.insert_resource("csol_data", std::vector<eig::Array3f>());
+    info.insert_resource("csol_data_al", std::vector<eig::AlArray3f>());
     info.insert_resource("csol_cntr", Colr(0.f));
   }
   
@@ -136,12 +136,13 @@ namespace met {
     bool is_sample = !e_samp_slct.empty();
 
     // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
-    auto &e_vert      = is_sample ? e_appl_data.project_data.sample_verts[e_samp_slct[0]]
-                                  : e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
-    auto &i_csol_data = info.get_resource<std::vector<eig::AlArray3f>>("csol_data");
-    auto &i_csol_cntr = info.get_resource<Colr>("csol_cntr");
+    auto &e_appl_data    = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data    = e_appl_data.project_data;
+    auto &e_vert         = is_sample ? e_appl_data.project_data.sample_verts[e_samp_slct[0]]
+                                    : e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
+    auto &i_csol_data    = info.get_resource<std::vector<Colr>>("csol_data");
+    auto &i_csol_data_al = info.get_resource<std::vector<AlColr>>("csol_data_al");
+    auto &i_csol_cntr    = info.get_resource<Colr>("csol_cntr");
 
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
@@ -158,16 +159,14 @@ namespace met {
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
     const auto &i_samples = info.get_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
 
-    // Generate points on metamer set boundary
+    // Generate points on metamer set boundary; store in aligned format
     auto basis  = e_appl_data.loaded_basis.rightCols(wavelength_bases);
-    auto points = generate_boundary_i(basis, cmfs_i, sign_i, cmfs_j, i_samples);
-
-    // Store in aligned format // TODO generate in aligned format, you numbskull
-    i_csol_data = std::vector<eig::AlArray3f>(range_iter(points));
+    i_csol_data = generate_boundary_i(basis, cmfs_i, sign_i, cmfs_j, i_samples);
+    i_csol_data_al = std::vector<AlColr>(range_iter(i_csol_data));
     
     // Compute center of metamer set boundary
     constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
     i_csol_cntr = std::reduce(std::execution::par_unseq, range_iter(i_csol_data), 
-      eig::AlArray3f(0.f), f_add) / static_cast<float>(i_csol_data.size());
+      Colr(0.f), f_add) / static_cast<float>(i_csol_data.size());
   }
 } // namespace met

@@ -687,13 +687,13 @@ namespace met {
   void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskEvalInfo &info) {
     met_trace_full();
         
-    // Get shared resources
     // Determine sample/gamut vertex selection
     auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_samp_slct = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
     bool is_sample = !e_samp_slct.empty();
     uint i = is_sample ? e_samp_slct[0] : e_vert_slct[0];
 
+    // Get shared resources
     auto &i_cstr_slct   = info.get_resource<int>("constr_selection");
     auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
     auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_color_solid_target");

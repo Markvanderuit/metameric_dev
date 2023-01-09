@@ -10,7 +10,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  constexpr uint n_sphere_subdivs  = 4;
+  constexpr uint n_sphere_subdivs  = 3;
 
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
@@ -141,11 +141,12 @@ namespace met {
                                     : (e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any);
     if (recreate_chull) {
       // Get color solid data, if available
-      auto &e_csol_data = info.get_resource<std::vector<eig::AlArray3f>>("gen_color_solids", "csol_data");
+      auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
       guard(!e_csol_data.empty());
 
       // Generate convex hull mesh and convert to buffer format
-      m_csolid_mesh = generate_convex_hull_approx<HalfedgeMeshTraits, eig::AlArray3f>(e_csol_data, m_sphere_mesh);
+      m_csolid_mesh = generate_convex_hull<HalfedgeMeshTraits, Colr>(e_csol_data);
+      // m_csolid_mesh = generate_convex_hull_approx<HalfedgeMeshTraits, Colr>(e_csol_data, m_sphere_mesh);
       auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(m_csolid_mesh);
 
       // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
@@ -167,7 +168,7 @@ namespace met {
     // Set OpenGL state for coming draw operations
     gl::state::set_viewport(m_color_buffer_ms.size());
     gl::state::set_point_size(8.f);
-    gl::state::set_op(gl::CullOp::eFront);
+    gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
@@ -177,18 +178,27 @@ namespace met {
     m_draw_program.uniform("u_model_matrix",  transl.matrix());
     m_draw_program.uniform("u_camera_matrix", e_arcball.full().matrix());  
 
-    // Dispatch mesh and point draw operations as follows;
-    // 1. Do a line draw of the full mesh
-    // 2. Do a face draw of the full mesh
-    // 3. Do a point draw of the mesh vertices
+    
+    // Dispatch line draw of the full mesh, such that it is etched over the entire structure
     {
-      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
-                                
+      // Capabilities set such that the framework is drawn over the entire mesh
+      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
+                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
+                                  
       gl::state::set_op(gl::DrawOp::eLine);
       gl::dispatch_draw(m_chull_dispatch);
+    }
+
+    // Dispatch mesh and point draw operations as follows;
+    // 1. Do a line draw of the full mesh
+    // 2. Do a point draw of the mesh vertices
+    {
+      // Capabilities set such that the front of the mesh is the only part that is drawn, and the back is blended in
+      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
+                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
+                                
       gl::state::set_op(gl::DrawOp::eFill);
-      m_draw_program.uniform("u_alpha", .66f);
+      m_draw_program.uniform("u_alpha", .75f);
       gl::dispatch_draw(m_chull_dispatch);
       m_draw_program.uniform("u_alpha", 1.f);
       gl::dispatch_draw(m_point_dispatch);
@@ -196,15 +206,16 @@ namespace met {
 
     // Dispatch point draw for the current constraint's positione
     {
+      // Capabilities set such that the framework is drawn over the entire mesh
+      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
+                                  gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
+
       // Update uniform data for upcoming draw
       m_cnstr_program.uniform("u_model_matrix",  transl.matrix());
       m_cnstr_program.uniform("u_camera_matrix", e_arcball.full().matrix());
       m_cnstr_program.uniform("u_position",      e_vert.colr_j[e_cstr_slct]);
       m_cnstr_program.uniform("u_aspect",        eig::Vector2f { 1.f, e_arcball.m_aspect });
 
-      // Dispatch draw call with depth test and culling disabled, so it overlays everything
-      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
-                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
       gl::dispatch_draw(m_cnstr_dispatch);
     }
 
