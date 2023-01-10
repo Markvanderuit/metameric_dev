@@ -19,6 +19,13 @@ namespace met {
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals);
   
+  struct GenerateOCSBoundaryInfo {
+    CMFS                   system; // Color system spectra describing the expected gamut
+    std::span<const Colr> samples; // Random unit vector samples in 3 dimensions
+  };
+
+  std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info);
+
   std::vector<Colr> generate_boundary_i(const BBasis &basis,
                                        std::span<const CMFS> systems_i,
                                        std::span<const Colr> signals_i,

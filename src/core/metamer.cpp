@@ -76,6 +76,20 @@ namespace met {
     BSpec maxv = lp_solve(params).cast<float>();
     return basis * 0.5f * (minv + maxv);
   }
+
+  std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {
+    std::vector<Colr> out(info.samples.size());
+
+    std::transform(std::execution::par_unseq, range_iter(info.samples), out.begin(), [&](const Colr &sample) {
+      Spec s = (info.system * sample.matrix()).eval();
+      for (auto &f : s)
+        f = f >= 0.f ? 1.f : 0.f;
+      return (info.system.transpose() * s.matrix()).eval();
+    });
+
+    return out;
+  }
+
   
   std::vector<Colr> generate_boundary_i(const BBasis &basis,
                                         std::span<const CMFS> systems_i,
