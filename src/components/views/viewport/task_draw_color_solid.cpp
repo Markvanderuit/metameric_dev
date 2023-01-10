@@ -147,7 +147,7 @@ namespace met {
       // Generate convex hull mesh and convert to buffer format
       m_csolid_mesh = generate_convex_hull<HalfedgeMeshTraits, Colr>(e_csol_data);
       // m_csolid_mesh = generate_convex_hull_approx<HalfedgeMeshTraits, Colr>(e_csol_data, m_sphere_mesh);
-      auto [verts, elems] = generate_data<HalfedgeMeshTraits, eig::AlArray3f>(m_csolid_mesh);
+      auto [verts, elems] = generate_data<HalfedgeMeshTraits, AlColr>(m_csolid_mesh);
 
       // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
       m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
@@ -178,7 +178,6 @@ namespace met {
     m_draw_program.uniform("u_model_matrix",  transl.matrix());
     m_draw_program.uniform("u_camera_matrix", e_arcball.full().matrix());  
 
-    
     // Dispatch line draw of the full mesh, such that it is etched over the entire structure
     {
       // Capabilities set such that the framework is drawn over the entire mesh

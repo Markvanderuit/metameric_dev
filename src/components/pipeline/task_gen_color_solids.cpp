@@ -1,6 +1,7 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
@@ -16,8 +17,9 @@
 #include <unordered_map>
 
 namespace met {
-  constexpr uint n_constraints = 4;  // Maximum nr. of secondary color constraints
-  constexpr uint n_samples     = 64; // Nr. of samples for OCS generation
+  constexpr uint n_samples_ocs = 128; // Nr. of samples for color system OCS generation
+  constexpr uint n_samples_mmv = 64;  // Nr. of samples for metamer mismatch volume OCS generation
+  constexpr uint n_constraints = 4;   // Maximum nr. of secondary color constraints
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -106,15 +108,26 @@ namespace met {
   void GenColorSolidsTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
+    // Ger shared resources
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
     for (uint i = 1; i <= n_constraints; ++i) {
       const uint dims = 3 + 3 * i;
-      info.insert_resource(fmt::format("samples_{}", i), detail::gen_unit_dirs_x(n_samples, dims));
+      info.insert_resource(fmt::format("samples_{}", i), detail::gen_unit_dirs_x(n_samples_mmv, dims));
     }
 
-    // Register resources to hold convex hull data for each vertex of the gamut shape
-    info.insert_resource("csol_data", std::vector<eig::Array3f>());
-    info.insert_resource("csol_data_al", std::vector<eig::AlArray3f>());
+    // Register resources to hold convex hull data for a primary color system OCS
+    auto csys_ocs = generate_ocs_boundary({ .system = e_proj_data.csys(0).finalize(), 
+                                            .samples = detail::gen_unit_dirs<3>(n_samples_ocs) });
+    auto csys_ocs_mesh = generate_convex_hull<HalfedgeMeshTraits, Colr>(csys_ocs);
+    info.insert_resource("csys_ocs_data", std::move(csys_ocs));
+    info.insert_resource("csys_ocs_mesh", std::move(csys_ocs_mesh));
+
+    // Register resources to hold convex hull data for a metamer mismatch volume OCS
+    info.insert_resource("csol_data", std::vector<Colr>());
+    info.insert_resource("csol_data_al", std::vector<AlColr>());
     info.insert_resource("csol_cntr", Colr(0.f));
   }
   
