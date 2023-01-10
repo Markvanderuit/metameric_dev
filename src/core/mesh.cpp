@@ -162,8 +162,6 @@ namespace met {
       out_verts[i] = { v.x, v.y, v.z };
     }
 
-    // std::ranges::copy(verts, cnt_span<Vector3f>(out_verts));
-
     std::vector<eig::Array3u> out_elems(elems.size() / 3);
     for (uint i = 0; i < elems.size() / 3; ++i)
       out_elems[i] = { static_cast<uint>(elems[3 * i]),  
@@ -185,7 +183,6 @@ namespace met {
 
     QuickHull<float> builder;
     auto chull = builder.getConvexHull(vector_span.data(), vector_span.size(), true, false);
-
     const auto& elems = chull.getIndexBuffer();
     const auto& verts = chull.getVertexBuffer();
 
@@ -194,8 +191,6 @@ namespace met {
       auto v = verts[i];
       out_verts[i] = { v.x, v.y, v.z };
     }
-
-    // std::ranges::copy(verts, cnt_span<Vector3f>(out_verts));
 
     std::vector<eig::Array3u> out_elems(elems.size() / 3);
     for (uint i = 0; i < elems.size() / 3; ++i)
