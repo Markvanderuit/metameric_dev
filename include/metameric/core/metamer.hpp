@@ -6,7 +6,7 @@
 #include <metameric/core/texture.hpp>
 
 namespace met {
-  constexpr static uint wavelength_bases  = 12;
+  constexpr static uint wavelength_bases  = 14;
   constexpr static uint wavelength_blacks = wavelength_bases - 3;
 
   using BBasis = eig::Matrix<float, wavelength_samples, wavelength_bases>;

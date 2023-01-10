@@ -17,9 +17,9 @@
 #include <unordered_map>
 
 namespace met {
-  constexpr uint n_samples_ocs = 128; // Nr. of samples for color system OCS generation
-  constexpr uint n_samples_mmv = 64;  // Nr. of samples for metamer mismatch volume OCS generation
-  constexpr uint n_constraints = 4;   // Maximum nr. of secondary color constraints
+  constexpr uint n_samples_ocs = 4096; // Nr. of samples for color system OCS generation
+  constexpr uint n_samples_mmv = 64;   // Nr. of samples for metamer mismatch volume OCS generation
+  constexpr uint n_constraints = 4;    // Maximum nr. of secondary color constraints
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -121,9 +121,17 @@ namespace met {
     // Register resources to hold convex hull data for a primary color system OCS
     auto csys_ocs = generate_ocs_boundary({ .system = e_proj_data.csys(0).finalize(), 
                                             .samples = detail::gen_unit_dirs<3>(n_samples_ocs) });
-    auto csys_ocs_mesh = generate_convex_hull<HalfedgeMeshTraits, Colr>(csys_ocs);
+    auto csys_ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(csys_ocs), 0.001f);
+
+    // Compute center of convex hull
+    constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };
+    auto csys_ocs_cntr = std::reduce(std::execution::par_unseq, 
+      csys_ocs_mesh.points(), csys_ocs_mesh.points() + csys_ocs_mesh.n_vertices(),
+      omesh::Vec3f(0.f), f_add) / static_cast<float>(csys_ocs_mesh.n_vertices());
+    
     info.insert_resource("csys_ocs_data", std::move(csys_ocs));
     info.insert_resource("csys_ocs_mesh", std::move(csys_ocs_mesh));
+    info.insert_resource("csys_ocs_cntr", to_eig<float, 3>(csys_ocs_cntr));
 
     // Register resources to hold convex hull data for a metamer mismatch volume OCS
     info.insert_resource("csol_data", std::vector<Colr>());

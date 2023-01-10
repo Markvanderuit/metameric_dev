@@ -154,7 +154,7 @@ namespace met {
       // Register gizmo use
       if (ImGuizmo::IsUsing())
         std::ranges::for_each(selected_verts, [&](auto &v) { 
-          v.colr_i = (trf_delta * v.colr_i.matrix()).array().min(1.f).max(0.f);
+          v.colr_i = (trf_delta * v.colr_i.matrix());
         });
 
       // Register gizmo use end, update to new vertex positions

@@ -231,6 +231,33 @@ namespace met {
     return mesh;
   }
 
+  
+  template <typename Traits>
+  TriMesh<Traits> simplify_edges(const TriMesh<Traits> &input_mesh, float max_edge_length) {
+    met_trace();
+
+    namespace odec  = omesh::Decimater;
+    using Mesh      = TriMesh<Traits>;
+    using Module    = odec::ModEdgeLengthT<Mesh>::Handle;
+    using Decimater = odec::DecimaterT<Mesh>;
+
+    Mesh mesh = input_mesh;
+
+    Decimater dec(mesh);
+    Module mod_edge_len;
+
+    dec.add(mod_edge_len);
+    dec.module(mod_edge_len).set_binary(false);
+    dec.module(mod_edge_len).set_edge_length(0.005f); // not zero, but just up to reasonable precision
+
+    dec.initialize();
+    dec.decimate();
+
+    mesh.garbage_collection();
+    
+    return mesh;
+  }
+
   template <typename Traits>
   TriMesh<Traits> simplify(const TriMesh<Traits> &input_mesh, uint max_vertices) {
     met_trace();
@@ -241,9 +268,6 @@ namespace met {
     // Operate on a copy of the input mesh
     Mesh mesh = input_mesh;
     
-    Prop volume_prop;
-    mesh.add_property(volume_prop);
-
     // First, quickly collapse all very short edges into their average to a hardcoded minimum;
     // given that convex hull generation is relatively accurate, this likely does not affect anything
     fmt::print("Begin length collapse: {}\n", mesh.n_vertices());
@@ -356,6 +380,12 @@ namespace met {
   FNormalMesh simplify<FNormalMeshTraits>(const FNormalMesh &, uint);
   template
   HalfedgeMesh simplify<HalfedgeMeshTraits>(const HalfedgeMesh &, uint);
+  template
+  BaselineMesh simplify_edges<BaselineMeshTraits>(const BaselineMesh &, float);
+  template
+  FNormalMesh simplify_edges<FNormalMeshTraits>(const FNormalMesh &, float);
+  template
+  HalfedgeMesh simplify_edges<HalfedgeMeshTraits>(const HalfedgeMesh &, float);
 
   /* // Generate barycentric weights
   template

@@ -107,6 +107,8 @@ namespace met {
       std::vector<Colr> signals(1 + vert.colr_j.size());
       signals[0] = vert.colr_i;
       std::ranges::copy(vert.colr_j, signals.begin() + 1);
+      // std::ranges::transform(vert.colr_j, signals.begin() + 1,
+      //   [](const Colr &c) { return c.max(0.f).min(1.f).eval(); });
 
       // Generate new spectrum given the above systems+signals as solver constraints
       i_specs[i] = generate(basis, systems, signals);

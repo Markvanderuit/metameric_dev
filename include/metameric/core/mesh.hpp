@@ -55,6 +55,9 @@ namespace met {
   template <typename Traits>
   TriMesh<Traits> simplify(const TriMesh<Traits> &mesh, uint max_vertices);
 
+  template <typename Traits>
+  TriMesh<Traits> simplify_edges(const TriMesh<Traits> &mesh, float max_edge_length);
+
   template <typename Traits, typename T = eig::AlArray3f>
   TriMesh<Traits> generate_convex_hull(std::span<const T> points);
   
