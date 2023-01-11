@@ -6,7 +6,7 @@
 #include <metameric/core/texture.hpp>
 
 namespace met {
-  constexpr static uint wavelength_bases  = 14;
+  constexpr static uint wavelength_bases  = 12;
   constexpr static uint wavelength_blacks = wavelength_bases - 3;
 
   using BBasis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
@@ -15,11 +15,21 @@ namespace met {
   using BSpec  = eig::Matrix<float, wavelength_bases, 1>;
   using WSpec  = eig::Matrix<float, barycentric_weights, 1>;
 
+  struct GenerateSpectrumInfo {
+    BBasis                 &basis;   // Spectral basis functions
+    std::span<const CMFS> systems;  // Color systems in which signals are available
+    std::span<const Colr> signals;  // Signal samples in their respective color systems
+    bool impose_boundedness = true; // Impose boundedness cosntraints
+  };
+
+  Spec generate_spectrum(GenerateSpectrumInfo info);
+
   Spec generate(const BBasis         &basis,
                 std::span<const CMFS> systems,
                 std::span<const Colr> signals);
   
   struct GenerateOCSBoundaryInfo {
+    BBasis                &basis;  // Spectral basis functions
     CMFS                   system; // Color system spectra describing the expected gamut
     std::span<const Colr> samples; // Random unit vector samples in 3 dimensions
   };

@@ -87,7 +87,7 @@ namespace met {
       m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
     }
 
-    auto basis = e_appl_data.loaded_basis.rightCols(wavelength_bases);
+    BBasis basis = e_appl_data.loaded_basis.rightCols(wavelength_bases);
 
     // Generate spectra at gamut color positions in parallel
     #pragma omp parallel for
@@ -107,11 +107,47 @@ namespace met {
       std::vector<Colr> signals(1 + vert.colr_j.size());
       signals[0] = vert.colr_i;
       std::ranges::copy(vert.colr_j, signals.begin() + 1);
-      // std::ranges::transform(vert.colr_j, signals.begin() + 1,
-      //   [](const Colr &c) { return c.max(0.f).min(1.f).eval(); });
 
       // Generate new spectrum given the above systems+signals as solver constraints
-      i_specs[i] = generate(basis, systems, signals);
+      i_specs[i] = generate_spectrum({ 
+        .basis = basis, 
+        .systems = std::span<CMFS> { systems }, 
+        .signals = std::span<Colr> { signals }
+      });
+
+     /*  // Test relative roundtrip error to base vertex
+      Colr colr_i_roundtrip = systems[0].transpose() * i_specs[i].matrix();
+      Colr colr_i_error = vert.colr_i - colr_i_roundtrip;
+      guard_continue(!colr_i_error.isZero());
+
+      // Generate unbounded spectrum
+      Spec spec_i_unbounded = generate_spectrum({ 
+        .basis = basis, 
+        .systems = std::span<CMFS> { systems }, 
+        .signals = std::span<Colr> { signals },
+        .impose_boundedness = false 
+      });
+
+      // Search for mixture of the two generated metamers that minimizes error while being bounded
+      float best_err = colr_i_error.abs().sum();
+      Spec best_spec = i_specs[i];
+      for (float f = 0.f; f < 1.f; f += 0.01f) {
+        Spec s = ((1.f - f) * i_specs[i] + f * spec_i_unbounded).max(0.f).min(1.f).eval();
+        float s_err = (vert.colr_i - (systems[0].transpose() * s.matrix()).array()).abs().sum();
+        if (s_err < best_err) {
+          best_err = s_err;
+          best_spec = s;
+        }
+      }
+      if (best_err != colr_i_error.abs().sum()) {
+        fmt::print("{} -> {}\n", colr_i_error.abs().sum(), best_err);
+        i_specs[i] = best_spec;
+      } */
+
+      // Colr spec_i_roundtrip = systems[0].transpose() * spec_i_error.matrix();
+      
+      // fmt::print("error = {}, subtractive error = {}\n", colr_i_error, spec_i_roundtrip);
+      // i_specs[i] = (i_specs[i] + spec_i_error).max(0.f).min(1.f).eval();
     }
 
     // Describe ranges over stale gamut vertices/elements

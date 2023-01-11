@@ -39,42 +39,43 @@ namespace met {
     }
   } // namespace detail
 
-  Spec generate(const BBasis         &basis,
-                std::span<const CMFS> systems,
-                std::span<const Colr> signals) {
+  Spec generate_spectrum(GenerateSpectrumInfo info) {
     met_trace();
-    debug::check_expr_dbg(systems.size() == signals.size(),
+    debug::check_expr_dbg(info.systems.size() == info.signals.size(),
                           "Color system size not equal to color signal size");
 
     // Initialize parameter object for LP solver with expected matrix sizes M, N
     constexpr uint N = wavelength_bases;
-    const     uint M = 3 * systems.size() + 2 * wavelength_samples;
+    const     uint M = 3 * info.systems.size() 
+                     + (info.impose_boundedness ? 2 * wavelength_samples : 0);
     LPParameters params(M, N);
     params.method  = LPMethod::ePrimal;
     params.scaling = true;
 
     // Add constraints to ensure resulting spectra produce the given color signals
-    for (uint i = 0; i < systems.size(); ++i) {
-      params.A.block<3, N>(3 * i, 0) = (systems[i].transpose() * basis).cast<double>().eval();
-      params.b.block<3, 1>(3 * i, 0) = signals[i].cast<double>().eval();
+    for (uint i = 0; i < info.systems.size(); ++i) {
+      params.A.block<3, N>(3 * i, 0) = (info.systems[i].transpose() * info.basis).cast<double>().eval();
+      params.b.block<3, 1>(3 * i, 0) = info.signals[i].cast<double>().eval();
     }
 
     // Add constraints to ensure resulting spectra are bounded to [0, 1]
-    const uint offs_l = 3 * systems.size();
-    const uint offs_u = offs_l + wavelength_samples;
-    params.A.block<wavelength_samples, N>(offs_l, 0) = basis.cast<double>().eval();
-    params.A.block<wavelength_samples, N>(offs_u, 0) = basis.cast<double>().eval();
-    params.b.block<wavelength_samples, 1>(offs_l, 0) = 0.0;
-    params.b.block<wavelength_samples, 1>(offs_u, 0) = 1.0;
-    params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
-    params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
+    if (info.impose_boundedness) {
+      const uint offs_l = 3 * info.systems.size();
+      const uint offs_u = offs_l + wavelength_samples;
+      params.A.block<wavelength_samples, N>(offs_l, 0) = info.basis.cast<double>().eval();
+      params.A.block<wavelength_samples, N>(offs_u, 0) = info.basis.cast<double>().eval();
+      params.b.block<wavelength_samples, 1>(offs_l, 0) = 0.0;
+      params.b.block<wavelength_samples, 1>(offs_u, 0) = 1.0;
+      params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
+      params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
+    }
 
     // Solve for minimized/maximized results and take average
     params.objective = LPObjective::eMinimize;
     BSpec minv = lp_solve(params).cast<float>();
     params.objective = LPObjective::eMaximize;
     BSpec maxv = lp_solve(params).cast<float>();
-    return basis * 0.5f * (minv + maxv);
+    return info.basis * 0.5f * (minv + maxv);
   }
 
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {
@@ -84,12 +85,20 @@ namespace met {
       Spec s = (info.system * sample.matrix()).eval();
       for (auto &f : s)
         f = f >= 0.f ? 1.f : 0.f;
-      return (info.system.transpose() * s.matrix()).eval();
+
+      // Find nearest generalized spectrum that fits within the basis function approach
+      Spec s_ = generate_spectrum({
+        .basis = info.basis,
+        .systems = std::vector<CMFS> { info.system },
+        .signals = std::vector<Colr> { (info.system.transpose() * s.matrix()).eval() }
+      });
+
+      return (info.system.transpose() * s_.matrix()).eval();
+      // return (info.system.transpose() * s.matrix()).eval();
     });
 
     return out;
   }
-
   
   std::vector<Colr> generate_boundary_i(const BBasis &basis,
                                         std::span<const CMFS> systems_i,

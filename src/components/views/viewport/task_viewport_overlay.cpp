@@ -222,7 +222,7 @@ namespace met {
       edit3_width = ImGui::GetContentRegionAvail().x * .485f;
       ImGui::BeginGroup();
 
-      ColrSystem mapp    = e_proj_data.csys(e_vert.csys_i);
+      ColrSystem mapp = e_proj_data.csys(e_vert.csys_i);
       Colr colr_i  = e_vert.colr_i;
       Colr rtrip_i = mapp.apply_color(e_spec);
       Colr error_i = (rtrip_i - colr_i).abs().eval();
