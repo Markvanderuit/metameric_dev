@@ -19,7 +19,8 @@ option(met_enable_tracy          "Enable Tracy support"               ON)
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN      400) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX      700) # Maximum wavelength of spectral range
-set(MET_WAVELENGTH_SAMPLES   31) # Nr. of bins discretizing spectral range
+set(MET_WAVELENGTH_SAMPLES   31) # Nr. of bins used in discrete spectral representations
+set(MET_WAVELENGTH_BASES     12) # Nr. of basis functions used in generative functions
 set(MET_BARYCENTRIC_WEIGHTS  16) # Maximum nr. of barycentric weights supported
 
 # Specify output directories as /bin and /lib
@@ -89,6 +90,7 @@ message(STATUS "Metameric : Tracy support       = ${met_enable_tracy}")
 message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
+message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 message(STATUS "Metameric : Barycentric weights = ${MET_BARYCENTRIC_WEIGHTS}")
 
 # Find glslLangValidator program on system
@@ -112,6 +114,7 @@ string(CONCAT glsl_parser_arg_string
   "MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN},"
   "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
   "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES},"
+  "MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES},"
   "MET_BARYCENTRIC_WEIGHTS=${MET_BARYCENTRIC_WEIGHTS}"
 )
 
@@ -261,6 +264,7 @@ target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN}
   MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX}
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
+  MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES}
   MET_BARYCENTRIC_WEIGHTS=${MET_BARYCENTRIC_WEIGHTS}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc

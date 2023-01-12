@@ -1,48 +1,37 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
-#include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/texture.hpp>
 
 namespace met {
-  constexpr static uint wavelength_bases  = 12;
-  constexpr static uint wavelength_blacks = wavelength_bases - 3;
-
-  using BBasis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
-  using BBlack = eig::Matrix<float, wavelength_bases, wavelength_blacks>;
-  using BCMFS  = eig::Matrix<float, wavelength_bases, 3>;
-  using BSpec  = eig::Matrix<float, wavelength_bases, 1>;
-  using WSpec  = eig::Matrix<float, barycentric_weights, 1>;
-
+  /* Info struct for generation of a spectral reflectance, given color signals and color systems */
   struct GenerateSpectrumInfo {
-    BBasis                 &basis;   // Spectral basis functions
+    Basis                 &basis;  // Spectral basis functions
     std::span<const CMFS> systems;  // Color systems in which signals are available
     std::span<const Colr> signals;  // Signal samples in their respective color systems
     bool impose_boundedness = true; // Impose boundedness cosntraints
   };
-
-  Spec generate_spectrum(GenerateSpectrumInfo info);
-
-  Spec generate(const BBasis         &basis,
-                std::span<const CMFS> systems,
-                std::span<const Colr> signals);
   
+  /* Info struct for sampling-based generation of points on the object color solid of a color system */
   struct GenerateOCSBoundaryInfo {
-    BBasis                &basis;  // Spectral basis functions
+    Basis                &basis;  // Spectral basis functions
     CMFS                   system; // Color system spectra describing the expected gamut
     std::span<const Colr> samples; // Random unit vector samples in 3 dimensions
   };
 
+  /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
+  struct GenerateMismatchBoundaryInfo {
+    Basis                        &basis;     // Spectral basis functions
+    std::span<const CMFS>          systems_i; // Color system spectra for prior color signals
+    std::span<const Colr>          signals_i; // Color signals for prior constraints
+    const CMFS                    &system_j;  // Color system for mismatching region
+    std::span<const eig::ArrayXf>  samples;   // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
+  };
+
+  // Corresponding functions to above generate objects
+  Spec generate_spectrum(GenerateSpectrumInfo info);
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info);
-
-  std::vector<Colr> generate_boundary_i(const BBasis &basis,
-                                       std::span<const CMFS> systems_i,
-                                       std::span<const Colr> signals_i,
-                                       const CMFS &system_j,
-                                       std::span<const eig::ArrayXf> samples);
-
-  using Wght = std::vector<float>;
+  std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info);
 
   /* Info struct for simplified, unbounded generation of a gamut, given spectral information */
   struct GenerateGamutSimpleInfo {
@@ -53,7 +42,7 @@ namespace met {
 
   /* Info struct for generation of a gamut, given spectral information */
   struct GenerateGamutSpectrumInfo {
-    BBasis            &basis;   // Spectral basis functions
+    Basis            &basis;   // Spectral basis functions
     CMFS               system;  // Color system spectra describing the expected gamut
     std::vector<Colr>  gamut;   // Approximate color coordinates of the expected gamut
     std::vector<WSpec> weights; // Approximate barycentric coordinates inside the expected gamut
@@ -68,7 +57,7 @@ namespace met {
       uint  syst_i; // Color system index for this given color signal
     };
 
-    BBasis             &basis;   // Spectral basis functions
+    Basis             &basis;   // Spectral basis functions
     std::vector<Colr>   gamut;   // Known gamut
     std::vector<CMFS>   systems; // Color systems
     std::vector<Signal> signals; // Color signals and corresponding information

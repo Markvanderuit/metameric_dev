@@ -5,9 +5,10 @@
 
 namespace met {
   /* Define metameric's spectral range layout */
-  constexpr static float wavelength_min      = MET_WAVELENGTH_MIN;  
+  constexpr static float wavelength_min      = MET_WAVELENGTH_MIN;
   constexpr static float wavelength_max      = MET_WAVELENGTH_MAX;  
   constexpr static uint  wavelength_samples  = MET_WAVELENGTH_SAMPLES;
+  constexpr static uint  wavelength_bases    = MET_WAVELENGTH_BASES;
   constexpr static uint  barycentric_weights = MET_BARYCENTRIC_WEIGHTS;
 
   /* Define derived variables from metameric's spectral range layout */
@@ -28,6 +29,11 @@ namespace met {
   /* Forcibly aligned types */
   using AlSpec = eig::AlArray<float, wavelength_samples>;
   using AlColr = eig::AlArray<float, 3>;
+
+  /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
+  using Basis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
+  using BSpec = eig::Matrix<float, wavelength_bases, 1>;
+  using WSpec = eig::Matrix<float, barycentric_weights, 1>;
   
   /* Define pre-included color matching functions, SPD models, etc. */
   namespace models {

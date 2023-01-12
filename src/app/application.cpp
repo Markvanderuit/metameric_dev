@@ -84,7 +84,7 @@ namespace met {
         pca_input[i] = internal_sd[128 * i];
 
       // Obtain and store basis functions
-      auto basis = eigen_vectors(covariance_matrix(pca_input));
+      Basis basis = eigen_vectors(covariance_matrix(pca_input)).rightCols(wavelength_bases);
       scheduler.get_resource<ApplicationData>(global_key, "app_data").loaded_basis = basis;
     }
   } // namespace detail                          
@@ -117,7 +117,7 @@ namespace met {
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
 
-    ImGui::Init(window, info.color_mode == ApplicationColorMode::eDark);
+    ImGui::Init(window, info.color_mode == AppColorMode::eDark);
     
     // Initialize major application components on startup
     detail::init_parser(scheduler);

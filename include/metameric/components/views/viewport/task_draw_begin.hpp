@@ -47,7 +47,7 @@ namespace met {
         i_frame_buffer    = {{ .type = gl::FramebufferType::eColor, .attachment = &e_lrgb_target }};
       }
 
-      eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+      eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                               ? eig::Array4f { 0, 0, 0, 1 } 
                               : ImGui::GetStyleColorVec4(ImGuiCol_ChildBg);
 

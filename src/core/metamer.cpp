@@ -100,20 +100,16 @@ namespace met {
     return out;
   }
   
-  std::vector<Colr> generate_boundary_i(const BBasis &basis,
-                                        std::span<const CMFS> systems_i,
-                                        std::span<const Colr> signals_i,
-                                        const CMFS &system_j,
-                                        std::span<const eig::ArrayXf> samples) {
+  std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info) {
     met_trace();
 
     using Syst = eig::Matrix<float, 3, wavelength_bases>;
     
     // Generate color system spectra for basis function parameters
-    auto csys_j = (system_j.transpose() * basis).eval();
-    auto csys_i = std::vector<Syst>(systems_i.size());
-    std::ranges::transform(systems_i, csys_i.begin(),
-      [&](const auto &m) { return (m.transpose() * basis).eval(); });    
+    auto csys_j = (info.system_j.transpose() * info.basis).eval();
+    auto csys_i = std::vector<Syst>(info.systems_i.size());
+    std::ranges::transform(info.systems_i, csys_i.begin(),
+      [&](const auto &m) { return (m.transpose() * info.basis).eval(); });    
 
     // Initialize parameter object for LP solver, given expected matrix sizes
     constexpr uint N = wavelength_bases;
@@ -126,12 +122,12 @@ namespace met {
     // Add color system constraints
     for (uint i = 0; i < csys_i.size(); ++i) {
       params.A.block<3, N>(3 * i, 0) = csys_i[i].cast<double>();
-      params.b.block<3, 1>(3 * i, 0) = signals_i[i].cast<double>();
+      params.b.block<3, 1>(3 * i, 0) = info.signals_i[i].cast<double>();
     }
 
     // Add [0, 1] bounds constraints
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = basis.cast<double>();
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = basis.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = info.basis.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = info.basis.cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = Spec(0.0).cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = Spec(1.0).cast<double>();
     params.r.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = LPCompare::eGE;
@@ -147,15 +143,15 @@ namespace met {
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
     // Define return object
-    std::vector<Colr> output(samples.size());
+    std::vector<Colr> output(info.samples.size());
 
     // Parallel solve for basis function weights defining OCS boundary spectra
     #pragma omp parallel
     {
       LPParameters local_params = params;
       #pragma omp for
-      for (int i = 0; i < samples.size(); ++i) {
-        local_params.C = (U * samples[i].matrix()).cast<double>().eval();
+      for (int i = 0; i < info.samples.size(); ++i) {
+        local_params.C = (U * info.samples[i].matrix()).cast<double>().eval();
         BSpec w = lp_solve(local_params).cast<float>().eval();
         output[i] = csys_j * w;
       }
@@ -349,14 +345,8 @@ namespace met {
 
     // Obtain basis function weights from solution and compute resulting spectra
     std::vector<Spec> out(n_bary);
-    for (uint i = 0; i < n_bary; ++i) {
-      out[i] = (1.f * (
-        info.basis * BSpec(x_min.block<n_base, 1>(n_base * i, 0))
-        //  + 
-        // info.basis * BSpec(x_max.block<n_base, 1>(n_base * i, 0))
-      )).cwiseMax(0.f).cwiseMin(1.f).eval();
-    }
-    
+    for (uint i = 0; i < n_bary; ++i)
+      out[i] = (info.basis * BSpec(x_min.block<n_base, 1>(n_base * i, 0))).cwiseMax(0.f).cwiseMin(1.f).eval();
     return out;
   }
 } // namespace met

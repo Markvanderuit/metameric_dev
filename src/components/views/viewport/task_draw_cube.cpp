@@ -58,7 +58,7 @@ namespace met {
       .bindable_program = &m_program
     };
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                             ? 1
                             : eig::Array4f { 0, 0, 0, 1 };
                             

@@ -86,9 +86,7 @@ namespace met {
       m_elem_map = cast_span<eig::AlArray3u>(i_elem_buffer.map(buffer_access_flags));
       m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
     }
-
-    BBasis basis = e_appl_data.loaded_basis.rightCols(wavelength_bases);
-
+    
     // Generate spectra at gamut color positions in parallel
     #pragma omp parallel for
     for (int i = 0; i < i_specs.size(); ++i) {
@@ -110,7 +108,7 @@ namespace met {
 
       // Generate new spectrum given the above systems+signals as solver constraints
       i_specs[i] = generate_spectrum({ 
-        .basis = basis, 
+        .basis = e_appl_data.loaded_basis, 
         .systems = std::span<CMFS> { systems }, 
         .signals = std::span<Colr> { signals }
       });

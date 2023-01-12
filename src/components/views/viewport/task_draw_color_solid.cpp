@@ -82,7 +82,7 @@ namespace met {
     // Create sampler object used in gamma correction step
     m_srgb_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                             ? 1
                             : eig::Array4f { 0, 0, 0, 1 };
 
@@ -156,7 +156,7 @@ namespace met {
       m_point_dispatch.vertex_count = verts.size();
     }
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                             ? eig::Array4f { 0, 0, 0, 1 } 
                             : ImGui::GetStyleColorVec4(ImGuiCol_ChildBg);
                             

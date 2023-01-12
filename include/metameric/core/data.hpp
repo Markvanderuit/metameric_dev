@@ -10,6 +10,9 @@
 #include <vector>
 
 namespace met {
+  /* Color states in which application can exist */
+  enum class AppColorMode { eDark, eLight };
+
   /* Save states in which project data can exist */
   enum class SaveFlag {
     eUnloaded, // Project is not currently loaded
@@ -18,6 +21,7 @@ namespace met {
     eUnsaved,  // Project has previous save, and has been modified
   };
 
+  /* Wrapper object to hold information for project instantiation */
   struct ProjectCreateInfo {
     struct ImageData {
       Texture2d3f image;
@@ -74,11 +78,6 @@ namespace met {
     std::string csys_name(CSys m) const { return fmt::format("{}, {}", cmfs[m.cmfs].first, illuminants[m.illuminant].first); }
   };
 
-  enum class ApplicationColorMode {
-    eDark,
-    eLight
-  };
-
   /* Wrapper to hold all major application data */
   struct ApplicationData {
   public: /* public data */
@@ -88,9 +87,9 @@ namespace met {
     SaveFlag    project_save = SaveFlag::eUnloaded; 
 
     // Unsaved application data
-    Texture2d3f loaded_texture; // Primary RGB texture image extracted from project data
-    BMatrixType loaded_basis;   // Spectral basis functions obtained through PCA
-    ApplicationColorMode color_mode; // Application theming
+    Texture2d3f  loaded_texture; // Primary RGB texture image extracted from project data
+    Basis        loaded_basis;   // Set of basis functions obtained through PCA of measured spectra
+    AppColorMode color_mode;     // Application theming
 
   public: /* public create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object

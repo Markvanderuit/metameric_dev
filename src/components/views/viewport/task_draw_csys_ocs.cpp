@@ -42,7 +42,7 @@ namespace met {
     };
 
     // Setup relevant, non-changing uniforms
-    m_program.uniform("u_alpha", .5f);
+    m_program.uniform("u_alpha", .1f);
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
   }
 
@@ -92,16 +92,27 @@ namespace met {
     gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
-                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
-                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
-                               gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false) };
+                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
     
     // Update varying program uniforms
     m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
 
-    // Submit draw information
-    gl::state::set_op(gl::DrawOp::eLine);
-    gl::dispatch_draw(m_draw);
-    gl::state::set_op(gl::DrawOp::eFill);
+    // Submit line draw information
+    {
+      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
+                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false) };
+      m_program.uniform("u_alpha", .25f);
+      gl::state::set_op(gl::DrawOp::eLine);
+      gl::dispatch_draw(m_draw);
+    }
+
+    // Submit face draw information
+    {
+      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false),
+                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true) };
+      m_program.uniform("u_alpha", .01f);
+      gl::state::set_op(gl::DrawOp::eFill);
+      gl::dispatch_draw(m_draw);
+    }
   }
 } // namespace met

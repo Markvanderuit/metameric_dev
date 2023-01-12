@@ -202,13 +202,12 @@ namespace met {
 
       /* 2. Solve for a spectral gamut which satisfies the provided input*/
       bool solve_using_constraints = true;
-      BBasis basis = loaded_basis.rightCols(wavelength_bases);
       if (solve_using_constraints) {
         auto t_start = std::chrono::steady_clock::now();
 
         // Solve using image constraints directly
         GenerateGamutConstraintInfo info = {
-          .basis   = basis,
+          .basis   = loaded_basis,
           .gamut   = verts,
           .systems = std::vector<CMFS>(project_data.color_systems.size()),
           .signals = std::vector<GenerateGamutConstraintInfo::Signal>(n_samples)
@@ -254,12 +253,16 @@ namespace met {
           std::vector<Colr> sample_signals = { sample_colr_i[i] };
           for (uint j = 0; j < sample_colr_j.size(); ++j)
             sample_signals.push_back(sample_colr_j[j][i]);
-          sample_spec[i] = generate(basis, sample_cmfs, sample_signals);
+          sample_spec[i] = generate_spectrum({
+            .basis   = loaded_basis, 
+            .systems = sample_cmfs, 
+            .signals = sample_signals
+          });
         }
         
         // Solve using spectra generated from image constraints
         GenerateGamutSpectrumInfo info = {
-          .basis   = basis,
+          .basis   = loaded_basis,
           .system  = project_data.csys(0).finalize(),
           .gamut   = verts,
           .weights = sample_bary,
@@ -528,11 +531,9 @@ namespace met {
     }
     
     /* 3. Solve for a spectral gamut which satisfies the safe samples */
-    BBasis basis = loaded_basis.rightCols(wavelength_bases);
     if (solve_using_constraints) {
-      // Solve using image constraints directly
       GenerateGamutConstraintInfo info = {
-        .basis   = basis,
+        .basis   = loaded_basis,
         .gamut   = std::vector<Colr>(project_data.gamut_verts.size()), // project_data.gamut_verts,
         .systems = std::vector<CMFS>(project_data.color_systems.size())
       };

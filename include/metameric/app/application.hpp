@@ -12,7 +12,7 @@ namespace met {
     fs::path project_path = "";
 
     // Application color theme
-    ApplicationColorMode color_mode = ApplicationColorMode::eDark;
+    AppColorMode color_mode = AppColorMode::eDark;
   };
 
   // Initialize and run the metameric application

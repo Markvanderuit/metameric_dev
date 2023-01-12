@@ -24,7 +24,6 @@ namespace met {
       uint wght_xres;
       uint wght_yres;
     };
-
     /* Data block for spectral texture export format */
     struct SpectralData {
       SpectralDataHeader header;
@@ -58,6 +57,8 @@ namespace met {
     // optional comments marked with '#'. This is similar to the spectrum format described above.
     CMFS load_cmfs(const fs::path &path);
     void save_cmfs(const fs::path &path, const CMFS &s);
+
+    
 
     // Load a discrete spectral distribution from sequentially increasing wvl/value data
     Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values);

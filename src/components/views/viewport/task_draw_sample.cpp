@@ -74,7 +74,7 @@ namespace met {
     m_samp_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_vertices.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_vertices.frag" }};
    
-    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                             ? 1
                             : eig::Array4f { 0, 0, 0, 1 };
 
