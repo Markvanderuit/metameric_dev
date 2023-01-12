@@ -140,6 +140,7 @@ namespace met::io {
     // Read spectrum file as string, and parse line by line
     std::stringstream line__ss(load_string(path));
     std::string line;
+    uint line_nr = 0;
     while (std::getline(line__ss, line)) {
       auto split_line = line | std::views::split(' ');
       auto split_vect = std::vector<std::string>(range_iter(split_line));
@@ -147,10 +148,16 @@ namespace met::io {
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
 
+      // Throw on incorrect input data 
+      debug::check_expr_rel(split_vect.size() == 4,
+        fmt::format("Basis function data incorrect on line {}\n", line_nr));
+
       wvls.push_back(std::stof(split_vect[0]));
       values_x.push_back(std::stof(split_vect[1]));
       values_y.push_back(std::stof(split_vect[2]));
       values_z.push_back(std::stof(split_vect[3]));
+      
+      line_nr++;
     }
 
     return cmfs_from_data(wvls, values_x, values_y, values_z);
@@ -168,6 +175,43 @@ namespace met::io {
       ss << fmt::format("{} {} {} {}\n", wvls[i], values_x[i], values_y[i], values_z[i]);
 
     return save_string(path, ss.str());
+  }
+
+  Basis load_basis(const fs::path &path) {
+    met_trace();
+
+    // Output data blocks
+    std::vector<float> wvls;
+    std::vector<std::array<float, wavelength_bases>> values; 
+
+    // Read spectrum file as string, and parse line by line
+    std::stringstream line__ss(load_string(path));
+    std::string line;
+    uint line_nr = 0;
+    while (std::getline(line__ss, line)) {
+      auto split_line = line | std::views::split(' ');
+      auto split_vect = std::vector<std::string>(range_iter(split_line));
+
+      // Skip empty and commented lines
+      guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
+
+      // Throw on incorrect input data 
+      // debug::check_expr_rel(split_vect.size() == wavelength_bases + 1,
+      //   fmt::format("Basis function data incorrect on line {}\n", line_nr));
+
+      std::array<float, wavelength_bases> split_values;
+      std::transform(split_vect.begin() + 1, 
+                     split_vect.begin() + 1 + wavelength_bases, 
+                     split_values.begin(), 
+                     [](const auto &s) { return std::stof(s); });
+
+      wvls.push_back(std::stof(split_vect[0]));
+      values.push_back(split_values);
+
+      line_nr++;
+    }
+
+    return basis_from_data(wvls, values);
   }
 
   void save_spectral_data(const SpectralData &data, const fs::path &path) {
@@ -240,6 +284,52 @@ namespace met::io {
     return (CMFS() << spectrum_from_data(wvls, values_x),
                       spectrum_from_data(wvls, values_y),
                       spectrum_from_data(wvls, values_z)).finished();
+  }
+
+  Basis basis_from_data(std::span<const float> wvls, 
+                        std::span<std::array<float, wavelength_bases>> values) {
+    met_trace();
+    
+    float data_wvl_min = wvls[0],
+          data_wvl_max = wvls[wvls.size() - 1];
+
+    Basis s = 0.f;
+
+    for (size_t j = 0; j < wavelength_bases; ++j) {
+      for (size_t i = 0; i < wavelength_samples; ++i) {
+        float spec_wvl_min = i * wavelength_ssize + wavelength_min,
+              spec_wvl_max = spec_wvl_min + wavelength_ssize;
+
+        // Determine accessible range of wavelengths
+        float wvl_min = std::max(spec_wvl_min, data_wvl_min),
+              wvl_max = std::min(spec_wvl_max, data_wvl_max);
+        guard_continue(wvl_max > wvl_min);
+
+        // Find the starting index using binary search (Thanks for the idea, Mitsuba people!)
+        ptrdiff_t pos = std::max(std::ranges::lower_bound(wvls, wvl_min) - wvls.begin(),
+                                static_cast<ptrdiff_t>(1)) - 1;
+        
+        // Step through the provided data and integrate trapezoids
+        for (; pos + 1 < wvls.size() && wvls[pos] < wvl_max; ++pos) {
+          float wvl_a   = wvls[pos],
+                value_a = values[pos][j],
+                clamp_a = std::max(wvl_a, wvl_min);
+          float wvl_b   = wvls[pos + 1],
+                value_b = values[pos + 1][j],
+                clamp_b = std::min(wvl_b, wvl_max);
+          guard_continue(clamp_b > clamp_a);
+
+          float inv_ab = 1.f / (wvl_b - wvl_a);
+          float interp_a = std::lerp(value_a, value_b, (clamp_a - wvl_a) * inv_ab),
+                interp_b = std::lerp(value_a, value_b, (clamp_b - wvl_a) * inv_ab);
+
+          s(i, j) += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
+        }
+        s(i, j) /= wavelength_ssize;
+      }
+    }
+
+    return s.eval();
   }
   
   std::array<std::vector<float>, 2> spectrum_to_data(const Spec &s) {

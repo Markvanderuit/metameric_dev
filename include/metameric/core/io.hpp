@@ -58,6 +58,11 @@ namespace met {
     CMFS load_cmfs(const fs::path &path);
     void save_cmfs(const fs::path &path, const CMFS &s);
 
+    // Simple basis function load from file
+    // Input should be a text file, containing a single wavelength and 'm' values per line, and
+    // optional comments marked with '#'. This is similar to the spectrum format described above.
+    // See CmakeLists.txt, 'MET_WAVELENGTH_BASES' for the value of 'm'.
+    Basis load_basis(const fs::path &path);
     
 
     // Load a discrete spectral distribution from sequentially increasing wvl/value data
@@ -66,6 +71,10 @@ namespace met {
     // Load a discrete trio of color matching functions from sequentially increasing wvl/value data
     CMFS cmfs_from_data(std::span<const float> wvls,  std::span<const float> values_x,
                         std::span<const float> values_y, std::span<const float> values_z);
+
+    // Load a set of basis functions from sequentially increasing wvl/value data
+    Basis basis_from_data(std::span<const float> wvls, 
+                          std::span<std::array<float, wavelength_bases>> values);
 
     // Split a discrete spectral distribution or color matching functions into sequentially 
     // increasing wvl/value/*/* data
