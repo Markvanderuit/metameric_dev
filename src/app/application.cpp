@@ -1,7 +1,6 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/pca.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
@@ -33,6 +32,8 @@ namespace met {
       } else {
         data.unload();
       }
+      data.loaded_basis = io::load_basis("resources/misc/basis.txt");
+
       scheduler.insert_resource("app_data", std::move(data));
     }
 
@@ -50,42 +51,6 @@ namespace met {
       } else {
         submit_schedule_empty(scheduler);
       }
-    }
-
-    void init_spectral_grid(LinearScheduler &scheduler, ApplicationCreateInfo info) {
-      met_trace();
-
-      // Load input data 
-      auto hd5_data = io::load_hd5(info.database_path, "TotalRefs");
-
-      // Input data layout
-      const float data_minv  = 400.f,
-                  data_maxv  = 710.f,
-                  data_ssize = (data_maxv - data_minv) / static_cast<float>(hd5_data.dims);
-      auto idx_to_data = [&](uint i) { return (static_cast<float>(i)) * data_ssize + data_minv; };
-
-      // Fill list of wavelengths matching data layout for spectrum_from_data(...)
-      std::vector<float> wavelengths(hd5_data.dims);
-      std::ranges::copy(std::views::iota(0u, static_cast<uint>(hd5_data.dims)) 
-        | std::views::transform(idx_to_data), wavelengths.begin());
-      
-      // Convert data into metameric's spectral format
-      std::vector<Spec> internal_sd(hd5_data.size);
-      std::transform(std::execution::par_unseq, range_iter(hd5_data.data), 
-        internal_sd.begin(), [&](const auto &v) {  return io::spectrum_from_data(wavelengths, v); });
-
-      // Test PCA generation using a bunch of randomly chosen vectors
-      ColrSystem mapp = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
-      // std::vector<Spec> pca_input(128);
-      std::vector<Spec> pca_input(32768);
-      #pragma omp parallel for
-      for (int i = 0; i < pca_input.size(); ++i)
-        // pca_input[i] = internal_sd[32768 * i];
-        pca_input[i] = internal_sd[128 * i];
-
-      // Obtain and store basis functions
-      Basis basis = eigen_vectors(covariance_matrix(pca_input)).rightCols(wavelength_bases);
-      scheduler.get_resource<ApplicationData>(global_key, "app_data").loaded_basis = basis;
     }
   } // namespace detail                          
 
@@ -122,7 +87,6 @@ namespace met {
     // Initialize major application components on startup
     detail::init_parser(scheduler);
     detail::init_state(scheduler, info);
-    detail::init_spectral_grid(scheduler, info);
     detail::init_schedule(scheduler);
 
     // Main runtime loop

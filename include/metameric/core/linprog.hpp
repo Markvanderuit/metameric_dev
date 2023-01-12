@@ -1,7 +1,6 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
-#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <limits>
 #include <vector>

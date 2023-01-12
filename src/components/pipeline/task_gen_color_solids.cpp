@@ -3,7 +3,6 @@
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
-#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>

@@ -5,9 +5,6 @@
 
 namespace met {
   struct ApplicationCreateInfo {
-    // In case of a new project load
-    fs::path database_path = "";
-
     // In case of a existing project load
     fs::path project_path = "";
 

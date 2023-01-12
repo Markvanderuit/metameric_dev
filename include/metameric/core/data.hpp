@@ -1,6 +1,5 @@
 #pragma once
 
-#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>

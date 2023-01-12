@@ -1,7 +1,6 @@
 // Metameric includes
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/pca.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
@@ -112,9 +111,9 @@ namespace met {
       ImGui::End();
     }); */
 
-    /* // Temporary window to plot pca components
+    // Temporary window to plot pca components
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
-      if (ImGui::Begin("PCA inputs")) {
+     /*  if (ImGui::Begin("PCA inputs")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
                                * eig::Array2f(.67f, 0.3f);
@@ -126,7 +125,7 @@ namespace met {
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         }
       }
-      ImGui::End();
+      ImGui::End(); */
       
       if (ImGui::Begin("PCA plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -134,14 +133,14 @@ namespace met {
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        auto &pca = info.get_resource<BMatrixType>(global_key, "pca_basis");
+        auto &pca = info.get_resource<ApplicationData>(global_key, "app_data").loaded_basis;
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         }
       }
       ImGui::End();
-    }); */
+    });
   }
 
   template <typename Scheduler>

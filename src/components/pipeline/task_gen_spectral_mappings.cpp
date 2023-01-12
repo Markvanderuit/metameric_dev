@@ -1,7 +1,6 @@
 #include <metameric/components/pipeline/task_gen_spectral_mappings.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/metamer.hpp>
-#include <metameric/core/pca.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
 #include <metameric/core/state.hpp>
