@@ -51,6 +51,7 @@ namespace met {
     LPParameters params(M, N);
     params.method  = LPMethod::ePrimal;
     params.scaling = true;
+    params.C       = (info.systems[0].transpose() * info.basis).row(1).cast<double>().eval();
 
     // Add constraints to ensure resulting spectra produce the given color signals
     for (uint i = 0; i < info.systems.size(); ++i) {
@@ -303,6 +304,12 @@ namespace met {
     // Clear untouched matrix values to 0
     params.A.fill(0.0);
 
+    // Specify minimization as Y sensitivity curve
+    const auto gamut_csys = (info.systems[0].transpose() * info.basis).cast<double>().eval();
+    const auto gamut_copt = gamut_csys.row(1).transpose().eval();
+    for (uint i = 0; i <  n_bary; ++i)
+      params.C.block(i * n_base, 0, rowcol(gamut_copt)) = gamut_copt;
+
     // Add roundtrip constraints for seed samples
     for (uint i = 0; i < info.signals.size(); ++i) {
       const Signal &sign = info.signals[i];
@@ -316,7 +323,6 @@ namespace met {
     }
 
     // Add roundtrip constraints for gamut vertex positions
-    const auto gamut_csys = (info.systems[0].transpose() * info.basis).cast<double>().eval();
     const uint gamut_offs = info.signals.size() * n_colr;
     for (uint i = 0; i < info.gamut.size(); ++i) {
       auto b = info.gamut[i].cast<double>().eval();
