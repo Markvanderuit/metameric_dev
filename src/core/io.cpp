@@ -336,8 +336,7 @@ namespace met::io {
     std::vector<float> wvls(wavelength_samples);
     std::vector<float> values(wavelength_samples);
 
-    std::ranges::transform(std::views::iota(0u, wavelength_samples), wvls.begin(), 
-      [](const auto &i) { return  wavelength_at_index(i) - 0.5 * wavelength_ssize; });
+    std::ranges::transform(std::views::iota(0u, wavelength_samples), wvls.begin(), wavelength_at_index);
     std::ranges::copy(s, values.begin());
 
     return { wvls, values };
@@ -348,8 +347,7 @@ namespace met::io {
     std::vector<float> values_x(wavelength_samples), 
       values_y(wavelength_samples), values_z(wavelength_samples);
     
-    std::ranges::transform(std::views::iota(0u, wavelength_samples), wvls.begin(),
-      [](const auto &i) { return  wavelength_at_index(i) - 0.5 * wavelength_ssize; });
+    std::ranges::transform(std::views::iota(0u, wavelength_samples), wvls.begin(), wavelength_at_index);
     std::ranges::copy(s.col(0), values_x.begin());
     std::ranges::copy(s.col(1), values_y.begin());
     std::ranges::copy(s.col(2), values_z.begin());
