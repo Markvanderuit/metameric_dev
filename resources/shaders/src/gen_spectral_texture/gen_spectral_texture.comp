@@ -39,7 +39,9 @@ void load_shared_spectra() {
   const uint j = gl_LocalInvocationID.x % wavelength_samples_al;
 
   for (uint i_ = i; i_ < b_size.n_verts; i_ += cl_spectrum_invc_n)
-    s_spectra_in[i_][j] = b_spectra_in.data[i_][j];
+      s_spectra_in[i_] = b_spectra_in.data[i_];
+      // s_spectra_in[i_][j_] = b_spectra_in.data[i_][j_];
+    // for (uint j_ = j; j_ < wavelength_samples; j_ += cl_spectrum_invc_n)
 
   barrier();
   memoryBarrierShared();
@@ -59,7 +61,8 @@ void load_shared_weights() {
 
 Spec load_spec_in(uint i) {
   Spec s;
-  cl_spec_scatter(s, s_spectra_in[i]);
+  // cl_spec_scatter(s, s_spectra_in[i]);
+  cl_spec_scatter(s, b_spectra_in.data[i]);
   return s;
 }
 

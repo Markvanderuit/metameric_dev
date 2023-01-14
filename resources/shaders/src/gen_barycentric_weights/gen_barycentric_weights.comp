@@ -117,10 +117,10 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
          / (shift(sin_theta, _ip) * shift(sin_theta, _im)) 
          - 1.f;
   vec3 s = sign(determinant(transpose(mat3(u[0], u[1], u[2])))) 
-         * sqrt(1.f - c * c);
+         * sqrt(max(1.f - c * c, M_EPS));
 
   // Fallback: x lies on triangle's plane but way outside triangle, ignore weights
-  if (any(lessThan(abs(s), vec3(M_EPS)))) {
+  if (any(lessThanEqual(abs(s), vec3(M_EPS)))) {
     result.type = MVCReturnOnPlane;
     return result;
   }
