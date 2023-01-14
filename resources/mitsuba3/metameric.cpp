@@ -1,6 +1,7 @@
 #include <mitsuba/core/distr_2d.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/zstream.h>
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/spectrum.h>
@@ -15,7 +16,7 @@
 NAMESPACE_BEGIN(mitsuba)
 
 // Maximum nr. of supported barycentric weights
-constexpr unsigned barycentric_weights = 8;
+constexpr unsigned barycentric_weights = 16;
 
 /* Header block for spectral texture import format */
 struct SpectralDataHeader {
@@ -54,6 +55,7 @@ public:
     Log(Info, "Loading metameric texture from \"%s\" ..", m_name);
     SpectralData data;
     ref<FileStream> fs = new FileStream(file_path);
+    ref<ZStream>    zs = new ZStream(fs);
 
     // Read header data
     fs->read<float>(data.header.wvl_min);
@@ -126,7 +128,7 @@ public:
     m_accel = props.get<bool>("accel", true);
 
     // Read clamping mode
-    m_clamp = props.eet<bool>("clamp", true);
+    m_clamp = props.get<bool>("clamp", true);
 
     // Instantiate class objects
     size_t wght_shape[3] = { data.header.wght_yres, data.header.wght_xres, barycentric_weights };
