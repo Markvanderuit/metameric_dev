@@ -51,7 +51,11 @@ namespace met {
             ImGui::BeginGroup();
             ImGui::Bullet();
             ImGui::Text(key.c_str());
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 96.f);
+            if (fs::path path; ImGui::SmallButton("Export") && detail::save_dialog(path, ".spd")) {
+              io::save_spec(path, illuminant);
+            }
+            ImGui::SameLine();
             if (ImGui::SmallButton("X")) e_appl_data.touch({ 
               .name = "Deleted illuminant",
               .redo = [i = i](auto &data) { 
@@ -97,7 +101,12 @@ namespace met {
             ImGui::BeginGroup();
             ImGui::Bullet();
             ImGui::Text(key.c_str());
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 16.f);
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x - 96.f);
+            if (fs::path path; ImGui::SmallButton("Export") && detail::save_dialog(path, ".cmfs")) {
+              CMFS _cmfs = (models::srgb_to_xyz_transform * cmfs.transpose()).transpose();
+              io::save_cmfs(path, _cmfs);
+            }
+            ImGui::SameLine();
             if (ImGui::SmallButton("X")) e_appl_data.touch({ 
               .name = "Deleted cmfs",
               .redo = [i = i](auto &data) { 
