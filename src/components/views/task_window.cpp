@@ -94,8 +94,8 @@ namespace met {
       auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
 
       // Used sizes
-      const uint func_count = static_cast<uint>(e_prj_data.gamut_verts.size());
-      const auto weights_res    = e_app_data.loaded_texture.size();
+      const uint func_count  = static_cast<uint>(e_prj_data.gamut_verts.size());
+      const auto weights_res = e_app_data.loaded_texture.size();
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 
@@ -127,7 +127,7 @@ namespace met {
           .wght_yres = weights_res.y()
         },
         .functions = cnt_span<float>(spec_data_out), 
-        .weights = cnt_span<float>(wght_data_out)
+        .weights   = cnt_span<float>(wght_data_out)
       }, io::path_with_ext(path, ".met"));
 
       return true;
