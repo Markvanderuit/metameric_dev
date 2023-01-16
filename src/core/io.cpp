@@ -150,7 +150,7 @@ namespace met::io {
 
       // Throw on incorrect input data 
       debug::check_expr_rel(split_vect.size() == 4,
-        fmt::format("Basis function data incorrect on line {}\n", line_nr));
+        fmt::format("CMFS data incorrect on line {}\n", line_nr));
 
       wvls.push_back(std::stof(split_vect[0]));
       values_x.push_back(std::stof(split_vect[1]));
@@ -196,8 +196,8 @@ namespace met::io {
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
 
       // Throw on incorrect input data 
-      // debug::check_expr_rel(split_vect.size() == wavelength_bases + 1,
-      //   fmt::format("Basis function data incorrect on line {}\n", line_nr));
+      debug::check_expr_rel(split_vect.size() >= wavelength_bases + 1,
+        fmt::format("Basis function data too short on line {}\n", line_nr));
 
       std::array<float, wavelength_bases> split_values;
       std::transform(split_vect.begin() + 1, 
