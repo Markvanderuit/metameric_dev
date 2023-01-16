@@ -148,28 +148,25 @@ namespace met {
     using namespace quickhull;
 
     using Vector3f = quickhull::Vector3<float>;
-    auto vector_span = cnt_span<const Vector3f>(points);
+
+    std::vector<Vector3f> input(points.size());
+    std::ranges::transform(points, input.begin(), [](const T &c) { return Vector3f { c[0], c[1], c[2] }; });
 
     QuickHull<float> builder;
-    auto chull = builder.getConvexHull(vector_span.data(), vector_span.size(), false, false);
+    auto chull = builder.getConvexHull(input.data(), input.size(), false, false);
 
     const auto& elems = chull.getIndexBuffer();
     const auto& verts = chull.getVertexBuffer();
 
-    std::vector<T> out_verts(verts.size());
-    for (uint i = 0; i < verts.size(); ++i) {
-      auto v = verts[i];
-      out_verts[i] = { v.x, v.y, v.z };
-    }
+    std::vector<T> output_verts(verts.size());
+    std::ranges::transform(verts, output_verts.begin(),  [](const Vector3f &c) { return T { c.x, c.y, c.z }; });
 
-    std::vector<eig::Array3u> out_elems(elems.size() / 3);
+    std::vector<eig::Array3u> output_elems(elems.size() / 3);
     for (uint i = 0; i < elems.size() / 3; ++i)
-      out_elems[i] = { static_cast<uint>(elems[3 * i]),  
-                       static_cast<uint>(elems[3 * i + 1]), 
-                       static_cast<uint>(elems[3 * i + 2]) };
+      output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) };
     
-    return generate_from_data<Traits>(std::span<const T> { out_verts },
-                                      std::span<const eig::Array3u> { out_elems });
+    return generate_from_data<Traits>(std::span<const T> { output_verts },
+                                      std::span<const eig::Array3u> { output_elems });
   }
   
   template <typename T>
@@ -179,26 +176,24 @@ namespace met {
     using namespace quickhull;
 
     using Vector3f = quickhull::Vector3<float>;
-    auto vector_span = cnt_span<const Vector3f>(points);
+
+    std::vector<Vector3f> input(points.size());
+    std::ranges::transform(points, input.begin(), [](const T &c) { return Vector3f { c[0], c[1], c[2] }; });
 
     QuickHull<float> builder;
-    auto chull = builder.getConvexHull(vector_span.data(), vector_span.size(), true, false);
+    auto chull = builder.getConvexHull(input.data(), input.size(), false, false);
+
     const auto& elems = chull.getIndexBuffer();
     const auto& verts = chull.getVertexBuffer();
 
-    std::vector<T> out_verts(verts.size());
-    for (uint i = 0; i < verts.size(); ++i) {
-      auto v = verts[i];
-      out_verts[i] = { v.x, v.y, v.z };
-    }
+    std::vector<T> output_verts(verts.size());
+    std::ranges::transform(verts, output_verts.begin(),  [](const Vector3f &c) { return T { c.x, c.y, c.z }; });
 
-    std::vector<eig::Array3u> out_elems(elems.size() / 3);
+    std::vector<eig::Array3u> output_elems(elems.size() / 3);
     for (uint i = 0; i < elems.size() / 3; ++i)
-      out_elems[i] = { static_cast<uint>(elems[3 * i]),  
-                       static_cast<uint>(elems[3 * i + 1]), 
-                       static_cast<uint>(elems[3 * i + 2]) };
+      output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) };
 
-    return { out_verts, out_elems };
+    return { output_verts, output_elems };
   }
 
   template <typename Traits, typename T>
@@ -372,6 +367,8 @@ namespace met {
   HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>);
   template
   std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
+  template
+  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
   // simplify
   template

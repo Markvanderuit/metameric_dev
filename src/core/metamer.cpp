@@ -158,6 +158,8 @@ namespace met {
       }
     }
 
+    // Filter NaNs at underconstrained output and strip redundant output 
+    std::erase_if(output, [](Colr &c) { return c.isNaN().any(); });
     return detail::remove_identical_points(output);
   }
 

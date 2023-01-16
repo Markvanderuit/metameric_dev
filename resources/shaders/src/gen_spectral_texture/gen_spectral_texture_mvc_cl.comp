@@ -173,5 +173,6 @@ void main() {
   Spec sd = query_spectrum_mvc_baseline(b_colr_texture.data[i]);
 
   // Store results to buffer
-  store_spec_texture(clamp(sd, 0.f, 1.f), i); // Note: should only enforce clamp on export?
+  store_spec_texture(sd, i);
+  // store_spec_texture(clamp(sd, 0.f, 1.f), i); // Note: should only enforce clamp on export?
 }

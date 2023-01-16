@@ -141,13 +141,11 @@ namespace met {
                                     : (e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any);
     if (recreate_chull) {
       // Get color solid data, if available
-      auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
+      auto &e_csol_data = info.get_resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");
       guard(!e_csol_data.empty());
 
       // Generate convex hull mesh and convert to buffer format
-      m_csolid_mesh = generate_convex_hull<HalfedgeMeshTraits, Colr>(e_csol_data);
-      // m_csolid_mesh = generate_convex_hull_approx<HalfedgeMeshTraits, Colr>(e_csol_data, m_sphere_mesh);
-      auto [verts, elems] = generate_data<HalfedgeMeshTraits, AlColr>(m_csolid_mesh);
+      auto [verts, elems] = generate_convex_hull<AlColr>(e_csol_data);
 
       // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
       m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
