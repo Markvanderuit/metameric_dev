@@ -235,16 +235,17 @@ namespace met::io {
     ofs.close();
   }
 
-  // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::eval(...) from libcore/spectrum.cpp
+  // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::average(...) from libcore/spectrum.cpp
   Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values) {
     met_trace();
+
+    Spec s = 0.f;
 
     float data_wvl_min = wvls[0],
           data_wvl_max = wvls[wvls.size() - 1];
 
-    Spec s = 0.f;
     for (size_t i = 0; i < wavelength_samples; ++i) {
-      float spec_wvl_min = i * wavelength_ssize + wavelength_min,
+      float spec_wvl_min = wavelength_min + i * wavelength_ssize,
             spec_wvl_max = spec_wvl_min + wavelength_ssize;
 
       // Determine accessible range of wavelengths

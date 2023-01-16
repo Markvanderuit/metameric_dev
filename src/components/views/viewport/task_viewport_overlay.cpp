@@ -873,5 +873,14 @@ namespace met {
       
       ImPlot::EndPlot();
     }
+
+    if (ImGui::Button("Print reflectances")) {
+      for (uint i : e_vert_slct) {
+        const auto &s = e_spec[i];
+        auto [wvls, vals] = io::spectrum_to_data(s);
+        fmt::print("Spectrum {}\n\t{}\n\t{}\n", i, wvls, vals);
+      }
+      
+    }
   }
 } // namespace met

@@ -1,21 +1,9 @@
-// #define EIGEN_MAX_STATIC_ALIGN_BYTES 0
-
 // Metameric includes
+#include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
-
-// GL includes
-#include <small_gl/array.hpp>
-#include <small_gl/buffer.hpp>
-#include <small_gl/dispatch.hpp>
-#include <small_gl/framebuffer.hpp>
-#include <small_gl/program.hpp>
-#include <small_gl/sampler.hpp>
-#include <small_gl/texture.hpp>
-#include <small_gl/utility.hpp>
-#include <small_gl/window.hpp>
-#include <small_gl_parser/parser.hpp>
 
 // STL includes
 #include <algorithm>
@@ -26,128 +14,106 @@
 #include <string>
 #include <vector>
 
-const std::string shader_src = R"GLSL(
-  #version 460 core
+using namespace met;
+using uint = unsigned;
 
-  // Guard functions
-  #define guard(expr) if (!(expr)) { return; }
-
-  // Wavelength settings
-  const uint data_samples = DATA_WIDTH;
-
-  // Common types
-  #define SpecType float[data_samples]
-  #define CMFSType float[3][data_samples]
-
-  struct DataObject {
-    CMFSType c;
-    SpecType t;
-    float i;
-    // float v2[3]; /*  padding */
-  };
-
-  // Layout specifiers
-  layout(local_size_x = 256) in;
-  layout(std430)             buffer;
-
-  layout(binding = 0) restrict readonly  buffer b_0 { DataObject data[]; } b_in;
-  layout(binding = 1) restrict writeonly buffer b_1 { DataObject data[]; } b_out;
-
-  layout(location = 0) uniform uint u_n;
-
-  void main() {
-    const uint i = gl_GlobalInvocationID.x;
-    guard(i < u_n);
-
-    DataObject o = b_in.data[i];
-
-    for (uint j = 0; j < data_samples; ++j) {
-      b_out.data[i].t[j] = o.t[j];  
-    }
-    b_out.data[i].c = o.c;
-    // b_out.data[i].t = o.t;
-    b_out.data[i].i = o.i;
-  }
-)GLSL";
+// Given a wavelength, obtain the relevant spectral bin's index
+constexpr inline
+size_t index_from_wavelength(float wvl) {
+  int i = static_cast<int>((wvl - wavelength_min) * wavelength_ssinv);
+  return std::min<int>(std::max<int>(i, 0), wavelength_samples - 1);
+  // return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), 
+  //                 wavelength_samples - 1);
+}
 
 int main() {
-  using namespace met;
-  
-  constexpr uint DataRows = 32;
 
-  using SpecType     = eig::Array<float, DataRows, 1>;
-  using CMFSType     = eig::Array<float, DataRows, 3>;
-  using CMFSTypeUnAl = eig::Array<float, DataRows, 3, eig::DontAlign>;
-  using SpecTypeUnAl = eig::Array<float, DataRows, 1, eig::DontAlign>;
+  /* std::pair<
+    std::vector<float>, 
+    std::vector<float>
+  > spectrum_to_data(const Spec &s) {
 
-  struct DataObject {
-    CMFSTypeUnAl c;
-    SpecTypeUnAl t;
-    float i;
-    // float v2[3];
-  };
+    for (uint i = 0; i < wavelength_samples; ++i) {
+      float wvl = wavelength_min + i * wavelength_ssize;
+
+    }
+
+    // return { { }, { } };
+  } */
 
   try {
-    // Set up OpenGL
-    gl::Window window = {{ .size = { 1, 1}, .flags = gl::WindowCreateFlags::eDebug }};
-    gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
+    // Define color system
+    CMFS cmfs = models::cmfs_cie_xyz; // (models::xyz_to_srgb_transform * models::cmfs_cie_xyz .transpose()).transpose().eval();
+    Spec illm = models::emitter_cie_d65;
+    ColrSystem system = { .cmfs = cmfs, .illuminant = illm };
 
-    // Prepare input data
-    DataObject data_v;
-    std::iota(range_iter(data_v.t), 0.f);
-    std::iota(range_iter(data_v.t), 16.f);
-    data_v.i = 314.f;
-    std::vector<DataObject> data(8, data_v);
+    // Input signal
+    Colr colr = { 0.75, 0.35, 0.25 };
 
-    // Prepare buffer objects
-    gl::Buffer buffer_in  = {{ .data = cnt_span<const std::byte>(data)              }};
-    gl::Buffer buffer_out = {{ .size = cnt_span<const std::byte>(data).size_bytes() }};
+    // Generate SD
+    Basis basis = io::load_basis("resources/misc/basis.txt");
+    Spec spec = generate_spectrum({
+      .basis = basis,
+      .systems = std::vector<CMFS> { system.finalize() },
+      .signals = std::vector<Colr> { colr }
+    });
 
-    // Prepare shader parser
-    glp::Parser parser;
-    parser.add_string("DATA_WIDTH", std::to_string(DataRows));
+    // Test roundtrip of signal
+    Colr colr_rtrip = system.apply_color(spec);
+    fmt::print("rtrp = {}\n", colr_rtrip);
 
-    // Prepare compute shader
-    gl::Program program = {{ .type   = gl::ShaderType::eCompute, 
-                             .data   = cnt_span<const std::byte>(shader_src),
-                             .parser = &parser }};
-    program.uniform("u_n", static_cast<uint>(data.size()));
-    gl::ComputeInfo dispatch = { .groups_x = ceil_div(static_cast<uint>(data.size()), 256u), .bindable_program = &program };
+    std::vector<float> wvls(wavelength_samples + 1), vals(wavelength_samples + 1);
+    for (uint i = 0; i < wavelength_samples + 1; ++i) {
+      float wvl = wavelength_min + (float(i) - 0.5) * wavelength_ssize;
 
-    // Dispatch shader
-    buffer_in.bind_to(gl::BufferTargetType::eShaderStorage,  0);
-    buffer_out.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    gl::dispatch_compute(dispatch);
+      // uint bin_a = i, bin_b = i + 1;
 
-    // Copy back and read data
-    std::vector<DataObject> result(data.size());
-    buffer_out.get(cnt_span<std::byte>(result));
-    
-    
-    for (uint i = 0; i < data.size(); ++i) {
-      fmt::print("{}, {}, t = {}, i = {}\n", i, "a", data[i].t, data[i].i);
-      fmt::print("{}, {}, t = {}, i = {}\n", i, "b", result[i].t, result[i].i);
+      uint bin_a = index_from_wavelength(wvl),
+           bin_b = index_from_wavelength(wvl + wavelength_ssize);
+           
+      wvls[i] = wavelength_min + i * wavelength_ssize;
+      vals[i] = 0.5 * (spec[bin_a] + spec[bin_b]);
+      // fmt::print("{} - {} : {}\n", i, bin_a, bin_b);
     }
-    // fmt::print("in    : {}\n", data);
-    // fmt::print("out   : {}\n", result);
+    // std::exit(0);
 
+    /* for (uint i = 0; i < wavelength_samples + 1; ++i) {
+      float wvl = wavelength_min + (float(i) - 0.5) * wavelength_ssize;
+      
+      wvls[i] = wvl;
 
-    constexpr auto data_eq = [](const DataObject &a, const DataObject &b) { 
-      return (a.c == b.c).all() &&
-             (a.t == b.t).all() && 
-              a.i == b.i; };
-    fmt::print("equal : {}\n", std::equal(range_iter(data), range_iter(result), data_eq));
-    fmt::print("bytes : {}\n", sizeof(DataObject));
+      uint bin_a = index_from_wavelength(wvl),
+           bin_b = index_from_wavelength(wvl + wavelength_ssize);
 
+      fmt::print("{} - {} : {}\n", i, bin_a, bin_b);
 
-    eig::Matrix3f A;
-    eig::Vector3f b;
-    A << 1, 2, 3,  4, 5, 6,  7, 8, 10;
-    b << 3, 3, 4;
+      if (bin_a == bin_b) {
+        // vals[i] = ()
+        // vals[i] = spec[bin_a];
+        // vals[i] = 0.5 * (spec[bin_a] + spec[bin_b]);
+        vals[i] = spec[bin_a];
+      } else {
+        float a = wavelength_at_index(bin_a),
+              b = wavelength_at_index(bin_b),
+              fa = spec[bin_a],
+              fb = spec[bin_b];
+        float w = (wvl - a) / (b - a);
+        fmt::print("{}\n", w);
+        vals[i] = w * fb + (1 - w) * fa;
+      }
+    } */
+    // std::exit(0);
 
-    eig::Vector3f x = A.llt().solve(b);
-    fmt::print("{}\n", x);
+    // auto [wvls, vals] = io::spectrum_to_data(spec);
+    Spec spec_rtrip = io::spectrum_from_data(wvls, vals);
+    colr_rtrip = system.apply_color(spec_rtrip);
+    fmt::print("rtrp 2 = {}\n\n", colr_rtrip);
 
+    fmt::print("wvls = {}\n\n", wvls);
+    fmt::print("vals = {}\n\n", vals);
+
+    fmt::print("spec = {}\n\n", spec);
+    fmt::print("spec_rtrip = {}\n\n", spec_rtrip);
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;
