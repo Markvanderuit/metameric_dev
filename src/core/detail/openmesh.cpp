@@ -1,6 +1,9 @@
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/ray.hpp>
 #include <metameric/core/detail/openmesh.hpp>
+#include <algorithm>
+#include <execution>
 #include <vector>
 #if defined(OM_CC_MIPS)
 #include <float.h>
@@ -12,9 +15,11 @@ namespace OpenMesh::Decimater {
   namespace detail {
     template <class MeshT>
     std::pair<float, Vec3f> volume_solve(const MeshT &mesh,
-                                        const typename MeshT::HalfedgeHandle &v0v1,
-                                        const Vec3f &min_v = { 0, 0, 0 },
-                                        const Vec3f &max_v = { 1, 1, 1 }) {
+                                         const MeshT *bounds_mesh,
+                                         const Vec3f &bounds_cntr,
+                                         const typename MeshT::HalfedgeHandle &v0v1,
+                                         const Vec3f &min_v = { 0, 0, 0 },
+                                         const Vec3f &max_v = { 1, 1, 1 }) {
       auto v1v0 = mesh.opposite_halfedge_handle(v0v1);
 
       // Vertex handles, positions
@@ -89,11 +94,30 @@ namespace OpenMesh::Decimater {
       if (!optimal)
         return { 999.f, vertex };
 
+      // Clamp output to rgb cube +/- epsilon for now; 
+      // vertex = vertex.min(Vec3f(0.99999f)).max(Vec3f(0.000001f));
 
-      // Clamp output to rgb cube for now; 
-      // TODO: there's no need to do this, reproject onto OCS instead
-      vertex = vertex.min({ 1, 1, 1 }).max({ 0, 0, 0 }); 
-      // vertex = vertex.max({ 0, 0, 0 }); // Clamp negative values
+      // Reproject vertex onto boundary mesh surface if it exceeds this
+      {
+        // Cast a ray through the vertex point towards the mesh centroid;
+        met::Ray ray = { .o = met::to_eig<float, 3>(vertex),
+                         .d = met::to_eig<float, 3>(bounds_cntr - vertex).matrix().normalized().eval() };
+        auto query = met::ray_trace_nearest_elem_any_side(ray, *bounds_mesh);
+        if (query) {
+          // Get relevant face
+          auto fh = bounds_mesh->face_handle(query.i);
+          if (fh.is_valid()) {
+            // Test if face is facing towards us, or if we are on the inside
+            auto n = met::to_eig<float, 3>(bounds_mesh->calc_face_normal(fh));
+            if (n.dot(ray.d) < 0.f)
+              vertex = met::to_omesh<float, 3>(ray.o + query.t * ray.d);
+          }
+        }
+      }
+
+      // Epsilon offset for solver problems
+      if (solution.isZero())
+        vertex += Vec3f(0.001f);
 
       float volume = 0.f;
       for (auto fh : fm) {
@@ -117,19 +141,7 @@ namespace OpenMesh::Decimater {
 
       return { volume, vertex };
     }
-
-    template <class MeshT>
-    Vec3f solve_for_position(const CollapseInfoT<MeshT> &ci,
-                             const Vec3f                &min_v = { 0, 0, 0 },
-                             const Vec3f                &max_v = { 1, 1, 1 }) {
-      return volume_solve(ci.mesh, ci.v0v1, min_v, max_v).second;
-    }
   } // namespace detail
-
-  template <typename Mesh>
-  Mesh::Point VolumeCollapseFunction<Mesh>::collapse(const CollapseInfo &ci) {
-    return detail::solve_for_position(ci);
-  }
 
   template <class Mesh, template <typename> typename CollapseFunc>
   CollapsingDecimater<Mesh, CollapseFunc>::CollapsingDecimater(Mesh& _mesh)
@@ -468,7 +480,7 @@ namespace OpenMesh::Decimater {
       auto v0v1 = eh.h0(), v1v0 = eh.h1();
 
       // Solve for one half-edge, results should be identical for both
-      auto solve = detail::volume_solve<MeshT>(m_mesh, v0v1);
+      auto solve = detail::volume_solve<MeshT>(m_mesh, m_collision_mesh, m_collision_centroid, v0v1);
 
       std::tie(m_mesh.property(m_volume, v0v1), 
                m_mesh.property(m_vertex, v0v1)) = solve;
@@ -498,16 +510,27 @@ namespace OpenMesh::Decimater {
         auto v0v1 = eh.h0(), v1v0 = eh.h1();
 
         // Solve for one half-edge, results should be identical for both
-        auto solve = detail::volume_solve(m_mesh, v0v1);
+        auto solve = detail::volume_solve(m_mesh, m_collision_mesh, m_collision_centroid, v0v1);
 
         // Store resulting volume/vertex in halfedge properties
         std::tie(m_mesh.property(m_volume, v0v1), 
-                m_mesh.property(m_vertex, v0v1)) = solve;
+                 m_mesh.property(m_vertex, v0v1)) = solve;
         std::tie(m_mesh.property(m_volume, v1v0), 
-                m_mesh.property(m_vertex, v1v0)) = solve;
+                 m_mesh.property(m_vertex, v1v0)) = solve;
       }
     }
   }
+
+  template <typename MeshT>
+  void ModVolumeT<MeshT>::set_collision_mesh(const MeshT *mesh) {
+    constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };
+
+    m_collision_mesh = mesh;
+    m_collision_centroid = std::reduce(std::execution::par_unseq, 
+      mesh->points(), mesh->points() + mesh->n_vertices(),
+      Vec3f(0.f), f_add) / static_cast<float>(mesh->n_vertices());
+  }
+
 
   /* explicit temlate instantiations */
 
@@ -520,7 +543,4 @@ namespace OpenMesh::Decimater {
   template class CollapsingDecimater<met::BaselineMesh, AverageCollapseFunction>;
   template class CollapsingDecimater<met::FNormalMesh,  AverageCollapseFunction>;
   template class CollapsingDecimater<met::HalfedgeMesh, AverageCollapseFunction>;
-  template class CollapsingDecimater<met::BaselineMesh, VolumeCollapseFunction>;
-  template class CollapsingDecimater<met::FNormalMesh,  VolumeCollapseFunction>;
-  template class CollapsingDecimater<met::HalfedgeMesh, VolumeCollapseFunction>;
 } // namespace OpenMesh::Decimater

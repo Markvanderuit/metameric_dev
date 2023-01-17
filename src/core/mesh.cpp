@@ -228,7 +228,8 @@ namespace met {
 
   
   template <typename Traits>
-  TriMesh<Traits> simplify_edges(const TriMesh<Traits> &input_mesh, float max_edge_length) {
+  TriMesh<Traits> simplify_edges(const TriMesh<Traits> &input_mesh, 
+                                 float max_edge_length) {
     met_trace();
 
     namespace odec  = omesh::Decimater;
@@ -254,7 +255,9 @@ namespace met {
   }
 
   template <typename Traits>
-  TriMesh<Traits> simplify(const TriMesh<Traits> &input_mesh, uint max_vertices) {
+  TriMesh<Traits> simplify(const TriMesh<Traits> &input_mesh, 
+                           const TriMesh<Traits> &bounds_mesh,
+                           uint max_vertices) {
     met_trace();
     namespace odec = omesh::Decimater;
     using Mesh = TriMesh<Traits>;
@@ -265,7 +268,6 @@ namespace met {
     
     // First, quickly collapse all very short edges into their average to a hardcoded minimum;
     // given that convex hull generation is relatively accurate, this likely does not affect anything
-    fmt::print("Begin length collapse: {}\n", mesh.n_vertices());
     {
       using ModEdgeLen = odec::ModEdgeLengthT<Mesh>::Handle;
       using Decimater  = odec::DecimaterT<Mesh>;
@@ -282,10 +284,8 @@ namespace met {
 
       mesh.garbage_collection();
     }
-    fmt::print("End length collapse: {}\n", mesh.n_vertices());
-
+    
     // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
-    fmt::print("Attempting collapse: {} -> {}\n", mesh.n_vertices(), max_vertices);
     {
       using Decimater  = odec::CollapsingDecimater<Mesh, odec::DefaultCollapseFunction>;
       using ModVolume = odec::ModVolumeT<Mesh>::Handle;
@@ -294,7 +294,7 @@ namespace met {
       ModVolume volume_mod;
 
       dec.add(volume_mod);
-      // dec.module(volume_mod).set_maximum_volume(0.1f);
+      dec.module(volume_mod).set_collision_mesh(&bounds_mesh);
 
       dec.initialize();
       dec.decimate_to(max_vertices);
@@ -372,11 +372,11 @@ namespace met {
 
   // simplify
   template
-  BaselineMesh simplify<BaselineMeshTraits>(const BaselineMesh &, uint);
+  BaselineMesh simplify<BaselineMeshTraits>(const BaselineMesh &, const BaselineMesh &, uint);
   template
-  FNormalMesh simplify<FNormalMeshTraits>(const FNormalMesh &, uint);
+  FNormalMesh simplify<FNormalMeshTraits>(const FNormalMesh &, const FNormalMesh &, uint);
   template
-  HalfedgeMesh simplify<HalfedgeMeshTraits>(const HalfedgeMesh &, uint);
+  HalfedgeMesh simplify<HalfedgeMeshTraits>(const HalfedgeMesh &, const HalfedgeMesh &, uint);
   template
   BaselineMesh simplify_edges<BaselineMeshTraits>(const BaselineMesh &, float);
   template

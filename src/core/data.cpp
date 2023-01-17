@@ -10,18 +10,70 @@
 #include <small_gl/program.hpp>
 #include <small_gl/utility.hpp>
 #include <nlohmann/json.hpp>
+#include <omp.h>
 #include <algorithm>
+#include <chrono>
 #include <execution>
+#include <numbers>
 #include <ranges>
 #include <random>
 #include <mutex>
-#include <chrono>
 
 namespace met {
   constexpr uint chull_vertex_count = 5;
 
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+
+  namespace detail {
+    // Given a random vector in RN bounded to [-1, 1], return a vector
+    // distributed over a gaussian distribution
+    auto inv_gaussian_cdf(const auto &x) {
+      met_trace();
+      auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
+      auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
+      return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
+    }
+    
+    // Given a random vector in RN bounded to [-1, 1], return a uniformly
+    // distributed point on the unit sphere
+    auto inv_unit_sphere_cdf(const auto &x) {
+      met_trace();
+      return inv_gaussian_cdf(x).matrix().normalized().eval();
+    }
+
+    // Generate a set of random, uniformly distributed unit vectors in RN
+    template <uint N>
+    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
+      met_trace();
+      
+      using ArrayNf = eig::Array<float, N, 1>;
+      using SeedTy = std::random_device::result_type;
+
+      // Generate separate seeds for each thread's rng
+      std::random_device rd;
+      std::vector<SeedTy> seeds(omp_get_max_threads());
+      for (auto &s : seeds) s = rd();
+
+      std::vector<ArrayNf> unit_dirs(n_samples);
+      #pragma omp parallel
+      {
+        // Initialize separate random number generator per thread
+        std::mt19937 rng(seeds[omp_get_thread_num()]);
+        std::uniform_real_distribution<float> distr(-1.f, 1.f);
+
+        // Draw samples for this thread's range
+        #pragma omp for
+        for (int i = 0; i < unit_dirs.size(); ++i) {
+          ArrayNf v;
+          for (auto &f : v) f = distr(rng);
+          unit_dirs[i] = detail::inv_unit_sphere_cdf(v);
+        }
+      }
+
+      return unit_dirs;
+    }
+  } // namespace detail
 
   namespace io {
     ProjectData load_project(const fs::path &path) {
@@ -55,6 +107,7 @@ namespace met {
   void ApplicationData::create(ProjectCreateInfo &&info) {
     met_trace();
 
+    fmt::print("Project generation\n");
     debug::check_expr_rel(!info.images.empty(), "ProjectCreateInfo::images must not be empty");
 
     // Reset project data
@@ -78,13 +131,19 @@ namespace met {
     loaded_texture = std::move(info.images[0].image);
     info.images.erase(info.images.begin()); // Youch
 
-    fmt::print("Project generation\n");
-    fmt::print("  Generating simplified convex hull\n");
+    // Generate temporary object color solid boundaries for convex hull estimation
+    fmt::print("  Generating object color solid boundaries\n");
+    auto ocs = generate_ocs_boundary({ .basis = loaded_basis,
+                                       .system = project_data.csys(0).finalize(), 
+                                       .samples = detail::gen_unit_dirs<3>(4096) });
+    auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
 
     // Generate a simplified convex hull over texture data
+    fmt::print("  Generating simplified convex hull\n");
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
-    auto chull_simp = simplify(chull_mesh, info.n_vertices);
+    auto chull_simp = simplify(chull_mesh, ocs_mesh, info.n_vertices);
     auto [verts, elems] = generate_data(chull_simp);
+    fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());
 
     // Store results with approximate values
     project_data.gamut_elems = elems;
@@ -419,8 +478,15 @@ namespace met {
   }  
 
   void ApplicationData::refit_convex_hull() {
+    // Generate color solid
+    auto ocs = generate_ocs_boundary({ .basis = loaded_basis,
+                                       .system = project_data.csys(0).finalize(), 
+                                       .samples = detail::gen_unit_dirs<3>(4096) });
+    auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
+
+    // Generate convex hull
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
-    auto chull_simp = simplify(chull_mesh, project_data.gamut_verts.size());
+    auto chull_simp = simplify(chull_mesh, ocs_mesh, project_data.gamut_verts.size());
     auto [verts, elems] = generate_data(chull_simp);
 
     // Store results with approximate values

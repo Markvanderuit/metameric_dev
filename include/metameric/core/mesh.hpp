@@ -53,7 +53,9 @@ namespace met {
   TriMesh<Traits> generate_spheroid(uint n_subdivs = 3);
 
   template <typename Traits>
-  TriMesh<Traits> simplify(const TriMesh<Traits> &mesh, uint max_vertices);
+  TriMesh<Traits> simplify(const TriMesh<Traits> &mesh, 
+                           const TriMesh<Traits> &bounds,
+                           uint max_vertices);
 
   template <typename Traits>
   TriMesh<Traits> simplify_edges(const TriMesh<Traits> &mesh, float max_edge_length);

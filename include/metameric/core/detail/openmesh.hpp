@@ -54,15 +54,6 @@ namespace OpenMesh::Decimater {
     }
   };
 
-  // Collapse a pair of vertices in a volume-preserving manner
-  template <typename Mesh>
-  struct VolumeCollapseFunction {
-    typedef CollapseInfoT<Mesh> CollapseInfo;
-    typedef Mesh::Point         Point;
-
-    static Point collapse(const CollapseInfo &ci);
-  };
-
   template <typename MeshT>
   class ModVolumeT : public ModBaseT<MeshT> {
   public:
@@ -71,7 +62,7 @@ namespace OpenMesh::Decimater {
   public:
     explicit ModVolumeT(MeshT &mesh)
     : Base(mesh, false),
-      m_mesh(Base::mesh()) ,
+      m_mesh(Base::mesh()),
       m_maximum_volume(std::numeric_limits<float>::max()) {
       m_mesh.add_property(m_vertex);
       m_mesh.add_property(m_volume);
@@ -89,10 +80,15 @@ namespace OpenMesh::Decimater {
 
     float maximum_volume() const { return m_maximum_volume; }
     void set_maximum_volume(float f) { m_maximum_volume = f; }
+    void set_collision_mesh(const MeshT *mesh);
 
   private: /* private data */
     // Reference to mesh
     Mesh &m_mesh;
+
+    // Reference to wrapper mesh as maximum volume bounds
+    const MeshT * m_collision_mesh = nullptr;
+    Vec3f m_collision_centroid;
 
     // Half-edge properties to handle a volume-preserving collapse data
     HPropHandleT<Vec3f> m_vertex; // Solved vertex position for potential collapse
