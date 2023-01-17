@@ -257,6 +257,13 @@ namespace met {
             }
           }
         }
+
+        ImGui::Separator();
+        if (ImGui::Button("Print hull to console")) {
+          std::vector<Colr> verts(e_verts.size());
+          std::ranges::transform(e_verts, verts.begin(), [](const auto &v) { return v.colr_i; });
+          fmt::print("verts = np.array({})\nelems = np.array({})\n", verts, e_elems);
+        }
       }
       ImGui::End();
 

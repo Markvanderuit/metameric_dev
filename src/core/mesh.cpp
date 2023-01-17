@@ -294,7 +294,7 @@ namespace met {
       ModVolume volume_mod;
 
       dec.add(volume_mod);
-      // dec.module(volume_mod).set_maximum_volume(0.001f);
+      // dec.module(volume_mod).set_maximum_volume(0.1f);
 
       dec.initialize();
       dec.decimate_to(max_vertices);

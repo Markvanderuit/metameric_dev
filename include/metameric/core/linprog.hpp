@@ -61,7 +61,7 @@ namespace met {
     eig::ArrayXd x_l, x_u;    /* N x 1 */
   };
 
-
   // Solve a linear program for a valid parameter object
   eig::ArrayXd lp_solve(const LPParameters &params);
+  std::pair<bool, eig::ArrayXd> lp_solve_res(const LPParameters &params);
 } // namespace metw

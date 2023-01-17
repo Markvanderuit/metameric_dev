@@ -78,16 +78,25 @@ namespace met {
     Spec power       = mapp.illuminant * reflectance;
     Colr color       = mapp.apply_color(reflectance);
 
-    // Plot rest of tooltip
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
       nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
     ImGui::ColorEdit3("Color (lRGB)", color.data(), ImGuiColorEditFlags_Float);
+
     ImGui::Separator();
-    ImGui::Value("Minimum", reflectance.minCoeff(), "%.16f");
-    ImGui::Value("Maximum", reflectance.maxCoeff(), "%.16f");
-    ImGui::Value("Valid", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+    
+    ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
+    ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
+    ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+
+    ImGui::Separator();
+
+    ImGui::Text("Press 'R' to print reflectance to stdout.");
+    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+      auto [wvls, vals] = io::spectrum_to_data(reflectance);
+      fmt::print("wvls = {}\nvals = {}\n, col={}\n", wvls, vals, color.max(0.f).min(1.f).eval());
+    }
 
     ImGui::EndTooltip();
   }

@@ -62,19 +62,38 @@ int main() {
     Colr colr_rtrip = system.apply_color(spec);
     fmt::print("rtrp = {}\n", colr_rtrip);
 
+    constexpr auto wvl_at_i = [](int i) {
+      return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
+    };
+    constexpr auto i_at_wvl = [](float wvl) {
+      return std::clamp(uint((wvl - wavelength_min) * wavelength_ssinv - 0.5), 0u, wavelength_samples - 1);
+    };
+
     std::vector<float> wvls(wavelength_samples + 1), vals(wavelength_samples + 1);
     for (uint i = 0; i < wavelength_samples + 1; ++i) {
-      float wvl = wavelength_min + (float(i) - 0.5) * wavelength_ssize;
+      float wvl = wavelength_min + float(i) * wavelength_ssize;
 
-      // uint bin_a = i, bin_b = i + 1;
-
-      uint bin_a = index_from_wavelength(wvl),
-           bin_b = index_from_wavelength(wvl + wavelength_ssize);
+      uint bin_a = i_at_wvl(wvl),
+           bin_b = i_at_wvl(wvl + wavelength_ssize),
+           wvl_a = wvl_at_i(bin_a),
+           wvl_b = wvl_at_i(bin_b);
            
       wvls[i] = wavelength_min + i * wavelength_ssize;
       vals[i] = 0.5 * (spec[bin_a] + spec[bin_b]);
-      // fmt::print("{} - {} : {}\n", i, bin_a, bin_b);
+
+      wvls[i] = wvl;
+      if (bin_a == bin_b) {
+        vals[i] = spec[bin_a];
+      } else {
+        float a = (wvl - wvl_a) / (wvl_b - wvl_a);
+        vals[i] = (1.f - a) * spec[bin_a] + a * spec[bin_b];
+      }
+
+      fmt::print("input = {}, bins = ({}, {}), wvls = ({}, {})\n", 
+        wvl, bin_a, bin_b, wvl_a, wvl_b);
     }
+
+    
     // std::exit(0);
 
     /* for (uint i = 0; i < wavelength_samples + 1; ++i) {
@@ -104,7 +123,7 @@ int main() {
     } */
     // std::exit(0);
 
-    // auto [wvls, vals] = io::spectrum_to_data(spec);
+    // // auto [wvls, vals] = io::spectrum_to_data(spec);
     Spec spec_rtrip = io::spectrum_from_data(wvls, vals);
     colr_rtrip = system.apply_color(spec_rtrip);
     fmt::print("rtrp 2 = {}\n\n", colr_rtrip);

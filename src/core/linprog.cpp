@@ -64,4 +64,46 @@ namespace met {
 
     return x;
   }
+
+  std::pair<bool, eig::ArrayXd> lp_solve_res(const LPParameters &params) {
+    met_trace();
+
+    // Set up a simplex model without log output
+    ClpSimplex model;
+    model.messageHandler()->setLogLevel(0); // shuddup you
+    model.resize(0, params.N);
+
+    // Pass in objective coefficients and constraintss
+    for (int i = 0; i < params.N; ++i) {
+      model.setObjCoeff(i, (params.objective == LPObjective::eMaximize) ? params.C[i] : -params.C[i]);
+      model.setColBounds(i, params.x_l[i], params.x_u[i]);
+    }
+
+    // Pass in constraints matrix
+    eig::ArrayXi indices = eig::ArrayXi::LinSpaced(params.N, 0, params.N - 1);
+    for (int i = 0; i < params.M; ++i)
+      model.addRow(params.N, 
+                   indices.data(), 
+                   params.A.row(i).eval().data(),
+                   params.r[i] == LPCompare::eLE ? -COIN_DBL_MAX : params.b[i], 
+                   params.r[i] == LPCompare::eGE ?  COIN_DBL_MAX : params.b[i]);
+
+    // Model settings
+    model.scaling(params.scaling ? 1 : 0);
+
+    // Solve for solution with requested method
+    if (params.method == LPMethod::ePrimal) {
+      model.primal();
+    } else {
+      model.dual();
+    }
+
+    // Obtain solution data and copy to return object
+    std::span<const double> solution = { model.getColSolution(), params.N };
+    eig::VectorXd x(params.N);
+    std::ranges::copy(solution, x.begin());
+
+    return { model.isProvenOptimal(), x };
+  }
+
 } // namespace met

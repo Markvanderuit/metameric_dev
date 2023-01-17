@@ -40,18 +40,11 @@ namespace OpenMesh::Decimater {
       met::LPParameters params(M, N);
       params.method    = met::LPMethod::ePrimal;
       params.objective = met::LPObjective::eMinimize;
-      params.r         = met::LPCompare::eGE;
+      params.r         = met::LPCompare::eLE;
 
       // Iterate settings
       Vec3f n_sum = { 0, 0, 0 };
       Vec3f v_base = 0.5f * (p0 + p1);
-
-      // Fill constraint matrices describing boundedness
-     /*  params.r.block(0, 0, 6, 1) = met::LPCompare::eLE;
-      params.A.block(0, 0, 3, 3) = (Eigen::Matrix3d() << -1, 0, 0, 0, -1, 0, 0, 0, -1).finished();
-      params.b.block(0, 0, 3, 1) = met::to_eig<float, 3>(v_base).cast<double>().eval();
-      params.A.block(3, 0, 3, 3) = (Eigen::Matrix3d() << 1, 0, 0, 0, 1, 0, 0, 0, 1).finished();
-      params.b.block(3, 0, 3, 1) = met::to_eig<float, 3>(Vec3f(1) - v_base).cast<double>().eval(); */
 
       // Fill constraint matrices describing added volume, which must be zero or positive
       uint i = 0;
@@ -68,15 +61,18 @@ namespace OpenMesh::Decimater {
         // Compute triangle area
         auto s = 0.5f * (d[0] + d[1] + d[2]);
         auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
-        auto n = mesh.calc_face_normal(fh);
-        auto An = (A / 3.f) * n;
 
+        // Compute volume metric
+        auto n = mesh.calc_face_normal(fh);
+        n = n / std::sqrtf(n.dot(n));
+
+        // Add normal to objective function
         n_sum += n;
 
-        // Positive volume
-        params.A.row(i) = met::to_eig<float, 3>(An).cast<double>().eval();
-        params.r[i]     = met::LPCompare::eGE;
-        params.b[i]     = An.dot(p[0] - v_base);
+        // Set constraint information
+        n = (A / 3.f) * n;
+        params.A.row(i) = met::to_eig<float, 3>(n).cast<double>().eval();
+        params.b[i]     = n.dot(p[0]); 
 
         i++;
       }
@@ -86,10 +82,16 @@ namespace OpenMesh::Decimater {
       params.C = met::to_eig<float, 3>(n_sum).cast<double>().eval();
       
       // Set minimization constraint, run solver, and pray 
-      auto vertex = v_base + met::to_omesh<float, 3>(met::lp_solve(params).cast<float>().eval());
+      auto [optimal, solution] = met::lp_solve_res(params);
+      auto vertex = met::to_omesh<float, 3>(solution.cast<float>());
+
+      // Penalize failed solutions
+      if (!optimal)
+        return { 999.f, vertex };
+
 
       // Clamp output to rgb cube for now; 
-      // TODO: there's no need to do this in xyz
+      // TODO: there's no need to do this, reproject onto OCS instead
       vertex = vertex.min({ 1, 1, 1 }).max({ 0, 0, 0 }); 
       // vertex = vertex.max({ 0, 0, 0 }); // Clamp negative values
 
@@ -107,9 +109,10 @@ namespace OpenMesh::Decimater {
         // Compute triangle area
         auto s = 0.5f * (d[0] + d[1] + d[2]);
         auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
-        auto n = (A / 3.f) * mesh.calc_face_normal(fh);
 
-        volume += n.dot(vertex - p[0]);
+        // Compute volume metric
+        auto n = mesh.calc_face_normal(fh);
+        volume += std::abs((A / 3.f) * n.dot(vertex - p[0]));
       }
 
       return { volume, vertex };
@@ -478,7 +481,7 @@ namespace OpenMesh::Decimater {
   float ModVolumeT<MeshT>::collapse_priority(const CollapseInfoT<MeshT>& ci) {
     // Return pre-computed added volume, should this half-edge be collapsed
     auto volume = m_mesh.property(m_volume, ci.v0v1);
-    return (volume >= 0.f) 
+    return (volume >= 0.f && volume < m_maximum_volume) 
       ? volume 
       : float(Base::ILLEGAL_COLLAPSE);
   }
