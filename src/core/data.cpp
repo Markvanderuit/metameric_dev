@@ -135,15 +135,28 @@ namespace met {
     fmt::print("  Generating object color solid boundaries\n");
     auto ocs = generate_ocs_boundary({ .basis = loaded_basis,
                                        .system = project_data.csys(0).finalize(), 
-                                       .samples = detail::gen_unit_dirs<3>(4096) });
+                                       .samples = detail::gen_unit_dirs<3>(1024) });
     auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
 
-    // Generate a simplified convex hull over texture data
+    /* // TODO: Remove
+    {
+      auto [verts, elems] = generate_data(ocs_mesh);
+      fmt::print("ocs_verts = np.array({})\nocs_elems = np.array({})\n", verts, elems);
+    } */
+
+    // Generate a simplified concave hull fit to texture data; then re-generate a convex hull around this
     fmt::print("  Generating simplified convex hull\n");
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
     auto chull_simp = simplify(chull_mesh, ocs_mesh, info.n_vertices);
     auto [verts, elems] = generate_data(chull_simp);
+    chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(verts);
+    std::tie(verts, elems) = generate_data(chull_mesh);
     fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());
+
+    /* // TODO: Remove
+    {
+      fmt::print("chull_verts = np.array({})\nchull_elems = np.array({})\n", verts, elems);
+    } */
 
     // Store results with approximate values
     project_data.gamut_elems = elems;

@@ -262,7 +262,7 @@ namespace met {
         if (ImGui::Button("Print hull to console")) {
           std::vector<Colr> verts(e_verts.size());
           std::ranges::transform(e_verts, verts.begin(), [](const auto &v) { return v.colr_i; });
-          fmt::print("verts = np.array({})\nelems = np.array({})\n", verts, e_elems);
+          fmt::print("chull_verts = np.array({})\nchull_elems = np.array({})\n", verts, e_elems);
         }
       }
       ImGui::End();

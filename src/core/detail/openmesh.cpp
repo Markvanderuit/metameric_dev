@@ -43,15 +43,14 @@ namespace OpenMesh::Decimater {
       
       // Initialize parameter object for LP solver with expected matrix sizes
       met::LPParameters params(M, N);
-      params.method    = met::LPMethod::ePrimal;
+      params.method    = met::LPMethod::eDual;
       params.objective = met::LPObjective::eMinimize;
       params.r         = met::LPCompare::eLE;
-
-      // Iterate settings
-      Vec3f n_sum = { 0, 0, 0 };
-      Vec3f v_base = 0.5f * (p0 + p1);
+      params.x_l       = -0.5;
+      params.x_u       = 1.5;
 
       // Fill constraint matrices describing added volume, which must be zero or positive
+      Vec3f n_sum = { 0, 0, 0 };
       uint i = 0;
       for (auto fh : fm) {
         // Get vertex positions and edge lengths
@@ -70,12 +69,12 @@ namespace OpenMesh::Decimater {
         // Compute volume metric
         auto n = mesh.calc_face_normal(fh);
         n = n / std::sqrtf(n.dot(n));
+        n = (A / 3.f) * n;
 
         // Add normal to objective function
         n_sum += n;
 
         // Set constraint information
-        n = (A / 3.f) * n;
         params.A.row(i) = met::to_eig<float, 3>(n).cast<double>().eval();
         params.b[i]     = n.dot(p[0]); 
 
@@ -83,19 +82,14 @@ namespace OpenMesh::Decimater {
       }
 
       // Minimize the solution vertex with respect to triangle normals, which places it
-      // on their intersecting planes
+      // on their intersecting planes; run solver, and pray 
       params.C = met::to_eig<float, 3>(n_sum).cast<double>().eval();
-      
-      // Set minimization constraint, run solver, and pray 
       auto [optimal, solution] = met::lp_solve_res(params);
       auto vertex = met::to_omesh<float, 3>(solution.cast<float>());
 
       // Penalize failed solutions
       if (!optimal)
         return { 999.f, vertex };
-
-      // Clamp output to rgb cube +/- epsilon for now; 
-      // vertex = vertex.min(Vec3f(0.99999f)).max(Vec3f(0.000001f));
 
       // Reproject vertex onto boundary mesh surface if it exceeds this
       {
@@ -109,8 +103,9 @@ namespace OpenMesh::Decimater {
           if (fh.is_valid()) {
             // Test if face is facing towards us, or if we are on the inside
             auto n = met::to_eig<float, 3>(bounds_mesh->calc_face_normal(fh));
-            if (n.dot(ray.d) < 0.f)
+            if (n.dot(ray.d) < 0.f) {
               vertex = met::to_omesh<float, 3>(ray.o + query.t * ray.d);
+            }
           }
         }
       }
@@ -135,8 +130,9 @@ namespace OpenMesh::Decimater {
         auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
 
         // Compute volume metric
-        auto n = mesh.calc_face_normal(fh);
-        volume += std::abs((A / 3.f) * n.dot(vertex - p[0]));
+        auto n = (A / 3.f) * mesh.calc_face_normal(fh);
+        // volume += std::abs(n.dot(vertex - p[0]));
+        volume += std::abs(n.dot(vertex - p[0]));
       }
 
       return { volume, vertex };

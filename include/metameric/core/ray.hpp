@@ -146,6 +146,40 @@ namespace met {
 
   
   // Given a ray object, find the nearest (front-or-back-facing) triangle intersecting the ray
+  inline
+  RayQuery ray_trace_nearest_elem_any_side(const Ray &ray,
+                                           const std::vector<eig::Array3f> &verts,
+                                           const std::vector<eig::Array3u> &elems) {
+    RayQuery query;
+
+    for (uint i = 0; i < elems.size(); ++i) {
+      // Load triangle data
+      const eig::Array3u e = elems[i];
+      eig::Vector3f a = verts[e[0]], 
+                    b = verts[e[1]], 
+                    c = verts[e[2]];
+
+      // Compute edges, plane normal
+      eig::Vector3f ab = b - a, bc = c - b, ca = a - c;
+      eig::Vector3f n  = bc.cross(ab).normalized();
+      
+      // Test if intersection point is closer than current t
+      float t = ((a + b + c) / 3.f - ray.o).dot(n) / n.dot(ray.d);
+      guard_continue(t >= 0.f && t < query.t);
+
+      // Test if intersection point lies within triangle boundaries
+      eig::Vector3f x = ray.o + t * ray.d;
+      guard_continue(n.dot((x - a).cross(ab)) >= 0.f);
+      guard_continue(n.dot((x - b).cross(bc)) >= 0.f);
+      guard_continue(n.dot((x - c).cross(ca)) >= 0.f);
+
+      query = { t, i };
+    }
+
+    return query;
+  }
+  
+  // Given a ray object, find the nearest (front-or-back-facing) triangle intersecting the ray
   template <typename Traits>
   inline
   RayQuery ray_trace_nearest_elem_any_side(const Ray &ray,

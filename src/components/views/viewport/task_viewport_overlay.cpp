@@ -1,4 +1,7 @@
 #include <metameric/core/state.hpp>
+#include <metameric/core/mesh.hpp>
+#include <metameric/core/ray.hpp>
+#include <metameric/core/metamer.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -11,8 +14,11 @@
 #include <small_gl/utility.hpp>
 #include <ImGuizmo.h>
 #include <implot.h>
+#include <algorithm>
+#include <execution>
 #include <numeric>
 #include <ranges>
+#include <random>
 #include <utility>
 
 namespace met {
@@ -700,6 +706,7 @@ namespace met {
     auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_color_solid_target");
     auto &e_csol_cntr   = info.get_resource<Colr>("gen_color_solids", "csol_cntr");
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data   = e_appl_data.project_data;
     auto &e_vert        = is_sample ? e_appl_data.project_data.sample_verts[i]
                                     : e_appl_data.project_data.gamut_verts[i];
 
@@ -835,6 +842,97 @@ namespace met {
                   { data.gamut_verts[i].colr_j[j] = edit; }
         });
       }
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("Print mismatch data to stdout")) {
+      auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
+      auto [verts, elems] = generate_convex_hull<Colr>(e_csol_data);
+      fmt::print("mmv_verts = np.array({})\nmmv_elems = np.array({})\n", verts, elems);
+    }
+
+    if (ImGui::Button("Print mismatch metamers to stdout")) {
+      // Get mismatch volume data and generate convex hull
+      auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
+      auto [verts, elems] = generate_convex_hull<Colr>(e_csol_data);
+
+      // Find farthest point from MMV center
+      Colr farthest_point = e_csol_cntr;
+      float farthest_point_dist = 0.f;
+      for (auto &vert : verts) {
+        float dist = (vert - e_csol_cntr).matrix().norm();
+        if (dist > farthest_point_dist) {
+          farthest_point_dist = dist;
+          farthest_point = vert;
+        }
+      }
+      fmt::print("Farthest point: {}\n", farthest_point_dist);
+
+      // Generate random signals in box with w/h/d = farthest_point_dist
+      std::random_device rd;
+      std::mt19937 eng(rd());
+      std::uniform_real_distribution<float> distr(-farthest_point_dist, farthest_point_dist);
+      uint n_samples = 8;
+      std::vector<Colr> samples;
+      samples.reserve(n_samples * n_samples * n_samples);
+      for (uint i = 0; i < n_samples * n_samples * n_samples; ++i)
+        samples.push_back((e_csol_cntr + Colr(distr(eng), distr(eng), distr(eng))).eval());
+
+      // Reject samples that fall outside the MMV
+      std::vector<Colr> samples_passed;
+      for (Colr sample : samples) {
+        // Cast a ray through the sample towards the centroid;
+        Ray ray = { .o = sample, .d = (e_csol_cntr - sample).matrix().normalized().eval() };
+        auto query = ray_trace_nearest_elem_any_side(ray, verts, elems);
+
+        // Test for hit
+        guard_continue(query);
+
+        // Get face data
+        auto elem = elems[query.i];
+        Colr a = verts[elem[0]], b = verts[elem[1]], c = verts[elem[2]];
+        auto n = (c - b).matrix().cross((b - a).matrix()).normalized().eval();
+
+        // Test for 'bad' normal direction
+        guard_continue(n.dot(ray.d) >= 0.f);
+
+        // Keep sample
+        samples_passed.push_back(sample);
+      }
+      fmt::print("{} -> {}\n", samples.size(), samples_passed.size());
+      samples = samples_passed;
+
+      // For each sample, generate a spectral distribution
+      std::vector<Spec> sample_spectra(samples.size());
+      auto sign_i = e_vert.colr_i;
+      std::vector<CMFS> systems = {
+        e_proj_data.csys(e_vert.csys_i).finalize(),
+        e_proj_data.csys(e_vert.csys_j[i_cstr_slct]).finalize()
+      };
+      std::transform(std::execution::par_unseq, range_iter(samples), sample_spectra.begin(), [&](Colr c) {
+        std::vector<Colr> signals = { e_vert.colr_i, c };
+        return generate_spectrum({
+          .basis = e_appl_data.loaded_basis, 
+          .systems = systems,
+          .signals = signals
+        }).max(0.f).min(1.f).eval();
+      });
+
+      // For each spectral distribution, test roundtrip or discard
+      std::erase_if(sample_spectra, [&](Spec &s) {
+        Colr sign_i_r = e_proj_data.csys(e_vert.csys_i).apply_color(s);
+        return !sign_i_r.isApprox(sign_i);
+      });
+      fmt::print("{} -> {}\n", samples.size(), sample_spectra.size());
+
+      fmt::print("output = [\n");
+      for (const auto &s : sample_spectra) {
+        fmt::print("  np.array({}),\n", s);
+      }
+      fmt::print("]\n");
+
+      // auto [wvls, _] = io::spectrum_to_data(sample_spectra[0]);
+      // fmt::print("wvls = np.array([{}])\n", wvls);
     }
   }
 
