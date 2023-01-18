@@ -126,7 +126,7 @@ namespace met::io {
     // Parse split data into string format
     std::stringstream ss;
     for (uint i = 0; i < wvls.size(); ++i)
-      ss << fmt::format("{} {}\n", wvls[i], values[i]);
+      ss << fmt::format("{:.6f} {:.6f}\n", wvls[i], values[i]);
 
     return save_string(path, ss.str());
   }
@@ -342,6 +342,36 @@ namespace met::io {
 
     return { wvls, values };
   }
+
+  /* {
+    std::vector<float> wvls(wavelength_samples + 1);
+    std::vector<float> vals(wavelength_samples + 1);
+
+    constexpr auto wvl_at_i = [](int i) {
+      return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
+    };
+    constexpr auto i_at_wvl = [](float wvl) {
+      return std::clamp(uint((wvl - wavelength_min) * wavelength_ssinv - 0.5), 0u, wavelength_samples - 1);
+    };
+
+    for (uint i = 0; i < wavelength_samples + 1; ++i) {
+      float wvl = wavelength_min + float(i) * wavelength_ssize;
+
+      uint bin_a = i_at_wvl(wvl), bin_b = i_at_wvl(wvl + wavelength_ssize);
+      float wvl_a = wvl_at_i(bin_a), wvl_b = wvl_at_i(bin_b);
+
+            
+      wvls[i] = wvl;
+      if (bin_a == bin_b) {
+        vals[i] = s[bin_a];
+      } else {
+        float alpha = (wvl - wvl_a) / (wvl_b - wvl_a);
+        vals[i] = (1.f - alpha) * s[bin_a] + alpha * s[bin_b];
+      }
+    }
+
+    return { wvls, vals };
+  } */
 
   std::array<std::vector<float>, 4> cmfs_to_data(const CMFS &s) {
     std::vector<float> wvls(wavelength_samples);

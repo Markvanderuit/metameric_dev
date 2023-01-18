@@ -43,7 +43,7 @@ int main() {
 
   try {
     // Define color system
-    CMFS cmfs = models::cmfs_cie_xyz; // (models::xyz_to_srgb_transform * models::cmfs_cie_xyz .transpose()).transpose().eval();
+    CMFS cmfs = models::cmfs_cie_xyz;
     Spec illm = models::emitter_cie_d65;
     ColrSystem system = { .cmfs = cmfs, .illuminant = illm };
 
@@ -74,54 +74,21 @@ int main() {
       float wvl = wavelength_min + float(i) * wavelength_ssize;
 
       uint bin_a = i_at_wvl(wvl),
-           bin_b = i_at_wvl(wvl + wavelength_ssize),
-           wvl_a = wvl_at_i(bin_a),
-           wvl_b = wvl_at_i(bin_b);
+           bin_b = i_at_wvl(wvl + wavelength_ssize);
+      float wvl_a = wvl_at_i(bin_a),
+            wvl_b = wvl_at_i(bin_b);
            
-      wvls[i] = wavelength_min + i * wavelength_ssize;
-      vals[i] = 0.5 * (spec[bin_a] + spec[bin_b]);
-
       wvls[i] = wvl;
       if (bin_a == bin_b) {
         vals[i] = spec[bin_a];
       } else {
-        float a = (wvl - wvl_a) / (wvl_b - wvl_a);
-        vals[i] = (1.f - a) * spec[bin_a] + a * spec[bin_b];
+        float alpha = (wvl - wvl_a) / (wvl_b - wvl_a);
+        vals[i] = (1.f - alpha) * spec[bin_a] + alpha * spec[bin_b];
       }
 
       fmt::print("input = {}, bins = ({}, {}), wvls = ({}, {})\n", 
         wvl, bin_a, bin_b, wvl_a, wvl_b);
     }
-
-    
-    // std::exit(0);
-
-    /* for (uint i = 0; i < wavelength_samples + 1; ++i) {
-      float wvl = wavelength_min + (float(i) - 0.5) * wavelength_ssize;
-      
-      wvls[i] = wvl;
-
-      uint bin_a = index_from_wavelength(wvl),
-           bin_b = index_from_wavelength(wvl + wavelength_ssize);
-
-      fmt::print("{} - {} : {}\n", i, bin_a, bin_b);
-
-      if (bin_a == bin_b) {
-        // vals[i] = ()
-        // vals[i] = spec[bin_a];
-        // vals[i] = 0.5 * (spec[bin_a] + spec[bin_b]);
-        vals[i] = spec[bin_a];
-      } else {
-        float a = wavelength_at_index(bin_a),
-              b = wavelength_at_index(bin_b),
-              fa = spec[bin_a],
-              fb = spec[bin_b];
-        float w = (wvl - a) / (b - a);
-        fmt::print("{}\n", w);
-        vals[i] = w * fb + (1 - w) * fa;
-      }
-    } */
-    // std::exit(0);
 
     // // auto [wvls, vals] = io::spectrum_to_data(spec);
     Spec spec_rtrip = io::spectrum_from_data(wvls, vals);
