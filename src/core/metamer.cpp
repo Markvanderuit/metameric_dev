@@ -49,9 +49,8 @@ namespace met {
     const     uint M = 3 * info.systems.size() 
                      + (info.impose_boundedness ? 2 * wavelength_samples : 0);
     LPParameters params(M, N);
-    params.method  = LPMethod::ePrimal;
-    params.scaling = true;
-    // params.C       = (info.systems[0].transpose() * info.basis).row(1).cast<double>().eval();
+    params.method    = LPMethod::ePrimal;
+    params.scaling   = true;
 
     // Add constraints to ensure resulting spectra produce the given color signals
     for (uint i = 0; i < info.systems.size(); ++i) {
@@ -65,18 +64,30 @@ namespace met {
       const uint offs_u = offs_l + wavelength_samples;
       params.A.block<wavelength_samples, N>(offs_l, 0) = info.basis.cast<double>().eval();
       params.A.block<wavelength_samples, N>(offs_u, 0) = info.basis.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_l, 0) = 0.0;
+      params.b.block<wavelength_samples, 1>(offs_l, 0) = 0.00000001;
       params.b.block<wavelength_samples, 1>(offs_u, 0) = 1.0;
       params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
       params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
     }
 
-    // Solve for minimized/maximized results and take average
-    params.objective = LPObjective::eMinimize;
-    BSpec minv = lp_solve(params).cast<float>();
+    
+    // Normalized inverse sensitivity weight minimization to prevent border issues
+    Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
+    w = 1.0 - (w / w.sum());
+    BSpec C = (w.matrix().transpose() * info.basis).transpose().eval();
+    params.C = C.cast<double>().eval();
     params.objective = LPObjective::eMaximize;
-    BSpec maxv = lp_solve(params).cast<float>();
-    return info.basis * 0.5f * (minv + maxv);
+    Spec s_max = (info.basis * BSpec(lp_solve(params).cast<float>())).eval();
+    float max_w = s_max.sum();
+
+    w = 1.0 - w;
+    C = (w.matrix().transpose() * info.basis).transpose().eval();
+    params.C = C.cast<double>().eval();
+    params.objective = LPObjective::eMinimize;
+    Spec s_min = (info.basis * BSpec(lp_solve(params).cast<float>())).eval();
+    float min_w = s_min.sum();
+
+    return 0.5 * (s_max + s_min); //  ((max_w / (min_w + max_w)) * s_max + (min_w / (min_w + max_w)) * s_min).eval();
   }
 
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {
