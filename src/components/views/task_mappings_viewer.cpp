@@ -82,7 +82,7 @@ namespace met {
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
       nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
-    ImGui::ColorEdit3("Color (lRGB)", color.data(), ImGuiColorEditFlags_Float);
+    ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
 
     ImGui::Separator();
     
@@ -95,7 +95,9 @@ namespace met {
     ImGui::Text("Press 'R' to print reflectance to stdout.");
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
       auto [wvls, vals] = io::spectrum_to_data(reflectance);
-      fmt::print("wvls = {}\nvals = {}\n, col={}\n", wvls, vals, color.max(0.f).min(1.f).eval());
+      fmt::print("Pixel {}, {}\n",  m_tooltip_pixel.x(), m_tooltip_pixel.y());
+      fmt::print("wvls = np.array({})\nvals = np.array({})\ncol = np.array({})",
+        wvls, vals, color);
     }
 
     ImGui::EndTooltip();

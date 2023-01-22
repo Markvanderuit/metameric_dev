@@ -25,6 +25,7 @@ layout(binding = 0) uniform u_0 {
   uint n;
   uint mapping_i;
 } b_unif;
+layout(location = 0) uniform mat3 u_xyz_to_rgb;
 
 shared InMapp s_mapping;
 
@@ -67,7 +68,7 @@ void main() {
   // Load reflectance and color system, then apply to obtain color signal
   Spec sd = load_spec(i);
   CMFS cs = finalize_mapp(load_mapp_shared_cl());
-  vec3 v  = cl_mmul(cs, sd);
+  vec3 v  = u_xyz_to_rgb * cl_mmul(cs, sd);
   
   // Sture results using first invocation
   if (cl_bin_elect())

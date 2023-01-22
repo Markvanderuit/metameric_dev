@@ -133,9 +133,10 @@ namespace met {
 
     // Generate temporary object color solid boundaries for convex hull estimation
     fmt::print("  Generating object color solid boundaries\n");
-    auto ocs = generate_ocs_boundary({ .basis = loaded_basis,
-                                       .system = project_data.csys(0).finalize(), 
-                                       .samples = detail::gen_unit_dirs<3>(1024) });
+    auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
+                                       .basis_avg = loaded_basis_avg,
+                                       .system    = project_data.csys(0).finalize(), 
+                                       .samples   = detail::gen_unit_dirs<3>(1024) });
     auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
 
     /* // TODO: Remove
@@ -227,13 +228,14 @@ namespace met {
     }
 
     // Relevant settings for the following section
-    constexpr uint n_samples  = 16;
-    constexpr uint n_attempts = 16;
+    const     uint n_samples  = 64; //48 * info.images.size();
+    constexpr uint n_attempts = 32;
+    constexpr bool solve_using_constraints = true;
 
     // Mutex for safe solver sections
     std::mutex solver_mutex;
     float solver_error = std::numeric_limits<float>::max();
-    fmt::print("  Starting solver runs\n");
+    fmt::print("  Starting solver runs, {} samples, {} attempts\n", n_samples, n_attempts);
 
     #pragma omp parallel for
     for (int _i = 0; _i < n_attempts; ++_i) {
@@ -273,16 +275,16 @@ namespace met {
       std::vector<Spec> gamut_spec;
 
       /* 2. Solve for a spectral gamut which satisfies the provided input*/
-      bool solve_using_constraints = true;
       if (solve_using_constraints) {
         auto t_start = std::chrono::steady_clock::now();
 
         // Solve using image constraints directly
         GenerateGamutConstraintInfo info = {
-          .basis   = loaded_basis,
-          .gamut   = verts,
-          .systems = std::vector<CMFS>(project_data.color_systems.size()),
-          .signals = std::vector<GenerateGamutConstraintInfo::Signal>(n_samples)
+          .basis     = loaded_basis,
+          .basis_avg = loaded_basis_avg,
+          .gamut     = verts,
+          .systems   = std::vector<CMFS>(project_data.color_systems.size()),
+          .signals   = std::vector<GenerateGamutConstraintInfo::Signal>(n_samples)
         };
 
         // Transform mappings
@@ -316,6 +318,8 @@ namespace met {
 
         fmt::print("  Solve time: {}ms\n", t_duration.count());
       } else {
+        auto t_start = std::chrono::steady_clock::now();
+
         // Generate spectral distributions for each sample
         std::vector<Spec> sample_spec(n_samples);
         std::vector<CMFS> sample_cmfs(project_data.color_systems.size());
@@ -326,9 +330,10 @@ namespace met {
           for (uint j = 0; j < sample_colr_j.size(); ++j)
             sample_signals.push_back(sample_colr_j[j][i]);
           sample_spec[i] = generate_spectrum({
-            .basis   = loaded_basis, 
-            .systems = sample_cmfs, 
-            .signals = sample_signals
+            .basis     = loaded_basis, 
+            .basis_avg = loaded_basis_avg,
+            .systems   = sample_cmfs, 
+            .signals   = sample_signals
           });
         }
         
@@ -344,6 +349,11 @@ namespace met {
         // Fire solver and cross fingers
         gamut_spec = generate_gamut(info);
         gamut_spec.resize(verts.size());
+
+        auto t_end = std::chrono::steady_clock::now();
+        auto t_duration = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
+
+        fmt::print("  Solve time: {}ms\n", t_duration.count());
       }
 
       // Intermediate storage for vertices and constraints
@@ -378,7 +388,7 @@ namespace met {
         for (uint i = 0; i < gamut_verts.size(); ++i)
           roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum();
 
-        // Squared error based on sample roundtrip
+        // Add squared error based on sample roundtrip
         /* for (uint i = 0; i < n_samples; ++i) {
           // Recover spectrum at sample position
           Wght w = sample_bary[i];
@@ -493,6 +503,7 @@ namespace met {
   void ApplicationData::refit_convex_hull() {
     // Generate color solid
     auto ocs = generate_ocs_boundary({ .basis = loaded_basis,
+                                       .basis_avg = loaded_basis_avg,
                                        .system = project_data.csys(0).finalize(), 
                                        .samples = detail::gen_unit_dirs<3>(4096) });
     auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
@@ -612,9 +623,10 @@ namespace met {
     /* 3. Solve for a spectral gamut which satisfies the safe samples */
     if (solve_using_constraints) {
       GenerateGamutConstraintInfo info = {
-        .basis   = loaded_basis,
-        .gamut   = std::vector<Colr>(project_data.gamut_verts.size()), // project_data.gamut_verts,
-        .systems = std::vector<CMFS>(project_data.color_systems.size())
+        .basis     = loaded_basis,
+        .basis_avg = loaded_basis_avg,
+        .gamut     = std::vector<Colr>(project_data.gamut_verts.size()), // project_data.gamut_verts,
+        .systems   = std::vector<CMFS>(project_data.color_systems.size())
       };
 
       // Add color systems and gamut data

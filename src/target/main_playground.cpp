@@ -1,9 +1,12 @@
 // Metameric includes
 #include <metameric/core/io.hpp>
+#include <metameric/core/data.hpp>
+#include <metameric/core/json.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
+#include <nlohmann/json.hpp>
 
 // STL includes
 #include <algorithm>
@@ -27,79 +30,67 @@ size_t index_from_wavelength(float wvl) {
 }
 
 int main() {
-
-  /* std::pair<
-    std::vector<float>, 
-    std::vector<float>
-  > spectrum_to_data(const Spec &s) {
-
-    for (uint i = 0; i < wavelength_samples; ++i) {
-      float wvl = wavelength_min + i * wavelength_ssize;
-
-    }
-
-    // return { { }, { } };
-  } */
-
   try {
+    // Load bases
+    BasisTreeNode tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
+
     // Define color system
     CMFS cmfs = models::cmfs_cie_xyz;
     Spec illm = models::emitter_cie_d65;
     ColrSystem system = { .cmfs = cmfs, .illuminant = illm };
 
-    // Input signal
-    Colr colr = { 0.75, 0.35, 0.25 };
+    // Color signals
+    Colr colr_0 = { 0.81634661,  0.19187019,  0.02059487 }; 
+    Colr colr_1 = { 0.03438915,  0.04543598,  0.26456009 }; 
 
-    // Generate SD
-    Basis basis = io::load_basis("resources/misc/basis.txt");
-    Spec spec = generate_spectrum({
-      .basis = basis,
+    // Uplift to reflectances
+    Spec spec_0 = generate_spectrum({
+      .basis = tree.basis,
+      .basis_avg = tree.basis_mean,
       .systems = std::vector<CMFS> { system.finalize() },
-      .signals = std::vector<Colr> { colr }
+      .signals = std::vector<Colr> { colr_0 }
+    });
+    Spec spec_1 = generate_spectrum({
+      .basis = tree.basis,
+      .basis_avg = tree.basis_mean,
+      .systems = std::vector<CMFS> { system.finalize() },
+      .signals = std::vector<Colr> { colr_1 }
     });
 
-    // Test roundtrip of signal
-    Colr colr_rtrip = system.apply_color(spec);
-    fmt::print("rtrp = {}\n", colr_rtrip);
+    colr_0 = lrgb_to_xyz(colr_0);
+    colr_1 = lrgb_to_xyz(colr_1);
 
-    constexpr auto wvl_at_i = [](int i) {
-      return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
-    };
-    constexpr auto i_at_wvl = [](float wvl) {
-      return std::clamp(uint((wvl - wavelength_min) * wavelength_ssinv - 0.5), 0u, wavelength_samples - 1);
-    };
+    // Define used storage
+    std::vector<float> alpha(16);
+    std::vector<Colr> colr_alpha(alpha.size());
+    std::vector<Colr> spec_alpha(alpha.size());
+    
+    // Define alpha parameters
+    float step = 1.f / static_cast<float>(alpha.size() - 1);
+    std::generate(range_iter(alpha), [step, a = 0.f] () mutable {
+      auto a_ = a;
+      a += step;
+      return a_;
+    });
 
-    std::vector<float> wvls(wavelength_samples + 1), vals(wavelength_samples + 1);
-    for (uint i = 0; i < wavelength_samples + 1; ++i) {
-      float wvl = wavelength_min + float(i) * wavelength_ssize;
+    // Perform interpolations
+    std::ranges::transform(alpha, colr_alpha.begin(), [&](float a) {
+      return lrgb_to_srgb(xyz_to_lrgb((1.f - a) * colr_0 + a * colr_1));
+    });
+    std::ranges::transform(alpha, spec_alpha.begin(), [&](float a) {
+      Spec spec_a = (1.f - a) * spec_0 + a * spec_1;
+      return lrgb_to_srgb(system.apply_color(spec_a));
+    });
 
-      uint bin_a = i_at_wvl(wvl),
-           bin_b = i_at_wvl(wvl + wavelength_ssize);
-      float wvl_a = wvl_at_i(bin_a),
-            wvl_b = wvl_at_i(bin_b);
-           
-      wvls[i] = wvl;
-      if (bin_a == bin_b) {
-        vals[i] = spec[bin_a];
-      } else {
-        float alpha = (wvl - wvl_a) / (wvl_b - wvl_a);
-        vals[i] = (1.f - alpha) * spec[bin_a] + alpha * spec[bin_b];
-      }
+    fmt::print("alpha = {}\n", alpha);
+    fmt::print("colr_alpha = {}\n", colr_alpha);
+    fmt::print("spec_alpha = {}\n", spec_alpha);
 
-      fmt::print("input = {}, bins = ({}, {}), wvls = ({}, {})\n", 
-        wvl, bin_a, bin_b, wvl_a, wvl_b);
-    }
-
-    // // auto [wvls, vals] = io::spectrum_to_data(spec);
-    Spec spec_rtrip = io::spectrum_from_data(wvls, vals);
-    colr_rtrip = system.apply_color(spec_rtrip);
-    fmt::print("rtrp 2 = {}\n\n", colr_rtrip);
-
-    fmt::print("wvls = {}\n\n", wvls);
-    fmt::print("vals = {}\n\n", vals);
-
-    fmt::print("spec = {}\n\n", spec);
-    fmt::print("spec_rtrip = {}\n\n", spec_rtrip);
+    // auto [wvls, vals_0] = io::spectrum_to_data(spec_0);
+    // auto [_, vals_1] = io::spectrum_to_data(spec_1);
+    // fmt::print("wvls = np.array([{}])\n", wvls);
+    // fmt::print("spec_0 = np.array([{}])\n", vals_0);
+    // fmt::print("spec_1 = np.array([{}])\n", vals_1);
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}", e.what());
     return EXIT_FAILURE;

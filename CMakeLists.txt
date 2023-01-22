@@ -17,8 +17,8 @@ option(met_enable_dbg_exceptions "Enable debug exceptions on release" ON)
 option(met_enable_tracy          "Enable Tracy support"               ON)
 
 # Define Metameric's spectral layout
-set(MET_WAVELENGTH_MIN      400) # Minimum wavelength of spectral range
-set(MET_WAVELENGTH_MAX      700) # Maximum wavelength of spectral range
+set(MET_WAVELENGTH_MIN      380) # Minimum wavelength of spectral range
+set(MET_WAVELENGTH_MAX      780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES   64) # Nr. of bins used in discrete spectral representations
 set(MET_WAVELENGTH_BASES     12) # Nr. of basis functions used in generative functions
 set(MET_BARYCENTRIC_WEIGHTS  16) # Maximum nr. of barycentric weights supported

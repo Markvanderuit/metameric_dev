@@ -273,10 +273,15 @@ namespace met {
 
       // Spawn error display 
       ImGui::SetNextItemWidth(edit3_width);
-      ImGui::ColorEdit3("##Error", linear_srgb_to_gamma_srgb(error_i).data(), ImGuiColorEditFlags_Float);
+      ImGui::ColorEdit3("##Error", lrgb_to_srgb(error_i).data(), ImGuiColorEditFlags_Float);
 
       // End the second of two groups
       ImGui::EndGroup();
+
+
+      if (ImGui::SmallButton("->")) {
+        fmt::print("{}\n", rtrip_i);
+      }
 
       // End full group
       ImGui::EndGroup();
@@ -366,14 +371,16 @@ namespace met {
         Colr error_j = (rtrip_j - colr_j).abs().eval();
 
         ImGui::ColorEdit3(fmt::format("##value{}", j).c_str(), 
-          (colr_j).data(),  
-          // linear_srgb_to_gamma_srgb(colr_j).data(),  
+          // (colr_j).data(),  
+          lrgb_to_srgb(rtrip_j).data(),  
           ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
         ImGui::SameLine();
         ImGui::ColorEdit3(fmt::format("##error{}", j).c_str(), 
-          linear_srgb_to_gamma_srgb(error_j).data(), 
+          lrgb_to_srgb(error_j).data(), 
           ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-
+        if (ImGui::SmallButton("->")) {
+          fmt::print("{}\n", rtrip_j);
+        }
         ImGui::PopID();
       }
       ImGui::EndGroup();  ImGui::SameLine();
@@ -913,6 +920,7 @@ namespace met {
         std::vector<Colr> signals = { e_vert.colr_i, c };
         return generate_spectrum({
           .basis = e_appl_data.loaded_basis, 
+          .basis_avg = e_appl_data.loaded_basis_avg, 
           .systems = systems,
           .signals = signals
         }).max(0.f).min(1.f).eval();
@@ -964,7 +972,7 @@ namespace met {
 
       // Plot each vertex
       for (uint i : e_vert_slct) {
-        auto c = linear_srgb_to_gamma_srgb(e_vert[i].colr_i);
+        auto c = lrgb_to_srgb(e_vert[i].colr_i);
         ImPlot::SetNextLineStyle({ c.x(), c.y(), c.z(), 1.f });
         ImPlot::PlotLine(fmt::format("Vertex {}", i).c_str(), x_values.data(), e_spec[i].data(), wavelength_samples);
       }
@@ -976,7 +984,7 @@ namespace met {
       for (uint i : e_vert_slct) {
         const auto &s = e_spec[i];
         auto [wvls, vals] = io::spectrum_to_data(s);
-        fmt::print("Spectrum {}\n\t{}\n\t{}\n", i, wvls, vals);
+        fmt::print("Spectrum {}\n\twvls=np.array({})\n\tvalues=np.array({})\n", i, wvls, vals);
       }
       
     }

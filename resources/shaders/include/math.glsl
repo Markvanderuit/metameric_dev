@@ -6,8 +6,8 @@
 #define FLT_MIN 1.175494351e-38
 
 // Define math constants
-#define M_PI  3.14159265f
-#define M_EPS 0.000001f
+#define M_PI  3.1415926536f
+#define M_EPS 0.0000000001f
 
 // Rounded-up division functions
 
@@ -38,15 +38,18 @@ float hprod(in vec4 v)  { return HPROD_4(v); }
 #define HSUM_3(v) (v.x + v.y + v.z)
 #define HSUM_4(v) (v.x + v.y + v.z + v.w)
 
-uint  hsum(in uvec2 v) { return HSUM_2(v); }
-uint  hsum(in uvec3 v) { return HSUM_3(v); }
-uint  hsum(in uvec4 v) { return HSUM_4(v); }
-int   hsum(in ivec2 v) { return HSUM_2(v); }
-int   hsum(in ivec3 v) { return HSUM_3(v); }
-int   hsum(in ivec4 v) { return HSUM_4(v); }
-float hsum(in vec2 v)  { return HSUM_2(v); }
-float hsum(in vec3 v)  { return HSUM_3(v); }
-float hsum(in vec4 v)  { return HSUM_4(v); }
+uint   hsum(in uvec2 v) { return HSUM_2(v); }
+uint   hsum(in uvec3 v) { return HSUM_3(v); }
+uint   hsum(in uvec4 v) { return HSUM_4(v); }
+int    hsum(in ivec2 v) { return HSUM_2(v); }
+int    hsum(in ivec3 v) { return HSUM_3(v); }
+int    hsum(in ivec4 v) { return HSUM_4(v); }
+float  hsum(in vec2 v)  { return HSUM_2(v); }
+float  hsum(in vec3 v)  { return HSUM_3(v); }
+float  hsum(in vec4 v)  { return HSUM_4(v); }
+double hsum(in dvec2 v) { return HSUM_2(v); }
+double hsum(in dvec3 v) { return HSUM_3(v); }
+double hsum(in dvec4 v) { return HSUM_4(v); }
 
 // Horizontal component min functions
 

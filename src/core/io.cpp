@@ -125,8 +125,12 @@ namespace met::io {
 
     // Parse split data into string format
     std::stringstream ss;
+    ss << "np.array([";
     for (uint i = 0; i < wvls.size(); ++i)
-      ss << fmt::format("{:.6f} {:.6f}\n", wvls[i], values[i]);
+      ss << fmt::format("{:.6f}, ", values[i]);
+    ss << "])";
+    // for (uint i = 0; i < wvls.size(); ++i)
+    //   ss << fmt::format("{:.6f} {:.6f}\n", wvls[i], values[i]);
 
     return save_string(path, ss.str());
   }
@@ -171,8 +175,13 @@ namespace met::io {
 
     // Parse split data into string format
     std::stringstream ss;
+    ss << "{";
     for (uint i = 0; i < wvls.size(); ++i)
-      ss << fmt::format("{} {} {} {}\n", wvls[i], values_x[i], values_y[i], values_z[i]);
+      ss << fmt::format("{:.6f} : ({:.6f}, {:.6f}, {:.6f}),", wvls[i], values_x[i], values_y[i], values_z[i]);
+    ss << "}";
+
+    // for (uint i = 0; i < wvls.size(); ++i)
+    //   ss << fmt::format("{:.6f} {:.6f} {:.6f} {:.6f}\n", wvls[i], values_x[i], values_y[i], values_z[i]);
 
     return save_string(path, ss.str());
   }
@@ -236,8 +245,23 @@ namespace met::io {
   }
 
   // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::average(...) from libcore/spectrum.cpp
-  Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values) {
+  Spec spectrum_from_data(std::span<const float> wvls_, std::span<const float> values, bool remap) {
     met_trace();
+
+    // TODO: remove this hack
+    // constexpr auto wvl_at_i = [](int i) {
+    //   return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
+    // };
+    // Generate extended wavelengths for now, fitting current spectral range
+    std::vector<float> wvls;
+    if (remap) {
+      wvls.resize(values.size());
+      for (int i = 0; i < wvls.size(); ++i) {
+        wvls[i] = wavelength_min + i * (wavelength_range / static_cast<float>(values.size() - 1));
+      }
+    } else {
+      wvls = std::vector<float>(range_iter(wvls_));
+    }
 
     Spec s = 0.f;
 
@@ -287,10 +311,20 @@ namespace met::io {
                       spectrum_from_data(wvls, values_z)).finished();
   }
 
-  Basis basis_from_data(std::span<const float> wvls, 
+  Basis basis_from_data(std::span<const float> wvls_, 
                         std::span<std::array<float, wavelength_bases>> values) {
     met_trace();
-    
+
+    // TODO: remove this hack
+    constexpr auto wvl_at_i = [](int i) {
+      return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
+    };
+    // Generate extended wavelengths for now, fitting current spectral range
+    std::vector<float> wvls(values.size() + 1);
+    for (int i = 0; i < wvls.size(); ++i) {
+      wvls[i] = wavelength_min + i * (wavelength_range / static_cast<float>(values.size()));
+    }
+  
     float data_wvl_min = wvls[0],
           data_wvl_max = wvls[wvls.size() - 1];
 
@@ -332,6 +366,51 @@ namespace met::io {
 
     return s.eval();
   }
+
+  Basis basis_from_data(std::span<const float> wvls, std::span<const float> values) {
+    met_trace();
+    
+    float data_wvl_min = wvls[0],
+          data_wvl_max = wvls[wvls.size() - 1];
+
+    Basis s = 0.f;
+
+    for (size_t j = 0; j < wavelength_bases; ++j) {
+      for (size_t i = 0; i < wavelength_samples; ++i) {
+        float spec_wvl_min = i * wavelength_ssize + wavelength_min,
+              spec_wvl_max = spec_wvl_min + wavelength_ssize;
+
+        // Determine accessible range of wavelengths
+        float wvl_min = std::max(spec_wvl_min, data_wvl_min),
+              wvl_max = std::min(spec_wvl_max, data_wvl_max);
+        guard_continue(wvl_max > wvl_min);
+
+        // Find the starting index using binary search (Thanks for the idea, Mitsuba people!)
+        ptrdiff_t pos = std::max(std::ranges::lower_bound(wvls, wvl_min) - wvls.begin(),
+                                static_cast<ptrdiff_t>(1)) - 1;
+        
+        // Step through the provided data and integrate trapezoids
+        for (; pos + 1 < wvls.size() && wvls[pos] < wvl_max; ++pos) {
+          float wvl_a   = wvls[pos],
+                value_a = values[wavelength_bases * pos + j],
+                clamp_a = std::max(wvl_a, wvl_min);
+          float wvl_b   = wvls[pos + 1],
+                value_b = values[wavelength_bases * (pos + 1) + j],
+                clamp_b = std::min(wvl_b, wvl_max);
+          guard_continue(clamp_b > clamp_a);
+
+          float inv_ab = 1.f / (wvl_b - wvl_a);
+          float interp_a = std::lerp(value_a, value_b, (clamp_a - wvl_a) * inv_ab),
+                interp_b = std::lerp(value_a, value_b, (clamp_b - wvl_a) * inv_ab);
+
+          s(i, j) += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
+        }
+        s(i, j) /= wavelength_ssize;
+      }
+    }
+
+    return s.eval();
+  }
   
   std::array<std::vector<float>, 2> spectrum_to_data(const Spec &s) {
     std::vector<float> wvls(wavelength_samples);
@@ -343,37 +422,7 @@ namespace met::io {
     return { wvls, values };
   }
 
-  /* {
-    std::vector<float> wvls(wavelength_samples + 1);
-    std::vector<float> vals(wavelength_samples + 1);
-
-    constexpr auto wvl_at_i = [](int i) {
-      return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
-    };
-    constexpr auto i_at_wvl = [](float wvl) {
-      return std::clamp(uint((wvl - wavelength_min) * wavelength_ssinv - 0.5), 0u, wavelength_samples - 1);
-    };
-
-    for (uint i = 0; i < wavelength_samples + 1; ++i) {
-      float wvl = wavelength_min + float(i) * wavelength_ssize;
-
-      uint bin_a = i_at_wvl(wvl), bin_b = i_at_wvl(wvl + wavelength_ssize);
-      float wvl_a = wvl_at_i(bin_a), wvl_b = wvl_at_i(bin_b);
-
-            
-      wvls[i] = wvl;
-      if (bin_a == bin_b) {
-        vals[i] = s[bin_a];
-      } else {
-        float alpha = (wvl - wvl_a) / (wvl_b - wvl_a);
-        vals[i] = (1.f - alpha) * s[bin_a] + alpha * s[bin_b];
-      }
-    }
-
-    return { wvls, vals };
-  } */
-
-  std::array<std::vector<float>, 4> cmfs_to_data(const CMFS &s) {
+  std::array<std::vector<float>, 4> cmfs_to_data(const CMFS &s)  {
     std::vector<float> wvls(wavelength_samples);
     std::vector<float> values_x(wavelength_samples), 
       values_y(wavelength_samples), values_z(wavelength_samples);

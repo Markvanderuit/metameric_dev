@@ -52,7 +52,7 @@ namespace met {
             ImGui::Bullet();
             ImGui::Text(key.c_str());
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 96.f);
-            if (fs::path path; ImGui::SmallButton("Export") && detail::save_dialog(path, ".spd")) {
+            if (fs::path path; ImGui::SmallButton("Export") && detail::save_dialog(path, "spd")) {
               io::save_spec(path, illuminant);
             }
             ImGui::SameLine();
@@ -102,8 +102,8 @@ namespace met {
             ImGui::Bullet();
             ImGui::Text(key.c_str());
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 96.f);
-            if (fs::path path; ImGui::SmallButton("Export") && detail::save_dialog(path, ".cmfs")) {
-              CMFS _cmfs = (models::srgb_to_xyz_transform * cmfs.transpose()).transpose();
+            if (fs::path path; ImGui::SmallButton("Export") && detail::save_dialog(path, "cmfs")) {
+              CMFS _cmfs = ( models::srgb_to_xyz_transform * cmfs.transpose()).transpose();
               io::save_cmfs(path, _cmfs);
             }
             ImGui::SameLine();

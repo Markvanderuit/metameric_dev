@@ -36,14 +36,43 @@ namespace met {
     js["colr_j"] = v.colr_j;
     js["csys_j"] = v.csys_j;
   }
+  
+  void from_json(const json &js, BasisTreeNode &b) {
+    // Extract structure data
+    if (js.contains("children"))
+      b.children = js.at("children").get<std::vector<BasisTreeNode>>();
+    b.bbox_min = js.at("bbox_min").get<Chromaticity>();
+    b.bbox_max = js.at("bbox_max").get<Chromaticity>();
+    b.depth    = js.at("depth").get<uint>();
+
+    // Extract node data
+    constexpr uint data_wvls = 31;
+    auto [wvls, mean, basis] = js.at("data").get<std::tuple<
+      eig::Array<float, data_wvls, 1>, 
+      eig::Array<float, data_wvls, 1>, 
+      eig::Array<float, data_wvls, data_wvls>>
+    >();
+
+    // Format node data
+    auto block = basis.eval().block<data_wvls, wavelength_bases>(0, 0).transpose().eval();
+    // auto block = basis.transpose().eval().block<data_wvls, wavelength_bases>(0, 0).eval();
+    for (uint i = 0; i < wavelength_bases; ++i) {
+      b.basis.col(i) = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(block.row(i).eval()), true);
+    }
+    b.basis_mean = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(mean), true);
+  }
+  
+  void to_json(json &js, const BasisTreeNode &b) {
+    debug::check_expr_rel(false, "Not imeplemented!");
+  }
 
   void from_json(const json &js, ProjectData &v) {
-    v.gamut_elems  = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
-    v.gamut_verts  = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
-    v.sample_verts = js.at("sample_verts").get<std::vector<ProjectData::Vert>>();
-    v.color_systems     = js.at("mappings").get<std::vector<ProjectData::CSys>>();
-    v.cmfs         = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
-    v.illuminants  = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
+    v.gamut_elems   = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
+    v.gamut_verts   = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
+    v.sample_verts  = js.at("sample_verts").get<std::vector<ProjectData::Vert>>();
+    v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
+    v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
+    v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
@@ -88,5 +117,39 @@ namespace Eigen {
   void to_json(met::json &js, const met::CMFS &v) {
     auto r = v.reshaped();
     js = std::vector<met::CMFS::value_type>(r.begin(), r.end());
+  }
+  
+  void from_json(const met::json &js, met::Basis &b) {
+    std::ranges::copy(js, b.reshaped().begin());
+  }
+
+  void to_json(met::json &js, const met::Basis &b) {
+    auto r = b.reshaped();
+    js = std::vector<met::Basis::value_type>(r.begin(), r.end());
+  }
+  
+  void from_json(const met::json& js, met::Chromaticity &v) {
+    std::ranges::copy(js, v.begin());
+  }
+
+  void to_json(met::json &js, const met::Chromaticity &v) {
+    js = std::vector<met::Chromaticity::value_type>(v.begin(), v.end());
+  }
+
+  void from_json(const met::json &js, Array<float, 31, 1> &m) {
+    std::ranges::copy(js, m.begin());
+  }
+
+  void to_json(met::json &js, const Array<float, 31, 1> &m) {
+    js = std::vector<float>(m.begin(), m.end());
+  }
+
+  void from_json(const met::json &js, Array<float, 31, 31> &m) {
+    std::ranges::copy(js, m.reshaped().begin());
+  }
+
+  void to_json(met::json &js, const Array<float, 31, 31> &m) {
+    auto r = m.reshaped();
+    js = std::vector<float>(r.begin(), r.end());
   }
 } // namespace Eigen

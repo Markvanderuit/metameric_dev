@@ -89,7 +89,7 @@ namespace OpenMesh::Decimater {
 
       // Penalize failed solutions
       if (!optimal)
-        return { 999.f, vertex };
+        return { 99999.f, vertex };
 
       // Reproject vertex onto boundary mesh surface if it exceeds this
       {
@@ -112,7 +112,7 @@ namespace OpenMesh::Decimater {
 
       // Epsilon offset for solver problems
       if (solution.isZero())
-        vertex += Vec3f(0.001f);
+        vertex += Vec3f(0.00001f);
 
       float volume = 0.f;
       for (auto fh : fm) {

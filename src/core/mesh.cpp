@@ -277,7 +277,7 @@ namespace met {
 
       dec.add(mod_edge_len);
       dec.module(mod_edge_len).set_binary(false);
-      dec.module(mod_edge_len).set_edge_length(0.005f); // not zero, but just up to reasonable precision
+      dec.module(mod_edge_len).set_edge_length(0.0f); // not zero, but just up to reasonable precision
 
       dec.initialize();
       dec.decimate();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/tree.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>
 #include <functional>
@@ -86,9 +87,11 @@ namespace met {
     SaveFlag    project_save = SaveFlag::eUnloaded; 
 
     // Unsaved application data
-    Texture2d3f  loaded_texture; // Primary RGB texture image extracted from project data
-    Basis        loaded_basis;   // Set of basis functions obtained through PCA of measured spectra
-    AppColorMode color_mode;     // Application theming
+    Texture2d3f   loaded_texture;   // Primary RGB texture image extracted from project data
+    Basis         loaded_basis;     // Set of basis functions obtained through PCA of measured spectra
+    Spec          loaded_basis_avg; // Set of basis functions obtained through PCA of measured spectra
+    BasisTreeNode loaded_tree_root; // Basis function tree structure, loaded from disk
+    AppColorMode  color_mode;       // Application theming
 
   public: /* public create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object

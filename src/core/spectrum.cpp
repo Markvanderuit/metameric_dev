@@ -29,10 +29,10 @@ namespace met {
     eig::Matrix3f ap1_to_xyz_transform = xyz_to_ap1_transform.inverse().eval();
     
     // Color matching functions
-    CMFS cmfs_cie_xyz = (xyz_to_srgb_transform * 
-                         io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z).transpose()
-                        ).transpose();
-    // CMFS cmfs_cie_xyz = io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z);
+    // CMFS cmfs_cie_xyz = (xyz_to_srgb_transform * 
+    //                      io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z).transpose()
+    //                     ).transpose();
+    CMFS cmfs_cie_xyz = io::cmfs_from_data(cie_wavelength_values, cie_xyz_values_x, cie_xyz_values_y, cie_xyz_values_z);
 
     // Illuminant spectra
     Spec emitter_cie_e       = 1.f;

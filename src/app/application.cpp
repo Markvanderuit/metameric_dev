@@ -1,4 +1,5 @@
 #include <metameric/core/io.hpp>
+#include <metameric/core/json.hpp>
 #include <metameric/core/knn.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
@@ -9,14 +10,13 @@
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/app/application.hpp>
-
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl_parser/parser.hpp>
-
+#include <nlohmann/json.hpp>
 #include <algorithm>
 #include <execution>
 #include <ranges>
@@ -32,7 +32,16 @@ namespace met {
       } else {
         data.unload();
       }
-      data.loaded_basis = io::load_basis("resources/misc/basis.txt");
+      
+      // data.loaded_basis = io::load_basis("resources/misc/basis.txt");
+      // data.loaded_basis_avg = io::load_spec("resources/misc/basis_avg.spd");
+      data.loaded_tree_root = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
+
+      // TODO: remove
+      // data.loaded_tree_root.basis = data.loaded_basis;
+      // data.loaded_tree_root.basis_mean = data.loaded_basis_avg;
+      data.loaded_basis = data.loaded_tree_root.basis;
+      data.loaded_basis_avg = data.loaded_tree_root.basis_mean;
 
       scheduler.insert_resource("app_data", std::move(data));
     }

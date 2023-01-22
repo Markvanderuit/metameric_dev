@@ -66,7 +66,7 @@ namespace met {
     
 
     // Load a discrete spectral distribution from sequentially increasing wvl/value data
-    Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values);
+    Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values, bool remap=false);
 
     // Load a discrete trio of color matching functions from sequentially increasing wvl/value data
     CMFS cmfs_from_data(std::span<const float> wvls,  std::span<const float> values_x,
@@ -75,6 +75,7 @@ namespace met {
     // Load a set of basis functions from sequentially increasing wvl/value data
     Basis basis_from_data(std::span<const float> wvls, 
                           std::span<std::array<float, wavelength_bases>> values);
+    Basis basis_from_data(std::span<const float> wvls, std::span<const float> values);
 
     // Split a discrete spectral distribution or color matching functions into sequentially 
     // increasing wvl/value/*/* data

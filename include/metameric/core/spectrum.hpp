@@ -21,6 +21,9 @@ namespace met {
   using Spec = eig::Array<float, wavelength_samples, 1>;
   using Colr = eig::Array<float, 3, 1>;
 
+  /* XY chromaticity type */
+  using Chromaticity = eig::Array<float, 2, 1>; 
+
   /* Forcibly unaligned types */
   using UnalCMFS = eig::Matrix<float, wavelength_samples, 3, eig::DontAlign>;
   using UnalSpec = eig::Array<float, wavelength_samples, 1, eig::DontAlign>;
@@ -73,13 +76,14 @@ namespace met {
   public: /* mapping data */
     UnalCMFS cmfs;       // Color matching or sensor response functions, defining the observer
     UnalSpec illuminant; // Illuminant under which observation is performed
-
+    
   public:/* Mapping functions */
     // Simplify the CMFS/illuminant into color system spectra
     CMFS finalize() const {
       auto cmfs_col = cmfs.array().colwise();
-      float k = 1.f / (cmfs_col * illuminant).col(1).sum();
-      return k * (cmfs_col * illuminant);
+      float k = 1.f / (cmfs_col * illuminant * wavelength_ssize).col(1).sum();
+      auto cmfs_e = (k * (cmfs_col * illuminant) * wavelength_ssize).eval();
+      return (models::xyz_to_srgb_transform * cmfs_e.matrix().transpose()).transpose().eval();
     }
     
     // Obtain a color by applying this spectral mapping
@@ -109,7 +113,7 @@ namespace met {
   // Convert a gamma-corrected sRGB value to linear sRGB
   template <typename Float>
   constexpr inline
-  Float gamma_srgb_to_linear_srgb_f(Float f) {
+  Float srgb_to_lrgb_f(Float f) {
     return f <= 0.04045 
          ? f / 12.92 
          : std::pow<Float>((f + 0.055) / 1.055, 2.4);
@@ -118,7 +122,7 @@ namespace met {
   // Convert a linear sRGB value to gamma-corrected sRGB
   template <typename Float>
   constexpr inline
-  Float linear_srgb_to_gamma_srgb_f(Float f) {
+  Float lrgb_to_srgb_f(Float f) {
     return f <= 0.003130
          ? f * 12.92 
          : std::pow<Float>(f, 1.0 / 2.4) * 1.055 - 0.055;
@@ -126,15 +130,42 @@ namespace met {
 
   // Convert a gamma-corrected sRGB value to linear sRGB
   inline
-  Colr gamma_srgb_to_linear_srgb(Colr c) {
-    std::ranges::transform(c, c.begin(), gamma_srgb_to_linear_srgb_f<float>);
+  Colr srgb_to_lrgb(Colr c) {
+    std::ranges::transform(c, c.begin(), srgb_to_lrgb_f<float>);
     return c;
   }
 
   // Convert a linear sRGB value to gamma-corrected sRGB
   inline
-  Colr linear_srgb_to_gamma_srgb(Colr c) {
-    std::ranges::transform(c, c.begin(), linear_srgb_to_gamma_srgb_f<float>);
+  Colr lrgb_to_srgb(Colr c) {
+    std::ranges::transform(c, c.begin(), lrgb_to_srgb_f<float>);
     return c;
+  }
+
+  inline
+  Colr xyz_to_lrgb(Colr c) {
+    return models::xyz_to_srgb_transform * c.matrix();
+  }
+
+  inline
+  Colr lrgb_to_xyz(Colr c) {
+    return models::srgb_to_xyz_transform * c.matrix();
+  }
+
+  inline
+  Colr xyz_to_srgb(Colr c) {
+    return lrgb_to_srgb(xyz_to_lrgb(c));
+  }
+
+  inline
+  Colr srgb_to_xyz(Colr c) {
+    return lrgb_to_xyz(srgb_to_lrgb(c));
+  }
+
+  // Convert a XYZ color to xy(Y)
+  inline
+  Chromaticity xyz_to_xy(Colr c) {
+    float y = c.sum();
+    return { c[0] / y, c[2] / y };
   }
 } // namespace met

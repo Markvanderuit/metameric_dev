@@ -155,7 +155,7 @@ namespace met {
       met_trace();
       auto d = lrgb.data();
       std::transform(std::execution::par_unseq,
-          d.begin(), d.end(), d.begin(), linear_srgb_to_gamma_srgb);
+          d.begin(), d.end(), d.begin(), lrgb_to_srgb);
     }
 
     template <typename T>
@@ -163,7 +163,7 @@ namespace met {
       met_trace();
       auto d = srgb.data();
       std::transform(std::execution::par_unseq,
-          d.begin(), d.end(), d.begin(), gamma_srgb_to_linear_srgb);
+          d.begin(), d.end(), d.begin(), srgb_to_lrgb);
     }
     
     // Explicit instantiation skipping alpha channels
@@ -173,7 +173,7 @@ namespace met {
       auto d = lrgb.data();
       std::transform(std::execution::par_unseq, 
         d.begin(), d.end(), d.begin(), [](eig::Array4f v) {
-          v.head<3>() = linear_srgb_to_gamma_srgb(v.head<3>());
+          v.head<3>() = lrgb_to_srgb(v.head<3>());
           return v;
       });
     }
@@ -185,7 +185,7 @@ namespace met {
       auto d = srgb.data();
       std::transform(std::execution::par_unseq, 
         d.begin(), d.end(), d.begin(), [](eig::Array4f v) {
-          v.head<3>() = gamma_srgb_to_linear_srgb(v.head<3>());
+          v.head<3>() = srgb_to_lrgb(v.head<3>());
           return v;
       });
     }

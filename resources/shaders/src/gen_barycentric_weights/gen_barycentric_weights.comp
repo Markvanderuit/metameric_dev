@@ -79,6 +79,10 @@ struct MVCReturnObject {
   uint type;
 };
 
+vec3 safe_denom(vec3 denom) {
+  return mix(max(denom, M_EPS), min(denom, -M_EPS), lessThan(sign(denom), vec3(0)));
+}
+
 MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
   MVCReturnObject result;
 
@@ -106,7 +110,7 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
     
   // Fallback: x lies near or on triangle, use 2D barycentric coordinates
   float h = .5f * hsum(theta);
-  if (M_PI - h <= M_EPS) {
+  if (abs(M_PI - h) <= M_EPS) {
     result.weight = sin(theta) * shift(d, _ip) * shift(d, _im);
     result.type = MVCReturnOnTriangle;
     return result;
@@ -114,7 +118,7 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
 
   vec3 sin_theta = sin(theta);
   vec3 c = (2.f * sin(h) * sin(h - theta)) 
-         / (shift(sin_theta, _ip) * shift(sin_theta, _im)) 
+         / max(shift(sin_theta, _ip) * shift(sin_theta, _im), M_EPS) 
          - 1.f;
   vec3 s = sign(determinant(transpose(mat3(u[0], u[1], u[2])))) 
          * sqrt(max(1.f - c * c, M_EPS));
@@ -129,7 +133,7 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
   result.weight = (theta - 
                    shift(c, _ip) * shift(theta, _im) - 
                    shift(c, _im) * shift(theta, _ip))
-                / (d * shift(sin_theta, _ip) * shift(s, _im));
+                / safe_denom(d * shift(sin_theta, _ip) * shift(s, _im));
   result.type = MVCReturnCorrect;
   return result;
 }
@@ -146,6 +150,7 @@ Wght mean_value_coords_total(in vec3 x) {
       continue;
 
     // Catch NANs and set respective weight to zero
+    // man, I wish glsl double precision trigonometry was a thing :(
     if (any(isnan(result.weight)))
       continue;
 
