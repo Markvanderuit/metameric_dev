@@ -24,9 +24,10 @@ namespace met {
 
   enum class LPStatus {
     eOptimal,
-    eUnbounded,
-    eInfeasible,
-    eAbandoned
+    ePrimalInfeasible,
+    eDualInfeasible,
+    eIterationHalted,
+    eItBrokeCompletely
   };
 
   struct LPResult {

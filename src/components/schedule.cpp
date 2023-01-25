@@ -167,7 +167,7 @@ namespace met {
     scheduler.emplace_task<WeightViewerTask>("weight_viewer");
 
     // Insert temporary unimportant tasks
-    submit_schedule_debug(scheduler);
+    // submit_schedule_debug(scheduler);
 
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }

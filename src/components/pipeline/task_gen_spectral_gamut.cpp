@@ -117,7 +117,8 @@ namespace met {
       i_specs[i] = generate_spectrum_tree({ 
         .basis_tree = e_appl_data.loaded_tree_root, 
         .systems    = std::span<CMFS> { systems }, 
-        .signals    = std::span<Colr> { signals }
+        .signals    = std::span<Colr> { signals },
+        .reduce_basis_count = false
       });
 
      /*  // Test relative roundtrip error to base vertex

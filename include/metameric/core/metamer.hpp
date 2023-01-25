@@ -7,19 +7,23 @@
 namespace met {
   /* Info struct for generation of a spectral reflectance, given color signals and color systems */
   struct GenerateSpectrumTreeInfo {
-    const BasisTreeNode  &basis_tree; // Spectral basis functions
-    std::span<const CMFS> systems;    // Color systems in which signals are available
-    std::span<const Colr> signals;    // Signal samples in their respective color systems
-    bool impose_boundedness = true;   // Impose boundedness cosntraints
+    const BasisTreeNode  &basis_tree;    // Spectral basis functions
+    std::span<const CMFS> systems;       // Color systems in which signals are available
+    std::span<const Colr> signals;       // Signal samples in their respective color systems
+    bool impose_boundedness = true;      // Impose boundedness cosntraints
+    bool reduce_basis_count = false;     // After solve, re-attempt solve with reduced nr. of bases
+    uint basis_count = wavelength_bases; // Starting nr. of bases
   };
 
   /* Info struct for generation of a spectral reflectance, given color signals and color systems */
   struct GenerateSpectrumInfo {
-    Basis                &basis;  // Spectral basis functions
-    Spec                 &basis_avg;
-    std::span<const CMFS> systems;  // Color systems in which signals are available
-    std::span<const Colr> signals;  // Signal samples in their respective color systems
-    bool impose_boundedness = true; // Impose boundedness cosntraints
+    Basis                &basis;         // Spectral basis functions
+    Spec                 &basis_avg;     // Average of spectral basis function data
+    std::span<const CMFS> systems;       // Color systems in which signals are available
+    std::span<const Colr> signals;       // Signal samples in their respective color systems
+    bool impose_boundedness = true;      // Impose boundedness cosntraints
+    bool reduce_basis_count = false;     // After solve, re-attempt solve with reduced nr. of bases
+    uint basis_count = wavelength_bases; // Starting nr. of bases
   };
   
   /* Info struct for sampling-based generation of points on the object color solid of a color system */

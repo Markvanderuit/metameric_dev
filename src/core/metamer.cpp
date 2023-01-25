@@ -9,6 +9,8 @@
 #include <fmt/ranges.h>
 
 namespace met {
+  constexpr uint min_wavelength_bases = 4;
+
   namespace detail {
     // key_hash for eigen types for std::unordered_map/unordered_set
     template <typename T>
@@ -43,117 +45,148 @@ namespace met {
     met_trace();
     debug::check_expr_dbg(info.systems.size() == info.signals.size(),
                           "Color system size not equal to color signal size");
+    // Out-of-loop state
+    bool is_first_run = true;
+    Spec s = 0;
 
-    // Initialize parameter object for LP solver with expected matrix sizes M, N
-    const uint N = wavelength_bases;
-    const uint M = 3 * info.systems.size() 
-                     + (info.impose_boundedness ? 2 * wavelength_samples : 0);
-    LPParameters params(M, N);
-    params.method  = LPMethod::ePrimal;
-    params.scaling = true;
+    while (info.basis_count > min_wavelength_bases) {
+      // Initialize parameter object for LP solver with expected matrix sizes M, N
+      const uint N = info.basis_count;
+      const uint M = 3 * info.systems.size() + (info.impose_boundedness ? 2 * wavelength_samples : 0);
+      LPParameters params(M, N);
+      params.method  = LPMethod::ePrimal;
+      params.scaling = true;
 
-    // Construct basis functions
-    eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
+      // Construct basis functions
+      eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
 
-    // Construct basis bounds
-    Spec upper_bounds = Spec(1.0) - info.basis_avg;
-    Spec lower_bounds = Spec(0.0) - info.basis_avg;
+      // Construct basis bounds
+      Spec upper_bounds = Spec(1.0) - info.basis_avg;
+      Spec lower_bounds = Spec(0.0) - info.basis_avg;
 
-    // Normalized inverse sensitivity weight minimization to prevent border issues
-    // Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
-    // w = (w / w.sum());
-    // eig::VectorXf C = (w.matrix().transpose() * basis).transpose().eval();
-    // params.C = C.cast<double>().eval();
+      // Normalized inverse sensitivity weight minimization to prevent border issues
+      // Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
+      // w = (w / w.sum());
+      // eig::VectorXf C = (w.matrix().transpose() * basis).transpose().eval();
+      // params.C = C.cast<double>().eval();
 
-    // Add constraints to ensure resulting spectra produce the given color signals
-    for (uint i = 0; i < info.systems.size(); ++i) {
-      Colr signal_offs = (info.systems[i].transpose() * info.basis_avg.matrix()).transpose().eval();
-      params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
-      params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
+      // Add constraints to ensure resulting spectra produce the given color signals
+      for (uint i = 0; i < info.systems.size(); ++i) {
+        Colr signal_offs = (info.systems[i].transpose() * info.basis_avg.matrix()).transpose().eval();
+        params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
+        params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
+      }
+
+      // Add constraints to ensure resulting spectra are bounded to [0, 1]
+      if (info.impose_boundedness) {
+        const uint offs_l = 3 * info.systems.size();
+        const uint offs_u = offs_l + wavelength_samples;
+        params.A.block(offs_l, 0, wavelength_samples, N) = basis.cast<double>().eval();
+        params.A.block(offs_u, 0, wavelength_samples, N) = basis.cast<double>().eval();
+        params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
+        params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
+        params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
+        params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
+      }
+
+      // Average min/max objectives for a nice smooth result
+      params.objective = LPObjective::eMaximize;
+      auto [opt_max, res_max] = lp_solve_res(params);
+      params.objective = LPObjective::eMinimize;
+      auto [opt_min, res_min] = lp_solve_res(params);
+
+      // Obtain spectral reflectance
+      Spec s_max = info.basis_avg + Spec(basis * res_max.cast<float>().matrix());
+      Spec s_min = info.basis_avg + Spec(basis * res_min.cast<float>().matrix());
+      Spec s_new = (0.5 * (s_min + s_max)).eval();
+
+      // On first run, obtain any (possibly infeasible) result
+      if (is_first_run)
+        s = s_new;
+      
+      // On secondary runs, continue only if the system remains feasible
+      guard_break(info.reduce_basis_count && opt_min && opt_max);
+      info.basis_count--;
+      s = s_new;
     }
 
-    // Add constraints to ensure resulting spectra are bounded to [0, 1]
-    if (info.impose_boundedness) {
-      const uint offs_l = 3 * info.systems.size();
-      const uint offs_u = offs_l + wavelength_samples;
-      params.A.block(offs_l, 0, wavelength_samples, N) = basis.cast<double>().eval();
-      params.A.block(offs_u, 0, wavelength_samples, N) = basis.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
-      params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
-      params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
-    }
-
-    // Average min/max objectives for a nice smooth result
-    params.objective = LPObjective::eMaximize;
-    Spec s_max = info.basis_avg + Spec(basis * lp_solve(params).cast<float>().matrix());
-    params.objective = LPObjective::eMinimize;
-    Spec s_min = info.basis_avg + Spec(basis * lp_solve(params).cast<float>().matrix());
-    return (0.5 * (s_min + s_max)).eval();
+    return s;
   }
 
   Spec generate_spectrum_tree(GenerateSpectrumTreeInfo info) {
     met_trace();
     debug::check_expr_dbg(info.systems.size() == info.signals.size(),
                           "Color system size not equal to color signal size");
-                          
-    // Initialize parameter object for LP solver with expected matrix sizes M, N
-    constexpr uint N = wavelength_bases;
-    const     uint M = 3 * info.systems.size() 
-                     + (info.impose_boundedness ? 2 * wavelength_samples : 0);
-    LPParameters params(M, N);
-    params.method  = LPMethod::ePrimal;
-    params.scaling = true;
+           
+    // Out-of-loop state
+    bool is_first_run = true;
+    Spec s = 0;
 
-    // Obtain appropriate basis functions from tree structure
-    // Search tree structure for basis functions
-    Basis basis = info.basis_tree.basis; // 0.f;
-    Spec basis_mean = info.basis_tree.basis_mean; // 0.f;
-    // for (const Colr &c : info.signals) {
-    //   Chromaticity xy = xyz_to_xy((models::srgb_to_xyz_transform * c.matrix()).eval());
-    //   auto [basis_mean_, basis_] = info.basis_tree.traverse(xy);
-    //   basis = basis_;
-    //   basis_mean = basis_mean_;
-    //   break;
-    // }
-    // basis /= static_cast<float>(info.signals.size());
-    // basis_avg /= static_cast<float>(info.signals.size());
+    while (info.basis_count > min_wavelength_bases) {
+      // Initialize parameter object for LP solver with expected matrix sizes M, N
+      const uint N = info.basis_count;
+      const uint M = 3 * info.systems.size() + (info.impose_boundedness ? 2 * wavelength_samples : 0);
+      LPParameters params(M, N);
+      params.method  = LPMethod::ePrimal;
+      params.scaling = true;
 
-    // Construct basis bounds
-    Spec upper_bounds = Spec(1.0) - basis_mean;
-    Spec lower_bounds = upper_bounds - Spec(1.0); 
+      // Obtain appropriate basis functions from tree structure
+      // Search tree structure for basis functions
+      // Basis basis = info.basis_tree.basis; // 0.f;
+      eig::MatrixXf basis = info.basis_tree.basis.block(0, 0, wavelength_samples, N).eval();
+      Spec basis_mean = info.basis_tree.basis_mean; // 0.f;
 
-    // Normalized sensitivity weight minimization to prevent border issues
-    Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
-    w = (Spec(1.0) - (w / w.sum())).eval();
-    BSpec C = (w.matrix().transpose() * basis).transpose().eval();
-    params.C = C.cast<double>().eval();   
+      // Construct basis bounds
+      Spec upper_bounds = Spec(1.0) - basis_mean;
+      Spec lower_bounds = upper_bounds - Spec(1.0); 
 
-    // Add constraints to ensure resulting spectra produce the given color signals
-    for (uint i = 0; i < info.systems.size(); ++i) {
-      Colr signal_offs = (info.systems[i].transpose() * basis_mean.matrix()).transpose().eval();
-      params.A.block<3, N>(3 * i, 0) = (info.systems[i].transpose() * basis).cast<double>().eval();
-      params.b.block<3, 1>(3 * i, 0) = (info.signals[i] - signal_offs).cast<double>().eval();
-    }
+      // Normalized sensitivity weight minimization to prevent border issues
+      Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
+      w = ((w / w.sum())).eval();
+      BSpec C = (w.matrix().transpose() * basis).transpose().eval();
+      params.C = C.cast<double>().eval();   
 
-    // Add constraints to ensure resulting spectra are bounded to [0, 1]
-    if (info.impose_boundedness) {
-      const uint offs_l = 3 * info.systems.size();
-      const uint offs_u = offs_l + wavelength_samples;
-      params.A.block<wavelength_samples, N>(offs_l, 0) = basis.cast<double>().eval();
-      params.A.block<wavelength_samples, N>(offs_u, 0) = basis.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
-      params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
-      params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
-    }
+      // Add constraints to ensure resulting spectra produce the given color signals
+      for (uint i = 0; i < info.systems.size(); ++i) {
+        Colr signal_offs = (info.systems[i].transpose() * basis_mean.matrix()).transpose().eval();
+        params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
+        params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
+      }
 
-    // Average min/max objectives for a nice smooth result
-    params.objective = LPObjective::eMaximize;
-    Spec s_max = (basis_mean + (basis * BSpec(lp_solve(params).cast<float>())).array()).eval();
-    params.objective = LPObjective::eMinimize;
-    Spec s_min = (basis_mean + (basis * BSpec(lp_solve(params).cast<float>())).array()).eval();
-    return (0.5 * (s_min + s_max)).eval();
+      // Add constraints to ensure resulting spectra are bounded to [0, 1]
+      if (info.impose_boundedness) {
+        const uint offs_l = 3 * info.systems.size();
+        const uint offs_u = offs_l + wavelength_samples;
+        params.A.block(offs_l, 0, wavelength_samples, N) = basis.cast<double>().eval();
+        params.A.block(offs_u, 0, wavelength_samples, N) = basis.cast<double>().eval();
+        params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
+        params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
+        params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
+        params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
+      }
+
+      // Average min/max objectives for a nice smooth result
+      params.objective = LPObjective::eMaximize;
+      auto [opt_max, res_max] = lp_solve_res(params);
+      params.objective = LPObjective::eMinimize;
+      auto [opt_min, res_min] = lp_solve_res(params);
+
+      // Obtain spectral reflectance
+      Spec s_max = basis_mean + Spec(basis * res_max.cast<float>().matrix());
+      Spec s_min = basis_mean + Spec(basis * res_min.cast<float>().matrix());
+      Spec s_new = (0.5 * (s_min + s_max)).eval();
+
+      // On first run, obtain any (possibly infeasible) result
+      if (is_first_run)
+        s = s_new;
+
+      // On secondary runs, continue only if the system remains feasible
+      guard_break(info.reduce_basis_count && opt_min && opt_max);
+      info.basis_count--;
+      s = s_new;
+    }               
+    
+    return s;
   }
 
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {

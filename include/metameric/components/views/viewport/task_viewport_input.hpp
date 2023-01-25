@@ -88,7 +88,7 @@ namespace met {
 
       // Share resources
       info.emplace_resource<detail::ViewportInputMode>("mode", detail::ViewportInputMode::eVertex);
-      info.emplace_resource<detail::Arcball>("arcball", { .dist = 2.f, .e_eye = 1.5f, .e_center = 0.5f });
+      info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
     void dstr(detail::TaskDstrInfo &info) override {

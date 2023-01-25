@@ -102,7 +102,7 @@ namespace met {
     std::span<const double> solution = { model.getColSolution(), params.N };
     eig::VectorXd x(params.N);
     std::ranges::copy(solution, x.begin());
-
+    
     return { model.isProvenOptimal(), x };
   }
 

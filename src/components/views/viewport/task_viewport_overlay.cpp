@@ -378,9 +378,6 @@ namespace met {
         ImGui::ColorEdit3(fmt::format("##error{}", j).c_str(), 
           lrgb_to_srgb(error_j).data(), 
           ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-        if (ImGui::SmallButton("->")) {
-          fmt::print("{}\n", rtrip_j);
-        }
         ImGui::PopID();
       }
       ImGui::EndGroup();  ImGui::SameLine();
@@ -851,14 +848,14 @@ namespace met {
       }
     }
 
-    ImGui::Separator();
+    /* ImGui::Separator();
     if (ImGui::Button("Print mismatch data to stdout")) {
       auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
       auto [verts, elems] = generate_convex_hull<Colr>(e_csol_data);
       fmt::print("mmv_verts = np.array({})\nmmv_elems = np.array({})\n", verts, elems);
-    }
+    } */
 
-    if (ImGui::Button("Print mismatch metamers to stdout")) {
+    /* if (ImGui::Button("Print mismatch metamers to stdout")) {
       // Get mismatch volume data and generate convex hull
       auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
       auto [verts, elems] = generate_convex_hull<Colr>(e_csol_data);
@@ -941,7 +938,7 @@ namespace met {
 
       // auto [wvls, _] = io::spectrum_to_data(sample_spectra[0]);
       // fmt::print("wvls = np.array([{}])\n", wvls);
-    }
+    } */
   }
 
   void ViewportOverlayTask::eval_overlay_plot(detail::TaskEvalInfo &info) {
@@ -980,13 +977,12 @@ namespace met {
       ImPlot::EndPlot();
     }
 
-    if (ImGui::Button("Print reflectances")) {
+    /* if (ImGui::Button("Print reflectances")) {
       for (uint i : e_vert_slct) {
         const auto &s = e_spec[i];
         auto [wvls, vals] = io::spectrum_to_data(s);
         fmt::print("Spectrum {}\n\twvls=np.array({})\n\tvalues=np.array({})\n", i, wvls, vals);
       }
-      
-    }
+    } */
   }
 } // namespace met

@@ -90,9 +90,9 @@ namespace met {
     ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
     ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
 
-    ImGui::Separator();
+    // ImGui::Separator();
 
-    ImGui::Text("Press 'R' to print reflectance to stdout.");
+    // ImGui::Text("Press 'R' to print reflectance to stdout.");
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
       auto [wvls, vals] = io::spectrum_to_data(reflectance);
       fmt::print("Pixel {}, {}\n",  m_tooltip_pixel.x(), m_tooltip_pixel.y());

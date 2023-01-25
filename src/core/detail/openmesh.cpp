@@ -43,11 +43,9 @@ namespace OpenMesh::Decimater {
       
       // Initialize parameter object for LP solver with expected matrix sizes
       met::LPParameters params(M, N);
-      params.method    = met::LPMethod::eDual;
+      params.method    = met::LPMethod::ePrimal;
       params.objective = met::LPObjective::eMinimize;
       params.r         = met::LPCompare::eLE;
-      params.x_l       = -0.5;
-      params.x_u       = 1.5;
 
       // Fill constraint matrices describing added volume, which must be zero or positive
       Vec3f n_sum = { 0, 0, 0 };
@@ -67,7 +65,7 @@ namespace OpenMesh::Decimater {
         auto A = std::sqrtf(s * (s - d[0]) * (s - d[1]) * (s - d[2]));
 
         // Compute volume metric
-        auto n = mesh.calc_face_normal(fh);
+        auto n = -mesh.calc_face_normal(fh);
         n = n / std::sqrtf(n.dot(n));
         n = (A / 3.f) * n;
 
@@ -111,7 +109,7 @@ namespace OpenMesh::Decimater {
       }
 
       // Epsilon offset for solver problems
-      if (solution.isZero())
+      if (vertex == Vec3f { 0, 0, 0 })
         vertex += Vec3f(0.00001f);
 
       float volume = 0.f;
@@ -131,8 +129,8 @@ namespace OpenMesh::Decimater {
 
         // Compute volume metric
         auto n = (A / 3.f) * mesh.calc_face_normal(fh);
-        // volume += std::abs(n.dot(vertex - p[0]));
-        volume += std::abs(n.dot(vertex - p[0]));
+        auto v = n.dot(vertex - p[0]);
+        volume += std::abs(v);
       }
 
       return { volume, vertex };
@@ -312,11 +310,11 @@ namespace OpenMesh::Decimater {
       }
 
       // update heap (former one ring of decimated vertex)
-      /* for (s_it = support.begin(), s_end = support.end(); s_it != s_end; ++s_it) {
+      for (s_it = support.begin(), s_end = support.end(); s_it != s_end; ++s_it) {
         assert(!mesh_.status(*s_it).deleted());
         if (!_only_selected  || mesh_.status(*s_it).selected() )
           heap_vertex(*s_it);
-      } */
+      }
 
       // notify observer and stop if the observer requests it
       if (!this->notify_observer(n_collapses))
@@ -421,10 +419,9 @@ namespace OpenMesh::Decimater {
       // Update heap (remaining, moved vertex and its one ring)
       // heap_vertex(ci.v0);
       heap_vertex(ci.v1);
-     /*  for (auto vh : mesh_.vv_range(ci.v1)) {
+      /* for (auto vh : mesh_.vv_range(ci.v1)) {
         assert(!mesh_.status(vh).deleted());
         if (!_only_selected  || mesh_.status(vh).selected() ) {
-          fmt::print("\theaping {}\n", vh.idx());
           heap_vertex(vh);
         }
       }
@@ -432,7 +429,6 @@ namespace OpenMesh::Decimater {
         met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
         assert(!mesh_.status(vh).deleted());
         if (!_only_selected  || mesh_.status(vh).selected() ) {
-          fmt::print("\theaping {}\n", vh.idx());
           heap_vertex(vh);
         }
       } */
@@ -491,7 +487,7 @@ namespace OpenMesh::Decimater {
     auto volume = m_mesh.property(m_volume, ci.v0v1);
     return (volume >= 0.f && volume < m_maximum_volume) 
       ? volume 
-      : float(Base::ILLEGAL_COLLAPSE);
+      : 99999.f; // float(Base::ILLEGAL_COLLAPSE);
   }
   
   template <typename MeshT>

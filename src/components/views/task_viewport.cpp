@@ -34,7 +34,7 @@ namespace met {
 
     // Add drawing subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),     name() + draw_end_name);
-    info.emplace_task_after<ViewportDrawCubeTask>(name(),    name() + draw_cube_name);
+    // info.emplace_task_after<ViewportDrawCubeTask>(name(),    name() + draw_cube_name);
     info.emplace_task_after<ViewportDrawSampleTask>(name(),  name() + draw_sample_name);
     info.emplace_task_after<ViewportDrawGamutTask>(name(),   name() + draw_gamut_name);
     info.emplace_task_after<ViewportDrawTextureTask>(name(), name() + draw_texture_name);
@@ -61,7 +61,7 @@ namespace met {
     info.remove_task(name() + draw_sample_name);
     info.remove_task(name() + draw_csys_ocs_name);
     info.remove_task(name() + draw_gamut_name);
-    info.remove_task(name() + draw_cube_name);
+    // info.remove_task(name() + draw_cube_name);
     info.remove_task(name() + draw_end_name);
   }
 

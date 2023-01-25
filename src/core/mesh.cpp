@@ -265,9 +265,11 @@ namespace met {
 
     // Operate on a copy of the input mesh
     Mesh mesh = input_mesh;
+    size_t pre_vertex_count, post_vertex_count;
     
     // First, quickly collapse all very short edges into their average to a hardcoded minimum;
     // given that convex hull generation is relatively accurate, this likely does not affect anything
+    pre_vertex_count = mesh.n_vertices();
     {
       using ModEdgeLen = odec::ModEdgeLengthT<Mesh>::Handle;
       using Decimater  = odec::DecimaterT<Mesh>;
@@ -284,8 +286,11 @@ namespace met {
 
       mesh.garbage_collection();
     }
+    post_vertex_count = mesh.n_vertices();
+    fmt::print("  zero-edge collapse; {} -> {}", pre_vertex_count, post_vertex_count);
     
     // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
+    pre_vertex_count = mesh.n_vertices();
     {
       using Decimater  = odec::CollapsingDecimater<Mesh, odec::DefaultCollapseFunction>;
       using ModVolume = odec::ModVolumeT<Mesh>::Handle;
@@ -301,6 +306,8 @@ namespace met {
 
       mesh.garbage_collection();
     }
+    post_vertex_count = mesh.n_vertices();
+    fmt::print("  volume preserving collapse; {} -> {}", pre_vertex_count, post_vertex_count);
 
     return mesh;
   }
