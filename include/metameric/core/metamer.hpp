@@ -6,19 +6,9 @@
 
 namespace met {
   /* Info struct for generation of a spectral reflectance, given color signals and color systems */
-  struct GenerateSpectrumTreeInfo {
-    const BasisTreeNode  &basis_tree;    // Spectral basis functions
-    std::span<const CMFS> systems;       // Color systems in which signals are available
-    std::span<const Colr> signals;       // Signal samples in their respective color systems
-    bool impose_boundedness = true;      // Impose boundedness cosntraints
-    bool reduce_basis_count = false;     // After solve, re-attempt solve with reduced nr. of bases
-    uint basis_count = wavelength_bases; // Starting nr. of bases
-  };
-
-  /* Info struct for generation of a spectral reflectance, given color signals and color systems */
   struct GenerateSpectrumInfo {
     Basis                &basis;         // Spectral basis functions
-    Spec                 &basis_avg;     // Average of spectral basis function data
+    Spec                 &basis_mean;    // Average of spectral basis function data
     std::span<const CMFS> systems;       // Color systems in which signals are available
     std::span<const Colr> signals;       // Signal samples in their respective color systems
     bool impose_boundedness = true;      // Impose boundedness cosntraints
@@ -38,36 +28,19 @@ namespace met {
   struct GenerateMismatchBoundaryInfo {
     Basis                        &basis;     // Spectral basis functions
     Spec                         &basis_avg;
-    std::span<const CMFS>          systems_i; // Color system spectra for prior color signals
-    std::span<const Colr>          signals_i; // Color signals for prior constraints
-    const CMFS                    &system_j;  // Color system for mismatching region
-    std::span<const eig::ArrayXf>  samples;   // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
+    std::span<const CMFS>         systems_i; // Color system spectra for prior color signals
+    std::span<const Colr>         signals_i; // Color signals for prior constraints
+    const CMFS                   &system_j;  // Color system for mismatching region
+    std::span<const eig::ArrayXf> samples;   // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };
 
   // Corresponding functions to above generate objects
   Spec generate_spectrum(GenerateSpectrumInfo info);
-  Spec generate_spectrum_tree(GenerateSpectrumTreeInfo info);
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info);
   std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info);
 
-  /* Info struct for simplified, unbounded generation of a gamut, given spectral information */
-  struct GenerateGamutSimpleInfo {
-    uint               bary_weights;
-    std::vector<WSpec> weights; // Approximate barycentric coordinates inside the expected gamut
-    std::vector<Colr>  samples; // Sample colors inside the expected gamut
-  };
-
-  /* Info struct for generation of a gamut, given spectral information */
-  struct GenerateGamutSpectrumInfo {
-    Basis            &basis;   // Spectral basis functions
-    CMFS               system;  // Color system spectra describing the expected gamut
-    std::vector<Colr>  gamut;   // Approximate color coordinates of the expected gamut
-    std::vector<WSpec> weights; // Approximate barycentric coordinates inside the expected gamut
-    std::vector<Spec>  samples; // Sample spectral distributions in the expected gamut
-  };
-
   /* Info struct for generation of a gamut, given color constraint information */
-  struct GenerateGamutConstraintInfo {
+  struct GenerateGamutInfo {
     struct Signal {
       Colr  colr_v; // Color signal
       WSpec bary_v; // Approximate barycentric coords. of the signal in the expected gamut
@@ -81,10 +54,8 @@ namespace met {
     std::vector<Signal> signals; // Color signals and corresponding information
   };
 
-  // Generate a gamut solution using a linear programming problem; ee GenerateGamut*Info 
+  // Generate a gamut solution using a linear programming problem; see GenerateGamutInfo 
   // above for necessary information. Note: returns n=barycentric_weights spectra; 
   // the last (padded) spectra should be ignored
-  std::vector<Colr> generate_gamut(const GenerateGamutSimpleInfo &info);
-  std::vector<Spec> generate_gamut(const GenerateGamutSpectrumInfo &info);
-  std::vector<Spec> generate_gamut(const GenerateGamutConstraintInfo &info);
+  std::vector<Spec> generate_gamut(const GenerateGamutInfo &info);
 } // namespace met

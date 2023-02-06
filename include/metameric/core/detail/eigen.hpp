@@ -15,11 +15,30 @@ namespace met {
 namespace Eigen {
   namespace detail {
     template <size_t D>
-    constexpr size_t vector_align() {
+    constexpr 
+    size_t vector_align() {
       return D >= 3 ? 16
            : D == 2 ? 8
            : 4;
     }
+
+    // key_hash for eigen types for std::unordered_map/unordered_set
+    template <typename T>
+    constexpr
+    auto matrix_hash = [](const auto &mat) {
+      size_t seed = 0;
+      for (size_t i = 0; i < mat.size(); ++i) {
+        auto elem = *(mat.data() + i);
+        seed ^= std::hash<T>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      }
+      return seed;
+    };
+
+    // key_equal for eigen types for std::unordered_map/unordered_set
+    constexpr
+    auto matrix_equal = [](const auto &a, const auto &b) { 
+      return a.isApprox(b); 
+    };
   } // namespace detail
 
   template <class Type, size_t Size>

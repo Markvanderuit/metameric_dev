@@ -119,7 +119,7 @@ namespace met {
 
     // Register resources to hold convex hull data for a primary color system OCS
     auto csys_ocs = generate_ocs_boundary({ .basis = e_appl_data.loaded_basis,
-                                            .basis_avg = e_appl_data.loaded_basis_avg, 
+                                            .basis_avg = e_appl_data.loaded_basis_mean, 
                                             .system = e_proj_data.csys(0).finalize(), 
                                             .samples = detail::gen_unit_dirs<3>(n_samples_ocs) });
     auto csys_ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(csys_ocs), 0.001f);
@@ -183,7 +183,7 @@ namespace met {
 
     // Generate points on metamer set boundary; store in aligned format
     i_csol_data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 
-                                               .basis_avg = e_appl_data.loaded_basis_avg, 
+                                               .basis_avg = e_appl_data.loaded_basis_mean, 
                                                .systems_i = cmfs_i, 
                                                .signals_i = sign_i, 
                                                .system_j  = cmfs_j, 

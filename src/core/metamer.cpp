@@ -11,109 +11,7 @@
 namespace met {
   constexpr uint min_wavelength_bases = 4;
 
-  namespace detail {
-    // key_hash for eigen types for std::unordered_map/unordered_set
-    template <typename T>
-    constexpr
-    auto eig_hash = [](const auto &mat) {
-      size_t seed = 0;
-      for (size_t i = 0; i < mat.size(); ++i) {
-        auto elem = *(mat.data() + i);
-        seed ^= std::hash<T>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      }
-      return seed;
-    };
-
-    // key_equal for eigen types for std::unordered_map/unordered_set
-    constexpr 
-    auto eig_equal = [](const auto &a, const auto &b) { 
-      return a.isApprox(b); 
-    };
-    
-    template <typename T>
-    using eig_hash_t  = decltype(eig_hash<T>);
-    using eig_equal_t = decltype(eig_equal);
-
-    std::vector<Colr> remove_identical_points(const std::vector<Colr> &v) {
-      met_trace();
-      std::unordered_set<Colr, eig_hash_t<float>, eig_equal_t> s(range_iter(v), 16);
-      return std::vector<Colr>(range_iter(s));
-    }
-  } // namespace detail
-
   Spec generate_spectrum(GenerateSpectrumInfo info) {
-    met_trace();
-    debug::check_expr_dbg(info.systems.size() == info.signals.size(),
-                          "Color system size not equal to color signal size");
-    // Out-of-loop state
-    bool is_first_run = true;
-    Spec s = 0;
-
-    while (info.basis_count > min_wavelength_bases) {
-      // Initialize parameter object for LP solver with expected matrix sizes M, N
-      const uint N = info.basis_count;
-      const uint M = 3 * info.systems.size() + (info.impose_boundedness ? 2 * wavelength_samples : 0);
-      LPParameters params(M, N);
-      params.method  = LPMethod::ePrimal;
-      params.scaling = true;
-
-      // Construct basis functions
-      eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
-
-      // Construct basis bounds
-      Spec upper_bounds = Spec(1.0) - info.basis_avg;
-      Spec lower_bounds = Spec(0.0) - info.basis_avg;
-
-      // Normalized inverse sensitivity weight minimization to prevent border issues
-      // Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
-      // w = (w / w.sum());
-      // eig::VectorXf C = (w.matrix().transpose() * basis).transpose().eval();
-      // params.C = C.cast<double>().eval();
-
-      // Add constraints to ensure resulting spectra produce the given color signals
-      for (uint i = 0; i < info.systems.size(); ++i) {
-        Colr signal_offs = (info.systems[i].transpose() * info.basis_avg.matrix()).transpose().eval();
-        params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
-        params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
-      }
-
-      // Add constraints to ensure resulting spectra are bounded to [0, 1]
-      if (info.impose_boundedness) {
-        const uint offs_l = 3 * info.systems.size();
-        const uint offs_u = offs_l + wavelength_samples;
-        params.A.block(offs_l, 0, wavelength_samples, N) = basis.cast<double>().eval();
-        params.A.block(offs_u, 0, wavelength_samples, N) = basis.cast<double>().eval();
-        params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
-        params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
-        params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
-        params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
-      }
-
-      // Average min/max objectives for a nice smooth result
-      params.objective = LPObjective::eMaximize;
-      auto [opt_max, res_max] = lp_solve_res(params);
-      params.objective = LPObjective::eMinimize;
-      auto [opt_min, res_min] = lp_solve_res(params);
-
-      // Obtain spectral reflectance
-      Spec s_max = info.basis_avg + Spec(basis * res_max.cast<float>().matrix());
-      Spec s_min = info.basis_avg + Spec(basis * res_min.cast<float>().matrix());
-      Spec s_new = (0.5 * (s_min + s_max)).eval();
-
-      // On first run, obtain any (possibly infeasible) result
-      if (is_first_run)
-        s = s_new;
-      
-      // On secondary runs, continue only if the system remains feasible
-      guard_break(info.reduce_basis_count && opt_min && opt_max);
-      info.basis_count--;
-      s = s_new;
-    }
-
-    return s;
-  }
-
-  Spec generate_spectrum_tree(GenerateSpectrumTreeInfo info) {
     met_trace();
     debug::check_expr_dbg(info.systems.size() == info.signals.size(),
                           "Color system size not equal to color signal size");
@@ -130,14 +28,11 @@ namespace met {
       params.method  = LPMethod::ePrimal;
       params.scaling = true;
 
-      // Obtain appropriate basis functions from tree structure
-      // Search tree structure for basis functions
-      // Basis basis = info.basis_tree.basis; // 0.f;
-      eig::MatrixXf basis = info.basis_tree.basis.block(0, 0, wavelength_samples, N).eval();
-      Spec basis_mean = info.basis_tree.basis_mean; // 0.f;
+      // Obtain appropriate nr. of basis functions from data
+      eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
 
       // Construct basis bounds
-      Spec upper_bounds = Spec(1.0) - basis_mean;
+      Spec upper_bounds = Spec(1.0) - info.basis_mean;
       Spec lower_bounds = upper_bounds - Spec(1.0); 
 
       // Normalized sensitivity weight minimization to prevent border issues
@@ -148,7 +43,7 @@ namespace met {
 
       // Add constraints to ensure resulting spectra produce the given color signals
       for (uint i = 0; i < info.systems.size(); ++i) {
-        Colr signal_offs = (info.systems[i].transpose() * basis_mean.matrix()).transpose().eval();
+        Colr signal_offs = (info.systems[i].transpose() * info.basis_mean.matrix()).transpose().eval();
         params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
         params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
       }
@@ -172,8 +67,8 @@ namespace met {
       auto [opt_min, res_min] = lp_solve_res(params);
 
       // Obtain spectral reflectance
-      Spec s_max = basis_mean + Spec(basis * res_max.cast<float>().matrix());
-      Spec s_min = basis_mean + Spec(basis * res_min.cast<float>().matrix());
+      Spec s_max = info.basis_mean + Spec(basis * res_max.cast<float>().matrix());
+      Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
       Spec s_new = (0.5 * (s_min + s_max)).eval();
 
       // On first run, obtain any (possibly infeasible) result
@@ -199,14 +94,13 @@ namespace met {
 
       // Find nearest generalized spectrum that fits within the basis function approach
       Spec s_ = generate_spectrum({
-        .basis     = info.basis,
-        .basis_avg = info.basis_avg,
-        .systems   = std::vector<CMFS> { info.system },
-        .signals   = std::vector<Colr> { (info.system.transpose() * s.matrix()).eval() }
+        .basis      = info.basis,
+        .basis_mean = info.basis_avg,
+        .systems    = std::vector<CMFS> { info.system },
+        .signals    = std::vector<Colr> { (info.system.transpose() * s.matrix()).eval() }
       });
 
       return (info.system.transpose() * s_.matrix()).eval();
-      // return (info.system.transpose() * s.matrix()).eval();
     });
 
     return out;
@@ -269,134 +163,22 @@ namespace met {
       }
     }
 
-    // Filter NaNs at underconstrained output and strip redundant output 
+    // Filter NaNs at underconstrained output and strip redundant output from return 
     std::erase_if(output, [](Colr &c) { return c.isNaN().any(); });
-    return detail::remove_identical_points(output);
+    std::unordered_set<
+      Colr, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > output_unique(range_iter(output));
+    return std::vector<Colr>(range_iter(output_unique));
   }
 
   // row/col expansion shorthand for a given eigen matrix
   #define rowcol(mat) decltype(mat)::RowsAtCompileTime, decltype(mat)::ColsAtCompileTime
 
-  std::vector<Colr> generate_gamut(const GenerateGamutSimpleInfo &info) {
-    const uint n_bary = info.bary_weights;
-    const uint n_colr = 3;
-    const uint N = n_bary * n_colr;
-    const uint M = info.samples.size() * n_colr;
-    
-    // Initialize parameter object for LP solver with expected matrix sizes
-    LPParameters params(M, N);
-    params.method    = LPMethod::ePrimal;
-    params.scaling   = true;
-    params.objective = LPObjective::eMinimize;
-
-    // Clear untouched matrix values to 0
-    params.A.fill(0.0);
-
-    // Add constraints to ensure weighted combinations produce the given samples
-    for (uint i = 0; i < info.samples.size(); ++i) {
-      for (uint j = 0; j < n_bary; ++j) {
-        double w = info.weights[i][j];
-        auto A = (eig::Matrix3d() << w, 0, 0, 0, w, 0, 0, 0, w).finished();
-        fmt::print("A = {}\n", A.reshaped());
-        params.A.block(i * n_colr, j * n_colr, rowcol(A)) = A;
-      }
-      auto b = info.samples[i].cast<double>().eval();
-      fmt::print("b = {}\n", b.reshaped());
-      params.b.block(i * n_colr, 0, rowcol(b)) = b;
-    }
-
-    // Run solver and pray; cast results back to float
-    params.objective = LPObjective::eMinimize;
-    auto x_min = lp_solve(params).cast<float>().eval();
-    // params.objective = LPObjective::eMaximize;
-    // auto x_max = lp_solve(params).cast<float>().eval();
-
-    // Obtain resulting set of colors
-    std::vector<Colr> out(n_bary);
-    for (uint i = 0; i < n_bary; ++i)
-      out[i] = x_min.block<n_colr, 1>(i * n_colr, 0);
-      // out[i] = 0.5 * (x_min.block<n_colr, 1>(i * n_colr, 0) + x_max.block<n_colr, 1>(i * n_colr, 0));
-
-    return out;
-  } 
-
-  std::vector<Spec> generate_gamut(const GenerateGamutSpectrumInfo &info) {
-    // Constant shorthands
-    constexpr uint n_bary = barycentric_weights;
-    constexpr uint n_spec = wavelength_samples;
-    constexpr uint n_base = wavelength_bases;
-    constexpr uint n_colr = 3;
-    constexpr double gamut_err = 0.0; //5;
-    
-    // Common matrix sizes
-    constexpr uint N = n_bary * n_base;
-    const     uint M = info.samples.size() * n_spec // Recovery constraints for seed samples
-                     + info.gamut.size() * n_colr   // Roundtrip constraints for vertex positions
-                     + 2 * n_bary * n_spec;         // Boundedness constraints for vertex spectra
-    
-    // Initialize parameter object for LP solver with expected matrix sizes
-    LPParameters params(M, N);
-    params.method    = LPMethod::eDual;
-    params.scaling   = true;
-    params.objective = LPObjective::eMinimize;
-
-    // Clear untouched matrix values to 0
-    params.A.fill(0.0);
-    
-    // Add recovery constraints for seed samples
-    for (uint i = 0; i < info.samples.size(); ++i) {
-      for (uint j = 0; j < n_bary; ++j) {
-        auto A = (info.basis * info.weights[i][j]).cast<double>().eval();
-        params.A.block(i * n_spec, j * n_base, rowcol(A)) = A;
-      }
-
-      auto b = info.samples[i].cast<double>().eval();
-      params.b.block(i * n_spec, 0, rowcol(b)) = b;
-    }
-
-    // Add roundtrip constraints for gamut vertex positions
-    const auto gamut_csys = (info.system.transpose() * info.basis).cast<double>().eval();
-    const uint gamut_offs = info.samples.size() * n_spec;
-    for (uint i = 0; i < info.gamut.size(); ++i) {
-      auto b = info.gamut[i].cast<double>().eval();
-      params.A.block(gamut_offs + i * n_colr, i * n_base, rowcol(gamut_csys)) = gamut_csys;
-      params.b.block(gamut_offs + i * n_colr, 0, rowcol(b)) = (b - gamut_err).max(0.0).eval();
-    }
-
-    // Add boundedness constraints for resulting spectra
-    const uint l_offs = gamut_offs + info.gamut.size() * n_colr;
-    const uint u_offs = l_offs + n_bary * n_spec;
-    const auto basis = info.basis.cast<double>().eval();
-    for (uint i = 0; i < n_bary; ++i) {
-      params.A.block<rowcol(basis)>(l_offs + i * n_spec, i * n_base) = basis;
-      params.A.block<rowcol(basis)>(u_offs + i * n_spec, i * n_base) = basis;
-    }
-    params.b.block(l_offs, 0, n_bary * n_spec, 1) = 0.0;
-    params.b.block(u_offs, 0, n_bary * n_spec, 1) = 1.0;
-    params.r.block(l_offs, 0, n_bary * n_spec, 1) = LPCompare::eGE;
-    params.r.block(u_offs, 0, n_bary * n_spec, 1) = LPCompare::eLE;
-
-    // Run solver and pray; cast result back to float
-    params.objective = LPObjective::eMinimize;
-    auto x_min = lp_solve(params).cast<float>().eval();
-    params.objective = LPObjective::eMaximize;
-    auto x_max = lp_solve(params).cast<float>().eval();
-
-    // Obtain basis function weights from solution and compute resulting spectra
-    std::vector<Spec> out(n_bary);
-    for (uint i = 0; i < n_bary; ++i) {
-      out[i] = (0.5 * (
-        info.basis * BSpec(x_min.block<n_base, 1>(n_base * i, 0)) + 
-        info.basis * BSpec(x_max.block<n_base, 1>(n_base * i, 0))
-      )).cwiseMax(0.f).cwiseMin(1.f).eval();
-    }
-    
-    return out;
-  }
-
-  std::vector<Spec> generate_gamut(const GenerateGamutConstraintInfo &info) {
+  std::vector<Spec> generate_gamut(const GenerateGamutInfo &info) {
     // Constant and type shorthands
-    using Signal = GenerateGamutConstraintInfo::Signal;
+    using Signal = GenerateGamutInfo::Signal;
     constexpr uint n_bary = barycentric_weights;
     constexpr uint n_spec = wavelength_samples;
     constexpr uint n_base = wavelength_bases;
@@ -468,10 +250,6 @@ namespace met {
       params.r.block<wavelength_samples, 1>(l_offs + i * n_spec, 0) = LPCompare::eGE;
       params.r.block<wavelength_samples, 1>(u_offs + i * n_spec, 0) = LPCompare::eLE;
     }
-    // params.b.block(l_offs, 0, n_bary * n_spec, 1) = 0.0;
-    // params.b.block(u_offs, 0, n_bary * n_spec, 1) = 1.0;
-    // params.r.block(l_offs, 0, n_bary * n_spec, 1) = LPCompare::eGE;
-    // params.r.block(u_offs, 0, n_bary * n_spec, 1) = LPCompare::eLE;
 
     // Run solver and pray; cast results back to float
     params.objective = LPObjective::eMinimize;

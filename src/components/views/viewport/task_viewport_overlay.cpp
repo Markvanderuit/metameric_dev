@@ -917,7 +917,7 @@ namespace met {
         std::vector<Colr> signals = { e_vert.colr_i, c };
         return generate_spectrum({
           .basis = e_appl_data.loaded_basis, 
-          .basis_avg = e_appl_data.loaded_basis_avg, 
+          .basis_avg = e_appl_data.loaded_basis_mean, 
           .systems = systems,
           .signals = signals
         }).max(0.f).min(1.f).eval();

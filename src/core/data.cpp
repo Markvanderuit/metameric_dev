@@ -222,7 +222,7 @@ namespace met {
     // Generate temporary OCS for convex hull clipping
     fmt::print("  Generating object color solid boundaries\n");
     auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
-                                       .basis_avg = loaded_basis_avg,
+                                       .basis_avg = loaded_basis_mean,
                                        .system    = project_data.csys(0).finalize(), 
                                        .samples   = detail::gen_unit_dirs<3>(1024) });
     auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
@@ -360,12 +360,12 @@ namespace met {
       /* 2. Solve for a spectral gamut which satisfies the provided input*/
       {
         // Solve using image constraints directly
-        GenerateGamutConstraintInfo info = {
+        GenerateGamutInfo info = {
           .basis     = loaded_basis,
-          .basis_avg = loaded_basis_avg,
+          .basis_avg = loaded_basis_mean,
           .gamut     = verts,
           .systems   = std::vector<CMFS>(project_data.color_systems.size()),
-          .signals   = std::vector<GenerateGamutConstraintInfo::Signal>(n_samples)
+          .signals   = std::vector<GenerateGamutInfo::Signal>(n_samples)
         };
 
         // Transform mappings
@@ -423,10 +423,11 @@ namespace met {
               signals.push_back(vert.colr_j[j]);
             }
             
-            Spec valid_spec = generate_spectrum_tree({
-              .basis_tree = loaded_tree_root,
-              .systems   = systems, 
-              .signals   = signals
+            Spec valid_spec = generate_spectrum({
+              .basis      = loaded_basis,
+              .basis_mean = loaded_basis_mean,
+              .systems    = systems, 
+              .signals    = signals
             });
 
             for (uint j = 0; j < vert.colr_j.size(); ++j) {
@@ -588,9 +589,9 @@ namespace met {
     
     /* 3. Solve for a spectral gamut which satisfies the safe samples */
     if (solve_using_constraints) {
-      GenerateGamutConstraintInfo info = {
+      GenerateGamutInfo info = {
         .basis     = loaded_basis,
-        .basis_avg = loaded_basis_avg,
+        .basis_avg = loaded_basis_mean,
         .gamut     = std::vector<Colr>(project_data.gamut_verts.size()), // project_data.gamut_verts,
         .systems   = std::vector<CMFS>(project_data.color_systems.size())
       };

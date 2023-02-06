@@ -34,14 +34,14 @@ namespace met {
       }
       
       // data.loaded_basis = io::load_basis("resources/misc/basis.txt");
-      // data.loaded_basis_avg = io::load_spec("resources/misc/basis_avg.spd");
+      // data.loaded_basis_mean = io::load_spec("resources/misc/basis_avg.spd");
       data.loaded_tree_root = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
 
       // TODO: remove
       // data.loaded_tree_root.basis = data.loaded_basis;
-      // data.loaded_tree_root.basis_mean = data.loaded_basis_avg;
+      // data.loaded_tree_root.basis_mean = data.loaded_basis_mean;
       data.loaded_basis = data.loaded_tree_root.basis;
-      data.loaded_basis_avg = data.loaded_tree_root.basis_mean;
+      data.loaded_basis_mean = data.loaded_tree_root.basis_mean;
 
       scheduler.insert_resource("app_data", std::move(data));
     }

@@ -108,14 +108,15 @@ namespace met {
       // Generate new spectrum given the above systems+signals as solver constraints
       /* i_specs[i] = generate_spectrum({ 
         .basis     = e_appl_data.loaded_basis, 
-        .basis_avg = e_appl_data.loaded_basis_avg, 
+        .basis_avg = e_appl_data.loaded_basis_mean, 
         .systems   = std::span<CMFS> { systems }, 
         .signals   = std::span<Colr> { signals }
       });
  */
       // Generate new spectrum given the above systems+signals as solver constraints
-      i_specs[i] = generate_spectrum_tree({ 
-        .basis_tree = e_appl_data.loaded_tree_root, 
+      i_specs[i] = generate_spectrum({ 
+        .basis      = e_appl_data.loaded_basis,
+        .basis_mean = e_appl_data.loaded_basis_mean,
         .systems    = std::span<CMFS> { systems }, 
         .signals    = std::span<Colr> { signals },
         .reduce_basis_count = false
