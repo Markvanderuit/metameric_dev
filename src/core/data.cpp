@@ -20,8 +20,6 @@
 #include <mutex>
 
 namespace met {
-  constexpr uint chull_vertex_count = 5;
-
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -121,332 +119,21 @@ namespace met {
     mod_i = -1;
 
     // Copy over cmfs/illuminants and assign mappings in image order
-    project_data.cmfs        = info.cmfs;
+    project_data.cmfs = info.cmfs;
     project_data.illuminants = info.illuminants;
     project_data.color_systems.clear();
     for (auto &image : info.images)
-      project_data.color_systems.push_back({ .cmfs       = image.cmfs, 
-                                        .illuminant = image.illuminant });
+      project_data.color_systems.push_back({ .cmfs = image.cmfs, .illuminant = image.illuminant });
 
     // Move texture into application - not project - data; stored in separate file
     loaded_texture = std::move(info.images[0].image);
     info.images.erase(info.images.begin()); // Youch
+    
+    gen_convex_hull(info.n_vertices);
 
-    // Generate temporary object color solid boundaries for convex hull estimation
-    fmt::print("  Generating object color solid boundaries\n");
-    auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
-                                       .basis_avg = loaded_basis_avg,
-                                       .system    = project_data.csys(0).finalize(), 
-                                       .samples   = detail::gen_unit_dirs<3>(1024) });
-    auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
-
-    /* // TODO: Remove
-    {
-      auto [verts, elems] = generate_data(ocs_mesh);
-      fmt::print("ocs_verts = np.array({})\nocs_elems = np.array({})\n", verts, elems);
-    } */
-
-    // Generate a simplified concave hull fit to texture data; then re-generate a convex hull around this
-    fmt::print("  Generating simplified convex hull\n");
-    auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
-    auto chull_simp = simplify(chull_mesh, ocs_mesh, info.n_vertices);
-    auto [verts, elems] = generate_data(chull_simp);
-    chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(verts);
-    std::tie(verts, elems) = generate_data(chull_mesh);
-    fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());
-
-    /* // TODO: Remove
-    {
-      fmt::print("chull_verts = np.array({})\nchull_elems = np.array({})\n", verts, elems);
-    } */
-
-    // Store results with approximate values
-    project_data.gamut_elems = elems;
-    project_data.gamut_verts.resize(verts.size());
-    std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
-      return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
-    });
-
-    // Continue only with the below solver steps if there are additional input images to serve as constraints
-    guard(!info.images.empty());
-
-    // Intermediate storage for computed barycentric weights and indices to positive weights
-    std::vector<eig::Array<float, barycentric_weights, 1>> img_weights;
-    std::vector<uint> img_indices;
-
-  
-    // Relevant settings for the following section
-    const     uint n_samples  = 48; //48 * info.images.size();
-    constexpr uint n_attempts = 32;
-    constexpr uint n_runs     = 1;
-    constexpr bool solve_using_constraints = true;
-
-    // Mutex for safe solver sections
-    std::mutex solver_mutex;
-    float solver_error = std::numeric_limits<float>::max();
-    fmt::print("  Starting {} solver runs, {} samples, {} attempts\n", n_runs, n_samples, n_attempts);
-    for (int _j = 0; _j < n_runs; ++_j) {
-      // mask current set of vertices
-      std::vector<Colr> verts(project_data.gamut_verts.size());
-      std::ranges::transform(project_data.gamut_verts, verts.begin(), [](const auto &v) { return v.colr_i; });
-      
-      /* 1. Generate barycentric weights for the convex hull, given the input image;
-            we quick hack reuse shader code from the rendering pipeline */
-      {
-        fmt::print("  Generating barycentric weights\n");
-
-        const uint n = loaded_texture.size().prod();
-        const uint n_div = ceil_div(n, 256u);
-
-        // Create program object, reusing shader from gen_barycentric_weights
-        gl::Program bary_program = {{ .type = gl::ShaderType::eCompute,
-                                      .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights.comp.spv_opt",
-                                      .is_spirv_binary = true }};
-
-        // Initialize uniform buffer layout
-        struct UniformBuffer { uint n, n_verts, n_elems; } uniform_buffer = {
-          .n = n,
-          .n_verts = static_cast<uint>(verts.size()),
-          .n_elems = static_cast<uint>(elems.size())
-        };
-
-        // Create relevant buffer objects containing properly aligned data
-        auto al_verts = std::vector<eig::AlArray3f>(range_iter(verts));
-        auto al_elems = std::vector<eig::AlArray3u>(range_iter(elems));
-        gl::Buffer bary_vert_buffer = {{ .data = cnt_span<const std::byte>(al_verts) }};
-        gl::Buffer bary_elem_buffer = {{ .data = cnt_span<const std::byte>(al_elems) }};
-        gl::Buffer bary_unif_buffer  = {{ .data = obj_span<const std::byte>(uniform_buffer) }};
-        gl::Buffer bary_colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned(loaded_texture).data()) }};
-        gl::Buffer bary_wght_buffer = {{ .size = loaded_texture.size().prod() * barycentric_weights * sizeof(float),
-                                        .flags = gl::BufferCreateFlags::eStorageDynamic }};
-
-        // Bind resources to buffer targets for upcoming shader dispatch
-        bary_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-        bary_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-        bary_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-        bary_wght_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
-        bary_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
-        
-        // Dispatch shader call and copy results to host memory
-        gl::dispatch_compute({ .groups_x = n_div, .bindable_program = &bary_program });
-        img_weights.resize(n);
-        bary_wght_buffer.get(cnt_span<std::byte>(img_weights));
-
-        // Obtain mask over indices of non-negative barycentric weights; in case the convex hull
-        // estimation does not provide a perfect fit, as the decimation implementation is a bit wonky
-        img_indices.clear();
-        std::vector<uint> index_full(n);
-        std::iota(range_iter(index_full), 0);
-        std::copy_if(range_iter(index_full), std::back_inserter(img_indices),
-          [&img_weights](uint i) { return (img_weights[i] >= 0).all(); });
-
-        float positive_ratio = static_cast<float>(img_indices.size()) / static_cast<float>(n);
-        fmt::print("  Barycentric weight fit: {}\n", positive_ratio);
-      }
-
-
-      #pragma omp parallel for
-      for (int _i = 0; _i < n_attempts; ++_i) {
-        using Wght = eig::Matrix<float, barycentric_weights, 1>;
-
-        // Data storage for the current attempt's random samples
-        std::vector<uint> sample_indices(n_samples);
-        std::vector<Wght> sample_bary(n_samples);
-        std::vector<Colr> sample_colr_i(n_samples);
-        std::vector<std::vector<Colr>> sample_colr_j(info.images.size());
-
-        /* 1. Sample a random subset of pixels in the texture and obtain their color values */
-        {
-          auto colr_i_span = loaded_texture.data();
-
-          // Define random distribution to sample non-negative weight indices
-          std::random_device rd;
-          std::mt19937 eng(rd());
-          std::uniform_int_distribution<uint> distr(0, img_indices.size() - 1);
-
-          // Draw random samples from said distribution
-          std::vector<uint> samples(n_samples);
-          std::ranges::generate(samples, [&]{ return distr(eng); });
-
-          // Extract sampled data
-          std::ranges::transform(samples, sample_indices.begin(), [&](uint i) { return img_indices[i]; });
-          std::ranges::transform(sample_indices, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
-          std::ranges::transform(sample_indices, sample_bary.begin(), [&](uint i) { return img_weights[i]; });
-          for (uint i = 0; i < info.images.size(); ++i) {
-            auto colr_j_span = info.images[i].image.data();
-            sample_colr_j[i] = std::vector<Colr>(n_samples);
-            std::ranges::transform(sample_indices, sample_colr_j[i].begin(), [&](uint i) { return colr_j_span[i]; });
-          }
-        }
-
-        // Intermediate storage for solved spectral gamut
-        std::vector<Spec> gamut_spec;
-
-        /* 2. Solve for a spectral gamut which satisfies the provided input*/
-        if (solve_using_constraints) {
-          auto t_start = std::chrono::steady_clock::now();
-
-          // Solve using image constraints directly
-          GenerateGamutConstraintInfo info = {
-            .basis     = loaded_basis,
-            .basis_avg = loaded_basis_avg,
-            .gamut     = verts,
-            .systems   = std::vector<CMFS>(project_data.color_systems.size()),
-            .signals   = std::vector<GenerateGamutConstraintInfo::Signal>(n_samples)
-          };
-
-          // Transform mappings
-          for (uint i = 0; i < project_data.color_systems.size(); ++i)
-            info.systems[i] = project_data.csys(i).finalize();
-
-          // Add baseline samples
-          for (uint i = 0; i < n_samples; ++i)
-            info.signals[i] = { .colr_v = sample_colr_i[i],
-                                .bary_v = sample_bary[i],
-                                .syst_i = 0 };
-
-          // Add constraint samples
-          for (uint i = 0; i < sample_colr_j.size(); ++i) {
-            const auto &values = sample_colr_j[i];
-            for (uint j = 0; j < n_samples; ++j) {
-              info.signals.push_back({
-                .colr_v = values[j],
-                .bary_v = sample_bary[j],
-                .syst_i = i + 1
-              });
-            }
-          }
-
-          // Fire solver and cross fingers
-          gamut_spec = generate_gamut(info);
-          gamut_spec.resize(verts.size());
-
-          auto t_end = std::chrono::steady_clock::now();
-          auto t_duration = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
-
-          fmt::print("  Solve time: {}ms\n", t_duration.count());
-        } else {
-          auto t_start = std::chrono::steady_clock::now();
-
-          // Generate spectral distributions for each sample
-          std::vector<Spec> sample_spec(n_samples);
-          std::vector<CMFS> sample_cmfs(project_data.color_systems.size());
-          for (uint i = 0; i < sample_cmfs.size(); ++i)
-            sample_cmfs[i] = project_data.csys(i).finalize();
-          for (uint i = 0; i < n_samples; ++i) {
-            std::vector<Colr> sample_signals = { sample_colr_i[i] };
-            for (uint j = 0; j < sample_colr_j.size(); ++j)
-              sample_signals.push_back(sample_colr_j[j][i]);
-            sample_spec[i] = generate_spectrum_tree({
-              .basis_tree = loaded_tree_root,
-              .systems   = sample_cmfs, 
-              .signals   = sample_signals
-            });
-          }
-          
-          // Solve using spectra generated from image constraints
-          GenerateGamutSpectrumInfo info = {
-            .basis   = loaded_basis,
-            .system  = project_data.csys(0).finalize(),
-            .gamut   = verts,
-            .weights = sample_bary,
-            .samples = sample_spec
-          };
-
-          // Fire solver and cross fingers
-          gamut_spec = generate_gamut(info);
-          gamut_spec.resize(verts.size());
-
-          auto t_end = std::chrono::steady_clock::now();
-          auto t_duration = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
-
-          fmt::print("  Solve time: {}ms\n", t_duration.count());
-        }
-
-        // Intermediate storage for vertices and constraints
-        std::vector<ProjectData::Vert> gamut_verts;
-
-        /* 3. Obtain vertices and constraints from spectral gamut, by applying known color systems */
-        {
-          for (uint i = 0; i < gamut_spec.size(); ++i) {
-            const Spec &sd = gamut_spec[i];
-            ProjectData::Vert vert;
-
-            // Define vertex settings
-            vert.colr_i = project_data.gamut_verts[i].colr_i; // project_data.csys(project_data.color_systems[0]).apply_color(sd);
-            vert.csys_i = 0;
-
-            // Define constraint settings
-            for (uint j = 1; j < project_data.color_systems.size(); ++j) {
-              vert.colr_j.push_back(project_data.csys(project_data.color_systems[j]).apply_color(sd));
-              vert.csys_j.push_back(j);
-            }
-
-            // Clip constraints to validity
-            {
-              std::vector<CMFS> systems = { project_data.csys(vert.csys_i).finalize() };
-              std::vector<Colr> signals = { vert.colr_i };
-              for (uint j = 0; j < vert.colr_j.size(); ++j) {
-                systems.push_back(project_data.csys(vert.csys_j[j]).finalize());
-                signals.push_back(vert.colr_j[j]);
-              }
-              
-              Spec valid_spec = generate_spectrum_tree({
-                .basis_tree = loaded_tree_root,
-                .systems   = systems, 
-                .signals   = signals
-              });
-
-              for (uint j = 0; j < vert.colr_j.size(); ++j) {
-                vert.colr_i = project_data.csys(vert.csys_i).apply_color(valid_spec);
-                vert.colr_j[j] = project_data.csys(vert.csys_j[j]).apply_color(valid_spec);
-              }
-            }
-
-            gamut_verts.push_back(vert);
-          }
-        }
-
-        // Intermediate error storage
-        float roundtrip_error = 0.f;
-
-        /* 4. Compute roundtrip error for the different inputs */
-        {
-          // Squared error based on offsets to the convex hull vertices
-          /* for (uint i = 0; i < gamut_verts.size(); ++i)
-            roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum(); */
-
-          // Add squared error based on sample roundtrip
-          for (uint i = 0; i < n_samples; ++i) {
-            // Recover spectrum at sample position
-            Wght w = sample_bary[i];
-            Spec s = 0.f;
-            for (uint j = 0; j < gamut_spec.size(); ++j)
-              s += w[j] * gamut_spec[j];
-            
-            // Add baseline sample error
-            Colr colr_i = project_data.csys(0).apply_color(s);
-            roundtrip_error += (sample_colr_i[i] - colr_i).pow(2.f).sum();
-
-            // Add constraint sample error
-            for (uint j = 0; j < sample_colr_j.size(); ++j) {
-              Colr colr_j = project_data.csys(j + 1).apply_color(s);
-              roundtrip_error += (sample_colr_j[j][i] - colr_j).pow(2.f).sum();
-            }
-          }
-        }
-
-        /* 5. Apply results */
-        {
-          std::lock_guard<std::mutex> lock(solver_mutex);
-          if (roundtrip_error < solver_error) {
-            project_data.gamut_verts = gamut_verts;
-            solver_error = roundtrip_error;
-            fmt::print("  Best error: {}\n", solver_error);
-          }
-        }
-      }
-    }
+    // If additional input images are provided, fit constraints
+    if (!info.images.empty())
+      gen_constraints_from_images(info.images);
   }
   
   void ApplicationData::save(const fs::path &path) {
@@ -529,25 +216,275 @@ namespace met {
     mod_i = -1;
   }  
 
-  void ApplicationData::refit_convex_hull() {
-    // Generate color solid
-    auto ocs = generate_ocs_boundary({ .basis = loaded_basis,
+  void ApplicationData::gen_convex_hull(uint n_vertices) {
+    met_trace_full();
+
+    // Generate temporary OCS for convex hull clipping
+    fmt::print("  Generating object color solid boundaries\n");
+    auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
                                        .basis_avg = loaded_basis_avg,
-                                       .system = project_data.csys(0).finalize(), 
-                                       .samples = detail::gen_unit_dirs<3>(4096) });
+                                       .system    = project_data.csys(0).finalize(), 
+                                       .samples   = detail::gen_unit_dirs<3>(1024) });
     auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
 
-    // Generate convex hull
+    // Generate simplified concave hull fitting texture data, then fit convex hull around this
+    fmt::print("  Generating simplified convex hull\n");
     auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
-    auto chull_simp = simplify(chull_mesh, ocs_mesh, project_data.gamut_verts.size());
+    auto chull_simp = simplify(chull_mesh, ocs_mesh, n_vertices);
     auto [verts, elems] = generate_data(chull_simp);
+    std::tie(verts, elems) = generate_convex_hull<eig::Array3f>(verts);
+    
+    fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());
 
-    // Store results with approximate values
+    // Update project data with new convex hull
     project_data.gamut_elems = elems;
     project_data.gamut_verts.resize(verts.size());
     std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
       return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
     });
+  }
+
+  void ApplicationData::gen_constraints_from_images(std::span<const ProjectCreateInfo::ImageData> images) {
+    met_trace_full();
+  
+    // Relevant settings for the following section
+    const     uint n_samples  = 48;
+    constexpr uint n_attempts = 32;
+    constexpr uint n_runs     = 1;
+
+    // Get current set of vertices
+    std::vector<Colr> verts(project_data.gamut_verts.size());
+    std::ranges::transform(project_data.gamut_verts, verts.begin(), [](const auto &v) { return v.colr_i; });
+    
+    // Intermediate storage for computed barycentric weights and indices to positive weights
+    std::vector<eig::Array<float, barycentric_weights, 1>> img_weights;
+    std::vector<uint> img_indices;
+
+    /* 1. Generate barycentric weights for the convex hull, given the input image;
+          we quick hack reuse shader code from the rendering pipeline */
+    {
+      fmt::print("  Generating barycentric weights\n");
+
+      const uint n = loaded_texture.size().prod();
+      const uint n_div = ceil_div(n, 256u);
+
+      // Create program object, reusing shader from gen_barycentric_weights
+      gl::Program bary_program = {{ .type = gl::ShaderType::eCompute,
+                                    .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights.comp.spv_opt",
+                                    .is_spirv_binary = true }};
+
+      // Initialize uniform buffer layout
+      struct UniformBuffer { uint n, n_verts, n_elems; } uniform_buffer = {
+        .n = n,
+        .n_verts = static_cast<uint>(verts.size()),
+        .n_elems = static_cast<uint>(project_data.gamut_elems.size())
+      };
+
+      // Create relevant buffer objects containing properly aligned data
+      auto al_verts = std::vector<eig::AlArray3f>(range_iter(verts));
+      auto al_elems = std::vector<eig::AlArray3u>(range_iter(project_data.gamut_elems));
+      gl::Buffer bary_vert_buffer = {{ .data = cnt_span<const std::byte>(al_verts) }};
+      gl::Buffer bary_elem_buffer = {{ .data = cnt_span<const std::byte>(al_elems) }};
+      gl::Buffer bary_unif_buffer = {{ .data = obj_span<const std::byte>(uniform_buffer) }};
+      gl::Buffer bary_colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned(loaded_texture).data()) }};
+      gl::Buffer bary_wght_buffer = {{ .size = loaded_texture.size().prod() * barycentric_weights * sizeof(float),
+                                      .flags = gl::BufferCreateFlags::eStorageDynamic }};
+
+      // Bind resources to buffer targets for upcoming shader dispatch
+      bary_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+      bary_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+      bary_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+      bary_wght_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
+      bary_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
+      
+      // Dispatch shader call and copy results to host memory
+      gl::dispatch_compute({ .groups_x = n_div, .bindable_program = &bary_program });
+      img_weights.resize(n);
+      bary_wght_buffer.get(cnt_span<std::byte>(img_weights));
+
+      // Obtain mask over indices of non-negative barycentric weights; in case the convex hull
+      // estimation does not provide a perfect fit, as the decimation implementation is a bit wonky
+      img_indices.clear();
+      std::vector<uint> index_full(n);
+      std::iota(range_iter(index_full), 0);
+      std::copy_if(range_iter(index_full), std::back_inserter(img_indices),
+        [&img_weights](uint i) { return (img_weights[i] >= 0).all(); });
+
+      float positive_ratio = static_cast<float>(img_indices.size()) / static_cast<float>(n);
+      fmt::print("  Barycentric weight fit: {}\n", positive_ratio);
+    }
+
+    // Mutex for safe solver sections
+    std::mutex solver_mutex;
+    float solver_error = std::numeric_limits<float>::max();
+
+    // Begin solver runs
+    fmt::print("  Starting solver, {} samples, {} attempts\n", n_samples, n_attempts);
+    #pragma omp parallel for
+    for (int _i = 0; _i < n_attempts; ++_i) {
+      using Wght = eig::Matrix<float, barycentric_weights, 1>;
+
+      // Data storage for the current attempt's random samples
+      std::vector<uint> sample_indices(n_samples);
+      std::vector<Wght> sample_bary(n_samples);
+      std::vector<Colr> sample_colr_i(n_samples);
+      std::vector<std::vector<Colr>> sample_colr_j(images.size());
+
+      /* 1. Sample a random subset of pixels in the texture and obtain their color values */
+      {
+        auto colr_i_span = loaded_texture.data();
+
+        // Define random distribution to sample non-negative weight indices
+        std::random_device rd;
+        std::mt19937 eng(rd());
+        std::uniform_int_distribution<uint> distr(0, img_indices.size() - 1);
+
+        // Draw random samples from said distribution
+        std::vector<uint> samples(n_samples);
+        std::ranges::generate(samples, [&]{ return distr(eng); });
+
+        // Extract sampled data
+        std::ranges::transform(samples, sample_indices.begin(), [&](uint i) { return img_indices[i]; });
+        std::ranges::transform(sample_indices, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
+        std::ranges::transform(sample_indices, sample_bary.begin(), [&](uint i) { return img_weights[i]; });
+        for (uint i = 0; i < images.size(); ++i) {
+          auto colr_j_span = images[i].image.data();
+          sample_colr_j[i] = std::vector<Colr>(n_samples);
+          std::ranges::transform(sample_indices, sample_colr_j[i].begin(), [&](uint i) { return colr_j_span[i]; });
+        }
+      }
+
+      // Intermediate storage for solved spectral gamut
+      std::vector<Spec> gamut_spec;
+
+      /* 2. Solve for a spectral gamut which satisfies the provided input*/
+      {
+        // Solve using image constraints directly
+        GenerateGamutConstraintInfo info = {
+          .basis     = loaded_basis,
+          .basis_avg = loaded_basis_avg,
+          .gamut     = verts,
+          .systems   = std::vector<CMFS>(project_data.color_systems.size()),
+          .signals   = std::vector<GenerateGamutConstraintInfo::Signal>(n_samples)
+        };
+
+        // Transform mappings
+        for (uint i = 0; i < project_data.color_systems.size(); ++i)
+          info.systems[i] = project_data.csys(i).finalize();
+
+        // Add baseline samples
+        for (uint i = 0; i < n_samples; ++i)
+          info.signals[i] = { .colr_v = sample_colr_i[i],
+                              .bary_v = sample_bary[i],
+                              .syst_i = 0 };
+
+        // Add constraint samples
+        for (uint i = 0; i < sample_colr_j.size(); ++i) {
+          const auto &values = sample_colr_j[i];
+          for (uint j = 0; j < n_samples; ++j) {
+            info.signals.push_back({
+              .colr_v = values[j],
+              .bary_v = sample_bary[j],
+              .syst_i = i + 1
+            });
+          }
+        }
+
+        // Fire solver and cross fingers
+        gamut_spec = generate_gamut(info);
+        gamut_spec.resize(verts.size());
+      }
+
+      // Intermediate storage for vertices and constraints
+      std::vector<ProjectData::Vert> gamut_verts;
+
+      /* 3. Obtain vertices and constraints from spectral gamut, by applying known color systems */
+      {
+        for (uint i = 0; i < gamut_spec.size(); ++i) {
+          const Spec &sd = gamut_spec[i];
+          ProjectData::Vert vert;
+
+          // Define vertex settings
+          vert.colr_i = project_data.gamut_verts[i].colr_i; // project_data.csys(project_data.color_systems[0]).apply_color(sd);
+          vert.csys_i = 0;
+
+          // Define constraint settings
+          for (uint j = 1; j < project_data.color_systems.size(); ++j) {
+            vert.colr_j.push_back(project_data.csys(project_data.color_systems[j]).apply_color(sd));
+            vert.csys_j.push_back(j);
+          }
+
+          // Clip constraints to validity
+          {
+            std::vector<CMFS> systems = { project_data.csys(vert.csys_i).finalize() };
+            std::vector<Colr> signals = { vert.colr_i };
+            for (uint j = 0; j < vert.colr_j.size(); ++j) {
+              systems.push_back(project_data.csys(vert.csys_j[j]).finalize());
+              signals.push_back(vert.colr_j[j]);
+            }
+            
+            Spec valid_spec = generate_spectrum_tree({
+              .basis_tree = loaded_tree_root,
+              .systems   = systems, 
+              .signals   = signals
+            });
+
+            for (uint j = 0; j < vert.colr_j.size(); ++j) {
+              vert.colr_i = project_data.csys(vert.csys_i).apply_color(valid_spec);
+              vert.colr_j[j] = project_data.csys(vert.csys_j[j]).apply_color(valid_spec);
+            }
+          }
+
+          gamut_verts.push_back(vert);
+        }
+      }
+
+      // Intermediate error storage
+      float roundtrip_error = 0.f;
+
+      /* 4. Compute roundtrip error for the different inputs */
+      {
+        // Squared error based on offsets to the convex hull vertices
+        /* for (uint i = 0; i < gamut_verts.size(); ++i)
+          roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum(); */
+
+        // Add squared error based on sample roundtrip
+        for (uint i = 0; i < n_samples; ++i) {
+          // Recover spectrum at sample position
+          Wght w = sample_bary[i];
+          Spec s = 0.f;
+          for (uint j = 0; j < gamut_spec.size(); ++j)
+            s += w[j] * gamut_spec[j];
+          
+          // Add baseline sample error
+          Colr colr_i = project_data.csys(0).apply_color(s);
+          roundtrip_error += (sample_colr_i[i] - colr_i).pow(2.f).sum();
+
+          // Add constraint sample error
+          for (uint j = 0; j < sample_colr_j.size(); ++j) {
+            Colr colr_j = project_data.csys(j + 1).apply_color(s);
+            roundtrip_error += (sample_colr_j[j][i] - colr_j).pow(2.f).sum();
+          }
+        }
+      }
+
+      /* 5. Apply results */
+      {
+        std::lock_guard<std::mutex> lock(solver_mutex);
+        if (roundtrip_error < solver_error) {
+          project_data.gamut_verts = gamut_verts;
+          solver_error = roundtrip_error;
+          fmt::print("  Best error: {}\n", solver_error);
+        }
+      }
+    }
+  }
+
+
+  void ApplicationData::gen_constraints_from_samples() {
+    met_trace_full();
+
+
   }
 
   void ApplicationData::solve_samples() {
@@ -696,36 +633,6 @@ namespace met {
 
       project_data.gamut_verts[i] = vert;
     }
-
-    /* 3-4-alt. Solve for simplified constraints and store in gamut */
-    /* {
-      // Assumption; all samples have the same nr. and order of maps
-      // TODO: fix this, do a gather step of mapping data instead
-      uint n = project_data.sample_verts[0].csys_j.size();
-
-      // Clear constraints from gamut
-      for (auto &v : project_data.gamut_verts) {
-        v.colr_j.clear();
-        v.csys_j.clear();
-      }
-      
-      // Resolve constraints and apply
-      for (uint i = 0; i < n; ++i) {
-        GenerateGamutSimpleInfo info = { .bary_weights = static_cast<uint>(project_data.gamut_verts.size()), 
-                                         .weights = sample_weights };
-        for (uint j = 0; j < project_data.sample_verts.size(); ++j)
-          info.samples.push_back(project_data.sample_verts[j].colr_j[i]);
-        
-        std::vector<Colr> result = generate_gamut(info);
-        result.resize(project_data.gamut_verts.size());
-        for (uint j = 0; j < project_data.gamut_verts.size(); ++j) {
-          project_data.gamut_verts[j].colr_j.push_back(result[j]);
-          project_data.gamut_verts[j].csys_j.push_back(i + 1);
-        }
-
-        fmt::print("Result {}\n", result);
-      }
-    } */
 
     /* 5. Report sample recovery error */
     {

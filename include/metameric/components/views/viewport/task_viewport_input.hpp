@@ -248,14 +248,15 @@ namespace met {
           // Solver button
           ImGui::Separator();
           if (ImGui::Button("Fit convex hull")) {
-            e_appl_data.refit_convex_hull();
+            e_appl_data.gen_convex_hull(e_proj_data.gamut_verts.size());
           }
-          if (!e_samples.empty()) {
+
+          /* if (!e_samples.empty()) {
             ImGui::SameLine();
             if (ImGui::Button("Fit samples")) {
               e_appl_data.solve_samples();
             }
-          }
+          } */
         }
 
         ImGui::Separator();
