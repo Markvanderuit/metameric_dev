@@ -18,14 +18,13 @@
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
     "imguizmo",
     "implot",
-    "meshoptimizer",
     "nativefiledialog",
     "nlohmann-json",
     "openmesh",
     "stb",
-    "tbb",
     "tracy",
-    "zlib"
+    "zlib",
+    "zstr"
   ],
   "features" : { }
 }
