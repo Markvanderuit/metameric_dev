@@ -17,12 +17,12 @@ namespace met {
 
     /* Header block for spectral texture export format */
     struct SpectralDataHeader {
-      float wvl_min    = wavelength_min;
-      float wvl_max    = wavelength_max;
-      uint wvl_samples = wavelength_samples;
-      uint func_count;
-      uint wght_xres;
-      uint wght_yres;
+      float wvl_min     = wavelength_min;
+      float wvl_max     = wavelength_max;
+      uint  wvl_samples = wavelength_samples;
+      uint  func_count;
+      uint  wght_xres;
+      uint  wght_yres;
     };
 
     /* Data block for spectral texture export format */
@@ -66,7 +66,6 @@ namespace met {
     // Load a set of basis functions from sequentially increasing wvl/value data
     Basis basis_from_data(std::span<const float> wvls, 
                           std::span<std::array<float, wavelength_bases>> values);
-    Basis basis_from_data(std::span<const float> wvls, std::span<const float> values);
 
     // Split a discrete spectral distribution or color matching functions into sequentially 
     // increasing wvl/value/*/* data

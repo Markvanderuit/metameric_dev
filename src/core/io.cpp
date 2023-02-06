@@ -6,6 +6,7 @@
 
 // Third party includes
 #include <nlohmann/json.hpp>
+#include <zstr.hpp>
 
 // STL includes
 #include <algorithm>
@@ -195,22 +196,30 @@ namespace met::io {
   void save_spectral_data(const SpectralData &data, const fs::path &path) {
     met_trace();
     
-    // Attempt to open output file stream in binary mode
-    std::ofstream ofs(path, std::ios::out | std::ios::binary);
-    debug::check_expr_dbg(ofs.is_open(),
-      fmt::format("failed to open file \"{}\"", path.string()));
+    // Attempt to open output file stream in binary mode using zlib stream wrapper
+    zstr::ofstream ofs(path.string(), std::ios::out | std::ios::binary, 9);
+
+    // Cast [0, 1]-bounded weights to 16 bit fixed point
+    constexpr auto fcompact = [](float f) -> ushort { 
+      constexpr float multiplier = static_cast<float>(std::numeric_limits<unsigned short>::max());
+      return static_cast<ushort>(std::round(std::clamp(f, 0.f, 1.f) * multiplier)); 
+    };
+    std::vector<ushort> weights_compact(data.weights.size());
+    std::transform(std::execution::par_unseq, range_iter(data.weights), weights_compact.begin(), fcompact);
+    fmt::print("{}->'{}\n", data.weights[16], weights_compact[16]);
 
     // Expected data sizes
     constexpr size_t header_size = sizeof(SpectralDataHeader);
-    const size_t functions_size = data.functions.size() * sizeof(decltype(data.functions)::value_type);
-    const size_t weights_size = data.weights.size() * sizeof(decltype(data.weights)::value_type);
+    const size_t functions_size  = data.functions.size() * sizeof(decltype(data.functions)::value_type);
+    const size_t weights_size    = weights_compact.size() * sizeof(decltype(weights_compact)::value_type);
 
     // Write data in three steps
     ofs.write((const char *) &data.header, header_size);
     ofs.write((const char *) data.functions.data(), functions_size);
-    ofs.write((const char *) data.weights.data(), weights_size);
+    ofs.write((const char *) weights_compact.data(), weights_size);
+    // ofs.write((const char *) data.weights.data(), weights_size);
 
-    ofs.close();
+    ofs.flush();
   }
 
   // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::average(...) from libcore/spectrum.cpp
@@ -284,15 +293,10 @@ namespace met::io {
                         std::span<std::array<float, wavelength_bases>> values) {
     met_trace();
 
-    // TODO: remove this hack
-    constexpr auto wvl_at_i = [](int i) {
-      return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
-    };
     // Generate extended wavelengths for now, fitting current spectral range
     std::vector<float> wvls(values.size() + 1);
-    for (int i = 0; i < wvls.size(); ++i) {
+    for (int i = 0; i < wvls.size(); ++i)
       wvls[i] = wavelength_min + i * (wavelength_range / static_cast<float>(values.size()));
-    }
   
     float data_wvl_min = wvls[0],
           data_wvl_max = wvls[wvls.size() - 1];
@@ -320,51 +324,6 @@ namespace met::io {
                 clamp_a = std::max(wvl_a, wvl_min);
           float wvl_b   = wvls[pos + 1],
                 value_b = values[pos + 1][j],
-                clamp_b = std::min(wvl_b, wvl_max);
-          guard_continue(clamp_b > clamp_a);
-
-          float inv_ab = 1.f / (wvl_b - wvl_a);
-          float interp_a = std::lerp(value_a, value_b, (clamp_a - wvl_a) * inv_ab),
-                interp_b = std::lerp(value_a, value_b, (clamp_b - wvl_a) * inv_ab);
-
-          s(i, j) += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
-        }
-        s(i, j) /= wavelength_ssize;
-      }
-    }
-
-    return s.eval();
-  }
-
-  Basis basis_from_data(std::span<const float> wvls, std::span<const float> values) {
-    met_trace();
-    
-    float data_wvl_min = wvls[0],
-          data_wvl_max = wvls[wvls.size() - 1];
-
-    Basis s = 0.f;
-
-    for (size_t j = 0; j < wavelength_bases; ++j) {
-      for (size_t i = 0; i < wavelength_samples; ++i) {
-        float spec_wvl_min = i * wavelength_ssize + wavelength_min,
-              spec_wvl_max = spec_wvl_min + wavelength_ssize;
-
-        // Determine accessible range of wavelengths
-        float wvl_min = std::max(spec_wvl_min, data_wvl_min),
-              wvl_max = std::min(spec_wvl_max, data_wvl_max);
-        guard_continue(wvl_max > wvl_min);
-
-        // Find the starting index using binary search (Thanks for the idea, Mitsuba people!)
-        ptrdiff_t pos = std::max(std::ranges::lower_bound(wvls, wvl_min) - wvls.begin(),
-                                static_cast<ptrdiff_t>(1)) - 1;
-        
-        // Step through the provided data and integrate trapezoids
-        for (; pos + 1 < wvls.size() && wvls[pos] < wvl_max; ++pos) {
-          float wvl_a   = wvls[pos],
-                value_a = values[wavelength_bases * pos + j],
-                clamp_a = std::max(wvl_a, wvl_min);
-          float wvl_b   = wvls[pos + 1],
-                value_b = values[wavelength_bases * (pos + 1) + j],
                 clamp_b = std::min(wvl_b, wvl_max);
           guard_continue(clamp_b > clamp_a);
 

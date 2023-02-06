@@ -12,6 +12,9 @@
 #include <drjit/texture.h>
 #include <mutex>
 #include <span>
+#include <iostream>
+#include <execution>
+#include <algorithm>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -32,6 +35,7 @@ struct SpectralDataHeader {
 struct SpectralData {
   SpectralDataHeader header;
   std::vector<float> functions;
+  std::vector<unsigned short> weights_compact;
   std::vector<float> weights;
 };
 
@@ -55,15 +59,15 @@ public:
     Log(Info, "Loading metameric texture from \"%s\" ..", m_name);
     SpectralData data;
     ref<FileStream> fs = new FileStream(file_path);
-    ref<ZStream>    zs = new ZStream(fs);
+    ref<ZStream>    zs = new ZStream(fs, ZStream::EStreamType::EGZipStream);
 
     // Read header data
-    fs->read<float>(data.header.wvl_min);
-    fs->read<float>(data.header.wvl_max);
-    fs->read<unsigned>(data.header.wvl_samples);
-    fs->read<unsigned>(data.header.func_count);
-    fs->read<unsigned>(data.header.wght_xres);
-    fs->read<unsigned>(data.header.wght_yres);
+    zs->read<float>(data.header.wvl_min);
+    zs->read<float>(data.header.wvl_max);
+    zs->read<unsigned>(data.header.wvl_samples);
+    zs->read<unsigned>(data.header.func_count);
+    zs->read<unsigned>(data.header.wght_xres);
+    zs->read<unsigned>(data.header.wght_yres);
 
     Log(Info, "Metameric texture header data loaded\n");
     Log(Info, "wvl_min = %f\nwvl_max = %f\nwvl_samples = %d\nfunc_count = %d\nwght_xres = %d\nwght_yres = %d\n",
@@ -72,11 +76,26 @@ public:
 
     // Allocate weight/function data blocks
     data.functions.resize(data.header.func_count * data.header.wvl_samples);
+    data.weights_compact.resize(data.header.func_count * data.header.wght_xres * data.header.wght_yres);
     data.weights.resize(data.header.func_count * data.header.wght_xres * data.header.wght_yres);
 
     // Read block data
-    fs->read_array<float>(data.functions.data(), data.functions.size());
-    fs->read_array<float>(data.weights.data(), data.weights.size());
+    zs->read_array<float>(data.functions.data(), data.functions.size());
+    zs->read_array<unsigned short>(data.weights_compact.data(), data.weights_compact.size());
+
+    // Convert 16-bit fixed point weights to 32-bit floating point
+    constexpr auto fcompact = [](unsigned short f) -> float { 
+      constexpr float divider = static_cast<float>(std::numeric_limits<unsigned short>::max());
+      return static_cast<float>(f) / divider; 
+    };
+    std::transform(std::execution::par_unseq, data.weights_compact.begin(), data.weights_compact.end(), data.weights.begin(), fcompact);
+
+    std::cout << data.weights[16] << " -> " << data.weights_compact[16] << std::endl;
+    // zs->read_array<float>(data.weights.data(), data.weights.size());
+
+    // Close streams
+    zs->close();
+    fs->close();
 
     // Obtain padded weight data
     std::vector<float> wght_data(data.header.wght_yres * data.header.wght_xres * barycentric_weights, 0.f);
@@ -99,6 +118,7 @@ public:
     // Wavelength data
     m_spectral_sub = data.header.wvl_min;
     m_spectral_div = data.header.wvl_max - data.header.wvl_min;
+    m_spectral_size =  m_spectral_div / data.header.wvl_samples;
 
     // Read filter mode
     std::string filter_mode_str = props.string("filter_type", "bilinear");
@@ -283,7 +303,7 @@ protected:
   bool              m_accel;
   Float             m_mean;
   std::string       m_name;
-  Float             m_spectral_sub, m_spectral_div;
+  Float             m_spectral_size, m_spectral_sub, m_spectral_div;
 
   // Optional: distribution for importance sampling
   mutable std::mutex m_mutex;
