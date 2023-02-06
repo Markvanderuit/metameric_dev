@@ -54,7 +54,6 @@ find_package(Osi       CONFIG REQUIRED)
 find_package(Clp       CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
-find_package(HighFive  CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(implot    CONFIG REQUIRED)
@@ -248,7 +247,6 @@ target_link_libraries(core PUBLIC
   fmt::fmt-header-only
   Coin::Clp
   Tracy::TracyClient
-  libdeps HighFive HighFive_libdeps HighFive_HighFive # highfive libs
   meshoptimizer::meshoptimizer
   nlohmann_json::nlohmann_json
   ${OPENMESH_LIBRARIES}
@@ -316,23 +314,3 @@ if (met_enable_tracy)
   target_compile_definitions(app        PUBLIC MET_ENABLE_TRACY)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_TRACY)
 endif()
-
-# Set up playground executable
-add_executable_r(playground src/target/main_playground.cpp)
-target_link_libraries(playground PRIVATE core small_gl small_gl_parser_lib)
-
-# Set up playground spv executable
-add_executable_r(playground_spv src/target/main_playground_spv.cpp)
-# set_target_properties(SPIRV-Tools-static PROPERTIES SUFFIX "")
-target_link_libraries(playground_spv PRIVATE 
-  core small_gl small_gl_parser_lib
-  # glslang SPIRV OGLCompiler OSDependent
-
-  # SPIRV-Tools-shared SPIRV-Tools-static SPIRV-Tools-opt
-  # unofficial::shaderc_util::shaderc_util
-  # unofficial::shaderc::shaderc
-  spirv-cross-core
-  spirv-cross-glsl
-  spirv-cross-util
-  spirv-cross-reflect
-)

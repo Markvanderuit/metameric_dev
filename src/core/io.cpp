@@ -5,7 +5,6 @@
 #include <metameric/core/detail/trace.hpp>
 
 // Third party includes
-#include <highfive/H5File.hpp>
 #include <nlohmann/json.hpp>
 
 // STL includes
@@ -34,27 +33,6 @@ namespace met::io {
       return wr;
     }
   } // namespace detail
-
-  HD5Data load_hd5(const fs::path &path, const std::string &name) {
-    met_trace();
-
-    // Check that file path exists
-    debug::check_expr_dbg(fs::exists(path),
-      fmt::format("failed to resolve path \"{}\"", path.string()));
-
-    // Attempt to open file and extract forcibly named dataset from file
-    HighFive::File file(path.string(), HighFive::File::ReadOnly);
-    HighFive::DataSet ds = file.getDataSet(name);
-
-    // Read file properties into data object
-    HD5Data obj;
-    ds.read(obj.data);
-    obj.data = detail::transpose(obj.data);
-    obj.size = obj.data.size();
-    obj.dims = obj.data[0].size();
-
-    return obj;
-  }
 
   std::string load_string(const fs::path &path) {
     met_trace();
@@ -125,12 +103,8 @@ namespace met::io {
 
     // Parse split data into string format
     std::stringstream ss;
-    ss << "np.array([";
     for (uint i = 0; i < wvls.size(); ++i)
-      ss << fmt::format("{:.6f}, ", values[i]);
-    ss << "])";
-    // for (uint i = 0; i < wvls.size(); ++i)
-    //   ss << fmt::format("{:.6f} {:.6f}\n", wvls[i], values[i]);
+      ss << fmt::format("{:.6f} {:.6f}\n", wvls[i], values[i]);
 
     return save_string(path, ss.str());
   }
@@ -175,13 +149,8 @@ namespace met::io {
 
     // Parse split data into string format
     std::stringstream ss;
-    ss << "{";
     for (uint i = 0; i < wvls.size(); ++i)
-      ss << fmt::format("{:.6f} : ({:.6f}, {:.6f}, {:.6f}),", wvls[i], values_x[i], values_y[i], values_z[i]);
-    ss << "}";
-
-    // for (uint i = 0; i < wvls.size(); ++i)
-    //   ss << fmt::format("{:.6f} {:.6f} {:.6f} {:.6f}\n", wvls[i], values_x[i], values_y[i], values_z[i]);
+      ss << fmt::format("{:.6f} {:.6f} {:.6f} {:.6f}\n", wvls[i], values_x[i], values_y[i], values_z[i]);
 
     return save_string(path, ss.str());
   }

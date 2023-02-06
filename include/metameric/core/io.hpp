@@ -24,23 +24,15 @@ namespace met {
       uint wght_xres;
       uint wght_yres;
     };
+
     /* Data block for spectral texture export format */
     struct SpectralData {
       SpectralDataHeader header;
       std::span<float> functions;
       std::span<float> weights;
     };
+
     void save_spectral_data(const SpectralData &data, const fs::path &path);
-
-    /* Wrapper object for two-dimensional HD5 data files */
-    struct HD5Data {
-      std::vector<std::vector<float>> data;
-      size_t size; // nr. of vectors
-      size_t dims; // dimensionality of vectors
-    };
-
-    // HD5 file load from file
-    HD5Data load_hd5(const fs::path &path, const std::string &name = "TotalRefs");
 
     // Simple string load/save to/from file
     std::string load_string(const fs::path &path);
@@ -63,7 +55,6 @@ namespace met {
     // optional comments marked with '#'. This is similar to the spectrum format described above.
     // See CmakeLists.txt, 'MET_WAVELENGTH_BASES' for the value of 'm'.
     Basis load_basis(const fs::path &path);
-    
 
     // Load a discrete spectral distribution from sequentially increasing wvl/value data
     Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values, bool remap=false);
