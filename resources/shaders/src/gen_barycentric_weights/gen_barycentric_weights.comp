@@ -1,5 +1,9 @@
 #version 460 core
 
+// Trig approximation functions sourced from
+// https://developer.download.nvidia.com/cg/sin.html
+// https://developer.download.nvidia.com/cg/asin.html
+
 #include <guard.glsl>
 #include <math.glsl>
 #include <spectrum.glsl>
