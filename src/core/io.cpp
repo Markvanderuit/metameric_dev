@@ -14,27 +14,6 @@
 #include <fstream>
 
 namespace met::io {
-  namespace detail {
-    template <typename T>
-    constexpr inline
-    std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &v) {
-      met_trace();
-
-      std::vector<std::vector<T>> wr(v[0].size(), std::vector<T>(v.size()));
-
-      #pragma omp parallel for // target seq. writes and less thread spawns
-      // TODO sequence out for TBB
-      for (int i = 0; i < static_cast<int>(v[0].size()); ++i) {
-        auto &wri = wr[i];
-        for (size_t j = 0; j < v.size(); ++j) {
-          wri[j] = v[j][i];
-        }
-      }
-
-      return wr;
-    }
-  } // namespace detail
-
   std::string load_string(const fs::path &path) {
     met_trace();
 
@@ -206,19 +185,15 @@ namespace met::io {
     };
     std::vector<ushort> weights_compact(data.weights.size());
     std::transform(std::execution::par_unseq, range_iter(data.weights), weights_compact.begin(), fcompact);
-    fmt::print("{}->'{}\n", data.weights[16], weights_compact[16]);
 
     // Expected data sizes
     constexpr size_t header_size = sizeof(SpectralDataHeader);
     const size_t functions_size  = data.functions.size() * sizeof(decltype(data.functions)::value_type);
     const size_t weights_size    = weights_compact.size() * sizeof(decltype(weights_compact)::value_type);
 
-    // Write data in three steps
     ofs.write((const char *) &data.header, header_size);
     ofs.write((const char *) data.functions.data(), functions_size);
     ofs.write((const char *) weights_compact.data(), weights_size);
-    // ofs.write((const char *) data.weights.data(), weights_size);
-
     ofs.flush();
   }
 
@@ -226,10 +201,6 @@ namespace met::io {
   Spec spectrum_from_data(std::span<const float> wvls_, std::span<const float> values, bool remap) {
     met_trace();
 
-    // TODO: remove this hack
-    // constexpr auto wvl_at_i = [](int i) {
-    //   return wavelength_min + (float(i) + 0.5) * wavelength_ssize;
-    // };
     // Generate extended wavelengths for now, fitting current spectral range
     std::vector<float> wvls;
     if (remap) {
