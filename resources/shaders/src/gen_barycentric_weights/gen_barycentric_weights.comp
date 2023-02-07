@@ -1,8 +1,7 @@
 #version 460 core
 
-// Trig approximation functions sourced from
-// https://developer.download.nvidia.com/cg/sin.html
-// https://developer.download.nvidia.com/cg/asin.html
+#pragma optionNV(fastmath off)
+#pragma optionNV(fastprecision off)
 
 #include <guard.glsl>
 #include <math.glsl>
@@ -13,6 +12,9 @@ const uvec3 _ip = uvec3(1, 2, 0);
 const uvec3 _im = uvec3(2, 0, 1);
 
 #define Wght float[barycentric_weights]
+
+const float asin_period = 1.f;
+const float sin_period  = 2.f * M_PI;
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -68,8 +70,8 @@ void scatter_add_weights(inout Wght w, in vec3 w_, in uvec3 i) {
   w[i[2]] += w_[2];
 }
 
-vec3 shift(in vec3 v, in uvec3 i) { return vec3(v[i[0]], v[i[1]], v[i[2]]); }
-uvec3 shift(in uvec3 v, in uvec3 i) {  return uvec3(v[i[0]], v[i[1]], v[i[2]]); }
+vec3 shift(in vec3 v, in uvec3 i)   { return vec3(v[i[0]], v[i[1]], v[i[2]]); }
+uvec3 shift(in uvec3 v, in uvec3 i) { return uvec3(v[i[0]], v[i[1]], v[i[2]]); }
 
 // Enum flags for per-triangle MVC computation return type
 #define MVCReturnOnVertex   0x01u
@@ -108,9 +110,8 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
   }
 
   // Compute spherical triangle data
-  vec3 theta = 2.f * asin(.5f * vec3(length(u[1] - u[2]), 
-                                     length(u[2] - u[0]), 
-                                     length(u[0] - u[1])));
+  vec3 theta_ = .5f * vec3(length(u[1] - u[2]), length(u[2] - u[0]), length(u[0] - u[1]));
+  vec3 theta  = 2.f * asin(mod(theta_, asin_period));
     
   // Fallback: x lies near or on triangle, use 2D barycentric coordinates
   float h = .5f * hsum(theta);
@@ -120,8 +121,8 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
     return result;
   }
 
-  vec3 sin_theta = sin(theta);
-  vec3 c = (2.f * sin(h) * sin(h - theta)) 
+  vec3 sin_theta = sin(mod(theta, sin_period));
+  vec3 c = (2.f * sin(mod(h, sin_period)) * sin(mod(h - theta, sin_period))) 
          / max(shift(sin_theta, _ip) * shift(sin_theta, _im), M_EPS) 
          - 1.f;
   vec3 s = sign(determinant(transpose(mat3(u[0], u[1], u[2])))) 
@@ -145,30 +146,30 @@ MVCReturnObject mean_value_coords_per_tri(in vec3 x, in uvec3 v) {
 Wght mean_value_coords_total(in vec3 x) {
   Wght weight = constr_weights(0.f);
 
+  float wsum = 0.f;
   for (uint j = 0; j < b_size.n_elems; ++j) {
     const uvec3 v = s_elems_in[j];
     MVCReturnObject result = mean_value_coords_per_tri(x, v);
     
-    // Catch special case which returns no value
-    if (result.type == MVCReturnOnPlane)
-      continue;
-
-    // Catch NANs and set respective weight to zero
-    // man, I wish glsl double precision trigonometry was a thing :(
-    if (any(isnan(result.weight)))
+    // Catch special case which returns no value; also catch NANs j.i.c.
+    if (result.type == MVCReturnOnPlane || any(isnan(result.weight)))
       continue;
 
     // Catch special cases which return their own value directly
     if (result.type == MVCReturnOnVertex || result.type == MVCReturnOnTriangle) {
+      // Reset other weights to 0
       weight = constr_weights(0.f);
+      
       scatter_add_weights(weight, result.weight, v);
+      wsum = hsum(result.weight);
+
       break;
     }
 
     scatter_add_weights(weight, result.weight, v);
+    wsum += hsum(result.weight);
   }
 
-  float wsum = sum_weights(weight);
   if (wsum != 0.f)
     weights_iter(i) weight[i] /= wsum;
   return weight;
