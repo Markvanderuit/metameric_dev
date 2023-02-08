@@ -143,25 +143,20 @@ namespace met {
   void GenColorSolidsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
-    // Continue only if constraint/sample selection is sensible
+    // Continue only if constraint selection is sensible
     auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
     guard(e_cstr_slct != -1);
 
     // Continue only on relevant state change
     auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &e_samp_slct = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    guard((!e_vert_slct.empty() && (e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection)) ||
-          (!e_samp_slct.empty() && (e_pipe_state.samps[e_samp_slct[0]].any || e_view_state.samp_selection)) || 
-          e_view_state.cstr_selection);
-    bool is_sample = !e_samp_slct.empty();
+    guard((!e_vert_slct.empty() && (e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection)) || e_view_state.cstr_selection);
 
     // Get shared resources
     auto &e_appl_data    = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_appl_data.project_data;
-    auto &e_vert         = is_sample ? e_appl_data.project_data.sample_verts[e_samp_slct[0]]
-                                    : e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
+    auto &e_vert         = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
     auto &i_csol_data    = info.get_resource<std::vector<Colr>>("csol_data");
     auto &i_csol_data_al = info.get_resource<std::vector<AlColr>>("csol_data_al");
     auto &i_csol_cntr    = info.get_resource<Colr>("csol_cntr");

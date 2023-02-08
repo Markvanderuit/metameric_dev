@@ -38,8 +38,7 @@ namespace met {
       // Normalized sensitivity weight minimization to prevent border issues
       Spec w = (info.systems[0].rowwise().sum() / 3.f).eval();
       w = ((w / w.sum())).eval();
-      BSpec C = (w.matrix().transpose() * basis).transpose().eval();
-      params.C = C.cast<double>().eval();   
+      params.C = (w.matrix().transpose() * basis).transpose().cast<double>().eval();   
 
       // Add constraints to ensure resulting spectra produce the given color signals
       for (uint i = 0; i < info.systems.size(); ++i) {
@@ -158,7 +157,7 @@ namespace met {
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
         local_params.C = (U * info.samples[i].matrix()).cast<double>().eval();
-        BSpec w = lp_solve(local_params).cast<float>().eval();
+        eig::Matrix<float, wavelength_bases, 1> w = lp_solve(local_params).cast<float>().eval();
         output[i] = csys_j * w;
       }
     }
@@ -206,7 +205,7 @@ namespace met {
     // Normalized sensitivity weight minimization to prevent border issues
     Spec w = (info.systems[0].rowwise().sum() / 3.f).eval(); // Average of three rows, not luminance?!
     w = (Spec(1.0) - (w / w.sum())).eval();
-    BSpec C = (w.matrix().transpose() * info.basis).transpose().eval();
+    auto C = (w.matrix().transpose() * info.basis).transpose().eval();
 
     // Specify objective function using the above weight
     for (uint i = 0; i <  n_bary; ++i)
@@ -262,7 +261,7 @@ namespace met {
     for (uint i = 0; i < n_bary; ++i)
       out[i] = (info.basis_avg 
         + (info.basis 
-          * BSpec(x_min.block<n_base, 1>(n_base * i, 0))
+          * eig::Matrix<float, wavelength_bases, 1>(x_min.block<n_base, 1>(n_base * i, 0))
           ).array().eval()
       ).cwiseMax(0.f).cwiseMin(1.f).eval();
     return out;

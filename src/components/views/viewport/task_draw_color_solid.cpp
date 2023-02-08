@@ -100,16 +100,13 @@ namespace met {
     // Verify that vertex and constraint are selected before continuing, as this draw operation
     // is otherwise not even visible
     auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &e_samp_slct = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
     auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
-    guard((e_vert_slct.size() == 1 || e_samp_slct.size() == 1) && e_cstr_slct != -1);
-    bool is_sample = !e_samp_slct.empty();
+    guard(e_vert_slct.size() == 1 && e_cstr_slct != -1);
 
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_vert        = is_sample ? e_proj_data.sample_verts[e_samp_slct[0]] 
-                                    : e_proj_data.gamut_verts[e_vert_slct[0]];
+    auto &e_vert        = e_proj_data.gamut_verts[e_vert_slct[0]];
     auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state  = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
@@ -137,8 +134,7 @@ namespace met {
 
     // (Re-)create convex hull mesh data. If the selected vertex/constraint has in any way changed, a new
     // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    bool recreate_chull = is_sample ? (e_view_state.samp_selection || e_view_state.cstr_selection || e_pipe_state.samps[e_samp_slct[0]].any)
-                                    : (e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any);
+    bool recreate_chull = e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
     if (recreate_chull) {
       // Get color solid data, if available
       auto &e_csol_data = info.get_resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");

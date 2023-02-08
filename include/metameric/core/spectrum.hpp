@@ -16,27 +16,15 @@ namespace met {
   constexpr static float wavelength_ssize = wavelength_range / static_cast<float>(wavelength_samples);  
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
-  /* Define program's underlying spectrum/cmfs/color classes as just renamed Eigen objects */
-  using CMFS = eig::Matrix<float, wavelength_samples, 3>;
-  using Spec = eig::Array<float, wavelength_samples, 1>;
-  using Colr = eig::Array<float, 3, 1>;
-
-  /* XY chromaticity type */
-  using Chromaticity = eig::Array<float, 2, 1>; 
-
-  /* Forcibly unaligned types */
-  using UnalCMFS = eig::Matrix<float, wavelength_samples, 3, eig::DontAlign>;
-  using UnalSpec = eig::Array<float, wavelength_samples, 1, eig::DontAlign>;
-  using UnalColr = eig::Array<float, 3, 1, eig::DontAlign>;
-
-  /* Forcibly aligned types */
-  using AlSpec = eig::AlArray<float, wavelength_samples>;
-  using AlColr = eig::AlArray<float, 3>;
+  /* Define program's underlying spectrum/cmfs/color classes as renamed Eigen objects */
+  using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix
+  using Spec = eig::Array<float, wavelength_samples, 1>;  // Discrete spectrum matrix
+  using Colr = eig::Array<float, 3, 1>;                   // Color signal matrix
+  using Chro = eig::Array<float, 2, 1>;                   // Color chromaticity matrix
 
   /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
+  using AlColr = eig::AlArray<float, 3>; // Colr alignas(eig::detail::vector_align<3>()); // eig::AlArray<float, 3>;
   using Basis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
-  using BSpec = eig::Matrix<float, wavelength_bases, 1>;
-  using WSpec = eig::Matrix<float, barycentric_weights, 1>;
   
   /* Define pre-included color matching functions, SPD models, etc. */
   namespace models {
@@ -74,8 +62,8 @@ namespace met {
   /* System object defining how a reflectance-to-color conversion is ultimately performed */
   struct ColrSystem {
   public: /* mapping data */
-    UnalCMFS cmfs;       // Color matching or sensor response functions, defining the observer
-    UnalSpec illuminant; // Illuminant under which observation is performed
+    CMFS cmfs;       // Color matching or sensor response functions, defining the observer
+    Spec illuminant; // Illuminant under which observation is performed
     
   public:/* Mapping functions */
     // Simplify the CMFS/illuminant into color system spectra
@@ -91,54 +79,49 @@ namespace met {
       return finalize().transpose() * sd.matrix();
     }
 
+    // Obtain a color by applying this spectral mapping
+    Colr operator()(const Spec &s) const { 
+      return apply_color(s);
+    }
+
     bool operator==(const ColrSystem &o) const {
-      return cmfs == o.cmfs && illuminant.matrix() == o.illuminant.matrix();
+      return cmfs == o.cmfs && illuminant.isApprox(o.illuminant);
     }
   };
 
   // Given a spectral bin, obtain the relevant central wavelength
   constexpr inline
   float wavelength_at_index(size_t i) {
-    debug::check_expr_dbg(i >= 0 && i < wavelength_samples, fmt::format("index {} out of range", i));
+    debug::check_expr_dbg(i >= 0 && i < wavelength_samples, 
+      fmt::format("index {} out of range", i));
     return wavelength_min + wavelength_ssize * (static_cast<float>(i) + .5f);
   }
 
   // Given a wavelength, obtain the relevant spectral bin's index
   constexpr inline
   size_t index_at_wavelength(float wvl) {
-    debug::check_expr_dbg(wvl >= wavelength_min && wvl <= wavelength_max, fmt::format("wavelength {} out of range", wvl));
+    debug::check_expr_dbg(wvl >= wavelength_min && wvl <= wavelength_max, 
+      fmt::format("wavelength {} out of range", wvl));
     return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
-  }
-
-  // Convert a gamma-corrected sRGB value to linear sRGB
-  template <typename Float>
-  constexpr inline
-  Float srgb_to_lrgb_f(Float f) {
-    return f <= 0.04045 
-         ? f / 12.92 
-         : std::pow<Float>((f + 0.055) / 1.055, 2.4);
-  }
-
-  // Convert a linear sRGB value to gamma-corrected sRGB
-  template <typename Float>
-  constexpr inline
-  Float lrgb_to_srgb_f(Float f) {
-    return f <= 0.003130
-         ? f * 12.92 
-         : std::pow<Float>(f, 1.0 / 2.4) * 1.055 - 0.055;
   }
 
   // Convert a gamma-corrected sRGB value to linear sRGB
   inline
   Colr srgb_to_lrgb(Colr c) {
-    std::ranges::transform(c, c.begin(), srgb_to_lrgb_f<float>);
+    constexpr auto srgb_to_lrgb_f = [](float f) {
+      return f <= 0.04045f ? f / 12.92f : std::pow<float>((f + 0.055f) / 1.055f, 2.4f);
+    };
+    std::ranges::transform(c, c.begin(), srgb_to_lrgb_f);
     return c;
   }
 
   // Convert a linear sRGB value to gamma-corrected sRGB
   inline
   Colr lrgb_to_srgb(Colr c) {
-    std::ranges::transform(c, c.begin(), lrgb_to_srgb_f<float>);
+    constexpr auto lrgb_to_srgb_f = [](float f) {
+      return f <= 0.003130f ? f * 12.92f : std::pow<float>(f, 1.0f / 2.4f) * 1.055f - 0.055f;
+    };
+    std::ranges::transform(c, c.begin(), lrgb_to_srgb_f);
     return c;
   }
 
@@ -162,10 +145,10 @@ namespace met {
     return lrgb_to_xyz(srgb_to_lrgb(c));
   }
 
-  // Convert a XYZ color to xy(Y)
+  // Convert a XYZ color to xyY
   inline
-  Chromaticity xyz_to_xy(Colr c) {
+  Chro xyz_to_xy(Colr c) {
     float y = c.sum();
-    return { c[0] / y, c[2] / y };
+    return y > 0.f ? Chro(c[0] / y, c[2] / y) : 0.f;
   }
 } // namespace met

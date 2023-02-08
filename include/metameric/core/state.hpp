@@ -28,19 +28,17 @@ namespace met {
     bool any_illuminants;
     bool any_cmfs;
     bool any_verts;
-    bool any_samps;
     bool any_elems;
     bool any_mapps;
 
     std::vector<CacheVert> verts;
-    std::vector<CacheVert> samps;
     std::vector<bool>      elems;
     std::vector<bool>      mapps;
     std::vector<bool>      illuminants;
     std::vector<bool>      cmfs;
   };
 
-  /* Wrapper objecct for tracking changes to viewport in program pipeline; e.g. vertex selection */
+  /* Wrapper object for tracking changes to viewport in program pipeline; e.g. vertex selection */
   struct ViewportState {
     // Vertex selection in viewport
     bool vert_selection;
@@ -49,10 +47,6 @@ namespace met {
     // Element selection in viewport
     bool elem_selection;
     bool elem_mouseover;
-
-    // Sample selection in viewport
-    bool samp_selection;
-    bool samp_mouseover;
 
     // Constraint selection in viewport overlay
     bool cstr_selection;

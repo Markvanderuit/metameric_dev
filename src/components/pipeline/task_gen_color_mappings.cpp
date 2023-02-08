@@ -57,7 +57,7 @@ namespace met {
 
     // Get shared resources
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spec_buffer");
-    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_spectral_mappings", "mapp_buffer");
+    auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_color_systems", "mapp_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Bind buffer resources to ssbo targets

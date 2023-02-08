@@ -10,7 +10,7 @@
 #include <spectrum_cluster.glsl>
 
 // Use shorthand for clustered types
-#define Wght float[barycentric_weights]
+#define InWght float[barycentric_weights]
 #define Spec ClSpec
 
 // General layout rule declarations
@@ -20,32 +20,17 @@ layout(std140)             uniform;
 
 // Shader storage buffer declarations
 layout(binding = 0) restrict readonly  buffer b_0 { InSpec data[]; } b_spectra_in;
-layout(binding = 1) restrict readonly  buffer b_1 { Wght   data[]; } b_weights_in;
+layout(binding = 1) restrict readonly  buffer b_1 { InWght data[]; } b_weights_in;
 layout(binding = 2) restrict writeonly buffer b_2 { InSpec data[]; } b_spectra_out;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
   uint n;
   uint n_verts;
-  uint n_elems;
 } b_size;
 
 // Shared memory declarations
-shared InSpec s_spectra_in[barycentric_weights];
-shared Wght   s_weights_in[gl_WorkGroupSize.x / cl_spectrum_invc_n];
-
-void load_shared_spectra() {
-  const uint i = gl_LocalInvocationID.x / wavelength_samples_al;
-  const uint j = gl_LocalInvocationID.x % wavelength_samples_al;
-
-  for (uint i_ = i; i_ < b_size.n_verts; i_ += cl_spectrum_invc_n)
-      s_spectra_in[i_] = b_spectra_in.data[i_];
-      // s_spectra_in[i_][j_] = b_spectra_in.data[i_][j_];
-    // for (uint j_ = j; j_ < wavelength_samples; j_ += cl_spectrum_invc_n)
-
-  barrier();
-  memoryBarrierShared();
-}
+shared InWght s_weights_in[gl_WorkGroupSize.x / cl_spectrum_invc_n];
 
 void load_shared_weights() {
   const uint g = gl_GlobalInvocationID.x / cl_spectrum_invc_n;
@@ -61,7 +46,6 @@ void load_shared_weights() {
 
 Spec load_spec_in(uint i) {
   Spec s;
-  // cl_spec_scatter(s, s_spectra_in[i]);
   cl_spec_scatter(s, b_spectra_in.data[i]);
   return s;
 }
@@ -73,16 +57,14 @@ void store_spec_out(in Spec s, uint i) {
 void main() {
   const uint i = gl_GlobalInvocationID.x / cl_spectrum_invc_n;
   const uint i_= gl_LocalInvocationID.x  / cl_spectrum_invc_n;
-  guard(i < b_size.n);
   
-  load_shared_spectra();
   load_shared_weights();
 
+  guard(i < b_size.n);
+
   Spec s = Spec(0);
-  
   for (uint j = 0; j < b_size.n_verts; ++j)
-    s += s_weights_in[i_][j] * load_spec_in(j);
+    s += s_weights_in[i_][j] *  load_spec_in(j);
     
   store_spec_out(s, i);
-  // store_spec_out(clamp(s, Spec(0), Spec(1)), i);
 }

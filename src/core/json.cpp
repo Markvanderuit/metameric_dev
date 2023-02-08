@@ -41,8 +41,8 @@ namespace met {
     // Extract structure data
     if (js.contains("children"))
       b.children = js.at("children").get<std::vector<BasisTreeNode>>();
-    b.bbox_min = js.at("bbox_min").get<Chromaticity>();
-    b.bbox_max = js.at("bbox_max").get<Chromaticity>();
+    b.bbox_min = js.at("bbox_min").get<Chro>();
+    b.bbox_max = js.at("bbox_max").get<Chro>();
     b.depth    = js.at("depth").get<uint>();
 
     // Extract node data
@@ -69,7 +69,6 @@ namespace met {
   void from_json(const json &js, ProjectData &v) {
     v.gamut_elems   = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
     v.gamut_verts   = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
-    v.sample_verts  = js.at("sample_verts").get<std::vector<ProjectData::Vert>>();
     v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
     v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
@@ -78,7 +77,6 @@ namespace met {
   void to_json(json &js, const ProjectData &v) {
     js["gamut_elems"]  = v.gamut_elems;
     js["gamut_verts"]  = v.gamut_verts;
-    js["sample_verts"] = v.sample_verts;
     js["mappings"]     = v.color_systems;
     js["cmfs"]         = v.cmfs;
     js["illuminants"]  = v.illuminants;
@@ -128,12 +126,12 @@ namespace Eigen {
     js = std::vector<met::Basis::value_type>(r.begin(), r.end());
   }
   
-  void from_json(const met::json& js, met::Chromaticity &v) {
+  void from_json(const met::json& js, met::Chro &v) {
     std::ranges::copy(js, v.begin());
   }
 
-  void to_json(met::json &js, const met::Chromaticity &v) {
-    js = std::vector<met::Chromaticity::value_type>(v.begin(), v.end());
+  void to_json(met::json &js, const met::Chro &v) {
+    js = std::vector<met::Chro::value_type>(v.begin(), v.end());
   }
 
   void from_json(const met::json &js, Array<float, 31, 1> &m) {

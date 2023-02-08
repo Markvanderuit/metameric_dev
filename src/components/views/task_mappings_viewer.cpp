@@ -73,10 +73,10 @@ namespace met {
       fence.cpu_wait();
     }
     
-    ColrSystem mapp        = e_proj_data.csys(texture_i);
+    ColrSystem mapp  = e_proj_data.csys(texture_i);
     Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
     Spec power       = mapp.illuminant * reflectance;
-    Colr color       = mapp.apply_color(reflectance);
+    Colr color       = mapp(reflectance);
 
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });

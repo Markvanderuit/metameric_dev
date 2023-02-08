@@ -21,19 +21,12 @@ namespace met {
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     const uint generate_n       = e_rgb_texture.size().prod();
-    const uint generate_ndiv    = ceil_div(generate_n, 256u);
     const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(wavelength_samples, 4u));
 
     // Initialize objects for clustered shader call
-    m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv_opt",
-                   .is_spirv_binary = true }};
     m_program_cl = {{ .type = gl::ShaderType::eCompute,
                       .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv_opt",
-                      // .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture_mvc_cl.comp.spv_opt",
                       .is_spirv_binary = true }};
-    m_dispatch = { .groups_x = generate_ndiv, 
-                   .bindable_program = &m_program }; 
     m_dispatch_cl = { .groups_x = generate_ndiv_cl, 
                       .bindable_program = &m_program_cl }; 
 
@@ -59,10 +52,11 @@ namespace met {
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
     
     // Update uniform data
-    m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
-    m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
-    m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
-    m_uniform_buffer.flush();
+    if (e_pipe_state.any_verts) {
+      m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+      m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
+      m_uniform_buffer.flush();
+    }
 
     // Bind resources to buffer targets
     e_spec_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);

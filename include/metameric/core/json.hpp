@@ -42,8 +42,8 @@ namespace Eigen {
   void from_json(const met::json &js, met::Basis &b);
   void to_json(met::json &js, const met::Basis &b);
   
-  void from_json(const met::json& js, met::Chromaticity &v);
-  void to_json(met::json &js, const met::Chromaticity &v);
+  void from_json(const met::json& js, met::Chro &v);
+  void to_json(met::json &js, const met::Chro &v);
 
   // Basis loading
   void from_json(const met::json &js, Array<float, 31, 1> &m);

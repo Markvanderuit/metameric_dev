@@ -405,12 +405,12 @@ namespace met {
           ProjectData::Vert vert;
 
           // Define vertex settings
-          vert.colr_i = project_data.gamut_verts[i].colr_i; // project_data.csys(project_data.color_systems[0]).apply_color(sd);
+          vert.colr_i = project_data.gamut_verts[i].colr_i;
           vert.csys_i = 0;
 
           // Define constraint settings
           for (uint j = 1; j < project_data.color_systems.size(); ++j) {
-            vert.colr_j.push_back(project_data.csys(project_data.color_systems[j]).apply_color(sd));
+            vert.colr_j.push_back(project_data.csys(project_data.color_systems[j])(sd));
             vert.csys_j.push_back(j);
           }
 
@@ -431,8 +431,8 @@ namespace met {
             });
 
             for (uint j = 0; j < vert.colr_j.size(); ++j) {
-              vert.colr_i = project_data.csys(vert.csys_i).apply_color(valid_spec);
-              vert.colr_j[j] = project_data.csys(vert.csys_j[j]).apply_color(valid_spec);
+              vert.colr_i = project_data.csys(vert.csys_i)(valid_spec);
+              vert.colr_j[j] = project_data.csys(vert.csys_j[j])(valid_spec);
             }
           }
 
@@ -458,12 +458,12 @@ namespace met {
             s += w[j] * gamut_spec[j];
           
           // Add baseline sample error
-          Colr colr_i = project_data.csys(0).apply_color(s);
+          Colr colr_i = project_data.csys(0)(s);
           roundtrip_error += (sample_colr_i[i] - colr_i).pow(2.f).sum();
 
           // Add constraint sample error
           for (uint j = 0; j < sample_colr_j.size(); ++j) {
-            Colr colr_j = project_data.csys(j + 1).apply_color(s);
+            Colr colr_j = project_data.csys(j + 1)(s);
             roundtrip_error += (sample_colr_j[j][i] - colr_j).pow(2.f).sum();
           }
         }
@@ -477,201 +477,6 @@ namespace met {
           solver_error = roundtrip_error;
           fmt::print("  Best error: {}\n", solver_error);
         }
-      }
-    }
-  }
-
-
-  void ApplicationData::gen_constraints_from_samples() {
-    met_trace_full();
-
-
-  }
-
-  void ApplicationData::solve_samples() {
-    using Wght = eig::Matrix<float, barycentric_weights, 1>;
-
-    guard(!project_data.sample_verts.empty());
-
-    std::vector<Wght> sample_weights;      // Storage for sample barycentric_weights
-    std::vector<Spec> gamut_spectra;       // Storage for generated gamut spectra
-    std::vector<uint> sample_indices_safe; // Indices of samples which are deemed safe
-    bool solve_using_constraints = true;   // Solve over color constraints, or alternatively spectra
-
-    /* 0. Generate additional samples */
-    {
-
-    }
-
-    /* 1. Generate barycentric weights for the given samples */
-    {
-      fmt::print("  Generating barycentric weights\n");
-
-      const uint n = project_data.sample_verts.size();
-      const uint n_div = ceil_div(n, 256u);
-
-      // Create program object, reusing shader code from gen_barycentric_weights
-      gl::Program bary_program = {{ .type = gl::ShaderType::eCompute,
-                                    .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights.comp.spv_opt",
-                                    .is_spirv_binary = true }};
-      
-      // Initialize uniform buffer layout
-      struct UniformBuffer { uint n, n_verts, n_elems; } uniform_buffer = {
-        .n = n,
-        .n_verts = static_cast<uint>(project_data.gamut_verts.size()),
-        .n_elems = static_cast<uint>(project_data.gamut_elems.size())
-      };
-
-      // Obtain aligned gamut data
-      auto al_elems = std::vector<eig::AlArray3u>(range_iter(project_data.gamut_elems));
-      auto al_verts = std::vector<eig::AlArray3f>(project_data.gamut_verts.size());
-      auto al_colrs = std::vector<eig::AlArray3f>(project_data.sample_verts.size());
-      std::ranges::transform(project_data.gamut_verts, al_verts.begin(), [](auto &v) { return v.colr_i; });
-      std::ranges::transform(project_data.sample_verts, al_colrs.begin(), [](auto &v) { return v.colr_i; });
-
-      fmt::print("al_verts : {}\n", al_verts);
-      fmt::print("al_colrs : {}\n", al_colrs);
-      fmt::print("al_elems : {}\n", al_elems);
-
-      // Create relevant buffer objects containing properly aligned data
-      gl::Buffer bary_vert_buffer = {{ .data = cnt_span<const std::byte>(al_verts) }};
-      gl::Buffer bary_elem_buffer = {{ .data = cnt_span<const std::byte>(al_elems) }};
-      gl::Buffer bary_colr_buffer = {{ .data = cnt_span<const std::byte>(al_colrs) }};
-      gl::Buffer bary_unif_buffer = {{ .data = obj_span<const std::byte>(uniform_buffer) }};
-      gl::Buffer bary_wght_buffer = {{ .size = project_data.sample_verts.size() * barycentric_weights * sizeof(float),
-                                      .flags = gl::BufferCreateFlags::eStorageDynamic }};
-      
-      // Bind resources to buffer targets for upcoming shader dispatch
-      bary_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-      bary_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-      bary_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-      bary_wght_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
-      bary_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
-      
-      // Dispatch shader call
-      gl::dispatch_compute({ .groups_x = n_div, .bindable_program = &bary_program });
-
-      // Copy computed barycentric weights back to host memory
-      sample_weights.resize(n);
-      bary_wght_buffer.get(cnt_span<std::byte>(sample_weights));
-      
-      fmt::print("Sample weights: {}\n", sample_weights);
-    }
-
-    /* 1.5 Verify barycentric weight correctness */
-    {
-      for (uint i = 0; i < sample_weights.size(); ++i) {
-        Colr colr_a = project_data.sample_verts[i].colr_i;
-        Colr colr_b = 0;
-        for (uint j = 0; j < project_data.gamut_verts.size(); ++j)
-          colr_b += project_data.gamut_verts[j].colr_i * sample_weights[i][j];
-
-        fmt::print("Sample recovery: {} -> {}, error {}\n", colr_a, colr_b, (colr_b - colr_a).pow(2.f).sum());
-      }
-    }
-
-    /* 2. Determine which samples are safe */
-    {
-      // Obtain mask over indices of non-negative barycentric weights; in case either the convex hull
-      // estimation does not provide a perfect fit (the decimation implementation is wonky), or the
-      // user has specified a non-fitting convex hull intentionally (or specified samples outside of the hull)
-      sample_indices_safe.clear();
-      std::vector<uint> indices_iota(sample_weights.size());
-      std::iota(range_iter(indices_iota), 0);
-      std::copy_if(range_iter(indices_iota), std::back_inserter(sample_indices_safe),
-        [&sample_weights](uint i) { return (sample_weights[i].array() >= 0).all(); });
-      
-      // TODO: remove
-      float positive_ratio = static_cast<float>(sample_indices_safe.size()) 
-                           / static_cast<float>(sample_weights.size());
-      fmt::print("Barycentric weight fit: {}\n", positive_ratio);
-    }
-    
-    /* 3. Solve for a spectral gamut which satisfies the safe samples */
-    if (solve_using_constraints) {
-      GenerateGamutInfo info = {
-        .basis     = loaded_basis,
-        .basis_avg = loaded_basis_mean,
-        .gamut     = std::vector<Colr>(project_data.gamut_verts.size()), // project_data.gamut_verts,
-        .systems   = std::vector<CMFS>(project_data.color_systems.size())
-      };
-
-      // Add color systems and gamut data
-      std::ranges::transform(project_data.color_systems, info.systems.begin(),
-        [&](auto m) { return project_data.csys(m).finalize(); });
-      std::ranges::transform(project_data.gamut_verts, info.gamut.begin(),
-        [](auto &v) { return v.colr_i; });
-      
-      // Add sample data
-      for (uint i = 0; i < project_data.sample_verts.size(); ++i) {
-        const auto &v = project_data.sample_verts[i];
-        info.signals.push_back({ .colr_v = v.colr_i, .bary_v = sample_weights[i], .syst_i = v.csys_i });
-        for (uint j = 0; j < v.colr_j.size(); ++j)
-          info.signals.push_back({ .colr_v = v.colr_j[j], .bary_v = sample_weights[i], .syst_i = v.csys_j[j] });
-      }
-
-      // Fire solver and cross fingers
-      gamut_spectra = generate_gamut(info);
-      gamut_spectra.resize(project_data.gamut_verts.size());
-    } else {
-      // ...
-    }
-
-    /* 4. Resolve constraints and store in gamut */
-    for (uint i = 0; i < gamut_spectra.size(); ++i) {
-      const Spec &sd = gamut_spectra[i];
-      ProjectData::Vert vert;
-
-      // Define vertex settings
-      vert.colr_i = project_data.csys(project_data.color_systems[0]).apply_color(sd);
-      vert.csys_i = 0;
-
-      // Define constraint settings
-      for (uint j = 1; j < project_data.color_systems.size(); ++j) {
-        vert.colr_j.push_back(project_data.csys(project_data.color_systems[j]).apply_color(sd));
-        vert.csys_j.push_back(j);
-      }
-
-      project_data.gamut_verts[i] = vert;
-    }
-
-    /* 5. Report sample recovery error */
-    {
-      for (uint i = 0; i < project_data.sample_verts.size(); ++i) {
-        float roundtrip_error = 0.f;
-
-        auto sample = project_data.sample_verts[i];
-        auto weight = sample_weights[i];
-
-        /* aut
-        
-        for (uint j = 0; j < sample.colr_j.size(); ++j) {
-          Colr colr_j = sample.colr_j[j];
-
-          Colr colr_j_offs = 0;
-          for (uint k = 0; k < project_data.gamut_verts.size(); ++k) {
-            colr_j_offs += weight[k] * project_data.gamut_verts[k].colr_j[j];
-          }
-          fmt::print("{} -> {}\n", colr_j, colr_j_offs);
-
-          roundtrip_error += (colr_j - colr_j_offs).pow(2.f).sum();
-        } */
-
-        // Recover spectrum using barycentric weights
-        Wght w = sample_weights[i];
-        Spec s = 0.f;
-        for (uint j = 0; j < gamut_spectra.size(); ++j)
-          s += w[j] * gamut_spectra[j];
-        
-        // Add baseline sample error
-        Colr colr_i = project_data.csys(sample.csys_i).apply_color(s);
-        roundtrip_error += (sample.colr_i - colr_i).pow(2.f).sum();
-        for (uint j = 0; j < sample.colr_j.size(); ++j) {
-          Colr colr_j = project_data.csys(sample.csys_j[j]).apply_color(s);
-          roundtrip_error += (sample.colr_j[j] - colr_j).pow(2.f).sum();
-        }
-
-        fmt::print("Roundtrip {} : {}\n", i, roundtrip_error);
       }
     }
   }

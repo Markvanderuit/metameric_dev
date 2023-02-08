@@ -76,19 +76,16 @@ namespace met {
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_window     = info.get_resource<gl::Window>(global_key, "window");
     auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &e_samp_slct  = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
     auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
     auto &e_verts      = e_proj_data.gamut_verts;
-    auto &e_samples    = e_proj_data.sample_verts;
 
     // Only spawn any tooltips on non-empty gamut selection; only allow constraint selection
     // on a single vertex
-    guard(!e_vert_slct.empty() || !e_samp_slct.empty());
-    if (e_vert_slct.size() > 1 && e_samp_slct.size() > 1) {
+    guard(!e_vert_slct.empty());
+    if (e_vert_slct.size() > 1)
       i_cstr_slct = -1;
-    }
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -127,35 +124,8 @@ namespace met {
       ImGui::End();
     }
 
-    // Spawn window with sample info if one or more samples are selected
-    if (!e_samp_slct.empty())  {
-      // Dictate hard size bounds
-      ImGui::SetNextWindowPos(view_posi);
-      ImGui::SetNextWindowSize(view_size);
-      ImGui::SetNextWindowSizeConstraints(view_minv, view_maxv);
-      view_size.y() = 0.f;
-
-      if (ImGui::Begin("Sample settings", nullptr, window_vertices_flags)) {
-        if (e_samp_slct.size() == 1) {
-          eval_overlay_sample(info, e_samp_slct[0]);
-        } else {
-          for (uint i : e_samp_slct) {
-            if (ImGui::CollapsingHeader(fmt::format("Sample {}", i).c_str())) {
-              eval_overlay_sample(info, i);
-            }
-          }
-        }
-      }
-
-      // Capture window size to offset next window by this amount
-      view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
-      view_posi.y() += view_size.y() + overlay_spacing * e_window.content_scale();
-
-      ImGui::End();
-    }
-
     // Spawn window for metamer set editing if there is one vertex selected
-    if ((e_vert_slct.size() == 1 || e_samp_slct.size() == 1) && i_cstr_slct >= 0) {
+    if (e_vert_slct.size() == 1 && i_cstr_slct >= 0) {
       view_size.y() = 0.f;
 
       // Set window state for next window
@@ -229,9 +199,9 @@ namespace met {
       ImGui::BeginGroup();
 
       ColrSystem mapp = e_proj_data.csys(e_vert.csys_i);
-      Colr colr_i  = e_vert.colr_i;
-      Colr rtrip_i = mapp.apply_color(e_spec);
-      Colr error_i = (rtrip_i - colr_i).abs().eval();
+      Colr colr_i     = e_vert.colr_i;
+      Colr rtrip_i    = mapp(e_spec);
+      Colr error_i    = (rtrip_i - colr_i).abs().eval();
 
       // Setup the first of two groups; vertex color and roundtrip error
       ImGui::AlignTextToFramePadding();
@@ -367,7 +337,7 @@ namespace met {
 
         ColrSystem mapp    = e_proj_data.csys(e_vert.csys_j[j]);
         Colr colr_j  = e_vert.colr_j[j];
-        Colr rtrip_j = mapp.apply_color(e_spec);
+        Colr rtrip_j = mapp(e_spec);
         Colr error_j = (rtrip_j - colr_j).abs().eval();
 
         ImGui::ColorEdit3(fmt::format("##value{}", j).c_str(), 
@@ -466,244 +436,11 @@ namespace met {
     ImGui::PopID(); // i
   }
 
-  void ViewportOverlayTask::eval_overlay_sample(detail::TaskEvalInfo &info, uint i) {
-    met_trace_full();
-    ImGui::PushID(fmt::format("overlay_sample_{}", i).c_str());
-    
-    // Get shared resources
-    auto &e_samp_slct  = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
-    auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_samp       = e_proj_data.sample_verts[i];
-
-    // Local state
-    float mapp_width, edit3_width;
-
-    // Plot settings for primary color
-    {
-      // Begin full group
-      edit3_width = ImGui::GetContentRegionAvail().x * .485f;
-      ImGui::BeginGroup();
-
-      ColrSystem mapp    = e_proj_data.csys(e_samp.csys_i);
-      Colr colr_i  = e_samp.colr_i;
-      // Colr rtrip_i = mapp.apply_color(e_spec);
-      // Colr error_i = (rtrip_i - colr_i).abs().eval();
-
-      ImGui::Text("Vertex color (lRGB)");
-
-      // Track a copy of the sample input color for editing
-      Colr colr_edit = colr_i;
-
-      // Spawn vertex color editor 
-      ImGui::SetNextItemWidth(edit3_width);
-      ImGui::ColorEdit3("##Value", colr_edit.data(),  ImGuiColorEditFlags_Float);
-
-      // Handle vertex color editor state
-      if (ImGui::IsItemActive() && !m_is_vert_edit_used) {
-        m_colr_prev = e_samp.colr_i;
-        m_is_vert_edit_used = true;
-      }
-      if (ImGui::IsItemActive()) {
-        e_samp.colr_i = colr_edit;
-      }
-      if (!ImGui::IsItemActive() && m_is_vert_edit_used) {
-        m_is_vert_edit_used = false;
-        e_appl_data.touch({
-          .name = "Change vertex color",
-          .redo = [edit = colr_edit, i = i](auto &data) { data.sample_verts[i].colr_i = edit; },
-          .undo = [edit = m_colr_prev, i = i](auto &data) { data.sample_verts[i].colr_i = edit; },
-        });
-      }
-
-      // End full group
-      ImGui::EndGroup();
-      mapp_width = ImGui::GetItemRectSize().x;
-    }
-
-    ImGui::Separator();
-
-    // Plot settings for mapping
-    {
-      // Selector for primary color mapping index, operating on a local copy
-      ImGui::Text("Sample mapping");
-      ImGui::SetNextItemWidth(mapp_width);
-      uint l_csys_i = e_samp.csys_i;
-      if (ImGui::BeginCombo("##Mapping", e_proj_data.csys_name(l_csys_i).c_str())) {
-        for (uint j = 0; j < e_proj_data.color_systems.size(); ++j) {
-          if (ImGui::Selectable(e_proj_data.csys_name(j).c_str(), j == l_csys_i)) {
-            l_csys_i = j;
-          }
-        }
-        ImGui::EndCombo();
-      }
-      
-      // Register potential changes to mapping data
-      if (l_csys_i != e_samp.csys_i) {
-        e_appl_data.touch({
-          .name = "Change mapping index",
-          .redo = [edit = l_csys_i,      i = i](auto &data) { data.sample_verts[i].csys_i = edit; },
-          .undo = [edit = e_samp.csys_i, i = i](auto &data) { data.sample_verts[i].csys_i = edit; }
-        });
-      }
-    }
-
-    ImGui::Separator();
-
-    // Plot settings for secondary colors
-    if (!e_samp.colr_j.empty()) {
-      ImGui::AlignTextToFramePadding();
-
-      // Coming column widths
-      const float constr_total_width = ImGui::GetContentRegionAvail().x;
-      const float constr_mapp_width  = .35f * constr_total_width;
-      const float constr_colr_width  = .1f * constr_total_width;
-      const float constr_edit_width  = .15f * constr_total_width;
-      const float constr_arrw_width  = .1f * constr_total_width;
-      const float constr_clse_width  = .05f * constr_total_width;
-
-      // Mapping selector
-      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_mapp_width); ImGui::Text("Constraint mapping");
-      for (uint j = 0; j < e_samp.colr_j.size(); ++j) {
-        ImGui::PushID(j);
-
-        // Selector for secondary color mapping index, operating on a local copy
-        uint l_csys_j = e_samp.csys_j[j];
-        ImGui::PushItemWidth(constr_mapp_width);
-        if (ImGui::BeginCombo("##Mapping", e_proj_data.csys_name(l_csys_j).c_str())) {
-          for (uint k = 0; k < e_proj_data.color_systems.size(); ++k) {
-            if (ImGui::Selectable(e_proj_data.csys_name(k).c_str(), k == l_csys_j)) {
-              l_csys_j = k;
-            }
-          }
-          ImGui::EndCombo();
-        }
-        ImGui::PopItemWidth();
-
-        // Register potential changes to constraint data
-        if (l_csys_j != e_samp.csys_j[j]) {
-          e_appl_data.touch({
-            .name = "Change constraint mapping",
-            .redo = [edit = l_csys_j,         i = i, j = j](auto &data) { data.sample_verts[i].csys_j[j] = edit; },
-            .undo = [edit = e_samp.csys_j[j], i = i, j = j](auto &data) { data.sample_verts[i].csys_j[j] = edit; }
-          });
-        }
-
-        ImGui::PopID();
-      }
-      ImGui::EndGroup();  ImGui::SameLine();
-
-      // Value/error
-      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_colr_width); ImGui::Text("Value");
-      for (uint j = 0; j < e_samp.colr_j.size(); ++j) {
-        ImGui::PushID(j);
-
-        ColrSystem mapp    = e_proj_data.csys(e_samp.csys_j[j]);
-        Colr colr_j  = e_samp.colr_j[j];
-
-        ImGui::ColorEdit3(fmt::format("##value{}", j).c_str(), 
-          (colr_j).data(),  
-          ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-
-        ImGui::PopID();
-      }
-      ImGui::EndGroup();  ImGui::SameLine();
-
-      // Edit buttons
-      ImGui::PushItemWidth(constr_edit_width); ImGui::BeginGroup(); ImGui::Text("");
-      for (uint j = 0; j < e_samp.colr_j.size(); ++j) {
-        ImGui::PushID(j);
-        bool is_editing = i_cstr_slct == j && e_samp_slct[0] == i;
-        if (ImGui::Button(is_editing ? "Editing" : "Edit")) {
-          i_cstr_slct = j;
-          e_samp_slct = { i };
-        }
-        ImGui::PopID();
-      }
-      ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
-    
-      // Up/down buttons
-      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_arrw_width); ImGui::Text("");
-      for (uint j = 0; j < e_samp.colr_j.size(); ++j) {
-        ImGui::PushID(j);
-
-        if (j == 0) ImGui::BeginDisabled();
-        if (ImGui::ArrowButton("up", ImGuiDir_Up)) {
-          e_appl_data.touch({ .name = "Swapped constraint mappings", .redo = [i = i, j = j](auto &data) {  
-            std::swap(data.sample_verts[i].colr_j[j], data.sample_verts[i].colr_j[j - 1]);
-            std::swap(data.sample_verts[i].csys_j[j], data.sample_verts[i].csys_j[j - 1]);
-          },.undo = [i = i, j = j](auto &data) {  
-            std::swap(data.sample_verts[i].colr_j[j], data.sample_verts[i].colr_j[j - 1]);
-            std::swap(data.sample_verts[i].csys_j[j], data.sample_verts[i].csys_j[j - 1]);
-          }});
-        }
-        if (j == 0) ImGui::EndDisabled();
-
-        ImGui::SameLine();
-        
-        if (j == e_samp.colr_j.size() - 1) ImGui::BeginDisabled();
-        if (ImGui::ArrowButton("down", ImGuiDir_Down)) {
-          e_appl_data.touch({ .name = "Swapped constraint mappings", .redo = [i = i, j = j](auto &data) {  
-            std::swap(data.sample_verts[i].colr_j[j], data.sample_verts[i].colr_j[j + 1]);
-            std::swap(data.sample_verts[i].csys_j[j], data.sample_verts[i].csys_j[j + 1]);
-          },.undo = [i = i, j = j](auto &data) {  
-            std::swap(data.sample_verts[i].colr_j[j], data.sample_verts[i].colr_j[j + 1]);
-            std::swap(data.sample_verts[i].csys_j[j], data.sample_verts[i].csys_j[j + 1]);
-          }});
-        }
-        if (j == e_samp.colr_j.size() - 1) ImGui::EndDisabled();
-
-        ImGui::PopID();
-      }
-      ImGui::EndGroup();  ImGui::SameLine();
-
-      // Close button
-      ImGui::BeginGroup(); ImGui::SetNextItemWidth(constr_clse_width); ImGui::Text("");
-      for (uint j = 0; j < e_samp.colr_j.size(); ++j) {
-        ImGui::PushID(j);
-
-        if (ImGui::Button("X")) {
-          e_appl_data.touch({ .name = "Delete color constraint", .redo = [i = i, j = j](auto &data) { 
-            data.sample_verts[i].colr_j.erase(data.sample_verts[i].colr_j.begin() + j); 
-            data.sample_verts[i].csys_j.erase(data.sample_verts[i].csys_j.begin() + j); 
-          }, .undo = [edit = e_samp,  i = i, j = j](auto &data) { data.sample_verts[i] = edit; }});
-
-          // Sanitize selected constraint in case this was deleted
-          i_cstr_slct = std::min(i_cstr_slct, 
-                                  static_cast<int>(e_samp.colr_j.size() - 1));
-        }
-
-        ImGui::PopID();
-      }
-      ImGui::EndGroup();
-    }
-
-    // Spawn button to add an extra constraint, if necessary
-    if (ImGui::Button("Add constraint")) {
-      e_appl_data.touch({ .name = "Add color constraint", .redo = [i = i](auto &data) { 
-        data.sample_verts[i].colr_j.push_back(data.sample_verts[i].colr_i); 
-        data.sample_verts[i].csys_j.push_back(0); 
-      }, .undo = [edit = e_samp,  i = i](auto &data) { data.sample_verts[i] = edit; }});
-
-      // Set displayed constraint in viewport to this constraint, iff a constraint was selected
-      if (i_cstr_slct != -1)
-        i_cstr_slct = e_samp.colr_j.size() - 1;
-    }
-
-    ImGui::PopID(); // i
-  }
-
   void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskEvalInfo &info) {
     met_trace_full();
         
-    // Determine sample/gamut vertex selection
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &e_samp_slct = info.get_resource<std::vector<uint>>("viewport_input_samp", "selection");
-    bool is_sample = !e_samp_slct.empty();
-    uint i = is_sample ? e_samp_slct[0] : e_vert_slct[0];
-
     // Get shared resources
+    auto &e_vert_slct   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &i_cstr_slct   = info.get_resource<int>("constr_selection");
     auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
     auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_color_solid_target");
@@ -711,8 +448,7 @@ namespace met {
     auto &e_csol_cntr   = info.get_resource<Colr>("gen_color_solids", "csol_cntr");
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_vert        = is_sample ? e_appl_data.project_data.sample_verts[i]
-                                    : e_appl_data.project_data.gamut_verts[i];
+    auto &e_vert        = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
 
     // Only continue if at least one secondary color constriant is present
     guard(!e_vert.colr_j.empty());
@@ -773,23 +509,13 @@ namespace met {
         m_is_gizmo_used = false;
         
         // Register data edit as drag finishes
-        if (is_sample) {
-          e_appl_data.touch({ 
-            .name = "Change constraint color", 
-            .redo = [edit = e_vert.colr_j[i_cstr_slct], i = i, j = i_cstr_slct](auto &data) 
-                    { data.sample_verts[i].colr_j[j] = edit; }, 
-            .undo = [edit = m_colr_prev, i = i, j = i_cstr_slct](auto &data) 
-                    { data.sample_verts[i].colr_j[j] = edit; }
-          });
-        } else {
-          e_appl_data.touch({ 
-            .name = "Change constraint color", 
-            .redo = [edit = e_vert.colr_j[i_cstr_slct], i = i, j = i_cstr_slct](auto &data) 
-                    { data.gamut_verts[i].colr_j[j] = edit; }, 
-            .undo = [edit = m_colr_prev, i = i, j = i_cstr_slct](auto &data) 
-                    { data.gamut_verts[i].colr_j[j] = edit; }
-          });
-        }
+        e_appl_data.touch({ 
+          .name = "Change constraint color", 
+          .redo = [edit = e_vert.colr_j[i_cstr_slct], i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
+                  { data.gamut_verts[i].colr_j[j] = edit; }, 
+          .undo = [edit = m_colr_prev, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
+                  { data.gamut_verts[i].colr_j[j] = edit; }
+        });
       }
     }
 
@@ -807,138 +533,26 @@ namespace met {
     }
     if (!ImGui::IsItemActive() && m_is_cstr_edit_used) {
       m_is_cstr_edit_used = false;
-      if (is_sample) {
-        e_appl_data.touch({
-          .name = "Change constraint color",
-          .redo = [edit = colr_edit, i = i, j = i_cstr_slct](auto &data) 
-                  { data.sample_verts[i].colr_j[j] = edit; },
-          .undo = [edit = m_colr_prev, i = i, j = i_cstr_slct](auto &data) 
-                  { data.sample_verts[i].colr_j[j] = edit; }
-        });
-      } else {
-        e_appl_data.touch({
-          .name = "Change constraint color",
-          .redo = [edit = colr_edit, i = i, j = i_cstr_slct](auto &data) 
-                  { data.gamut_verts[i].colr_j[j] = edit; },
-          .undo = [edit = m_colr_prev, i = i, j = i_cstr_slct](auto &data) 
-                  { data.gamut_verts[i].colr_j[j] = edit; }
-        });
-      }
+      e_appl_data.touch({
+        .name = "Change constraint color",
+        .redo = [edit = colr_edit, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
+                { data.gamut_verts[i].colr_j[j] = edit; },
+        .undo = [edit = m_colr_prev, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
+                { data.gamut_verts[i].colr_j[j] = edit; }
+      });
     }
 
     // Add button to move gamut offset back to the metamer boundary's centroid
     ImGui::SameLine();
     if (ImGui::Button("Re-center")) {
-      if (is_sample) {
-        e_appl_data.touch({ 
-          .name = "Center constraint color", 
-          .redo = [edit = e_csol_cntr, i = i, j = i_cstr_slct](auto &data) 
-                  { data.sample_verts[i].colr_j[j] = edit; }, 
-          .undo = [edit = e_vert.colr_j[i_cstr_slct], i = i, j = i_cstr_slct](auto &data) 
-                  { data.sample_verts[i].colr_j[j] = edit; }
-        });
-      } else {
-        e_appl_data.touch({ 
-          .name = "Center constraint color", 
-          .redo = [edit = e_csol_cntr, i = i, j = i_cstr_slct](auto &data) 
-                  { data.gamut_verts[i].colr_j[j] = edit; }, 
-          .undo = [edit = e_vert.colr_j[i_cstr_slct], i = i, j = i_cstr_slct](auto &data) 
-                  { data.gamut_verts[i].colr_j[j] = edit; }
-        });
-      }
+      e_appl_data.touch({ 
+        .name = "Center constraint color", 
+        .redo = [edit = e_csol_cntr, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
+                { data.gamut_verts[i].colr_j[j] = edit; }, 
+        .undo = [edit = e_vert.colr_j[i_cstr_slct], i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
+                { data.gamut_verts[i].colr_j[j] = edit; }
+      });
     }
-
-    /* ImGui::Separator();
-    if (ImGui::Button("Print mismatch data to stdout")) {
-      auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
-      auto [verts, elems] = generate_convex_hull<Colr>(e_csol_data);
-      fmt::print("mmv_verts = np.array({})\nmmv_elems = np.array({})\n", verts, elems);
-    } */
-
-    /* if (ImGui::Button("Print mismatch metamers to stdout")) {
-      // Get mismatch volume data and generate convex hull
-      auto &e_csol_data = info.get_resource<std::vector<Colr>>("gen_color_solids", "csol_data");
-      auto [verts, elems] = generate_convex_hull<Colr>(e_csol_data);
-
-      // Find farthest point from MMV center
-      Colr farthest_point = e_csol_cntr;
-      float farthest_point_dist = 0.f;
-      for (auto &vert : verts) {
-        float dist = (vert - e_csol_cntr).matrix().norm();
-        if (dist > farthest_point_dist) {
-          farthest_point_dist = dist;
-          farthest_point = vert;
-        }
-      }
-      fmt::print("Farthest point: {}\n", farthest_point_dist);
-
-      // Generate random signals in box with w/h/d = farthest_point_dist
-      std::random_device rd;
-      std::mt19937 eng(rd());
-      std::uniform_real_distribution<float> distr(-farthest_point_dist, farthest_point_dist);
-      uint n_samples = 8;
-      std::vector<Colr> samples;
-      samples.reserve(n_samples * n_samples * n_samples);
-      for (uint i = 0; i < n_samples * n_samples * n_samples; ++i)
-        samples.push_back((e_csol_cntr + Colr(distr(eng), distr(eng), distr(eng))).eval());
-
-      // Reject samples that fall outside the MMV
-      std::vector<Colr> samples_passed;
-      for (Colr sample : samples) {
-        // Cast a ray through the sample towards the centroid;
-        Ray ray = { .o = sample, .d = (e_csol_cntr - sample).matrix().normalized().eval() };
-        auto query = ray_trace_nearest_elem_any_side(ray, verts, elems);
-
-        // Test for hit
-        guard_continue(query);
-
-        // Get face data
-        auto elem = elems[query.i];
-        Colr a = verts[elem[0]], b = verts[elem[1]], c = verts[elem[2]];
-        auto n = (c - b).matrix().cross((b - a).matrix()).normalized().eval();
-
-        // Test for 'bad' normal direction
-        guard_continue(n.dot(ray.d) >= 0.f);
-
-        // Keep sample
-        samples_passed.push_back(sample);
-      }
-      fmt::print("{} -> {}\n", samples.size(), samples_passed.size());
-      samples = samples_passed;
-
-      // For each sample, generate a spectral distribution
-      std::vector<Spec> sample_spectra(samples.size());
-      auto sign_i = e_vert.colr_i;
-      std::vector<CMFS> systems = {
-        e_proj_data.csys(e_vert.csys_i).finalize(),
-        e_proj_data.csys(e_vert.csys_j[i_cstr_slct]).finalize()
-      };
-      std::transform(std::execution::par_unseq, range_iter(samples), sample_spectra.begin(), [&](Colr c) {
-        std::vector<Colr> signals = { e_vert.colr_i, c };
-        return generate_spectrum({
-          .basis = e_appl_data.loaded_basis, 
-          .basis_avg = e_appl_data.loaded_basis_mean, 
-          .systems = systems,
-          .signals = signals
-        }).max(0.f).min(1.f).eval();
-      });
-
-      // For each spectral distribution, test roundtrip or discard
-      std::erase_if(sample_spectra, [&](Spec &s) {
-        Colr sign_i_r = e_proj_data.csys(e_vert.csys_i).apply_color(s);
-        return !sign_i_r.isApprox(sign_i);
-      });
-      fmt::print("{} -> {}\n", samples.size(), sample_spectra.size());
-
-      fmt::print("output = [\n");
-      for (const auto &s : sample_spectra) {
-        fmt::print("  np.array({}),\n", s);
-      }
-      fmt::print("]\n");
-
-      // auto [wvls, _] = io::spectrum_to_data(sample_spectra[0]);
-      // fmt::print("wvls = np.array([{}])\n", wvls);
-    } */
   }
 
   void ViewportOverlayTask::eval_overlay_plot(detail::TaskEvalInfo &info) {

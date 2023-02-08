@@ -41,10 +41,12 @@ namespace met {
 
   /* Info struct for generation of a gamut, given color constraint information */
   struct GenerateGamutInfo {
+    using Bary = eig::Matrix<float, barycentric_weights, 1>;
+
     struct Signal {
-      Colr  colr_v; // Color signal
-      WSpec bary_v; // Approximate barycentric coords. of the signal in the expected gamut
-      uint  syst_i; // Color system index for this given color signal
+      Colr colr_v; // Color signal
+      Bary bary_v; // Approximate barycentric coords. of the signal in the expected gamut
+      uint syst_i; // Color system index for this given color signal
     };
 
     Basis             &basis;   // Spectral basis functions

@@ -61,7 +61,6 @@ namespace met {
     // Convex hull data structure used for rgb->spectral uplifting
     std::vector<Vert> gamut_verts;   // Gamut vertex data  
     std::vector<Elem> gamut_elems;   // Gamut element data, forming a convex hull
-    std::vector<Vert> sample_verts;  // Sample vertex data, used to seed the gamut vertex 
     std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
 
     // Named user- or program-provided illuminants and color matching functions
@@ -118,8 +117,5 @@ namespace met {
   public: /* project solve functions */
     void gen_convex_hull(uint n_vertices);
     void gen_constraints_from_images(std::span<const ProjectCreateInfo::ImageData> images);
-    void gen_constraints_from_samples();
-  
-    void solve_samples();
   };
 } // namespace met

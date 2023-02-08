@@ -39,7 +39,7 @@ namespace met {
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
     auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
-    auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal");
+    auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal"); // for element index
 
     // Unmap buffers
     if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped()) i_spec_buffer.unmap();
@@ -52,11 +52,11 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     guard(e_pipe_state.any_verts);
     
     // Get shared resources
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_elems       = e_proj_data.gamut_elems;
     auto &e_verts       = e_proj_data.gamut_verts;
@@ -66,7 +66,7 @@ namespace met {
     auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal");
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
 
-    // Resize spectrum data and re-create buffers if nr. of vertices changes
+    // On vertex count change, resize spectrum data and re-create buffers
     if (e_verts.size() != i_specs.size()) {
       i_specs.resize(e_verts.size());
 
@@ -86,7 +86,7 @@ namespace met {
       m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
     }
     
-    // Generate spectra at gamut color positions in parallel
+    // Generate spectra at stale gamut vertices in parallel
     #pragma omp parallel for
     for (int i = 0; i < i_specs.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
@@ -106,14 +106,6 @@ namespace met {
       std::ranges::copy(vert.colr_j, signals.begin() + 1);
 
       // Generate new spectrum given the above systems+signals as solver constraints
-      /* i_specs[i] = generate_spectrum({ 
-        .basis     = e_appl_data.loaded_basis, 
-        .basis_avg = e_appl_data.loaded_basis_mean, 
-        .systems   = std::span<CMFS> { systems }, 
-        .signals   = std::span<Colr> { signals }
-      });
- */
-      // Generate new spectrum given the above systems+signals as solver constraints
       i_specs[i] = generate_spectrum({ 
         .basis      = e_appl_data.loaded_basis,
         .basis_mean = e_appl_data.loaded_basis_mean,
@@ -121,40 +113,6 @@ namespace met {
         .signals    = std::span<Colr> { signals },
         .reduce_basis_count = false
       });
-
-     /*  // Test relative roundtrip error to base vertex
-      Colr colr_i_roundtrip = systems[0].transpose() * i_specs[i].matrix();
-      Colr colr_i_error = vert.colr_i - colr_i_roundtrip;
-      guard_continue(!colr_i_error.isZero());
-
-      // Generate unbounded spectrum
-      Spec spec_i_unbounded = generate_spectrum({ 
-        .basis = basis, 
-        .systems = std::span<CMFS> { systems }, 
-        .signals = std::span<Colr> { signals },
-        .impose_boundedness = false 
-      });
-
-      // Search for mixture of the two generated metamers that minimizes error while being bounded
-      float best_err = colr_i_error.abs().sum();
-      Spec best_spec = i_specs[i];
-      for (float f = 0.f; f < 1.f; f += 0.01f) {
-        Spec s = ((1.f - f) * i_specs[i] + f * spec_i_unbounded).max(0.f).min(1.f).eval();
-        float s_err = (vert.colr_i - (systems[0].transpose() * s.matrix()).array()).abs().sum();
-        if (s_err < best_err) {
-          best_err = s_err;
-          best_spec = s;
-        }
-      }
-      if (best_err != colr_i_error.abs().sum()) {
-        fmt::print("{} -> {}\n", colr_i_error.abs().sum(), best_err);
-        i_specs[i] = best_spec;
-      } */
-
-      // Colr spec_i_roundtrip = systems[0].transpose() * spec_i_error.matrix();
-      
-      // fmt::print("error = {}, subtractive error = {}\n", colr_i_error, spec_i_roundtrip);
-      // i_specs[i] = (i_specs[i] + spec_i_error).max(0.f).min(1.f).eval();
     }
 
     // Describe ranges over stale gamut vertices/elements
