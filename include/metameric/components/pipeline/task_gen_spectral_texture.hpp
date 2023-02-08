@@ -7,11 +7,6 @@
 
 namespace met {
   class GenSpectralTextureTask : public detail::AbstractTask {
-    struct BarycentricBuffer {
-      eig::AlArray3f sub;
-      eig::Array44f  inv;
-    };
-
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining surrounding hull
@@ -22,7 +17,6 @@ namespace met {
     gl::Buffer      m_uniform_buffer;
     gl::Buffer      m_bary_buffer;
     UniformBuffer  *m_uniform_map;
-    BarycentricBuffer *m_bary_map;
 
   public:
     GenSpectralTextureTask(const std::string &name);
