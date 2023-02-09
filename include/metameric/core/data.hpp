@@ -85,7 +85,7 @@ namespace met {
     fs::path    project_path;
     SaveFlag    project_save = SaveFlag::eUnloaded; 
 
-    // Unsaved application data
+    // Misc application data
     Texture2d3f   loaded_texture;    // Primary RGB texture image extracted from project data
     Basis         loaded_basis;      // Set of basis functions obtained through PCA of measured spectra
     Spec          loaded_basis_mean; // Set of basis functions obtained through PCA of measured spectra

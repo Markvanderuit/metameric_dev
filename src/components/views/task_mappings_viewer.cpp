@@ -66,7 +66,7 @@ namespace met {
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
     ImGui::Separator();
 
-    // Acquire output reflectance data, which should by now be copied into the a buffer
+    // Acquire output reflectance data, which should by now be copied into the next buffer
     // Check fence for this buffer, however, in case this is not the case
     m_tooltip_cycle_i = (m_tooltip_cycle_i + 1) % m_tooltip_buffers.size();
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init()) {
@@ -89,16 +89,6 @@ namespace met {
     ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
     ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
     ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
-
-    // ImGui::Separator();
-
-    // ImGui::Text("Press 'R' to print reflectance to stdout.");
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-      auto [wvls, vals] = io::spectrum_to_data(reflectance);
-      fmt::print("Pixel {}, {}\n",  m_tooltip_pixel.x(), m_tooltip_pixel.y());
-      fmt::print("wvls = np.array({})\nvals = np.array({})\ncol = np.array({})",
-        wvls, vals, color);
-    }
 
     ImGui::EndTooltip();
   }
