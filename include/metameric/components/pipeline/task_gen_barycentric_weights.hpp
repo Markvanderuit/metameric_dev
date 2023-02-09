@@ -13,14 +13,10 @@ namespace met {
       uint n_elems; // Nr. of elements defining surrounding hull
     };
 
-    struct FiltUniformBuffer {
-      uint n;          // Nr. of points to dispatch computation for
-      uint n_verts;    // Nr. of vertices defining surrounding hull
-      eig::Array2u wh; // Texture resolution
-    };
-
-    gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
+    gl::ComputeInfo m_dispatch_bary;
+    gl::ComputeInfo m_dispatch_bsum;
+    gl::Program     m_program_bary;
+    gl::Program     m_program_bsum;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;
 

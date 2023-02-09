@@ -15,9 +15,10 @@ layout(local_size_x = 256) in;
 layout(std140)             uniform;
 layout(std430)             buffer;
 
-layout(binding = 0) restrict readonly  buffer b_0 { Bary data[]; } b_bary_in;
-layout(binding = 1) restrict readonly  buffer b_1 { vec3 data[]; } b_gamut_in;
-layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_colr_out;
+layout(binding = 0) restrict readonly  buffer b_0 { Bary  data[]; } b_bary_in;
+layout(binding = 1) restrict readonly  buffer b_1 { float data[]; } b_bsum_in;
+layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_gamut_in;
+layout(binding = 3) restrict writeonly buffer b_3 { vec3  data[]; } b_colr_out;
 layout(binding = 0) uniform u_0 {
   uint n;
   uint n_vertices;
@@ -39,11 +40,12 @@ void main() {
   guard(i < b_unif.n);
 
   Bary b = b_bary_in.data[i];
+  float bsum = b_bsum_in.data[i];
 
   // Output color is convex combination of gamut vertices
   vec3 v = vec3(0);
   for (uint j = 0; j < b_unif.n_vertices; ++j)
-    v += b[j] * s_gamut[j];
+    v += (b[j] / bsum) * s_gamut[j];
     
   b_colr_out.data[i] = v;
 }

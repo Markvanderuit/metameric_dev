@@ -76,6 +76,7 @@ namespace met {
     // Compute output reflectance
     ColrSystem mapp  = e_proj_data.csys(texture_i);
     Bary bary        = m_tooltip_maps[m_tooltip_cycle_i][0];
+    bary /= bary.sum(); // Normalize here, instead of fetching data for this from a gpu buffer
     Spec reflectance = 0;
     for (uint i = 0; i < e_gamut_spec.size(); ++i)
       reflectance += bary[i] * e_gamut_spec[i];

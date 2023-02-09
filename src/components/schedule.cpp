@@ -16,7 +16,7 @@
 #include <metameric/components/pipeline/task_gen_color_systems.hpp>
 #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
-#include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
+// #include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
 
 // View data tasks
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
@@ -152,7 +152,7 @@ namespace met {
     scheduler.emplace_task<GenColorSystemsTask>("gen_color_systems");
     scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");            
     scheduler.emplace_task<GenBarycentricWeightsTask>("gen_barycentric_weights");
-    scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
+    // scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");
 
     // The following tasks define view pipeline necessities
     scheduler.emplace_task<GenColorSolidsTask>("gen_color_solids");
