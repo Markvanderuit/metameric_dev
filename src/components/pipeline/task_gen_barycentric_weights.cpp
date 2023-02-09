@@ -30,13 +30,13 @@ namespace met {
     m_dispatch = { .groups_x = generate_ndiv, 
                    .bindable_program = &m_program }; 
 
-    // Initialize uniform buffers and writeable, flushable mappings
+    // Initialize uniform buffer and writeable, flushable mapping
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
 
     // Initialize buffer holding barycentric weights
     info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info.emplace_resource<gl::Buffer>("bary_buffer", { .size = barycentric_weights * sizeof(float) * generate_n });
+    info.emplace_resource<gl::Buffer>("bary_buffer", { .size = sizeof(Bary) * generate_n });
   }
 
   void GenBarycentricWeightsTask::dstr(detail::TaskDstrInfo &info) {
@@ -74,8 +74,7 @@ namespace met {
     i_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
 
-    // Dispatch shader to generate spectral data
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+    // Dispatch shader to generate barycentric weights in i_bary_buffer
     gl::dispatch_compute(m_dispatch);
   }
 } // namespace met

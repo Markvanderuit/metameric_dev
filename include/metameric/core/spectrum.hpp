@@ -19,6 +19,7 @@ namespace met {
   /* Define program's underlying spectrum/cmfs/color classes as renamed Eigen objects */
   using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix
   using Spec = eig::Array<float, wavelength_samples, 1>;  // Discrete spectrum matrix
+  using Bary = eig::Array<float, barycentric_weights, 1>; // Discrete convex weightings
   using Colr = eig::Array<float, 3, 1>;                   // Color signal matrix
   using Chro = eig::Array<float, 2, 1>;                   // Color chromaticity matrix
 

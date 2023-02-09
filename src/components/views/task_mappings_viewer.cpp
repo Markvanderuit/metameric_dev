@@ -36,8 +36,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_spectrum_buffer = info.get_resource<gl::Buffer>("gen_spectral_texture", "spec_buffer");
-    auto &e_tex_data        = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+    auto &e_tex_data    = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
     // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
@@ -46,8 +46,8 @@ namespace met {
     m_tooltip_pixel = (mouse_pos * e_tex_data.size().cast<float>()).cast<int>();
     const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
-    // Perform copy of relevant reflectance data to current available buffer
-    e_spectrum_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(Spec), sizeof(Spec) * sample_i);
+    // Perform copy of relevant barycentric data to current available buffer
+    e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(Bary), sizeof(Bary) * sample_i);
 
     // Submit a fence for current available buffer as it affects mapped memory
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
@@ -58,23 +58,27 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data  = e_appl_data.project_data;
+    auto &e_gamut_spec = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
 
     // Spawn tooltip
     ImGui::BeginTooltip();
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
     ImGui::Separator();
 
-    // Acquire output reflectance data, which should by now be copied into the a buffer
+    // Acquire output barycentric data, which should by now be copied into the a buffer
     // Check fence for this buffer, however, in case this is not the case
     m_tooltip_cycle_i = (m_tooltip_cycle_i + 1) % m_tooltip_buffers.size();
-    if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init()) {
+    if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init())
       fence.cpu_wait();
-    }
-    
+
+    // Compute output reflectance
     ColrSystem mapp  = e_proj_data.csys(texture_i);
-    Spec reflectance = m_tooltip_maps[m_tooltip_cycle_i][0];
+    Bary bary        = m_tooltip_maps[m_tooltip_cycle_i][0];
+    Spec reflectance = 0;
+    for (uint i = 0; i < e_gamut_spec.size(); ++i)
+      reflectance += bary[i] * e_gamut_spec[i];
     Spec power       = mapp.illuminant * reflectance;
     Colr color       = mapp(reflectance);
 
@@ -82,6 +86,8 @@ namespace met {
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
       nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
+    ImGui::PlotLines("Weights", bary.data(), barycentric_weights, 0,
+      nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
 
     ImGui::Separator();
@@ -89,16 +95,6 @@ namespace met {
     ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
     ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
     ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
-
-    // ImGui::Separator();
-
-    // ImGui::Text("Press 'R' to print reflectance to stdout.");
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-      auto [wvls, vals] = io::spectrum_to_data(reflectance);
-      fmt::print("Pixel {}, {}\n",  m_tooltip_pixel.x(), m_tooltip_pixel.y());
-      fmt::print("wvls = np.array({})\nvals = np.array({})\ncol = np.array({})",
-        wvls, vals, color);
-    }
 
     ImGui::EndTooltip();
   }
@@ -140,8 +136,8 @@ namespace met {
       auto &buffer = m_tooltip_buffers[i];
       auto &map    = m_tooltip_maps[i];
 
-      buffer = {{ .size = sizeof(Spec), .flags = create_flags }};
-      map = cast_span<Spec>(buffer.map(map_flags));
+      buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
+      map = cast_span<Bary>(buffer.map(map_flags));
     }
   }
   
