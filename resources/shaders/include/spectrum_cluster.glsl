@@ -54,12 +54,10 @@ float cl_hmean(in ClSpec s) {
 }
 
 float cl_hmax(in ClSpec s) {
-  // cl_bin_iter_remainder(i) s[i] = -FLT_MAX;
   return subgroupClusteredMax(hmax(s), cl_spectrum_invc_n);
 }
 
 float cl_hmin(in ClSpec s) {
-  // cl_bin_iter_remainder(i) s[i] = FLT_MAX;
   return subgroupClusteredMin(hmin(s), cl_spectrum_invc_n);
 }
 
@@ -93,5 +91,7 @@ ClSpec cl_select(in ClMask m, in ClSpec x, in float y) { return mix(ClSpec(y), x
 ClSpec cl_select(in ClMask m, in float x, in ClSpec y) { return mix(y, ClSpec(x), m); }
 ClSpec cl_select(in ClMask m, in float x, in float y) { return mix(ClSpec(y), ClSpec(x), m); }
 
+#else
+#error "Subgroup extensions are not defined"
 #endif // EXTENSIONS
 #endif // SPECTRUM_CLUSTER_GLSL_GUARD

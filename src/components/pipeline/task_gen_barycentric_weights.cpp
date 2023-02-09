@@ -20,8 +20,9 @@ namespace met {
     // Get shared resources
     auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
 
-    const uint generate_n    = e_rgb_texture.size().prod();
-    const uint generate_ndiv = ceil_div(generate_n, 256u);
+    const uint generate_n       = e_rgb_texture.size().prod();
+    const uint generate_ndiv    = ceil_div(generate_n, 256u);
+    const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(barycentric_weights, 4u));
 
     // Initialize objects for shader call
     m_program_bary = {{ .type = gl::ShaderType::eCompute,
@@ -30,7 +31,7 @@ namespace met {
     m_program_bsum = {{ .type = gl::ShaderType::eCompute,
                         .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights_sum.comp.spv_opt",
                         .is_spirv_binary = true }};
-    m_dispatch_bary = { .groups_x = generate_ndiv, 
+    m_dispatch_bary = { .groups_x = generate_ndiv_cl, 
                         .bindable_program = &m_program_bary }; 
     m_dispatch_bsum = { .groups_x = generate_ndiv, 
                         .bindable_program = &m_program_bsum }; 
