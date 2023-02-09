@@ -11,18 +11,26 @@
 
 namespace met {
   class GenColorMappingTask : public detail::AbstractTask {
-    bool            m_init_stale;
-    uint            m_mapping_i;
-    gl::Buffer      m_uniform_buffer;
-    gl::Program     m_program;
-    gl::ComputeInfo m_dispatch;
-    gl::Program     m_program_cl;
-    gl::ComputeInfo m_dispatch_cl;
+    struct UniformBuffer {
+      uint n;       // Nr. of points to dispatch computation for
+      uint n_verts; // Nr. of vertices defining surrounding hull
+    };
+
+    bool              m_init_stale;
+    uint              m_mapping_i;
+    gl::Buffer        m_uniform_buffer;
+    gl::Buffer        m_gamut_buffer;
+    gl::Program       m_program;
+    gl::ComputeInfo   m_dispatch;
+
+    UniformBuffer    *m_uniform_map;
+    std::span<AlColr> m_gamut_map;
 
   public:
     GenColorMappingTask(const std::string &name, uint mapping_i);
 
     void init(detail::TaskInitInfo &) override;
+    void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 

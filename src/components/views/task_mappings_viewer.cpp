@@ -67,7 +67,7 @@ namespace met {
     ImGui::Text("Inspecting pixel (%i, %i)", m_tooltip_pixel.x(), m_tooltip_pixel.y());
     ImGui::Separator();
 
-    // Acquire output barycentric data, which should by now be copied into the a buffer
+    // Acquire output barycentric data, which should by now be copied into the next buffer
     // Check fence for this buffer, however, in case this is not the case
     m_tooltip_cycle_i = (m_tooltip_cycle_i + 1) % m_tooltip_buffers.size();
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init())
