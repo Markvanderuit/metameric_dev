@@ -63,7 +63,7 @@ find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
 
-# Header-only third party libraries provided through vcpkg
+# Include header-only third party libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
@@ -76,7 +76,7 @@ find_package(spirv_cross_reflect CONFIG REQUIRED)
 find_package(SPIRV-Tools         CONFIG REQUIRED)
 find_package(SPIRV-Tools-opt     CONFIG REQUIRED)
 
-# Include third party small_gl library directly
+# Include small_gl library directly
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
 option(gl_enable_tracy          "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
