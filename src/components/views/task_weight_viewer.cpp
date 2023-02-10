@@ -25,7 +25,7 @@ namespace met {
 
     // Initialize objects for shader call
     m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/viewport/draw_weights_.comp.spv_opt",
+                   .path = "resources/shaders/viewport/draw_weights.comp.spv_opt",
                    .is_spirv_binary = true }};
     m_dispatch = { .groups_x = dispatch_ndiv, 
                    .bindable_program = &m_program }; 

@@ -1,17 +1,19 @@
 #version 460 core
 
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_clustered  : require
+
 #include <guard.glsl>
 #include <math.glsl>
-#include <spectrum.glsl>
-
-#define Bary float[barycentric_weights]
+#include <bary.glsl>
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
+layout(std140)             uniform;
 
 // Shader storage buffer declarations
-layout(binding = 0) restrict readonly  buffer b_0 { Bary  data[]; } b_bary_in;
+layout(binding = 0) restrict readonly  buffer b_0 { Bary4 data[]; } b_bary_in;
 layout(binding = 1) restrict writeonly buffer b_1 { float data[]; } b_bsum_out;
 
 // Uniform buffer declarations
@@ -19,17 +21,18 @@ layout(binding = 0) uniform u_0 {
   uint n;
   uint n_verts;
   uint n_elems;
-} b_size;
+} b_unif;
 
-#define weights_iter(__b)      for (uint __b = 0; __b < b_size.n_verts; ++__b)
-#define weights_iter_full(__b) for (uint __b = 0; __b < barycentric_weights; ++__b)
+const uint sg_cluster_size = barycentric_weights / 4;
 
 void main() {
-  const uint i = gl_GlobalInvocationID.x;
-  guard(i < b_size.n);
+  const uint i  = gl_GlobalInvocationID.x / sg_cluster_size; // 000011112222
+  const uint j  = gl_GlobalInvocationID.x % sg_cluster_size; // 012301230123
 
-  Bary b = b_bary_in.data[i];
-  float weight_sum = 0.f;
-  weights_iter(j) weight_sum += b[j];
-  b_bsum_out.data[i] = weight_sum;
+  guard(i < b_unif.n);
+
+  float s = hsum(subgroupClusteredAdd(b_bary_in.data[i][j], sg_cluster_size));
+
+  if (j == 0)
+    b_bsum_out.data[i] = s;
 }

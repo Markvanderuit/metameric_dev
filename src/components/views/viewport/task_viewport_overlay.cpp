@@ -8,7 +8,6 @@
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/viewport/task_viewport_overlay.hpp>
 #include <metameric/components/views/viewport/task_draw_color_solid.hpp>
-#include <metameric/components/views/viewport/task_draw_weights.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/utility.hpp>

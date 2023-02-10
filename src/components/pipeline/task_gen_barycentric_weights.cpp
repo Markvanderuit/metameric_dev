@@ -22,18 +22,18 @@ namespace met {
 
     const uint generate_n       = e_rgb_texture.size().prod();
     const uint generate_ndiv    = ceil_div(generate_n, 256u);
-    const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(barycentric_weights, 4u));
+    const uint generate_ndiv_sg = ceil_div(generate_n, 256u / (barycentric_weights / 4));
 
     // Initialize objects for shader call
     m_program_bary = {{ .type = gl::ShaderType::eCompute,
-                        .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights_pre.comp.spv_opt",
+                        .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights.comp.spv_opt",
                         .is_spirv_binary = true }};
     m_program_bsum = {{ .type = gl::ShaderType::eCompute,
                         .path = "resources/shaders/gen_barycentric_weights/gen_barycentric_weights_sum.comp.spv_opt",
                         .is_spirv_binary = true }};
-    m_dispatch_bary = { .groups_x = generate_ndiv_cl, 
+    m_dispatch_bary = { .groups_x = generate_ndiv, 
                         .bindable_program = &m_program_bary }; 
-    m_dispatch_bsum = { .groups_x = generate_ndiv, 
+    m_dispatch_bsum = { .groups_x = generate_ndiv_sg, 
                         .bindable_program = &m_program_bsum }; 
 
     // Initialize uniform buffer and writeable, flushable mapping

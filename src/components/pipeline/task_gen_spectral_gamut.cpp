@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <execution>
 #include <ranges>
+#include <unordered_set>
 
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite 
@@ -84,6 +85,36 @@ namespace met {
       m_vert_map = cast_span<AlColr>(i_vert_buffer.map(buffer_access_flags));
       m_elem_map = cast_span<eig::AlArray3u>(i_elem_buffer.map(buffer_access_flags));
       m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
+
+      // TODO: remove debug section
+      {
+        std::vector<std::unordered_set<uint>> v_neighbs(e_verts.size());
+        for (uint i = 0; i < e_verts.size(); ++i) {
+          for (uint j = 0; j < e_elems.size(); ++j) {
+            const auto &el = e_elems[j];
+            if (std::ranges::find(el, i) != el.end())
+              for (uint j_ : e_elems[j])
+                v_neighbs[i].insert(j_);
+          }
+        }
+
+        std::vector<std::vector<uint>> v_to_e(e_verts.size());
+        for (uint i = 0; i < e_verts.size(); ++i) {
+          for (uint j = 0; j < e_elems.size(); ++j) {
+            const auto &el = e_elems[j];
+            if (std::ranges::find(el, i) != el.end())
+              v_to_e[i].push_back(j);
+          }
+        }
+
+        fmt::print("{}, {}\n", e_verts.size(), e_elems.size());
+        for (uint i = 0; i < e_verts.size(); ++i) {
+          std::unordered_set<uint> affected_elems;
+          for (uint j : v_neighbs[i])
+            std::ranges::copy(v_to_e[j], std::inserter(affected_elems, affected_elems.begin()));
+          fmt::print("v={} - neighours={} - affected_elems=({}) {}\n", i, v_neighbs[i], affected_elems.size(), affected_elems);
+        }
+      }
     }
     
     // Generate spectra at stale gamut vertices in parallel

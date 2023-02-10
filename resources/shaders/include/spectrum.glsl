@@ -5,7 +5,6 @@
 const float wavelength_min         = MET_WAVELENGTH_MIN;
 const float wavelength_max         = MET_WAVELENGTH_MAX;
 const uint  wavelength_samples     = MET_WAVELENGTH_SAMPLES;
-const uint  barycentric_weights    = MET_BARYCENTRIC_WEIGHTS;
 
 // Define derived variables from metameric's spectral layout
 const float wavelength_range       = wavelength_max - wavelength_min;

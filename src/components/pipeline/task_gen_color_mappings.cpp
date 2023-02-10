@@ -24,7 +24,7 @@ namespace met {
     
     // Determine dispatch group size
     const uint mapping_n       = e_appl_data.loaded_texture.size().prod();
-    const uint mapping_ndiv    = ceil_div(mapping_n, 256u);
+    const uint mapping_ndiv    = ceil_div(mapping_n, 256u / (barycentric_weights / 4));
 
     // Initialize objects for convex-combination mapping
     m_program = {{ .type = gl::ShaderType::eCompute,
