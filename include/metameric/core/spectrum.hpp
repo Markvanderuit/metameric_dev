@@ -24,7 +24,7 @@ namespace met {
   using Chro = eig::Array<float, 2, 1>;                   // Color chromaticity matrix
 
   /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
-  using AlColr = eig::AlArray<float, 3>; // Colr alignas(eig::detail::vector_align<3>()); // eig::AlArray<float, 3>;
+  using AlColr = eig::AlArray<float, 3>;
   using Basis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
   
   /* Define pre-included color matching functions, SPD models, etc. */

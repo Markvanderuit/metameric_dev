@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <execution>
 #include <unordered_set>
-#include <fmt/ranges.h>
 
 namespace met {
   constexpr uint min_wavelength_bases = 4;
@@ -147,10 +146,8 @@ namespace met {
     svd.compute(S, eig::ComputeFullV);
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
-    // Define return object
-    std::vector<Colr> output(info.samples.size());
-
     // Parallel solve for basis function weights defining OCS boundary spectra
+    std::vector<Colr> output(info.samples.size());
     #pragma omp parallel
     {
       LPParameters local_params = params;
@@ -162,7 +159,7 @@ namespace met {
       }
     }
 
-    // Filter NaNs at underconstrained output and strip redundant output from return 
+    // Filter NaNs at underconstrained output and strip redundancy from return 
     std::erase_if(output, [](Colr &c) { return c.isNaN().any(); });
     std::unordered_set<
       Colr, 

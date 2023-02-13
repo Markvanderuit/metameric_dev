@@ -189,11 +189,13 @@ namespace met::io {
     // Expected data sizes
     constexpr size_t header_size = sizeof(SpectralDataHeader);
     const size_t functions_size  = data.functions.size() * sizeof(decltype(data.functions)::value_type);
-    const size_t weights_size    = weights_compact.size() * sizeof(decltype(weights_compact)::value_type);
+    const size_t weights_size    = data.weights.size() * sizeof(decltype(data.weights)::value_type);
+    // const size_t weights_size    = weights_compact.size() * sizeof(decltype(weights_compact)::value_type);
 
     ofs.write((const char *) &data.header, header_size);
     ofs.write((const char *) data.functions.data(), functions_size);
-    ofs.write((const char *) weights_compact.data(), weights_size);
+    ofs.write((const char *) data.weights.data(), weights_size);
+    // ofs.write((const char *) weights_compact.data(), weights_size);
     ofs.flush();
   }
 

@@ -81,16 +81,17 @@ public:
 
     // Read block data
     zs->read_array<float>(data.functions.data(), data.functions.size());
-    zs->read_array<unsigned short>(data.weights_compact.data(), data.weights_compact.size());
+    zs->read_array<float>(data.weights.data(), data.weights.size());
 
-    // Convert 16-bit fixed point weights to 32-bit floating point
-    constexpr auto fcompact = [](unsigned short f) -> float { 
-      constexpr float divider = static_cast<float>(std::numeric_limits<unsigned short>::max());
-      return static_cast<float>(f) / divider; 
-    };
-    std::transform(std::execution::par_unseq, data.weights_compact.begin(), data.weights_compact.end(), data.weights.begin(), fcompact);
+    // zs->read_array<unsigned short>(data.weights_compact.data(), data.weights_compact.size());
+    // // Convert 16-bit fixed point weights to 32-bit floating point
+    // constexpr auto fcompact = [](unsigned short f) -> float { 
+    //   constexpr float divider = static_cast<float>(std::numeric_limits<unsigned short>::max());
+    //   return static_cast<float>(f) / divider; 
+    // };
+    // std::transform(std::execution::par_unseq, data.weights_compact.begin(), data.weights_compact.end(), data.weights.begin(), fcompact);
 
-    std::cout << data.weights[16] << " -> " << data.weights_compact[16] << std::endl;
+    // std::cout << data.weights[16] << " -> " << data.weights_compact[16] << std::endl;
     // zs->read_array<float>(data.weights.data(), data.weights.size());
 
     // Close streams
