@@ -1,14 +1,16 @@
 #version 460 core
 
+// Enable necessary subgroup extensions
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_clustered  : require
+
 #pragma optionNV(fastmath on)
 #pragma optionNV(fastprecision on)
 
 #include <guard.glsl>
 #include <math.glsl>
 #include <bary.glsl>
-#include <spectrum.glsl>
-
-#define Bary float[barycentric_weights]
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -19,42 +21,72 @@ layout(std140)             uniform;
 layout(binding = 0) restrict readonly  buffer b_0 { vec3  data[]; } b_vert_in;
 layout(binding = 1) restrict readonly  buffer b_1 { uvec3 data[]; } b_elem_in;
 layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_posi_in;
-layout(binding = 3) restrict writeonly buffer b_3 { Bary  data[]; } b_bary_out;
+layout(binding = 3) restrict writeonly buffer b_3 { Bary4 data[]; } b_bary_out;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
   uint n;
   uint n_verts;
   uint n_elems;
-} b_size;
+} b_unif;
+
+const uint sg_cluster_size = 2; // 2 units per set of barycentric weights
+      uint sg_cluster_offs = gl_SubgroupInvocationID.x % sg_cluster_size;
 
 // Shared memory declarations
 shared vec3  s_verts_in[barycentric_weights];
-shared uvec3 s_elems_in[2 * barycentric_weights];
-shared Bary  s_bary_out[gl_WorkGroupSize.x];
+shared uvec3 s_elems_in[barycentric_weights * 4];
+shared Bary4 s_bary_out[gl_WorkGroupSize.x / sg_cluster_size];
+      uint   s_bary_i = gl_LocalInvocationID.x / sg_cluster_size;
 
 void load_shared_data() {
-  const uint i = gl_LocalInvocationID.x;
-  if (i < b_size.n_verts)
+  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
     s_verts_in[i] = b_vert_in.data[i];
-  if (i < b_size.n_elems)
+  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_elems; i += gl_WorkGroupSize.x)
     s_elems_in[i] = b_elem_in.data[i];
+
   barrier();
   memoryBarrierShared();
 }
 
-// Define to perform commonly occuring iteration
-#define weights_iter(__b)      for (uint __b = 0; __b < b_size.n_verts; ++__b)
-#define weights_iter_full(__b) for (uint __b = 0; __b < barycentric_weights; ++__b)
-
-void clear_weights(inout Bary w, float value) {
-  weights_iter(i) w[i] = value;
+float norm_weights() {
+  vec4 n = vec4(0);
+  for (uint i = sg_cluster_offs; i < barycentric_weights_4; i += sg_cluster_size)
+    n += s_bary_out[s_bary_i][i];
+  return hsum(subgroupClusteredAdd(n, sg_cluster_size));
 }
 
-void scatter_add_weights(inout Bary w, in vec3 w_, in uvec3 i) {
-  w[i[0]] += w_[0];
-  w[i[1]] += w_[1];
-  w[i[2]] += w_[2];
+void normalize_weights() {
+  float n = 1.f / norm_weights();
+  for (uint i = sg_cluster_offs; i < barycentric_weights_4; i += sg_cluster_size)
+    s_bary_out[s_bary_i][i] *= n;
+
+  subgroupMemoryBarrierShared();
+  barrier();
+}
+
+void clear_weights(float value) {
+  for (uint i = sg_cluster_offs; i < barycentric_weights_4; i += sg_cluster_size)
+    s_bary_out[s_bary_i][i] = vec4(value);
+
+  subgroupMemoryBarrierShared();
+  barrier();
+}
+
+void scatter_weights(in vec3 w_, in uvec3 i) {
+  const uvec3 i_ = i / 4;
+  const uvec3 j_ = i % 4;
+
+  for (uint k = 0; k < sg_cluster_size; ++k) {
+    if (k == sg_cluster_offs) {
+      s_bary_out[s_bary_i][i_[0]][j_[0]] += w_[0];
+      s_bary_out[s_bary_i][i_[1]][j_[1]] += w_[1];
+      s_bary_out[s_bary_i][i_[2]][j_[2]] += w_[2];
+    }
+
+    subgroupMemoryBarrierShared();
+    barrier();
+  }
 }
 
 // Enum flags for per-triangle MVC computation return type
@@ -68,13 +100,6 @@ struct MVCObject {
   vec3 weight;
   uint type;
 };
-
-vec3 safe_denom(vec3 denom) {
-  return mix(max(denom, M_EPS), 
-             min(denom, -M_EPS), 
-             lessThan(sign(denom), 
-             vec3(0)));
-}
 
 MVCObject mean_value_coords_per_tri(in vec3 p, in uvec3 el) {
   // Compute per-vertex direction vectors and vector lengths for this particular element
@@ -99,7 +124,7 @@ MVCObject mean_value_coords_per_tri(in vec3 p, in uvec3 el) {
   if (abs(M_PI - h) <= M_EPS)
     return MVCObject(sin_theta * d.yzx * d.zxy, MVCReturnOnTriangle);
 
-  vec3 c = (2.f * sin(h) * sin(h - theta)) / max(sin_theta.yzx * sin_theta.zxy, M_EPS) - 1.f;
+  vec3 c = (2.f * sin(h) * sin(h - theta)) / (sin_theta.yzx * sin_theta.zxy) - 1.f;
   vec3 s = sign(determinant(u)) * sqrt(max(1.f - c * c, M_EPS));
 
   // Fallback: test if x lies on triangle's plane but way outside triangle, set weights to 0
@@ -107,38 +132,60 @@ MVCObject mean_value_coords_per_tri(in vec3 p, in uvec3 el) {
     return MVCObject(vec3(0), MVCReturnOnPlane);
 
   // Finally; compute actual weight and return
-  vec3 w = (theta - c.yzx * theta.zxy - c.zxy * theta.yzx) / safe_denom(d * sin_theta.yzx * s.zxy);
+  vec3 w = (theta - c.yzx * theta.zxy - c.zxy * theta.yzx) / (d * sin_theta.yzx * s.zxy);
   return MVCObject(w, MVCReturnCorrect);
 }
 
-void mean_value_coords_total(inout Bary weight, in vec3 p) {
-  clear_weights(weight, 0.f);
+void mean_value_coords_total(in vec3 p) {
+  clear_weights(0.f);
 
-  for (uint j = 0; j < b_size.n_elems; ++j) {
-    const uvec3 el = s_elems_in[j];
-    MVCObject result = mean_value_coords_per_tri(p, el);
+  uint j_over = b_unif.n_elems % sg_cluster_size;
+  uint j_maxm = b_unif.n_elems + j_over;
+
+  for (uint j = sg_cluster_offs; j < j_maxm; j += sg_cluster_size) {
+    uvec3 el = uvec3(0);
     
-    // Catch special case which returns no value; also catch NANs j.i.c.
-    if (result.type == MVCReturnOnPlane || any(isnan(result.weight)))
-      continue;
+    MVCObject result_self = MVCObject(vec3(0), MVCReturnCorrect);
+    if (j < j_maxm - j_over) {
+      el = s_elems_in[j];
+      result_self = mean_value_coords_per_tri(p, el);
+    };
 
-    // Catch special cases which return their own value directly
-    if (result.type == MVCReturnOnVertex || result.type == MVCReturnOnTriangle) {
-      clear_weights(weight, 0.f);
-      scatter_add_weights(weight, result.weight, el);
+    // Test for special cases which return their own value directly
+    bool clear_self = result_self.type == MVCReturnOnVertex || result_self.type == MVCReturnOnTriangle;
+    bool clear_return = subgroupClusteredOr(clear_self, sg_cluster_size);
+    
+    // Kill invalid results
+    if ((clear_return && !clear_self) || any(isnan(result_self.weight)))
+      result_self.weight = vec3(0);
+    
+    // Given special cases which return their own value directly, set all weights to zero
+    if (clear_return)
+      clear_weights(0.f);
+
+    scatter_weights(result_self.weight, el);
+
+    // Given special cases which return their own value directly, exit early
+    if (clear_return)
       break;
-    }
-
-    scatter_add_weights(weight, result.weight, el);
   }
+
+  normalize_weights();
 }
 
 void main() {
   load_shared_data();
   
-  const uint i = gl_GlobalInvocationID.x;
-  guard(i < b_size.n);
-  
-  mean_value_coords_total(s_bary_out[gl_LocalInvocationID.x], b_posi_in.data[i]);
-  b_bary_out.data[i] = s_bary_out[gl_LocalInvocationID.x];
+  const uint i = gl_GlobalInvocationID.x / sg_cluster_size;
+  guard(i < b_unif.n);
+
+  // Load position data across subgroup cluster
+  vec3 p = subgroupClusteredAdd(sg_cluster_offs == 0 ? b_posi_in.data[i] : vec3(0), sg_cluster_size);
+
+  // Main computational body
+  mean_value_coords_total(p);
+
+  // Share result store across subgroup cluster
+  for (uint k = sg_cluster_offs; k < barycentric_weights_4; k += sg_cluster_size)
+    b_bary_out.data[i][k] = s_bary_out[s_bary_i][k];
 }

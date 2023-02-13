@@ -116,7 +116,6 @@ namespace met {
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_cstr_slct   = info.get_resource<int>("viewport_overlay", "constr_selection");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
-    auto &e_bsum_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bsum_buffer");
     uint mapping_index  = e_cstr_slct >= 0 ? e_proj_data.gamut_verts[e_selection[0]].csys_j[e_cstr_slct] : 0;
     auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", mapping_index), "colr_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
@@ -130,9 +129,8 @@ namespace met {
 
     // Bind resources to buffer targets for upcoming computation
     e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_bsum_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
+    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
     m_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
 
     // Dispatch shader

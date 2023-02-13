@@ -14,9 +14,8 @@ layout(std140)             uniform;
 
 // Shader storage buffer declarations
 layout(binding = 0) restrict readonly  buffer b_0 { Bary4 data[]; } b_bary_in;
-layout(binding = 1) restrict readonly  buffer b_1 { float data[]; } b_bsum_in;
-layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_colr_in;
-layout(binding = 3) restrict writeonly buffer b_3 { vec3  data[]; } b_colr_out;
+layout(binding = 1) restrict readonly  buffer b_1 { vec3  data[]; } b_colr_in;
+layout(binding = 2) restrict writeonly buffer b_2 { vec3  data[]; } b_colr_out;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
@@ -34,8 +33,9 @@ void main() {
   guard(i < b_unif.n);
 
   float f = (j < b_unif.n_verts && b_unif.selection[j] != 0) 
-          ? b_bary_in.data[i][j / 4][j % 4] : 0.f;
-  float s = subgroupClusteredAdd(f, sg_cluster_size) / b_bsum_in.data[i];
+          ? b_bary_in.data[i][j / 4][j % 4] 
+          : 0.f;
+  float s = subgroupClusteredAdd(f, sg_cluster_size); // / b_bsum_in.data[i];
 
   if (j == 0)
     b_colr_out.data[i] = b_colr_in.data[i] * s;

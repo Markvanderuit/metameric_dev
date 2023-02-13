@@ -69,7 +69,6 @@ namespace met {
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
-    auto &e_bsum_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bsum_buffer");
     auto &e_mapp_buffer = info.get_resource<gl::Buffer>("gen_color_systems", "mapp_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
     auto &e_gamut_spec  = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
@@ -92,9 +91,8 @@ namespace met {
     // Bind buffer resources to correct buffer targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,     0);
     e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  0);
-    e_bsum_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  1);
-    m_gamut_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  3);
+    m_gamut_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  2);
 
     // Dispatch shader to generate color-mapped buffer
     gl::dispatch_compute(m_dispatch);

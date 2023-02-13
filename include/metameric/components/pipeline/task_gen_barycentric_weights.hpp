@@ -7,22 +7,14 @@
 
 namespace met {
   class GenBarycentricWeightsTask : public detail::AbstractTask {
-    struct WorkBuffer {
-      uint i_vert;                     // Index of current vertex to process
-      uint n_elems;                    // Nr. of relevant mesh elements for vertex
-      uint elems[barycentric_weights]; // Idxs of relevant mesh elements for vertex
-    };
-    
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining surrounding hull
       uint n_elems; // Nr. of elements defining surrounding hull
     };
 
-    gl::ComputeInfo m_dispatch_bary;
-    gl::ComputeInfo m_dispatch_bsum;
-    gl::Program     m_program_bary;
-    gl::Program     m_program_bsum;
+    gl::ComputeInfo m_dispatch;
+    gl::Program     m_program;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;
 

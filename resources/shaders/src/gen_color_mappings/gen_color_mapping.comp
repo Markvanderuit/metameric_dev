@@ -14,19 +14,18 @@ layout(std140)             uniform;
 layout(std430)             buffer;
 
 layout(binding = 0) restrict readonly  buffer b_0 { Bary4 data[]; } b_bary_in;
-layout(binding = 1) restrict readonly  buffer b_1 { float data[]; } b_bsum_in;
-layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_gamut_in;
-layout(binding = 3) restrict writeonly buffer b_3 { vec3  data[]; } b_colr_out;
+layout(binding = 1) restrict readonly  buffer b_1 { vec3  data[]; } b_gamut_in;
+layout(binding = 2) restrict writeonly buffer b_2 { vec3  data[]; } b_colr_out;
 layout(binding = 0) uniform u_0 {
   uint n;
-  uint n_vertices;
+  uint n_verts;
 } b_unif;
 
 shared vec3 s_gamut[barycentric_weights];
 
 // Load shared gamut data into memory
 void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_vertices; i += gl_WorkGroupSize.x)
+  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
     s_gamut[i] = b_gamut_in.data[i];
   
   memoryBarrierShared();
@@ -44,11 +43,9 @@ void main() {
   guard(i < b_unif.n);
 
   // Output color is convex combination of gamut vertices
-  vec4 w = b_bary_in.data[i][j] / vec4(b_bsum_in.data[i]);
-  vec3 v = w[0] * s_gamut[4 * j + 0] 
-         + w[1] * s_gamut[4 * j + 1]
-         + w[2] * s_gamut[4 * j + 2] 
-         + w[3] * s_gamut[4 * j + 3];
+  vec4 w = b_bary_in.data[i][j];
+  vec3 v = w[0] * s_gamut[4 * j + 0] + w[1] * s_gamut[4 * j + 1]
+         + w[2] * s_gamut[4 * j + 2] + w[3] * s_gamut[4 * j + 3];
   v = subgroupClusteredAdd(v, sg_cluster_size);
 
   if (j == 0)
