@@ -10,8 +10,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr float point_psize_min = 0.001f;
-  constexpr float point_psize_max = 0.003f;
+  constexpr float point_psize = 0.001f;
 
   constexpr std::array<float, 2 * 4> verts = {
     -1.f, -1.f,
@@ -42,8 +41,8 @@ namespace met {
     m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};
     m_elem_buffer = {{ .data = cnt_span<const std::byte>(elems) }};
     m_array = {{
-      .buffers = {{ .buffer = &m_vert_buffer,    .index = 0, .stride = 2 * sizeof(float),      .divisor = 0 },
-                  { .buffer = &e_texture_buffer, .index = 1, .stride = sizeof(eig::AlArray3f), .divisor = 1 }},
+      .buffers = {{ .buffer = &m_vert_buffer,    .index = 0, .stride = sizeof(float) * 2, .divisor = 0 },
+                  { .buffer = &e_texture_buffer, .index = 1, .stride = sizeof(AlColr),    .divisor = 1 }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e2 },
                   { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e3 }},
       .elements = &m_elem_buffer
@@ -51,14 +50,13 @@ namespace met {
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = elems.size(),
-      .instance_count   = (uint) (e_texture_buffer.size() / sizeof(eig::AlArray3f)),
+      .instance_count   = (uint) (e_texture_buffer.size() / sizeof(AlColr)),
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
 
     // Set constant uniforms
-    m_program.uniform("u_point_radius_min", point_psize_min);
-    m_program.uniform("u_point_radius_max", point_psize_max);
+    m_program.uniform("u_point_radius", point_psize);
   }
 
   void ViewportDrawTextureTask::eval(detail::TaskEvalInfo &info) {
@@ -69,8 +67,8 @@ namespace met {
     auto &e_error_buffer = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state
-    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
-                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true) };
+    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
+                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
     // Update varying program uniforms
     eig::Matrix4f camera_matrix = e_arcball.full().matrix();
