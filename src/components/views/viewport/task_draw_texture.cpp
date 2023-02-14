@@ -1,3 +1,4 @@
+#include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
@@ -12,18 +13,6 @@
 namespace met {
   constexpr float point_psize = 0.001f;
 
-  constexpr std::array<float, 2 * 4> verts = {
-    -1.f, -1.f,
-     1.f, -1.f,
-     1.f,  1.f,
-    -1.f,  1.f
-  };
-
-  constexpr std::array<uint, 2 * 3> elems = {
-    0, 1, 2,
-    2, 3, 0
-  };
-
   ViewportDrawTextureTask::ViewportDrawTextureTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
@@ -31,26 +20,18 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_texture_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
+    auto &e_texture_data   = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_pos_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
 
     // Setup program for instanced billboard point draw
-    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture.vert" },
-                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_texture.frag" }};
+    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv_opt", .is_spirv_binary = true },
+                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_texture.frag.spv_opt", .is_spirv_binary = true }};
 
-    // Setup objects for instanced quad draw
-    m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};
-    m_elem_buffer = {{ .data = cnt_span<const std::byte>(elems) }};
-    m_array = {{
-      .buffers = {{ .buffer = &m_vert_buffer,    .index = 0, .stride = sizeof(float) * 2, .divisor = 0 },
-                  { .buffer = &e_texture_buffer, .index = 1, .stride = sizeof(AlColr),    .divisor = 1 }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e2 },
-                  { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e3 }},
-      .elements = &m_elem_buffer
-    }};
+    // Specify array and draw object
+    m_array = {{ }};
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
-      .vertex_count     = elems.size(),
-      .instance_count   = (uint) (e_texture_buffer.size() / sizeof(AlColr)),
+      .vertex_count     = 6 * e_texture_data.size().prod(),
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
@@ -63,22 +44,22 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball      = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_error_buffer = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
+    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_pos_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
+    auto &e_err_buffer = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
-    // Update varying program uniforms
-    eig::Matrix4f camera_matrix = e_arcball.full().matrix();
-    eig::Vector2f camera_aspect = { 1.f, e_arcball.m_aspect };
-    m_program.uniform("u_camera_matrix", camera_matrix);
-    m_program.uniform("u_billboard_aspect", camera_aspect);
+    // Set varying program uniforms
+    m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
+    m_program.uniform("u_billboard_aspect", eig::Vector2f { 1.f, e_arcball.m_aspect });
 
     // Bind resources to buffer targets
-    e_error_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    
+    e_pos_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_err_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+
     // Submit draw information
     gl::dispatch_draw(m_draw);
   }

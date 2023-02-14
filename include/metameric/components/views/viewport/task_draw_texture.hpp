@@ -8,8 +8,6 @@
 
 namespace met {
   class ViewportDrawTextureTask : public detail::AbstractTask {
-    gl::Buffer   m_vert_buffer;
-    gl::Buffer   m_elem_buffer;
     gl::Array    m_array;
     gl::DrawInfo m_draw;
     gl::Program  m_program;
