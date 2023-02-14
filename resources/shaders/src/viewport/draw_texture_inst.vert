@@ -29,11 +29,10 @@ void main() {
 
   float err = min(hsum(b_erro_buffer.data[i]), 1.f);
   vec3  pos = b_posi_buffer.data[i];
-  vec2  ver = elem_data[j];
 
-  out_value_vert = ver;
+  out_value_vert = elem_data[j];
   out_value_colr = mix(pos, vec3(1, 0, 0), err);
 
   gl_Position = u_camera_matrix * vec4(pos, 1) 
-              + u_point_radius  * vec4(u_billboard_aspect * ver, 0, 0);
+              + u_point_radius  * vec4(u_billboard_aspect * elem_data[j], 0, 0);
 }
