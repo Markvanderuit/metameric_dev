@@ -85,6 +85,7 @@ namespace met::detail {
     /* misc accessors */
 
     eig::Array3f eye_pos() const { return m_center + m_dist * (m_eye - m_center); }
+    eig::Array3f eye_dir() const { return (m_eye - m_center).matrix().normalized().eval(); }
 
     /* update functions */
 

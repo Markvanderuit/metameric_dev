@@ -4,6 +4,7 @@
 
 namespace met {
   // Shorthand unsigned types
+  using byte   = std::byte;
   using uint   = unsigned int;
   using ushort = unsigned short;
 } // namespace met

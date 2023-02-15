@@ -37,7 +37,7 @@ namespace met {
 
     // Get shared resources
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
-    auto &e_tex_data    = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_tex_data    = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
@@ -111,7 +111,7 @@ namespace met {
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
 
       // Obtain cpu-side texture
-      Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
+      Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture_f32.size() }};
       e_colr_buffer.get(cast_span<std::byte>(texture_al.data()));
 
       // Remove padding bytes and apply gamma correction, then save to disk
@@ -163,8 +163,8 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       eig::Array2f texture_size = viewport_size
-                                 * e_appl_data.loaded_texture.size().cast<float>().y()
-                                 / e_appl_data.loaded_texture.size().cast<float>().x()
+                                 * e_appl_data.loaded_texture_f32.size().cast<float>().y()
+                                 / e_appl_data.loaded_texture_f32.size().cast<float>().x()
                                  * 0.95f / static_cast<float>(n_cols);
                                  
       // If texture size has changed, respawn texture resample tasks

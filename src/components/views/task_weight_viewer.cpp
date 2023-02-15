@@ -17,7 +17,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     // Nr. of workgroups for sum computation
     const uint dispatch_n    = e_texture.size().prod();
@@ -57,7 +57,7 @@ namespace met {
     if (ImGui::Begin("Weight viewer")) {
       // Get shared resources 
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_txtr_data   = e_appl_data.loaded_texture;
+      auto &e_txtr_data   = e_appl_data.loaded_texture_f32;
 
       // Weight data is drawn to texture in this function
       eval_draw(info);
@@ -121,7 +121,7 @@ namespace met {
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Update uniform data for upcoming sum computation
-    m_unif_map->n       = e_appl_data.loaded_texture.size().prod();
+    m_unif_map->n       = e_appl_data.loaded_texture_f32.size().prod();
     m_unif_map->n_verts = e_appl_data.project_data.gamut_verts.size();
     std::ranges::fill(m_unif_map->selection, eig::Array4u(0));
     std::ranges::for_each(e_selection, [&](uint i) { m_unif_map->selection[i] = 1; });

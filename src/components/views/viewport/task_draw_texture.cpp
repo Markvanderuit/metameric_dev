@@ -11,8 +11,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr float point_psize = 0.001f;
-
   ViewportDrawTextureTask::ViewportDrawTextureTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
@@ -20,8 +18,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_texture_data   = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
-    auto &e_pos_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
+    auto &e_texture_data   = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv_opt", .is_spirv_binary = true },
@@ -31,33 +28,32 @@ namespace met {
     m_array = {{ }};
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
-      .vertex_count     = 6 * e_texture_data.size().prod(),
+      .vertex_count     = 3 * e_texture_data.size().prod(),
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
-
-    // Set constant uniforms
-    m_program.uniform("u_point_radius", point_psize);
   }
 
   void ViewportDrawTextureTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_pos_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
-    auto &e_err_buffer = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
+    auto &e_arcball     = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_pack_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "pack_buffer");
+    auto &e_err_buffer  = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state
-    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
+    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,     false),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
     // Set varying program uniforms
-    m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
+    m_program.uniform("u_camera_matrix",    e_arcball.full().matrix());
+    /* m_program.uniform("u_camera_position",  e_arcball.eye_pos());
+    m_program.uniform("u_camera_direction", (e_arcball.eye_dir()).eval()); */
     m_program.uniform("u_billboard_aspect", eig::Vector2f { 1.f, e_arcball.m_aspect });
 
     // Bind resources to buffer targets
-    e_pos_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    e_pack_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_err_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
 
     // Submit draw information

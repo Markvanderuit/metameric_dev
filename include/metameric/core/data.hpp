@@ -86,11 +86,11 @@ namespace met {
     SaveFlag    project_save = SaveFlag::eUnloaded; 
 
     // Misc application data
-    Texture2d3f   loaded_texture;    // Primary RGB texture image extracted from project data
-    Basis         loaded_basis;      // Set of basis functions obtained through PCA of measured spectra
-    Spec          loaded_basis_mean; // Set of basis functions obtained through PCA of measured spectra
-    BasisTreeNode loaded_tree_root;  // Basis function tree structure, loaded from disk
-    AppColorMode  color_mode;        // Application theming
+    Texture2d3f   loaded_texture_f32; // F32 RGB image extracted from project data
+    Basis         loaded_basis;       // Set of basis functions obtained through PCA of measured spectra
+    Spec          loaded_basis_mean;  // Set of basis functions obtained through PCA of measured spectra
+    BasisTreeNode loaded_tree_root;   // Basis function tree structure, loaded from disk
+    AppColorMode  color_mode;         // Application theming
 
   public: /* create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object

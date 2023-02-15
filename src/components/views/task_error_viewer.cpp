@@ -17,7 +17,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_txtr_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_txtr_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
     auto &e_color_input  = info.get_resource<gl::Buffer>("gen_barycentric_weights", "colr_buffer");
     auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, 0), "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
@@ -114,7 +114,7 @@ namespace met {
     m_tooltip_cycle_i = 0;
 
     // Get externally shared resources
-    auto &e_txtr_data = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_txtr_data = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     // Initialize error computation components
     const uint generate_n    = e_txtr_data.size().prod();
@@ -152,7 +152,7 @@ namespace met {
     if (ImGui::Begin("Error viewer")) {
       // Get shared resources
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_txtr_data = e_appl_data.loaded_texture;
+      auto &e_txtr_data = e_appl_data.loaded_texture_f32;
       auto &e_proj_data = e_appl_data.project_data;
       auto &e_mappings  = e_proj_data.color_systems;
 

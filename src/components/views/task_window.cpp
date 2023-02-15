@@ -95,7 +95,7 @@ namespace met {
 
       // Used sizes
       const uint func_count  = static_cast<uint>(e_prj_data.gamut_verts.size());
-      const auto weights_res = e_app_data.loaded_texture.size();
+      const auto weights_res = e_app_data.loaded_texture_f32.size();
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 

@@ -5,6 +5,8 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
 #include <small_gl/utility.hpp>
+#include <algorithm>
+#include <execution>
 #include <ranges>
 
 namespace met {
@@ -18,7 +20,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     const uint generate_n    = e_rgb_texture.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u / 2u);
@@ -34,7 +36,15 @@ namespace met {
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
 
+    // Generate packed texture data
+    std::vector<uint> packed_data(e_rgb_texture.size().prod());
+    std::transform(std::execution::par_unseq, range_iter(e_rgb_texture.data()), packed_data.begin(), [](const auto &v_) {
+      eig::Array3u v = (v_.max(0.f).min(1.f) * 255.f).round().cast<uint>().eval();
+      return v[0] | (v[1] << 8) | (v[2] << 16);
+    });
+
     // Initialize buffer holding barycentric weights
+    info.emplace_resource<gl::Buffer>("pack_buffer", { .data = cnt_span<const std::byte>(packed_data) });
     info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(Bary) });
   }
@@ -62,7 +72,7 @@ namespace met {
     auto &i_bary_buffer = info.get_resource<gl::Buffer>("bary_buffer");
     
     // Update uniform data and bind uniform buffer to correct target
-    m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+    m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
     m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
     m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();

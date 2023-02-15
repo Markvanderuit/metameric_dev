@@ -83,4 +83,10 @@ float hmax(in vec2 v)  { return HMAX_2(v); }
 float hmax(in vec3 v)  { return HMAX_3(v); }
 float hmax(in vec4 v)  { return HMAX_4(v); }
 
+// Horizontal component self-dot functions
+
+float sdot(in vec2 v) { return dot(v, v); }
+float sdot(in vec3 v) { return dot(v, v); }
+float sdot(in vec4 v) { return dot(v, v); }
+
 #endif // MATH_GLSL_GUARD

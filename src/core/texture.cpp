@@ -11,8 +11,8 @@
 
 namespace met {
   namespace detail {
-    auto v3_to_v4 = [](const auto &v) { return (eig::Array4f() << v, 1).finished(); };
-    auto v4_to_v3 = [](const auto &v) { return v.head<3>(); };
+    auto v3_to_v4 = [](auto v) { return (eig::Array<decltype(v)::Scalar, 4, 1>() << v, 1).finished(); };
+    auto v4_to_v3 = [](auto v) { return v.head<3>(); };
   } // namespace detail
 
   template <typename T, uint D>
@@ -31,20 +31,50 @@ namespace met {
     met_trace_free(m_data.data());
   }
 
+  template <typename T> 
+  template <typename T_> 
+  Texture2d<T_> Texture2d<T>::convert() {
+    using IT = T::Scalar;
+    using OT = T_::Scalar;
+
+    Texture2d<T_> texture = {{ .size = this->size() }};
+
+    if constexpr (std::is_same_v<IT, OT>) {
+      std::copy(std::execution::par_unseq, range_iter(this->data()), texture.data().begin());
+    } else if constexpr (!std::is_same_v<IT, float> && std::is_same_v<OT, float>) {
+      // Convert to floating precision
+      float max_v = 1.0 / static_cast<float>(std::pow(2ul, sizeof(IT)) - 1);
+      std::transform(std::execution::par_unseq, range_iter(this->data()), texture.data().begin(), 
+      [&](const auto &iv) {
+        return iv.cast<OT>() * max_v;
+      });
+    } else if constexpr (std::is_same_v<IT, float> && !std::is_same_v<OT, float>) {
+      // Convert to fixed precision
+      float max_v = static_cast<float>(std::pow(2ul, sizeof(IT)) - 1);
+      std::transform(std::execution::par_unseq, range_iter(this->data()), texture.data().begin(), 
+      [&](const auto &iv) {
+        return (iv.min(0.0).max(1.0) * max_v).cast<OT>();
+      });
+    }
+
+    return texture;
+  }
+
   namespace io {
     template <typename T>
     Texture2d<T> load_texture2d(const fs::path &path, bool srgb_to_lrgb) {
+      constexpr uint C_ = T::RowsAtCompileTime; 
+      using          T_ = eig::Array<float, C_, 1>;
+
       met_trace();
 
       // Check that file path exists
       debug::check_expr_dbg(fs::exists(path),
         fmt::format("failed to resolve path \"{}\"", path.string()));
 
-      // Load image float data from disk
-      eig::Array2i v;
-      int c;
-
-      // float *data_ptr  = stbi_loadf(path.string().c_str(), &v.x(), &v.y(), &c, 0);
+      // Load image from disk
+      eig::Array2i v; // Size at runtime
+      int c;          // Rows at runtime
       std::byte *data_ptr  = (std::byte *) stbi_load(path.string().c_str(), &v.x(), &v.y(), &c, 0);
       size_t     data_size = v.prod() * c;
 
@@ -52,46 +82,42 @@ namespace met {
       debug::check_expr_dbg(data_ptr, 
         fmt::format("failed to load file \"{}\"", path.string()));
 
-      // Initialize texture object with correct size and requested channel layout
-      Texture2d<T> texture      = {{ .size = v.cast<uint>() }};
-      std::span<T> texture_span = texture.data();
-
-      // Convert data to floats
-      std::span<std::byte> data_byte = { data_ptr, data_size };
-      std::vector<float>   data_float(data_byte.size());
-      std::transform(std::execution::par_unseq,
-        data_byte.begin(), data_byte.end(), data_float.begin(),
+      // Elevate data to floating point
+      std::span<byte>    data_byte = { data_ptr, data_size };
+      std::vector<float> data_float(data_byte.size());
+      std::transform(std::execution::par_unseq, range_iter(data_byte), data_float.begin(),
         [](std::byte b) { return static_cast<float>(b) / 255.f; });
-        // [](std::byte b) { return std::powf(static_cast<float>(b) / 255.f, 2.2f); });
+
+      // Initialize temporary texture object with correct dims, requested channel layout, and float data
+      Texture2d<T_> texture_float = {{ .size = v.cast<uint>() }};
+      std::span<T_> texture_span  = texture_float.data();
 
       // Perform channel-correct copy/transform into texture data
       if (c == 3) {
         auto arr_span = cnt_span<const eig::Array3f>(data_float);
-        if constexpr (std::is_same_v<T, eig::Array4f>) {
-          std::transform(std::execution::par_unseq, 
-            arr_span.begin(), arr_span.end(), texture_span.begin(), detail::v3_to_v4);
+        if constexpr (C_ == 4) {
+          std::transform(std::execution::par_unseq, range_iter(arr_span), texture_span.begin(), detail::v3_to_v4);
         } else {
-          std::copy(std::execution::par_unseq,
-            arr_span.begin(), arr_span.end(), texture_span.begin());
+          std::copy(std::execution::par_unseq, range_iter(arr_span), texture_span.begin());
         }
       } else if (c == 4) {
         auto arr_span = cnt_span<const eig::Array4f>(data_float);
-        if constexpr (std::is_same_v<T, eig::Array4f>) {
-          std::copy(std::execution::par_unseq,
-            arr_span.begin(), arr_span.end(), texture_span.begin());
+        if constexpr (C_ == 4) {
+          std::copy(std::execution::par_unseq, range_iter(arr_span), texture_span.begin());
         } else {
-          std::transform(std::execution::par_unseq, 
-            arr_span.begin(), arr_span.end(), texture_span.begin(), detail::v4_to_v3);
+          std::transform(std::execution::par_unseq, range_iter(arr_span), texture_span.begin(), detail::v4_to_v3);
         }
       }
 
+      // Release stbi data from this point
       stbi_image_free(data_ptr);
 
       // Strip linear sRGB gamma if requested
       if (srgb_to_lrgb)
-        to_lrgb(texture);
-
-      return texture;
+        to_lrgb(texture_float);
+      
+      // Return result, converting to requested sized internal format
+      return texture_float.convert<T>();
     }
 
     template <typename T>
@@ -228,4 +254,13 @@ namespace met {
     template void save_texture2d<eig::Array3f>(const fs::path &, const Texture2d<eig::Array3f> &, bool);
     template void save_texture2d<eig::Array4f>(const fs::path &, const Texture2d<eig::Array4f> &, bool);
   } // namespace io
+
+  /* Explicit template instantiations for common types */
+
+  template class Texture2d<eig::Array3f>;
+  template class Texture2d<eig::Array4f>;
+  template class Texture2d<eig::AlArray3f>;
+  // template class Texture2d<eig::Array<std::byte, 3, 1>>;
+  // template class Texture2d<eig::Array<std::byte, 4, 1>>;
+  // template class Texture2d<eig::AlArray<std::byte, 3>>;
 } // namespace met

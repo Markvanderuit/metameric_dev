@@ -126,7 +126,7 @@ namespace met {
       project_data.color_systems.push_back({ .cmfs = image.cmfs, .illuminant = image.illuminant });
 
     // Move texture into application - not project - data; stored in separate file
-    loaded_texture = std::move(info.images[0].image);
+    loaded_texture_f32 = std::move(info.images[0].image);
     info.images.erase(info.images.begin()); // Youch
     
     gen_convex_hull(info.n_vertices);
@@ -143,7 +143,7 @@ namespace met {
     project_path = io::path_with_ext(path, ".json");
 
     io::save_json(project_path, project_data);
-    io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture, true);
+    io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture_f32, true);
   }
 
   void ApplicationData::load(const fs::path &path) {
@@ -152,7 +152,7 @@ namespace met {
     project_save   = SaveFlag::eSaved;
     project_path   = io::path_with_ext(path, ".json");
     project_data   = io::load_json(path).get<ProjectData>();
-    loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
+    loaded_texture_f32 = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
 
     // Reset undo/redo history
     mods  = { };
@@ -210,7 +210,7 @@ namespace met {
     project_path  = "";
     project_data  = { };
 
-    loaded_texture  = { };
+    loaded_texture_f32  = { };
     
     mods  = { };
     mod_i = -1;
@@ -229,7 +229,7 @@ namespace met {
 
     // Generate simplified concave hull fitting texture data, then fit convex hull around this
     fmt::print("  Generating simplified convex hull\n");
-    auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture.data());
+    auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture_f32.data());
     auto chull_simp = simplify(chull_mesh, ocs_mesh, n_vertices);
     auto [verts, elems] = generate_data(chull_simp);
     std::tie(verts, elems) = generate_convex_hull<eig::Array3f>(verts);
@@ -265,7 +265,7 @@ namespace met {
     {
       fmt::print("  Generating barycentric weights\n");
 
-      const uint n = loaded_texture.size().prod();
+      const uint n = loaded_texture_f32.size().prod();
       const uint n_div = ceil_div(n, 256u);
 
       // Create program object, reusing shader from gen_barycentric_weights
@@ -286,8 +286,8 @@ namespace met {
       gl::Buffer bary_vert_buffer = {{ .data = cnt_span<const std::byte>(al_verts) }};
       gl::Buffer bary_elem_buffer = {{ .data = cnt_span<const std::byte>(al_elems) }};
       gl::Buffer bary_unif_buffer = {{ .data = obj_span<const std::byte>(uniform_buffer) }};
-      gl::Buffer bary_colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned(loaded_texture).data()) }};
-      gl::Buffer bary_wght_buffer = {{ .size = loaded_texture.size().prod() * barycentric_weights * sizeof(float),
+      gl::Buffer bary_colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned(loaded_texture_f32).data()) }};
+      gl::Buffer bary_wght_buffer = {{ .size = loaded_texture_f32.size().prod() * barycentric_weights * sizeof(float),
                                       .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
       // Bind resources to buffer targets for upcoming shader dispatch
@@ -332,7 +332,7 @@ namespace met {
 
       /* 1. Sample a random subset of pixels in the texture and obtain their color values */
       {
-        auto colr_i_span = loaded_texture.data();
+        auto colr_i_span = loaded_texture_f32.data();
 
         // Define random distribution to sample non-negative weight indices
         std::random_device rd;

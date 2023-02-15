@@ -23,7 +23,7 @@ namespace met {
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     
     // Determine dispatch group size
-    const uint mapping_n       = e_appl_data.loaded_texture.size().prod();
+    const uint mapping_n       = e_appl_data.loaded_texture_f32.size().prod();
     const uint mapping_ndiv    = ceil_div(mapping_n, 256u / (barycentric_weights / 4));
 
     // Initialize objects for convex-combination mapping
@@ -75,7 +75,7 @@ namespace met {
 
     // Update uniform data
     if (e_pipe_state.any_verts) {
-      m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+      m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
       m_uniform_map->n_verts = e_proj_data.gamut_verts.size();
       m_uniform_buffer.flush();
     }
@@ -107,7 +107,7 @@ namespace met {
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
-    auto e_texture_size = e_appl_data.loaded_texture.size();
+    auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
     m_texture_subtasks.init(name(), info, e_mappings_n,

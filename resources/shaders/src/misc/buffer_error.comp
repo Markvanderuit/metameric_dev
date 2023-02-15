@@ -1,13 +1,14 @@
 #version 460 core
 
 #include <guard.glsl>
+#include <math.glsl>
 
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
 
 layout(binding = 0) restrict readonly  buffer b_0 { vec3 data[]; } b_in_a;
 layout(binding = 1) restrict readonly  buffer b_1 { vec3 data[]; } b_in_b;
-layout(binding = 2) restrict writeonly buffer b_2 { vec3 data[]; } b_out;
+layout(binding = 2) restrict writeonly buffer b_2 { vec4 data[]; } b_out;
 
 layout(location = 0) uniform uint u_n;
 
@@ -15,5 +16,6 @@ void main() {
   const uint i = gl_GlobalInvocationID.x;
   guard(i < u_n);
 
-  b_out.data[i] = 128.f * abs(b_in_a.data[i] - b_in_b.data[i]);
+  vec3 err = 128.f * abs(b_in_a.data[i] - b_in_b.data[i]);
+  b_out.data[i] = vec4(err, hsum(err));
 }

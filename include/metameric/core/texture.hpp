@@ -10,6 +10,9 @@ namespace met {
   // FWD
   template <typename T, uint D> struct TextureBlock;
   template <typename T>         struct Texture2d;
+  using Texture2d3b    = Texture2d<eig::Array<std::byte, 3, 1>>;
+  using Texture2d4b    = Texture2d<eig::Array<std::byte, 4, 1>>;
+  using Texture2d3b_al = Texture2d<eig::AlArray<std::byte, 3>>;
   using Texture2d3f    = Texture2d<eig::Array3f>;
   using Texture2d4f    = Texture2d<eig::Array4f>;
   using Texture2d3f_al = Texture2d<eig::AlArray3f>;
@@ -21,6 +24,10 @@ namespace met {
     template <> consteval uint texture_dims<eig::Array3f>()   { return 3; }
     template <> consteval uint texture_dims<eig::AlArray3f>() { return 3; }
     template <> consteval uint texture_dims<eig::Array4f>()   { return 4; }
+
+    template <> consteval uint texture_dims<eig::Array<std::byte, 3, 1>>() { return 3; }
+    template <> consteval uint texture_dims<eig::AlArray<std::byte, 3>>()  { return 4; }
+    template <> consteval uint texture_dims<eig::Array<std::byte, 4, 1>>() { return 3; }
   } // namespace detail
 
   namespace io {
@@ -109,7 +116,10 @@ namespace met {
 
     inline
     bool operator==(const TextureBlock &o) const {
-      return m_data == o.m_data && (m_size == o.m_size).all();
+      return std::equal(range_iter(m_data), 
+                        range_iter(o.m_data),
+                        [](const auto &a, const auto &b) { return a.isApprox(b); })
+              && (m_size == o.m_size).all();
     }
 
     met_declare_noncopyable(TextureBlock);
@@ -170,6 +180,9 @@ namespace met {
     bool operator==(const Texture2d &o) const {
       return Base::operator==(o);
     }
+
+    template <typename T_> 
+    Texture2d<T_> convert();
 
     met_declare_noncopyable(Texture2d);
   };

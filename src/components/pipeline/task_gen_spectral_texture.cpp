@@ -18,7 +18,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     const uint generate_n       = e_rgb_texture.size().prod();
     const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(wavelength_samples, 4u));
@@ -53,7 +53,7 @@ namespace met {
     
     // Update uniform data
     if (e_pipe_state.any_verts) {
-      m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
+      m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
       m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
       m_uniform_buffer.flush();
     }
