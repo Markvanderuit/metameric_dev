@@ -42,24 +42,22 @@ namespace met {
 
       // Blit color results into the single-sampled framebuffer with attached target draw_texture
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer);
-      constexpr auto blit_flags = gl::FramebufferMaskFlags::eColor | gl::FramebufferMaskFlags::eDepth;
+      constexpr auto blit_flags = gl::FramebufferMaskFlags::eColor;
       e_frame_buffer_ms.blit_to(e_frame_buffer, e_lrgb_target.size(), 0u, e_lrgb_target.size(), 0u, blit_flags);
 
       // Set dispatch size correctly depending on texture size
       eig::Array2u dispatch_n    = e_srgb_target.size();
       eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
-      m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                     .groups_y = dispatch_ndiv.y(),
-                     .bindable_program = &m_program };
       m_program.uniform("u_size", dispatch_n);
 
       // Bind resources
+      m_program.bind();
       m_sampler.bind_to(0);
       e_lrgb_target.bind_to(gl::TextureTargetType::eTextureUnit,    0);
       e_srgb_target.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
 
       // Dispatch shader, applying gamma correction to obtain final results in draw_texture_srgb
-      gl::dispatch_compute(m_dispatch);
+      gl::dispatch_compute({ .groups_x = dispatch_ndiv.x(), .groups_y = dispatch_ndiv.y() });
     }
   };
 } // namespace met

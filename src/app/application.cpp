@@ -78,7 +78,6 @@ namespace met {
              | gl::WindowCreateFlags::eFocused   
              | gl::WindowCreateFlags::eDecorated
              | gl::WindowCreateFlags::eResizable
-             | gl::WindowCreateFlags::eSRGB               // Support sRGB-corrected framebuffers
              | gl::WindowCreateFlags::eMSAA               // Support MSAA framebuffers
 #if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
              | gl::WindowCreateFlags::eDebug              // Support OpenGL debug output

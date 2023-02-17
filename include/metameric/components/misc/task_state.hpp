@@ -13,6 +13,10 @@ namespace met {
     std::vector<std::pair<std::string, CMFS>> m_cmfs;
     std::vector<std::pair<std::string, Spec>> m_illuminants;
 
+    // Copies of viewport camera data to check for and report state changes
+    eig::Matrix4f m_camera_matrix;
+    float         m_camera_aspect;
+
     // Copies of view selection data to check for and report state changes
     std::vector<uint> m_vert_selct;
     std::vector<uint> m_vert_mover;
