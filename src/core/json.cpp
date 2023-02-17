@@ -16,11 +16,13 @@ namespace met {
   void from_json(const json &js, ProjectData::CSys &v) {
     v.cmfs       = js.at("cmfs").get<uint>();
     v.illuminant = js.at("illuminant").get<uint>();
+    v.n_scatters = js.value<uint>("n_scatters", 1);
   }
 
   void to_json(json &js, const ProjectData::CSys &v) {
     js["cmfs"]       = v.cmfs;
     js["illuminant"] = v.illuminant;
+    js["n_scatters"] = v.n_scatters;
   }
 
   void from_json(const json &js, ProjectData::Vert &v) {

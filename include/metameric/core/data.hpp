@@ -52,7 +52,7 @@ namespace met {
     };
 
     // Set of indices of cmfs/illuminants together describing a stored color system
-    struct CSys { uint cmfs, illuminant; };
+    struct CSys { uint cmfs, illuminant, n_scatters; };
 
     // Data structure for a triangle element of the project's convex hull mesh
     using Elem = eig::Array3u;

@@ -34,7 +34,7 @@ namespace met {
     
     // Continue only on relevant state change
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.any_mapps);
+    guard(e_pipe_state.any_csys);
 
     // Get shared resources
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -49,7 +49,7 @@ namespace met {
     
     // Update specific, stale mapping data
     for (uint i = 0; i < e_proj_data.color_systems.size(); ++i) {
-      guard_continue(e_pipe_state.mapps[i]);
+      guard_continue(e_pipe_state.csys[i]);
       auto data = UnalColrSystem(e_proj_data.csys(i));
       i_buffer.set(obj_span<const std::byte>(data), sizeof(decltype(data)), i * sizeof(decltype(data)));
     }

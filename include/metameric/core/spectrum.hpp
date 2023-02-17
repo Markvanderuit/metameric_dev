@@ -65,7 +65,8 @@ namespace met {
   public: /* mapping data */
     CMFS cmfs;       // Color matching or sensor response functions, defining the observer
     Spec illuminant; // Illuminant under which observation is performed
-    
+    uint n_scatters; // Nr. of repeated scatterings of the input refletance
+
   public:/* Mapping functions */
     // Simplify the CMFS/illuminant into color system spectra
     CMFS finalize() const {
@@ -76,14 +77,8 @@ namespace met {
     }
     
     // Obtain a color by applying this spectral mapping
-    Colr apply_color(const Spec &sd) const {
-      return finalize().transpose() * sd.matrix();
-    }
-
-    // Obtain a color by applying this spectral mapping
-    Colr operator()(const Spec &s) const { 
-      return apply_color(s);
-    }
+    Colr apply_color(const Spec &sd) const { return finalize().transpose() * sd.pow(n_scatters).matrix();  }
+    Colr operator()(const Spec &s) const { return apply_color(s);  }
 
     bool operator==(const ColrSystem &o) const {
       return cmfs == o.cmfs && illuminant.isApprox(o.illuminant);

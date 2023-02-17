@@ -60,7 +60,7 @@ namespace met {
               .name = "Deleted illuminant",
               .redo = [i = i](auto &data) { 
                 data.illuminants.erase(data.illuminants.begin() + i);
-                for (auto &[_, illm] : data.color_systems) {
+                for (auto &[_cmfs, illm, _n_scatters] : data.color_systems) {
                   if (illm > 0 && illm >= i) illm--;
                 }
               },
@@ -111,7 +111,7 @@ namespace met {
               .name = "Deleted cmfs",
               .redo = [i = i](auto &data) { 
                 data.cmfs.erase(data.cmfs.begin() + i);
-                for (auto &[cmfs, _] : data.color_systems) {
+                for (auto &[cmfs, _illm, _n_scatters] : data.color_systems) {
                   if (cmfs > 0 && cmfs >= i) cmfs--;
                 }
               },
@@ -162,7 +162,7 @@ namespace met {
 
         // Coming column widths
         const float total_width = ImGui::GetContentRegionAvail().x;
-        const float selec_width  = .45f * total_width;
+        const float selec_width  = .30f * total_width;
         const float delet_width  = .05f * total_width;
 
         // CMFS selectors
@@ -170,7 +170,7 @@ namespace met {
         for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("cmfs_selector_{}", i).c_str());
           
-          auto &[cmfs_i, _] = e_csys[i];
+          auto &[cmfs_i, _illm, _n_scatters] = e_csys[i];
           
           if (ImGui::BeginCombo("##CMFS", e_cmfs[cmfs_i].first.c_str())) {
             for (uint j = 0; j < e_cmfs.size(); ++j)
@@ -192,7 +192,7 @@ namespace met {
         for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("illm_selector_{}", i).c_str());
 
-          auto &[_, illum_i] = e_csys[i];
+          auto &[_cmfs, illum_i, _n_scatters] = e_csys[i];
 
           if (ImGui::BeginCombo("##Illuminant", e_illuminants[illum_i].first.c_str())) {
             for (uint j = 0; j < e_illuminants.size(); ++j)
@@ -200,14 +200,34 @@ namespace met {
                 e_appl_data.touch({ 
                   .name = "Modify color system", 
                   .redo = [i = i, j = j](auto &data) { data.color_systems[i].illuminant = j; },
-                  .undo = [i = i, j = illum_i](auto &data) {  data.color_systems[i].illuminant = j; 
-                }});
+                  .undo = [i = i, j = illum_i](auto &data) {  data.color_systems[i].illuminant = j; }
+                });
             ImGui::EndCombo();
           }
 
           ImGui::PopID();
         }
         ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
+
+        ImGui::BeginGroup(); ImGui::PushItemWidth(selec_width); ImGui::Text("Scatters"); ImGui::Separator();
+        for (uint i = 0; i < e_csys.size(); ++i) {
+          ImGui::PushID(fmt::format("n_scatters_selector_{}", i).c_str());
+
+          auto &[_cmfs, _illm, n_scatters_i] = e_csys[i];
+          int n_scatters_t = n_scatters_i; // Signed to check for underflows
+
+          if (ImGui::InputInt("##Scatters", &n_scatters_t) && n_scatters_t > 0) {
+            e_appl_data.touch({
+              .name = "Modify color system",
+              .redo = [i = i, j = n_scatters_t](auto &data) { data.color_systems[i].n_scatters = j; },
+              .undo = [i = i, j = n_scatters_i](auto &data) { data.color_systems[i].n_scatters = j; }
+            });
+          }
+
+          ImGui::PopID();
+        }
+        ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
+
 
         // Delete buttons
         ImGui::BeginGroup(); ImGui::PushItemWidth(delet_width); ImGui::Text(""); ImGui::Separator();

@@ -34,15 +34,26 @@ namespace met {
                  { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
    
     // Setup dispatch object for mesh draw
-    m_draw = {
+    m_draw_line = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = 3 * static_cast<uint>(elems.size()),
+      .capabilities     = {{ gl::DrawCapability::eDepthTest, true },
+                           { gl::DrawCapability::eCullOp,   false }},
+      .draw_op          = gl::DrawOp::eLine,
+      .bindable_array   = &m_array,
+      .bindable_program = &m_program
+    };
+    m_draw_fill = {
+      .type             = gl::PrimitiveType::eTriangles,
+      .vertex_count     = 3 * static_cast<uint>(elems.size()),
+      .capabilities     = {{ gl::DrawCapability::eDepthTest, false },
+                           { gl::DrawCapability::eCullOp,     true }},
+      .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
 
     // Setup relevant, non-changing uniforms
-    m_program.uniform("u_alpha", .1f);
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
   }
 
@@ -51,6 +62,7 @@ namespace met {
 
     // Get state objects
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
 
     // Experimental clamping code
     if (e_pipe_state.any_verts) {
@@ -88,31 +100,20 @@ namespace met {
     // Get shared resources 
     auto &e_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
 
-    // Set OpenGL state for coming draw operations
+    // Set shared OpenGL state for coming draw operations
     gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
     
     // Update varying program uniforms
-    m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
+    if (e_view_state.camera_matrix || e_view_state.camera_aspect)
+      m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
 
-    // Submit line draw information
-    {
-      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
-                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false) };
-      m_program.uniform("u_alpha", .25f);
-      gl::state::set_op(gl::DrawOp::eLine);
-      gl::dispatch_draw(m_draw);
-    }
-
-    // Submit face draw information
-    {
-      auto draw_capabilities_ = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false),
-                                  gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true) };
-      m_program.uniform("u_alpha", .01f);
-      gl::state::set_op(gl::DrawOp::eFill);
-      gl::dispatch_draw(m_draw);
-    }
+    // Submit draw information with varying alpha
+    m_program.uniform("u_alpha", .01f);
+    gl::dispatch_draw(m_draw_fill);
+    m_program.uniform("u_alpha", .25f);
+    gl::dispatch_draw(m_draw_line);
   }
 } // namespace met

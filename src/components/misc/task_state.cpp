@@ -26,7 +26,7 @@ namespace met {
 
     template <>
     bool compare_func<ProjectData::CSys>(const ProjectData::CSys &in, ProjectData::CSys &out) {
-      guard(in.cmfs != out.cmfs || in.illuminant != out.illuminant, false);
+      guard(in.cmfs != out.cmfs || in.illuminant != out.illuminant || in.n_scatters != out.n_scatters, false);
       out = in;
       return true;
     }
@@ -64,8 +64,8 @@ namespace met {
       state.colr_i = compare_func(in.colr_i, out.colr_i);
       state.csys_i = compare_func(in.csys_i, out.csys_i);
       std::tie(state.colr_j, state.any_colr_j) = compare_state(in.colr_j, out.colr_j);
-      std::tie(state.csys_j, state.any_mapp_j) = compare_state(in.csys_j, out.csys_j);
-      state.any = state.colr_i || state.csys_i || state.any_colr_j || state.any_mapp_j;
+      std::tie(state.csys_j, state.any_csys_j) = compare_state(in.csys_j, out.csys_j);
+      state.any = state.colr_i || state.csys_i || state.any_colr_j || state.any_csys_j;
       return state;
     }
 
@@ -111,7 +111,7 @@ namespace met {
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
     std::tie(i_pipe_state.cmfs,  i_pipe_state.any_cmfs)  = detail::compare_state(e_proj_data.cmfs, m_cmfs);
     std::tie(i_pipe_state.elems, i_pipe_state.any_elems) = detail::compare_state(e_proj_data.gamut_elems, m_elems);
-    std::tie(i_pipe_state.mapps, i_pipe_state.any_mapps) = detail::compare_state(e_proj_data.color_systems, m_mapps);
+    std::tie(i_pipe_state.csys,  i_pipe_state.any_csys)  = detail::compare_state(e_proj_data.color_systems, m_csys);
 
     // Post-process fill in some gaps in project state
     for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
@@ -119,22 +119,23 @@ namespace met {
       auto &vert_data  = e_proj_data.gamut_verts[i];
       
       // If mapping state has become stale, this influenced the flag inside of a vertex as well
-      vert_state.csys_i |= i_pipe_state.mapps[vert_data.csys_i];
+      vert_state.csys_i |= i_pipe_state.csys[vert_data.csys_i];
       for (uint j = 0; j < vert_state.csys_j.size(); ++j)
-        vert_state.csys_j[j] = vert_state.csys_j[j] | i_pipe_state.mapps[vert_data.csys_j[j]];
+        vert_state.csys_j[j] = vert_state.csys_j[j] | i_pipe_state.csys[vert_data.csys_j[j]];
       
       // Update summary flags per vertex
       vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, reduce_stale);
-      vert_state.any_mapp_j |= std::reduce(range_iter(vert_state.csys_j), false, reduce_stale);
-      vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_mapp_j;
+      vert_state.any_csys_j |= std::reduce(range_iter(vert_state.csys_j), false, reduce_stale);
+      vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_csys_j;
     }
 
     // Set summary flags over all vertices/elements in project state
     i_pipe_state.any_verts = std::reduce(range_iter(i_pipe_state.verts), false, 
       [](const auto &a, const auto &b) { return a | b.any; });
-    
+
+
     // Set giant summary flag
-    i_pipe_state.any = i_pipe_state.any_mapps | 
+    i_pipe_state.any = i_pipe_state.any_csys  | 
                        i_pipe_state.any_elems | 
                        i_pipe_state.any_verts |
                        i_pipe_state.any_cmfs  |

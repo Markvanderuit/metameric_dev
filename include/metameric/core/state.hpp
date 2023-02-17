@@ -8,7 +8,7 @@ namespace met {
     struct CacheVert {
       bool any;
       bool any_colr_j;
-      bool any_mapp_j;
+      bool any_csys_j;
 
       bool colr_i;
       bool csys_i;
@@ -29,11 +29,11 @@ namespace met {
     bool any_cmfs;
     bool any_verts;
     bool any_elems;
-    bool any_mapps;
+    bool any_csys;
 
     std::vector<CacheVert> verts;
     std::vector<bool>      elems;
-    std::vector<bool>      mapps;
+    std::vector<bool>      csys;
     std::vector<bool>      illuminants;
     std::vector<bool>      cmfs;
   };

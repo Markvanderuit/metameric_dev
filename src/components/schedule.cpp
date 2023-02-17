@@ -13,7 +13,7 @@
 #include <metameric/components/misc/task_state.hpp>
 
 // Pipeline tasks
-#include <metameric/components/pipeline/task_gen_color_systems.hpp>
+// #include <metameric/components/pipeline/task_gen_color_systems.hpp>
 #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
 // #include <metameric/components/pipeline/task_gen_spectral_texture.hpp>
@@ -149,7 +149,7 @@ namespace met {
     scheduler.emplace_task<StateTask>("state");
 
     // The following tasks define the color->spectrum uplifting pipeline
-    scheduler.emplace_task<GenColorSystemsTask>("gen_color_systems");
+    // scheduler.emplace_task<GenColorSystemsTask>("gen_color_systems");
     scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");            
     scheduler.emplace_task<GenBarycentricWeightsTask>("gen_barycentric_weights");
     // scheduler.emplace_task<GenSpectralTextureTask>("gen_spectral_texture");

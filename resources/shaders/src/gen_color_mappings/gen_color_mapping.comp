@@ -7,7 +7,6 @@
 
 #include <guard.glsl>
 #include <bary.glsl>
-#include <spectrum_invoc.glsl>
 
 layout(local_size_x = 256) in;
 layout(std140)             uniform;

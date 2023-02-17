@@ -11,7 +11,8 @@ namespace met {
     gl::Buffer   m_vert_buffer;
     gl::Buffer   m_elem_buffer;
     gl::Array    m_array;
-    gl::DrawInfo m_draw;
+    gl::DrawInfo m_draw_line;
+    gl::DrawInfo m_draw_fill;
     gl::Program  m_program;
 
   public:
