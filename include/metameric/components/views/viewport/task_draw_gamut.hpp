@@ -8,11 +8,22 @@
 
 namespace met {
   class ViewportDrawGamutTask : public detail::AbstractTask {
-    // Cache objects to detect state changes in UI components
-    uint m_buffer_object_cache;
+    struct UniformBuffer {
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(16) eig::Vector2f camera_aspect;
+    };
 
-    // Local buffer to store individual opacities/sizes for vertex/element selection/mouseover;
-    // each buffer is mapped for flushable changes
+    // Local uniform buffer to stream shared camera data
+    gl::Buffer     m_unif_buffer;
+    UniformBuffer *m_unif_map;
+
+    // Local buffers to stream packed vertex data and unaligned element data
+    gl::Buffer m_vert_buffer;
+    gl::Buffer m_elem_buffer;
+    std::span<eig::AlArray3f> m_vert_map;
+    std::span<eig::Array3u>   m_elem_map;
+
+    // Local buffer to stream individual opacities/sizes for selection/mouseover
     gl::Buffer        m_vert_size_buffer;
     gl::Buffer        m_elem_opac_buffer;
     std::span<float>  m_vert_size_map;
@@ -21,11 +32,11 @@ namespace met {
     // Graphics draw components
     gl::Array    m_vert_array;
     gl::Array    m_elem_array;
-    gl::Buffer   m_inst_vert_buffer;
-    gl::Buffer   m_inst_elem_buffer;
     gl::Program  m_vert_program;
+    gl::Program  m_edge_program;
     gl::Program  m_elem_program;
     gl::DrawInfo m_vert_draw;
+    gl::DrawInfo m_edge_draw;
     gl::DrawInfo m_elem_draw;
 
   public:
