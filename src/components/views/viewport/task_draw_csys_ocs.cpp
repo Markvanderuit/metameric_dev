@@ -97,9 +97,6 @@ namespace met {
       }
     }
 
-    // Get shared resources 
-    auto &e_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-
     // Set shared OpenGL state for coming draw operations
     gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
@@ -107,8 +104,10 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
     
     // Update varying program uniforms
-    if (e_view_state.camera_matrix || e_view_state.camera_aspect)
+    if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
+      auto &e_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
+    }
 
     // Submit draw information with varying alpha
     m_program.uniform("u_alpha", .01f);
