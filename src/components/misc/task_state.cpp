@@ -1,6 +1,7 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/misc/task_state.hpp>
+#include <metameric/components/views/detail/arcball.hpp>
 #include <functional>
 #include <numeric>
 #include <tuple>
@@ -30,33 +31,20 @@ namespace met {
       return true;
     }
 
-    template <>
-    bool compare_func<CMFS>(const CMFS &in, CMFS &out) {
-      guard(!out.isApprox(in), false);
-      out = in;
-      return true;
-    }
+    #define decl_compare_func_eig(T)              \
+      template <>                                 \
+      bool compare_func<T>(const T &in, T &out) { \
+        guard (!out.isApprox(in), false);         \
+        out = in;                                 \
+        return true;                              \
+      }
 
-    template <>
-    bool compare_func<Spec>(const Spec &in, Spec &out) {
-      guard(!out.isApprox(in), false);
-      out = in;
-      return true;
-    }
-
-    template <>
-    bool compare_func<eig::Array3f>(const eig::Array3f &in, eig::Array3f &out) {
-      guard(!out.isApprox(in), false);
-      out = in;
-      return true;
-    }
-
-    template <>
-    bool compare_func<eig::Array3u>(const eig::Array3u &in, eig::Array3u &out) {
-      guard(!out.isApprox(in), false);
-      out = in;
-      return true;
-    }
+    decl_compare_func_eig(CMFS);
+    decl_compare_func_eig(Spec);
+    decl_compare_func_eig(eig::Array3u);
+    decl_compare_func_eig(eig::Array3f);
+    decl_compare_func_eig(eig::Matrix4f);
+    decl_compare_func_eig(eig::Vector2f);
 
     template <typename T>
     CompareTuple compare_state(const std::vector<T> &in,
@@ -69,56 +57,6 @@ namespace met {
       for (uint i = 0; i < in.size(); ++i)
         state[i] = compare_func(in[i], out[i]);
       return { state,  std::reduce(range_iter(state), false, std::logical_or<bool>()) };
-    }
-    
-    constexpr 
-    bool compare_and_set(const auto &in, auto &out) {
-      guard(out != in, false);
-      out = in;
-      return true;
-    }
-
-    constexpr 
-    bool compare_and_set_eig(const auto &in, auto &out) {
-      guard(!out.isApprox(in), false);
-      out = in;
-      return true;
-    }
-
-    constexpr
-    bool compare_and_set_reduce(const auto &in, auto &out) {
-      if (in.size() != out.size()) {
-        out = in;
-        return true;
-      }
-      bool state = false;
-      for (uint i = 0; i < in.size(); ++i)
-        state |= compare_and_set(in[i], out[i]);
-      return state;
-    }
-
-    constexpr
-    std::vector<bool> compare_and_set_all(const auto &in, auto &out) {
-      std::vector<bool> state(in.size(), true);
-      if (in.size() != out.size()) {
-        out = in;
-        return state;
-      }
-      for (uint i = 0; i < in.size(); ++i)
-        state[i] = compare_and_set(in[i], out[i]);
-      return state;
-    }
-
-    constexpr
-    std::vector<bool> compare_and_set_all_eig(const auto &in, auto &out) {
-      std::vector<bool> state(in.size(), true);
-      if (in.size() != out.size()) {
-        out = in;
-        return state;
-      }
-      for (uint i = 0; i < in.size(); ++i)
-        state[i] = compare_and_set_eig(in[i], out[i]);
-      return state;
     }
 
     CacheVert compare_and_set_vert(const ProjectData::Vert &in, ProjectData::Vert &out) {
@@ -161,6 +99,7 @@ namespace met {
     auto &i_view_state = info.get_resource<ViewportState>("viewport_state");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
+    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
     auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
     auto &e_elem_selct = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
@@ -207,5 +146,9 @@ namespace met {
     i_view_state.elem_selection = std::get<1>(detail::compare_state(e_elem_selct, m_elem_selct));
     i_view_state.elem_mouseover = std::get<1>(detail::compare_state(e_elem_mover, m_elem_mover));
     i_view_state.cstr_selection = detail::compare_func(e_cstr_selct, m_cstr_selct);
+
+    // Set summary flags over arcball camera state
+    i_view_state.camera_matrix = detail::compare_func(e_arcball.full().matrix(), m_camera_matrix);
+    i_view_state.camera_aspect = detail::compare_func(e_arcball.m_aspect,        m_camera_aspect);
   }
 } // namespace met

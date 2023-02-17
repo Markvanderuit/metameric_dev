@@ -40,6 +40,10 @@ namespace met {
 
   /* Wrapper object for tracking changes to viewport in program pipeline; e.g. vertex selection */
   struct ViewportState {
+    // Camera properties
+    bool camera_matrix;
+    bool camera_aspect;
+
     // Vertex selection in viewport
     bool vert_selection;
     bool vert_mouseover;
