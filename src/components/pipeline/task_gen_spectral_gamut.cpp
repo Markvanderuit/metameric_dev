@@ -30,7 +30,6 @@ namespace met {
     info.insert_resource<gl::Buffer>("vert_buffer",       { });
     info.insert_resource<gl::Buffer>("spec_buffer",       { });
     info.insert_resource<gl::Buffer>("elem_buffer",       { });
-    info.insert_resource<gl::Buffer>("elem_buffer_unal",  { });
   }
 
   void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
@@ -40,13 +39,11 @@ namespace met {
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
     auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
-    auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal"); // for element index
 
     // Unmap buffers
     if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped()) i_spec_buffer.unmap();
     if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped()) i_vert_buffer.unmap();
     if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped()) i_elem_buffer.unmap();
-    if (i_elem_buffer_.is_init() && i_elem_buffer_.is_mapped()) i_elem_buffer_.unmap();
   }
   
   void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
@@ -64,7 +61,6 @@ namespace met {
     auto &i_specs       = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
     auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
-    auto &i_elem_buffer_= info.get_resource<gl::Buffer>("elem_buffer_unal");
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
 
     // On vertex count change, resize spectrum data and re-create buffers
@@ -74,47 +70,14 @@ namespace met {
       if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped())   i_spec_buffer.unmap();
       if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped())   i_vert_buffer.unmap();
       if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped())   i_elem_buffer.unmap();
-      if (i_elem_buffer_.is_init() && i_elem_buffer_.is_mapped()) i_elem_buffer_.unmap();
       
       i_spec_buffer = {{ .size  = e_verts.size() * sizeof(Spec),           .flags = buffer_create_flags }};
       i_vert_buffer = {{ .size  = e_verts.size() * sizeof(AlColr),         .flags = buffer_create_flags }};
       i_elem_buffer = {{ .size  = e_elems.size() * sizeof(eig::AlArray3u), .flags = buffer_create_flags }};
-      i_elem_buffer_= {{ .size  = e_elems.size() * sizeof(eig::Array3u),   .flags = buffer_create_flags }};
       
       m_spec_map = cast_span<Spec>(i_spec_buffer.map(buffer_access_flags));
       m_vert_map = cast_span<AlColr>(i_vert_buffer.map(buffer_access_flags));
       m_elem_map = cast_span<eig::AlArray3u>(i_elem_buffer.map(buffer_access_flags));
-      m_elem_unal_map = cast_span<eig::Array3u>(i_elem_buffer_.map(buffer_access_flags));
-
-      // TODO: remove debug section
-      {
-        std::vector<std::unordered_set<uint>> v_neighbs(e_verts.size());
-        for (uint i = 0; i < e_verts.size(); ++i) {
-          for (uint j = 0; j < e_elems.size(); ++j) {
-            const auto &el = e_elems[j];
-            if (std::ranges::find(el, i) != el.end())
-              for (uint j_ : e_elems[j])
-                v_neighbs[i].insert(j_);
-          }
-        }
-
-        std::vector<std::vector<uint>> v_to_e(e_verts.size());
-        for (uint i = 0; i < e_verts.size(); ++i) {
-          for (uint j = 0; j < e_elems.size(); ++j) {
-            const auto &el = e_elems[j];
-            if (std::ranges::find(el, i) != el.end())
-              v_to_e[i].push_back(j);
-          }
-        }
-
-        fmt::print("{}, {}\n", e_verts.size(), e_elems.size());
-        for (uint i = 0; i < e_verts.size(); ++i) {
-          std::unordered_set<uint> affected_elems;
-          for (uint j : v_neighbs[i])
-            std::ranges::copy(v_to_e[j], std::inserter(affected_elems, affected_elems.begin()));
-          fmt::print("v={} - neighours={} - affected_elems=({}) {}\n", i, v_neighbs[i], affected_elems.size(), affected_elems);
-        }
-      }
     }
     
     // Generate spectra at stale gamut vertices in parallel
@@ -162,10 +125,8 @@ namespace met {
     
     // Push stale gamut element data to gpu
     for (uint i : elem_range) {
-      m_elem_map[i]      = e_proj_data.gamut_elems[i];
-      m_elem_unal_map[i] = e_proj_data.gamut_elems[i];
+      m_elem_map[i] = e_proj_data.gamut_elems[i];
       i_elem_buffer.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
-      i_elem_buffer_.flush(sizeof(eig::Array3u), i * sizeof(eig::Array3u));
     }
   }
 } // namespace met
