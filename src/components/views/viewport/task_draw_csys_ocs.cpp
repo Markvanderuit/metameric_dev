@@ -110,9 +110,9 @@ namespace met {
     }
 
     // Submit draw information with varying alpha
-    m_program.uniform("u_alpha", .01f);
-    gl::dispatch_draw(m_draw_fill);
     m_program.uniform("u_alpha", .25f);
     gl::dispatch_draw(m_draw_line);
+    m_program.uniform("u_alpha", .01f);
+    gl::dispatch_draw(m_draw_fill);
   }
 } // namespace met

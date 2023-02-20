@@ -253,7 +253,7 @@ namespace met {
         if (ImGui::Button("Add color system")) {
           e_appl_data.touch({
             .name = "Add color system",
-            .redo = [](auto &data) { data.color_systems.push_back({ 0, 0 }); },
+            .redo = [](auto &data) { data.color_systems.push_back({ 0, 0, 1 }); },
             .undo = [](auto &data) { data.color_systems.pop_back(); }
           });
         }

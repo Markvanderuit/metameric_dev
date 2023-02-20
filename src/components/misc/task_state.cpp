@@ -92,7 +92,7 @@ namespace met {
   void StateTask::eval(detail::TaskEvalInfo &info) {
     met_trace();
 
-    constexpr auto reduce_stale = [](auto a, auto b) { return a | b; };
+    constexpr auto reduce_or = [](auto a, auto b) { return a | b; };
 
     // Get shared resources
     auto &i_pipe_state = info.get_resource<ProjectState>("pipeline_state");
@@ -109,9 +109,9 @@ namespace met {
     // Iterate over all project data
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.gamut_verts, m_verts);
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
-    std::tie(i_pipe_state.cmfs,  i_pipe_state.any_cmfs)  = detail::compare_state(e_proj_data.cmfs, m_cmfs);
-    std::tie(i_pipe_state.elems, i_pipe_state.any_elems) = detail::compare_state(e_proj_data.gamut_elems, m_elems);
-    std::tie(i_pipe_state.csys,  i_pipe_state.any_csys)  = detail::compare_state(e_proj_data.color_systems, m_csys);
+    std::tie(i_pipe_state.cmfs,        i_pipe_state.any_cmfs)        = detail::compare_state(e_proj_data.cmfs, m_cmfs);
+    std::tie(i_pipe_state.elems,       i_pipe_state.any_elems)       = detail::compare_state(e_proj_data.gamut_elems, m_elems);
+    std::tie(i_pipe_state.csys,        i_pipe_state.any_csys)        = detail::compare_state(e_proj_data.color_systems, m_csys);
 
     // Post-process fill in some gaps in project state
     for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
@@ -124,8 +124,8 @@ namespace met {
         vert_state.csys_j[j] = vert_state.csys_j[j] | i_pipe_state.csys[vert_data.csys_j[j]];
       
       // Update summary flags per vertex
-      vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, reduce_stale);
-      vert_state.any_csys_j |= std::reduce(range_iter(vert_state.csys_j), false, reduce_stale);
+      vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, reduce_or);
+      vert_state.any_csys_j |= std::reduce(range_iter(vert_state.csys_j), false, reduce_or);
       vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_csys_j;
     }
 

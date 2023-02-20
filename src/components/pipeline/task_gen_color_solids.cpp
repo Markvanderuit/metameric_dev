@@ -120,7 +120,7 @@ namespace met {
     // Register resources to hold convex hull data for a primary color system OCS
     auto csys_ocs = generate_ocs_boundary({ .basis = e_appl_data.loaded_basis,
                                             .basis_avg = e_appl_data.loaded_basis_mean, 
-                                            .system = e_proj_data.csys(0).finalize(), 
+                                            .system = e_proj_data.csys(0).finalize_direct(), 
                                             .samples = detail::gen_unit_dirs<3>(n_samples_ocs) });
     auto csys_ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(csys_ocs), 0.001f);
 
@@ -157,6 +157,7 @@ namespace met {
     auto &e_appl_data    = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_appl_data.project_data;
     auto &e_vert         = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
+    auto &e_vert_sd      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[e_vert_slct[0]];
     auto &i_csol_data    = info.get_resource<std::vector<Colr>>("csol_data");
     auto &i_csol_data_al = info.get_resource<std::vector<AlColr>>("csol_data_al");
     auto &i_csol_cntr    = info.get_resource<Colr>("csol_cntr");
@@ -164,14 +165,14 @@ namespace met {
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
     // All secondary color systems and signals are added after, until the one given by e_cstr_index
-    std::vector<CMFS> cmfs_i = { e_proj_data.csys(e_vert.csys_i).finalize() };
+    std::vector<CMFS> cmfs_i = { e_proj_data.csys(e_vert.csys_i).finalize_indirect(e_vert_sd) };
     std::vector<Colr> sign_i = { e_vert.colr_i };
     std::copy(e_vert.colr_j.begin(), e_vert.colr_j.begin() + e_cstr_slct, std::back_inserter(sign_i));
     std::transform(e_vert.csys_j.begin(), e_vert.csys_j.begin() + e_cstr_slct, std::back_inserter(cmfs_i),
-      [&](uint j) { return e_proj_data.csys(j).finalize(); });
+      [&](uint j) { return e_proj_data.csys(j).finalize_indirect(e_vert_sd); });
 
     // The selected constraint is the varying component, for which we generate a metamer boundary
-    CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize();
+    CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
     const auto &i_samples = info.get_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));

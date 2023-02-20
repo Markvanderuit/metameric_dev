@@ -67,22 +67,19 @@ namespace met {
     Spec illuminant; // Illuminant under which observation is performed
     uint n_scatters; // Nr. of repeated scatterings of the input refletance
 
+
   public:/* Mapping functions */
     // Simplify the CMFS/illuminant into color system spectra
-    CMFS finalize() const {
-      auto cmfs_col = cmfs.array().colwise();
-      float k = 1.f / (cmfs_col * illuminant * wavelength_ssize).col(1).sum();
-      auto cmfs_e = (k * (cmfs_col * illuminant) * wavelength_ssize).eval();
-      return (models::xyz_to_srgb_transform * cmfs_e.matrix().transpose()).transpose().eval();
-    }
+    CMFS finalize_direct() const;
+    CMFS finalize_indirect(const Spec &sd) const;
     
     // Obtain a color by applying this spectral mapping
-    Colr apply_color(const Spec &sd) const { return finalize().transpose() * sd.pow(n_scatters).matrix();  }
-    Colr operator()(const Spec &s) const { return apply_color(s);  }
+    Colr apply_color_direct(const Spec &sd) const { return finalize_direct().transpose() * sd.pow(n_scatters).matrix().eval();  }
+    Colr apply_color_indirect(const Spec &sd) const { return finalize_indirect(sd).transpose() * sd.matrix();  }
 
-    bool operator==(const ColrSystem &o) const {
-      return cmfs == o.cmfs && illuminant.isApprox(o.illuminant);
-    }
+    // Operator shorthands
+    Colr operator()(const Spec &s) const { return apply_color_direct(s);  }
+    bool operator==(const ColrSystem &o) const { return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant); }
   };
 
   // Given a spectral bin, obtain the relevant central wavelength

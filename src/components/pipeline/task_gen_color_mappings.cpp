@@ -63,8 +63,6 @@ namespace met {
     bool activate_flag = m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;
     info.get_resource<bool>(fmt::format("gen_color_mapping_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
     guard(activate_flag);
-    m_init_stale = false;
-
 
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -74,19 +72,20 @@ namespace met {
     auto &e_gamut_spec  = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
 
     // Update uniform data
-    if (e_pipe_state.any_verts) {
+    if (e_pipe_state.any_verts || m_init_stale) {
       m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
       m_uniform_map->n_verts = e_proj_data.gamut_verts.size();
       m_uniform_buffer.flush();
     }
 
-    // Update gamut data, given a mapping/vertex state change
+    // Update gamut data, given any state change
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
     for (uint i = 0; i < e_proj_data.gamut_verts.size(); ++i) {
-      guard_continue(e_pipe_state.verts[i].any || e_pipe_state.csys[m_mapping_i]);
-      m_gamut_map[i] = csys(e_gamut_spec[i]);
+      guard_continue(activate_flag || e_pipe_state.verts[i].any);
+
+      m_gamut_map[i] = csys.apply_color_indirect(e_gamut_spec[i]);
+      m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }
-    m_gamut_buffer.flush();
 
     // Bind buffer resources to correct buffer targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,     0);
@@ -96,6 +95,8 @@ namespace met {
 
     // Dispatch shader to generate color-mapped buffer
     gl::dispatch_compute(m_dispatch);
+
+    m_init_stale = false;
   }
 
   GenColorMappingsTask::GenColorMappingsTask(const std::string &name)

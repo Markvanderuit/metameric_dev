@@ -16,20 +16,14 @@ layout(binding = 1) restrict readonly buffer b_1 { vec4 data[]; } b_erro_buffer;
 
 // Uniform declarations
 layout(location = 0) uniform mat4 u_camera_matrix;
-/* layout(location = 1) uniform vec3 u_camera_position;
-layout(location = 2) uniform vec3 u_camera_direction; */
-layout(location = 3) uniform vec2 u_billboard_aspect;
+layout(location = 1) uniform vec2 u_billboard_aspect;
 
 // Vertex output declarations
 layout(location = 0) out vec2 out_value_vert;
 layout(location = 1) out vec3 out_value_colr;
 
-/* // gl_PerVertex property declarations
-out float gl_CullDistance[1]; */
-
 // Internal constants
 const float point_radius  = 0.002f;
-const float cull_distance = 3.f;
 
 void main() {
   uint i = gl_VertexID / 3, j = gl_VertexID % 3;
@@ -41,8 +35,5 @@ void main() {
 
   // Set per vertex position property
   gl_Position = u_camera_matrix * vec4(pos, 1) 
-              + point_radius  * vec4(u_billboard_aspect * out_value_vert, 0, 0);
-
-  // Set per vertex culling property
-  // gl_CullDistance[0] = dot(u_camera_position - pos, u_camera_direction) > cull_distance ? -1.f : 1.f; 
+              + vec4(point_radius * u_billboard_aspect * out_value_vert, 0, 0);
 }

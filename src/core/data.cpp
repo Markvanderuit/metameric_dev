@@ -224,7 +224,7 @@ namespace met {
     fmt::print("  Generating object color solid boundaries\n");
     auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
                                        .basis_avg = loaded_basis_mean,
-                                       .system    = project_data.csys(0).finalize(), 
+                                       .system    = project_data.csys(0).finalize_direct(), 
                                        .samples   = detail::gen_unit_dirs<3>(1024) });
     auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
 
@@ -371,7 +371,7 @@ namespace met {
 
         // Transform mappings
         for (uint i = 0; i < project_data.color_systems.size(); ++i)
-          info.systems[i] = project_data.csys(i).finalize();
+          info.systems[i] = project_data.csys(i).finalize_direct();
 
         // Add baseline samples
         for (uint i = 0; i < n_samples; ++i)
@@ -417,10 +417,10 @@ namespace met {
 
           // Clip constraints to validity
           {
-            std::vector<CMFS> systems = { project_data.csys(vert.csys_i).finalize() };
+            std::vector<CMFS> systems = { project_data.csys(vert.csys_i).finalize_direct() };
             std::vector<Colr> signals = { vert.colr_i };
             for (uint j = 0; j < vert.colr_j.size(); ++j) {
-              systems.push_back(project_data.csys(vert.csys_j[j]).finalize());
+              systems.push_back(project_data.csys(vert.csys_j[j]).finalize_direct());
               signals.push_back(vert.colr_j[j]);
             }
             

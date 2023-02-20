@@ -90,9 +90,9 @@ namespace met {
       auto &vert = e_proj_data.gamut_verts[i];   
 
       // Obtain color system spectra for this vertex
-      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize() };
+      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_specs[i]) };
       std::ranges::transform(vert.csys_j, std::back_inserter(systems), 
-        [&](uint j) { return e_proj_data.csys(j).finalize(); });
+        [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
 
       // Obtain corresponding color signal for each color system
       std::vector<Colr> signals(1 + vert.colr_j.size());

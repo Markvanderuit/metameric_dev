@@ -59,8 +59,8 @@ namespace met::detail {
     void eval(detail::TaskEvalInfo &info) override {
       met_trace_full();
 
-      guard(info.has_resource(m_info.input_key.first, m_info.input_key.second));
-      guard(info.get_resource<bool>("activate_flag"));
+      // guard(info.has_resource(m_info.input_key.first, m_info.input_key.second));
+      // guard(info.get_resource<bool>("activate_flag"));
 
       // Get shared resources
       auto &e_rsrc = info.get_resource<gl::Buffer>(m_info.input_key.first, m_info.input_key.second);

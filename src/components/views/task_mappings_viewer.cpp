@@ -77,10 +77,13 @@ namespace met {
     ColrSystem mapp  = e_proj_data.csys(texture_i);
     Bary bary        = m_tooltip_maps[m_tooltip_cycle_i][0];
     Spec reflectance = 0;
-    for (uint i = 0; i < e_gamut_spec.size(); ++i)
+    Colr color       = 0;
+    for (uint i = 0; i < e_gamut_spec.size(); ++i) {
       reflectance += bary[i] * e_gamut_spec[i];
+      color += bary[i] * mapp.apply_color_indirect(e_gamut_spec[i]);
+    }
     Spec power       = mapp.illuminant * reflectance;
-    Colr color       = mapp(reflectance);
+    // Colr color       = mapp(reflectance);
 
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });

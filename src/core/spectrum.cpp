@@ -39,4 +39,23 @@ namespace met {
     Spec emitter_cie_ledb1   = io::spectrum_from_data(cie_wavelength_values, cie_ledb1_values);
     Spec emitter_cie_ledrgb1 = io::spectrum_from_data(cie_wavelength_values, cie_ledrgb1_values);
   } // namespace models 
+
+  CMFS ColrSystem::finalize_indirect(const Spec &sd) const {
+    Spec indirect = sd.pow(n_scatters - 1) * illuminant;
+
+    CMFS to_xyz = (cmfs.array().colwise() * indirect   * wavelength_ssize)
+                / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
+    CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
+
+    return to_rgb;
+  }
+
+  CMFS ColrSystem::finalize_direct() const {
+    CMFS to_xyz = (cmfs.array().colwise() * illuminant * wavelength_ssize)
+                / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
+    CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
+
+    return to_rgb;
+  }
+
 } // namespace met

@@ -48,8 +48,6 @@ namespace met {
     
     // Set varying program uniforms
     m_program.uniform("u_camera_matrix",    e_arcball.full().matrix());
-    /* m_program.uniform("u_camera_position",  e_arcball.eye_pos());
-    m_program.uniform("u_camera_direction", (e_arcball.eye_dir()).eval()); */
     m_program.uniform("u_billboard_aspect", eig::Vector2f { 1.f, e_arcball.m_aspect });
 
     // Bind resources to buffer targets
