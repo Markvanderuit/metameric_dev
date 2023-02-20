@@ -59,6 +59,7 @@ find_package(imguizmo  CONFIG REQUIRED)
 find_package(implot    CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(openmesh  CONFIG REQUIRED)
+find_package(Qhull CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
@@ -251,6 +252,8 @@ target_link_libraries(core PUBLIC
   nlohmann_json::nlohmann_json
   ${OPENMESH_LIBRARIES}
   quickhull
+  Qhull::qhullcpp
+  Qhull::qhull_r
   ZLIB::ZLIB
 )
 target_include_directories(core PUBLIC

@@ -21,6 +21,7 @@
     "nativefiledialog",
     "nlohmann-json",
     "openmesh",
+    "qhull",
     "stb",
     "tracy",
     "zlib",

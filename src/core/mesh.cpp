@@ -20,6 +20,11 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
+#include <libqhullcpp/Qhull.h>
+#include "libqhullcpp/QhullVertexSet.h"
+#include <libqhullcpp/QhullPoints.h>
+// #include "libqhullcpp/QhullVertex.h"
+// #include "libqhullcpp/QhullPoint.h"
 
 namespace met {
   namespace detail {
@@ -145,6 +150,44 @@ namespace met {
   TriMesh<Traits> generate_convex_hull(std::span<const T> points) {
     met_trace();
 
+    /* std::vector<double>       input_vertices;
+    for (uint i = 0; i < points.size(); ++i) {
+      const T &p = points[i];
+      input_vertices.push_back(p.x());
+      input_vertices.push_back(p.y());
+      input_vertices.push_back(p.z());
+    }
+
+    orgQhull::Qhull qhull;
+
+    int n_dims   = 3;
+    int n_points = points.size();
+    const char *input_comments = "";
+    const char *qhull_commands = "";
+    qhull.runQhull(input_comments, n_dims, n_points, input_vertices.data(), qhull_commands);
+
+    std::vector<T>            output_verts(qhull.vertexCount());
+    std::vector<eig::Array3u> output_elems(qhull.facetCount());
+
+    std::transform(std::execution::par_unseq, 
+      range_iter(qhull.facetList()), output_elems.begin(), [](const auto &el) {
+      eig::Array3u el_;
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), [](const auto &v) { return v.id(); });
+      fmt::print("{}\n", el_);
+      return el_;
+    });
+    std::transform(std::execution::par_unseq,
+    range_iter(qhull.vertexList()), output_verts.begin(), [](const auto &v) {
+      T t;
+      std::ranges::transform(v.point(), t.begin(), [](const auto &f) { return static_cast<float>(f); });
+      fmt::print("{}\n", t);
+      return t;
+    });
+
+    fmt::print("{}, {}\n", output_verts.size(), output_elems.size());
+    return generate_from_data<Traits>(std::span<const T>            { output_verts },
+                                      std::span<const eig::Array3u> { output_elems }); */
+
     using namespace quickhull;
 
     using Vector3f = quickhull::Vector3<float>;
@@ -165,6 +208,7 @@ namespace met {
     for (uint i = 0; i < elems.size() / 3; ++i)
       output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) };
     
+    fmt::print("{}, {}\n", output_verts.size(), output_elems.size());
     return generate_from_data<Traits>(std::span<const T> { output_verts },
                                       std::span<const eig::Array3u> { output_elems });
   }

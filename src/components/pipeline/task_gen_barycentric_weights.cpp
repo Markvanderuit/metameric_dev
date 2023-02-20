@@ -76,13 +76,15 @@ namespace met {
     m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
     m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
-    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform, 0);
 
-    // Dispatch shader to generate unnormalized barycentric weights in i_bary_buffer
+    // Bind required buffers to corresponding targets
+    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
     e_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
     e_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
     i_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
+
+    // Dispatch shader to generate unnormalized barycentric weights in i_bary_buffer
     gl::dispatch_compute(m_dispatch);
   }
 } // namespace met
