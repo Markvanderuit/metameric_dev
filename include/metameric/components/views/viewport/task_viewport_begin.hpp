@@ -41,7 +41,7 @@ namespace met {
       // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).all()) {
+      if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).any()) {
         i_lrgb_target = {{ .size = viewport_size.cast<uint>() }};
         i_srgb_target = {{ .size = viewport_size.cast<uint>() }};
       }
