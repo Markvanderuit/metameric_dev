@@ -52,13 +52,13 @@ namespace met {
   void GenBarycentricWeightsTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
 
-    // Unmap buffers
     if (m_uniform_buffer.is_init() && m_uniform_buffer.is_mapped()) 
       m_uniform_buffer.unmap();
   }
 
   void GenBarycentricWeightsTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
+
 
     // Continue only on relevant state change
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
@@ -71,7 +71,7 @@ namespace met {
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
     auto &i_bary_buffer = info.get_resource<gl::Buffer>("bary_buffer");
     
-    // Update uniform data and bind uniform buffer to correct target
+    // Update uniform data
     m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
     m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
     m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();

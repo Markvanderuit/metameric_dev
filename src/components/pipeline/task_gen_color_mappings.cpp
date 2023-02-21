@@ -3,7 +3,6 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <small_gl/utility.hpp>
-#include <small_gl_parser/parser.hpp>
 
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite 
@@ -34,11 +33,11 @@ namespace met {
 
     // Set up gamut buffer and establish a flushable mapping
     m_gamut_buffer = {{ .size = barycentric_weights * sizeof(AlColr), .flags = buffer_create_flags }};
-    m_gamut_map    = cast_span<AlColr>(m_gamut_buffer.map(buffer_access_flags));
+    m_gamut_map    = m_gamut_buffer.map_as<AlColr>(buffer_access_flags);
 
     // Set up uniform buffer and establish a flushable mapping
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
 
     // Create color buffer output for this task
     info.emplace_resource<gl::Buffer>("colr_buffer", {
@@ -50,7 +49,8 @@ namespace met {
   }
 
   void GenColorMappingTask::dstr(detail::TaskDstrInfo &info) {
-    if (m_gamut_buffer.is_init() && m_gamut_buffer.is_mapped()) m_gamut_buffer.unmap();
+    if (m_gamut_buffer.is_init() && m_gamut_buffer.is_mapped()) 
+      m_gamut_buffer.unmap();
   }
 
   void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {
@@ -87,7 +87,7 @@ namespace met {
       m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }
 
-    // Bind buffer resources to correct buffer targets
+    // Bind required buffers to corresponding targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,     0);
     e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  0);
     m_gamut_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);

@@ -23,8 +23,6 @@
 #include <libqhullcpp/Qhull.h>
 #include "libqhullcpp/QhullVertexSet.h"
 #include <libqhullcpp/QhullPoints.h>
-// #include "libqhullcpp/QhullVertex.h"
-// #include "libqhullcpp/QhullPoint.h"
 
 namespace met {
   namespace detail {
@@ -150,7 +148,7 @@ namespace met {
   TriMesh<Traits> generate_convex_hull(std::span<const T> points) {
     met_trace();
 
-    /* std::vector<double>       input_vertices;
+    std::vector<double>       input_vertices;
     for (uint i = 0; i < points.size(); ++i) {
       const T &p = points[i];
       input_vertices.push_back(p.x());
@@ -164,31 +162,55 @@ namespace met {
     int n_points = points.size();
     const char *input_comments = "";
     const char *qhull_commands = "";
+
+    qhull.setOutputStream(&std::cout);
+    qhull.setErrorStream(&std::cerr);
     qhull.runQhull(input_comments, n_dims, n_points, input_vertices.data(), qhull_commands);
+    if(qhull.hasQhullMessage()){
+        std::cerr << "\nResults of qhull\n" << qhull.qhullMessage();
+        qhull.clearQhullMessage();
+    }
 
     std::vector<T>            output_verts(qhull.vertexCount());
     std::vector<eig::Array3u> output_elems(qhull.facetCount());
 
-    std::transform(std::execution::par_unseq, 
-      range_iter(qhull.facetList()), output_elems.begin(), [](const auto &el) {
+    std::transform( // std::execution::par_unseq, 
+      range_iter(qhull.facetList()), output_elems.begin(), [&](const auto &el) {
       eig::Array3u el_;
-      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), [](const auto &v) { return v.id(); });
-      fmt::print("{}\n", el_);
-      return el_;
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 
+      [&](const auto &v) { 
+        int id = v.point().id();
+        fmt::print("{}, ", id);
+        // debug::check_expr_rel(id >= 0 && id < output_verts.size());
+        return id; 
+      });
+      fmt::print("\n");
+      return 0; // el_;
     });
-    std::transform(std::execution::par_unseq,
+
+    // #pragma omp parallel for
+    for (int i = 0; i < qhull.vertexCount(); ++i) {
+      const auto &v = *(qhull.vertexList().begin() + i);
+      T t;
+      std::ranges::transform(v.point(), t.begin(), [](const auto &f) { return static_cast<float>(f); });
+      fmt::print("{}\n", v.point().id());
+      // output_verts[v.point().id()] = t; 
+    }
+    std::exit(0);
+    
+   /*  std::transform(std::execution::par_unseq,
     range_iter(qhull.vertexList()), output_verts.begin(), [](const auto &v) {
       T t;
       std::ranges::transform(v.point(), t.begin(), [](const auto &f) { return static_cast<float>(f); });
-      fmt::print("{}\n", t);
+      // fmt::print("{}\n", t);
       return t;
-    });
+    }); */
 
     fmt::print("{}, {}\n", output_verts.size(), output_elems.size());
     return generate_from_data<Traits>(std::span<const T>            { output_verts },
-                                      std::span<const eig::Array3u> { output_elems }); */
+                                      std::span<const eig::Array3u> { output_elems });
 
-    using namespace quickhull;
+    /* using namespace quickhull;
 
     using Vector3f = quickhull::Vector3<float>;
 
@@ -210,7 +232,7 @@ namespace met {
     
     fmt::print("{}, {}\n", output_verts.size(), output_elems.size());
     return generate_from_data<Traits>(std::span<const T> { output_verts },
-                                      std::span<const eig::Array3u> { output_elems });
+                                      std::span<const eig::Array3u> { output_elems }); */
   }
   
   template <typename T>
