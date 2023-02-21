@@ -12,6 +12,7 @@
 #include <OpenMesh/Tools/Smoother/JacobiLaplaceSmootherT.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
 #include <quickhull/QuickHull.hpp>
+#include <fmt/ranges.h>
 #include <array>
 #include <algorithm>
 #include <execution>
@@ -19,7 +20,10 @@
 #include <numbers>
 #include <unordered_set>
 #include <unordered_map>
+#include <sstream>
 #include <vector>
+
+#define realT 1
 #include <libqhullcpp/Qhull.h>
 #include "libqhullcpp/QhullVertexSet.h"
 #include <libqhullcpp/QhullPoints.h>
@@ -148,65 +152,81 @@ namespace met {
   TriMesh<Traits> generate_convex_hull(std::span<const T> points) {
     met_trace();
 
-    std::vector<double>       input_vertices;
+    std::vector<double> input;
+    input.reserve(3 * points.size());
     for (uint i = 0; i < points.size(); ++i) {
       const T &p = points[i];
-      input_vertices.push_back(p.x());
-      input_vertices.push_back(p.y());
-      input_vertices.push_back(p.z());
+      input.push_back(p.x());
+      input.push_back(p.y());
+      input.push_back(p.z());
     }
-
-    orgQhull::Qhull qhull;
 
     int n_dims   = 3;
     int n_points = points.size();
     const char *input_comments = "";
-    const char *qhull_commands = "";
+    const char *qhull_commands = "QJ5e-2 C-0";
 
-    qhull.setOutputStream(&std::cout);
-    qhull.setErrorStream(&std::cerr);
-    qhull.runQhull(input_comments, n_dims, n_points, input_vertices.data(), qhull_commands);
-    if(qhull.hasQhullMessage()){
-        std::cerr << "\nResults of qhull\n" << qhull.qhullMessage();
-        qhull.clearQhullMessage();
+    std::stringstream ss;
+
+    orgQhull::Qhull qhull;
+    qhull.setOutputStream(&ss);
+    qhull.setErrorStream(&ss);
+    qhull.enableOutputStream();
+    qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands);
+          
+    std::cout << ss.str() << std::endl;
+
+    auto qhull_verts = qhull.vertexList().toStdVector();
+    auto qhull_elems = qhull.facetList().toStdVector();
+    std::vector<T>            output_verts(qhull_verts.size());
+    std::vector<eig::Array3u> output_elems(qhull_elems.size());
+
+    // std::vector<uint> index_map(qhull_verts.size());
+    // #pragma omp parallel for
+    // for (int i = 0; i < qhull_verts.size(); ++i)
+      // index_map[qhull_verts[i].id() - 1] = i;
+      // index_map[i] = qhull_verts[i].id() - 1;
+
+    uint minv = std::numeric_limits<uint>::max();
+    uint maxv = std::numeric_limits<uint>::min();
+    for (int i = 0; i < qhull_verts.size(); ++i) {
+      const auto &v = qhull_verts[i];
+      if (!v.isValid())
+        fmt::print("{}\n", i);
+      minv = std::min(static_cast<uint>(v.id()), minv);
+      maxv = std::max(static_cast<uint>(v.id()), maxv);
     }
 
-    std::vector<T>            output_verts(qhull.vertexCount());
-    std::vector<eig::Array3u> output_elems(qhull.facetCount());
+    fmt::print("{} values, {} min, {} max", qhull_verts.size(), minv, maxv);
 
-    std::transform( // std::execution::par_unseq, 
-      range_iter(qhull.facetList()), output_elems.begin(), [&](const auto &el) {
+    std::unordered_map<uint, uint> index_map;
+    for (int i = 0; i < qhull_verts.size(); ++i)
+      index_map[qhull_verts[i].id()] = i;
+
+    std::transform(std::execution::par_unseq, range_iter(qhull_elems), output_elems.begin(), [&](const auto &el) {
+      debug::check_expr_rel(el.isValid());
       eig::Array3u el_;
-      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 
-      [&](const auto &v) { 
-        int id = v.point().id();
-        fmt::print("{}, ", id);
-        // debug::check_expr_rel(id >= 0 && id < output_verts.size());
-        return id; 
-      });
-      fmt::print("\n");
-      return 0; // el_;
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), [&](const auto &v) { return index_map[v.id()]; });
+      return el_;
+    });
+    
+    std::transform(std::execution::par_unseq, range_iter(qhull_verts), output_verts.begin(), [](const auto &vt) {
+      debug::check_expr_rel(vt.isValid());
+      T vt_;
+      std::ranges::copy(vt.point(), vt_.begin());
+      return vt_;
     });
 
-    // #pragma omp parallel for
-    for (int i = 0; i < qhull.vertexCount(); ++i) {
-      const auto &v = *(qhull.vertexList().begin() + i);
-      T t;
-      std::ranges::transform(v.point(), t.begin(), [](const auto &f) { return static_cast<float>(f); });
-      fmt::print("{}\n", v.point().id());
-      // output_verts[v.point().id()] = t; 
-    }
-    std::exit(0);
-    
-   /*  std::transform(std::execution::par_unseq,
-    range_iter(qhull.vertexList()), output_verts.begin(), [](const auto &v) {
-      T t;
-      std::ranges::transform(v.point(), t.begin(), [](const auto &f) { return static_cast<float>(f); });
-      // fmt::print("{}\n", t);
-      return t;
-    }); */
+    // Handle flipped triangles provided by qhull
+    T centr = std::reduce(std::execution::par_unseq, range_iter(output_verts), T(0)) / static_cast<float>(output_verts.size());
+    std::for_each(std::execution::par_unseq, range_iter(output_elems), [&](auto &el) {
+      T a = output_verts[el[1]] - output_verts[el[0]], b = output_verts[el[2]] - output_verts[el[0]];
+      T c = (output_verts[el[0]] + output_verts[el[1]] + output_verts[el[2]]) / 3.f;
+      auto n = a.matrix().cross(b.matrix()).normalized().eval();
+      if (n.dot((c - centr).matrix().normalized()) <= 0.f)
+        el = eig::Array3u(el[2], el[1], el[0]);
+    });
 
-    fmt::print("{}, {}\n", output_verts.size(), output_elems.size());
     return generate_from_data<Traits>(std::span<const T>            { output_verts },
                                       std::span<const eig::Array3u> { output_elems });
 
@@ -239,7 +259,59 @@ namespace met {
   std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_convex_hull(std::span<const T> points) {
     met_trace();
 
-    using namespace quickhull;
+    std::vector<double> input;
+    input.reserve(3 * points.size());
+    for (uint i = 0; i < points.size(); ++i) {
+      const T &p = points[i];
+      input.push_back(p.x());
+      input.push_back(p.y());
+      input.push_back(p.z());
+    }
+
+    int n_dims   = 3;
+    int n_points = points.size();
+    const char *input_comments = "";
+    const char *qhull_commands = "Qt";
+
+    orgQhull::Qhull qhull;
+    qhull.setOutputStream(&std::cout);
+    qhull.setErrorStream(&std::cerr);
+    qhull.enableOutputStream();
+    qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands);
+      
+    auto qhull_verts = qhull.vertexList().toStdVector();
+    auto qhull_elems = qhull.facetList().toStdVector();
+    std::vector<T>            output_verts(qhull_verts.size());
+    std::vector<eig::Array3u> output_elems(qhull_elems.size());
+
+    std::unordered_map<uint, uint> index_map;
+    for (int i = 0; i < qhull_verts.size(); ++i)
+      index_map[qhull_verts[i].point().id()] = i;
+
+    std::transform(std::execution::par_unseq, range_iter(qhull_elems), output_elems.begin(), [&](const auto &el) {
+      debug::check_expr_rel(el.isValid());
+      eig::Array3u el_;
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), [&](const auto &v) { return index_map[v.point().id()]; });
+      return el_;
+    });
+    
+    std::transform(std::execution::par_unseq, range_iter(qhull_verts), output_verts.begin(), [&](const auto &vt) {
+      debug::check_expr_rel(vt.isValid());
+      T vt_;
+      std::ranges::copy(vt.point(), vt_.begin());
+      return vt_;
+    });
+
+    T centr = std::reduce(std::execution::par_unseq, range_iter(output_verts), T(0)) / static_cast<float>(output_verts.size());
+    std::for_each(std::execution::par_unseq, range_iter(output_elems), [&](auto &el) {
+      T a = output_verts[el[1]] - output_verts[el[0]], b = output_verts[el[2]] - output_verts[el[0]];
+      T c = (output_verts[el[0]] + output_verts[el[1]] + output_verts[el[2]]) / 3.f;
+      auto n = a.matrix().cross(b.matrix()).normalized().eval();
+      if (n.dot((c - centr).matrix().normalized()) <= 0.f)
+        el = eig::Array3u(el[2], el[1], el[0]);
+    });
+
+    /* using namespace quickhull;
 
     using Vector3f = quickhull::Vector3<float>;
 
@@ -257,7 +329,7 @@ namespace met {
 
     std::vector<eig::Array3u> output_elems(elems.size() / 3);
     for (uint i = 0; i < elems.size() / 3; ++i)
-      output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) };
+      output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) }; */
 
     return { output_verts, output_elems };
   }
