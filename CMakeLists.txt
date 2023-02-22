@@ -125,8 +125,6 @@ string(CONCAT glsl_parser_placeholder_string
   "MET_SUBGROUP_SIZE=32"
 )
 
-# Define build target for query_wg_size
-
 # Process shaders
 foreach(glsl_src ${glsl_srcs})
   # Obtain path, stripped of lead, and filename

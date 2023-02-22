@@ -22,8 +22,6 @@
 #include <unordered_map>
 #include <sstream>
 #include <vector>
-
-#define realT 1
 #include <libqhullcpp/Qhull.h>
 #include "libqhullcpp/QhullVertexSet.h"
 #include <libqhullcpp/QhullPoints.h>
@@ -31,41 +29,19 @@
 namespace met {
   namespace detail {
     template <typename T>
-    constexpr
-    auto eig_hash = [](const auto &mat) {
-      size_t seed = 0;
-      for (size_t i = 0; i < mat.size(); ++i) {
-        auto elem = *(mat.data() + i);
-        seed ^= std::hash<T>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      }
-      return seed;
-    };
+    orgQhull::Qhull generate_convex_hull(std::span<const T> points);
+    
+    template<>
+    orgQhull::Qhull generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f> points) {
+      met_trace();
+      return orgQhull::Qhull("", 3, points.size(), cast_span<const float>(points).data(), "Qt Qx");
+    }
 
-    // key_equal for eigen types for std::unordered_map/unordered_set
-    constexpr 
-    auto eig_equal = [](const auto &a, const auto &b) { 
-      return a.isApprox(b); 
-    };
-
-    constexpr
-    auto eig_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
-
-    template <typename T>
-    constexpr
-    auto omesh_hash = [](const auto &v) {
-      size_t seed = 0;
-      for (size_t i = 0; i < 3; ++i) {
-        auto elem = v[i];
-        seed ^= std::hash<T>()(v[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      }
-      return seed;
-    };
-
-    template <typename T>
-    constexpr
-    auto vert_hash = [](const auto &vert) {
-      return std::hash<T>(vert.idx());
-    };
+    template<>
+    orgQhull::Qhull generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f> points) {
+      met_trace();
+      return generate_convex_hull<eig::Array3f>(std::vector<eig::Array3f>(range_iter(points)));
+    }
   } // namespace detail
 
   template <typename Traits, typename T>
@@ -152,7 +128,7 @@ namespace met {
   TriMesh<Traits> generate_convex_hull(std::span<const T> points) {
     met_trace();
 
-    std::vector<double> input;
+    /* std::vector<float> input;
     input.reserve(3 * points.size());
     for (uint i = 0; i < points.size(); ++i) {
       const T &p = points[i];
@@ -164,17 +140,10 @@ namespace met {
     int n_dims   = 3;
     int n_points = points.size();
     const char *input_comments = "";
-    const char *qhull_commands = "QJ5e-2 C-0";
+    const char *qhull_commands = "Qt C-0"; */
 
-    std::stringstream ss;
-
-    orgQhull::Qhull qhull;
-    qhull.setOutputStream(&ss);
-    qhull.setErrorStream(&ss);
-    qhull.enableOutputStream();
-    qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands);
-          
-    std::cout << ss.str() << std::endl;
+    orgQhull::Qhull qhull = detail::generate_convex_hull<T>(points);
+    // qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands);
 
     auto qhull_verts = qhull.vertexList().toStdVector();
     auto qhull_elems = qhull.facetList().toStdVector();
@@ -259,7 +228,7 @@ namespace met {
   std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_convex_hull(std::span<const T> points) {
     met_trace();
 
-    std::vector<double> input;
+    /* std::vector<float> input;
     input.reserve(3 * points.size());
     for (uint i = 0; i < points.size(); ++i) {
       const T &p = points[i];
@@ -277,7 +246,9 @@ namespace met {
     qhull.setOutputStream(&std::cout);
     qhull.setErrorStream(&std::cerr);
     qhull.enableOutputStream();
-    qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands);
+    qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands); */
+
+    orgQhull::Qhull qhull = detail::generate_convex_hull<T>(points);
       
     auto qhull_verts = qhull.vertexList().toStdVector();
     auto qhull_elems = qhull.facetList().toStdVector();
@@ -341,7 +312,9 @@ namespace met {
     auto mesh = spheroid_mesh;
 
     // Compute centroid of input points
-    T cntr = std::reduce(std::execution::par_unseq, range_iter(points), T(0.f), detail::eig_add)
+    constexpr
+    auto eig_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+    T cntr = std::reduce(std::execution::par_unseq, range_iter(points), T(0.f), eig_add)
            / static_cast<float>(points.size());
 
     // For each vertex in mesh, each defining a unit direction and therefore line through the origin:

@@ -1,0 +1,14 @@
+{
+  "default-registry": {
+    "kind": "builtin",
+    "baseline": "6f7ffeb18f99796233b958aaaf14ec7bd4fb64b2"
+  },
+  "registries": [
+    {
+      "kind": "filesystem",
+      "path": "vcpkg-registry",
+      "baseline": "2023-02-22",
+      "packages": [ "qhull" ]
+    }
+  ]
+}
