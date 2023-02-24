@@ -9,6 +9,7 @@
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/QhullPoints.h>
+#include <fmt/ranges.h>
 #include <algorithm>
 #include <execution>
 #include <ranges>
@@ -87,6 +88,18 @@ namespace met {
   HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
     met_trace_n("AlignedMeshData -> HalfedgeMeshData");
     return convert_mesh<HalfedgeMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  }
+
+  template <>
+  IndexedDelaunayData convert_mesh<IndexedDelaunayData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> IndexedDelaunayData");
+    return { std::vector<eig::Array3f>(range_iter(mesh.first)), mesh.second };
+  }
+
+  template <>
+  AlignedDelaunayData convert_mesh<AlignedDelaunayData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> IndexedDelaunayData");
+    return { std::vector<eig::AlArray3f>(range_iter(mesh.first)), mesh.second };
   }
 
   template <typename Mesh>
@@ -173,6 +186,41 @@ namespace met {
 
     return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
   }
+  
+  template <typename Delaunay, typename Vector>
+  Delaunay generate_delaunay(std::span<const Vector> data) {
+    met_trace();
+
+    // Query qhull for a delaunay tetrahedralization structure
+    std::vector<eig::Array3f> input(range_iter(data));
+    // auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "Qt");
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
+    auto qh_verts = qhull.vertexList().toStdVector();
+    auto qh_elems = qhull.facetList().toStdVector();
+
+    // Assign incremental IDs to qh_verts; Qhull does not seem to manage removed vertices properly?
+    #pragma omp parallel for
+    for (int i = 0; i < qh_verts.size(); ++i) 
+      qh_verts[i].getVertexT()->id = i;
+
+    // Assemble indexed data from qhull format
+    std::vector<eig::Array3f>                verts(qh_verts.size());
+    std::vector<std::array<eig::Array3u, 4>> elems(qh_elems.size());
+    std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [](const auto &el) {
+      std::array<uint, 4> id;
+      std::ranges::transform(el.vertices().toStdVector(), id.begin(), [](const auto &v) { return v.id(); });
+      return std::array<eig::Array3u, 4> {
+        eig::Array3u { id[0], id[1], id[2] },
+        eig::Array3u { id[1], id[2], id[3] },
+        eig::Array3u { id[2], id[3], id[0] },
+        eig::Array3u { id[0], id[3], id[2] }
+      };
+    });
+    std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
+      [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
+
+    return convert_mesh<Delaunay>(IndexedDelaunayData { verts, elems });
+  }
 
   template <typename OutputMesh, typename InputMesh>
   OutputMesh simplify_edge_length(const InputMesh &mesh_, float max_edge_length) {
@@ -233,7 +281,13 @@ namespace met {
 
   /* Explicit template instantiations */
   
-  #define declare_function_output_only(OutputMesh)                                                \
+#define declare_function_delaunay_output_only(OutputDelaunay)                                         \
+    template                                                                                          \
+    OutputDelaunay generate_delaunay<OutputDelaunay, eig::Array3f>(std::span<const eig::Array3f>);    \
+    template                                                                                          \
+    OutputDelaunay generate_delaunay<OutputDelaunay, eig::AlArray3f>(std::span<const eig::AlArray3f>);
+
+  #define declare_function_mesh_output_only(OutputMesh)                                           \
     template                                                                                      \
     OutputMesh generate_octahedron<OutputMesh>();                                                 \
     template                                                                                      \
@@ -250,11 +304,13 @@ namespace met {
     OutputMesh simplify_volume<OutputMesh, InputMesh>(const InputMesh &, uint, const InputMesh *);
 
   #define declare_function_all_inputs(OutputMesh)                                                 \
-    declare_function_output_only(OutputMesh)                                                      \
+    declare_function_mesh_output_only(OutputMesh)                                                 \
     declare_function_output_input(OutputMesh, IndexedMeshData)                                    \
     declare_function_output_input(OutputMesh, AlignedMeshData)                                    \
     declare_function_output_input(OutputMesh, HalfedgeMeshData)
   
+  declare_function_delaunay_output_only(IndexedDelaunayData)
+  declare_function_delaunay_output_only(AlignedDelaunayData)
   declare_function_all_inputs(IndexedMeshData)
   declare_function_all_inputs(AlignedMeshData)
   declare_function_all_inputs(HalfedgeMeshData)

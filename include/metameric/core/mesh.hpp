@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/openmesh.hpp>
+#include <array>
 #include <span>
 #include <vector>
 #include <unordered_map>
@@ -33,6 +34,18 @@ namespace met {
     std::vector<eig::Array3u>
   >;
 
+  // Simple, indexed delaunay mesh representation
+  using IndexedDelaunayData = std::pair<
+    std::vector<eig::Array3f>,
+    std::vector<std::array<eig::Array3u, 4>>
+  >;
+
+  // Simple, indexed triangle delaunay representation with better packed vec3 data (for OpenGL)
+  using AlignedDelaunayData = std::pair<
+    std::vector<eig::AlArray3f>,
+    std::vector<std::array<eig::Array3u, 4>>
+  >;
+
   // Convert between halfedge/indexed/aligned mesh data structures
   template <typename OutputMesh, typename InputMesh>
   OutputMesh convert_mesh(const InputMesh &mesh);
@@ -50,6 +63,10 @@ namespace met {
   // Returns a convex hull mesh around a set of points in 3D
   template <typename Mesh, typename Vector>
   Mesh generate_convex_hull(std::span<const Vector> data);
+
+  // Returns a set of simplices representing a delaunay triangulation of a set of points in 3D
+  template <typename Delaunay, typename Vector>
+  Delaunay generate_delaunay(std::span<const Vector> data);
 
   /* Mesh simplification functions */
 
