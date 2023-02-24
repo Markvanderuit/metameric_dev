@@ -120,8 +120,7 @@ namespace met {
     const uint M = 3 * csys_i.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
     params.objective = LPObjective::eMaximize;
-    params.method    = LPMethod::eDual;
-    params.scaling   = true;
+    params.method    = LPMethod::ePrimal;
 
     // Add color system constraints
     for (uint i = 0; i < csys_i.size(); ++i) {

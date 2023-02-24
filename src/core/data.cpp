@@ -226,15 +226,16 @@ namespace met {
                                        .basis_avg = loaded_basis_mean,
                                        .system    = project_data.csys(0).finalize_direct(), 
                                        .samples   = detail::gen_unit_dirs<3>(1024) });
-    auto ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(ocs), 0.001f);
+    auto ocs_mesh = simplify_edge_length<HalfedgeMeshData>(
+      generate_convex_hull<HalfedgeMeshData, eig::Array3f>(ocs), 0.001f);
 
     // Generate simplified concave hull fitting texture data, then fit convex hull around this
     fmt::print("  Generating simplified convex hull\n");
-    auto chull_mesh = generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(loaded_texture_f32.data());
-    auto chull_simp = simplify(chull_mesh, ocs_mesh, n_vertices);
-    auto [verts, elems] = generate_data(chull_simp);
-    std::tie(verts, elems) = generate_convex_hull<eig::Array3f>(verts);
+    auto chull_mesh = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture_f32.data());
+    auto [verts, elems] = simplify_volume<IndexedMeshData>(chull_mesh, n_vertices, &ocs_mesh);
+    std::tie(verts, elems) = generate_convex_hull<IndexedMeshData, eig::Array3f>(verts);
     
+
     fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());
 
     // Update project data with new convex hull

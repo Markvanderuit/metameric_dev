@@ -11,6 +11,28 @@
 #include <cfloat>
 #endif
 
+namespace met {
+  template <>
+  eig::Array3f convert_vector<eig::Array3f, omesh::Vec3f>(const omesh::Vec3f &v) {
+    return eig::Array3f(v.data());
+  }
+
+  template <>
+  eig::AlArray3f convert_vector<eig::AlArray3f, omesh::Vec3f>(const omesh::Vec3f &v) {
+    return convert_vector<eig::Array3f, omesh::Vec3f>(v);
+  }
+
+  template <>
+  omesh::Vec3f convert_vector<omesh::Vec3f, eig::Array3f>(const eig::Array3f &v) {
+    return omesh::Vec3f(v.begin());
+  }
+  
+  template <>
+  omesh::Vec3f convert_vector<omesh::Vec3f, eig::AlArray3f>(const eig::AlArray3f &v) {
+    return convert_vector<omesh::Vec3f, eig::Array3f>(v);
+  }
+} // namespace met
+
 namespace OpenMesh::Decimater {
   namespace detail {
     template <class MeshT>
@@ -90,11 +112,11 @@ namespace OpenMesh::Decimater {
         return { 99999.f, vertex };
 
       // Reproject vertex onto boundary mesh surface if it exceeds this
-      {
+      if (bounds_mesh) {
         // Cast a ray through the vertex point towards the mesh centroid;
         met::Ray ray = { .o = met::to_eig<float, 3>(vertex),
                          .d = met::to_eig<float, 3>(bounds_cntr - vertex).matrix().normalized().eval() };
-        auto query = met::ray_trace_nearest_elem_any_side(ray, *bounds_mesh);
+        auto query = met::raytrace_elem(ray, *bounds_mesh, false);
         if (query) {
           // Get relevant face
           auto fh = bounds_mesh->face_handle(query.i);
@@ -526,13 +548,7 @@ namespace OpenMesh::Decimater {
 
   /* explicit temlate instantiations */
 
-  template class ModVolumeT<met::BaselineMesh>;
-  template class ModVolumeT<met::FNormalMesh>;
-  template class ModVolumeT<met::HalfedgeMesh>;
-  template class CollapsingDecimater<met::BaselineMesh, DefaultCollapseFunction>;
-  template class CollapsingDecimater<met::FNormalMesh,  DefaultCollapseFunction>;
-  template class CollapsingDecimater<met::HalfedgeMesh, DefaultCollapseFunction>;
-  template class CollapsingDecimater<met::BaselineMesh, AverageCollapseFunction>;
-  template class CollapsingDecimater<met::FNormalMesh,  AverageCollapseFunction>;
-  template class CollapsingDecimater<met::HalfedgeMesh, AverageCollapseFunction>;
+  template class ModVolumeT<met::HalfedgeMeshData>;
+  template class CollapsingDecimater<met::HalfedgeMeshData, DefaultCollapseFunction>;
+  template class CollapsingDecimater<met::HalfedgeMeshData, AverageCollapseFunction>;
 } // namespace OpenMesh::Decimater

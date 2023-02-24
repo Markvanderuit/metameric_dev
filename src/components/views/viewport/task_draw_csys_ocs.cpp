@@ -1,5 +1,6 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/ray.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
@@ -17,8 +18,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_csys_ocs_mesh = info.get_resource<HalfedgeMesh>("gen_color_solids", "csys_ocs_mesh");
-    auto [verts, elems] = generate_data<HalfedgeMeshTraits, AlColr>(e_csys_ocs_mesh);
+    auto &e_csys_ocs_mesh = info.get_resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
+    auto [verts, elems] = convert_mesh<AlignedMeshData>(e_csys_ocs_mesh);
 
     // Setup array object and corresponding buffers for mesh data
     m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};
@@ -67,7 +68,7 @@ namespace met {
     // Experimental clamping code
     if (e_pipe_state.any_verts) {
       // Get shared resources
-      auto &e_chull_mesh = info.get_resource<HalfedgeMesh>("gen_color_solids", "csys_ocs_mesh");
+      auto &e_chull_mesh = info.get_resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
       auto &e_chull_cntr = info.get_resource<Colr>("gen_color_solids", "csys_ocs_cntr");
       auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data  = e_appl_data.project_data;
@@ -81,7 +82,7 @@ namespace met {
         // Cast a ray through the vertex point towards the mesh centroid;
         Ray ray = { .o = vert.colr_i,
                     .d = (e_chull_cntr - vert.colr_i).matrix().normalized().eval() };
-        auto query = ray_trace_nearest_elem_any_side(ray, e_chull_mesh);
+        auto query = raytrace_elem(ray, e_chull_mesh, false);
         guard_continue(query);
         
         // Get relevant face

@@ -24,16 +24,11 @@ namespace met {
   const float overlay_width   = 192.f;
 
   namespace detail {
-    using MeshReturnType = std::pair<
-      std::vector<eig::Array3f>, 
-      std::vector<eig::Array3u>
-    >;
-
-    MeshReturnType subdivide_elem(const std::vector<eig::Array3f> &verts,
+    IndexedMeshData subdivide_elem(const std::vector<eig::Array3f> &verts,
                                   const std::vector<eig::Array3u> &elems,
                                   uint i) {
       // Generate openmesh representation to perform mesh operations
-      auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(verts, elems);
+      auto mesh = convert_mesh<HalfedgeMeshData>(IndexedMeshData { verts, elems });
 
       // Acquire handle to relevant subdividable face and vertices
       auto fh = mesh.face_handle(i);
@@ -49,14 +44,14 @@ namespace met {
       mesh.add_face(fv2, fv0, vh);
 
       mesh.garbage_collection();
-      return generate_data(mesh);
+      return convert_mesh<IndexedMeshData>(mesh);
     }
 
-    MeshReturnType collapse_vert(const std::vector<eig::Array3f> &verts,
-                                 const std::vector<eig::Array3u> &elems,
-                                 uint i) {
+    IndexedMeshData collapse_vert(const std::vector<eig::Array3f> &verts,
+                                  const std::vector<eig::Array3u> &elems,
+                                  uint i) {
       // Generate openmesh representation to perform mesh operations
-      auto mesh = generate_from_data<HalfedgeMeshTraits, Colr>(verts, elems);
+      auto mesh = convert_mesh<HalfedgeMeshData>(IndexedMeshData { verts, elems });
 
       // Acquire handle to relevant center vertex and surrounding faces/verts
       auto vh = mesh.vertex_handle(i);
@@ -67,7 +62,7 @@ namespace met {
       mesh.add_face(vh1, vh0, vh2);
 
       mesh.garbage_collection();
-      return generate_data(mesh);
+      return convert_mesh<IndexedMeshData>(mesh);
     }
   } // namespace detail
 

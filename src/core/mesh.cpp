@@ -2,109 +2,122 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <OpenMesh/Tools/Subdivider/Uniform/LoopT.hh>
-#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
-#include <OpenMesh/Tools/Decimater/ModNormalDeviationT.hh>
-#include <OpenMesh/Tools/Decimater/ModNormalFlippingT.hh>
 #include <OpenMesh/Tools/Decimater/ModEdgeLengthT.hh>
-#include <OpenMesh/Tools/Decimater/ModAspectRatioT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
-#include <OpenMesh/Tools/Decimater/MixedDecimaterT.hh>
 #include <OpenMesh/Tools/Smoother/JacobiLaplaceSmootherT.hh>
 #include <OpenMesh/Core/Utils/Property.hh>
-#include <quickhull/QuickHull.hpp>
-#include <fmt/ranges.h>
-#include <array>
+#include <libqhullcpp/Qhull.h>
+#include <libqhullcpp/QhullVertexSet.h>
+#include <libqhullcpp/QhullPoints.h>
 #include <algorithm>
 #include <execution>
 #include <ranges>
-#include <numbers>
-#include <unordered_set>
-#include <unordered_map>
-#include <sstream>
 #include <vector>
-#include <libqhullcpp/Qhull.h>
-#include "libqhullcpp/QhullVertexSet.h"
-#include <libqhullcpp/QhullPoints.h>
 
 namespace met {
   namespace detail {
-    template <typename T>
-    orgQhull::Qhull generate_convex_hull(std::span<const T> points);
-    
-    template<>
-    orgQhull::Qhull generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f> points) {
+    orgQhull::Qhull generate_convex_hull(const std::vector<eig::Array3f> &data) {
       met_trace();
-      return orgQhull::Qhull("", 3, points.size(), cast_span<const float>(points).data(), "Qt Qx");
-    }
-
-    template<>
-    orgQhull::Qhull generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f> points) {
-      met_trace();
-      return generate_convex_hull<eig::Array3f>(std::vector<eig::Array3f>(range_iter(points)));
+      return orgQhull::Qhull("", 3, data.size(), cnt_span<const float>(data).data(), "Qt Qx C-0");
     }
   } // namespace detail
 
-  template <typename Traits, typename T>
-  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const TriMesh<Traits> &mesh) {
-    met_trace();
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh convert_mesh(const InputMesh &mesh) requires std::is_same_v<OutputMesh, InputMesh> {
+    met_trace_n("Passthrough");
+    return mesh;
+  }
 
-    std::vector<T> vertices(mesh.n_vertices());
-    std::vector<eig::Array3u> elements(mesh.n_faces());
+  template <>
+  HalfedgeMeshData convert_mesh<HalfedgeMeshData, IndexedMeshData>(const IndexedMeshData &mesh_) {
+    met_trace_n("IndexedMeshData -> HalfedgeMeshData");
 
-    std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), vertices.begin(), [&](auto vh) { 
-      return to_eig<float, 3>(mesh.point(vh));
+    const auto &[verts, elems] = mesh_;
+
+    // Prepare mesh structure
+    HalfedgeMeshData mesh;
+    mesh.reserve(
+      verts.size(), (verts.size() + elems.size() - 2), 
+      elems.size()
+    );
+
+    // Register vertices/elements single-threaded
+    std::vector<HalfedgeMeshData::VertexHandle> vth(verts.size());
+    std::ranges::transform(verts, vth.begin(), [&](const auto &v) { 
+      HalfedgeMeshData::Point p;
+      std::ranges::copy(v, p.begin());
+      return mesh.add_vertex(p);
     });
-    std::transform(std::execution::par_unseq, range_iter(mesh.faces()), elements.begin(), [](auto fh) {
+    std::ranges::for_each(elems, 
+      [&](const auto &el) { return mesh.add_face(vth[el[0]], vth[el[1]], vth[el[2]]); });
+
+    return mesh;
+  }
+  
+  template <>
+  IndexedMeshData convert_mesh<IndexedMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+    met_trace_n("HalfedgeMeshData -> IndexedMeshData");
+
+    std::vector<eig::Array3f> verts(mesh.n_vertices());
+    std::vector<eig::Array3u> faces(mesh.n_faces());
+
+    std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), verts.begin(), 
+      [&](auto vh) { return convert_vector<eig::Array3f, omesh::Vec3f>(mesh.point(vh)); });
+    std::transform(std::execution::par_unseq, range_iter(mesh.faces()), faces.begin(), [](auto fh) {
       eig::Array3u el; 
       std::ranges::transform(fh.vertices(), el.begin(), [](auto vh) { return vh.idx(); });
       return el;
     });
-
-    return { vertices, elements };
+    
+    return { verts, faces };
   }
 
-  template <typename Traits, typename T>
-  TriMesh<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements) {
-    met_trace();
-
-    TriMesh<Traits> mesh;
-    mesh.reserve(vertices.size(), (vertices.size() + elements.size() - 2), elements.size());
-
-    std::vector<typename decltype(mesh)::VertexHandle> vth(vertices.size());
-    std::ranges::transform(vertices, vth.begin(), [&](const auto &v) { 
-      typename decltype(mesh)::Point p;
-      std::ranges::copy(v, p.begin());
-      return mesh.add_vertex(p);
-    });
-    std::ranges::for_each(elements, [&](const auto &e) { 
-      return mesh.add_face(vth[e[0]], vth[e[1]], vth[e[2]]); 
-    });
-
-    return mesh;
+  template <>
+  IndexedMeshData convert_mesh<IndexedMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
+    met_trace_n("AlignedMeshData -> IndexedMeshData");
+    return { std::vector<eig::Array3f>(range_iter(mesh.first)), mesh.second };
   }
 
-  template <typename Traits>
-  TriMesh<Traits> generate_octahedron() {
-    met_trace();
+  template <>
+  AlignedMeshData convert_mesh<AlignedMeshData, IndexedMeshData>(const IndexedMeshData &mesh) {
+    met_trace_n("IndexedMeshData -> AlignedMeshData");
+    return { std::vector<eig::AlArray3f>(range_iter(mesh.first)), mesh.second };
+  }
 
+  template <>
+  AlignedMeshData convert_mesh<AlignedMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+    met_trace_n("HalfedgeMeshData -> AlignedMeshData");
+    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  }
+
+  template <>
+  HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
+    met_trace_n("AlignedMeshData -> HalfedgeMeshData");
+    return convert_mesh<HalfedgeMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  }
+
+  template <typename Mesh>
+  Mesh generate_octahedron() {
+    met_trace();
+    
     using V = eig::Array3f;
     using E = eig::Array3u;
+    
+    std::vector<V> verts = { V(-1.f, 0.f, 0.f ), V( 0.f,-1.f, 0.f ), V( 0.f, 0.f,-1.f ),
+                             V( 1.f, 0.f, 0.f ), V( 0.f, 1.f, 0.f ), V( 0.f, 0.f, 1.f ) };
+    std::vector<E> elems = { E(0, 2, 1), E(3, 1, 2), E(0, 1, 5), E(3, 5, 1),
+                             E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
 
-    std::array<V, 6> verts = { V(-1.f, 0.f, 0.f ), V( 0.f,-1.f, 0.f ), V( 0.f, 0.f,-1.f ),
-                               V( 1.f, 0.f, 0.f ), V( 0.f, 1.f, 0.f ), V( 0.f, 0.f, 1.f ) };
-    std::array<E, 8> elems = { E(0, 2, 1), E(3, 1, 2), E(0, 1, 5), E(3, 5, 1),
-                               E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
-
-    return generate_from_data<Traits>(std::span<const V> { verts }, std::span<const E> { elems });
+    return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
   }
-
-  template <typename Traits>
-  TriMesh<Traits> generate_spheroid(uint n_subdivs) {
+  
+  template <typename Mesh>
+  Mesh generate_spheroid(uint n_subdivs) {
     met_trace();
 
     // Start with an octahedron; doing loop subdivision and normalizing the resulting vertices
     // naturally leads to a spheroid with unit vectors as its vertices
-    auto mesh = generate_octahedron<Traits>();
+    auto mesh = generate_octahedron<HalfedgeMeshData>();
     
     // Construct loop subdivider
     omesh::Subdivider::Uniform::LoopT<
@@ -120,391 +133,136 @@ namespace met {
     // Normalize each resulting vertex point
     std::for_each(std::execution::par_unseq, range_iter(mesh.vertices()),
       [&](auto vh) { mesh.point(vh).normalize(); });
-      
-    return mesh;
+    
+    return convert_mesh<Mesh>(mesh);
   }
 
-  template <typename Traits, typename T>
-  TriMesh<Traits> generate_convex_hull(std::span<const T> points) {
+  template <typename Mesh, typename Vector>
+  Mesh generate_convex_hull(std::span<const Vector> data) {
     met_trace();
 
-    /* std::vector<float> input;
-    input.reserve(3 * points.size());
-    for (uint i = 0; i < points.size(); ++i) {
-      const T &p = points[i];
-      input.push_back(p.x());
-      input.push_back(p.y());
-      input.push_back(p.z());
-    }
+    // Query qhull for a convex hull structure
+    std::vector<eig::Array3f> input(range_iter(data));
+    orgQhull::Qhull qhull = detail::generate_convex_hull(input);
+    auto qh_verts = qhull.vertexList().toStdVector();
+    auto qh_elems = qhull.facetList().toStdVector();
 
-    int n_dims   = 3;
-    int n_points = points.size();
-    const char *input_comments = "";
-    const char *qhull_commands = "Qt C-0"; */
+    // Assign incremental IDs to qh_verts; Qhull does not seem to manage removed vertices properly?
+    #pragma omp parallel for
+    for (int i = 0; i < qh_verts.size(); ++i) 
+      qh_verts[i].getVertexT()->id = i;
 
-    orgQhull::Qhull qhull = detail::generate_convex_hull<T>(points);
-    // qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands);
-
-    auto qhull_verts = qhull.vertexList().toStdVector();
-    auto qhull_elems = qhull.facetList().toStdVector();
-    std::vector<T>            output_verts(qhull_verts.size());
-    std::vector<eig::Array3u> output_elems(qhull_elems.size());
-
-    // std::vector<uint> index_map(qhull_verts.size());
-    // #pragma omp parallel for
-    // for (int i = 0; i < qhull_verts.size(); ++i)
-      // index_map[qhull_verts[i].id() - 1] = i;
-      // index_map[i] = qhull_verts[i].id() - 1;
-
-    uint minv = std::numeric_limits<uint>::max();
-    uint maxv = std::numeric_limits<uint>::min();
-    for (int i = 0; i < qhull_verts.size(); ++i) {
-      const auto &v = qhull_verts[i];
-      if (!v.isValid())
-        fmt::print("{}\n", i);
-      minv = std::min(static_cast<uint>(v.id()), minv);
-      maxv = std::max(static_cast<uint>(v.id()), maxv);
-    }
-
-    fmt::print("{} values, {} min, {} max", qhull_verts.size(), minv, maxv);
-
-    std::unordered_map<uint, uint> index_map;
-    for (int i = 0; i < qhull_verts.size(); ++i)
-      index_map[qhull_verts[i].id()] = i;
-
-    std::transform(std::execution::par_unseq, range_iter(qhull_elems), output_elems.begin(), [&](const auto &el) {
-      debug::check_expr_rel(el.isValid());
+    // Assemble indexed mesh data from qhull format
+    std::vector<eig::Array3f> verts(qh_verts.size());
+    std::vector<eig::Array3u> elems(qh_elems.size());
+    std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [&](const auto &el) {
       eig::Array3u el_;
-      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), [&](const auto &v) { return index_map[v.id()]; });
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 
+        [](const auto &v) { return v.id(); });
       return el_;
     });
-    
-    std::transform(std::execution::par_unseq, range_iter(qhull_verts), output_verts.begin(), [](const auto &vt) {
-      debug::check_expr_rel(vt.isValid());
-      T vt_;
-      std::ranges::copy(vt.point(), vt_.begin());
-      return vt_;
-    });
+    std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
+      [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
 
-    // Handle flipped triangles provided by qhull
-    T centr = std::reduce(std::execution::par_unseq, range_iter(output_verts), T(0)) / static_cast<float>(output_verts.size());
-    std::for_each(std::execution::par_unseq, range_iter(output_elems), [&](auto &el) {
-      T a = output_verts[el[1]] - output_verts[el[0]], b = output_verts[el[2]] - output_verts[el[0]];
-      T c = (output_verts[el[0]] + output_verts[el[1]] + output_verts[el[2]]) / 3.f;
-      auto n = a.matrix().cross(b.matrix()).normalized().eval();
-      if (n.dot((c - centr).matrix().normalized()) <= 0.f)
-        el = eig::Array3u(el[2], el[1], el[0]);
-    });
+    // Handle flipped triangles; Qhull sorts vertices by index, but we need consistent CW orientation 
+    // to have outward normals for culled rendering; not to mention potential mesh simplification
+    eig::Vector3f chull_cntr = std::reduce(std::execution::par_unseq, range_iter(verts), eig::Array3f(0)) 
+                             / static_cast<float>(verts.size());
+    std::for_each(std::execution::par_unseq, range_iter(elems), [&](auto &el) {
+      eig::Vector3f a = verts[el[0]], b = verts[el[1]], c = verts[el[2]];
 
-    return generate_from_data<Traits>(std::span<const T>            { output_verts },
-                                      std::span<const eig::Array3u> { output_elems });
+      eig::Vector3f norm = (b - a).cross(c - a).normalized().eval();
+      eig::Vector3f cntr = ((a + b + c) / 3.f).eval();
 
-    /* using namespace quickhull;
+      if (norm.dot((cntr - chull_cntr).normalized()) <= 0.f)
+        el = eig::Array3u { el[2], el[1], el[0] };
+    }); 
 
-    using Vector3f = quickhull::Vector3<float>;
-
-    std::vector<Vector3f> input(points.size());
-    std::ranges::transform(points, input.begin(), [](const T &c) { return Vector3f { c[0], c[1], c[2] }; });
-
-    QuickHull<float> builder;
-    auto chull = builder.getConvexHull(input.data(), input.size(), false, false);
-
-    const auto& elems = chull.getIndexBuffer();
-    const auto& verts = chull.getVertexBuffer();
-
-    std::vector<T> output_verts(verts.size());
-    std::ranges::transform(verts, output_verts.begin(),  [](const Vector3f &c) { return T { c.x, c.y, c.z }; });
-
-    std::vector<eig::Array3u> output_elems(elems.size() / 3);
-    for (uint i = 0; i < elems.size() / 3; ++i)
-      output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) };
-    
-    fmt::print("{}, {}\n", output_verts.size(), output_elems.size());
-    return generate_from_data<Traits>(std::span<const T> { output_verts },
-                                      std::span<const eig::Array3u> { output_elems }); */
-  }
-  
-  template <typename T>
-  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_convex_hull(std::span<const T> points) {
-    met_trace();
-
-    /* std::vector<float> input;
-    input.reserve(3 * points.size());
-    for (uint i = 0; i < points.size(); ++i) {
-      const T &p = points[i];
-      input.push_back(p.x());
-      input.push_back(p.y());
-      input.push_back(p.z());
-    }
-
-    int n_dims   = 3;
-    int n_points = points.size();
-    const char *input_comments = "";
-    const char *qhull_commands = "Qt";
-
-    orgQhull::Qhull qhull;
-    qhull.setOutputStream(&std::cout);
-    qhull.setErrorStream(&std::cerr);
-    qhull.enableOutputStream();
-    qhull.runQhull(input_comments, n_dims, n_points, input.data(), qhull_commands); */
-
-    orgQhull::Qhull qhull = detail::generate_convex_hull<T>(points);
-      
-    auto qhull_verts = qhull.vertexList().toStdVector();
-    auto qhull_elems = qhull.facetList().toStdVector();
-    std::vector<T>            output_verts(qhull_verts.size());
-    std::vector<eig::Array3u> output_elems(qhull_elems.size());
-
-    std::unordered_map<uint, uint> index_map;
-    for (int i = 0; i < qhull_verts.size(); ++i)
-      index_map[qhull_verts[i].point().id()] = i;
-
-    std::transform(std::execution::par_unseq, range_iter(qhull_elems), output_elems.begin(), [&](const auto &el) {
-      debug::check_expr_rel(el.isValid());
-      eig::Array3u el_;
-      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), [&](const auto &v) { return index_map[v.point().id()]; });
-      return el_;
-    });
-    
-    std::transform(std::execution::par_unseq, range_iter(qhull_verts), output_verts.begin(), [&](const auto &vt) {
-      debug::check_expr_rel(vt.isValid());
-      T vt_;
-      std::ranges::copy(vt.point(), vt_.begin());
-      return vt_;
-    });
-
-    T centr = std::reduce(std::execution::par_unseq, range_iter(output_verts), T(0)) / static_cast<float>(output_verts.size());
-    std::for_each(std::execution::par_unseq, range_iter(output_elems), [&](auto &el) {
-      T a = output_verts[el[1]] - output_verts[el[0]], b = output_verts[el[2]] - output_verts[el[0]];
-      T c = (output_verts[el[0]] + output_verts[el[1]] + output_verts[el[2]]) / 3.f;
-      auto n = a.matrix().cross(b.matrix()).normalized().eval();
-      if (n.dot((c - centr).matrix().normalized()) <= 0.f)
-        el = eig::Array3u(el[2], el[1], el[0]);
-    });
-
-    /* using namespace quickhull;
-
-    using Vector3f = quickhull::Vector3<float>;
-
-    std::vector<Vector3f> input(points.size());
-    std::ranges::transform(points, input.begin(), [](const T &c) { return Vector3f { c[0], c[1], c[2] }; });
-
-    QuickHull<float> builder;
-    auto chull = builder.getConvexHull(input.data(), input.size(), false, false);
-
-    const auto& elems = chull.getIndexBuffer();
-    const auto& verts = chull.getVertexBuffer();
-
-    std::vector<T> output_verts(verts.size());
-    std::ranges::transform(verts, output_verts.begin(),  [](const Vector3f &c) { return T { c.x, c.y, c.z }; });
-
-    std::vector<eig::Array3u> output_elems(elems.size() / 3);
-    for (uint i = 0; i < elems.size() / 3; ++i)
-      output_elems[i] = { static_cast<uint>(elems[3 * i]),  static_cast<uint>(elems[3 * i + 1]), static_cast<uint>(elems[3 * i + 2]) }; */
-
-    return { output_verts, output_elems };
+    return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
   }
 
-  template <typename Traits, typename T>
-  TriMesh<Traits> generate_convex_hull_approx(std::span<const T> points, const TriMesh<Traits> &spheroid_mesh) {
-    met_trace();
-
-    auto mesh = spheroid_mesh;
-
-    // Compute centroid of input points
-    constexpr
-    auto eig_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
-    T cntr = std::reduce(std::execution::par_unseq, range_iter(points), T(0.f), eig_add)
-           / static_cast<float>(points.size());
-
-    // For each vertex in mesh, each defining a unit direction and therefore line through the origin:
-    std::for_each(std::execution::par_unseq, range_iter(mesh.vertices()), [&](auto &vh) {
-      met_trace();
-
-      auto v = to_eig(mesh.point(vh));
-
-      // Obtain a range of point projections along this line
-      auto proj_funct = [&](const auto &p) { return v.matrix().dot((p - cntr).matrix());  };
-      auto proj_range = points | std::views::transform(proj_funct);
-
-      // Provide iterator to endpoint, given the largest point projection
-      auto proj_maxel = std::ranges::max_element(proj_range);
-      
-      // Replace mesh vertex with this endpoint
-      mesh.point(vh) = to_omesh<float, 3>(points[std::distance(proj_range.begin(), proj_maxel)].matrix());
-    });
-
-    return mesh;
-  }
-
-  
-  template <typename Traits>
-  TriMesh<Traits> simplify_edges(const TriMesh<Traits> &input_mesh, 
-                                 float max_edge_length) {
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh simplify_edge_length(const InputMesh &mesh_, float max_edge_length) {
     met_trace();
 
     namespace odec  = omesh::Decimater;
-    using Mesh      = TriMesh<Traits>;
-    using Module    = odec::ModEdgeLengthT<Mesh>::Handle;
-    using Decimater = odec::DecimaterT<Mesh>;
-
-    Mesh mesh = input_mesh;
+    using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
+    using Decimater = odec::DecimaterT<HalfedgeMeshData>;
+    
+    // Operate on a copy of the input mesh
+    auto mesh = convert_mesh<HalfedgeMeshData>(mesh_);
 
     Decimater dec(mesh);
-    Module mod_edge_len;
+    Module mod;
 
-    dec.add(mod_edge_len);
-    dec.module(mod_edge_len).set_binary(false);
-    dec.module(mod_edge_len).set_edge_length(0.005f); // not zero, but just up to reasonable precision
+    dec.add(mod);
+    dec.module(mod).set_binary(false);
+    dec.module(mod).set_edge_length(max_edge_length); // not zero, but just up to reasonable precision
 
     dec.initialize();
     dec.decimate();
 
     mesh.garbage_collection();
-    
-    return mesh;
+    return convert_mesh<OutputMesh>(mesh);
   }
 
-  template <typename Traits>
-  TriMesh<Traits> simplify(const TriMesh<Traits> &input_mesh, 
-                           const TriMesh<Traits> &bounds_mesh,
-                           uint max_vertices) {
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh simplify_volume(const InputMesh &mesh_, 
+                      uint             max_vertices, 
+                      const InputMesh *optional_bounds) {
     met_trace();
-    namespace odec = omesh::Decimater;
-    using Mesh = TriMesh<Traits>;
-    using Prop = omesh::HPropHandleT<omesh::Vec3f>;
 
-    // Operate on a copy of the input mesh
-    Mesh mesh = input_mesh;
-    size_t pre_vertex_count, post_vertex_count;
-    
-    // First, quickly collapse all very short edges into their average to a hardcoded minimum;
-    // given that convex hull generation is relatively accurate, this likely does not affect anything
-    pre_vertex_count = mesh.n_vertices();
-    {
-      using ModEdgeLen = odec::ModEdgeLengthT<Mesh>::Handle;
-      using Decimater  = odec::DecimaterT<Mesh>;
+    namespace odec  = omesh::Decimater;
+    using Module    = odec::ModVolumeT<HalfedgeMeshData>::Handle;
+    using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::DefaultCollapseFunction>;
 
-      Decimater dec(mesh);
-      ModEdgeLen mod_edge_len;
+    // Operate on a copy of the input mesh with zero-length edges removed
+    auto mesh = simplify_edge_length<HalfedgeMeshData>(mesh_, 0.f);
 
-      dec.add(mod_edge_len);
-      dec.module(mod_edge_len).set_binary(false);
-      dec.module(mod_edge_len).set_edge_length(0.0f); // not zero, but just up to reasonable precision
+    Decimater dec(mesh);
+    Module mod;
 
-      dec.initialize();
-      dec.decimate();
+    dec.add(mod);
 
-      mesh.garbage_collection();
+    // If provided, convert optional bounds to half edge format
+    std::optional<HalfedgeMeshData> bounds_mesh;
+    if (optional_bounds) {
+      bounds_mesh = convert_mesh<HalfedgeMeshData>(*optional_bounds);
+      dec.module(mod).set_collision_mesh(&(*bounds_mesh));
     }
-    post_vertex_count = mesh.n_vertices();
-    fmt::print("  zero-edge collapse; {} -> {}", pre_vertex_count, post_vertex_count);
-    
-    // Next, collapse remaining edges using more complicated metric to get to specified vertex amount
-    pre_vertex_count = mesh.n_vertices();
-    {
-      using Decimater  = odec::CollapsingDecimater<Mesh, odec::DefaultCollapseFunction>;
-      using ModVolume = odec::ModVolumeT<Mesh>::Handle;
 
-      Decimater dec(mesh);
-      ModVolume volume_mod;
+    dec.initialize();
+    dec.decimate_to(max_vertices);
 
-      dec.add(volume_mod);
-      dec.module(volume_mod).set_collision_mesh(&bounds_mesh);
-
-      dec.initialize();
-      dec.decimate_to(max_vertices);
-
-      mesh.garbage_collection();
-    }
-    post_vertex_count = mesh.n_vertices();
-    fmt::print("  volume preserving collapse; {} -> {}", pre_vertex_count, post_vertex_count);
-
-    return mesh;
+    mesh.garbage_collection();
+    return convert_mesh<OutputMesh>(mesh);
   }
 
-  /* Forward declarations over common OpenMesh types and Array3f/AlArray3f */
+  /* Explicit template instantiations */
   
-  // generate_data
-  template
-  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<BaselineMeshTraits, eig::Array3f>(const BaselineMesh &);
-  template
-  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<FNormalMeshTraits, eig::Array3f>(const FNormalMesh &);
-  template
-  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_data<HalfedgeMeshTraits, eig::Array3f>(const HalfedgeMesh &);
-  template
-  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<BaselineMeshTraits, eig::AlArray3f>(const BaselineMesh &);
-  template
-  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<FNormalMeshTraits, eig::AlArray3f>(const FNormalMesh &);
-  template
-  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_data<HalfedgeMeshTraits, eig::AlArray3f>(const HalfedgeMesh &);
+  #define declare_function_output_only(OutputMesh)                                                \
+    template                                                                                      \
+    OutputMesh generate_octahedron<OutputMesh>();                                                 \
+    template                                                                                      \
+    OutputMesh generate_spheroid<OutputMesh>(uint);                                               \
+    template                                                                                      \
+    OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);     \
+    template                                                                                      \
+    OutputMesh generate_convex_hull<OutputMesh, eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
-  // generate_from_data
-  template
-  BaselineMesh generate_from_data<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
-  template
-  BaselineMesh generate_from_data<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
-  template
-  FNormalMesh generate_from_data<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, std::span<const eig::Array3u>);
-  template
-  FNormalMesh generate_from_data<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
-  template
-  HalfedgeMesh generate_from_data<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
-  template
-  HalfedgeMesh generate_from_data<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, std::span<const eig::Array3u>);
+  #define declare_function_output_input(OutputMesh, InputMesh)                                    \
+    template                                                                                      \
+    OutputMesh simplify_edge_length<OutputMesh, InputMesh>(const InputMesh &, float);             \
+    template                                                                                      \
+    OutputMesh simplify_volume<OutputMesh, InputMesh>(const InputMesh &, uint, const InputMesh *);
 
-  // generate_octahedron
-  template
-  BaselineMesh generate_octahedron<BaselineMeshTraits>();
-  template
-  FNormalMesh generate_octahedron<FNormalMeshTraits>();
-  template
-  HalfedgeMesh generate_octahedron<HalfedgeMeshTraits>();
-  template
-  BaselineMesh generate_spheroid<BaselineMeshTraits>(uint);
-  template
-  FNormalMesh generate_spheroid<FNormalMeshTraits>(uint);
-  template
-  HalfedgeMesh generate_spheroid<HalfedgeMeshTraits>(uint);
+  #define declare_function_all_inputs(OutputMesh)                                                 \
+    declare_function_output_only(OutputMesh)                                                      \
+    declare_function_output_input(OutputMesh, IndexedMeshData)                                    \
+    declare_function_output_input(OutputMesh, AlignedMeshData)                                    \
+    declare_function_output_input(OutputMesh, HalfedgeMeshData)
   
-  // generate_convex_hull_approx
-  template
-  BaselineMesh generate_convex_hull_approx<BaselineMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const BaselineMesh &);
-  template
-  FNormalMesh generate_convex_hull_approx<FNormalMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const FNormalMesh &);
-  template
-  HalfedgeMesh generate_convex_hull_approx<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>, const HalfedgeMesh &);
-  template
-  BaselineMesh generate_convex_hull_approx<BaselineMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const BaselineMesh &);
-  template
-  FNormalMesh generate_convex_hull_approx<FNormalMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const FNormalMesh &);
-  template
-  HalfedgeMesh generate_convex_hull_approx<HalfedgeMeshTraits, eig::AlArray3f>(std::span<const eig::AlArray3f>, const HalfedgeMesh &);
-
-  template
-  HalfedgeMesh generate_convex_hull<HalfedgeMeshTraits, eig::Array3f>(std::span<const eig::Array3f>);
-  template
-  std::pair<std::vector<eig::Array3f>, std::vector<eig::Array3u>> generate_convex_hull<eig::Array3f>(std::span<const eig::Array3f>);
-  template
-  std::pair<std::vector<eig::AlArray3f>, std::vector<eig::Array3u>> generate_convex_hull<eig::AlArray3f>(std::span<const eig::AlArray3f>);
-
-  // simplify
-  template
-  BaselineMesh simplify<BaselineMeshTraits>(const BaselineMesh &, const BaselineMesh &, uint);
-  template
-  FNormalMesh simplify<FNormalMeshTraits>(const FNormalMesh &, const FNormalMesh &, uint);
-  template
-  HalfedgeMesh simplify<HalfedgeMeshTraits>(const HalfedgeMesh &, const HalfedgeMesh &, uint);
-  template
-  BaselineMesh simplify_edges<BaselineMeshTraits>(const BaselineMesh &, float);
-  template
-  FNormalMesh simplify_edges<FNormalMeshTraits>(const FNormalMesh &, float);
-  template
-  HalfedgeMesh simplify_edges<HalfedgeMeshTraits>(const HalfedgeMesh &, float);
-
-  /* // Generate barycentric weights
-  template
-  std::vector<eig::ArrayXf> generate_barycentric_weights(const HalfedgeMesh &, std::span<const eig::Array3f>);
-  template
-  std::vector<eig::ArrayXf> generate_barycentric_weights(const HalfedgeMesh &, std::span<const eig::AlArray3f>); */
+  declare_function_all_inputs(IndexedMeshData)
+  declare_function_all_inputs(AlignedMeshData)
+  declare_function_all_inputs(HalfedgeMeshData)
 } // namespace met

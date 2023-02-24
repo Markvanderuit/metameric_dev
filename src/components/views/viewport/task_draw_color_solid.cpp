@@ -10,8 +10,6 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  constexpr uint n_sphere_subdivs  = 3;
-
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -31,11 +29,11 @@ namespace met {
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
 
     // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
-    m_sphere_mesh = generate_spheroid<HalfedgeMeshTraits>(n_sphere_subdivs);
+    auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
 
     // Allocate convex hull buffer objects with predetermined maximum sizes
-    m_chull_verts = {{ .size = m_sphere_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = gl::BufferCreateFlags::eStorageDynamic }};
-    m_chull_elems = {{ .size = m_sphere_mesh.n_faces() * sizeof(eig::Array3u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    m_chull_verts = {{ .size = sphere_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    m_chull_elems = {{ .size = sphere_mesh.n_faces() * sizeof(eig::Array3u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
     // Allocate buffer objects for billboard quad draw
     m_quad_verts = {{ .data = cnt_span<const std::byte>(quad_vert_data) }};
@@ -134,20 +132,26 @@ namespace met {
 
     // (Re-)create convex hull mesh data. If the selected vertex/constraint has in any way changed, a new
     // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    bool recreate_chull = e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
+    bool recreate_chull = true; //e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
     if (recreate_chull) {
       // Get color solid data, if available
       auto &e_csol_data = info.get_resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");
       guard(!e_csol_data.empty());
 
       // Generate convex hull mesh and convert to buffer format
-      auto [verts, elems] = generate_convex_hull<AlColr>(e_csol_data);
+      auto [verts, elems] = generate_convex_hull<AlignedMeshData, AlColr>(e_csol_data);
 
       // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
       m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
       m_chull_elems.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
       m_chull_dispatch.vertex_count = elems.size() * 3;
       m_point_dispatch.vertex_count = verts.size();
+
+      // fmt::print("{}\n", e_csol_data.size());
+      // fmt::print("a = {}, {}, {}, {}\n", e_csol_data[8], e_csol_data[16], e_csol_data[32], e_csol_data[48]);
+      // fmt::print("a = {}, {}, {}, {}\n", elems[8], elems[16], elems[32], elems[48]);
+      // fmt::print("a = {}, {}, {}, {}\n", e_csol_data[8], e_csol_data[16], e_csol_data[32], e_csol_data[48]);
+      // fmt::print("b = {}, {}, {}, {}\n", verts[8], verts[16], verts[32], verts[48]);
     }
 
     eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark

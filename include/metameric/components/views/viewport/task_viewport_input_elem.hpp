@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/data.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/ray.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
@@ -66,7 +67,7 @@ namespace met {
       // Generate and fire a camera ray against the gamut's triangle elements
       auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
       auto camera_ray = i_arcball.generate_ray(screen_pos);
-      auto ray_query = ray_trace_nearest_elem(camera_ray, colrs_i, e_elems);
+      auto ray_query = raytrace_elem<IndexedMeshData>(camera_ray, { colrs_i, e_elems });
 
       // Apply mouseover on every iteration
       i_mouseover.clear();

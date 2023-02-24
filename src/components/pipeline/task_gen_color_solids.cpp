@@ -122,7 +122,8 @@ namespace met {
                                             .basis_avg = e_appl_data.loaded_basis_mean, 
                                             .system = e_proj_data.csys(0).finalize_direct(), 
                                             .samples = detail::gen_unit_dirs<3>(n_samples_ocs) });
-    auto csys_ocs_mesh = simplify_edges(generate_convex_hull<HalfedgeMeshTraits, Colr>(csys_ocs), 0.001f);
+    auto csys_ocs_mesh = simplify_edge_length<HalfedgeMeshData>(
+      generate_convex_hull<HalfedgeMeshData, eig::Array3f>(csys_ocs), 0.001f);
 
     // Compute center of convex hull
     constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };

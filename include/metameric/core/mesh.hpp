@@ -9,21 +9,6 @@
 #include <utility>
 
 namespace met {
-  /* An indexed mesh with face normals and no additional data */
-  struct BaselineMeshTraits : public omesh::DefaultTraits {
-    // Define default attributes; only face normals are stored, half-edges are intentionally omitted
-    VertexAttributes(omesh::Attributes::None);
-    HalfedgeAttributes(omesh::Attributes::None);
-    FaceAttributes(omesh::Attributes::None);
-  };
-
-  /* An indexed mesh with face normals */
-  struct FNormalMeshTraits : public omesh::DefaultTraits {
-    VertexAttributes(omesh::Attributes::Status);
-    HalfedgeAttributes(omesh::Attributes::None);
-    FaceAttributes(omesh::Attributes::Normal | omesh::Attributes::Status);
-  };
-
   /* An indexed mesh with face normals and half-edges to simplify a number of operations */
   struct HalfedgeMeshTraits : public omesh::DefaultTraits {
     VertexAttributes(omesh::Attributes::Status);
@@ -31,42 +16,49 @@ namespace met {
     FaceAttributes(omesh::Attributes::Normal | omesh::Attributes::Status);
   };
 
-  // Triangle mesh shorthands implementing the above defined traits
+  // Triangle mesh shorthand for simplifications, using the openmesh halfedge implementation 
   template <typename Traits>
-  using TriMesh      = omesh::TriMesh_ArrayKernelT<Traits>;
-  using BaselineMesh = TriMesh<BaselineMeshTraits>;
-  using FNormalMesh  = TriMesh<FNormalMeshTraits>;
-  using HalfedgeMesh = TriMesh<HalfedgeMeshTraits>;
+  using TriMesh          = omesh::TriMesh_ArrayKernelT<Traits>;
+  using HalfedgeMeshData = TriMesh<HalfedgeMeshTraits>;
+
+  // Simple, indexed triangle mesh representation
+  using IndexedMeshData = std::pair<
+    std::vector<eig::Array3f>,
+    std::vector<eig::Array3u>
+  >;
+
+  // Simple, indexed triangle mesh representation with packed vec3 data (for OpenGL)
+  using AlignedMeshData = std::pair<
+    std::vector<eig::AlArray3f>,
+    std::vector<eig::Array3u>
+  >;
+
+  // Convert between halfedge/indexed/aligned mesh data structures
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh convert_mesh(const InputMesh &mesh);
 
   /* Generational helper functions */
 
-  template <typename Traits, typename T = eig::Array3f>
-  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_data(const TriMesh<Traits> &mesh);
-
-  template <typename Traits, typename T = eig::Array3f>
-  TriMesh<Traits> generate_from_data(std::span<const T> vertices, std::span<const eig::Array3u> elements);
-
-  template <typename Traits>
-  TriMesh<Traits> generate_octahedron();
-
-  template <typename Traits>
-  TriMesh<Traits> generate_spheroid(uint n_subdivs = 3);
-
-  template <typename Traits>
-  TriMesh<Traits> simplify(const TriMesh<Traits> &mesh, 
-                           const TriMesh<Traits> &bounds,
-                           uint max_vertices);
-
-  template <typename Traits>
-  TriMesh<Traits> simplify_edges(const TriMesh<Traits> &mesh, float max_edge_length);
-
-  template <typename Traits, typename T = eig::AlArray3f>
-  TriMesh<Traits> generate_convex_hull(std::span<const T> points);
+  // Returns a simple octahedral mesh, fitted inside a unit cube
+  template <typename Mesh>
+  Mesh generate_octahedron();
   
-  template <typename T = eig::AlArray3f>
-  std::pair<std::vector<T>, std::vector<eig::Array3u>> generate_convex_hull(std::span<const T> points);
+  // Returns a repeatedly subdivided spherical mesh, fitted inside a unit cube
+  template <typename Mesh>
+  Mesh generate_spheroid(uint n_subdivs = 3);
 
-  template <typename Traits, typename T = eig::AlArray3f>
-  TriMesh<Traits> generate_convex_hull_approx(std::span<const T> points, 
-    const TriMesh<Traits> &spheroid_mesh = generate_spheroid<Traits>());
+  // Returns a convex hull mesh around a set of points in 3D
+  template <typename Mesh, typename Vector>
+  Mesh generate_convex_hull(std::span<const Vector> data);
+
+  /* Mesh simplification functions */
+
+  // Performs progressive edge collapse for edges below max_edge_length
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh simplify_edge_length(const InputMesh &mesh, float max_edge_length = 0.f);
+
+  // Performs volume-preserving progressive edge collapse until max_vertices remain; newly placed vertices
+  // are optionally clipped into a secondary mesh optional_bounds
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh simplify_volume(const InputMesh &mesh, uint max_vertices, const InputMesh *optional_bounds = nullptr);
 } // namespace met

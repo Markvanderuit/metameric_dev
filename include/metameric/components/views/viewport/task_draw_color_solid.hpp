@@ -28,10 +28,6 @@ namespace met {
     // State information
     std::string m_parent;
 
-    // Convex hull mesh generation data
-    HalfedgeMesh m_sphere_mesh;
-    HalfedgeMesh m_csolid_mesh;
-
     // Constraint-point draw components
     gl::Buffer           m_quad_verts;
     gl::Buffer           m_quad_elems;

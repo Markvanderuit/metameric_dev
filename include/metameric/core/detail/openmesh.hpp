@@ -14,6 +14,9 @@
 namespace met {
   namespace omesh = OpenMesh; // namespace shorthand
 
+  template <typename OutputVector, typename InputVector>
+  OutputVector convert_vector(const InputVector &v);
+
   template <typename Scalar, int Rows>
   eig::Vector<Scalar, Rows> to_eig(const omesh::VectorT<Scalar, Rows> &v) {
     eig::Vector<Scalar, Rows> _v;
