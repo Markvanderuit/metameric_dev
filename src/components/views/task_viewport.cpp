@@ -7,7 +7,7 @@
 #include <metameric/components/views/viewport/task_viewport_end.hpp>
 #include <metameric/components/views/viewport/task_draw_begin.hpp>
 #include <metameric/components/views/viewport/task_draw_gamut.hpp>
-// #include <metameric/components/views/viewport/task_draw_cube.hpp>
+#include <metameric/components/views/viewport/task_draw_delaunay.hpp>
 #include <metameric/components/views/viewport/task_draw_texture.hpp>
 #include <metameric/components/views/viewport/task_draw_csys_ocs.hpp>
 #include <metameric/components/views/viewport/task_draw_end.hpp>
@@ -19,6 +19,7 @@ namespace met {
   constexpr auto viewport_end_name     = "_end";
   constexpr auto draw_begin_name       = "_draw_begin";
   constexpr auto draw_gamut_name       = "_draw_gamut";
+  constexpr auto draw_delaunay_name    = "_draw_delaunay";
   constexpr auto draw_csys_ocs_name    = "_draw_csys_ocs";
   constexpr auto draw_texture_name     = "_draw_texture";
   constexpr auto draw_cube_name        = "_draw_cube";
@@ -32,7 +33,7 @@ namespace met {
 
     // Add drawing subtasks in reverse order
     info.emplace_task_after<ViewportDrawEndTask>(name(),     name() + draw_end_name);
-    // info.emplace_task_after<ViewportDrawCubeTask>(name(),    name() + draw_cube_name);
+    info.emplace_task_after<ViewportDrawDelaunayTask>(name(),name() + draw_delaunay_name);
     info.emplace_task_after<ViewportDrawGamutTask>(name(),   name() + draw_gamut_name);
     info.emplace_task_after<ViewportDrawTextureTask>(name(), name() + draw_texture_name);
     info.emplace_task_after<ViewportDrawCSysOCSTask>(name(), name() + draw_csys_ocs_name);
@@ -57,7 +58,7 @@ namespace met {
     info.remove_task(name() + draw_texture_name);
     info.remove_task(name() + draw_csys_ocs_name);
     info.remove_task(name() + draw_gamut_name);
-    // info.remove_task(name() + draw_cube_name);
+    info.remove_task(name() + draw_delaunay_name);
     info.remove_task(name() + draw_end_name);
   }
 
