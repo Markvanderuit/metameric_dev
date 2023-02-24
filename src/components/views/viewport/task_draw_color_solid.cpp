@@ -132,7 +132,7 @@ namespace met {
 
     // (Re-)create convex hull mesh data. If the selected vertex/constraint has in any way changed, a new
     // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    bool recreate_chull = true; //e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
+    bool recreate_chull = e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
     if (recreate_chull) {
       // Get color solid data, if available
       auto &e_csol_data = info.get_resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");
