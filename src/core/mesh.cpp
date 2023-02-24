@@ -15,13 +15,6 @@
 #include <vector>
 
 namespace met {
-  namespace detail {
-    orgQhull::Qhull generate_convex_hull(const std::vector<eig::Array3f> &data) {
-      met_trace();
-      return orgQhull::Qhull("", 3, data.size(), cnt_span<const float>(data).data(), "Qt Qx C-0");
-    }
-  } // namespace detail
-
   template <typename OutputMesh, typename InputMesh>
   OutputMesh convert_mesh(const InputMesh &mesh) requires std::is_same_v<OutputMesh, InputMesh> {
     met_trace_n("Passthrough");
@@ -143,7 +136,7 @@ namespace met {
 
     // Query qhull for a convex hull structure
     std::vector<eig::Array3f> input(range_iter(data));
-    orgQhull::Qhull qhull = detail::generate_convex_hull(input);
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "Qt Qx C-0");
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_elems = qhull.facetList().toStdVector();
 
