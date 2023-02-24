@@ -9,17 +9,17 @@
 #include <utility>
 
 namespace met {
-  /* An indexed mesh with face normals and half-edges to simplify a number of operations */
+  /* Mesh formats */
+
+  // Triangle mesh traits for the openmesh halfedge implementation 
   struct HalfedgeMeshTraits : public omesh::DefaultTraits {
     VertexAttributes(omesh::Attributes::Status);
     HalfedgeAttributes(omesh::Attributes::PrevHalfedge | omesh::Attributes::Status);
     FaceAttributes(omesh::Attributes::Normal | omesh::Attributes::Status);
   };
 
-  // Triangle mesh shorthand for simplifications, using the openmesh halfedge implementation 
-  template <typename Traits>
-  using TriMesh          = omesh::TriMesh_ArrayKernelT<Traits>;
-  using HalfedgeMeshData = TriMesh<HalfedgeMeshTraits>;
+  // Triangle mesh shorthand for the openmesh halfedge implementation 
+  using HalfedgeMeshData = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
 
   // Simple, indexed triangle mesh representation
   using IndexedMeshData = std::pair<
