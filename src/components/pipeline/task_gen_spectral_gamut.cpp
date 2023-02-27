@@ -73,11 +73,11 @@ namespace met {
       
       i_spec_buffer = {{ .size  = e_verts.size() * sizeof(Spec),           .flags = buffer_create_flags }};
       i_vert_buffer = {{ .size  = e_verts.size() * sizeof(AlColr),         .flags = buffer_create_flags }};
-      i_elem_buffer = {{ .size  = e_elems.size() * sizeof(eig::AlArray3u), .flags = buffer_create_flags }};
+      i_elem_buffer = {{ .size  = e_elems.size() * sizeof(eig::AlArray4u), .flags = buffer_create_flags }};
       
       m_spec_map = cast_span<Spec>(i_spec_buffer.map(buffer_access_flags));
       m_vert_map = cast_span<AlColr>(i_vert_buffer.map(buffer_access_flags));
-      m_elem_map = cast_span<eig::AlArray3u>(i_elem_buffer.map(buffer_access_flags));
+      m_elem_map = cast_span<eig::AlArray4u>(i_elem_buffer.map(buffer_access_flags));
     }
     
     // Generate spectra at stale gamut vertices in parallel

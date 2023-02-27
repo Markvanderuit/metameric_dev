@@ -42,8 +42,6 @@ namespace met {
     m_draw_line = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = 3 * 4 * static_cast<uint>(elems.size()),
-      .capabilities     = {{ gl::DrawCapability::eDepthTest, true },
-                           { gl::DrawCapability::eCullOp,   false }},
       .draw_op          = gl::DrawOp::eLine,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
@@ -51,8 +49,6 @@ namespace met {
     m_draw_fill = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = 3 * 4 * static_cast<uint>(elems.size()),
-      .capabilities     = {{ gl::DrawCapability::eDepthTest,  true },
-                           { gl::DrawCapability::eCullOp,    false }},
       .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
@@ -89,10 +85,11 @@ namespace met {
     }
 
     // Set shared OpenGL state for coming draw operations
-    gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
-                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
+                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
+                               gl::state::ScopedSet(gl::DrawCapability::eCullOp,   false),
+                               gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
     // Update varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
@@ -105,6 +102,5 @@ namespace met {
     gl::dispatch_draw(m_draw_line);
     m_program.uniform("u_alpha", .01f);
     gl::dispatch_draw(m_draw_fill);
-
   }
 } // namespace met

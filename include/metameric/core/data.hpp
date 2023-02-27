@@ -1,7 +1,6 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/tree.hpp>
 #include <metameric/core/texture.hpp>
 #include <filesystem>
 #include <functional>
@@ -55,7 +54,7 @@ namespace met {
     struct CSys { uint cmfs, illuminant, n_scatters; };
 
     // Data structure for a triangle element of the project's convex hull mesh
-    using Elem = eig::Array3u;
+    using Elem = std::conditional<use_delaunay, eig::Array4u, eig::Array3u>::type;
     
   public: /* public data */
     // Convex hull data structure used for rgb->spectral uplifting
@@ -84,12 +83,11 @@ namespace met {
     ProjectData project_data;
     fs::path    project_path;
     SaveFlag    project_save = SaveFlag::eUnloaded; 
-
+    
     // Misc application data
     Texture2d3f   loaded_texture_f32; // F32 RGB image extracted from project data
     Basis         loaded_basis;       // Set of basis functions obtained through PCA of measured spectra
     Spec          loaded_basis_mean;  // Set of basis functions obtained through PCA of measured spectra
-    BasisTreeNode loaded_tree_root;   // Basis function tree structure, loaded from disk
     AppColorMode  color_mode;         // Application theming
 
   public: /* create/load/save methods */

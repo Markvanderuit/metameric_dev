@@ -10,6 +10,11 @@ namespace met {
   constexpr static uint  wavelength_samples  = MET_WAVELENGTH_SAMPLES;
   constexpr static uint  wavelength_bases    = MET_WAVELENGTH_BASES;
   constexpr static uint  barycentric_weights = MET_BARYCENTRIC_WEIGHTS;
+#ifdef MET_USE_DELAUNAY
+  constexpr static bool  use_delaunay = true;
+#else
+  constexpr static bool  use_delaunay = false;
+#endif
 
   /* Define derived variables from metameric's spectral range layout */
   constexpr static float wavelength_range = wavelength_max - wavelength_min;  

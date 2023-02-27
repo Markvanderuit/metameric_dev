@@ -37,7 +37,7 @@ const uint sg_cluster_size = 2; // 2 units per set of barycentric weights
 shared vec3  s_verts_in[barycentric_weights];
 shared uvec3 s_elems_in[barycentric_weights * 4];
 shared Bary4 s_bary_out[gl_WorkGroupSize.x / sg_cluster_size];
-      uint   s_bary_i = gl_LocalInvocationID.x / sg_cluster_size;
+       uint  s_bary_i = gl_LocalInvocationID.x / sg_cluster_size;
 
 void load_shared_data() {
   for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
@@ -45,8 +45,8 @@ void load_shared_data() {
   for (uint i = gl_LocalInvocationID.x; i < b_unif.n_elems; i += gl_WorkGroupSize.x)
     s_elems_in[i] = b_elem_in.data[i];
 
-  barrier();
   memoryBarrierShared();
+  barrier();
 }
 
 float norm_weights() {

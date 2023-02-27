@@ -21,7 +21,7 @@ namespace met {
     gl::Buffer m_vert_buffer;
     gl::Buffer m_elem_buffer;
     std::span<eig::AlArray3f> m_vert_map;
-    std::span<eig::Array3u>   m_elem_map;
+    std::span<eig::Array4u>   m_elem_map;
 
     // Local buffer to stream individual opacities/sizes for selection/mouseover
     gl::Buffer        m_vert_size_buffer;

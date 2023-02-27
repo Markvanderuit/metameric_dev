@@ -224,16 +224,15 @@ namespace met {
       };
 
       // Handle flipped triangles, again because Qhull
-      /* eig::Vector3f tetr_cntr = std::reduce(range_iter(vt), eig::Vector3f(0)) / 4.f;
+      eig::Vector3f tetr_cntr = std::reduce(range_iter(vt), eig::Vector3f(0)) / 4.f;
       std::ranges::for_each(result, [&](auto &el) {
         eig::Vector3f a = verts[el[0]], b = verts[el[1]], c = verts[el[2]];
         eig::Vector3f norm = (b - a).cross(c - a).normalized().eval();
         eig::Vector3f cntr = ((a + b + c) / 3.f).eval();
         if (norm.dot((cntr - tetr_cntr).normalized()) <= 0.f) {
-          fmt::print("{} -> {}\n", el, eig::Array3u { el[2], el[1], el[0] });
           el = eig::Array3u { el[2], el[1], el[0] };
         }
-      }); */
+      });
 
       return result;
     });
@@ -306,26 +305,26 @@ namespace met {
     template                                                                                          \
     OutputDelaunay generate_delaunay<OutputDelaunay, eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
-  #define declare_function_mesh_output_only(OutputMesh)                                           \
-    template                                                                                      \
-    OutputMesh generate_octahedron<OutputMesh>();                                                 \
-    template                                                                                      \
-    OutputMesh generate_spheroid<OutputMesh>(uint);                                               \
-    template                                                                                      \
-    OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);     \
-    template                                                                                      \
+  #define declare_function_mesh_output_only(OutputMesh)                                               \
+    template                                                                                          \
+    OutputMesh generate_octahedron<OutputMesh>();                                                     \
+    template                                                                                          \
+    OutputMesh generate_spheroid<OutputMesh>(uint);                                                   \
+    template                                                                                          \
+    OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);         \
+    template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
-  #define declare_function_output_input(OutputMesh, InputMesh)                                    \
-    template                                                                                      \
-    OutputMesh simplify_edge_length<OutputMesh, InputMesh>(const InputMesh &, float);             \
-    template                                                                                      \
+  #define declare_function_output_input(OutputMesh, InputMesh)                                        \
+    template                                                                                          \
+    OutputMesh simplify_edge_length<OutputMesh, InputMesh>(const InputMesh &, float);                 \
+    template                                                                                          \
     OutputMesh simplify_volume<OutputMesh, InputMesh>(const InputMesh &, uint, const InputMesh *);
 
-  #define declare_function_all_inputs(OutputMesh)                                                 \
-    declare_function_mesh_output_only(OutputMesh)                                                 \
-    declare_function_output_input(OutputMesh, IndexedMeshData)                                    \
-    declare_function_output_input(OutputMesh, AlignedMeshData)                                    \
+  #define declare_function_all_inputs(OutputMesh)                                                     \
+    declare_function_mesh_output_only(OutputMesh)                                                     \
+    declare_function_output_input(OutputMesh, IndexedMeshData)                                        \
+    declare_function_output_input(OutputMesh, AlignedMeshData)                                        \
     declare_function_output_input(OutputMesh, HalfedgeMeshData)
   
   declare_function_delaunay_output_only(IndexedDelaunayData)

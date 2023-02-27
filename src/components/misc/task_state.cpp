@@ -42,6 +42,7 @@ namespace met {
     decl_compare_func_eig(CMFS);
     decl_compare_func_eig(Spec);
     decl_compare_func_eig(eig::Array3u);
+    decl_compare_func_eig(eig::Array4u);
     decl_compare_func_eig(eig::Array3f);
     decl_compare_func_eig(eig::Matrix4f);
     decl_compare_func_eig(eig::Vector2f);

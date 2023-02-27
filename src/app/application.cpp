@@ -1,11 +1,11 @@
 #include <metameric/core/io.hpp>
+#include <metameric/core/data.hpp>
 #include <metameric/core/json.hpp>
-#include <metameric/core/knn.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/data.hpp>
 #include <metameric/core/texture.hpp>
+#include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -35,13 +35,13 @@ namespace met {
       
       // data.loaded_basis = io::load_basis("resources/misc/basis.txt");
       // data.loaded_basis_mean = io::load_spec("resources/misc/basis_avg.spd");
-      data.loaded_tree_root = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
+      auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
 
       // TODO: remove
       // data.loaded_tree_root.basis = data.loaded_basis;
       // data.loaded_tree_root.basis_mean = data.loaded_basis_mean;
-      data.loaded_basis = data.loaded_tree_root.basis;
-      data.loaded_basis_mean = data.loaded_tree_root.basis_mean;
+      data.loaded_basis = loaded_tree.basis;
+      data.loaded_basis_mean = loaded_tree.basis_mean;
 
       scheduler.insert_resource("app_data", std::move(data));
     }

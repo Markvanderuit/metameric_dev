@@ -9,8 +9,8 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/enum.hpp>
 #include <metameric/components/views/viewport/task_viewport_input_vert.hpp>
-#include <metameric/components/views/viewport/task_viewport_input_edge.hpp>
-#include <metameric/components/views/viewport/task_viewport_input_elem.hpp>
+// #include <metameric/components/views/viewport/task_viewport_input_edge.hpp>
+// #include <metameric/components/views/viewport/task_viewport_input_elem.hpp>
 #include <small_gl/window.hpp>
 #include <ImGuizmo.h>
 #include <algorithm>
@@ -76,7 +76,7 @@ namespace met {
     
       // Add subtasks
       info.emplace_task_after<ViewportInputVertTask>(name(), name() + "_vert");
-      info.emplace_task_after<ViewportInputElemTask>(name(), name() + "_elem");
+      // info.emplace_task_after<ViewportInputElemTask>(name(), name() + "_elem");
 
       // Share resources
       info.emplace_resource<detail::ViewportInputMode>("mode", detail::ViewportInputMode::eVertex);

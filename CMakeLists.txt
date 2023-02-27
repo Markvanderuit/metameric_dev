@@ -22,6 +22,7 @@ set(MET_WAVELENGTH_MAX      780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES   64) # Nr. of bins used in discrete spectral representations
 set(MET_WAVELENGTH_BASES     12) # Nr. of basis functions used in generative functions
 set(MET_BARYCENTRIC_WEIGHTS  16) # Maximum nr. of barycentric weights supported
+set(MET_USE_DELAUNAY         ON) # Use newer delaunay computation instead of generalized barycentric weights
 
 # Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -93,6 +94,7 @@ message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
 message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 message(STATUS "Metameric : Barycentric weights = ${MET_BARYCENTRIC_WEIGHTS}")
+message(STATUS "Metameric : Use delaunay        = ${MET_USE_DELAUNAY}")
 
 # Find glslLangValidator program on system
 find_program(glsl_validator_path glslangValidator HINTS 
@@ -267,6 +269,9 @@ target_compile_definitions(core PUBLIC
   MET_BARYCENTRIC_WEIGHTS=${MET_BARYCENTRIC_WEIGHTS}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
+if (MET_USE_DELAUNAY)
+  target_compile_definitions(core PUBLIC MET_USE_DELAUNAY)
+endif()
 
 # Set up components library
 add_library_r(components components)

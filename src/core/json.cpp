@@ -89,9 +89,17 @@ namespace Eigen {
   void from_json(const met::json& js, Array3u &v) {
     std::ranges::copy(js, v.begin());
   }
+  
+  void from_json(const met::json& js, Array4u &v) {
+    std::ranges::copy(js, v.begin());
+  }
 
   void to_json(met::json &js, const Array3u &v) {
     js = std::vector<Array3u::value_type>(v.begin(), v.end());
+  }
+
+  void to_json(met::json &js, const Array4u &v) {
+    js = std::vector<Array4u::value_type>(v.begin(), v.end());
   }
 
   void from_json(const met::json& js, met::Spec &v) {
