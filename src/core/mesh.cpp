@@ -69,13 +69,13 @@ namespace met {
   template <>
   IndexedMeshData convert_mesh<IndexedMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
     met_trace_n("AlignedMeshData -> IndexedMeshData");
-    return { std::vector<eig::Array3f>(range_iter(mesh.first)), mesh.second };
+    return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
   AlignedMeshData convert_mesh<AlignedMeshData, IndexedMeshData>(const IndexedMeshData &mesh) {
     met_trace_n("IndexedMeshData -> AlignedMeshData");
-    return { std::vector<eig::AlArray3f>(range_iter(mesh.first)), mesh.second };
+    return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
@@ -176,10 +176,8 @@ namespace met {
                              / static_cast<float>(verts.size());
     std::for_each(std::execution::par_unseq, range_iter(elems), [&](auto &el) {
       eig::Vector3f a = verts[el[0]], b = verts[el[1]], c = verts[el[2]];
-
       eig::Vector3f norm = (b - a).cross(c - a).normalized().eval();
       eig::Vector3f cntr = ((a + b + c) / 3.f).eval();
-
       if (norm.dot((cntr - chull_cntr).normalized()) <= 0.f)
         el = eig::Array3u { el[2], el[1], el[0] };
     }); 
@@ -206,18 +204,39 @@ namespace met {
     // Assemble indexed data from qhull format
     std::vector<eig::Array3f>                verts(qh_verts.size());
     std::vector<std::array<eig::Array3u, 4>> elems(qh_elems.size());
-    std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [](const auto &el) {
-      std::array<uint, 4> id;
-      std::ranges::transform(el.vertices().toStdVector(), id.begin(), [](const auto &v) { return v.id(); });
-      return std::array<eig::Array3u, 4> {
-        eig::Array3u { id[0], id[1], id[2] },
-        eig::Array3u { id[1], id[2], id[3] },
-        eig::Array3u { id[2], id[3], id[0] },
-        eig::Array3u { id[0], id[3], id[2] }
-      };
-    });
     std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
       [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
+    std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [&](const auto &el) {
+      // Obtain vertex data for this tetrahedron
+      std::array<uint, 4>          id;
+      std::array<eig::Vector3f, 4> vt;
+      std::ranges::transform(el.vertices().toStdVector(), id.begin(), 
+        [](const auto &v) { return v.id(); });
+      std::ranges::transform(el.vertices().toStdVector(), vt.begin(), 
+        [&](const auto &v) { return verts[v.id()]; });
+
+      // Describe initial tetrahedron's array structure
+      std::array<eig::Array3u, 4> result = {
+        eig::Array3u { id[0], id[1], id[2] },
+        eig::Array3u { id[1], id[2], id[3] },
+        eig::Array3u { id[2], id[0], id[3] },
+        eig::Array3u { id[0], id[1], id[3] }
+      };
+
+      // Handle flipped triangles, again because Qhull
+      /* eig::Vector3f tetr_cntr = std::reduce(range_iter(vt), eig::Vector3f(0)) / 4.f;
+      std::ranges::for_each(result, [&](auto &el) {
+        eig::Vector3f a = verts[el[0]], b = verts[el[1]], c = verts[el[2]];
+        eig::Vector3f norm = (b - a).cross(c - a).normalized().eval();
+        eig::Vector3f cntr = ((a + b + c) / 3.f).eval();
+        if (norm.dot((cntr - tetr_cntr).normalized()) <= 0.f) {
+          fmt::print("{} -> {}\n", el, eig::Array3u { el[2], el[1], el[0] });
+          el = eig::Array3u { el[2], el[1], el[0] };
+        }
+      }); */
+
+      return result;
+    });
 
     return convert_mesh<Delaunay>(IndexedDelaunayData { verts, elems });
   }

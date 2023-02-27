@@ -232,8 +232,9 @@ namespace met {
     // Generate simplified concave hull fitting texture data, then fit convex hull around this
     fmt::print("  Generating simplified convex hull\n");
     auto chull_mesh = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture_f32.data());
-    auto [verts, elems] = simplify_volume<IndexedMeshData>(chull_mesh, n_vertices, &ocs_mesh);
-    std::tie(verts, elems) = generate_convex_hull<IndexedMeshData, eig::Array3f>(verts);
+    auto [verts, elems] = generate_convex_hull<IndexedMeshData, eig::Array3f>(
+      simplify_volume<IndexedMeshData>(chull_mesh, n_vertices, &ocs_mesh).verts
+    );
     
 
     fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());

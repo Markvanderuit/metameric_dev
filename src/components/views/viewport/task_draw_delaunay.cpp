@@ -19,11 +19,10 @@ namespace met {
     // Get shared resources
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data = e_appl_data.project_data;
-    auto &e_verts     = e_proj_data.gamut_verts; 
 
     // Generate delaunay tetrahedralization of input data
-    std::vector<Colr> input_verts(e_verts.size());
-    std::ranges::transform(e_verts, input_verts.begin(), [](const auto &v) { return v.colr_i; });
+    std::vector<Colr> input_verts(e_proj_data.gamut_verts.size());
+    std::ranges::transform(e_proj_data.gamut_verts, input_verts.begin(), [](const auto &v) { return v.colr_i; });
     auto [verts, elems] = generate_delaunay<AlignedDelaunayData, Colr>(input_verts);
 
     // Push to buffer
@@ -52,8 +51,8 @@ namespace met {
     m_draw_fill = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = 3 * 4 * static_cast<uint>(elems.size()),
-      .capabilities     = {{ gl::DrawCapability::eDepthTest, false },
-                           { gl::DrawCapability::eCullOp,     true }},
+      .capabilities     = {{ gl::DrawCapability::eDepthTest,  true },
+                           { gl::DrawCapability::eCullOp,    false }},
       .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
@@ -67,7 +66,27 @@ namespace met {
     met_trace_full();
 
     // Get state objects
+    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
+
+    if (e_pipe_state.any_verts) {
+      auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data = e_appl_data.project_data;
+
+      // Generate delaunay tetrahedralization of input data
+      std::vector<Colr> input_verts(e_proj_data.gamut_verts.size());
+      std::ranges::transform(e_proj_data.gamut_verts, input_verts.begin(), [](const auto &v) { return v.colr_i; });
+      auto [verts, elems] = generate_delaunay<AlignedDelaunayData, Colr>(input_verts);
+
+      // Push to buffer
+      m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};
+      m_elem_buffer = {{ .data = cnt_span<const std::byte>(elems) }};
+      m_array = {{
+        .buffers = {{ .buffer = &m_vert_buffer,  .index = 0, .stride = sizeof(AlColr) }},
+        .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+        .elements = &m_elem_buffer
+      }};
+    }
 
     // Set shared OpenGL state for coming draw operations
     gl::state::set_op(gl::CullOp::eBack);
@@ -82,7 +101,7 @@ namespace met {
     }
 
     // Submit draw information with varying alpha
-    m_program.uniform("u_alpha", .25f);
+    m_program.uniform("u_alpha", 1.f);
     gl::dispatch_draw(m_draw_line);
     m_program.uniform("u_alpha", .01f);
     gl::dispatch_draw(m_draw_fill);

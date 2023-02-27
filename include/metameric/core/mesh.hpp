@@ -22,17 +22,26 @@ namespace met {
   // Triangle mesh shorthand for the openmesh halfedge implementation 
   using HalfedgeMeshData = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
 
+  template <typename Vertex, typename Element>
+  struct TemplateMeshData {
+    std::vector<Vertex>  verts;
+    std::vector<Element> elems;
+  };
+  using IndexedMeshData = TemplateMeshData<eig::Array3f, eig::Array3u>;
+  using AlignedMeshData = TemplateMeshData<eig::AlArray3f, eig::Array3u>;
+
+
   // Simple, indexed triangle mesh representation
-  using IndexedMeshData = std::pair<
+ /*  using IndexedMeshData = std::pair<
     std::vector<eig::Array3f>,
     std::vector<eig::Array3u>
-  >;
+  >; */
 
   // Simple, indexed triangle mesh representation with packed vec3 data (for OpenGL)
-  using AlignedMeshData = std::pair<
+  /* using AlignedMeshData = std::pair<
     std::vector<eig::AlArray3f>,
     std::vector<eig::Array3u>
-  >;
+  >; */
 
   // Simple, indexed delaunay mesh representation
   using IndexedDelaunayData = std::pair<
