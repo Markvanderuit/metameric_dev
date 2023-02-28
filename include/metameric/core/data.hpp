@@ -82,8 +82,8 @@ namespace met {
     
     // Misc application data
     Texture2d3f   loaded_texture_f32; // F32 RGB image extracted from project data
-    Basis         loaded_basis;       // Set of basis functions obtained through PCA of measured spectra
-    Spec          loaded_basis_mean;  // Set of basis functions obtained through PCA of measured spectra
+    Basis         loaded_basis;       // Basis functions obtained through PCA of measured spectra
+    Spec          loaded_basis_mean;  // Mean of basis functions obtained through PCA of measured spectra
     AppColorMode  color_mode;         // Application theming
 
   public: /* create/load/save methods */

@@ -90,18 +90,5 @@ namespace met {
 
     // Dispatch shader to generate unnormalized barycentric weights in i_bary_buffer
     gl::dispatch_compute(m_dispatch);
-
-    std::vector<eig::Array4f> bary_buffer(16);
-    std::vector<uint> bary_indices(16);
-
-    i_bary_buffer.get_as<eig::Array4f>(bary_buffer, bary_buffer.size(), 1024);
-
-    std::ranges::transform(bary_buffer, bary_indices.begin(),
-      [](const auto &v) { return *reinterpret_cast<const uint *>(&v[3]); });
-    std::ranges::for_each(bary_buffer,
-      [](auto &v) { v.w() = 1.f - v.head<3>().sum(); });
-
-    fmt::print("{}\n", bary_buffer);
-    fmt::print("{}\n", bary_indices);
   }
 } // namespace met

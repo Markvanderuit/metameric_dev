@@ -99,8 +99,8 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < mesh.elems.size(); ++i) {
       eig::Array4u in = mesh.elems[i];
-      std::array<eig::Array3u, 4> out = { eig::Array3u { in[0], in[1], in[2] }, eig::Array3u { in[1], in[2], in[3] },
-                                          eig::Array3u { in[2], in[0], in[3] }, eig::Array3u { in[0], in[1], in[3] } };
+      std::array<eig::Array3u, 4> out = { eig::Array3u { in[2], in[1], in[0] }, eig::Array3u { in[3], in[1], in[2] },
+                                          eig::Array3u { in[3], in[2], in[0] }, eig::Array3u { in[3], in[0], in[1] } };
       std::ranges::copy(out, elems.begin() + 4 *  i);
     }
 

@@ -64,7 +64,6 @@ void main() {
       bary_ = bary;
       j_ = j;
       err_ = err;
-      break;
     }
   }
 

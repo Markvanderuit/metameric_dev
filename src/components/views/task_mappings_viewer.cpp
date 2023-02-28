@@ -1,5 +1,6 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
@@ -47,7 +48,7 @@ namespace met {
     const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant barycentric data to current available buffer
-    e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(Bary), sizeof(Bary) * sample_i);
+    e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(eig::Array4f), sizeof(eig::Array4f) * sample_i);
 
     // Submit a fence for current available buffer as it affects mapped memory
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
@@ -58,9 +59,10 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_gamut_spec = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+    auto &e_vert_spec = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+    auto &e_delaunay  = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
     // Spawn tooltip
     ImGui::BeginTooltip();
@@ -73,25 +75,32 @@ namespace met {
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init())
       fence.cpu_wait();
 
+    // Unpack barycentric weights and get corresponding tetrahedron from delaunay
+    const auto &bary_data = m_tooltip_maps[m_tooltip_cycle_i][0];
+    eig::Array4f bary = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
+    eig::Array4u elem = e_delaunay.elems[*reinterpret_cast<const uint *>(&bary_data.w())];
+
     // Compute output reflectance
     ColrSystem mapp  = e_proj_data.csys(texture_i);
-    Bary bary        = m_tooltip_maps[m_tooltip_cycle_i][0];
     Spec reflectance = 0;
     Colr color       = 0;
-    for (uint i = 0; i < e_gamut_spec.size(); ++i) {
-      reflectance += bary[i] * e_gamut_spec[i];
-      color += bary[i] * mapp.apply_color_indirect(e_gamut_spec[i]);
+    for (uint i = 0; i < 4; ++i) {
+      reflectance += bary[i] * e_vert_spec[elem[i]];
+      color += bary[i] * mapp.apply_color_indirect(e_vert_spec[elem[i]]);
     }
-    Spec power       = mapp.illuminant * reflectance;
-    // Colr color       = mapp(reflectance);
+    Spec power = mapp.illuminant * reflectance;
 
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
       nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
-    ImGui::PlotLines("Weights", bary.data(), barycentric_weights, 0,
-      nullptr, 0.f, 1.f, { 0.f, 64.f });
+
     ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
+
+    ImGui::Separator();
+
+    ImGui::InputScalarN("Weights", ImGuiDataType_Float, bary.data(), bary.size());
+    ImGui::InputScalarN("Indices", ImGuiDataType_U32, elem.data(), elem.size());
 
     ImGui::Separator();
     
@@ -140,7 +149,7 @@ namespace met {
       auto &map    = m_tooltip_maps[i];
 
       buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
-      map = cast_span<Bary>(buffer.map(map_flags));
+      map = cast_span<eig::Array4f>(buffer.map(map_flags));
     }
   }
   
