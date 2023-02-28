@@ -241,8 +241,8 @@ namespace met {
 
     // Update project data with new convex hull
     project_data.gamut_elems = elems;
-    project_data.gamut_verts.resize(verts.size());
-    std::ranges::transform(verts, project_data.gamut_verts.begin(), [](Colr c) {
+    project_data.samples.resize(verts.size());
+    std::ranges::transform(verts, project_data.samples.begin(), [](Colr c) {
       return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
     }); */
   }
@@ -256,8 +256,8 @@ namespace met {
     // constexpr uint n_runs     = 1;
 
     // // Get current set of vertices
-    // std::vector<Colr> verts(project_data.gamut_verts.size());
-    // std::ranges::transform(project_data.gamut_verts, verts.begin(), [](const auto &v) { return v.colr_i; });
+    // std::vector<Colr> verts(project_data.samples.size());
+    // std::ranges::transform(project_data.samples, verts.begin(), [](const auto &v) { return v.colr_i; });
     
     // // Intermediate storage for computed barycentric weights and indices to positive weights
     // std::vector<eig::Array<float, barycentric_weights, 1>> img_weights;
@@ -399,7 +399,7 @@ namespace met {
     //   }
 
     //   // Intermediate storage for vertices and constraints
-    //   std::vector<ProjectData::Vert> gamut_verts;
+    //   std::vector<ProjectData::Vert> samples;
 
     //   /* 3. Obtain vertices and constraints from spectral gamut, by applying known color systems */
     //   {
@@ -408,7 +408,7 @@ namespace met {
     //       ProjectData::Vert vert;
 
     //       // Define vertex settings
-    //       vert.colr_i = project_data.gamut_verts[i].colr_i;
+    //       vert.colr_i = project_data.samples[i].colr_i;
     //       vert.csys_i = 0;
 
     //       // Define constraint settings
@@ -439,7 +439,7 @@ namespace met {
     //         }
     //       }
 
-    //       gamut_verts.push_back(vert);
+    //       samples.push_back(vert);
     //     }
     //   }
 
@@ -449,8 +449,8 @@ namespace met {
     //   /* 4. Compute roundtrip error for the different inputs */
     //   {
     //     // Squared error based on offsets to the convex hull vertices
-    //     /* for (uint i = 0; i < gamut_verts.size(); ++i)
-    //       roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum(); */
+    //     /* for (uint i = 0; i < samples.size(); ++i)
+    //       roundtrip_error += (samples[i].colr_i - verts[i]).pow(2.f).sum(); */
 
     //     // Add squared error based on sample roundtrip
     //     for (uint i = 0; i < n_samples; ++i) {
@@ -476,7 +476,7 @@ namespace met {
     //   {
     //     std::lock_guard<std::mutex> lock(solver_mutex);
     //     if (roundtrip_error < solver_error) {
-    //       project_data.gamut_verts = gamut_verts;
+    //       project_data.samples = samples;
     //       solver_error = roundtrip_error;
     //       fmt::print("  Best error: {}\n", solver_error);
     //     }

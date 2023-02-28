@@ -73,7 +73,7 @@ namespace met {
     
     // Update uniform data
     m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
-    m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
+    m_uniform_map->n_verts = e_appl_data.project_data.vertices.size();
     m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
     m_uniform_buffer.flush();
 

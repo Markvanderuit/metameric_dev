@@ -66,7 +66,7 @@ namespace met {
     // Setup dispatch objects summarizing both draw operations
     m_vert_draw = {
       .type             = gl::PrimitiveType::eTriangles,
-      .vertex_count     = 3 * static_cast<uint>(e_proj_data.gamut_verts.size()),
+      .vertex_count     = 3 * static_cast<uint>(e_proj_data.vertices.size()),
       .capabilities     = {{ gl::DrawCapability::eMSAA, false }},
       .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_vert_array,
@@ -129,7 +129,7 @@ namespace met {
     if (e_pipe_state.any_verts || e_pipe_state.any_elems) {
       for (uint i = 0; i < e_pipe_state.verts.size(); ++i) {
         guard_continue(e_pipe_state.verts[i].colr_i);
-        m_vert_map[i] = e_proj_data.gamut_verts[i].colr_i;
+        m_vert_map[i] = e_proj_data.vertices[i].colr_i;
         m_vert_buffer.flush(sizeof(eig::Array3f), i * sizeof(eig::AlArray3f));
       }
       for (uint i = 0; i < e_pipe_state.elems.size(); ++i) {
@@ -137,7 +137,7 @@ namespace met {
         m_elem_map[i] = e_proj_data.gamut_elems[i];
         m_elem_buffer.flush(sizeof(eig::Array3u), i * sizeof(eig::Array3u));
       }
-      m_vert_draw.vertex_count = 3 * static_cast<uint>(e_proj_data.gamut_verts.size());
+      m_vert_draw.vertex_count = 3 * static_cast<uint>(e_proj_data.vertices.size());
       m_edge_draw.vertex_count = 3 * static_cast<uint>(e_proj_data.gamut_elems.size());
       m_elem_draw.vertex_count = 3 * static_cast<uint>(e_proj_data.gamut_elems.size());
     }

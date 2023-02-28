@@ -21,8 +21,8 @@ namespace met {
     auto &e_proj_data = e_appl_data.project_data;
 
     // Generate delaunay tetrahedralization of input data
-    std::vector<Colr> input_verts(e_proj_data.gamut_verts.size());
-    std::ranges::transform(e_proj_data.gamut_verts, input_verts.begin(), [](const auto &v) { return v.colr_i; });
+    std::vector<Colr> input_verts(e_proj_data.vertices.size());
+    std::ranges::transform(e_proj_data.vertices, input_verts.begin(), [](const auto &v) { return v.colr_i; });
     auto [verts, elems] = generate_delaunay<AlignedDelaunayData, Colr>(input_verts);
 
     // Push to buffer
@@ -70,8 +70,8 @@ namespace met {
       auto &e_proj_data = e_appl_data.project_data;
 
       // Generate delaunay tetrahedralization of input data
-      std::vector<Colr> input_verts(e_proj_data.gamut_verts.size());
-      std::ranges::transform(e_proj_data.gamut_verts, input_verts.begin(), [](const auto &v) { return v.colr_i; });
+      std::vector<Colr> input_verts(e_proj_data.vertices.size());
+      std::ranges::transform(e_proj_data.vertices, input_verts.begin(), [](const auto &v) { return v.colr_i; });
       auto [verts, elems] = generate_delaunay<AlignedDelaunayData, Colr>(input_verts);
 
       // Push to buffer

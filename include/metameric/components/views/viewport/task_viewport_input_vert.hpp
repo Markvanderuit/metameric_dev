@@ -50,7 +50,7 @@ namespace met {
       auto &i_arcball   = info.get_resource<detail::Arcball>("viewport_input", "arcball");
       auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_app_data.project_data;
-      auto &e_verts     = e_app_data.project_data.gamut_verts;
+      auto &e_verts     = e_app_data.project_data.vertices;
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -162,10 +162,10 @@ namespace met {
         // Register data edit as drag finishes
         e_app_data.touch({ 
           .name = "Move gamut points", 
-          .redo = [edit = e_verts](auto &data) { data.gamut_verts = edit; }, 
+          .redo = [edit = e_verts](auto &data) { data.vertices = edit; }, 
           .undo = [edit = m_colrs_prev](auto &data) { 
             for (uint i = 0; i < edit.size(); ++i)
-              data.gamut_verts[i].colr_i = edit[i];
+              data.vertices[i].colr_i = edit[i];
           }
         });
         m_is_gizmo_used = false;

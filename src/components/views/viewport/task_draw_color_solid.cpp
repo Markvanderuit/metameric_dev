@@ -104,7 +104,7 @@ namespace met {
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_vert        = e_proj_data.gamut_verts[e_vert_slct[0]];
+    auto &e_vert        = e_proj_data.vertices[e_vert_slct[0]];
     auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state  = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");

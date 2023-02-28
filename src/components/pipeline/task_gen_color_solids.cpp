@@ -157,7 +157,7 @@ namespace met {
     // Get shared resources
     auto &e_appl_data    = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_appl_data.project_data;
-    auto &e_vert         = e_appl_data.project_data.gamut_verts[e_vert_slct[0]];
+    auto &e_vert         = e_appl_data.project_data.vertices[e_vert_slct[0]];
     auto &e_vert_sd      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[e_vert_slct[0]];
     auto &i_csol_data    = info.get_resource<std::vector<Colr>>("csol_data");
     auto &i_csol_data_al = info.get_resource<std::vector<AlColr>>("csol_data_al");

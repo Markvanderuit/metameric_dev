@@ -69,19 +69,17 @@ namespace met {
   }
 
   void from_json(const json &js, ProjectData &v) {
-    v.gamut_elems   = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
-    v.gamut_verts   = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
+    v.vertices      = js.at("vertices").get<std::vector<ProjectData::Vert>>();
     v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
     v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
-    js["gamut_elems"]  = v.gamut_elems;
-    js["gamut_verts"]  = v.gamut_verts;
-    js["mappings"]     = v.color_systems;
-    js["cmfs"]         = v.cmfs;
-    js["illuminants"]  = v.illuminants;
+    js["vertices"]    = v.vertices;
+    js["mappings"]    = v.color_systems;
+    js["cmfs"]        = v.cmfs;
+    js["illuminants"] = v.illuminants;
   }
 } // namespace met
 

@@ -103,7 +103,7 @@ namespace met {
       auto &e_selection_elem = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
       auto &e_appl_data      = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data      = e_appl_data.project_data;
-      auto &e_verts          = e_appl_data.project_data.gamut_verts;
+      auto &e_verts          = e_appl_data.project_data.vertices;
       auto &e_elems          = e_appl_data.project_data.gamut_elems;
 
       // Compute viewport offs, size minus ImGui's tab bars etc
@@ -159,12 +159,12 @@ namespace met {
               .redo = [elems = elems,
                        i     = e_selection_vert[0]](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_verts.erase(data.gamut_verts.begin() + i);
+                data.vertices.erase(data.vertices.begin() + i);
               },
               .undo = [elems  = e_elems,
                        verts  = e_verts](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_verts  = verts;
+                data.vertices  = verts;
               }
             });
 
@@ -190,7 +190,7 @@ namespace met {
               .redo = [verts = verts, 
                        elems = elems](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_verts.resize(verts.size(), {
+                data.vertices.resize(verts.size(), {
                   .colr_i = verts[verts.size() - 1],
                   .csys_i = 0,
                   .colr_j = { },
@@ -200,7 +200,7 @@ namespace met {
               .undo = [elems  = e_elems,
                        verts = e_verts](auto &data) {
                 data.gamut_elems  = elems;
-                data.gamut_verts  = verts;
+                data.vertices  = verts;
               },
             });
 

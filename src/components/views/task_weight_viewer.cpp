@@ -116,13 +116,13 @@ namespace met {
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_cstr_slct   = info.get_resource<int>("viewport_overlay", "constr_selection");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
-    uint mapping_index  = e_cstr_slct >= 0 ? e_proj_data.gamut_verts[e_selection[0]].csys_j[e_cstr_slct] : 0;
+    uint mapping_index  = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
     auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", mapping_index), "colr_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Update uniform data for upcoming sum computation
     m_unif_map->n       = e_appl_data.loaded_texture_f32.size().prod();
-    m_unif_map->n_verts = e_appl_data.project_data.gamut_verts.size();
+    m_unif_map->n_verts = e_appl_data.project_data.vertices.size();
     std::ranges::fill(m_unif_map->selection, eig::Array4u(0));
     std::ranges::for_each(e_selection, [&](uint i) { m_unif_map->selection[i] = 1; });
     m_unif_buffer.flush();

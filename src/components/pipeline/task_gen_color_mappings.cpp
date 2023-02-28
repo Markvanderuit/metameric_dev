@@ -74,13 +74,13 @@ namespace met {
     // Update uniform data
     if (e_pipe_state.any_verts || m_init_stale) {
       m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
-      m_uniform_map->n_verts = e_proj_data.gamut_verts.size();
+      m_uniform_map->n_verts = e_proj_data.vertices.size();
       m_uniform_buffer.flush();
     }
 
     // Update gamut data, given any state change
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
-    for (uint i = 0; i < e_proj_data.gamut_verts.size(); ++i) {
+    for (uint i = 0; i < e_proj_data.vertices.size(); ++i) {
       guard_continue(activate_flag || e_pipe_state.verts[i].any);
 
       m_gamut_map[i] = csys.apply_color_indirect(e_gamut_spec[i]);

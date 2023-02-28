@@ -44,22 +44,18 @@ namespace met {
   public: /* internal data structures */
     // Data structure for a single vertex of the project's convex hull mesh
     struct Vert {
-      Colr colr_i; // The expected vertex color under a primary color system
-      uint csys_i; // Index of the selected primary color system
+      Colr colr_i;              // The expected vertex color under a primary color system
+      uint csys_i;              // Index of the selected primary color system
       std::vector<Colr> colr_j; // The expected vertex colors under secondary color systems
       std::vector<uint> csys_j; // Indices of the selected secondary color systems
     };
 
     // Set of indices of cmfs/illuminants together describing a stored color system
     struct CSys { uint cmfs, illuminant, n_scatters; };
-
-    // Data structure for a triangle element of the project's convex hull mesh
-    using Elem = std::conditional<use_delaunay, eig::Array4u, eig::Array3u>::type;
     
   public: /* public data */
     // Convex hull data structure used for rgb->spectral uplifting
-    std::vector<Vert> gamut_verts;   // Gamut vertex data  
-    std::vector<Elem> gamut_elems;   // Gamut element data, forming a convex hull
+    std::vector<Vert> vertices;      // User-specified vetex data  
     std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
 
     // Named user- or program-provided illuminants and color matching functions

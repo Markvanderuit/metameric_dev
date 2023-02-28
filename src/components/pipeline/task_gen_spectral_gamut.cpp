@@ -57,7 +57,7 @@ namespace met {
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_elems       = e_proj_data.gamut_elems;
-    auto &e_verts       = e_proj_data.gamut_verts;
+    auto &e_verts       = e_proj_data.vertices;
     auto &i_specs       = info.get_resource<std::vector<Spec>>("gamut_spec");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
     auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
@@ -87,7 +87,7 @@ namespace met {
       guard_continue(e_pipe_state.verts[i].any);
 
       // Relevant vertex data
-      auto &vert = e_proj_data.gamut_verts[i];   
+      auto &vert = e_proj_data.vertices[i];   
 
       // Obtain color system spectra for this vertex
       std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_specs[i]) };
@@ -117,7 +117,7 @@ namespace met {
 
     // Push stale gamut vertex data to gpu
     for (uint i : vert_range) {
-      m_vert_map[i] = e_proj_data.gamut_verts[i].colr_i;
+      m_vert_map[i] = e_proj_data.vertices[i].colr_i;
       m_spec_map[i] = i_specs[i];
       i_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
       i_spec_buffer.flush(sizeof(Spec), i * sizeof(Spec));

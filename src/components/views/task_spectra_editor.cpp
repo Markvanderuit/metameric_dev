@@ -236,12 +236,12 @@ namespace met {
           if (ImGui::Button("X")) {
             e_appl_data.touch({ .name = "Delete color system", .redo = [i = i](auto &data) {
               data.color_systems.erase(data.color_systems.begin() + i);
-              for (auto &vert : data.gamut_verts)
+              for (auto &vert : data.vertices)
                 for (uint &j : vert.csys_j) if (j >= i) 
                   j--;
-            }, .undo = [edit = e_csys, verts = e_proj_data.gamut_verts](auto &data) { 
+            }, .undo = [edit = e_csys, verts = e_proj_data.vertices](auto &data) { 
               data.color_systems = edit;
-              data.gamut_verts = verts;
+              data.vertices = verts;
             }});
           }
           ImGui::PopID();
