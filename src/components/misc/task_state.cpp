@@ -103,15 +103,12 @@ namespace met {
     auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
     auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
-    auto &e_elem_selct = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
-    auto &e_elem_mover = info.get_resource<std::vector<uint>>("viewport_input_elem", "mouseover");
     auto &e_cstr_selct = info.get_resource<int>("viewport_overlay", "constr_selection");
 
     // Iterate over all project data
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.vertices, m_verts);
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
     std::tie(i_pipe_state.cmfs,        i_pipe_state.any_cmfs)        = detail::compare_state(e_proj_data.cmfs, m_cmfs);
-    std::tie(i_pipe_state.elems,       i_pipe_state.any_elems)       = detail::compare_state(e_proj_data.gamut_elems, m_elems);
     std::tie(i_pipe_state.csys,        i_pipe_state.any_csys)        = detail::compare_state(e_proj_data.color_systems, m_csys);
 
     // Post-process fill in some gaps in project state
@@ -130,14 +127,13 @@ namespace met {
       vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_csys_j;
     }
 
-    // Set summary flags over all vertices/elements in project state
+    // Set summary flags over all vertices in project state
     i_pipe_state.any_verts = std::reduce(range_iter(i_pipe_state.verts), false, 
       [](const auto &a, const auto &b) { return a | b.any; });
 
 
     // Set giant summary flag
     i_pipe_state.any = i_pipe_state.any_csys  | 
-                       i_pipe_state.any_elems | 
                        i_pipe_state.any_verts |
                        i_pipe_state.any_cmfs  |
                        i_pipe_state.any_illuminants;
@@ -145,8 +141,6 @@ namespace met {
     // Iterate over all selection data
     i_view_state.vert_selection = std::get<1>(detail::compare_state(e_vert_selct, m_vert_selct));
     i_view_state.vert_mouseover = std::get<1>(detail::compare_state(e_vert_mover, m_vert_mover));
-    i_view_state.elem_selection = std::get<1>(detail::compare_state(e_elem_selct, m_elem_selct));
-    i_view_state.elem_mouseover = std::get<1>(detail::compare_state(e_elem_mover, m_elem_mover));
     i_view_state.cstr_selection = detail::compare_func(e_cstr_selct, m_cstr_selct);
 
     // Set summary flags over arcball camera state

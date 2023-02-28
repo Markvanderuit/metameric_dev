@@ -13,7 +13,8 @@ namespace met {
   class GenColorMappingTask : public detail::AbstractTask {
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
-      uint n_verts; // Nr. of vertices defining surrounding hull
+      uint n_verts; // Nr. of vertices defining delaunay
+      uint n_elems; // Nr. of elements defining delaunay
     };
 
     bool              m_init_stale;

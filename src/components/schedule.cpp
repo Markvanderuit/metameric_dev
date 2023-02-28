@@ -12,8 +12,9 @@
 #include <metameric/components/misc/task_state.hpp>
 
 // Pipeline tasks
-#include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
-#include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
+// #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
+#include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/pipeline/task_gen_color_solids.hpp>
 
@@ -82,8 +83,8 @@ namespace met {
     scheduler.emplace_task<StateTask>("state");
 
     // The following tasks define the color->spectrum uplifting pipeline and view data
-    scheduler.emplace_task<GenSpectralGamutTask>("gen_spectral_gamut");            
-    scheduler.emplace_task<GenBarycentricWeightsTask>("gen_barycentric_weights");
+    scheduler.emplace_task<GenSpectralDataTask>("gen_spectral_data");            
+    scheduler.emplace_task<GenDelaunayWeightsTask>("gen_delaunay_weights");
     scheduler.emplace_task<GenColorSolidsTask>("gen_color_solids");
     scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
 

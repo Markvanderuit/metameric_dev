@@ -91,15 +91,38 @@ namespace met {
   }
 
   template <>
+  IndexedMeshData convert_mesh<IndexedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> IndexedMeshData");
+    
+    std::vector<eig::Array3u> elems(4 * mesh.elems.size());
+
+    #pragma omp parallel for
+    for (int i = 0; i < mesh.elems.size(); ++i) {
+      eig::Array4u in = mesh.elems[i];
+      std::array<eig::Array3u, 4> out = { eig::Array3u { in[0], in[1], in[2] }, eig::Array3u { in[1], in[2], in[3] },
+                                          eig::Array3u { in[2], in[0], in[3] }, eig::Array3u { in[0], in[1], in[3] } };
+      std::ranges::copy(out, elems.begin() + 4 *  i);
+    }
+
+    return { mesh.verts, elems };
+  }
+
+  template <>
+  AlignedMeshData convert_mesh<AlignedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> AlignedMeshData");
+    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  }
+
+  template <>
   IndexedDelaunayData convert_mesh<IndexedDelaunayData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
     met_trace_n("IndexedDelaunayData -> IndexedDelaunayData");
-    return { std::vector<eig::Array3f>(range_iter(mesh.first)), mesh.second };
+    return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
   AlignedDelaunayData convert_mesh<AlignedDelaunayData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
     met_trace_n("IndexedDelaunayData -> IndexedDelaunayData");
-    return { std::vector<eig::AlArray3f>(range_iter(mesh.first)), mesh.second };
+    return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <typename Mesh>
@@ -185,14 +208,13 @@ namespace met {
     return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
   }
   
-  template <typename Delaunay, typename Vector>
-  Delaunay generate_delaunay(std::span<const Vector> data) {
+  template <typename Mesh, typename Vector>
+  Mesh generate_delaunay(std::span<const Vector> data) {
     met_trace();
 
     // Query qhull for a delaunay tetrahedralization structure
     std::vector<eig::Array3f> input(range_iter(data));
-    // auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "Qt");
-    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt Q3");
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_elems = qhull.facetList().toStdVector();
 
@@ -202,42 +224,28 @@ namespace met {
       qh_verts[i].getVertexT()->id = i;
 
     // Assemble indexed data from qhull format
-    std::vector<eig::Array3f>                verts(qh_verts.size());
-    std::vector<std::array<eig::Array3u, 4>> elems(qh_elems.size());
+    std::vector<eig::Array3f> verts(qh_verts.size());
+    std::vector<eig::Array4u> elems(qh_elems.size());
     std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
       [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
+
+    // Undo QHull's unnecessary scatter-because-screw-you-aaaaaargh
+    std::vector<uint> vertex_idx(data.size());
+    for (uint i = 0; i < data.size(); ++i) {
+      auto it = std::ranges::find_if(data, [&](const auto &v) { return v.isApprox(verts[i]); });
+      guard_continue(it != data.end());
+      vertex_idx[i] = std::distance(data.begin(), it);
+    }
+    
+    // Build element data
     std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [&](const auto &el) {
-      // Obtain vertex data for this tetrahedron
-      std::array<uint, 4>          id;
-      std::array<eig::Vector3f, 4> vt;
-      std::ranges::transform(el.vertices().toStdVector(), id.begin(), 
-        [](const auto &v) { return v.id(); });
-      std::ranges::transform(el.vertices().toStdVector(), vt.begin(), 
-        [&](const auto &v) { return verts[v.id()]; });
-
-      // Describe initial tetrahedron's array structure
-      std::array<eig::Array3u, 4> result = {
-        eig::Array3u { id[0], id[1], id[2] },
-        eig::Array3u { id[1], id[2], id[3] },
-        eig::Array3u { id[2], id[0], id[3] },
-        eig::Array3u { id[0], id[1], id[3] }
-      };
-
-      // Handle flipped triangles, again because Qhull
-      eig::Vector3f tetr_cntr = std::reduce(range_iter(vt), eig::Vector3f(0)) / 4.f;
-      std::ranges::for_each(result, [&](auto &el) {
-        eig::Vector3f a = verts[el[0]], b = verts[el[1]], c = verts[el[2]];
-        eig::Vector3f norm = (b - a).cross(c - a).normalized().eval();
-        eig::Vector3f cntr = ((a + b + c) / 3.f).eval();
-        if (norm.dot((cntr - tetr_cntr).normalized()) <= 0.f) {
-          el = eig::Array3u { el[2], el[1], el[0] };
-        }
-      });
-
-      return result;
+      eig::Array4u el_;
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 
+        [&](const auto &v) { return vertex_idx[v.id()]; });
+      return el_;
     });
 
-    return convert_mesh<Delaunay>(IndexedDelaunayData { verts, elems });
+    return convert_mesh<Mesh>(IndexedDelaunayData { std::vector<eig::Array3f>(range_iter(data)), elems });
   }
 
   template <typename OutputMesh, typename InputMesh>

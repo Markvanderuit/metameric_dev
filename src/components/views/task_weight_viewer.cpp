@@ -115,7 +115,7 @@ namespace met {
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_cstr_slct   = info.get_resource<int>("viewport_overlay", "constr_selection");
-    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
     uint mapping_index  = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
     auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", mapping_index), "colr_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");

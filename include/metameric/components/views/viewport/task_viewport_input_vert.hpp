@@ -38,8 +38,6 @@ namespace met {
       met_trace_full();
 
       // If active window is not hovered or we are not in vertex mode, exit early
-      auto &e_mode = info.get_resource<detail::ViewportInputMode>("viewport_input", "mode");
-      guard(e_mode == detail::ViewportInputMode::eVertex);
       guard(ImGui::IsItemHovered());
 
       // Get shared resources

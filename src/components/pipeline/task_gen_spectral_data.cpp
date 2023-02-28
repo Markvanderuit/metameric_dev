@@ -1,11 +1,12 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/components/pipeline/task_gen_spectral_gamut.hpp>
+#include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <small_gl/buffer.hpp>
 #include <algorithm>
 #include <execution>
@@ -18,35 +19,40 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite 
                                      | gl::BufferAccessFlags::eMapPersistent
                                      | gl::BufferAccessFlags::eMapFlush;
+  constexpr uint buffer_init_size = 64u;
 
-  GenSpectralGamutTask::GenSpectralGamutTask(const std::string &name)
+  GenSpectralDataTask::GenSpectralDataTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
-  void GenSpectralGamutTask::init(detail::TaskInitInfo &info) {
+  void GenSpectralDataTask::init(detail::TaskInitInfo &info) {
     met_trace_full();
 
+    // Setup buffer data and corresponding maps
+    gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
+    gl::Buffer tetr_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
+    m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
+    m_tetr_map = tetr_buffer.map_as<eig::Array4u>(buffer_access_flags);
+
     // Submit shared resources 
-    info.insert_resource<std::vector<Spec>>("gamut_spec", { });
-    info.insert_resource<gl::Buffer>("vert_buffer",       { });
-    info.insert_resource<gl::Buffer>("spec_buffer",       { });
-    info.insert_resource<gl::Buffer>("elem_buffer",       { });
+    info.insert_resource<std::vector<Spec>>("vert_spec",               { }); // CPU-side generated reflectance spectra for each vertex
+    info.insert_resource<AlignedDelaunayData>("delaunay",              { }); // Generated delaunay tetrahedralization over input vertices
+    info.insert_resource<gl::Buffer>("vert_buffer", std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
+    info.insert_resource<gl::Buffer>("tetr_buffer", std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
 
-  void GenSpectralGamutTask::dstr(detail::TaskDstrInfo &info) {
+  void GenSpectralDataTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
 
     // Get shared resources
-    auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
-    auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
+    auto &i_tetr_buffer = info.get_resource<gl::Buffer>("tetr_buffer");
 
-    // Unmap buffers
-    if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped()) i_spec_buffer.unmap();
+    // Unmap mapped buffers
     if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped()) i_vert_buffer.unmap();
-    if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped()) i_elem_buffer.unmap();
+    if (i_tetr_buffer.is_init() && i_tetr_buffer.is_mapped()) i_tetr_buffer.unmap();
   }
   
-  void GenSpectralGamutTask::eval(detail::TaskEvalInfo &info) {
+  void GenSpectralDataTask::eval(detail::TaskEvalInfo &info) {
     met_trace_full();
 
     // Continue only on relevant state change
@@ -56,33 +62,27 @@ namespace met {
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_elems       = e_proj_data.gamut_elems;
-    auto &e_verts       = e_proj_data.vertices;
-    auto &i_specs       = info.get_resource<std::vector<Spec>>("gamut_spec");
+    auto &i_spectra     = info.get_resource<std::vector<Spec>>("vert_spec");
+    auto &i_delaunay    = info.get_resource<AlignedDelaunayData>("delaunay");
     auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
-    auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
-    auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");
+    auto &i_tetr_buffer = info.get_resource<gl::Buffer>("tetr_buffer");
 
-    // On vertex count change, resize spectrum data and re-create buffers
-    if (e_verts.size() != i_specs.size()) {
-      i_specs.resize(e_verts.size());
+    // Generate new delaunay structure
+    std::vector<Colr> delaunay_input(e_proj_data.vertices.size());
+    std::ranges::transform(e_proj_data.vertices, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
+    i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
 
-      if (i_spec_buffer.is_init() && i_spec_buffer.is_mapped())   i_spec_buffer.unmap();
-      if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped())   i_vert_buffer.unmap();
-      if (i_elem_buffer.is_init() && i_elem_buffer.is_mapped())   i_elem_buffer.unmap();
-      
-      i_spec_buffer = {{ .size  = e_verts.size() * sizeof(Spec),           .flags = buffer_create_flags }};
-      i_vert_buffer = {{ .size  = e_verts.size() * sizeof(AlColr),         .flags = buffer_create_flags }};
-      i_elem_buffer = {{ .size  = e_elems.size() * sizeof(eig::AlArray4u), .flags = buffer_create_flags }};
-      
-      m_spec_map = cast_span<Spec>(i_spec_buffer.map(buffer_access_flags));
-      m_vert_map = cast_span<AlColr>(i_vert_buffer.map(buffer_access_flags));
-      m_elem_map = cast_span<eig::AlArray4u>(i_elem_buffer.map(buffer_access_flags));
-    }
-    
+    // TODO: Optimize data push
+    // Push new delaunay data to buffers
+    std::ranges::copy(i_delaunay.verts, m_vert_map.begin());
+    std::ranges::copy(i_delaunay.elems, m_tetr_map.begin());
+    i_vert_buffer.flush(i_delaunay.verts.size() * sizeof(eig::AlArray3f));
+    i_tetr_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
+
     // Generate spectra at stale gamut vertices in parallel
+    i_spectra.resize(e_proj_data.vertices.size()); // vector-resize is non-destructive on vector growth
     #pragma omp parallel for
-    for (int i = 0; i < i_specs.size(); ++i) {
+    for (int i = 0; i < i_spectra.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
       guard_continue(e_pipe_state.verts[i].any);
 
@@ -90,9 +90,8 @@ namespace met {
       auto &vert = e_proj_data.vertices[i];   
 
       // Obtain color system spectra for this vertex
-      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_specs[i]) };
-      std::ranges::transform(vert.csys_j, std::back_inserter(systems), 
-        [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
+      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_spectra[i]) };
+      std::ranges::transform(vert.csys_j, std::back_inserter(systems), [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
 
       // Obtain corresponding color signal for each color system
       std::vector<Colr> signals(1 + vert.colr_j.size());
@@ -100,7 +99,7 @@ namespace met {
       std::ranges::copy(vert.colr_j, signals.begin() + 1);
 
       // Generate new spectrum given the above systems+signals as solver constraints
-      i_specs[i] = generate_spectrum({ 
+      i_spectra[i] = generate_spectrum({ 
         .basis      = e_appl_data.loaded_basis,
         .basis_mean = e_appl_data.loaded_basis_mean,
         .systems    = std::span<CMFS> { systems }, 
@@ -109,7 +108,8 @@ namespace met {
       });
     }
 
-    // Describe ranges over stale gamut vertices/elements
+    // TODO: Remove dead code if irrelevant
+    /* // Describe ranges over stale gamut vertices/elements
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
                     | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i].any; });
     auto elem_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.elems.size()))
@@ -127,6 +127,6 @@ namespace met {
     for (uint i : elem_range) {
       m_elem_map[i] = e_proj_data.gamut_elems[i];
       i_elem_buffer.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
-    }
+    } */
   }
 } // namespace met

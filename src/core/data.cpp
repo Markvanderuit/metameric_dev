@@ -220,7 +220,7 @@ namespace met {
   void ApplicationData::gen_convex_hull(uint n_vertices) {
     met_trace_full();
 
-    /* // Generate temporary OCS for convex hull clipping
+    // Generate temporary OCS for convex hull clipping
     fmt::print("  Generating object color solid boundaries\n");
     auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
                                        .basis_avg = loaded_basis_mean,
@@ -231,20 +231,20 @@ namespace met {
 
     // Generate simplified concave hull fitting texture data, then fit convex hull around this
     fmt::print("  Generating simplified convex hull\n");
-    auto chull_mesh = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture_f32.data());
-    auto [verts, elems] = generate_convex_hull<IndexedMeshData, eig::Array3f>(
-      simplify_volume<IndexedMeshData>(chull_mesh, n_vertices, &ocs_mesh).verts
+    auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture_f32.data());
+    auto chull_mesh = generate_convex_hull<IndexedMeshData, eig::Array3f>(
+      simplify_volume<IndexedMeshData>(chull_base, n_vertices, &ocs_mesh).verts
     );
     
 
-    fmt::print("  Convex hull result: {} vertices, {} faces\n", verts.size(), elems.size());
+    fmt::print("  Convex hull result: {} vertices\n", chull_mesh.verts.size());
 
     // Update project data with new convex hull
-    project_data.gamut_elems = elems;
-    project_data.samples.resize(verts.size());
-    std::ranges::transform(verts, project_data.samples.begin(), [](Colr c) {
+    // project_data.gamut_elems = elems;
+    project_data.vertices.resize(chull_mesh.verts.size());
+    std::ranges::transform(chull_mesh.verts, project_data.vertices.begin(), [](Colr c) {
       return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
-    }); */
+    });
   }
 
   void ApplicationData::gen_constraints_from_images(std::span<const ProjectCreateInfo::ImageData> images) {

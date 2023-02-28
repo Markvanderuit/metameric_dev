@@ -39,7 +39,7 @@ namespace met {
 
     // Get shared resources 
     auto &e_arcball     = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_pack_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "pack_buffer");
+    auto &e_pack_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "pack_buffer");
     auto &e_err_buffer  = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state

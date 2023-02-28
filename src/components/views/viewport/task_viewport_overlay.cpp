@@ -177,7 +177,7 @@ namespace met {
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
     auto &e_vert       = e_proj_data.vertices[i];
-    auto &e_spec       = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec")[i];
+    auto &e_spec       = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[i];
 
     // Local state
     float mapp_width, edit3_width;
@@ -189,7 +189,7 @@ namespace met {
       }
       ImGui::Separator();
     }
-    
+  
 
     // Plot vertex settings for primary color
     {
@@ -564,7 +564,7 @@ namespace met {
     auto &i_cstr_slct = info.get_resource<int>("constr_selection");
     auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
     auto &e_vert        = e_appl_data.project_data.vertices;
-    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_gamut", "gamut_spec");
+    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
 
     const ImVec2 refl_size = { -1.f, overlay_plot_height * e_window.content_scale() };
     const auto   refl_flag = ImPlotFlags_NoInputs | ImPlotFlags_NoFrame;

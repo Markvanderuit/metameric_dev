@@ -36,7 +36,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
     auto &e_tex_data    = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     // Compute sample position in texture dependent on mouse position in image

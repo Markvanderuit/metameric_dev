@@ -8,7 +8,6 @@
 
 namespace met {
   class ViewportDrawDelaunayTask : public detail::AbstractTask {
-    gl::Buffer   m_vert_buffer;
     gl::Buffer   m_elem_buffer;
     gl::Array    m_array;
     gl::DrawInfo m_draw_line;

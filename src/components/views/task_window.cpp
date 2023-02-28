@@ -90,7 +90,7 @@ namespace met {
       // Get shared resources
       auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_prj_data = e_app_data.project_data;
-      auto &e_wght_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
+      auto &e_wght_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
       auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
 
       // Used sizes

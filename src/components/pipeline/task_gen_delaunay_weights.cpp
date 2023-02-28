@@ -1,4 +1,5 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
@@ -67,27 +68,40 @@ namespace met {
     guard(e_pipe_state.any_verts);
 
     // Get shared resources
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_vert_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
-    auto &i_elem_buffer = info.get_resource<gl::Buffer>("elem_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
     auto &i_bary_buffer = info.get_resource<gl::Buffer>("bary_buffer");
-
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_vert_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
+    auto &e_tetr_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
+    auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
     // Update uniform data
     m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
-    m_uniform_map->n_verts = e_appl_data.project_data.gamut_verts.size();
-    m_uniform_map->n_elems = e_appl_data.project_data.gamut_elems.size();
+    m_uniform_map->n_verts = e_delaunay.verts.size();
+    m_uniform_map->n_elems = e_delaunay.elems.size();
     m_uniform_buffer.flush();
 
     // Bind required buffers to corresponding targets
     m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
     e_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    i_elem_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    e_tetr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
     i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
     i_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
 
     // Dispatch shader to generate unnormalized barycentric weights in i_bary_buffer
     gl::dispatch_compute(m_dispatch);
+
+    std::vector<eig::Array4f> bary_buffer(16);
+    std::vector<uint> bary_indices(16);
+
+    i_bary_buffer.get_as<eig::Array4f>(bary_buffer, bary_buffer.size(), 1024);
+
+    std::ranges::transform(bary_buffer, bary_indices.begin(),
+      [](const auto &v) { return *reinterpret_cast<const uint *>(&v[3]); });
+    std::ranges::for_each(bary_buffer,
+      [](auto &v) { v.w() = 1.f - v.head<3>().sum(); });
+
+    fmt::print("{}\n", bary_buffer);
+    fmt::print("{}\n", bary_indices);
   }
 } // namespace met

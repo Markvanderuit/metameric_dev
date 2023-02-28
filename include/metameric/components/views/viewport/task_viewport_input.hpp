@@ -9,8 +9,6 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/enum.hpp>
 #include <metameric/components/views/viewport/task_viewport_input_vert.hpp>
-// #include <metameric/components/views/viewport/task_viewport_input_edge.hpp>
-// #include <metameric/components/views/viewport/task_viewport_input_elem.hpp>
 #include <small_gl/window.hpp>
 #include <ImGuizmo.h>
 #include <algorithm>
@@ -23,49 +21,6 @@ namespace met {
   const float overlay_padding = 8.f;
   const float overlay_width   = 192.f;
 
-  namespace detail {
-    IndexedMeshData subdivide_elem(const std::vector<eig::Array3f> &verts,
-                                  const std::vector<eig::Array3u> &elems,
-                                  uint i) {
-      // Generate openmesh representation to perform mesh operations
-      auto mesh = convert_mesh<HalfedgeMeshData>(IndexedMeshData { verts, elems });
-
-      // Acquire handle to relevant subdividable face and vertices
-      auto fh = mesh.face_handle(i);
-      auto [fv0, fv1, fv2] = mesh.fv_range(fh).to_array<3>();
-
-      // Insert new vertex at face's centroid
-      auto vh = mesh.add_vertex(mesh.calc_face_centroid(fh));
-
-      // Insert new faces connecting to this vertex and delete the old one
-      mesh.delete_face(fh);
-      mesh.add_face(fv0, fv1, vh);
-      mesh.add_face(fv1, fv2, vh);
-      mesh.add_face(fv2, fv0, vh);
-
-      mesh.garbage_collection();
-      return convert_mesh<IndexedMeshData>(mesh);
-    }
-
-    IndexedMeshData collapse_vert(const std::vector<eig::Array3f> &verts,
-                                  const std::vector<eig::Array3u> &elems,
-                                  uint i) {
-      // Generate openmesh representation to perform mesh operations
-      auto mesh = convert_mesh<HalfedgeMeshData>(IndexedMeshData { verts, elems });
-
-      // Acquire handle to relevant center vertex and surrounding faces/verts
-      auto vh = mesh.vertex_handle(i);
-
-      // Remove trio of faces around vertex and fill hole with a single face
-      auto [vh0, vh1, vh2] = mesh.vv_range(vh).to_array<3>();
-      mesh.delete_vertex(vh);
-      mesh.add_face(vh1, vh0, vh2);
-
-      mesh.garbage_collection();
-      return convert_mesh<IndexedMeshData>(mesh);
-    }
-  } // namespace detail
-
   class ViewportInputTask : public detail::AbstractTask {
   public:
     ViewportInputTask(const std::string &name)
@@ -76,10 +31,8 @@ namespace met {
     
       // Add subtasks
       info.emplace_task_after<ViewportInputVertTask>(name(), name() + "_vert");
-      // info.emplace_task_after<ViewportInputElemTask>(name(), name() + "_elem");
 
       // Share resources
-      info.emplace_resource<detail::ViewportInputMode>("mode", detail::ViewportInputMode::eVertex);
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
@@ -88,7 +41,6 @@ namespace met {
 
       // Remove subtasks
       info.remove_task(name() + "_vert");
-      info.remove_task(name() + "_elem");
     }
 
     void eval(detail::TaskEvalInfo &info) override {
@@ -98,13 +50,10 @@ namespace met {
       auto &io               = ImGui::GetIO();
       auto &e_window         = info.get_resource<gl::Window>(global_key, "window");
       auto &i_arcball        = info.get_resource<detail::Arcball>("arcball");
-      auto &i_mode           = info.get_resource<detail::ViewportInputMode>("mode");
-      auto &e_selection_vert = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-      auto &e_selection_elem = info.get_resource<std::vector<uint>>("viewport_input_elem", "selection");
+      auto &e_vert_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
       auto &e_appl_data      = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data      = e_appl_data.project_data;
       auto &e_verts          = e_appl_data.project_data.vertices;
-      auto &e_elems          = e_appl_data.project_data.gamut_elems;
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -112,7 +61,7 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());     
 
-      // Handle edit mode selection window
+      /* // Handle edit mode selection window
       constexpr auto window_flags = 
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
@@ -124,8 +73,8 @@ namespace met {
 
       ImGui::SetNextWindowPos(overlay_offs);
       ImGui::SetNextWindowSize(overlay_size);
-      
-      if (ImGui::Begin("Edit mode", nullptr, window_flags)) {
+       */
+     /*  if (ImGui::Begin("Edit mode", nullptr, window_flags)) {
         // Handle edit mode flags
         int m = static_cast<int>(i_mode);
         ImGui::RadioButton("Vertex", &m, static_cast<int>(detail::ViewportInputMode::eVertex));
@@ -139,25 +88,25 @@ namespace met {
 
         // Reset selections if edit mode was changed
         if (auto mode = detail::ViewportInputMode(m); mode != i_mode) {
-          e_selection_vert.clear();
+          e_vert_selection.clear();
           e_selection_elem.clear();
           i_mode = mode;
         }
 
         // Given vertex edit mode and a potential selection, display options
-        if (i_mode == detail::ViewportInputMode::eVertex && e_selection_vert.size() == 1) {
+        if (i_mode == detail::ViewportInputMode::eVertex && e_vert_selection.size() == 1) {
           ImGui::Separator();
           if (ImGui::Button("Collapse vertex")) {
             // Obtain mesh data with the collapsed vertex
             std::vector<Colr> colrs_i;
             std::ranges::transform(e_verts, std::back_inserter(colrs_i), [](const auto &v) { return v.colr_i; });
-            auto [_, elems] = detail::collapse_vert(colrs_i, e_elems, e_selection_vert[0]);
+            auto [_, elems] = detail::collapse_vert(colrs_i, e_elems, e_vert_selection[0]);
             
             // Apply data modification to project
             e_appl_data.touch({
               .name = "Collapse vertex",
               .redo = [elems = elems,
-                       i     = e_selection_vert[0]](auto &data) {
+                       i     = e_vert_selection[0]](auto &data) {
                 data.gamut_elems  = elems;
                 data.vertices.erase(data.vertices.begin() + i);
               },
@@ -170,7 +119,7 @@ namespace met {
 
             // Clear selection to prevent issues down the line with non-existent 
             // data still being selected
-            e_selection_vert.clear();
+            e_vert_selection.clear();
             e_selection_elem.clear();
           }
         }
@@ -205,7 +154,7 @@ namespace met {
             });
 
             // Clear selection to prevent issues down the line with non-existent data being selected
-            e_selection_vert.clear(); 
+            e_vert_selection.clear(); 
             e_selection_elem.clear();
           }
         }
@@ -217,7 +166,7 @@ namespace met {
           fmt::print("chull_verts = np.array({})\nchull_elems = np.array({})\n", verts, e_elems);
         }
       }
-      ImGui::End();
+      ImGui::End(); */
 
       // If window is not hovered, exit now instead of handling camera input
       guard(ImGui::IsItemHovered());

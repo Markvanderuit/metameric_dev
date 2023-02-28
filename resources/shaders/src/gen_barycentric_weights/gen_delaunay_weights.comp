@@ -1,13 +1,5 @@
 #version 460 core
 
-// Enable necessary subgroup extensions
-#extension GL_KHR_shader_subgroup_basic      : require
-#extension GL_KHR_shader_subgroup_arithmetic : require
-#extension GL_KHR_shader_subgroup_clustered  : require
-
-#pragma optionNV(fastmath on)
-#pragma optionNV(fastprecision on)
-
 #include <guard.glsl>
 #include <math.glsl>
 
@@ -53,20 +45,26 @@ void main() {
   guard(i < b_unif.n);
   
   vec3 p = b_posi_in.data[i];
-
+  
+  float err_ = 1000.f;
   vec4 bary_ = vec4(0);
   uint j_ = 0;
+
   for (uint j = 0; j < b_unif.n_elems; ++j) {
     uvec4 elem = s_elems_in[j];
-    mat4 vert = transpose(mat4(vec4(s_verts_in[elem[0]], 0), 
-                               vec4(s_verts_in[elem[1]], 0),
-                               vec4(s_verts_in[elem[2]], 0), 
-                               vec4(s_verts_in[elem[3]], 0)));
+    mat3 t = inverse(mat3(s_verts_in[elem[0]] - s_verts_in[elem[3]],
+                          s_verts_in[elem[1]] - s_verts_in[elem[3]],
+                          s_verts_in[elem[2]] - s_verts_in[elem[3]]));
+    vec3 xyz = t * (p - s_verts_in[elem[3]]);
+    vec4 bary = vec4(xyz, 1.f - hsum(xyz));
 
-    vec4 bary = inverse(vert) * vec4(p, 0);
-    if (all(equal(bary, clamp(bary, 0, 1)))) {
+    // Take closest fit
+    float err = dot(bary, clamp(bary, 0, 1));
+    if (err < err_) {
       bary_ = bary;
       j_ = j;
+      err_ = err;
+      break;
     }
   }
 

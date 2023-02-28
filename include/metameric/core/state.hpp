@@ -28,7 +28,6 @@ namespace met {
     bool any_illuminants;
     bool any_cmfs;
     bool any_verts;
-    bool any_elems;
     bool any_csys;
 
     std::vector<CacheVert> verts;
@@ -47,10 +46,6 @@ namespace met {
     // Vertex selection in viewport
     bool vert_selection;
     bool vert_mouseover;
-
-    // Element selection in viewport
-    bool elem_selection;
-    bool elem_mouseover;
 
     // Constraint selection in viewport overlay
     bool cstr_selection;

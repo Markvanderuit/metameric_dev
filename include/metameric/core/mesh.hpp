@@ -27,33 +27,10 @@ namespace met {
     std::vector<Vertex>  verts;
     std::vector<Element> elems;
   };
-  using IndexedMeshData = TemplateMeshData<eig::Array3f, eig::Array3u>;
-  using AlignedMeshData = TemplateMeshData<eig::AlArray3f, eig::Array3u>;
-
-
-  // Simple, indexed triangle mesh representation
- /*  using IndexedMeshData = std::pair<
-    std::vector<eig::Array3f>,
-    std::vector<eig::Array3u>
-  >; */
-
-  // Simple, indexed triangle mesh representation with packed vec3 data (for OpenGL)
-  /* using AlignedMeshData = std::pair<
-    std::vector<eig::AlArray3f>,
-    std::vector<eig::Array3u>
-  >; */
-
-  // Simple, indexed delaunay mesh representation
-  using IndexedDelaunayData = std::pair<
-    std::vector<eig::Array3f>,
-    std::vector<std::array<eig::Array3u, 4>>
-  >;
-
-  // Simple, indexed triangle delaunay representation with better packed vec3 data (for OpenGL)
-  using AlignedDelaunayData = std::pair<
-    std::vector<eig::AlArray3f>,
-    std::vector<std::array<eig::Array3u, 4>>
-  >;
+  using IndexedMeshData     = TemplateMeshData<eig::Array3f,   eig::Array3u>;
+  using AlignedMeshData     = TemplateMeshData<eig::AlArray3f, eig::Array3u>;
+  using IndexedDelaunayData = TemplateMeshData<eig::Array3f,   eig::Array4u>;
+  using AlignedDelaunayData = TemplateMeshData<eig::AlArray3f, eig::Array4u>;
 
   // Convert between halfedge/indexed/aligned mesh data structures
   template <typename OutputMesh, typename InputMesh>
@@ -74,8 +51,8 @@ namespace met {
   Mesh generate_convex_hull(std::span<const Vector> data);
 
   // Returns a set of simplices representing a delaunay triangulation of a set of points in 3D
-  template <typename Delaunay, typename Vector>
-  Delaunay generate_delaunay(std::span<const Vector> data);
+  template <typename Mesh, typename Vector>
+  Mesh generate_delaunay(std::span<const Vector> data);
 
   /* Mesh simplification functions */
 
