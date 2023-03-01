@@ -1,11 +1,7 @@
 #version 460 core
 
-#extension GL_KHR_shader_subgroup_basic      : require
-#extension GL_KHR_shader_subgroup_clustered  : require
-
 #include <guard.glsl>
 #include <math.glsl>
-#include <bary.glsl>
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -13,30 +9,51 @@ layout(std430)             buffer;
 layout(std140)             uniform;
 
 // Shader storage buffer declarations
-layout(binding = 0) restrict readonly  buffer b_0 { Bary4 data[]; } b_bary_in;
-layout(binding = 1) restrict readonly  buffer b_1 { vec3  data[]; } b_colr_in;
-layout(binding = 2) restrict writeonly buffer b_2 { vec3  data[]; } b_colr_out;
+layout(binding = 0) restrict readonly  buffer b_0 { vec4  data[]; } b_bary_in;
+layout(binding = 1) restrict readonly  buffer b_1 { vec3  data[]; } b_vert_in;
+layout(binding = 2) restrict readonly  buffer b_2 { uvec4 data[]; } b_elem_in;
+layout(binding = 3) restrict writeonly buffer b_3 { vec3  data[]; } b_colr_out;
+
+// Constants
+const uint max_verts_support = 256;
+const uint max_elems_support = 256;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {
   uint n;
   uint n_verts;
-  uint selection[barycentric_weights];
+  uint n_elems;
+  uint selection[max_verts_support];
 } b_unif;
 
-const uint sg_cluster_size = barycentric_weights;
+// Shared memory declarations
+shared vec3  s_verts_in[max_verts_support]; // Shared load of b_vert_in buffer
+shared uvec4 s_elems_in[max_elems_support]; // Shared load of b_elem_in buffer
+
+void load_shared() {
+  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
+    s_verts_in[i] = b_vert_in.data[i];
+  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_elems; i += gl_WorkGroupSize.x)
+    s_elems_in[i] = b_elem_in.data[i];
+  memoryBarrierShared();
+  barrier();
+}
 
 void main() {
-  const uint i = gl_GlobalInvocationID.x / sg_cluster_size;
-  const uint j = gl_GlobalInvocationID.x % sg_cluster_size;
-
+  load_shared();
+  
+  const uint i = gl_GlobalInvocationID.x;
   guard(i < b_unif.n);
 
-  float f = (j < b_unif.n_verts && b_unif.selection[j] != 0) 
-          ? b_bary_in.data[i][j / 4][j % 4] 
-          : 0.f;
-  float s = subgroupClusteredAdd(f, sg_cluster_size); // / b_bsum_in.data[i];
+  // Load relevant barycentric weights and vertex indices
+  uvec4 idx = s_elems_in[floatBitsToUint(b_bary_in.data[i].w)];
+  vec3 xyz  = b_bary_in.data[i].xyz;
+  vec4 bary = vec4(xyz, 1.f - hsum(xyz));
 
-  if (j == 0)
-    b_colr_out.data[i] = b_colr_in.data[i] * s;
+  // Compute convex combination of vertex colors, negating unselected vertices
+  vec3 v = vec3(0);
+  for (uint j = 0; j < 4; ++j)
+    v += float(b_unif.selection[idx[j]]) * bary[j] * s_verts_in[idx[j]];
+
+  b_colr_out.data[i] = v;
 }

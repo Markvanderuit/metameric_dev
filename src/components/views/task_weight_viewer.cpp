@@ -1,4 +1,5 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_weight_viewer.hpp>
@@ -9,6 +10,7 @@ namespace met {
   constexpr auto sub_resample_fmt = FMT_COMPILE("{}_gen_resample");
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr uint buffer_init_size = 64u;
 
   WeightViewerTask::WeightViewerTask(const std::string &name)
   : detail::AbstractTask(name, false) { }
@@ -17,22 +19,23 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
 
-    // Nr. of workgroups for sum computation
-    const uint dispatch_n    = e_texture.size().prod();
-    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / barycentric_weights);
+    // Determine dispatch group size
+    const uint dispatch_n    = e_appl_data.loaded_texture_f32.size().prod();
+    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
 
     // Initialize objects for shader call
     m_program = {{ .type = gl::ShaderType::eCompute,
                    .path = "resources/shaders/viewport/draw_weights.comp.spv_opt",
                    .is_spirv_binary = true }};
-    m_dispatch = { .groups_x = dispatch_ndiv, 
-                   .bindable_program = &m_program }; 
+    m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
 
-    // Initialize uniform buffer and writeable, flushable mapping
+    // Initialize relevant buffers and writeable, flushable mapping
+    m_vert_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
+    m_vert_map    = m_vert_buffer.map_as<AlColr>(buffer_access_flags);
     m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_unif_map = &m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
 
     // Initialize buffer object for storing intermediate results
     info.emplace_resource<gl::Buffer>("colr_buffer", { .size = sizeof(AlColr) * dispatch_n });
@@ -40,12 +43,17 @@ namespace met {
     // Insert subtask to handle buffer->texture and lrgb->srgb conversion
     TextureSubtask task = {{ .input_key  = { name(), "colr_buffer" },
                              .output_key = { fmt::format(sub_texture_fmt, name()), "colr_texture" },
-                             .texture_info = { .size = e_texture.size() }}};
+                             .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
     info.insert_task_after(name(), std::move(task));
   }
   
   void WeightViewerTask::dstr(detail::TaskDstrInfo &info) {
     met_trace_full();
+
+    if (m_unif_buffer.is_init() && m_unif_buffer.is_mapped()) 
+      m_unif_buffer.unmap();
+    if (m_vert_buffer.is_init() && m_vert_buffer.is_mapped()) 
+      m_vert_buffer.unmap();
 
     info.remove_task(fmt::format(sub_texture_fmt, name()));
     info.remove_task(fmt::format(sub_resample_fmt, name()));
@@ -89,7 +97,6 @@ namespace met {
       eval_view(info);
     }
     ImGui::End();
-
   }
 
   void WeightViewerTask::eval_draw(detail::TaskEvalInfo &info) {
@@ -114,24 +121,36 @@ namespace met {
     // Get shared resources 
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
+    auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
     auto &e_cstr_slct   = info.get_resource<int>("viewport_overlay", "constr_selection");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
-    uint mapping_index  = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
-    auto &e_colr_buffer = info.get_resource<gl::Buffer>(fmt::format("gen_color_mapping_{}", mapping_index), "colr_buffer");
+    auto &e_tetr_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
+    auto &e_vert_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
+    uint mapping_i  = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
 
     // Update uniform data for upcoming sum computation
     m_unif_map->n       = e_appl_data.loaded_texture_f32.size().prod();
-    m_unif_map->n_verts = e_appl_data.project_data.vertices.size();
-    std::ranges::fill(m_unif_map->selection, eig::Array4u(0));
+    m_unif_map->n_verts = e_delaunay.verts.size();
+    m_unif_map->n_elems = e_delaunay.elems.size();
+    std::fill(m_unif_map->selection, m_unif_map->selection + e_proj_data.vertices.size(), 0);
     std::ranges::for_each(e_selection, [&](uint i) { m_unif_map->selection[i] = 1; });
     m_unif_buffer.flush();
 
+    // Update vertex data, given any state change
+    ColrSystem csys = e_proj_data.csys(mapping_i);
+    for (uint i = 0; i < e_proj_data.vertices.size(); ++i) {
+      guard_continue(activate_flag || e_pipe_state.verts[i].any);
+      m_vert_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
+      m_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
+    }
+
     // Bind resources to buffer targets for upcoming computation
-    e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
     m_unif_buffer.bind_to(gl::BufferTargetType::eUniform,       0);
+    e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
+    m_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
+    e_tetr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
+    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
 
     // Dispatch shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
