@@ -32,12 +32,11 @@ namespace met {
     met_trace_full();
 
     // Add drawing subtasks in reverse order
-    info.emplace_task_after<ViewportDrawEndTask>(name(),     name() + draw_end_name);
-    info.emplace_task_after<ViewportDrawDelaunayTask>(name(),name() + draw_delaunay_name);
-    // info.emplace_task_after<ViewportDrawGamutTask>(name(),   name() + draw_gamut_name);
-    info.emplace_task_after<ViewportDrawCSysOCSTask>(name(), name() + draw_csys_ocs_name);
-    info.emplace_task_after<ViewportDrawTextureTask>(name(), name() + draw_texture_name);
-    info.emplace_task_after<ViewportDrawBeginTask>(name(),   name() + draw_begin_name);
+    info.emplace_task_after<ViewportDrawEndTask>(name(),      name() + draw_end_name);
+    info.emplace_task_after<ViewportDrawTextureTask>(name(),  name() + draw_texture_name);
+    info.emplace_task_after<ViewportDrawDelaunayTask>(name(), name() + draw_delaunay_name);
+    info.emplace_task_after<ViewportDrawCSysOCSTask>(name(),  name() + draw_csys_ocs_name);
+    info.emplace_task_after<ViewportDrawBeginTask>(name(),    name() + draw_begin_name);
 
     // Add UI subtasks in reverse order
     info.emplace_task_after<ViewportEndTask>(name(),     name() + viewport_end_name);
@@ -56,9 +55,8 @@ namespace met {
     info.remove_task(name() + viewport_end_name);
     info.remove_task(name() + draw_begin_name);
     info.remove_task(name() + draw_csys_ocs_name);
-    // info.remove_task(name() + draw_gamut_name);
-    info.remove_task(name() + draw_texture_name);
     info.remove_task(name() + draw_delaunay_name);
+    info.remove_task(name() + draw_texture_name);
     info.remove_task(name() + draw_end_name);
   }
 

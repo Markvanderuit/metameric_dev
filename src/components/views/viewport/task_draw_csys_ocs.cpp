@@ -101,8 +101,8 @@ namespace met {
     // Set shared OpenGL state for coming draw operations
     gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
-    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true),
-                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
+    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,    true),
+                               gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
     
     // Update varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {

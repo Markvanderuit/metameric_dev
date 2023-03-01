@@ -29,6 +29,7 @@ namespace met {
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
       .vertex_count     = 3 * e_texture_data.size().prod(),
+      .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
@@ -43,7 +44,10 @@ namespace met {
     auto &e_err_buffer  = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state
+    gl::state::set_op(gl::CullOp::eBack);
+    gl::state::set_op(gl::DepthOp::eLess);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,     false),
+                               gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
     // Set varying program uniforms

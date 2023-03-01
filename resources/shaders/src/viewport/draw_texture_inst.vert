@@ -23,7 +23,7 @@ layout(location = 0) out vec2 out_value_vert;
 layout(location = 1) out vec3 out_value_colr;
 
 // Internal constants
-const float point_radius  = 0.002f;
+const float point_radius  = 0.001f;
 
 void main() {
   uint i = gl_VertexID / 3, j = gl_VertexID % 3;

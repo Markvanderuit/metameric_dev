@@ -8,15 +8,29 @@
 
 namespace met {
   class ViewportDrawDelaunayTask : public detail::AbstractTask {
-    gl::Buffer   m_elem_buffer;
-    gl::Array    m_array;
-    gl::DrawInfo m_draw_line;
-    gl::DrawInfo m_draw_fill;
-    gl::Program  m_program;
+    struct UniformBuffer {
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(16) eig::Vector2f camera_aspect;
+    };
+
+    gl::Buffer              m_size_buffer;
+    gl::Buffer              m_elem_buffer;
+    gl::Buffer              m_unif_buffer;
+    std::span<float>        m_size_map;
+    std::span<eig::Array3u> m_elem_map;
+    UniformBuffer          *m_unif_map;
+
+    gl::Array               m_vert_array;
+    gl::DrawInfo            m_vert_draw;
+    gl::Program             m_vert_program;
+    gl::Array               m_elem_array;
+    gl::DrawInfo            m_elem_draw;
+    gl::Program             m_elem_program;
 
   public:
     ViewportDrawDelaunayTask(const std::string &);
     void init(detail::TaskInitInfo &) override;
+    void dstr(detail::TaskDstrInfo &) override;
     void eval(detail::TaskEvalInfo &) override;
   };
 } // namespace met
