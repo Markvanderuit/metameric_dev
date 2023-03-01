@@ -106,6 +106,7 @@ namespace met {
     auto &e_cstr_selct = info.get_resource<int>("viewport_overlay", "constr_selection");
 
     // Iterate over all project data
+    bool pre_verts_resize = e_proj_data.vertices.size() != m_verts.size();
     i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.vertices, m_verts);
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
     std::tie(i_pipe_state.cmfs,        i_pipe_state.any_cmfs)        = detail::compare_state(e_proj_data.cmfs, m_cmfs);
@@ -128,9 +129,8 @@ namespace met {
     }
 
     // Set summary flags over all vertices in project state
-    i_pipe_state.any_verts = std::reduce(range_iter(i_pipe_state.verts), false, 
+    i_pipe_state.any_verts = pre_verts_resize | std::reduce(range_iter(i_pipe_state.verts), false, 
       [](const auto &a, const auto &b) { return a | b.any; });
-
 
     // Set giant summary flag
     i_pipe_state.any = i_pipe_state.any_csys  | 

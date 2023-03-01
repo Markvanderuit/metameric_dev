@@ -22,51 +22,56 @@ layout(binding = 0) uniform u_0 {
 } b_unif;
 
 // Constants
-const uint max_verts = 256;
-const uint max_elems = 256;
+const uint max_verts_support = 256;
+const uint max_elems_support = 256;
 
-shared vec3  s_verts_in[max_verts];
-shared uvec4 s_elems_in[max_elems];
+// Shared memory declarations
+shared vec3  s_verts_in[max_verts_support]; // Shared load of b_vert_in buffer
+shared uvec4 s_elems_in[max_elems_support]; // Shared load of b_elem_in buffer
 
-void load_shared_data() {
+void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
     s_verts_in[i] = b_vert_in.data[i];
   for (uint i = gl_LocalInvocationID.x; i < b_unif.n_elems; i += gl_WorkGroupSize.x)
     s_elems_in[i] = b_elem_in.data[i];
-
   memoryBarrierShared();
   barrier();
 }
 
 void main() {
-  load_shared_data();
+  load_shared();
   
   const uint i = gl_GlobalInvocationID.x;
   guard(i < b_unif.n);
   
   vec3 p = b_posi_in.data[i];
   
-  float err_ = 1000.f;
-  vec4 bary_ = vec4(0);
-  uint j_ = 0;
+  float result_err  = FLT_MAX;
+  vec4 result_bary;
+  uint result_indx;
 
   for (uint j = 0; j < b_unif.n_elems; ++j) {
     uvec4 elem = s_elems_in[j];
-    mat3 t = inverse(mat3(s_verts_in[elem[0]] - s_verts_in[elem[3]],
-                          s_verts_in[elem[1]] - s_verts_in[elem[3]],
-                          s_verts_in[elem[2]] - s_verts_in[elem[3]]));
-    vec3 xyz = t * (p - s_verts_in[elem[3]]);
+
+    // Compute barycentric weights for this tetrahedron
+    vec3 sub = s_verts_in[elem.w];
+    mat3 t = inverse(mat3(s_verts_in[elem.x] - sub, s_verts_in[elem.y] - sub, s_verts_in[elem.z] - sub));
+    vec3 xyz = t * (p - sub);
     vec4 bary = vec4(xyz, 1.f - hsum(xyz));
 
-    // Take closest fit
+    // Compute squared error of potentially negative barycentric weights
     float err = dot(bary, clamp(bary, 0, 1));
-    if (err < err_) {
-      bary_ = bary;
-      j_ = j;
-      err_ = err;
-    }
+
+    // Store best result if error is improved
+    guard_continue(err < result_err);
+    result_err  = err;
+    result_bary = bary;
+    result_indx = j;
+
+    // Exit early if error is zero
+    guard_break(err != 0);
   }
 
-  // Store result, packing 3/4th of weights together with the element index
-  b_bary_out.data[i] = vec4(bary_.xyz, uintBitsToFloat(j_));
+  // Store result, packing 3/4th of weights, together with the tetrahedron's index
+  b_bary_out.data[i] = vec4(result_bary.xyz, uintBitsToFloat(result_indx));
 }

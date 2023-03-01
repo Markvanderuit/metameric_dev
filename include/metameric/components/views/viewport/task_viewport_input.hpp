@@ -21,6 +21,11 @@ namespace met {
   const float overlay_padding = 8.f;
   const float overlay_width   = 192.f;
 
+  // Flags for the input overlay window
+  constexpr auto window_flags = 
+    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
+    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
+
   class ViewportInputTask : public detail::AbstractTask {
   public:
     ViewportInputTask(const std::string &name)
@@ -29,17 +34,13 @@ namespace met {
     void init(detail::TaskInitInfo &info) override {
       met_trace_full();
     
-      // Add subtasks
+      // Add subtasks, share resources
       info.emplace_task_after<ViewportInputVertTask>(name(), name() + "_vert");
-
-      // Share resources
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
     void dstr(detail::TaskDstrInfo &info) override {
       met_trace_full();
-
-      // Remove subtasks
       info.remove_task(name() + "_vert");
     }
 
@@ -53,7 +54,6 @@ namespace met {
       auto &e_vert_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
       auto &e_appl_data      = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data      = e_appl_data.project_data;
-      auto &e_verts          = e_appl_data.project_data.vertices;
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -61,11 +61,7 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());     
 
-      /* // Handle edit mode selection window
-      constexpr auto window_flags = 
-        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
-
+      // Compute overlay window dimensions, taking into account padding in the top-right corner
       float actual_padding = overlay_padding * e_window.content_scale();
       eig::Array2f overlay_size = { overlay_width * e_window.content_scale() , 0.f };
       eig::Array2f overlay_offs = { viewport_offs.x() - actual_padding + viewport_size.x() - overlay_size.x(), 
@@ -73,7 +69,45 @@ namespace met {
 
       ImGui::SetNextWindowPos(overlay_offs);
       ImGui::SetNextWindowSize(overlay_size);
-       */
+
+      if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
+        ImGui::Value("Vertices", static_cast<uint>(e_proj_data.vertices.size()));
+        if (ImGui::Button("Add vertex")) {
+          // Apply data modification to project
+          e_appl_data.touch({
+            .name = "Add vertex",
+            .redo = [](auto &data) { data.vertices.push_back({ .colr_i = Colr(0.5), .csys_i = 0 }); },
+            .undo = [](auto &data) { data.vertices.pop_back(); }
+          });
+
+          // Select newly added vertex
+          e_vert_selection = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
+        }
+        ImGui::SameLine();
+        if (e_vert_selection.empty()) ImGui::BeginDisabled();
+        if (ImGui::Button("Remove vertex")) {
+          // Collect back-to-front indices of deleted vertices, s.t. they can be removed from std::vector without affecting order
+          std::vector<uint> indices = e_vert_selection;
+          std::ranges::sort(indices, std::ranges::greater());
+
+          // Apply data modification to project
+          e_appl_data.touch({
+            .name = "Remove vertex",
+            .redo = [edit = indices](auto &data) { 
+              for (uint i : edit)
+                data.vertices.erase(data.vertices.begin() + i);
+            }, .undo = [edit = e_proj_data.vertices](auto &data) { 
+              data.vertices = edit;
+            }
+          });
+
+          // Clear selection after deleting vertex
+          e_vert_selection.clear();
+        }
+        if (e_vert_selection.empty()) ImGui::EndDisabled();
+      }
+      ImGui::End();
+
      /*  if (ImGui::Begin("Edit mode", nullptr, window_flags)) {
         // Handle edit mode flags
         int m = static_cast<int>(i_mode);
