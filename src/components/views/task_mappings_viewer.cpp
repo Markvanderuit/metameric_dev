@@ -78,16 +78,14 @@ namespace met {
     // Unpack barycentric weights and get corresponding tetrahedron from delaunay
     const auto &bary_data = m_tooltip_maps[m_tooltip_cycle_i][0];
     eig::Array4f bary = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
-    eig::Array4u elem = e_delaunay.elems[*reinterpret_cast<const uint *>(&bary_data.w())];
+    eig::Array4u elem = e_delaunay.elems[*reinterpret_cast<const uint *>(&bary_data.w())].min(e_delaunay.verts.size() - 1);
 
-    // Compute output reflectance
-    ColrSystem mapp  = e_proj_data.csys(texture_i);
+    // Compute output reflectance and color as convex combinations
     Spec reflectance = 0;
-    Colr color       = 0;
-    for (uint i = 0; i < 4; ++i) {
+    for (uint i = 0; i < 4; ++i)
       reflectance += bary[i] * e_vert_spec[elem[i]];
-      color += bary[i] * mapp.apply_color_indirect(e_vert_spec[elem[i]]);
-    }
+    ColrSystem mapp  = e_proj_data.csys(texture_i);
+    Colr color = mapp.apply_color_indirect(reflectance);
     Spec power = mapp.illuminant * reflectance;
 
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,

@@ -48,12 +48,13 @@ namespace met {
       met_trace_full();
                       
       // Get shared resources
-      auto &io               = ImGui::GetIO();
-      auto &e_window         = info.get_resource<gl::Window>(global_key, "window");
-      auto &i_arcball        = info.get_resource<detail::Arcball>("arcball");
-      auto &e_vert_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-      auto &e_appl_data      = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_proj_data      = e_appl_data.project_data;
+      auto &io          = ImGui::GetIO();
+      auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
+      auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
+      auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+      auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
+      auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_proj_data = e_appl_data.project_data;
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -72,6 +73,8 @@ namespace met {
 
       if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
         ImGui::Value("Vertices", static_cast<uint>(e_proj_data.vertices.size()));
+
+        // Describe a button whichs adds a vertex
         if (ImGui::Button("Add vertex")) {
           // Apply data modification to project
           e_appl_data.touch({
@@ -81,13 +84,17 @@ namespace met {
           });
 
           // Select newly added vertex
-          e_vert_selection = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
+          e_vert_slct = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
+          e_cstr_slct = -1;
         }
+
         ImGui::SameLine();
-        if (e_vert_selection.empty()) ImGui::BeginDisabled();
+
+        // Describe a button which removes one or more vertices, visible only if vertices are selected
+        if (e_vert_slct.empty()) ImGui::BeginDisabled();
         if (ImGui::Button("Remove vertex")) {
           // Collect back-to-front indices of deleted vertices, s.t. they can be removed from std::vector without affecting order
-          std::vector<uint> indices = e_vert_selection;
+          std::vector<uint> indices = e_vert_slct;
           std::ranges::sort(indices, std::ranges::greater());
 
           // Apply data modification to project
@@ -102,9 +109,10 @@ namespace met {
           });
 
           // Clear selection after deleting vertex
-          e_vert_selection.clear();
+          e_vert_slct.clear();
+          e_cstr_slct = -1;
         }
-        if (e_vert_selection.empty()) ImGui::EndDisabled();
+        if (e_vert_slct.empty()) ImGui::EndDisabled();
       }
       ImGui::End();
 
@@ -122,25 +130,25 @@ namespace met {
 
         // Reset selections if edit mode was changed
         if (auto mode = detail::ViewportInputMode(m); mode != i_mode) {
-          e_vert_selection.clear();
+          e_vert_slct.clear();
           e_selection_elem.clear();
           i_mode = mode;
         }
 
         // Given vertex edit mode and a potential selection, display options
-        if (i_mode == detail::ViewportInputMode::eVertex && e_vert_selection.size() == 1) {
+        if (i_mode == detail::ViewportInputMode::eVertex && e_vert_slct.size() == 1) {
           ImGui::Separator();
           if (ImGui::Button("Collapse vertex")) {
             // Obtain mesh data with the collapsed vertex
             std::vector<Colr> colrs_i;
             std::ranges::transform(e_verts, std::back_inserter(colrs_i), [](const auto &v) { return v.colr_i; });
-            auto [_, elems] = detail::collapse_vert(colrs_i, e_elems, e_vert_selection[0]);
+            auto [_, elems] = detail::collapse_vert(colrs_i, e_elems, e_vert_slct[0]);
             
             // Apply data modification to project
             e_appl_data.touch({
               .name = "Collapse vertex",
               .redo = [elems = elems,
-                       i     = e_vert_selection[0]](auto &data) {
+                       i     = e_vert_slct[0]](auto &data) {
                 data.gamut_elems  = elems;
                 data.vertices.erase(data.vertices.begin() + i);
               },
@@ -153,7 +161,7 @@ namespace met {
 
             // Clear selection to prevent issues down the line with non-existent 
             // data still being selected
-            e_vert_selection.clear();
+            e_vert_slct.clear();
             e_selection_elem.clear();
           }
         }
@@ -188,7 +196,7 @@ namespace met {
             });
 
             // Clear selection to prevent issues down the line with non-existent data being selected
-            e_vert_selection.clear(); 
+            e_vert_slct.clear(); 
             e_selection_elem.clear();
           }
         }
