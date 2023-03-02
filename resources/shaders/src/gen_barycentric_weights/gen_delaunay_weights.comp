@@ -69,7 +69,7 @@ void main() {
     result_indx = j;
 
     // Exit early if error is zero
-    guard_break(err != 0);
+    // guard_break(err != 0);
   }
 
   // Store result, packing 3/4th of weights, together with the tetrahedron's index

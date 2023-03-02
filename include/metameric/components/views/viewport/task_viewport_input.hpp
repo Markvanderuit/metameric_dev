@@ -2,6 +2,7 @@
 
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_task.hpp>
@@ -55,6 +56,7 @@ namespace met {
       auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_appl_data.project_data;
+      auto &e_delaunay  = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -72,7 +74,8 @@ namespace met {
       ImGui::SetNextWindowSize(overlay_size);
 
       if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
-        ImGui::Value("Vertices", static_cast<uint>(e_proj_data.vertices.size()));
+        ImGui::Value("Vertices", static_cast<uint>(e_delaunay.verts.size()));
+        ImGui::Value("Elements", static_cast<uint>(e_delaunay.elems.size()));
 
         // Describe a button whichs adds a vertex
         if (ImGui::Button("Add vertex")) {

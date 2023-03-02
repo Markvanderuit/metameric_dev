@@ -15,19 +15,17 @@ namespace met {
       return path.replace_extension(ext);
     }
 
-    /* Header block for spectral texture export format */
-    struct SpectralDataHeader {
-      float wvl_min     = wavelength_min;
-      float wvl_max     = wavelength_max;
-      uint  wvl_samples = wavelength_samples;
-      uint  func_count;
-      uint  wght_xres;
-      uint  wght_yres;
-    };
-
     /* Data block for spectral texture export format */
     struct SpectralData {
-      SpectralDataHeader header;
+      // Header data
+      float spec_min     = wavelength_min;
+      float spec_max     = wavelength_max;
+      uint  spec_samples = wavelength_samples;
+      uint  bary_xres;
+      uint  bary_yres;
+      uint  bary_zres;
+
+      // Bulk data
       std::span<float> functions;
       std::span<float> weights;
     };

@@ -19,7 +19,7 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite 
                                      | gl::BufferAccessFlags::eMapPersistent
                                      | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size = 64u;
+  constexpr uint buffer_init_size = 256u;
 
   GenSpectralDataTask::GenSpectralDataTask(const std::string &name)
   : detail::AbstractTask(name) { }

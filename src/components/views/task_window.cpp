@@ -1,4 +1,5 @@
 #include <metameric/core/io.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/schedule.hpp>
@@ -85,26 +86,56 @@ namespace met {
     met_trace_full();
 
     if (fs::path path; detail::save_dialog(path, "met")) {
-      using AlWeight = eig::Array<float, barycentric_weights, 1>;
-
       // Get shared resources
-      auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_prj_data = e_app_data.project_data;
-      auto &e_wght_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
-      auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
-
-      // Used sizes
-      const uint func_count  = static_cast<uint>(e_prj_data.vertices.size());
-      const auto weights_res = e_app_data.loaded_texture_f32.size();
+      auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_prj_data    = e_app_data.project_data;
+      auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
+      auto &e_spectra     = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+      auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 
                                 gl::BarrierFlags::eShaderStorageBuffer | 
                                 gl::BarrierFlags::eClientMappedBuffer  );
 
+      // Obtain packed barycentric data from buffer
+      std::vector<eig::Array4f> bary_data(e_bary_buffer.size() / sizeof(float));
+      e_bary_buffer.get_as<eig::Array4f>(bary_data);
+
+      // Pack interleaved spectral data 
+      std::vector<eig::Array4f> spec_data(wavelength_samples * e_delaunay.elems.size());
+      for (uint i = 0; i < e_delaunay.elems.size(); ++i) {
+        const auto &el = e_delaunay.elems[i];
+
+        // Gather the four relevant spectra for this element
+        std::array<Spec, 4> el_spectra;
+        std::ranges::transform(el, el_spectra.begin(), [&](uint i) { return e_spectra[i]; });
+
+        // Interleave values and scatter into data so four values are accessed in one query
+        for (uint j = 0; j < wavelength_samples; ++j)
+          spec_data[i * wavelength_samples + j] = eig::Array4f {
+            el_spectra[0][j], el_spectra[1][j], el_spectra[2][j], el_spectra[3][j], 
+          };
+      }
+
+      // Save data to specified filepath
+      io::save_spectral_data({
+        .bary_xres = e_app_data.loaded_texture_f32.size()[0],
+        .bary_yres = e_app_data.loaded_texture_f32.size()[1],
+        .bary_zres = static_cast<uint>(e_delaunay.elems.size()),
+        .functions = cnt_span<float>(spec_data),
+        .weights   = cnt_span<float>(bary_data)
+      }, io::path_with_ext(path, ".met"));
+
+/* 
+      // Used sizes
+      const uint func_count  = static_cast<uint>(e_prj_data.vertices.size());
+      const auto weights_res = e_app_data.loaded_texture_f32.size();
+
+
       // Obtain padded weight data from buffers
-      std::vector<AlWeight> bary_data(e_wght_buffer.size() / sizeof(AlWeight));
-      e_wght_buffer.get(cnt_span<std::byte>(bary_data));
+      std::vector<AlWeight> bary_data(e_bary_buffer.size() / sizeof(AlWeight));
+      e_bary_buffer.get(cnt_span<std::byte>(bary_data));
 
       // Copy weights without padding to wght_data_out
       std::vector<float> wght_data_out(bary_data.size() * func_count);
@@ -128,7 +159,7 @@ namespace met {
         },
         .functions = cnt_span<float>(spec_data_out), 
         .weights   = cnt_span<float>(wght_data_out)
-      }, io::path_with_ext(path, ".met"));
+      }, io::path_with_ext(path, ".met")); */
 
       return true;
     }

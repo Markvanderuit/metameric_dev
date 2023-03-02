@@ -178,24 +178,19 @@ namespace met::io {
     // Attempt to open output file stream in binary mode using zlib stream wrapper
     zstr::ofstream ofs(path.string(), std::ios::out | std::ios::binary, 9);
 
-    // Cast [0, 1]-bounded weights to 16 bit fixed point
-    constexpr auto fcompact = [](float f) -> ushort { 
-      constexpr float multiplier = static_cast<float>(std::numeric_limits<unsigned short>::max());
-      return static_cast<ushort>(std::round(std::clamp(f, 0.f, 1.f) * multiplier)); 
-    };
-    std::vector<ushort> weights_compact(data.weights.size());
-    std::transform(std::execution::par_unseq, range_iter(data.weights), weights_compact.begin(), fcompact);
+    // Output header data
+    std::array<float, 2> header_f = { data.spec_min, data.spec_max };
+    std::array<uint, 4>  header_u = { data.spec_samples, data.bary_xres, data.bary_yres, data.bary_zres };
+    ofs.write((const char *) header_f.data(), sizeof(float) * header_f.size());
+    ofs.write((const char *) header_u.data(), sizeof(uint) * header_u.size());
 
-    // Expected data sizes
-    constexpr size_t header_size = sizeof(SpectralDataHeader);
+    // Output bulk data
     const size_t functions_size  = data.functions.size() * sizeof(decltype(data.functions)::value_type);
     const size_t weights_size    = data.weights.size() * sizeof(decltype(data.weights)::value_type);
-    // const size_t weights_size    = weights_compact.size() * sizeof(decltype(weights_compact)::value_type);
-
-    ofs.write((const char *) &data.header, header_size);
     ofs.write((const char *) data.functions.data(), functions_size);
     ofs.write((const char *) data.weights.data(), weights_size);
-    // ofs.write((const char *) weights_compact.data(), weights_size);
+
+    // Flush only; ofs closes on destruction
     ofs.flush();
   }
 
