@@ -14,10 +14,11 @@
 #include <algorithm>
 #include <chrono>
 #include <execution>
+#include <mutex>
 #include <numbers>
 #include <ranges>
 #include <random>
-#include <mutex>
+#include <unordered_map>
 
 namespace met {
   namespace detail {
@@ -250,25 +251,51 @@ namespace met {
 
     // Relevant settings for the following section
     // TODO expose parameter to users in input view
-    const uint n_samples = 48;
+    const uint n_samples = 64;
 
     // Data store for next steps
-    std::vector<uint>              samples(n_samples);
+    std::vector<uint>              sampleable_indices;
+    std::vector<uint>              samples;
     std::vector<Colr>              sample_colr_i(n_samples);
     std::vector<std::vector<Colr>> sample_colr_j(n_samples);
+
+    /* 0. Build a set of available color values s.t. identical pixels are not sampled twice  */
+    {
+      // Instantiate an unordered map storing color/uint pairs
+      using MapValue = eig::Array3u;
+      std::unordered_map<
+        MapValue, 
+        uint, 
+        decltype(eig::detail::matrix_hash<MapValue::value_type>), 
+        decltype(eig::detail::matrix_equal)
+      > indices_map;
+
+      // Insert indices of discretized image colors into the map, if they do not yet exist
+      auto colr_i_span = loaded_texture_f32.data();
+      for (uint i = 0; i < colr_i_span.size(); ++i)
+        indices_map.insert({ (colr_i_span[i] * 64).cast<uint>(), i });
+
+      // Export resulting set of indices to sampleable_indices
+      sampleable_indices.resize(indices_map.size());
+      std::transform(std::execution::par_unseq, range_iter(indices_map), sampleable_indices.begin(),
+        [](const auto &pair) { return pair.second; });
+
+      fmt::print("Sampleable set: {} -> {}\n", colr_i_span.size(), sampleable_indices.size());
+    }
 
     /* 1. Sample a random subset of pixels from the textures and obtain their color values */
     // TODO: sample a histogram of the image's colors instead
     {
       auto colr_i_span = loaded_texture_f32.data();
         
-      // Define random distribution over image span
+      // Define random generator
       std::random_device rd;
-      std::mt19937 eng(rd());
-      std::uniform_int_distribution<uint> distr(0, colr_i_span.size() - 1);
+      std::mt19937 gen(rd());
 
-      // Draw random sample indices
-      std::ranges::generate(samples, [&]{ return distr(eng); });
+      // Draw random, unique indices from sampleable_indices
+      samples = sampleable_indices;
+      std::shuffle(range_iter(samples), gen);
+      samples.resize(std::min(static_cast<size_t>(n_samples), samples.size()));
 
       // Extract sampled colr_i, colr_j from input images
       std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });

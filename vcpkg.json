@@ -24,6 +24,7 @@
     "qhull",
     "stb",
     "tracy",
+    "tinyexr",
     "zlib",
     "zstr"
   ],

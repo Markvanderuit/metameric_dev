@@ -6,7 +6,7 @@
   "registries": [
     {
       "kind": "filesystem",
-      "path": "vcpkg-registry",
+      "path": "third_party/vcpkg-registry",
       "baseline": "2023-02-22",
       "packages": [ "qhull" ]
     }

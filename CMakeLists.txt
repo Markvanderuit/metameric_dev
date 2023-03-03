@@ -59,7 +59,8 @@ find_package(imguizmo  CONFIG REQUIRED)
 find_package(implot    CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(openmesh  CONFIG REQUIRED)
-find_package(Qhull CONFIG REQUIRED)
+find_package(Qhull     CONFIG REQUIRED)
+find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
@@ -81,9 +82,6 @@ find_package(SPIRV-Tools-opt     CONFIG REQUIRED)
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
 option(gl_enable_tracy          "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
-
-# Include third party quickhull library directly
-add_subdirectory(third_party/quickhull)
 
 # Configuration output info
 message(STATUS "Metameric : debug exceptions    = ${met_enable_dbg_exceptions}")
@@ -248,8 +246,8 @@ target_link_libraries(core PUBLIC
   Coin::Clp
   Tracy::TracyClient
   nlohmann_json::nlohmann_json
+  unofficial::tinyexr::tinyexr
   ${OPENMESH_LIBRARIES}
-  quickhull
   Qhull::qhullcpp
   Qhull::qhull_r
   ZLIB::ZLIB

@@ -1,18 +1,110 @@
+#include <metameric/core/math.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
 #include <algorithm>
 #include <execution>
 #include <vector>
+#include <limits>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
+#define TINYEXR_USE_MINIZ  1
+#define TINYEXR_USE_OPENMP 1
+#ifdef _WIN32
+#define NOMINMAX
+#endif
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr.h"
 
 namespace met {
   namespace detail {
     auto v3_to_v4 = [](auto v) { return (eig::Array<decltype(v)::Scalar, 4, 1>() << v, 1).finished(); };
     auto v4_to_v3 = [](auto v) { return v.head<3>(); };
+
+    std::array<std::string, 4> channel_flags = { "B\0", "G\0", "R\0", "A\0" };
+
+    void save_tinyexr(const fs::path &path, std::span<const float> data, uint w, uint h, uint c) {
+      met_trace();
+
+      debug::check_expr_dbg(c <= 4, "maximum 4 channels supported");
+      
+      // Scatter data into per-channel blocks
+      std::vector<std::vector<float>> blocks(c);
+      for (int i = 0; i < c; ++i)
+        blocks[i].resize(w * h);
+      #pragma omp parallel for
+      for (int i = 0; i < data.size(); ++i)
+        blocks[(c - 1) - (i % c)][i / c] = data[i]; // reverse-order
+
+      std::vector<float *> block_ptrs;
+      std::ranges::transform(blocks, std::back_inserter(block_ptrs), [](auto &block) { return block.data(); });
+
+      std::vector<EXRChannelInfo> channels(c);
+      std::vector<int> pixel_types(c);
+      std::vector<int> requested_pixel_types(c);
+      for (uint i = 0; i < c; ++i) {
+        strncpy(channels[i].name, channel_flags[i].data(), channel_flags[i].length());
+        pixel_types[i]           = TINYEXR_PIXELTYPE_FLOAT;
+        requested_pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;
+      }
+
+      EXRHeader header;
+      InitEXRHeader(&header);
+      header.num_channels          = c;
+      header.channels              = channels.data();
+      header.pixel_types           = pixel_types.data();
+      header.requested_pixel_types = pixel_types.data();
+
+      EXRImage image;
+      InitEXRImage(&image);
+      image.width         = w;
+      image.height        = h;
+      image.num_channels  = c;
+      image.images        = (unsigned char **) block_ptrs.data();
+
+      const char *err_code = nullptr;
+      const char *pstr = path.string().c_str();
+      int ret = SaveEXRImageToFile(&image, &header, pstr, &err_code);
+      
+      debug::check_expr_dbg(ret == TINYEXR_SUCCESS,
+        fmt::format("could not save image to \"{}\", code was {}", path.string(), ret));
+    }
+
+    void save_stb(const fs::path &path, std::span<const float> data, uint w, uint h, uint c) {
+      met_trace();
+
+      debug::check_expr_dbg(c <= 4, "maximum 4 channels supported");
+
+      // Convert data to unsigned bytes
+      std::vector<std::byte> byte_data(data.size());
+      std::transform(std::execution::par_unseq,
+        data.begin(), data.end(), byte_data.begin(),
+        [](float f) { return static_cast<std::byte>(std::clamp(f * 256.f, 0.f, 255.f)); });
+      
+      // Get path information
+      const auto ext = path.extension();
+      const char *pstr = path.string().c_str();
+
+      int ret = 0;
+      if (ext == ".png") {
+        ret = stbi_write_png(pstr, w, h, c, byte_data.data(), w * c);
+      } else if (ext == ".jpg") {
+        ret = stbi_write_jpg(pstr, w, h, c, byte_data.data(), 0);
+      } else if (ext == ".bmp") {
+        ret = stbi_write_bmp(pstr, w, h, c, byte_data.data());
+      } else {
+        debug::check_expr_dbg(false,
+          fmt::format("unsupported image extension for writing \"{}\"", path.string()));
+      }
+
+      debug::check_expr_dbg(ret != 0,
+        fmt::format("could not save image to \"{}\", code was {}", path.string(), ret));
+    }
   } // namespace detail
 
   template <typename T, uint D>
@@ -135,17 +227,21 @@ namespace met {
       auto c    = Texture2d<T>::dims();
       auto data = cast_span<const float>(texture.data());
 
-      // Convert data to unsigned bytes
+      const auto ext = path.extension();
+      if (ext == ".exr") {
+        // Use TinyEXR to store hdr output
+        detail::save_tinyexr(path, data, size.x(), size.y(), c);
+      } else {
+        // Use STB_image_write to store sdr output
+        detail::save_stb(path, data, size.x(), size.y(), c);
+      }
+
+      /* // Convert data to unsigned bytes
       std::vector<std::byte> byte_data(data.size());
       std::transform(std::execution::par_unseq,
         data.begin(), data.end(), byte_data.begin(),
-        [](float f) { 
-          auto b = static_cast<std::byte>(std::clamp(f * 256.f, 0.f, 255.f));
-          // fmt::print("{} -> {}\n", b, f);
-          return b; // static_cast<std::byte>(std::max(f * 256.f, 0.f)); 
-        });
+        [](float f) { return static_cast<std::byte>(std::clamp(f * 256.f, 0.f, 255.f)); });
       
-      const auto ext = path.extension();
       int ret = 0;
       if (ext == ".png") {
         ret = stbi_write_png(pstr, size.x(), size.y(), c, byte_data.data(), size.x() * c);
@@ -159,7 +255,7 @@ namespace met {
       }
 
       debug::check_expr_dbg(ret != 0,
-        fmt::format("could not save file to \"{}\", code was {}", path.string(), ret));
+        fmt::format("could not save file to \"{}\", code was {}", path.string(), ret)); */
     }
     
     Texture2d3f as_unaligned(const Texture2d3f_al &in) {

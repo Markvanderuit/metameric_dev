@@ -114,7 +114,7 @@ namespace met {
   }
 
   void MappingsViewerTask::eval_save(detail::TaskEvalInfo &info, uint texture_i) {
-    if (fs::path path; detail::save_dialog(path, "bmp")) {
+    if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get shared resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
       auto &e_colr_buffer = info.get_resource<gl::Buffer>(color_task_key, "colr_buffer");
@@ -125,8 +125,10 @@ namespace met {
       e_colr_buffer.get(cast_span<std::byte>(texture_al.data()));
 
       // Remove padding bytes and apply gamma correction, then save to disk
-      Texture2d3f texture = io::as_srgb(io::as_unaligned(texture_al));
-      io::save_texture2d(io::path_with_ext(path, "bmp"), texture);
+      // Texture2d3f texture = io::as_srgb(io::as_unaligned(texture_al));
+      Texture2d3f texture = io::as_unaligned(texture_al);
+      io::save_texture2d(path, texture);
+      // io::save_texture2d(io::path_with_ext(path, "bmp"), texture);
     }
   }
 
