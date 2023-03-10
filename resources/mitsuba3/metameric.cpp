@@ -69,10 +69,10 @@ public:
     // Read header data
     zs->read<float>(data.spec_min);
     zs->read<float>(data.spec_max);
-    zs->read<unsigned>(data.spec_samples);
-    zs->read<unsigned>(data.bary_xres);
-    zs->read<unsigned>(data.bary_yres);
-    zs->read<unsigned>(data.bary_zres);
+    zs->read<uint>(data.spec_samples);
+    zs->read<uint>(data.bary_xres);
+    zs->read<uint>(data.bary_yres);
+    zs->read<uint>(data.bary_zres);
 
     // Allocate weight/function data blocks, then read block data
     data.functions.resize(data.bary_zres * data.spec_samples * 4);

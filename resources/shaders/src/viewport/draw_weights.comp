@@ -15,8 +15,8 @@ layout(binding = 2) restrict readonly  buffer b_2 { uvec4 data[]; } b_elem_in;
 layout(binding = 3) restrict writeonly buffer b_3 { vec3  data[]; } b_colr_out;
 
 // Constants
-const uint max_verts_support = 256;
-const uint max_elems_support = 256;
+const uint max_verts_support = 1024;
+const uint max_elems_support = 1024;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform u_0 {

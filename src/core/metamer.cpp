@@ -20,12 +20,11 @@ namespace met {
     Spec s = 0;
 
     while (info.basis_count > min_wavelength_bases) {
-      // Initialize parameter object for LP solver with expected matrix sizes M, N
       const uint N = info.basis_count;
       const uint M = 3 * info.systems.size() + (info.impose_boundedness ? 2 * wavelength_samples : 0);
+
+      // Initialize parameter object for LP solver with expected matrix sizes M, N
       LPParameters params(M, N);
-      params.method  = LPMethod::ePrimal;
-      params.scaling = true;
 
       // Obtain appropriate nr. of basis functions from data
       eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();

@@ -10,7 +10,7 @@ namespace met {
   constexpr auto sub_resample_fmt = FMT_COMPILE("{}_gen_resample");
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size = 64u;
+  constexpr uint buffer_init_size    = 1024u;
 
   WeightViewerTask::WeightViewerTask(const std::string &name)
   : detail::AbstractTask(name, false) { }

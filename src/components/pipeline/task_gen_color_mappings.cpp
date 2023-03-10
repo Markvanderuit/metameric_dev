@@ -6,12 +6,9 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite 
-                                     | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite 
-                                     | gl::BufferAccessFlags::eMapPersistent
-                                     | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size = 64u;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr uint buffer_init_size    = 1024u;
 
   GenColorMappingTask::GenColorMappingTask(const std::string &name, uint mapping_i)
   : detail::AbstractTask(name, true),

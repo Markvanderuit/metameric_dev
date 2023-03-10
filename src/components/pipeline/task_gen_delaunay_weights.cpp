@@ -13,6 +13,7 @@
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr uint buffer_init_size    = 1024u;
 
   GenDelaunayWeightsTask::GenDelaunayWeightsTask(const std::string &name)
   : detail::AbstractTask(name) { }
@@ -49,7 +50,7 @@ namespace met {
     // Initialize buffer holding barycentric weights
     info.emplace_resource<gl::Buffer>("pack_buffer", { .data = cnt_span<const std::byte>(packed_data) });
     info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info.emplace_resource<gl::Buffer>("elem_buffer", { .size = 256 * sizeof(eig::Array4u), .flags = buffer_create_flags });
+    info.emplace_resource<gl::Buffer>("elem_buffer", { .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(eig::Array4f) });
   }
 

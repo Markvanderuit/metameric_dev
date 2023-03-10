@@ -21,8 +21,8 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
   // Initial allocation sizes for vertex/element dependent buffers
-  constexpr uint init_vert_support = 64;
-  constexpr uint init_elem_support = 64;
+  constexpr uint init_vert_support = 1024;
+  constexpr uint init_elem_support = 1024;
 
   ViewportDrawDelaunayTask::ViewportDrawDelaunayTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
