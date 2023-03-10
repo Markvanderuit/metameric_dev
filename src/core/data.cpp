@@ -144,7 +144,7 @@ namespace met {
     project_path = io::path_with_ext(path, ".json");
 
     io::save_json(project_path, project_data);
-    io::save_texture2d(io::path_with_ext(project_path, ".bmp"), loaded_texture_f32, true);
+    io::save_texture2d(io::path_with_ext(project_path, ".exr"), loaded_texture_f32, true);
   }
 
   void ApplicationData::load(const fs::path &path) {
@@ -153,7 +153,7 @@ namespace met {
     project_save   = SaveFlag::eSaved;
     project_path   = io::path_with_ext(path, ".json");
     project_data   = io::load_json(path).get<ProjectData>();
-    loaded_texture_f32 = io::load_texture2d<Colr>(io::path_with_ext(project_path,".bmp"), true);
+    loaded_texture_f32 = io::load_texture2d<Colr>(io::path_with_ext(project_path,".exr"), true);
 
     // Reset undo/redo history
     mods  = { };
@@ -251,7 +251,8 @@ namespace met {
 
     // Relevant settings for the following section
     // TODO expose parameter to users in input view
-    const uint n_samples = 64;
+    const uint n_samples    = 164;
+    const uint sample_discr = 256;
 
     // Data store for next steps
     std::vector<uint>              sampleable_indices;
@@ -259,7 +260,7 @@ namespace met {
     std::vector<Colr>              sample_colr_i(n_samples);
     std::vector<std::vector<Colr>> sample_colr_j(n_samples);
 
-    /* 0. Build a set of available color values s.t. identical pixels are not sampled twice  */
+    /* 0. Build a distribution of unique color values s.t. identical texels are not sampled twice  */
     {
       // Instantiate an unordered map storing color/uint pairs
       using MapValue = eig::Array3u;
@@ -273,7 +274,7 @@ namespace met {
       // Insert indices of discretized image colors into the map, if they do not yet exist
       auto colr_i_span = loaded_texture_f32.data();
       for (uint i = 0; i < colr_i_span.size(); ++i)
-        indices_map.insert({ (colr_i_span[i] * 64).cast<uint>(), i });
+        indices_map.insert({ (colr_i_span[i] * sample_discr).cast<uint>(), i });
 
       // Export resulting set of indices to sampleable_indices
       sampleable_indices.resize(indices_map.size());
@@ -283,8 +284,7 @@ namespace met {
       fmt::print("Sampleable set: {} -> {}\n", colr_i_span.size(), sampleable_indices.size());
     }
 
-    /* 1. Sample a random subset of pixels from the textures and obtain their color values */
-    // TODO: sample a histogram of the image's colors instead
+    /* 1. Sample a random subset of texels and obtain their color values from each texture */
     {
       auto colr_i_span = loaded_texture_f32.data();
         
@@ -297,13 +297,14 @@ namespace met {
       std::shuffle(range_iter(samples), gen);
       samples.resize(std::min(static_cast<size_t>(n_samples), samples.size()));
 
-      // Extract sampled colr_i, colr_j from input images
+      fmt::print("Samples size: {}\n", samples.size());
+
+      // Extract colr_i, colr_j from input images at sampled indices
       std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
       for (uint i = 0; i < n_samples; ++i) {
         sample_colr_j[i] = std::vector<Colr>(images.size());
-        std::ranges::transform(images, sample_colr_j[i].begin(), [&](const auto &info) {
-          return info.image.data()[samples[i]];
-        });
+        std::ranges::transform(images, sample_colr_j[i].begin(), 
+          [&](const auto &info) { return info.image.data()[samples[i]]; });
       }
     }
 
@@ -316,38 +317,47 @@ namespace met {
       // Add vertices to project data
       project_data.vertices.reserve(project_data.vertices.size() + n_samples);
       for (uint i = 0; i < n_samples; ++i) {
-        ProjectData::Vert vt = {
-          .colr_i = sample_colr_i[i],
-          .csys_i = 0,
-          .colr_j = sample_colr_j[i],
-          .csys_j = csys_j_data
-        };
+        // Iterate through samples, in case bad samples still exist
+        while (i < n_samples) {
+          ProjectData::Vert vt = {
+            .colr_i = sample_colr_i[i],
+            .csys_i = 0,
+            .colr_j = sample_colr_j[i],
+            .csys_j = csys_j_data
+          };
 
-        // Obtain color system spectra for this vertex
-        std::vector<CMFS> systems = { project_data.csys(vt.csys_i).finalize_direct() };
-        std::ranges::transform(vt.csys_j, std::back_inserter(systems), [&](uint j) { return project_data.csys(j).finalize_direct(); });
+          // Obtain color system spectra for this vertex
+          std::vector<CMFS> systems = { project_data.csys(vt.csys_i).finalize_direct() };
+          std::ranges::transform(vt.csys_j, std::back_inserter(systems), [&](uint j) { return project_data.csys(j).finalize_direct(); });
 
-        // Obtain corresponding color signal for each color system
-        std::vector<Colr> signals(1 + vt.colr_j.size());
-        signals[0] = vt.colr_i;
-        std::ranges::copy(vt.colr_j, signals.begin() + 1);
+          // Obtain corresponding color signal for each color system
+          std::vector<Colr> signals(1 + vt.colr_j.size());
+          signals[0] = vt.colr_i;
+          std::ranges::copy(vt.colr_j, signals.begin() + 1);
 
-        // Generate new spectrum given the current set of systems+signals as solver constraints
-        Spec sd = generate_spectrum({ 
-          .basis      = loaded_basis,
-          .basis_mean = loaded_basis_mean,
-          .systems    = std::span<CMFS> { systems }, 
-          .signals    = std::span<Colr> { signals },
-          .reduce_basis_count = false
-        });
+          // Generate new spectrum given the current set of systems+signals as solver constraints
+          Spec sd = generate_spectrum({ 
+            .basis      = loaded_basis,
+            .basis_mean = loaded_basis_mean,
+            .systems    = std::span<CMFS> { systems }, 
+            .signals    = std::span<Colr> { signals },
+            .reduce_basis_count = false
+          });
 
-        // Test roundtrip error for generated spectrum, compared to input color signal
-        Colr signal_rt = project_data.csys(0).apply_color_direct(sd);
-        float rt_error = (signal_rt - vt.colr_i).abs().sum();
+          // Test roundtrip error for generated spectrum, compared to input color signal
+          Colr signal_rt = project_data.csys(0).apply_color_direct(sd);
+          float rt_error = (signal_rt - vt.colr_i).abs().sum();
 
-        // Only add vertex to data if roundtrip error is below epsilon
-        guard_continue(rt_error <= 0.00001f);
-        project_data.vertices.push_back(vt);
+          // Only add vertex to data if roundtrip error is below epsilon; otherwise this sample
+          // has a bad fit (potentially indicating a problem with input data)
+          if (rt_error > 0.0001f) {
+            i++;
+            continue;
+          } else {
+            project_data.vertices.push_back(vt);
+            break;
+          }
+        }
       }
     }
   }

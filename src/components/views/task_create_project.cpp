@@ -144,12 +144,15 @@ namespace met {
     ImGui::Separator();
     if (std::vector<fs::path> paths; ImGui::Button("Add images...") && detail::load_dialog_mult(paths)) {
       for (const fs::path &path : paths) {
-        // Load image without gamma correction applied. Copy this image to gpu for direct display,
-        auto host_image   = io::load_texture2d<Colr>(path);
+        // Load image with gamma correction applied
+        auto host_image = io::load_texture2d<Colr>(path);
+        if (path.extension().string() == ".exr") io::to_srgb(host_image);
+        
+        // Copy this image to gpu for direct display
         auto device_image = gl::Texture2d3f {{ .size = host_image.size(),
-                                                .data = cast_span<const float>(host_image.data()) }};
+                                               .data = cast_span<const float>(host_image.data()) }};
 
-        // Then apply gamma correction after for rest of program pipeline
+        // Strip gamma correction after copy for the rest of program pipeline
         io::to_lrgb(host_image);
 
         // Push on list of input 

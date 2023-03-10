@@ -26,7 +26,7 @@ namespace met {
     auto v3_to_v4 = [](auto v) { return (eig::Array<decltype(v)::Scalar, 4, 1>() << v, 1).finished(); };
     auto v4_to_v3 = [](auto v) { return v.head<3>(); };
 
-    std::array<std::string, 4> channel_flags = { "B\0", "G\0", "R\0", "A\0" };
+    std::array<std::string, 4> exr_channel_flags = { "B\0", "G\0", "R\0", "A\0" };
 
     void save_tinyexr(const fs::path &path, std::span<const float> data, uint w, uint h, uint c) {
       met_trace();
@@ -48,9 +48,9 @@ namespace met {
       std::vector<int> pixel_types(c);
       std::vector<int> requested_pixel_types(c);
       for (uint i = 0; i < c; ++i) {
-        strncpy(channels[i].name, channel_flags[i].data(), channel_flags[i].length());
-        pixel_types[i]           = TINYEXR_PIXELTYPE_FLOAT;
-        requested_pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;
+        strncpy(channels[i].name, exr_channel_flags[i].data(), exr_channel_flags[i].length());
+        pixel_types[i]           = TINYEXR_PIXELTYPE_FLOAT; // Store full precision; no half-precision shenanigans
+        requested_pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT; // Store full precision; no half-precision shenanigans
       }
 
       EXRHeader header;
@@ -154,7 +154,7 @@ namespace met {
 
   namespace io {
     template <typename T>
-    Texture2d<T> load_texture2d(const fs::path &path, bool srgb_to_lrgb) {
+    Texture2d<T> load_texture2d(const fs::path &path, bool _srgb_to_lrgb) {
       constexpr uint C_ = T::RowsAtCompileTime; 
       using          T_ = eig::Array<float, C_, 1>;
 
@@ -164,21 +164,51 @@ namespace met {
       debug::check_expr_dbg(fs::exists(path),
         fmt::format("failed to resolve path \"{}\"", path.string()));
 
+      // Strip gamma if requested, but not for .EXR input
+      bool srgb_to_lrgb = _srgb_to_lrgb && path.extension() != ".exr";
+
+      eig::Array2i       v;          // Size at runtime
+      int                c;          // Rows at runtime
+      std::vector<float> data_float; // Data at runtime
+
       // Load image from disk
-      eig::Array2i v; // Size at runtime
-      int c;          // Rows at runtime
-      std::byte *data_ptr  = (std::byte *) stbi_load(path.string().c_str(), &v.x(), &v.y(), &c, 0);
-      size_t     data_size = v.prod() * c;
+      if (path.extension() == ".exr") {
+        //  TODO Stop assuming RGBA input format
+        c = 4;
 
-      // Test if data was loaded
-      debug::check_expr_dbg(data_ptr, 
-        fmt::format("failed to load file \"{}\"", path.string()));
+        // Load hdr .exr file
+        const char *err = nullptr;
+        float      *ptr;
+        int         ret = LoadEXR(&ptr, &v[0], &v[1], path.string().c_str(), &err); // deprecated :(
+        size_t      size = v.prod() * c;
 
-      // Elevate data to floating point
-      std::span<byte>    data_byte = { data_ptr, data_size };
-      std::vector<float> data_float(data_byte.size());
-      std::transform(std::execution::par_unseq, range_iter(data_byte), data_float.begin(),
-        [](std::byte b) { return static_cast<float>(b) / 255.f; });
+        // Test if data was loaded
+        debug::check_expr_rel(ret == TINYEXR_SUCCESS, 
+          fmt::format("failed to load file \"{}\"", path.string()));
+
+        // Copy data over
+        data_float = std::vector<float>(ptr, ptr + size);
+
+        // Release exr data from this point
+        free(ptr);
+      } else {
+        // Load sdr .bmp/.png/.jpg file
+        std::byte *ptr  = (std::byte *) stbi_load(path.string().c_str(), &v.x(), &v.y(), &c, 0);
+        size_t     size = v.prod() * c;
+
+        // Test if data was loaded
+        debug::check_expr_rel(ptr, 
+          fmt::format("failed to load file \"{}\"", path.string()));
+            
+        // Elevate data to floating point
+        data_float.resize(size);
+        std::span<byte> data_byte = { ptr, size };
+        std::transform(std::execution::par_unseq, range_iter(data_byte), data_float.begin(),
+          [](std::byte b) { return static_cast<float>(b) / 255.f; });
+          
+        // Release stbi data from this point
+        stbi_image_free(ptr);
+      }
 
       // Initialize temporary texture object with correct dims, requested channel layout, and float data
       Texture2d<T_> texture_float = {{ .size = v.cast<uint>() }};
@@ -201,9 +231,6 @@ namespace met {
         }
       }
 
-      // Release stbi data from this point
-      stbi_image_free(data_ptr);
-
       // Strip linear sRGB gamma if requested
       if (srgb_to_lrgb)
         to_lrgb(texture_float);
@@ -219,7 +246,7 @@ namespace met {
       // Operate on a copy as gamma may need to be applied;
       // apply linear sRGB gamma if requested
       Texture2d<T> texture({ .size = texture_.size(), .data = texture_.data() });
-      if (lrgb_to_srgb)
+      if (lrgb_to_srgb && path.extension().string() != ".exr")
         to_srgb(texture);
 
       const char *pstr = path.string().c_str();
@@ -227,35 +254,13 @@ namespace met {
       auto c    = Texture2d<T>::dims();
       auto data = cast_span<const float>(texture.data());
 
-      const auto ext = path.extension();
-      if (ext == ".exr") {
+      if (path.extension().string() == ".exr") {
         // Use TinyEXR to store hdr output
         detail::save_tinyexr(path, data, size.x(), size.y(), c);
       } else {
         // Use STB_image_write to store sdr output
         detail::save_stb(path, data, size.x(), size.y(), c);
       }
-
-      /* // Convert data to unsigned bytes
-      std::vector<std::byte> byte_data(data.size());
-      std::transform(std::execution::par_unseq,
-        data.begin(), data.end(), byte_data.begin(),
-        [](float f) { return static_cast<std::byte>(std::clamp(f * 256.f, 0.f, 255.f)); });
-      
-      int ret = 0;
-      if (ext == ".png") {
-        ret = stbi_write_png(pstr, size.x(), size.y(), c, byte_data.data(), size.x() * c);
-      } else if (ext == ".jpg") {
-        ret = stbi_write_jpg(pstr, size.x(), size.y(), c, byte_data.data(), 0);
-      } else if (ext == ".bmp") {
-        ret = stbi_write_bmp(pstr, size.x(), size.y(), c, byte_data.data());
-      } else {
-        debug::check_expr_dbg(false,
-          fmt::format("unsupported image extension for writing \"{}\"", path.string()));
-      }
-
-      debug::check_expr_dbg(ret != 0,
-        fmt::format("could not save file to \"{}\", code was {}", path.string(), ret)); */
     }
     
     Texture2d3f as_unaligned(const Texture2d3f_al &in) {

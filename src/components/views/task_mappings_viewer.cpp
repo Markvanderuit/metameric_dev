@@ -124,11 +124,8 @@ namespace met {
       Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture_f32.size() }};
       e_colr_buffer.get(cast_span<std::byte>(texture_al.data()));
 
-      // Remove padding bytes and apply gamma correction, then save to disk
-      // Texture2d3f texture = io::as_srgb(io::as_unaligned(texture_al));
-      Texture2d3f texture = io::as_unaligned(texture_al);
-      io::save_texture2d(path, texture);
-      // io::save_texture2d(io::path_with_ext(path, "bmp"), texture);
+      // Remove padding bytes, then save to disk
+      io::save_texture2d(path, io::as_unaligned(texture_al), true);
     }
   }
 
