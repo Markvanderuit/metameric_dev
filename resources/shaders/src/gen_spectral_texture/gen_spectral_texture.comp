@@ -11,7 +11,7 @@
 #include <spectrum_cluster.glsl>
 
 // Use shorthand for clustered types
-#define InWght float[barycentric_weights]
+#define InWght float[mvc_weights]
 #define Spec ClSpec
 
 // General layout rule declarations

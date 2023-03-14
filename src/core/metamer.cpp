@@ -173,7 +173,7 @@ namespace met {
   std::vector<Spec> generate_gamut(const GenerateGamutInfo &info) {
     // Constant and type shorthands
     using Signal = GenerateGamutInfo::Signal;
-    constexpr uint n_bary = barycentric_weights;
+    constexpr uint n_bary = mvc_weights;
     constexpr uint n_spec = wavelength_samples;
     constexpr uint n_base = wavelength_bases;
     constexpr uint n_colr = 3;

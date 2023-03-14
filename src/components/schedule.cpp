@@ -101,6 +101,16 @@ namespace met {
 
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }
+
+  template <typename Scheduler>
+  void submit_schedule_delaunay(Scheduler &scheduler) {
+    
+  }
+
+  template <typename Scheduler>
+  void submit_schedule_mvc(Scheduler &scheduler) {
+    
+  }
   
   template <typename Scheduler>
   void submit_schedule_empty<Scheduler>(Scheduler &scheduler) {

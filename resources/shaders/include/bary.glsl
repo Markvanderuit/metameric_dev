@@ -1,12 +1,11 @@
 #ifndef BARY_GLSL_GUARD
 #define BARY_GLSL_GUARD
 
-const uint barycentric_weights   = MET_BARYCENTRIC_WEIGHTS;
-const uint barycentric_weights_4 = MET_BARYCENTRIC_WEIGHTS / 4;
+const uint mvc_weights   = MET_MVC_WEIGHTS;
+const uint mvc_weights_4 = MET_MVC_WEIGHTS / 4;
 
-#define Bary     float[barycentric_weights]
-#define Bary4    vec4[barycentric_weights_4]
-
+#define Bary  float[mvc_weights]
+#define Bary4 vec4[mvc_weights_4]
 #define BaryP Bary4
 
 Bary4 unpack(in BaryP w) {
@@ -21,7 +20,7 @@ vec4 unpack(in BaryP w, uint i) {
   return w[i];
 }
 
-/* #define BaryP uvec4[barycentric_weights / 8]
+/* #define BaryP uvec4[mvc_weights / 8]
 
 vec4 unpack(in uvec2 f) {
   return vec4(unpackHalf2x16(f.x), unpackHalf2x16(f.y));
@@ -39,7 +38,7 @@ vec4 unpack(in BaryP iw, uint i) {
 
 Bary4 unpack(in BaryP iw) {
   Bary4 ow;
-  for (uint i = 0; i < barycentric_weights / 8; ++i) {
+  for (uint i = 0; i < mvc_weights / 8; ++i) {
     ow[2 * i    ] = unpack(iw[i].xy);
     ow[2 * i + 1] = unpack(iw[i].zw);
   }
@@ -48,7 +47,7 @@ Bary4 unpack(in BaryP iw) {
 
 BaryP pack(in Bary4 iw) {
   BaryP ow;
-  for (uint i = 0; i < barycentric_weights / 8; ++i) {
+  for (uint i = 0; i < mvc_weights / 8; ++i) {
     ow[i].xy = pack(iw[2 * i    ]);
     ow[i].zw = pack(iw[2 * i + 1]);
   }

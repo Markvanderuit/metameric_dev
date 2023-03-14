@@ -55,7 +55,7 @@ namespace met {
       }
       
       // Define convex hull vertex slider
-      uint min_chull_v = 4, max_chull_v = barycentric_weights;
+      uint min_chull_v = 4, max_chull_v = mvc_weights;
       ImGui::SameLine(0.f, -48.f * e_window.content_scale());
       ImGui::SetNextItemWidth(-48.f * e_window.content_scale());
       ImGui::SliderScalar("Vertices", ImGuiDataType_U32, 

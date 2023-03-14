@@ -41,8 +41,6 @@ namespace met {
 
   /* Info struct for generation of a gamut, given color constraint information */
   struct GenerateGamutInfo {
-    using Bary = eig::Matrix<float, barycentric_weights, 1>;
-
     struct Signal {
       Colr colr_v; // Color signal
       Bary bary_v; // Approximate barycentric coords. of the signal in the expected gamut
@@ -57,7 +55,7 @@ namespace met {
   };
 
   // Generate a gamut solution using a linear programming problem; see GenerateGamutInfo 
-  // above for necessary information. Note: returns n=barycentric_weights spectra; 
+  // above for necessary information. Note: returns n=mvc_weights spectra; 
   // the last (padded) spectra should be ignored
   std::vector<Spec> generate_gamut(const GenerateGamutInfo &info);
 } // namespace met

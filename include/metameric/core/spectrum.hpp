@@ -9,7 +9,7 @@ namespace met {
   constexpr static float wavelength_max      = MET_WAVELENGTH_MAX;  
   constexpr static uint  wavelength_samples  = MET_WAVELENGTH_SAMPLES;
   constexpr static uint  wavelength_bases    = MET_WAVELENGTH_BASES;
-  constexpr static uint  barycentric_weights = MET_BARYCENTRIC_WEIGHTS;
+  constexpr static uint  mvc_weights         = MET_MVC_WEIGHTS;
 
   /* Define derived variables from metameric's spectral range layout */
   constexpr static float wavelength_range = wavelength_max - wavelength_min;  
@@ -17,11 +17,11 @@ namespace met {
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
   /* Define program's underlying spectrum/cmfs/color classes as renamed Eigen objects */
-  using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix
-  using Spec = eig::Array<float, wavelength_samples, 1>;  // Discrete spectrum matrix
-  using Bary = eig::Array<float, barycentric_weights, 1>; // Discrete convex weightings
-  using Colr = eig::Array<float, 3, 1>;                   // Color signal matrix
-  using Chro = eig::Array<float, 2, 1>;                   // Color chromaticity matrix
+  using CMFS = eig::Matrix<float, wavelength_samples, 3>;  // Color matching function matrix
+  using Spec = eig::Array<float,  wavelength_samples, 1>;  // Discrete spectrum matrix
+  using Bary = eig::Array<float,  mvc_weights, 1>;         // Discrete convex weightings
+  using Colr = eig::Array<float,  3, 1>;                   // Color signal matrix
+  using Chro = eig::Array<float,  2, 1>;                   // Color chromaticity matrix
 
   /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
   using AlColr = eig::AlArray<float, 3>;
@@ -56,8 +56,8 @@ namespace met {
     eig::Matrix3f xyz_to_rgb_transform;
     eig::Matrix3f rgb_to_xyz_transform;
 
-    Colr to_xyz(Colr c) const { return rgb_to_xyz_transform * c.matrix(); }
-    Colr to_rgb(Colr c) { return xyz_to_rgb_transform * c.matrix(); }
+    Colr to_xyz(Colr c_rgb) const { return rgb_to_xyz_transform * c_rgb.matrix(); }
+    Colr to_rgb(Colr c_xyz) const { return xyz_to_rgb_transform * c_xyz.matrix(); }
   };
   
   /* System object defining how a reflectance-to-color conversion is ultimately performed */
@@ -65,8 +65,7 @@ namespace met {
   public: /* mapping data */
     CMFS cmfs;       // Color matching or sensor response functions, defining the observer
     Spec illuminant; // Illuminant under which observation is performed
-    uint n_scatters; // Nr. of repeated scatterings of the input refletance
-
+    uint n_scatters; // Nr. of recursive scatters of observed refletance; default 1
 
   public:/* Mapping functions */
     // Simplify the CMFS/illuminant into color system spectra

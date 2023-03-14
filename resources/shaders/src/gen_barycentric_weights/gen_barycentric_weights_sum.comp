@@ -23,7 +23,7 @@ layout(binding = 0) uniform u_0 {
   uint n_elems;
 } b_unif;
 
-const uint sg_cluster_size = barycentric_weights / 4;
+const uint sg_cluster_size = mvc_weights / 4;
 
 void main() {
   const uint i  = gl_GlobalInvocationID.x / sg_cluster_size; // 000011112222

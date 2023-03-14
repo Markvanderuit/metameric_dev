@@ -17,11 +17,11 @@ option(met_enable_dbg_exceptions "Enable debug exceptions on release" ON)
 option(met_enable_tracy          "Enable Tracy support"               ON)
 
 # Define Metameric's spectral layout
-set(MET_WAVELENGTH_MIN      380) # Minimum wavelength of spectral range
-set(MET_WAVELENGTH_MAX      780) # Maximum wavelength of spectral range
-set(MET_WAVELENGTH_SAMPLES   64) # Nr. of bins used in discrete spectral representations
-set(MET_WAVELENGTH_BASES     12) # Nr. of basis functions used in generative functions
-set(MET_BARYCENTRIC_WEIGHTS  16) # Maximum nr. of barycentric weights supported
+set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
+set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
+set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
+set(MET_WAVELENGTH_BASES    12) # Nr. of basis functions used in generative functions
+set(MET_MVC_WEIGHTS         16) # Maximum nr. of barycentric weights supported
 
 # Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -90,7 +90,7 @@ message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
 message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
-message(STATUS "Metameric : Barycentric weights = ${MET_BARYCENTRIC_WEIGHTS}")
+message(STATUS "Metameric : Barycentric weights = ${MET_MVC_WEIGHTS}")
 
 # Find glslLangValidator program on system
 find_program(glsl_validator_path glslangValidator HINTS 
@@ -114,7 +114,7 @@ string(CONCAT glsl_parser_arg_string
   "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
   "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES},"
   "MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES},"
-  "MET_BARYCENTRIC_WEIGHTS=${MET_BARYCENTRIC_WEIGHTS}"
+  "MET_MVC_WEIGHTS=${MET_MVC_WEIGHTS}"
 )
 
 # Add together placeholder args to pass into glsl parser;
@@ -262,7 +262,7 @@ target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX}
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
   MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES}
-  MET_BARYCENTRIC_WEIGHTS=${MET_BARYCENTRIC_WEIGHTS}
+  MET_MVC_WEIGHTS=${MET_MVC_WEIGHTS}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
 

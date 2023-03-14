@@ -31,8 +31,8 @@ layout(binding = 0) uniform u_0 {
 } b_unif;
 
 // Shared memory declarations
-shared vec3  s_verts_in[barycentric_weights];
-shared uvec3 s_elems_in[2 * barycentric_weights];
+shared vec3  s_verts_in[mvc_weights];
+shared uvec3 s_elems_in[2 * mvc_weights];
 shared Bary4 s_bary_out[gl_WorkGroupSize.x];
 
 void load_shared_data() {
@@ -46,19 +46,19 @@ void load_shared_data() {
 
 float norm_weights(in Bary4 w) {
   float n = 0.f;
-  for (uint j = 0; j < barycentric_weights / 4; ++j)
+  for (uint j = 0; j < mvc_weights / 4; ++j)
     n += hsum(w[j]);
   return n;
 }
 
 void normalize_weights(inout Bary4 w) {
   float n = 1.f / norm_weights(w);
-  for (uint j = 0; j < barycentric_weights / 4; ++j)
+  for (uint j = 0; j < mvc_weights / 4; ++j)
     w[j] *= n;
 }
 
 void clear_weights(inout Bary4 w, float value) {
-  for (uint i = 0; i < barycentric_weights / 4; ++i)
+  for (uint i = 0; i < mvc_weights / 4; ++i)
     w[i] = vec4(value);
 }
 
