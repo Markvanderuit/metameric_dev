@@ -27,12 +27,12 @@ namespace met {
   WindowTask::WindowTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void WindowTask::init(detail::TaskInitInfo &info) {
+  void WindowTask::init(detail::TaskInfo &info) {
     met_trace_full();
     // ...
   }
 
-  void WindowTask::dstr(detail::TaskDstrInfo &info) {
+  void WindowTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
     
     // Remove straggling modal subtasks if they exist
@@ -41,7 +41,7 @@ namespace met {
     info.remove_task(name() + exit_modal_name);
   }
   
-  bool WindowTask::handle_open(detail::TaskEvalInfo &info) {
+  bool WindowTask::handle_open(detail::TaskInfo &info) {
     met_trace_full();
     
     // Open a file picker
@@ -60,7 +60,7 @@ namespace met {
     return false;
   }
 
-  bool WindowTask::handle_save(detail::TaskEvalInfo &info) {
+  bool WindowTask::handle_save(detail::TaskInfo &info) {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -72,7 +72,7 @@ namespace met {
     }
   }
 
-  bool WindowTask::handle_save_as(detail::TaskEvalInfo &info) {
+  bool WindowTask::handle_save_as(detail::TaskInfo &info) {
     met_trace_full();
     
     if (fs::path path; detail::save_dialog(path, "json")) {
@@ -82,7 +82,7 @@ namespace met {
     return false;
   }
 
-  bool WindowTask::handle_export(detail::TaskEvalInfo &info) {
+  bool WindowTask::handle_export(detail::TaskInfo &info) {
     met_trace_full();
 
     if (fs::path path; detail::save_dialog(path, "met")) {
@@ -167,7 +167,7 @@ namespace met {
     return false;
   }
   
-  void WindowTask::handle_close_safe(detail::TaskEvalInfo &info) {
+  void WindowTask::handle_close_safe(detail::TaskInfo &info) {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -179,7 +179,7 @@ namespace met {
     }
   }
 
-  void WindowTask::handle_close(detail::TaskEvalInfo &info) {
+  void WindowTask::handle_close(detail::TaskInfo &info) {
     met_trace_full();
     
     // Clear OpenGL state
@@ -194,7 +194,7 @@ namespace met {
     submit_schedule_empty(info);
   }
   
-  void WindowTask::handle_exit_safe(detail::TaskEvalInfo &info) {
+  void WindowTask::handle_exit_safe(detail::TaskInfo &info) {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -206,7 +206,7 @@ namespace met {
     }
   }
 
-  void WindowTask::handle_exit(detail::TaskEvalInfo &info) {
+  void WindowTask::handle_exit(detail::TaskInfo &info) {
     met_trace_full();
     
     ImGui::CloseAnyPopupIfOpen();
@@ -221,7 +221,7 @@ namespace met {
     info.signal_flags = detail::TaskSignalFlags::eClearTasks;
   }
 
-  void WindowTask::eval(detail::TaskEvalInfo &info) {
+  void WindowTask::eval(detail::TaskInfo &info) {
     met_trace_full();
     
     // Modals/popups have to be on the same level of stack as OpenPopup(), so track this state

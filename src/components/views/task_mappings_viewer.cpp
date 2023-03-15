@@ -17,7 +17,7 @@ namespace met {
     // Lambda captures of texture_size parameter and outputs
     // capture to add a resample task
     constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
-      return [=](detail::AbstractTaskInfo &, uint i) -> detail::TextureResampleTask<gl::Texture2d4f> {
+      return [=](detail::TaskInfo &, uint i) -> detail::TextureResampleTask<gl::Texture2d4f> {
         return {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
                   .output_key   = { fmt::format(resample_fmt, i), "texture"        },
                   .texture_info = { .size = texture_size                           },
@@ -28,12 +28,12 @@ namespace met {
     };
 
     // Lambda capture to remove a resample task
-    constexpr auto resample_subtask_rmv = [](detail::AbstractTaskInfo &, uint i) {
+    constexpr auto resample_subtask_rmv = [](detail::TaskInfo &, uint i) {
       return fmt::format(resample_fmt, i);
     };
   } // namespace detail
 
-  void MappingsViewerTask::eval_tooltip_copy(detail::TaskEvalInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_tooltip_copy(detail::TaskInfo &info, uint texture_i) {
     met_trace_full();
 
     // Get shared resources
@@ -55,7 +55,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   }
 
-  void MappingsViewerTask::eval_tooltip(detail::TaskEvalInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_tooltip(detail::TaskInfo &info, uint texture_i) {
     met_trace_full();
 
     // Get shared resources
@@ -109,11 +109,11 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void MappingsViewerTask::eval_popout(detail::TaskEvalInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_popout(detail::TaskInfo &info, uint texture_i) {
     // ...
   }
 
-  void MappingsViewerTask::eval_save(detail::TaskEvalInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_save(detail::TaskInfo &info, uint texture_i) {
     if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get shared resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
@@ -132,7 +132,7 @@ namespace met {
   MappingsViewerTask::MappingsViewerTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
-  void MappingsViewerTask::init(detail::TaskInitInfo &info) {
+  void MappingsViewerTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     m_resample_size   = 1;
@@ -150,7 +150,7 @@ namespace met {
     }
   }
   
-  void MappingsViewerTask::dstr(detail::TaskDstrInfo &info) {
+  void MappingsViewerTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
     for (auto &buffer : m_tooltip_buffers) {
       buffer.unmap();
@@ -158,7 +158,7 @@ namespace met {
     m_resample_tasks.dstr(info);
   }
 
-  void MappingsViewerTask::eval(detail::TaskEvalInfo &info) {
+  void MappingsViewerTask::eval(detail::TaskInfo &info) {
     met_trace_full();
     
     if (ImGui::Begin("Mappings viewer")) {

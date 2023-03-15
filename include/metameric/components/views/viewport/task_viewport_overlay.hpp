@@ -14,13 +14,13 @@ namespace met {
   public:
     ViewportOverlayTask(const std::string &name);
 
-    void init(detail::TaskInitInfo &info) override;
-    void dstr(detail::TaskDstrInfo &info) override;
-    void eval(detail::TaskEvalInfo &info) override;
+    void init(detail::TaskInfo &info) override;
+    void dstr(detail::TaskInfo &info) override;
+    void eval(detail::TaskInfo &info) override;
 
-    void eval_overlay_vertex(detail::TaskEvalInfo &info, uint i);
-    void eval_overlay_sample(detail::TaskEvalInfo &info, uint i);
-    void eval_overlay_color_solid(detail::TaskEvalInfo &info);
-    void eval_overlay_plot(detail::TaskEvalInfo &info);
+    void eval_overlay_vertex(detail::TaskInfo &info, uint i);
+    void eval_overlay_sample(detail::TaskInfo &info, uint i);
+    void eval_overlay_color_solid(detail::TaskInfo &info);
+    void eval_overlay_plot(detail::TaskInfo &info);
   };
 } // namespace met

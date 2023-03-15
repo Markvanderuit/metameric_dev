@@ -10,8 +10,8 @@ namespace met {
 
   public:
     GenSpectralDataTask(const std::string &);
-    void init(detail::TaskInitInfo &) override;
-    void dstr(detail::TaskDstrInfo &) override;
-    void eval(detail::TaskEvalInfo &) override;
+    void init(detail::TaskInfo &) override;
+    void dstr(detail::TaskInfo &) override;
+    void eval(detail::TaskInfo &) override;
   };
 } // namespace met

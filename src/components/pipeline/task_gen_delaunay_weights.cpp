@@ -18,7 +18,7 @@ namespace met {
   GenDelaunayWeightsTask::GenDelaunayWeightsTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenDelaunayWeightsTask::init(detail::TaskInitInfo &info) {
+  void GenDelaunayWeightsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -54,14 +54,14 @@ namespace met {
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(eig::Array4f) });
   }
 
-  void GenDelaunayWeightsTask::dstr(detail::TaskDstrInfo &info) {
+  void GenDelaunayWeightsTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     if (m_uniform_buffer.is_init() && m_uniform_buffer.is_mapped()) 
       m_uniform_buffer.unmap();
   }
 
-  void GenDelaunayWeightsTask::eval(detail::TaskEvalInfo &info) {
+  void GenDelaunayWeightsTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Continue only on relevant state change

@@ -33,7 +33,7 @@ namespace met {
   ViewportDrawCubeTask::ViewportDrawCubeTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportDrawCubeTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawCubeTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -67,7 +67,7 @@ namespace met {
     m_program.uniform("u_value",      clear_colr);
   }
 
-  void ViewportDrawCubeTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawCubeTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources 

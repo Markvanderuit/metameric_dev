@@ -40,16 +40,16 @@ namespace met {
     gl::ComputeInfo m_error_dispatch;
 
     // Delegating functions
-    void eval_error(detail::TaskEvalInfo &info);
-    void eval_tooltip_copy(detail::TaskEvalInfo &info);
-    void eval_tooltip(detail::TaskEvalInfo &info);
+    void eval_error(detail::TaskInfo &info);
+    void eval_tooltip_copy(detail::TaskInfo &info);
+    void eval_tooltip(detail::TaskInfo &info);
 
   public:
     ErrorViewerTask(const std::string &name);
     
-    void init(detail::TaskInitInfo &) override;
-    void dstr(detail::TaskDstrInfo &) override;
-    void eval(detail::TaskEvalInfo &) override;
+    void init(detail::TaskInfo &) override;
+    void dstr(detail::TaskInfo &) override;
+    void eval(detail::TaskInfo &) override;
   };
 
 } // namespace met

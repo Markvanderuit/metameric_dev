@@ -14,7 +14,7 @@ namespace met {
     ViewportBeginTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
 
       // Share resources
@@ -22,7 +22,7 @@ namespace met {
       info.emplace_resource<gl::Texture2d4f>("srgb_target", { .size = 1 });
     }
     
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
 
       // Get shared resources

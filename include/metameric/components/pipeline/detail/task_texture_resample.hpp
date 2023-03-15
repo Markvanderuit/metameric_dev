@@ -36,7 +36,7 @@ namespace met::detail {
     : detail::AbstractTask(info.output_key.first, true),
       m_info(info) { }
                         
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
 
       // Emplace texture resource using provided info object
@@ -60,7 +60,7 @@ namespace met::detail {
       m_program.uniform("u_lrgb_to_srgb", static_cast<uint>(m_info.lrgb_to_srgb));
     }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
 
       guard(info.has_resource(m_info.input_key.first, m_info.input_key.second));

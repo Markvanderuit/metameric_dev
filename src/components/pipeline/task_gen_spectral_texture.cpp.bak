@@ -14,7 +14,7 @@ namespace met {
   GenSpectralTextureTask::GenSpectralTextureTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenSpectralTextureTask::init(detail::TaskInitInfo &info) {
+  void GenSpectralTextureTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -38,7 +38,7 @@ namespace met {
     info.emplace_resource<gl::Buffer>("spec_buffer", { .size  = sizeof(Spec) * generate_n });
   }
 
-  void GenSpectralTextureTask::eval(detail::TaskEvalInfo &info) {
+  void GenSpectralTextureTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Continue only on relevant state change

@@ -27,7 +27,7 @@ namespace met {
   ViewportDrawDelaunayTask::ViewportDrawDelaunayTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportDrawDelaunayTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawDelaunayTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -83,7 +83,7 @@ namespace met {
     m_vert_program.uniform("u_value", clear_colr);
   }
 
-  void ViewportDrawDelaunayTask::dstr(detail::TaskDstrInfo &info) {
+  void ViewportDrawDelaunayTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     if (m_size_buffer.is_init() && m_size_buffer.is_mapped()) 
@@ -94,7 +94,7 @@ namespace met {
       m_elem_buffer.unmap();
   }
 
-  void ViewportDrawDelaunayTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawDelaunayTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources

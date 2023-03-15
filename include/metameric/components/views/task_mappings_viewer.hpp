@@ -28,16 +28,16 @@ namespace met {
     int                                    m_tooltip_mapping_i;
 
     // Delegating functions
-    void eval_tooltip_copy(detail::TaskEvalInfo &info, uint texture_i);
-    void eval_tooltip(detail::TaskEvalInfo &info, uint texture_i);
-    void eval_popout(detail::TaskEvalInfo &info, uint texture_i);
-    void eval_save(detail::TaskEvalInfo &info, uint texture_i);
+    void eval_tooltip_copy(detail::TaskInfo &info, uint texture_i);
+    void eval_tooltip(detail::TaskInfo &info, uint texture_i);
+    void eval_popout(detail::TaskInfo &info, uint texture_i);
+    void eval_save(detail::TaskInfo &info, uint texture_i);
 
   public:
     MappingsViewerTask(const std::string &name);
     
-    void init(detail::TaskInitInfo &) override;
-    void dstr(detail::TaskDstrInfo &) override;
-    void eval(detail::TaskEvalInfo &) override;
+    void init(detail::TaskInfo &) override;
+    void dstr(detail::TaskInfo &) override;
+    void eval(detail::TaskInfo &) override;
   };
 } // namespace met

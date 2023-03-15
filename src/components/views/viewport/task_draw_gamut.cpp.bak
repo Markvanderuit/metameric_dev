@@ -30,7 +30,7 @@ namespace met {
   ViewportDrawGamutTask::ViewportDrawGamutTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportDrawGamutTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawGamutTask::init(detail::TaskInfo &info) {
     met_trace_full();
     
     // Get shared resources
@@ -108,14 +108,14 @@ namespace met {
     m_vert_program.uniform("u_value",       clear_colr);
   }
 
-  void ViewportDrawGamutTask::dstr(detail::TaskDstrInfo &info) {
+  void ViewportDrawGamutTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     if (m_vert_size_buffer.is_init() && m_vert_size_buffer.is_mapped()) m_vert_size_buffer.unmap();
     if (m_elem_opac_buffer.is_init() && m_elem_opac_buffer.is_mapped()) m_elem_opac_buffer.unmap();
   }
 
-  void ViewportDrawGamutTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawGamutTask::eval(detail::TaskInfo &info) {
     met_trace_full();
                                 
     // Get shared resources 

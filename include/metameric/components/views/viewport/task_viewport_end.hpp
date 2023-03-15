@@ -12,7 +12,7 @@ namespace met {
     ViewportEndTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
 
       // Declare scoped ImGui style state

@@ -21,7 +21,7 @@ namespace met {
   GenColorSystemsTask::GenColorSystemsTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenColorSystemsTask::init(detail::TaskInitInfo &info) {
+  void GenColorSystemsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Specify a default buffer that can hold a default nr. of mappings
@@ -29,7 +29,7 @@ namespace met {
     info.emplace_resource<gl::Buffer>("mapp_buffer", { .size = m_max_maps * sizeof(ColrSystem), .flags = buffer_flags });
   }
   
-  void GenColorSystemsTask::eval(detail::TaskEvalInfo &info) {
+  void GenColorSystemsTask::eval(detail::TaskInfo &info) {
     met_trace_full();
     
     // Continue only on relevant state change

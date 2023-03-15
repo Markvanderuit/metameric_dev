@@ -16,13 +16,13 @@ namespace met {
     ViewportInputEdgeTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
 
       // ...
     }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
 
       // ...

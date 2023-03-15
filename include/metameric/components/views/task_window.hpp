@@ -12,23 +12,23 @@ namespace met {
 
     /* Special handlers */
 
-    bool handle_open(detail::TaskEvalInfo &info);
-    bool handle_save(detail::TaskEvalInfo &info);
-    bool handle_save_as(detail::TaskEvalInfo &info);
+    bool handle_open(detail::TaskInfo &info);
+    bool handle_save(detail::TaskInfo &info);
+    bool handle_save_as(detail::TaskInfo &info);
 
-    bool handle_export(detail::TaskEvalInfo &info);
+    bool handle_export(detail::TaskInfo &info);
 
-    void handle_close_safe(detail::TaskEvalInfo &info);
-    void handle_close(detail::TaskEvalInfo &info);
+    void handle_close_safe(detail::TaskInfo &info);
+    void handle_close(detail::TaskInfo &info);
     
-    void handle_exit_safe(detail::TaskEvalInfo &info);
-    void handle_exit(detail::TaskEvalInfo &info);
+    void handle_exit_safe(detail::TaskInfo &info);
+    void handle_exit(detail::TaskInfo &info);
 
   public:
     WindowTask(const std::string &name);
     
-    void init(detail::TaskInitInfo &info) override;
-    void dstr(detail::TaskDstrInfo &info) override;
-    void eval(detail::TaskEvalInfo &info) override;
+    void init(detail::TaskInfo &info) override;
+    void dstr(detail::TaskInfo &info) override;
+    void eval(detail::TaskInfo &info) override;
   };
 } // namespace met

@@ -17,17 +17,17 @@ namespace met {
   : detail::AbstractTask(name),
     m_view_title(view_title) { }
 
-  void CreateProjectTask::init(detail::TaskInitInfo &info) {
+  void CreateProjectTask::init(detail::TaskInfo &info) {
     met_trace_full();
     m_proj_data = { };
   }
 
-  void CreateProjectTask::dstr(detail::TaskDstrInfo &info) {
+  void CreateProjectTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
     m_proj_data = { };
   }
 
-  void CreateProjectTask::eval(detail::TaskEvalInfo &info) {
+  void CreateProjectTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -68,7 +68,7 @@ namespace met {
     }
   }
   
-  void CreateProjectTask::eval_images_section(detail::TaskEvalInfo &info) {
+  void CreateProjectTask::eval_images_section(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -164,7 +164,7 @@ namespace met {
     }
   }
 
-  void CreateProjectTask::eval_data_section(detail::TaskEvalInfo &info) {
+  void CreateProjectTask::eval_data_section(detail::TaskInfo &info) {
     ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
     // Get shared resources
@@ -276,7 +276,7 @@ namespace met {
     ImPlot::PopStyleVar();
   }
   
-  void CreateProjectTask::eval_progress_modal(detail::TaskEvalInfo &info) {
+  void CreateProjectTask::eval_progress_modal(detail::TaskInfo &info) {
     if (ImGui::BeginPopupModal("Warning: unsaved progress")) {
       ImGui::Text("If you continue, you may lose unsaved progress.");
       ImGui::Separator();
@@ -289,7 +289,7 @@ namespace met {
     }
   }
 
-  bool CreateProjectTask::create_project_safe(detail::TaskEvalInfo &info) {
+  bool CreateProjectTask::create_project_safe(detail::TaskInfo &info) {
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
@@ -302,7 +302,7 @@ namespace met {
     }
   }
 
-  bool CreateProjectTask::create_project(detail::TaskEvalInfo &info) {
+  bool CreateProjectTask::create_project(detail::TaskInfo &info) {
     // Create a new project
     info.get_resource<ApplicationData>(global_key, "app_data").create(std::move(m_proj_data));
 

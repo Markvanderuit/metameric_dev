@@ -16,7 +16,7 @@ namespace met {
   GenBarycentricWeightsTask::GenBarycentricWeightsTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenBarycentricWeightsTask::init(detail::TaskInitInfo &info) {
+  void GenBarycentricWeightsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -49,14 +49,14 @@ namespace met {
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(Bary) });
   }
 
-  void GenBarycentricWeightsTask::dstr(detail::TaskDstrInfo &info) {
+  void GenBarycentricWeightsTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     if (m_uniform_buffer.is_init() && m_uniform_buffer.is_mapped()) 
       m_uniform_buffer.unmap();
   }
 
-  void GenBarycentricWeightsTask::eval(detail::TaskEvalInfo &info) {
+  void GenBarycentricWeightsTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
 

@@ -22,7 +22,7 @@ namespace met {
   : detail::AbstractTask(name, true),
     m_parent(parent) { }
     
-  void DrawColorSolidTask::init(detail::TaskInitInfo &info) { 
+  void DrawColorSolidTask::init(detail::TaskInfo &info) { 
     met_trace_full();
 
     // Get shared resources
@@ -92,7 +92,7 @@ namespace met {
     m_cnstr_program.uniform("u_value", clear_colr);
   }
 
-  void DrawColorSolidTask::eval(detail::TaskEvalInfo &info) { 
+  void DrawColorSolidTask::eval(detail::TaskInfo &info) { 
     met_trace_full();
   
     // Verify that vertex and constraint are selected before continuing, as this draw operation

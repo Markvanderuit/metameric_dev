@@ -9,7 +9,7 @@ namespace met::detail {
   template <typename TaskType>
   class Subtasks {
     using KeyType = std::string;
-    using InfType = detail::AbstractTaskInfo;
+    using InfType = detail::TaskInfo;
     using AddType = std::function<TaskType(InfType &, uint)>;
     using RmvType = std::function<KeyType (InfType &, uint)>;
     
@@ -53,7 +53,7 @@ namespace met::detail {
       adjust_to(info, n_tasks);
     }
 
-    void dstr(detail::AbstractTaskInfo &info) {
+    void dstr(detail::TaskInfo &info) {
       met_trace_full();
       adjust_to(info, 0);
     }

@@ -84,13 +84,13 @@ namespace met {
   StateTask::StateTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
-  void StateTask::init(detail::TaskInitInfo &info) {
+  void StateTask::init(detail::TaskInfo &info) {
     met_trace();
     info.insert_resource<ProjectState>("pipeline_state",  { });
     info.insert_resource<ViewportState>("viewport_state", { });
   }
 
-  void StateTask::eval(detail::TaskEvalInfo &info) {
+  void StateTask::eval(detail::TaskInfo &info) {
     met_trace();
 
     constexpr auto reduce_or = [](auto a, auto b) { return a | b; };

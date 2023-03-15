@@ -9,35 +9,39 @@
 
 namespace met {
   class LinearScheduler {
-    using KeyType  = std::string;
     using RsrcType = std::shared_ptr<detail::AbstractResource>;
     using TaskType = std::shared_ptr<detail::AbstractTask>;
-    using RsrcRegs = std::unordered_map<KeyType, std::unordered_map<KeyType, RsrcType>>;
+    using RsrcRegs = std::unordered_map<
+      std::string, 
+      std::unordered_map<std::string, RsrcType>
+    >;
     using TaskRegs = std::vector<TaskType>;
     
   private: /* private members */
-    RsrcRegs _rsrc_registry;
-    TaskRegs _task_registry;
+    RsrcRegs m_rsrc_registry;
+    TaskRegs m_task_registry;
 
   private: /* private methods */
-    void register_task(const KeyType &prev, TaskType &&task);
-    void deregister_task(const KeyType &key);
+    void register_task(const std::string &prev, TaskType &&task);
+    void deregister_task(const std::string &key);
+    // void register_rsrc(const std::string &key, )
 
   public: /* public methods */
     /* scheduling */
 
+    void build();
     void run();
 
     /* Create, add, remove tasks */
     
     template <typename Ty, typename... Args>
-    void emplace_task(const KeyType &key, Args... args) {
+    void emplace_task(const std::string &key, Args... args) {
       static_assert(std::is_base_of_v<detail::AbstractTask, Ty>);
       register_task("", std::make_shared<Ty>(key, args...));
     }
 
     template <typename Ty, typename... Args>
-    void emplace_task_after(const KeyType &prev, const KeyType &key, Args... args) {
+    void emplace_task_after(const std::string &prev, const std::string &key, Args... args) {
       static_assert(std::is_base_of_v<detail::AbstractTask, Ty>);
       register_task(prev, std::make_shared<Ty>(key, args...));
     }
@@ -49,37 +53,43 @@ namespace met {
     }
 
     template <typename Ty>
-    void insert_task_after(const KeyType &prev, Ty &&task) {
+    void insert_task_after(const std::string &prev, Ty &&task) {
       static_assert(std::is_base_of_v<detail::AbstractTask, Ty>);
       register_task(prev, std::make_shared<Ty>(std::move(task)));
     }
 
-    void remove_task(const KeyType &key);
+    void remove_task(const std::string &key) {
+      met_trace();
+      deregister_task(key);
+    }
 
     /* create/add/remove global resources */
 
     template <typename Ty, typename InfoTy = Ty::InfoType>
-    Ty& emplace_resource(const KeyType &key, InfoTy info) {
+    Ty& emplace_resource(const std::string &key, InfoTy info) {
       using ResourceType = detail::Resource<Ty>;
-      auto [it, r] = _rsrc_registry[global_key].emplace(key, std::make_shared<ResourceType>(Ty(info)));
+      auto [it, r] = m_rsrc_registry[global_key].emplace(key, std::make_shared<ResourceType>(Ty(info)));
       debug::check_expr_dbg(r, fmt::format("could not emplace resource with key: {}", key));
       return it->second->get_as<Ty>();
     }
   
     template <typename Ty>
-    void insert_resource(const KeyType &key, Ty &&rsrc) {
+    void insert_resource(const std::string &key, Ty &&rsrc) {
       using ResourceType = detail::Resource<Ty>;
-      auto [it, r] = _rsrc_registry[global_key].emplace(key, std::make_shared<ResourceType>(std::move(rsrc)));
+      auto [it, r] = m_rsrc_registry[global_key].emplace(key, std::make_shared<ResourceType>(std::move(rsrc)));
       debug::check_expr_dbg(r, fmt::format("could not insert resource with key: {}", key));
     }
 
-    void remove_resource(const KeyType &key);
+    void remove_resource(const std::string &key) {
+      met_trace();
+      m_rsrc_registry[global_key].erase(key);
+    }
 
     /* Access existing resources */
     
     template <typename T>
-    T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      return _rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
+    T & get_resource(const std::string &task_key, const std::string &rsrc_key) {
+      return m_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
     }
 
     /* miscellaneous, dbeug info */
@@ -89,14 +99,7 @@ namespace met {
     void clear_all();    // Clear tasks and resources 
 
     // Return const registries
-    const TaskRegs& tasks() const { return _task_registry; }
-    const RsrcRegs& resources() const { return _rsrc_registry; }
-    
-    // String output of current task schedule
-    std::vector<std::string> schedule_list() const {
-      std::vector<std::string> v(_task_registry.size());
-      std::ranges::transform(_task_registry, v.begin(), [](const auto &task) { return task->name(); });
-      return v;
-    }
+    const TaskRegs& tasks() const { return m_task_registry; }
+    const RsrcRegs& resources() const { return m_rsrc_registry; }
   };
 } // namespace met

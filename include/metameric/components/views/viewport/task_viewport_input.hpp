@@ -32,7 +32,7 @@ namespace met {
     ViewportInputTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
     
       // Add subtasks, share resources
@@ -40,12 +40,12 @@ namespace met {
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
-    void dstr(detail::TaskDstrInfo &info) override {
+    void dstr(detail::TaskInfo &info) override {
       met_trace_full();
       info.remove_task(name() + "_vert");
     }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
                       
       // Get shared resources

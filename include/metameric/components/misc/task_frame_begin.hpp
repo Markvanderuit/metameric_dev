@@ -10,7 +10,7 @@ namespace met {
     FrameBeginTask(const std::string &name)
     : detail::AbstractTask(name) { }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
 
       ImGui::BeginFrame();

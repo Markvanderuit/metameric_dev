@@ -43,7 +43,7 @@ namespace met {
   ViewportOverlayTask::ViewportOverlayTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportOverlayTask::init(detail::TaskInitInfo &info) {
+  void ViewportOverlayTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Share resources
@@ -61,14 +61,14 @@ namespace met {
     m_is_cstr_edit_used = false;
   }
 
-  void ViewportOverlayTask::dstr(detail::TaskDstrInfo &info) {
+  void ViewportOverlayTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     // Remove subtasks
     info.remove_task(name() + "_draw_color_solid");
   }
 
-  void ViewportOverlayTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportOverlayTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
@@ -167,7 +167,7 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_vertex(detail::TaskEvalInfo &info, uint i) {
+  void ViewportOverlayTask::eval_overlay_vertex(detail::TaskInfo &info, uint i) {
     met_trace_full();
     ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
@@ -435,7 +435,7 @@ namespace met {
     ImGui::PopID(); // i
   }
 
-  void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskEvalInfo &info) {
+  void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskInfo &info) {
     met_trace_full();
         
     // Get shared resources
@@ -554,7 +554,7 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_plot(detail::TaskEvalInfo &info) {
+  void ViewportOverlayTask::eval_overlay_plot(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources

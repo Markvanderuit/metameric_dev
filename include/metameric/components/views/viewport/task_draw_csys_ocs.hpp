@@ -17,7 +17,7 @@ namespace met {
 
   public:
     ViewportDrawCSysOCSTask(const std::string &);
-    void init(detail::TaskInitInfo &) override;
-    void eval(detail::TaskEvalInfo &) override;
+    void init(detail::TaskInfo &) override;
+    void eval(detail::TaskInfo &) override;
   };
 } // namespace met

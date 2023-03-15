@@ -19,7 +19,7 @@ namespace met {
   SpectraEditorTask::SpectraEditorTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void SpectraEditorTask::eval(detail::TaskEvalInfo &info) {
+  void SpectraEditorTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     if (ImGui::Begin("Spectra editor")) {

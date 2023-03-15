@@ -290,6 +290,9 @@ target_link_libraries(app PUBLIC
 add_executable_r(metameric src/target/main_metameric.cpp)
 target_link_libraries(metameric PRIVATE app)
 
+add_executable_r(scheduler src/target/main_scheduler.cpp)
+target_link_libraries(scheduler PRIVATE app)
+
 # Configure OpenMP
 if(OpenMP_CXX_FOUND)
     target_link_libraries(core       PUBLIC OpenMP::OpenMP_CXX)

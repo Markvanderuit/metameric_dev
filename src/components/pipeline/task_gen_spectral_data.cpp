@@ -21,7 +21,7 @@ namespace met {
   GenSpectralDataTask::GenSpectralDataTask(const std::string &name)
   : detail::AbstractTask(name) { }
   
-  void GenSpectralDataTask::init(detail::TaskInitInfo &info) {
+  void GenSpectralDataTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Setup buffer data and corresponding maps
@@ -37,7 +37,7 @@ namespace met {
     info.insert_resource<gl::Buffer>("tetr_buffer", std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
 
-  void GenSpectralDataTask::dstr(detail::TaskDstrInfo &info) {
+  void GenSpectralDataTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -49,7 +49,7 @@ namespace met {
     if (i_tetr_buffer.is_init() && i_tetr_buffer.is_mapped()) i_tetr_buffer.unmap();
   }
   
-  void GenSpectralDataTask::eval(detail::TaskEvalInfo &info) {
+  void GenSpectralDataTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Continue only on relevant state change

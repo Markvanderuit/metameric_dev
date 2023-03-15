@@ -16,9 +16,7 @@ namespace met {
 
 namespace met::detail {
   // fwd
-  class TaskInitInfo;
-  class TaskEvalInfo;
-  class TaskDstrInfo;
+  class TaskInfo;
 
   /**
    * Abstract base class for application tasks.
@@ -35,9 +33,9 @@ namespace met::detail {
     : m_name(name), m_is_subtask(is_subtask) { }
 
     // Override and implement
-    virtual void init(TaskInitInfo &) { };
-    virtual void eval(TaskEvalInfo &) = 0;
-    virtual void dstr(TaskDstrInfo &) { };
+    virtual void init(TaskInfo &) { };
+    virtual void eval(TaskInfo &) = 0;
+    virtual void dstr(TaskInfo &) { };
   };
 
   enum class TaskSignalFlags : uint {
@@ -51,11 +49,13 @@ namespace met::detail {
   };
   met_declare_bitflag(TaskSignalFlags);
 
+  enum class TaskInfoUsage { eInit, eEval, eDstr };
+
   /**
-   * Abstract base class that consumes application tasks and updates the environment
+   * Base class that consumes application tasks and updates the environment
    * in which they exist.
    */
-  class AbstractTaskInfo {
+  class TaskInfo {
   protected:
     using KeyType         = std::string;
     using RsrcType        = std::shared_ptr<AbstractResource>;
@@ -68,14 +68,24 @@ namespace met::detail {
     ApplRsrcMapType &m_appl_rsrc_registry;
     ApplTaskVecType &m_appl_task_registry;
 
-    AbstractTaskInfo(ApplRsrcMapType &appl_rsrc_registry,
-                     ApplTaskVecType &appl_task_registry,
-                     const AbstractTask &task)
+  public:
+    /* Public constructor */
+
+    // By consuming the task in this object, we initialize/evaluate/shutdown the task
+    TaskInfo(ApplRsrcMapType &appl_rsrc_registry,
+             ApplTaskVecType &appl_task_registry,
+             AbstractTask    &task,
+             TaskInfoUsage    usage)
     : m_appl_rsrc_registry(appl_rsrc_registry),
       m_appl_task_registry(appl_task_registry),
-      m_task_rsrc_registry(appl_rsrc_registry[task.name()]) { };
-    
-  public:
+      m_task_rsrc_registry(appl_rsrc_registry[task.name()]) {
+      met_trace();
+      switch (usage) {
+        case TaskInfoUsage::eInit: task.init(*this); break;
+        case TaskInfoUsage::eEval: task.eval(*this); break;
+        case TaskInfoUsage::eDstr: task.dstr(*this); break;
+      }
+    }
 
     /* Public data registries */
 
@@ -184,45 +194,5 @@ namespace met::detail {
     // Return const list of current tasks
     const ApplTaskVecType& tasks() const { return m_appl_task_registry; }
     const ApplRsrcMapType& resources() const { return m_appl_rsrc_registry; }
-
-    // String output of current task schedule
-    std::vector<KeyType> schedule_list() const {
-      std::vector<std::string> v(m_appl_task_registry.size());
-      std::ranges::transform(m_appl_task_registry, v.begin(), [](const auto &t) { return t->name(); });
-      return v;
-    }
-  };
-
-  struct TaskInitInfo : public AbstractTaskInfo {
-    // By consuming the task in this object, we initialize the task
-    TaskInitInfo(ApplRsrcMapType &appl_rsrc_registry,
-                 ApplTaskVecType &appl_task_registry,
-                 AbstractTask &task)
-    : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
-      met_trace();
-      task.init(*this);
-    }
-  };
-
-  struct TaskEvalInfo : public AbstractTaskInfo {
-    // By consuming the task in this object, we eval/run the task
-    TaskEvalInfo(ApplRsrcMapType &appl_rsrc_registry,
-                 ApplTaskVecType &appl_task_registry,
-                 AbstractTask &task)
-    : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
-      met_trace();
-      task.eval(*this);
-    }
-  };
-
-  struct TaskDstrInfo : public AbstractTaskInfo {
-    // By consuming the task in this object, we eval/run the task
-    TaskDstrInfo(ApplRsrcMapType &appl_rsrc_registry,
-                 ApplTaskVecType &appl_task_registry,
-                 AbstractTask &task)
-    : AbstractTaskInfo(appl_rsrc_registry, appl_task_registry, task) {
-      met_trace();
-      task.dstr(*this);
-    }
   };
 } // met::detail

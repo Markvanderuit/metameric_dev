@@ -19,7 +19,7 @@ namespace met {
     ViewportDrawEndTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
 
       // Set up draw components for gamma correction
@@ -31,7 +31,7 @@ namespace met {
       m_program.uniform("u_lrgb_to_srgb", 1u);
     }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
     
       // Get shared resources 

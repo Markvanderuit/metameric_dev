@@ -14,7 +14,7 @@ namespace met {
   ViewportDrawCSysOCSTask::ViewportDrawCSysOCSTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportDrawCSysOCSTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawCSysOCSTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -58,7 +58,7 @@ namespace met {
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
   }
 
-  void ViewportDrawCSysOCSTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawCSysOCSTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get state objects

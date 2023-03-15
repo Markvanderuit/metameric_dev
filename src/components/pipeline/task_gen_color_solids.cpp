@@ -104,7 +104,7 @@ namespace met {
   GenColorSolidsTask::GenColorSolidsTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenColorSolidsTask::init(detail::TaskInitInfo &info) {
+  void GenColorSolidsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Ger shared resources
@@ -141,7 +141,7 @@ namespace met {
     info.insert_resource("csol_cntr", Colr(0.f));
   }
   
-  void GenColorSolidsTask::eval(detail::TaskEvalInfo &info) {
+  void GenColorSolidsTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Continue only if constraint selection is sensible

@@ -14,7 +14,7 @@ namespace met {
   : detail::AbstractTask(name, true),
     m_mapping_i(mapping_i) { }
 
-  void GenColorMappingTask::init(detail::TaskInitInfo &info) {
+  void GenColorMappingTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -47,12 +47,12 @@ namespace met {
     m_init_stale = true;
   }
 
-  void GenColorMappingTask::dstr(detail::TaskDstrInfo &info) {
+  void GenColorMappingTask::dstr(detail::TaskInfo &info) {
     if (m_gamut_buffer.is_init() && m_gamut_buffer.is_mapped()) 
       m_gamut_buffer.unmap();
   }
 
-  void GenColorMappingTask::eval(detail::TaskEvalInfo &info) {
+  void GenColorMappingTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Generate color texture only on relevant state changes
@@ -105,7 +105,7 @@ namespace met {
   GenColorMappingsTask::GenColorMappingsTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void GenColorMappingsTask::init(detail::TaskInitInfo &info) {
+  void GenColorMappingsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -128,7 +128,7 @@ namespace met {
       [](auto &, uint i) { return fmt::format("gen_color_mapping_{}", i); });
   }
 
-  void GenColorMappingsTask::dstr(detail::TaskDstrInfo &info) {
+  void GenColorMappingsTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     // Remove subtasks
@@ -136,7 +136,7 @@ namespace met {
     m_mapping_subtasks.dstr(info);
   }
 
-  void GenColorMappingsTask::eval(detail::TaskEvalInfo &info) {
+  void GenColorMappingsTask::eval(detail::TaskInfo &info) {
     met_trace_full();
     
     // Get shared resources

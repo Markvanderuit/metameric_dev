@@ -101,16 +101,6 @@ namespace met {
 
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
   }
-
-  template <typename Scheduler>
-  void submit_schedule_delaunay(Scheduler &scheduler) {
-    
-  }
-
-  template <typename Scheduler>
-  void submit_schedule_mvc(Scheduler &scheduler) {
-    
-  }
   
   template <typename Scheduler>
   void submit_schedule_empty<Scheduler>(Scheduler &scheduler) {
@@ -122,11 +112,7 @@ namespace met {
   /* Explicit template instantiations of submit_schedule_*<...> */
 
   template void submit_schedule_main<LinearScheduler>(LinearScheduler &scheduler);
-  template void submit_schedule_main<detail::TaskInitInfo>(detail::TaskInitInfo &scheduler);
-  template void submit_schedule_main<detail::TaskEvalInfo>(detail::TaskEvalInfo &scheduler);
-  template void submit_schedule_main<detail::TaskDstrInfo>(detail::TaskDstrInfo &scheduler);
+  template void submit_schedule_main<detail::TaskInfo>(detail::TaskInfo &scheduler);
   template void submit_schedule_empty<LinearScheduler>(LinearScheduler &scheduler);
-  template void submit_schedule_empty<detail::TaskInitInfo>(detail::TaskInitInfo &scheduler);
-  template void submit_schedule_empty<detail::TaskEvalInfo>(detail::TaskEvalInfo &scheduler);
-  template void submit_schedule_empty<detail::TaskDstrInfo>(detail::TaskDstrInfo &scheduler);
+  template void submit_schedule_empty<detail::TaskInfo>(detail::TaskInfo &scheduler);
 } // namespace met

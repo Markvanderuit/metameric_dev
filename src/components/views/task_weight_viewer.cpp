@@ -15,7 +15,7 @@ namespace met {
   WeightViewerTask::WeightViewerTask(const std::string &name)
   : detail::AbstractTask(name, false) { }
 
-  void WeightViewerTask::init(detail::TaskInitInfo &info) {
+  void WeightViewerTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -47,7 +47,7 @@ namespace met {
     info.insert_task_after(name(), std::move(task));
   }
   
-  void WeightViewerTask::dstr(detail::TaskDstrInfo &info) {
+  void WeightViewerTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
 
     if (m_unif_buffer.is_init() && m_unif_buffer.is_mapped()) 
@@ -59,7 +59,7 @@ namespace met {
     info.remove_task(fmt::format(sub_resample_fmt, name()));
   }
 
-  void WeightViewerTask::eval(detail::TaskEvalInfo &info) {
+  void WeightViewerTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     if (ImGui::Begin("Weight viewer")) {
@@ -99,7 +99,7 @@ namespace met {
     ImGui::End();
   }
 
-  void WeightViewerTask::eval_draw(detail::TaskEvalInfo &info) {
+  void WeightViewerTask::eval_draw(detail::TaskInfo &info) {
     met_trace_full();
 
     // Continue only on relevant state changes
@@ -157,7 +157,7 @@ namespace met {
     gl::dispatch_compute(m_dispatch);
   }
 
-  void WeightViewerTask::eval_view(detail::TaskEvalInfo &info) {
+  void WeightViewerTask::eval_view(detail::TaskInfo &info) {
     met_trace_full();
 
     // Continue only if the necessary output texture exists; this may not be the case on first run

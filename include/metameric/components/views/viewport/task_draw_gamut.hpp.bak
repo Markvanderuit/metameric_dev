@@ -41,8 +41,8 @@ namespace met {
 
   public:
     ViewportDrawGamutTask(const std::string &);
-    void init(detail::TaskInitInfo &) override;
-    void eval(detail::TaskEvalInfo &) override;
-    void dstr(detail::TaskDstrInfo &) override;
+    void init(detail::TaskInfo &) override;
+    void eval(detail::TaskInfo &) override;
+    void dstr(detail::TaskInfo &) override;
   };
 } // namespace met

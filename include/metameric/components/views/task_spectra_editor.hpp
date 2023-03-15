@@ -6,6 +6,6 @@ namespace met {
   class SpectraEditorTask : public detail::AbstractTask {
   public:
     SpectraEditorTask(const std::string &name);
-    void eval(detail::TaskEvalInfo &) override;
+    void eval(detail::TaskInfo &) override;
   };
 } // namespace met

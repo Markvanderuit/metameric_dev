@@ -14,7 +14,7 @@ namespace met {
   ViewportDrawTextureTask::ViewportDrawTextureTask(const std::string &name)
   : detail::AbstractTask(name, true) { }
 
-  void ViewportDrawTextureTask::init(detail::TaskInitInfo &info) {
+  void ViewportDrawTextureTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -35,7 +35,7 @@ namespace met {
     };
   }
 
-  void ViewportDrawTextureTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportDrawTextureTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources 

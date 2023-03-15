@@ -21,7 +21,7 @@ namespace met {
     ViewportDrawBeginTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
     
       // Share uninitialized framebuffer objects; initialized during eval()
@@ -29,7 +29,7 @@ namespace met {
       info.insert_resource("frame_buffer_msaa", gl::Framebuffer());
     }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
     
       // Get shared resources 

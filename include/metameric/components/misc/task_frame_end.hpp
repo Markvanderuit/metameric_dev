@@ -14,7 +14,7 @@ namespace met {
     FrameEndTask(const std::string &name, bool bind_default_fbo = true)
     : detail::AbstractTask(name), m_bind_default_fbo(bind_default_fbo) { }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
       
       auto fb = gl::Framebuffer::make_default();

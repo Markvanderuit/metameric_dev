@@ -23,7 +23,7 @@ namespace met {
     ViewportInputElemTask(const std::string &name)
     : detail::AbstractTask(name, true) { }
 
-    void init(detail::TaskInitInfo &info) override {
+    void init(detail::TaskInfo &info) override {
       met_trace_full();
 
       // Insert shared resources
@@ -34,7 +34,7 @@ namespace met {
       m_is_gizmo_used = false;
     }
 
-    void eval(detail::TaskEvalInfo &info) override {
+    void eval(detail::TaskInfo &info) override {
       met_trace_full();
 
       // If active window is not hovered or we are not in face  mode, exit early

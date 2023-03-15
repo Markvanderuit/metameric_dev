@@ -28,7 +28,7 @@ namespace met {
   ViewportTask::ViewportTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void ViewportTask::init(detail::TaskInitInfo &info) {
+  void ViewportTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Add drawing subtasks in reverse order
@@ -45,7 +45,7 @@ namespace met {
     info.emplace_task_after<ViewportBeginTask>(name(),   name() + viewport_begin_name);
   }
 
-  void ViewportTask::dstr(detail::TaskDstrInfo &info) {
+  void ViewportTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
     
     // Remove subtasks
@@ -60,7 +60,7 @@ namespace met {
     info.remove_task(name() + draw_end_name);
   }
 
-  void ViewportTask::eval(detail::TaskEvalInfo &info) {
+  void ViewportTask::eval(detail::TaskInfo &info) {
     met_trace_full();
   }
 } // namespace met

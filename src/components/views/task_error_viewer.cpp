@@ -13,7 +13,7 @@ namespace met {
   constexpr auto resample_fmt = FMT_COMPILE("{}_gen_resample");
   constexpr auto mapping_fmt  = FMT_COMPILE("gen_color_mapping_{}");
 
-  void ErrorViewerTask::eval_tooltip_copy(detail::TaskEvalInfo &info) {
+  void ErrorViewerTask::eval_tooltip_copy(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -39,7 +39,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   } 
 
-  void ErrorViewerTask::eval_tooltip(detail::TaskEvalInfo &info) {
+  void ErrorViewerTask::eval_tooltip(detail::TaskInfo &info) {
     met_trace_full();
 
     // Get shared resources
@@ -67,7 +67,7 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void ErrorViewerTask::eval_error(detail::TaskEvalInfo &info) {
+  void ErrorViewerTask::eval_error(detail::TaskInfo &info) {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     bool activate_flag = e_pipe_state.any;
@@ -92,7 +92,7 @@ namespace met {
   ErrorViewerTask::ErrorViewerTask(const std::string &name)
   : detail::AbstractTask(name) { }
 
-  void ErrorViewerTask::init(detail::TaskInitInfo &info) {
+  void ErrorViewerTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     m_texture_size = 1;
@@ -137,7 +137,7 @@ namespace met {
     info.insert_task_after(name(), std::move(subtask));
   }
 
-  void ErrorViewerTask::dstr(detail::TaskDstrInfo &info) {
+  void ErrorViewerTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
     for (auto &buffer_obj : m_tooltip_buffers) {
       buffer_obj.in_a.unmap();
@@ -146,7 +146,7 @@ namespace met {
     }
   }
 
-  void ErrorViewerTask::eval(detail::TaskEvalInfo &info) {
+  void ErrorViewerTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
     if (ImGui::Begin("Error viewer")) {
