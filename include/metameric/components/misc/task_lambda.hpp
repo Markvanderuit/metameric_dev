@@ -6,7 +6,7 @@
 #include <functional>
 
 namespace met {
-  class LambdaTask : public detail::AbstractTask {
+  class LambdaTask : public detail::TaskBase {
     using InitType = std::function<void(detail::TaskInfo &)>;
     using EvalType = std::function<void(detail::TaskInfo &)>;
     using DstrType = std::function<void(detail::TaskInfo &)>;
@@ -16,17 +16,14 @@ namespace met {
     DstrType _dstr;
 
   public:
-    LambdaTask(const std::string &name, EvalType eval)
-    : detail::AbstractTask(name),
-      _eval(eval) { }
+    LambdaTask(EvalType eval)
+    : _eval(eval) { }
 
-    LambdaTask(const std::string &name, InitType init, EvalType eval)
-    : detail::AbstractTask(name),
-      _init(init), _eval(eval) { }
+    LambdaTask(InitType init, EvalType eval)
+    : _init(init), _eval(eval) { }
 
-    LambdaTask(const std::string &name, InitType init, EvalType eval, DstrType dstr)
-    : detail::AbstractTask(name),
-      _init(init), _eval(eval), _dstr(dstr) { }
+    LambdaTask(InitType init, EvalType eval, DstrType dstr)
+    : _init(init), _eval(eval), _dstr(dstr) { }
 
     void init(detail::TaskInfo &init_info) override {
       met_trace_full();

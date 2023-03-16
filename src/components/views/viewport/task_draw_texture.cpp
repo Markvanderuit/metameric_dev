@@ -11,9 +11,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  ViewportDrawTextureTask::ViewportDrawTextureTask(const std::string &name)
-  : detail::AbstractTask(name, true) { }
-
   void ViewportDrawTextureTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

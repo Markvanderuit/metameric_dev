@@ -15,9 +15,6 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  GenDelaunayWeightsTask::GenDelaunayWeightsTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-
   void GenDelaunayWeightsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

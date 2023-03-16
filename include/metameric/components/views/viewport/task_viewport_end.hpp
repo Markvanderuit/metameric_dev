@@ -6,12 +6,8 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  class ViewportEndTask : public detail::AbstractTask {
-
+  class ViewportEndTask : public detail::TaskBase {
   public:
-    ViewportEndTask(const std::string &name)
-    : detail::AbstractTask(name, true) { }
-
     void eval(detail::TaskInfo &info) override {
       met_trace_full();
 

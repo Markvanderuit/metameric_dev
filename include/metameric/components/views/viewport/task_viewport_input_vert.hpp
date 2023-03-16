@@ -15,14 +15,11 @@
 namespace met {
   constexpr float selector_near_distance = 12.f;
 
-  class ViewportInputVertTask : public detail::AbstractTask {
+  class ViewportInputVertTask : public detail::TaskBase {
     std::vector<Colr> m_colrs_prev;
     bool              m_is_gizmo_used;
     
   public:
-    ViewportInputVertTask(const std::string &name)
-    : detail::AbstractTask(name, true) { }
-
     void init(detail::TaskInfo &info) override {
       met_trace_full();
 

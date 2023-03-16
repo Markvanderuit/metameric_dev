@@ -40,9 +40,6 @@ namespace met {
   constexpr float    overlay_spacing     = 8.f;
   const eig::Array2f overlay_padding     = 8.f;
 
-  ViewportOverlayTask::ViewportOverlayTask(const std::string &name)
-  : detail::AbstractTask(name, true) { }
-
   void ViewportOverlayTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
@@ -53,7 +50,7 @@ namespace met {
     info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
-    info.emplace_task_after<DrawColorSolidTask>(name(), name() + "_draw_color_solid", name());
+    info.emplace_task_after<DrawColorSolidTask>(info.task_key(), info.task_key() + "_draw_color_solid", info.task_key());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -65,7 +62,7 @@ namespace met {
     met_trace_full();
 
     // Remove subtasks
-    info.remove_task(name() + "_draw_color_solid");
+    info.remove_task(info.task_key() + "_draw_color_solid");
   }
 
   void ViewportOverlayTask::eval(detail::TaskInfo &info) {

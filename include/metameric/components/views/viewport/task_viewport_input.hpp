@@ -27,22 +27,19 @@ namespace met {
     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing;
 
-  class ViewportInputTask : public detail::AbstractTask {
+  class ViewportInputTask : public detail::TaskBase {
   public:
-    ViewportInputTask(const std::string &name)
-    : detail::AbstractTask(name, true) { }
-
     void init(detail::TaskInfo &info) override {
       met_trace_full();
     
       // Add subtasks, share resources
-      info.emplace_task_after<ViewportInputVertTask>(name(), name() + "_vert");
+      info.emplace_task_after<ViewportInputVertTask>(info.task_key(), info.task_key() + "_vert");
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
     void dstr(detail::TaskInfo &info) override {
       met_trace_full();
-      info.remove_task(name() + "_vert");
+      info.remove_task(info.task_key() + "_vert");
     }
 
     void eval(detail::TaskInfo &info) override {

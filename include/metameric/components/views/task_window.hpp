@@ -4,7 +4,7 @@
 #include <string>
 
 namespace met {
-  class WindowTask : public detail::AbstractTask {
+  class WindowTask : public detail::TaskBase {
     /* Local state for handling modals */
     bool m_open_close_modal; 
     bool m_open_exit_modal; 
@@ -25,8 +25,6 @@ namespace met {
     void handle_exit(detail::TaskInfo &info);
 
   public:
-    WindowTask(const std::string &name);
-    
     void init(detail::TaskInfo &info) override;
     void dstr(detail::TaskInfo &info) override;
     void eval(detail::TaskInfo &info) override;

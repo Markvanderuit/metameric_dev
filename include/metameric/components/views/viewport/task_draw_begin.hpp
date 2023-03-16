@@ -9,7 +9,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class ViewportDrawBeginTask : public detail::AbstractTask {
+  class ViewportDrawBeginTask : public detail::TaskBase {
     using Colorbuffer = gl::Renderbuffer<float, 4, gl::RenderbufferType::eMultisample>;
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1, gl::RenderbufferType::eMultisample>;
 
@@ -18,9 +18,6 @@ namespace met {
     Depthbuffer m_depth_buffer_ms;
     
   public:
-    ViewportDrawBeginTask(const std::string &name)
-    : detail::AbstractTask(name, true) { }
-
     void init(detail::TaskInfo &info) override {
       met_trace_full();
     

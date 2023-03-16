@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/mesh.hpp>
-#include <metameric/core/detail/scheduler_task.hpp>
+#include <metameric/core/scheduler.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
@@ -12,7 +12,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class DrawColorSolidTask : public detail::AbstractTask {
+  class DrawColorSolidTask : public detail::TaskBase {
     // Shorthands for multisampled framebuffer attachment types
     using Colorbuffer = gl::Renderbuffer<
       float, 
@@ -56,7 +56,7 @@ namespace met {
     gl::Sampler     m_srgb_sampler;
 
   public:
-    DrawColorSolidTask(const std::string &name, const std::string &parent);
+    DrawColorSolidTask(const std::string &parent);
     void init(detail::TaskInfo &info) override;
     void eval(detail::TaskInfo &info) override;
   };

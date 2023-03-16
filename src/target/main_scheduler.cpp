@@ -6,6 +6,50 @@
 #include <ranges>
 #include <unordered_map>
 #include <vector>
+#include <functional>
+
+// FWD
+template <typename Type, typename Info>
+struct ResourceNode;
+
+struct ResourceNodeBase {
+  template <typename T>
+  T & get_as() {
+    return static_cast<ResourceNode<T> *>(this)->m_object;
+  }
+
+  template <typename T>
+  const T & get_as() const {
+    return static_cast<ResourceNode<T> *>(this)->m_object;
+  }
+};
+
+template <typename Type, typename Info>
+struct ResourceNode : public ResourceNodeBase {
+  ResourceNode(T &&object)
+  : m_object(std::move(object)) { }
+  
+  Type m_object;
+};
+
+
+
+struct TaskNode {
+  using EvalType = std::function<void()>;
+
+  std::string m_name;
+  EvalType    m_eval;
+
+  TaskNode(const std::string &name, EvalType eval)
+  : m_name(name),
+    m_eval(eval) 
+  { }
+
+  void eval() {
+    m_eval();
+  }
+};
+
 
 /* enum class ResourceFlag { eReadWrite, eRead, eWrite }; */
 
@@ -60,14 +104,21 @@ constexpr void test_umap() {
 } */
 
 int main() {
+  TaskNode node_0 = {
+    "node_0",
+    []() {
+      fmt::print("Hello 0\n");
+    }
+  };
+
+  TaskNode node_1 = {
+    "node_1",
+    []() {
+      fmt::print("Hello 1\n");
+    }
+  };
 
 
 
-  /* try { */
-    met::create_application({ .color_mode    = met::AppColorMode::eDark });
-  /* } catch (const std::exception &e) {
-    fmt::print(stderr, "{}\n", e.what());
-    return EXIT_FAILURE;
-  } */
   return EXIT_SUCCESS;
 }

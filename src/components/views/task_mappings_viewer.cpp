@@ -17,13 +17,16 @@ namespace met {
     // Lambda captures of texture_size parameter and outputs
     // capture to add a resample task
     constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
-      return [=](detail::TaskInfo &, uint i) -> detail::TextureResampleTask<gl::Texture2d4f> {
-        return {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
-                  .output_key   = { fmt::format(resample_fmt, i), "texture"        },
-                  .texture_info = { .size = texture_size                           },
-                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                    .mag_filter = gl::SamplerMagFilter::eLinear    },
-                  .lrgb_to_srgb = true                                             }};
+      return [=](detail::TaskInfo &, uint i) -> std::pair<std::string, MappingsViewerTask::ResampleTaskType> {
+        return std::pair {
+          fmt::format(resample_fmt, i),
+          MappingsViewerTask::ResampleTaskType {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
+                                                  .output_key   = { fmt::format(resample_fmt, i), "texture"        },
+                                                  .texture_info = { .size = texture_size                           },
+                                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+                                                                    .mag_filter = gl::SamplerMagFilter::eLinear    },
+                                                  .lrgb_to_srgb = true                                             }}
+        };
       };
     };
 
@@ -129,9 +132,6 @@ namespace met {
     }
   }
 
-  MappingsViewerTask::MappingsViewerTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-  
   void MappingsViewerTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
@@ -180,7 +180,7 @@ namespace met {
       if (auto resample_size = texture_size.max(1.f).cast<uint>(); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
-        m_resample_tasks.init(name(), info, e_mappings_n, 
+        m_resample_tasks.init(info.task_key(), info, e_mappings_n, 
           detail::resample_subtask_add(m_resample_size), detail::resample_subtask_rmv);
       } else {
         // Adjust nr. of spawned tasks to correct number

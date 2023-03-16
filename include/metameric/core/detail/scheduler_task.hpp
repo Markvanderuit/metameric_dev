@@ -3,41 +3,62 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/core/detail/scheduler_resource.hpp>
+#include <metameric/core/detail/scheduler_base.hpp>
+#include <metameric/core/detail/scheduler_info.hpp>
 #include <memory>
 #include <list>
 #include <string>
 #include <unordered_map>
 
-namespace met {
-  // Global key for resources with no managing task
-  const std::string global_key = "global";
-} // namespace met
-
 namespace met::detail {
-  // fwd
-  class TaskInfo;
+  class TaskInfoRsrcScheduler : public RsrcSchedulerBase {
+    // Virtual methods from RsrcSchedulerBase
+    virtual const std::string &task_key_impl() const override { return m_task_key_impl; };
+    virtual RsrcNode add_rsrc_impl(AddRsrcInfo &&info) override;
+    virtual RsrcNode get_rsrc_impl(GetRsrcInfo &&info) override;
+    virtual void     rem_rsrc_impl(RemRsrcInfo &&info) override;
 
-  /**
-   * Abstract base class for application tasks.
-   */
-  class AbstractTask {
-    std::string m_name;
-    bool        m_is_subtask;
+  protected:
+    std::string  m_task_key_impl;
+    RsrcMap     &m_rsrc_registry;
 
   public:
-    const std::string &name()       const { return m_name; } 
-    const bool        &is_subtask() const { return m_is_subtask; }
+    // Public data registries
+    std::list<AddRsrcInfo> add_rsrc_info;
+    std::list<RemRsrcInfo> rem_rsrc_info;
+    
+    /* Public constructor */
+    
+    TaskInfoRsrcScheduler(RsrcMap &rsrc_registry, const std::string &task_key)
+    : m_rsrc_registry(rsrc_registry),
+      m_task_key_impl(task_key) { }
 
-    AbstractTask(const std::string &name, bool is_subtask = false) 
-    : m_name(name), m_is_subtask(is_subtask) { }
-
-    // Override and implement
-    virtual void init(TaskInfo &) { };
-    virtual void eval(TaskInfo &) = 0;
-    virtual void dstr(TaskInfo &) { };
+    /* Miscellaneous, debug info */
+    
+    const RsrcMap& resources() const { return m_rsrc_registry; }
   };
 
+  class TaskInfoTaskScheduler : public TaskSchedulerBase {
+    virtual void add_task_impl(AddTaskInfo &&info) override;
+    virtual void rem_task_impl(RemTaskInfo &&info) override;
+
+  protected:
+    TaskMap &m_appl_task_registry;
+
+  public:
+    std::list<AddTaskInfo> add_task_info;
+    std::list<RemTaskInfo> rem_task_info;
+    
+    TaskInfoTaskScheduler(TaskMap &appl_task_registry)
+    : m_appl_task_registry(appl_task_registry) {}
+
+    const TaskMap& tasks() const { return m_appl_task_registry; }
+  };
+
+  // Usage flags passed into TaskInfo object
+  enum class TaskInfoUsage { eInit, eEval, eDstr };
+
+  // Signal flags passed back by TaskInfo object
   enum class TaskSignalFlags : uint {
     eNone       = 0x000u,
 
@@ -49,150 +70,33 @@ namespace met::detail {
   };
   met_declare_bitflag(TaskSignalFlags);
 
-  enum class TaskInfoUsage { eInit, eEval, eDstr };
-
   /**
-   * Base class that consumes application tasks and updates the environment
+   * Class that consumes application tasks and updates the environment
    * in which they exist.
    */
-  class TaskInfo {
-  protected:
-    using KeyType         = std::string;
-    using RsrcType        = std::shared_ptr<AbstractResource>;
-    using TaskType        = std::shared_ptr<AbstractTask>;
-    using RsrcMapType     = std::unordered_map<KeyType, RsrcType>;
-    using ApplRsrcMapType = std::unordered_map<KeyType, RsrcMapType>;
-    using ApplTaskVecType = const std::vector<TaskType>; 
-
-    RsrcMapType     &m_task_rsrc_registry;
-    ApplRsrcMapType &m_appl_rsrc_registry;
-    ApplTaskVecType &m_appl_task_registry;
+  class TaskInfo : public TaskInfoRsrcScheduler, 
+                   public TaskInfoTaskScheduler {
+    std::string m_task_key;
 
   public:
-    /* Public constructor */
-
-    // By consuming the task in this object, we initialize/evaluate/shutdown the task
-    TaskInfo(ApplRsrcMapType &appl_rsrc_registry,
-             ApplTaskVecType &appl_task_registry,
-             AbstractTask    &task,
-             TaskInfoUsage    usage)
-    : m_appl_rsrc_registry(appl_rsrc_registry),
-      m_appl_task_registry(appl_task_registry),
-      m_task_rsrc_registry(appl_rsrc_registry[task.name()]) {
+    TaskInfo(RsrcMap           &appl_rsrc_registry,
+             TaskMap           &appl_task_registry,
+             const std::string &key,
+             TaskNode          &task,
+             TaskInfoUsage      usage)
+    : TaskInfoRsrcScheduler(appl_rsrc_registry, key),
+      TaskInfoTaskScheduler(appl_task_registry),
+      m_task_key(key) {
       met_trace();
       switch (usage) {
-        case TaskInfoUsage::eInit: task.init(*this); break;
-        case TaskInfoUsage::eEval: task.eval(*this); break;
-        case TaskInfoUsage::eDstr: task.dstr(*this); break;
+        case TaskInfoUsage::eInit: task->init(*this); break;
+        case TaskInfoUsage::eEval: task->eval(*this); break;
+        case TaskInfoUsage::eDstr: task->dstr(*this); break;
       }
     }
 
-    /* Public data registries */
+    TaskSignalFlags signal_flags = TaskSignalFlags::eNone;
 
-    std::unordered_map<KeyType, RsrcType>   add_rsrc_registry;
-    std::list<std::pair<KeyType, TaskType>> add_task_registry;
-    std::list<KeyType>                      rem_rsrc_registry;
-    std::list<KeyType>                      rem_task_registry;
-    TaskSignalFlags                         signal_flags = TaskSignalFlags::eNone;
-
-    /* Create, add, remove resources */
-
-    template <typename Ty, typename InfoTy = Ty::InfoType>
-    void emplace_resource(const KeyType &key, InfoTy info) {
-      met_trace();
-      add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(Ty(info)));
-    }
-
-    template <typename Ty>
-    void insert_resource(const KeyType &key, Ty &&rsrc) {
-      met_trace();
-      add_rsrc_registry.emplace(key, std::make_shared<detail::Resource<Ty>>(std::move(rsrc)));
-    }
-
-    void remove_resource(const KeyType &key) {
-      met_trace();
-      rem_rsrc_registry.push_back(key);
-    }
-
-    /* Create, add, remove subtasks */
-    
-    template <typename Ty, typename... Args>
-    void emplace_task(const KeyType &key, Args... args) {
-      static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      met_trace();
-      add_task_registry.emplace_back("", std::make_shared<Ty>(key, args...));
-    }
-
-    template <typename Ty, typename... Args>
-    void emplace_task_after(const KeyType &prev, const KeyType &key, Args... args) {
-      static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      met_trace();
-      add_task_registry.emplace_back(prev, std::make_shared<Ty>(key, args...));
-    }
-
-    template <typename Ty>
-    void insert_task(Ty &&task) {
-      static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      met_trace();
-      add_task_registry.emplace_back("", std::make_shared<Ty>(std::move(task)));
-    }
-
-    template <typename Ty>
-    void insert_task_after(const KeyType &prev, Ty &&task) {
-      static_assert(std::is_base_of_v<AbstractTask, Ty>);
-      met_trace();
-      add_task_registry.emplace_back(prev, std::make_shared<Ty>(std::move(task)));
-    }
-
-    void remove_task(const KeyType &key) {
-      met_trace();
-      rem_task_registry.push_back(key);
-    }
-
-    /* Access existing resources */
-
-    template <typename T>
-    T & get_resource(const KeyType &key) {
-      met_trace();
-      if (auto i = m_task_rsrc_registry.find(key); i != m_task_rsrc_registry.end()) {
-        return i->second->get_as<T>();
-      } else {
-        return get_resource<T>(global_key, key);
-      }
-    }
-
-    template <typename T>
-    const T & get_resource(const KeyType &key) const {
-      met_trace();
-      if (auto i = m_task_rsrc_registry.find(key); i != m_task_rsrc_registry.end()) {
-        return i->second->get_as<T>();
-      } else {
-        return get_resource<T>(global_key, key);
-      }
-    }
-
-    template <typename T>
-    T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      met_trace();
-      return m_appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
-    }
-
-    template <typename T>
-    const T & get_resource(const KeyType &task_key, const KeyType &rsrc_key) const {
-      met_trace();
-      return m_appl_rsrc_registry.at(task_key).at(rsrc_key)->get_as<T>();
-    }
-
-    bool has_resource(const KeyType &task_key, const KeyType &rsrc_key) {
-      met_trace();
-      return m_appl_rsrc_registry.contains(task_key)
-          && m_appl_rsrc_registry.at(task_key).contains(rsrc_key);
-    }
-
-    /* miscellaneous, debug info */
-
-    // Return const list of current tasks
-    const ApplTaskVecType& tasks() const { return m_appl_task_registry; }
-    const ApplRsrcMapType& resources() const { return m_appl_rsrc_registry; }
+    const std::string &task_key() const { return m_task_key; }
   };
 } // met::detail

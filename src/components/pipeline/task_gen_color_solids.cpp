@@ -101,9 +101,6 @@ namespace met {
     }
   } // namespace detail
 
-  GenColorSolidsTask::GenColorSolidsTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-
   void GenColorSolidsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

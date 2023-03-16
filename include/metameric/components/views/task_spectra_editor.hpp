@@ -3,9 +3,8 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class SpectraEditorTask : public detail::AbstractTask {
+  class SpectraEditorTask : public detail::TaskBase {
   public:
-    SpectraEditorTask(const std::string &name);
     void eval(detail::TaskInfo &) override;
   };
 } // namespace met

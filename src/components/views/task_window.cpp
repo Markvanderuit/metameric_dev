@@ -24,9 +24,6 @@ namespace met {
   const static std::string close_modal_name  = "_close_modal";
   const static std::string exit_modal_name   = "_exit_modal";
 
-  WindowTask::WindowTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-
   void WindowTask::init(detail::TaskInfo &info) {
     met_trace_full();
     // ...
@@ -36,9 +33,9 @@ namespace met {
     met_trace_full();
     
     // Remove straggling modal subtasks if they exist
-    info.remove_task(name() + create_modal_name);
-    info.remove_task(name() + close_modal_name);
-    info.remove_task(name() + exit_modal_name);
+    info.remove_task(info.task_key() + create_modal_name);
+    info.remove_task(info.task_key() + close_modal_name);
+    info.remove_task(info.task_key() + exit_modal_name);
   }
   
   bool WindowTask::handle_open(detail::TaskInfo &info) {
@@ -285,13 +282,13 @@ namespace met {
 
     // Spawn create modal
     if (m_open_create_modal) { 
-      info.emplace_task_after<CreateProjectTask>(name(), name() + create_modal_name, create_modal_title);
+      info.emplace_task_after<CreateProjectTask>(info.task_key(), info.task_key() + create_modal_name, create_modal_title);
       ImGui::OpenPopup(create_modal_title.c_str()); 
     }
 
     // Spawn close modal
     if (m_open_close_modal)  { 
-      info.emplace_task_after<LambdaTask>(name(), name() + close_modal_name, [&](auto &info) {
+      info.emplace_task_after<LambdaTask>(info.task_key(), info.task_key() + close_modal_name, [&](auto &info) {
         if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
           ImGui::SpacedSeparator();
@@ -308,7 +305,7 @@ namespace met {
 
     // Spawm exit modal
     if (m_open_exit_modal)   { 
-      info.emplace_task_after<LambdaTask>(name(), name() + exit_modal_name, [&](auto &info) {
+      info.emplace_task_after<LambdaTask>(info.task_key(), info.task_key() + exit_modal_name, [&](auto &info) {
         if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
           ImGui::SpacedSeparator();

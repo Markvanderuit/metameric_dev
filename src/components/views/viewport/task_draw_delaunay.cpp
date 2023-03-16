@@ -24,9 +24,6 @@ namespace met {
   constexpr uint init_vert_support = 1024;
   constexpr uint init_elem_support = 1024;
 
-  ViewportDrawDelaunayTask::ViewportDrawDelaunayTask(const std::string &name)
-  : detail::AbstractTask(name, true) { }
-
   void ViewportDrawDelaunayTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

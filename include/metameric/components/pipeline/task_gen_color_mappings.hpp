@@ -10,7 +10,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class GenColorMappingTask : public detail::AbstractTask {
+  class GenColorMappingTask : public detail::TaskBase {
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining delaunay
@@ -28,14 +28,14 @@ namespace met {
     std::span<AlColr> m_gamut_map;
 
   public:
-    GenColorMappingTask(const std::string &name, uint mapping_i);
+    GenColorMappingTask(uint mapping_i);
 
     void init(detail::TaskInfo &) override;
     void dstr(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;
   };
 
-  class GenColorMappingsTask : public detail::AbstractTask {
+  class GenColorMappingsTask : public detail::TaskBase {
     using MappingSubTask = GenColorMappingTask;
     using TextureSubTask = detail::TextureFromBufferTask<gl::Texture2d4f>;
 
@@ -43,8 +43,6 @@ namespace met {
     detail::Subtasks<TextureSubTask> m_texture_subtasks;
 
   public:
-    GenColorMappingsTask(const std::string &name);
-
     void init(detail::TaskInfo &) override;
     void dstr(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;

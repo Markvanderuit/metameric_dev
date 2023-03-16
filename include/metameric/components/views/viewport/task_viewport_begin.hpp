@@ -8,12 +8,8 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  class ViewportBeginTask : public detail::AbstractTask {
-
+  class ViewportBeginTask : public detail::TaskBase {
   public:
-    ViewportBeginTask(const std::string &name)
-    : detail::AbstractTask(name, true) { }
-
     void init(detail::TaskInfo &info) override {
       met_trace_full();
 

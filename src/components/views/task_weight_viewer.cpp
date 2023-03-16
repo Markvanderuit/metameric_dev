@@ -12,9 +12,6 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  WeightViewerTask::WeightViewerTask(const std::string &name)
-  : detail::AbstractTask(name, false) { }
-
   void WeightViewerTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
@@ -41,10 +38,10 @@ namespace met {
     info.emplace_resource<gl::Buffer>("colr_buffer", { .size = sizeof(AlColr) * dispatch_n });
 
     // Insert subtask to handle buffer->texture and lrgb->srgb conversion
-    TextureSubtask task = {{ .input_key  = { name(), "colr_buffer" },
-                             .output_key = { fmt::format(sub_texture_fmt, name()), "colr_texture" },
+    TextureSubtask task = {{ .input_key  = { info.task_key(), "colr_buffer" },
+                             .output_key = { fmt::format(sub_texture_fmt, info.task_key()), "colr_texture" },
                              .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
-    info.insert_task_after(name(), std::move(task));
+    info.insert_task_after(info.task_key(), fmt::format(sub_texture_fmt, info.task_key()), std::move(task));
   }
   
   void WeightViewerTask::dstr(detail::TaskInfo &info) {
@@ -55,8 +52,8 @@ namespace met {
     if (m_vert_buffer.is_init() && m_vert_buffer.is_mapped()) 
       m_vert_buffer.unmap();
 
-    info.remove_task(fmt::format(sub_texture_fmt, name()));
-    info.remove_task(fmt::format(sub_resample_fmt, name()));
+    info.remove_task(fmt::format(sub_texture_fmt, info.task_key()));
+    info.remove_task(fmt::format(sub_resample_fmt, info.task_key()));
   }
 
   void WeightViewerTask::eval(detail::TaskInfo &info) {
@@ -81,16 +78,16 @@ namespace met {
         m_texture_size = texture_size;
 
         // Define new resample subtask
-        ResampleSubtask task = {{ .input_key  = { fmt::format(sub_texture_fmt, name()), "colr_texture" },
-                                  .output_key = { fmt::format(sub_resample_fmt, name()), "colr_texture" },
+        ResampleSubtask task = {{ .input_key  = { fmt::format(sub_texture_fmt, info.task_key()), "colr_texture" },
+                                  .output_key = { fmt::format(sub_resample_fmt, info.task_key()), "colr_texture" },
                                   .texture_info = { .size = m_texture_size },
                                   .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
                                                     .mag_filter = gl::SamplerMagFilter::eLinear },
                                   .lrgb_to_srgb = true}};
         
         // Replace task; this is safe if the task does not yet exist
-        info.remove_task(fmt::format(sub_resample_fmt, name()));
-        info.insert_task_after(fmt::format(sub_texture_fmt, name()), std::move(task));
+        info.remove_task(fmt::format(sub_resample_fmt, info.task_key()));
+        info.insert_task_after(fmt::format(sub_texture_fmt, info.task_key()), fmt::format(sub_resample_fmt, info.task_key()), std::move(task));
       }
 
       // View data is defined in this function
@@ -106,7 +103,7 @@ namespace met {
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     bool activate_flag = e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection;
-    info.get_resource<bool>(fmt::format(sub_texture_fmt, name()), "activate_flag") = activate_flag;
+    info.get_resource<bool>(fmt::format(sub_texture_fmt, info.task_key()), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Continue only if vertex selection is non-empty
@@ -161,7 +158,7 @@ namespace met {
     met_trace_full();
 
     // Continue only if the necessary output texture exists; this may not be the case on first run
-    auto st_name = fmt::format(sub_resample_fmt, name());
+    auto st_name = fmt::format(sub_resample_fmt, info.task_key());
     guard(info.has_resource(st_name, "colr_texture"));
 
     // Get shared resources

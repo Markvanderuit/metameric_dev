@@ -81,9 +81,6 @@ namespace met {
     }
   }
   
-  StateTask::StateTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-  
   void StateTask::init(detail::TaskInfo &info) {
     met_trace();
     info.insert_resource<ProjectState>("pipeline_state",  { });

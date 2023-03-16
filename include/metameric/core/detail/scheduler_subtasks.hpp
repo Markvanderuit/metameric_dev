@@ -9,32 +9,32 @@ namespace met::detail {
   template <typename TaskType>
   class Subtasks {
     using KeyType = std::string;
-    using InfType = detail::TaskInfo;
-    using AddType = std::function<TaskType(InfType &, uint)>;
-    using RmvType = std::function<KeyType (InfType &, uint)>;
+    using AddType = std::function<std::pair<std::string, TaskType> (detail::TaskInfo &, uint)>;
+    using RmvType = std::function<std::string                      (detail::TaskInfo &, uint)>;
     
     uint    m_n_tasks = 0;
     KeyType m_prev;
     AddType m_add;
     RmvType m_rmv;
 
-    void adjust_to(InfType &info, uint n_tasks) {
+    void adjust_to(detail::TaskInfo &info, uint n_tasks) {
       met_trace_full();
 
       // Adjust nr. of subtasks upwards if necessary
       for (; m_n_tasks < n_tasks; ++m_n_tasks) {
-        auto task = m_add(info, m_n_tasks);
-        info.insert_task_after(m_prev, std::move(task));
+        auto [key, task] = m_add(info, m_n_tasks);
+        info.insert_task_after(m_prev, key, std::move(task));
       }
 
       // Adjust nr. of subtasks downwards if necessary
       for (; m_n_tasks > n_tasks; --m_n_tasks) {
-        info.remove_task(m_rmv(info, m_n_tasks - 1));
+        auto key = m_rmv(info, m_n_tasks - 1);
+        info.remove_task(key);
       }
     }
 
   public:
-    void init(const KeyType &prev, InfType &info, uint n_tasks, AddType add, RmvType rmv) {
+    void init(const KeyType &prev, detail::TaskInfo &info, uint n_tasks, AddType add, RmvType rmv) {
       met_trace_full();
 
       // Clear out remaining tasks
@@ -48,7 +48,7 @@ namespace met::detail {
       adjust_to(info, n_tasks);
     }
 
-    void eval(InfType &info, uint n_tasks) {
+    void eval(detail::TaskInfo &info, uint n_tasks) {
       met_trace_full();
       adjust_to(info, n_tasks);
     }

@@ -33,7 +33,7 @@ namespace met {
     /* scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
     scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); }); */
 
-    // Temporary window to show runtime schedule
+    /* // Temporary window to show runtime schedule
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
       if (ImGui::Begin("Schedule")) {
         const auto &tasks = scheduler.tasks();
@@ -56,7 +56,7 @@ namespace met {
         }
       }
       ImGui::End();
-    });
+    }); */
 
 
     // Temporary window to plot pca components

@@ -10,9 +10,11 @@
 #include <array>
 
 namespace met {
-  class MappingsViewerTask : public detail::AbstractTask {
+  class MappingsViewerTask : public detail::TaskBase {
+  public:
     using ResampleTaskType = detail::TextureResampleTask<gl::Texture2d4f>;
 
+  private:
     // Resample subtask state
     eig::Array2u                           m_resample_size;
     detail::Subtasks<ResampleTaskType>     m_resample_tasks;
@@ -34,8 +36,6 @@ namespace met {
     void eval_save(detail::TaskInfo &info, uint texture_i);
 
   public:
-    MappingsViewerTask(const std::string &name);
-    
     void init(detail::TaskInfo &) override;
     void dstr(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;

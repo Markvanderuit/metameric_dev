@@ -13,9 +13,8 @@ namespace met {
   constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
   constexpr auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
   
-  CreateProjectTask::CreateProjectTask(const std::string &name, const std::string &view_title)
-  : detail::AbstractTask(name),
-    m_view_title(view_title) { }
+  CreateProjectTask::CreateProjectTask(const std::string &view_title)
+  : m_view_title(view_title) { }
 
   void CreateProjectTask::init(detail::TaskInfo &info) {
     met_trace_full();
@@ -45,13 +44,13 @@ namespace met {
       if (m_proj_data.images.empty()) ImGui::BeginDisabled();
       if (ImGui::Button("Create") && create_project_safe(info)) { 
         ImGui::CloseAnyPopupIfOpen();
-        info.remove_task(name());
+        info.remove_task(info.task_key());
       }
       if (m_proj_data.images.empty()) ImGui::EndDisabled();
       ImGui::SameLine();      
       if (ImGui::Button("Cancel")) { 
         ImGui::CloseCurrentPopup();
-        info.remove_task(name());
+        info.remove_task(info.task_key());
       }
       
       // Define convex hull vertex slider

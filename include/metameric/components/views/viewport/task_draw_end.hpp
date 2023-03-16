@@ -11,13 +11,10 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  struct ViewportDrawEndTask : public detail::AbstractTask {
+  struct ViewportDrawEndTask : public detail::TaskBase {
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::Sampler     m_sampler;
-
-    ViewportDrawEndTask(const std::string &name)
-    : detail::AbstractTask(name, true) { }
 
     void init(detail::TaskInfo &info) override {
       met_trace_full();

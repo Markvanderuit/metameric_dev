@@ -21,7 +21,7 @@ namespace met::detail {
   };
 
   template <class TextureType>
-  class TextureFromBufferTask : public detail::AbstractTask {
+  class TextureFromBufferTask : public detail::TaskBase {
     using InfoType = TextureFromBufferTaskCreateInfo<TextureType>;
     using StrPair = std::pair<std::string, std::string>;
 
@@ -31,8 +31,7 @@ namespace met::detail {
 
   public:
     TextureFromBufferTask(InfoType info)
-    : detail::AbstractTask(info.output_key.first, true),
-      m_info(info) { }
+    : m_info(info) { }
     
     void init(detail::TaskInfo &info) override {
       met_trace_full();

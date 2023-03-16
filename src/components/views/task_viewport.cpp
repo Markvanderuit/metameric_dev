@@ -24,40 +24,37 @@ namespace met {
   constexpr auto draw_texture_name     = "_draw_texture";
   constexpr auto draw_cube_name        = "_draw_cube";
   constexpr auto draw_end_name         = "_draw_end";
-  
-  ViewportTask::ViewportTask(const std::string &name)
-  : detail::AbstractTask(name) { }
 
   void ViewportTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
     // Add drawing subtasks in reverse order
-    info.emplace_task_after<ViewportDrawEndTask>(name(),      name() + draw_end_name);
-    info.emplace_task_after<ViewportDrawTextureTask>(name(),  name() + draw_texture_name);
-    info.emplace_task_after<ViewportDrawDelaunayTask>(name(), name() + draw_delaunay_name);
-    info.emplace_task_after<ViewportDrawCSysOCSTask>(name(),  name() + draw_csys_ocs_name);
-    info.emplace_task_after<ViewportDrawBeginTask>(name(),    name() + draw_begin_name);
+    info.emplace_task_after<ViewportDrawEndTask>(info.task_key(),      info.task_key() + draw_end_name);
+    info.emplace_task_after<ViewportDrawTextureTask>(info.task_key(),  info.task_key() + draw_texture_name);
+    info.emplace_task_after<ViewportDrawDelaunayTask>(info.task_key(), info.task_key() + draw_delaunay_name);
+    info.emplace_task_after<ViewportDrawCSysOCSTask>(info.task_key(),  info.task_key() + draw_csys_ocs_name);
+    info.emplace_task_after<ViewportDrawBeginTask>(info.task_key(),    info.task_key() + draw_begin_name);
 
     // Add UI subtasks in reverse order
-    info.emplace_task_after<ViewportEndTask>(name(),     name() + viewport_end_name);
-    info.emplace_task_after<ViewportInputTask>(name(),   name() + viewport_input_name);
-    info.emplace_task_after<ViewportOverlayTask>(name(), name() + viewport_overlay_name);
-    info.emplace_task_after<ViewportBeginTask>(name(),   name() + viewport_begin_name);
+    info.emplace_task_after<ViewportEndTask>(info.task_key(),     info.task_key() + viewport_end_name);
+    info.emplace_task_after<ViewportInputTask>(info.task_key(),   info.task_key() + viewport_input_name);
+    info.emplace_task_after<ViewportOverlayTask>(info.task_key(), info.task_key() + viewport_overlay_name);
+    info.emplace_task_after<ViewportBeginTask>(info.task_key(),   info.task_key() + viewport_begin_name);
   }
 
   void ViewportTask::dstr(detail::TaskInfo &info) {
     met_trace_full();
     
     // Remove subtasks
-    info.remove_task(name() + viewport_begin_name);
-    info.remove_task(name() + viewport_input_name);
-    info.remove_task(name() + viewport_overlay_name);
-    info.remove_task(name() + viewport_end_name);
-    info.remove_task(name() + draw_begin_name);
-    info.remove_task(name() + draw_csys_ocs_name);
-    info.remove_task(name() + draw_delaunay_name);
-    info.remove_task(name() + draw_texture_name);
-    info.remove_task(name() + draw_end_name);
+    info.remove_task(info.task_key() + viewport_begin_name);
+    info.remove_task(info.task_key() + viewport_input_name);
+    info.remove_task(info.task_key() + viewport_overlay_name);
+    info.remove_task(info.task_key() + viewport_end_name);
+    info.remove_task(info.task_key() + draw_begin_name);
+    info.remove_task(info.task_key() + draw_csys_ocs_name);
+    info.remove_task(info.task_key() + draw_delaunay_name);
+    info.remove_task(info.task_key() + draw_texture_name);
+    info.remove_task(info.task_key() + draw_end_name);
   }
 
   void ViewportTask::eval(detail::TaskInfo &info) {

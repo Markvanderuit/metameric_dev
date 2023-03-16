@@ -71,7 +71,7 @@ namespace met {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     bool activate_flag = e_pipe_state.any;
-    info.get_resource<bool>(fmt::format(texture_fmt, name()), "activate_flag") = activate_flag;
+    info.get_resource<bool>(fmt::format(texture_fmt, info.task_key()), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Get shared resources
@@ -88,9 +88,6 @@ namespace met {
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_error_dispatch);
   }
-
-  ErrorViewerTask::ErrorViewerTask(const std::string &name)
-  : detail::AbstractTask(name) { }
 
   void ErrorViewerTask::init(detail::TaskInfo &info) {
     met_trace_full();
@@ -131,10 +128,10 @@ namespace met {
     info.emplace_resource<gl::Buffer>("colr_buffer", { .size = generate_n * sizeof(AlColr) });
 
     // Insert subtask to handle buffer->texture conversion
-    TextureSubtask subtask = {{ .input_key    = { name(), "colr_buffer" },
-                                .output_key   = { fmt::format(texture_fmt, name()), "colr_texture" },
+    TextureSubtask subtask = {{ .input_key    = { info.task_key(), "colr_buffer" },
+                                .output_key   = { fmt::format(texture_fmt, info.task_key()), "colr_texture" },
                                 .texture_info = { .size = e_txtr_data.size() }}};
-    info.insert_task_after(name(), std::move(subtask));
+    info.insert_task_after(info.task_key(), fmt::format(texture_fmt, info.task_key()), std::move(subtask));
   }
 
   void ErrorViewerTask::dstr(detail::TaskInfo &info) {
@@ -157,8 +154,8 @@ namespace met {
       auto &e_mappings  = e_proj_data.color_systems;
 
       // Get subtask names
-      auto texture_subtask_name  = fmt::format(texture_fmt, name());
-      auto resample_subtask_name = fmt::format(resample_fmt, name());
+      auto texture_subtask_name  = fmt::format(texture_fmt, info.task_key());
+      auto resample_subtask_name = fmt::format(resample_fmt, info.task_key());
 
       // Local state
       bool handle_toolip = false;
@@ -183,7 +180,7 @@ namespace met {
                                   .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
                                                     .mag_filter = gl::SamplerMagFilter::eLinear }}};
         info.remove_task(resample_subtask_name);
-        info.insert_task_after(texture_subtask_name, std::move(task));
+        info.insert_task_after(texture_subtask_name, resample_subtask_name, std::move(task));
       }
 
       // 3. Display ImGui components to show error and select mapping

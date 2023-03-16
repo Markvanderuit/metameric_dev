@@ -30,9 +30,6 @@ namespace met {
     5, 7, 6, 7
   };
 
-  ViewportDrawCubeTask::ViewportDrawCubeTask(const std::string &name)
-  : detail::AbstractTask(name, true) { }
-
   void ViewportDrawCubeTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

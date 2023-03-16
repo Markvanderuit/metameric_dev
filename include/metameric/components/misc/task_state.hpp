@@ -4,7 +4,7 @@
 #include <metameric/core/data.hpp>
 
 namespace met {
-  class StateTask : public detail::AbstractTask {
+  class StateTask : public detail::TaskBase {
     // Copies of project data to check for and report state changes
     std::vector<ProjectData::Vert>            m_verts;
     std::vector<ProjectData::CSys>            m_csys;
@@ -23,7 +23,6 @@ namespace met {
     int               m_cstr_selct;
 
   public:
-    StateTask(const std::string &name);
     void init(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;
   };

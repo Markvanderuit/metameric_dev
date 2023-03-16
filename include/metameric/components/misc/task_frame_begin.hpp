@@ -6,13 +6,9 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  struct FrameBeginTask : public detail::AbstractTask {
-    FrameBeginTask(const std::string &name)
-    : detail::AbstractTask(name) { }
-
+  struct FrameBeginTask : public detail::TaskBase {
     void eval(detail::TaskInfo &info) override {
       met_trace_full();
-
       ImGui::BeginFrame();
     }
   };

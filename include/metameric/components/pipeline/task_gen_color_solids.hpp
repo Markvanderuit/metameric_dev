@@ -4,9 +4,8 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class GenColorSolidsTask : public detail::AbstractTask {
+  class GenColorSolidsTask : public detail::TaskBase {
   public:
-    GenColorSolidsTask(const std::string &name);
     void init(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;
   };

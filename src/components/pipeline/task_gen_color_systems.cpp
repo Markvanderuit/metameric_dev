@@ -17,10 +17,7 @@ namespace met {
     eig::Matrix<float, wavelength_samples, 3, eig::DontAlign> cmfs;
     eig::Array<float, wavelength_samples, 1, eig::DontAlign>  illm;
   };
-
-  GenColorSystemsTask::GenColorSystemsTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-
+  
   void GenColorSystemsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

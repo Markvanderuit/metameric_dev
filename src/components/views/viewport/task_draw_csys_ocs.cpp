@@ -11,9 +11,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  ViewportDrawCSysOCSTask::ViewportDrawCSysOCSTask(const std::string &name)
-  : detail::AbstractTask(name, true) { }
-
   void ViewportDrawCSysOCSTask::init(detail::TaskInfo &info) {
     met_trace_full();
 

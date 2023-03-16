@@ -4,11 +4,10 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class GenColorSystemsTask : public detail::AbstractTask {
+  class GenColorSystemsTask : public detail::TaskBase {
     uint m_max_maps;
     
   public:
-    GenColorSystemsTask(const std::string &name);
     void init(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;
   };

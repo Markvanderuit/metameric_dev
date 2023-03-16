@@ -1,13 +1,13 @@
 #pragma once
 
-#include <metameric/core/detail/scheduler_task.hpp>
+#include <metameric/core/scheduler.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 
 namespace met {
-  class ViewportDrawDelaunayTask : public detail::AbstractTask {
+  class ViewportDrawDelaunayTask : public detail::TaskBase {
     struct UniformBuffer {
       alignas(64) eig::Matrix4f camera_matrix;
       alignas(16) eig::Vector2f camera_aspect;
@@ -28,7 +28,6 @@ namespace met {
     gl::Program             m_elem_program;
 
   public:
-    ViewportDrawDelaunayTask(const std::string &);
     void init(detail::TaskInfo &) override;
     void dstr(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;

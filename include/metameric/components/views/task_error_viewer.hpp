@@ -14,7 +14,7 @@
 #include <array>
 
 namespace met {
-  class ErrorViewerTask : public detail::AbstractTask {
+  class ErrorViewerTask : public detail::TaskBase {
     using TextureSubtask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
     using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
 
@@ -45,8 +45,6 @@ namespace met {
     void eval_tooltip(detail::TaskInfo &info);
 
   public:
-    ErrorViewerTask(const std::string &name);
-    
     void init(detail::TaskInfo &) override;
     void dstr(detail::TaskInfo &) override;
     void eval(detail::TaskInfo &) override;

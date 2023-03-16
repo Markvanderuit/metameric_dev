@@ -11,7 +11,7 @@
 #include <string>
 
 namespace met {
-  class CreateProjectTask : public detail::AbstractTask {
+  class CreateProjectTask : public detail::TaskBase {
     std::string m_view_title;
 
     ProjectCreateInfo                                    m_proj_data;
@@ -27,7 +27,7 @@ namespace met {
     void eval_progress_modal(detail::TaskInfo &info);
 
   public:
-    CreateProjectTask(const std::string &name, const std::string &view_title);
+    CreateProjectTask(const std::string &view_title);
     
     void init(detail::TaskInfo &info) override;
     void dstr(detail::TaskInfo &info) override;

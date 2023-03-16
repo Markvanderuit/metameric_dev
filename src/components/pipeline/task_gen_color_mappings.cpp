@@ -10,9 +10,8 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  GenColorMappingTask::GenColorMappingTask(const std::string &name, uint mapping_i)
-  : detail::AbstractTask(name, true),
-    m_mapping_i(mapping_i) { }
+  GenColorMappingTask::GenColorMappingTask(uint mapping_i)
+  : m_mapping_i(mapping_i) { }
 
   void GenColorMappingTask::init(detail::TaskInfo &info) {
     met_trace_full();
@@ -102,9 +101,6 @@ namespace met {
     m_init_stale = false;
   }
 
-  GenColorMappingsTask::GenColorMappingsTask(const std::string &name)
-  : detail::AbstractTask(name) { }
-
   void GenColorMappingsTask::init(detail::TaskInfo &info) {
     met_trace_full();
 
@@ -114,17 +110,22 @@ namespace met {
     auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
-    m_texture_subtasks.init(name(), info, e_mappings_n,
-      [=](auto &, uint i) -> TextureSubTask { 
-        return {{ .input_key    = { fmt::format("gen_color_mapping_{}", i), "colr_buffer" },
-                  .output_key   = { fmt::format("gen_color_mapping_texture_{}", i), "texture" },
-                  .texture_info = { .size = e_texture_size }}}; 
+    m_texture_subtasks.init(info.task_key(), info, e_mappings_n,
+      [=](auto &, uint i) -> std::pair<std::string, TextureSubTask> { 
+        return std::pair { 
+          fmt::format("gen_color_mapping_texture_{}", i),
+          TextureSubTask {{ .input_key    = { fmt::format("gen_color_mapping_{}", i), "colr_buffer" },
+                            .output_key   = { fmt::format("gen_color_mapping_texture_{}", i), "texture" },
+                            .texture_info = { .size = e_texture_size }}}
+        }; 
       },
       [](auto &, uint i) { return fmt::format("gen_color_mapping_texture_{}", i); });
 
     // Add subtasks to perform mapping
-    m_mapping_subtasks.init(name(), info, e_mappings_n,
-      [](auto &, uint i) { return MappingSubTask(fmt::format("gen_color_mapping_{}", i), i); }, 
+    m_mapping_subtasks.init(info.task_key(), info, e_mappings_n,
+      [](auto &, uint i) { return std::pair {
+        fmt::format("gen_color_mapping_{}", i), MappingSubTask(i)
+      }; }, 
       [](auto &, uint i) { return fmt::format("gen_color_mapping_{}", i); });
   }
 

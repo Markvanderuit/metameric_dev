@@ -23,7 +23,7 @@ namespace met::detail {
   };
 
   template <class TextureType>
-  class TextureResampleTask : public detail::AbstractTask {
+  class TextureResampleTask : public detail::TaskBase {
     using InfoType = TextureResampleTaskCreateInfo<TextureType>;
 
     InfoType        m_info;
@@ -33,8 +33,7 @@ namespace met::detail {
 
   public:
     TextureResampleTask(InfoType info)
-    : detail::AbstractTask(info.output_key.first, true),
-      m_info(info) { }
+    : m_info(info) { }
                         
     void init(detail::TaskInfo &info) override {
       met_trace_full();

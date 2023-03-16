@@ -5,15 +5,13 @@
 #include <metameric/core/detail/scheduler_task.hpp>
 
 namespace met {
-  class ViewportOverlayTask : public detail::AbstractTask {
+  class ViewportOverlayTask : public detail::TaskBase {
     Colr m_colr_prev;
     bool m_is_gizmo_used;     // Gizmo use state
     bool m_is_vert_edit_used; // Color edit use state
     bool m_is_cstr_edit_used; // Cnstr edit use state
     
   public:
-    ViewportOverlayTask(const std::string &name);
-
     void init(detail::TaskInfo &info) override;
     void dstr(detail::TaskInfo &info) override;
     void eval(detail::TaskInfo &info) override;

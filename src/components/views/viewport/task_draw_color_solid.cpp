@@ -18,9 +18,8 @@ namespace met {
   constexpr std::array<float, 2 * 4> quad_vert_data = { -1.f, -1.f, 1.f, -1.f, 1.f,  1.f, -1.f,  1.f };
   constexpr std::array<uint, 2 * 3>  quad_elem_data = { 0, 1, 2, 2, 3, 0 };
 
-  DrawColorSolidTask::DrawColorSolidTask(const std::string &name, const std::string &parent)
-  : detail::AbstractTask(name, true),
-    m_parent(parent) { }
+  DrawColorSolidTask::DrawColorSolidTask(const std::string &parent)
+  : m_parent(parent) { }
     
   void DrawColorSolidTask::init(detail::TaskInfo &info) { 
     met_trace_full();
