@@ -5,6 +5,6 @@
 namespace met {
   class SpectraEditorTask : public detail::TaskBase {
   public:
-    void eval(detail::TaskInfo &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 } // namespace met

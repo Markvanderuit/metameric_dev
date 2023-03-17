@@ -18,7 +18,7 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  void GenSpectralDataTask::init(detail::TaskInfo &info) {
+  void GenSpectralDataTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Setup buffer data and corresponding maps
@@ -34,7 +34,7 @@ namespace met {
     info.insert_resource<gl::Buffer>("tetr_buffer", std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
 
-  void GenSpectralDataTask::dstr(detail::TaskInfo &info) {
+  void GenSpectralDataTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -46,7 +46,7 @@ namespace met {
     if (i_tetr_buffer.is_init() && i_tetr_buffer.is_mapped()) i_tetr_buffer.unmap();
   }
   
-  void GenSpectralDataTask::eval(detail::TaskInfo &info) {
+  void GenSpectralDataTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only on relevant state change

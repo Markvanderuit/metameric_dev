@@ -18,19 +18,19 @@ namespace met {
     std::vector<std::pair<std::string, gl::Texture2d3f>> m_imag_data;
 
     // Project building functions
-    bool create_project_safe(detail::TaskInfo &info);
-    bool create_project(detail::TaskInfo &info);
+    bool create_project_safe(detail::SchedulerHandle &info);
+    bool create_project(detail::SchedulerHandle &info);
     
     // eval() sections
-    void eval_images_section(detail::TaskInfo &info);
-    void eval_data_section(detail::TaskInfo &info);
-    void eval_progress_modal(detail::TaskInfo &info);
+    void eval_images_section(detail::SchedulerHandle &info);
+    void eval_data_section(detail::SchedulerHandle &info);
+    void eval_progress_modal(detail::SchedulerHandle &info);
 
   public:
     CreateProjectTask(const std::string &view_title);
     
-    void init(detail::TaskInfo &info) override;
-    void dstr(detail::TaskInfo &info) override;
-    void eval(detail::TaskInfo &info) override;
+    void init(detail::SchedulerHandle &info) override;
+    void dstr(detail::SchedulerHandle &info) override;
+    void eval(detail::SchedulerHandle &info) override;
   };
 } // namespace met

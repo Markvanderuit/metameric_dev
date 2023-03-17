@@ -7,7 +7,7 @@
 
 namespace met {
   struct FrameBeginTask : public detail::TaskBase {
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
       ImGui::BeginFrame();
     }

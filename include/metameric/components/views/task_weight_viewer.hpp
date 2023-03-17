@@ -36,12 +36,12 @@ namespace met {
     std::span<AlColr> m_vert_map;
 
     // Subfunctions
-    void eval_view(detail::TaskInfo &);
-    void eval_draw(detail::TaskInfo &);
+    void eval_view(detail::SchedulerHandle &);
+    void eval_draw(detail::SchedulerHandle &);
 
   public:
-    void init(detail::TaskInfo &) override;
-    void dstr(detail::TaskInfo &) override;
-    void eval(detail::TaskInfo &) override;
+    void init(detail::SchedulerHandle &) override;
+    void dstr(detail::SchedulerHandle &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 } // namespace met

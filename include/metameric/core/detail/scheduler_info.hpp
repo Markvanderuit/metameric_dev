@@ -9,19 +9,20 @@ namespace met::detail {
   struct RsrcBase;
 
   // Pointer wrappers
-  using TaskNode = std::shared_ptr<TaskBase>;
-  using RsrcNode = std::shared_ptr<RsrcBase>;
+  using TaskNode = std::unique_ptr<TaskBase>;
+  using RsrcNode = std::unique_ptr<RsrcBase>;
 
   // Info object for adding a new task to a schedule
   struct AddTaskInfo {
-    std::string prev_key = "";      // Key of previous task after which task is appended
-    std::string task_key = "";      // Key given to task
+    std::string prnt_key = "";      // Key of parent task to which task is appended
+    std::string task_key = "";      // Key of task
     TaskNode    task     = nullptr; // Pointer to task
   };
 
   // Info object for removing a task from the schedule
   struct RemTaskInfo {
-    std::string task_key = "";
+    std::string prnt_key = "";      // Key of parent task to which task is appended
+    std::string task_key = "";      // Key of task
   };
 
   // Info boject for adding a new resource to a task

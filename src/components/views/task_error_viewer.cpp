@@ -9,17 +9,14 @@
 
 namespace met {
   constexpr float tooltip_width = 256.f;
-  constexpr auto texture_fmt  = FMT_COMPILE("{}_gen_texture");
-  constexpr auto resample_fmt = FMT_COMPILE("{}_gen_resample");
-  constexpr auto mapping_fmt  = FMT_COMPILE("gen_color_mapping_{}");
 
-  void ErrorViewerTask::eval_tooltip_copy(detail::TaskInfo &info) {
+  void ErrorViewerTask::eval_tooltip_copy(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
     auto &e_txtr_data     = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
     auto &e_color_input  = info.get_resource<gl::Buffer>("gen_delaunay_weights", "colr_buffer");
-    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, 0), "colr_buffer");
+    auto &e_color_output = info.get_resource<gl::Buffer>("gen_color_mappings.gen_mapping_0", "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Compute sample position in texture dependent on mouse position in image
@@ -39,7 +36,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   } 
 
-  void ErrorViewerTask::eval_tooltip(detail::TaskInfo &info) {
+  void ErrorViewerTask::eval_tooltip(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -67,16 +64,16 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void ErrorViewerTask::eval_error(detail::TaskInfo &info) {
+  void ErrorViewerTask::eval_error(detail::SchedulerHandle &info) {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     bool activate_flag = e_pipe_state.any;
-    info.get_resource<bool>(fmt::format(texture_fmt, info.task_key()), "activate_flag") = activate_flag;
+    info.get_resource<bool>(fmt::format("{}.gen_texture", info.task_key()), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Get shared resources
     auto &e_color_input  = info.get_resource<gl::Buffer>("gen_delaunay_weights", "colr_buffer");
-    auto &e_color_output = info.get_resource<gl::Buffer>(fmt::format(mapping_fmt, 0), "colr_buffer");
+    auto &e_color_output = info.get_resource<gl::Buffer>("gen_color_mappings.gen_mapping_0", "colr_buffer");
     auto &i_color_error  = info.get_resource<gl::Buffer>("colr_buffer");
 
     // Bind resources to buffer targets
@@ -89,7 +86,7 @@ namespace met {
     gl::dispatch_compute(m_error_dispatch);
   }
 
-  void ErrorViewerTask::init(detail::TaskInfo &info) {
+  void ErrorViewerTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     m_texture_size = 1;
@@ -129,13 +126,14 @@ namespace met {
 
     // Insert subtask to handle buffer->texture conversion
     TextureSubtask subtask = {{ .input_key    = { info.task_key(), "colr_buffer" },
-                                .output_key   = { fmt::format(texture_fmt, info.task_key()), "colr_texture" },
+                                .output_key   = { "blablabla", "colr_texture" },
                                 .texture_info = { .size = e_txtr_data.size() }}};
-    info.insert_task_after(info.task_key(), fmt::format(texture_fmt, info.task_key()), std::move(subtask));
+    info.insert_subtask(info.task_key(), "gen_texture", std::move(subtask));
   }
 
-  void ErrorViewerTask::dstr(detail::TaskInfo &info) {
+  void ErrorViewerTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
+    info.remove_subtask(info.task_key(), "gen_texture");
     for (auto &buffer_obj : m_tooltip_buffers) {
       buffer_obj.in_a.unmap();
       buffer_obj.in_b.unmap();
@@ -143,7 +141,7 @@ namespace met {
     }
   }
 
-  void ErrorViewerTask::eval(detail::TaskInfo &info) {
+  void ErrorViewerTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     if (ImGui::Begin("Error viewer")) {
@@ -154,8 +152,8 @@ namespace met {
       auto &e_mappings  = e_proj_data.color_systems;
 
       // Get subtask names
-      auto texture_subtask_name  = fmt::format(texture_fmt, info.task_key());
-      auto resample_subtask_name = fmt::format(resample_fmt, info.task_key());
+      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
+      auto resample_subtask_name = fmt::format("{}.gen_resample", texture_subtask_name);
 
       // Local state
       bool handle_toolip = false;
@@ -175,12 +173,12 @@ namespace met {
 
         // Remove previous resample subtask and insert a new one
         ResampleSubtask task = {{ .input_key    = { texture_subtask_name, "colr_texture"        },
-                                  .output_key   = { resample_subtask_name, "colr_texture"       },
+                                  .output_key   = { "blablabla", "colr_texture"       },
                                   .texture_info = { .size = m_texture_size                      },
                                   .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
                                                     .mag_filter = gl::SamplerMagFilter::eLinear }}};
-        info.remove_task(resample_subtask_name);
-        info.insert_task_after(texture_subtask_name, resample_subtask_name, std::move(task));
+        info.remove_subtask(texture_subtask_name, "gen_resample");
+        info.insert_subtask(texture_subtask_name, "gen_resample", std::move(task));
       }
 
       // 3. Display ImGui components to show error and select mapping

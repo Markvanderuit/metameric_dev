@@ -6,14 +6,14 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
   GenColorMappingTask::GenColorMappingTask(uint mapping_i)
   : m_mapping_i(mapping_i) { }
 
-  void GenColorMappingTask::init(detail::TaskInfo &info) {
+  void GenColorMappingTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -46,12 +46,12 @@ namespace met {
     m_init_stale = true;
   }
 
-  void GenColorMappingTask::dstr(detail::TaskInfo &info) {
+  void GenColorMappingTask::dstr(detail::SchedulerHandle &info) {
     if (m_gamut_buffer.is_init() && m_gamut_buffer.is_mapped()) 
       m_gamut_buffer.unmap();
   }
 
-  void GenColorMappingTask::eval(detail::TaskInfo &info) {
+  void GenColorMappingTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Generate color texture only on relevant state changes
@@ -59,7 +59,7 @@ namespace met {
 
     // Continue only on relevant state changes; first time this is always true
     bool activate_flag = m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;
-    info.get_resource<bool>(fmt::format("gen_color_mapping_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
+    info.get_resource<bool>(fmt::format("gen_color_mappings.gen_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Get shared resources
@@ -101,7 +101,7 @@ namespace met {
     m_init_stale = false;
   }
 
-  void GenColorMappingsTask::init(detail::TaskInfo &info) {
+  void GenColorMappingsTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -110,26 +110,27 @@ namespace met {
     auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
     // Add subtasks to take mapping and format it into gl::Texture2d4f
-    m_texture_subtasks.init(info.task_key(), info, e_mappings_n,
+    std::string parent_key = info.task_key();
+    m_texture_subtasks.init(info, e_mappings_n,
       [=](auto &, uint i) -> std::pair<std::string, TextureSubTask> { 
         return std::pair { 
-          fmt::format("gen_color_mapping_texture_{}", i),
-          TextureSubTask {{ .input_key    = { fmt::format("gen_color_mapping_{}", i), "colr_buffer" },
-                            .output_key   = { fmt::format("gen_color_mapping_texture_{}", i), "texture" },
+          fmt::format("gen_texture_{}", i),
+          TextureSubTask {{ .input_key    = { fmt::format("{}.gen_mapping_{}", parent_key, i), "colr_buffer" },
+                            .output_key   = { fmt::format("{}.gen_texture_{}", parent_key, i), "texture" },
                             .texture_info = { .size = e_texture_size }}}
         }; 
       },
-      [](auto &, uint i) { return fmt::format("gen_color_mapping_texture_{}", i); });
+      [](auto &, uint i) { return fmt::format("gen_texture_{}", i); });
 
     // Add subtasks to perform mapping
-    m_mapping_subtasks.init(info.task_key(), info, e_mappings_n,
+    m_mapping_subtasks.init(info, e_mappings_n,
       [](auto &, uint i) { return std::pair {
-        fmt::format("gen_color_mapping_{}", i), MappingSubTask(i)
+        fmt::format("gen_mapping_{}", i), MappingSubTask(i)
       }; }, 
-      [](auto &, uint i) { return fmt::format("gen_color_mapping_{}", i); });
+      [](auto &, uint i) { return fmt::format("gen_mapping_{}", i); });
   }
 
-  void GenColorMappingsTask::dstr(detail::TaskInfo &info) {
+  void GenColorMappingsTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Remove subtasks
@@ -137,7 +138,7 @@ namespace met {
     m_mapping_subtasks.dstr(info);
   }
 
-  void GenColorMappingsTask::eval(detail::TaskInfo &info) {
+  void GenColorMappingsTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
     
     // Get shared resources

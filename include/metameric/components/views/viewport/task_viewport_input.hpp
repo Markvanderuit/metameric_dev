@@ -29,28 +29,28 @@ namespace met {
 
   class ViewportInputTask : public detail::TaskBase {
   public:
-    void init(detail::TaskInfo &info) override {
+    void init(detail::SchedulerHandle &info) override {
       met_trace_full();
     
       // Add subtasks, share resources
-      info.emplace_task_after<ViewportInputVertTask>(info.task_key(), info.task_key() + "_vert");
+      info.emplace_subtask<ViewportInputVertTask>(info.task_key(), "vert");
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
-    void dstr(detail::TaskInfo &info) override {
+    void dstr(detail::SchedulerHandle &info) override {
       met_trace_full();
-      info.remove_task(info.task_key() + "_vert");
+      info.remove_subtask(info.task_key(), "vert");
     }
 
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
                       
       // Get shared resources
       auto &io          = ImGui::GetIO();
       auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
       auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
-      auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-      auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
+      auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
+      auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_appl_data.project_data;
       auto &e_delaunay  = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");

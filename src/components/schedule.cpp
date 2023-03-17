@@ -30,11 +30,22 @@
 namespace met {
   template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
-    /* scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
-    scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); }); */
-
-    /* // Temporary window to show runtime schedule
+    scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
+    scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
+      // Temporary window to show runtime schedule
+      if (ImGui::Begin("Schedule debug")) {
+        for (const auto &task_key : info.schedule()) {
+          if (ImGui::TreeNodeEx(task_key.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+            ImGui::TreePop();
+          }
+        }
+      }
+      ImGui::End();
+    });
+    
+
+    /* scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
       if (ImGui::Begin("Schedule")) {
         const auto &tasks = scheduler.tasks();
         const auto &resources = scheduler.resources();
@@ -112,7 +123,7 @@ namespace met {
   /* Explicit template instantiations of submit_schedule_*<...> */
 
   template void submit_schedule_main<LinearScheduler>(LinearScheduler &scheduler);
-  template void submit_schedule_main<detail::TaskInfo>(detail::TaskInfo &scheduler);
+  template void submit_schedule_main<detail::SchedulerHandle>(detail::SchedulerHandle &scheduler);
   template void submit_schedule_empty<LinearScheduler>(LinearScheduler &scheduler);
-  template void submit_schedule_empty<detail::TaskInfo>(detail::TaskInfo &scheduler);
+  template void submit_schedule_empty<detail::SchedulerHandle>(detail::SchedulerHandle &scheduler);
 } // namespace met

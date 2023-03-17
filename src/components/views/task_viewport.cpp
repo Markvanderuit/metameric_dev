@@ -13,51 +13,51 @@
 #include <metameric/components/views/viewport/task_draw_end.hpp>
 
 namespace met {
-  constexpr auto viewport_begin_name   = "_begin";
-  constexpr auto viewport_input_name   = "_input";
-  constexpr auto viewport_overlay_name = "_overlay";
-  constexpr auto viewport_end_name     = "_end";
-  constexpr auto draw_begin_name       = "_draw_begin";
-  constexpr auto draw_gamut_name       = "_draw_gamut";
-  constexpr auto draw_delaunay_name    = "_draw_delaunay";
-  constexpr auto draw_csys_ocs_name    = "_draw_csys_ocs";
-  constexpr auto draw_texture_name     = "_draw_texture";
-  constexpr auto draw_cube_name        = "_draw_cube";
-  constexpr auto draw_end_name         = "_draw_end";
+  constexpr auto begin_name   = "begin";
+  constexpr auto input_name   = "input";
+  constexpr auto overlay_name = "overlay";
+  constexpr auto end_name     = "end";
+  constexpr auto draw_begin_name       = "draw_begin";
+  constexpr auto draw_gamut_name       = "draw_gamut";
+  constexpr auto draw_delaunay_name    = "draw_delaunay";
+  constexpr auto draw_csys_ocs_name    = "draw_csys_ocs";
+  constexpr auto draw_texture_name     = "draw_texture";
+  constexpr auto draw_cube_name        = "draw_cube";
+  constexpr auto draw_end_name         = "draw_end";
 
-  void ViewportTask::init(detail::TaskInfo &info) {
+  void ViewportTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
-    // Add drawing subtasks in reverse order
-    info.emplace_task_after<ViewportDrawEndTask>(info.task_key(),      info.task_key() + draw_end_name);
-    info.emplace_task_after<ViewportDrawTextureTask>(info.task_key(),  info.task_key() + draw_texture_name);
-    info.emplace_task_after<ViewportDrawDelaunayTask>(info.task_key(), info.task_key() + draw_delaunay_name);
-    info.emplace_task_after<ViewportDrawCSysOCSTask>(info.task_key(),  info.task_key() + draw_csys_ocs_name);
-    info.emplace_task_after<ViewportDrawBeginTask>(info.task_key(),    info.task_key() + draw_begin_name);
-
-    // Add UI subtasks in reverse order
-    info.emplace_task_after<ViewportEndTask>(info.task_key(),     info.task_key() + viewport_end_name);
-    info.emplace_task_after<ViewportInputTask>(info.task_key(),   info.task_key() + viewport_input_name);
-    info.emplace_task_after<ViewportOverlayTask>(info.task_key(), info.task_key() + viewport_overlay_name);
-    info.emplace_task_after<ViewportBeginTask>(info.task_key(),   info.task_key() + viewport_begin_name);
+    // Add subtasks
+    const auto &prnt_key = info.task_key();
+    info.emplace_subtask<ViewportDrawEndTask>(prnt_key,      draw_end_name);
+    info.emplace_subtask<ViewportDrawTextureTask>(prnt_key,  draw_texture_name);
+    info.emplace_subtask<ViewportDrawDelaunayTask>(prnt_key, draw_delaunay_name);
+    info.emplace_subtask<ViewportDrawCSysOCSTask>(prnt_key,  draw_csys_ocs_name);
+    info.emplace_subtask<ViewportDrawBeginTask>(prnt_key,    draw_begin_name);
+    info.emplace_subtask<ViewportEndTask>(prnt_key,          end_name);
+    info.emplace_subtask<ViewportInputTask>(prnt_key,        input_name);
+    info.emplace_subtask<ViewportOverlayTask>(prnt_key,      overlay_name);
+    info.emplace_subtask<ViewportBeginTask>(prnt_key,        begin_name);
   }
 
-  void ViewportTask::dstr(detail::TaskInfo &info) {
+  void ViewportTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
     
     // Remove subtasks
-    info.remove_task(info.task_key() + viewport_begin_name);
-    info.remove_task(info.task_key() + viewport_input_name);
-    info.remove_task(info.task_key() + viewport_overlay_name);
-    info.remove_task(info.task_key() + viewport_end_name);
-    info.remove_task(info.task_key() + draw_begin_name);
-    info.remove_task(info.task_key() + draw_csys_ocs_name);
-    info.remove_task(info.task_key() + draw_delaunay_name);
-    info.remove_task(info.task_key() + draw_texture_name);
-    info.remove_task(info.task_key() + draw_end_name);
+    const auto &prnt_key = info.task_key();
+    info.remove_subtask(prnt_key, begin_name);
+    info.remove_subtask(prnt_key, input_name);
+    info.remove_subtask(prnt_key, overlay_name);
+    info.remove_subtask(prnt_key, end_name);
+    info.remove_subtask(prnt_key, draw_begin_name);
+    info.remove_subtask(prnt_key, draw_csys_ocs_name);
+    info.remove_subtask(prnt_key, draw_delaunay_name);
+    info.remove_subtask(prnt_key, draw_texture_name);
+    info.remove_subtask(prnt_key, draw_end_name);
   }
 
-  void ViewportTask::eval(detail::TaskInfo &info) {
+  void ViewportTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
   }
 } // namespace met

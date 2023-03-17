@@ -14,7 +14,7 @@ namespace met {
     FrameEndTask(bool bind_default_fbo = true)
     : m_bind_default_fbo(bind_default_fbo) { }
 
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
       
       // Prepare default framebuffer for coming draw

@@ -10,7 +10,7 @@
 namespace met {
   class ViewportBeginTask : public detail::TaskBase {
   public:
-    void init(detail::TaskInfo &info) override {
+    void init(detail::SchedulerHandle &info) override {
       met_trace_full();
 
       // Share resources
@@ -18,7 +18,7 @@ namespace met {
       info.emplace_resource<gl::Texture2d4f>("srgb_target", { .size = 1 });
     }
     
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
 
       // Get shared resources

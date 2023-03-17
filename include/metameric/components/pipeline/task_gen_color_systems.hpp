@@ -8,7 +8,7 @@ namespace met {
     uint m_max_maps;
     
   public:
-    void init(detail::TaskInfo &) override;
-    void eval(detail::TaskInfo &) override;
+    void init(detail::SchedulerHandle &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 } // namespace met

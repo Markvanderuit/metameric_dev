@@ -9,8 +9,8 @@ namespace met {
     std::span<eig::Array4u> m_tetr_map;
 
   public:
-    void init(detail::TaskInfo &) override;
-    void dstr(detail::TaskInfo &) override;
-    void eval(detail::TaskInfo &) override;
+    void init(detail::SchedulerHandle &) override;
+    void dstr(detail::SchedulerHandle &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 } // namespace met

@@ -11,7 +11,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  void ViewportDrawTextureTask::init(detail::TaskInfo &info) {
+  void ViewportDrawTextureTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -32,11 +32,11 @@ namespace met {
     };
   }
 
-  void ViewportDrawTextureTask::eval(detail::TaskInfo &info) {
+  void ViewportDrawTextureTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball     = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_arcball     = info.get_resource<detail::Arcball>("viewport.input", "arcball");
     auto &e_pack_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "pack_buffer");
     auto &e_err_buffer  = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
 

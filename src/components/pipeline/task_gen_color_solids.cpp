@@ -101,7 +101,7 @@ namespace met {
     }
   } // namespace detail
 
-  void GenColorSolidsTask::init(detail::TaskInfo &info) {
+  void GenColorSolidsTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Ger shared resources
@@ -138,15 +138,15 @@ namespace met {
     info.insert_resource("csol_cntr", Colr(0.f));
   }
   
-  void GenColorSolidsTask::eval(detail::TaskInfo &info) {
+  void GenColorSolidsTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only if constraint selection is sensible
-    auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
+    auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
     guard(e_cstr_slct != -1);
 
     // Continue only on relevant state change
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     guard((!e_vert_slct.empty() && (e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection)) || e_view_state.cstr_selection);

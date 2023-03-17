@@ -121,7 +121,7 @@ namespace met {
     // Get shared resources 
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport.input", "arcball");
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
 
@@ -144,8 +144,8 @@ namespace met {
 
     // Stream size data based on selected vertices, if a state change occurred
     if (e_view_state.vert_selection || e_view_state.vert_mouseover) {
-      auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-      auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
+      auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
+      auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport.input.vert", "mouseover");
 
       std::ranges::fill(m_vert_size_map, vert_deslct_size);
       std::ranges::for_each(e_vert_msover, [&](uint i) { m_vert_size_map[i] = vert_msover_size; });

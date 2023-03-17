@@ -16,7 +16,7 @@ namespace met {
   constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
   constexpr auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
 
-  void SpectraEditorTask::eval(detail::TaskInfo &info) {
+  void SpectraEditorTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     if (ImGui::Begin("Spectra editor")) {

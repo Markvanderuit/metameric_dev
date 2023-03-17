@@ -11,11 +11,11 @@
 #include <ranges>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  void GenDelaunayWeightsTask::init(detail::TaskInfo &info) {
+  void GenDelaunayWeightsTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -51,14 +51,14 @@ namespace met {
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(eig::Array4f) });
   }
 
-  void GenDelaunayWeightsTask::dstr(detail::TaskInfo &info) {
+  void GenDelaunayWeightsTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
 
     if (m_uniform_buffer.is_init() && m_uniform_buffer.is_mapped()) 
       m_uniform_buffer.unmap();
   }
 
-  void GenDelaunayWeightsTask::eval(detail::TaskInfo &info) {
+  void GenDelaunayWeightsTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only on relevant state change

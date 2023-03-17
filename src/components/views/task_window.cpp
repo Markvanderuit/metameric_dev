@@ -20,25 +20,25 @@ namespace met {
   const static std::string exit_modal_title   = "Exit Metameric";
 
   /* Task IDs used to spawn modals' tasks */
-  const static std::string create_modal_name = "_create_modal";
-  const static std::string close_modal_name  = "_close_modal";
-  const static std::string exit_modal_name   = "_exit_modal";
+  const static std::string create_modal_name = "create_modal";
+  const static std::string close_modal_name  = "close_modal";
+  const static std::string exit_modal_name   = "exit_modal";
 
-  void WindowTask::init(detail::TaskInfo &info) {
+  void WindowTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
     // ...
   }
 
-  void WindowTask::dstr(detail::TaskInfo &info) {
+  void WindowTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
     
     // Remove straggling modal subtasks if they exist
-    info.remove_task(info.task_key() + create_modal_name);
-    info.remove_task(info.task_key() + close_modal_name);
-    info.remove_task(info.task_key() + exit_modal_name);
+    info.remove_subtask(info.task_key(), create_modal_name);
+    info.remove_subtask(info.task_key(), close_modal_name);
+    info.remove_subtask(info.task_key(), exit_modal_name);
   }
   
-  bool WindowTask::handle_open(detail::TaskInfo &info) {
+  bool WindowTask::handle_open(detail::SchedulerHandle &info) {
     met_trace_full();
     
     // Open a file picker
@@ -50,14 +50,14 @@ namespace met {
       gl::Program::unbind_all();
 
       // Signal schedule re-creation and submit new schedule for main view
-      info.signal_flags = detail::TaskSignalFlags::eClearTasks;
+      info.signal_clear_tasks();
       submit_schedule_main(info);
       return true;
     }
     return false;
   }
 
-  bool WindowTask::handle_save(detail::TaskInfo &info) {
+  bool WindowTask::handle_save(detail::SchedulerHandle &info) {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -69,7 +69,7 @@ namespace met {
     }
   }
 
-  bool WindowTask::handle_save_as(detail::TaskInfo &info) {
+  bool WindowTask::handle_save_as(detail::SchedulerHandle &info) {
     met_trace_full();
     
     if (fs::path path; detail::save_dialog(path, "json")) {
@@ -79,7 +79,7 @@ namespace met {
     return false;
   }
 
-  bool WindowTask::handle_export(detail::TaskInfo &info) {
+  bool WindowTask::handle_export(detail::SchedulerHandle &info) {
     met_trace_full();
 
     if (fs::path path; detail::save_dialog(path, "met")) {
@@ -164,7 +164,7 @@ namespace met {
     return false;
   }
   
-  void WindowTask::handle_close_safe(detail::TaskInfo &info) {
+  void WindowTask::handle_close_safe(detail::SchedulerHandle &info) {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -176,7 +176,7 @@ namespace met {
     }
   }
 
-  void WindowTask::handle_close(detail::TaskInfo &info) {
+  void WindowTask::handle_close(detail::SchedulerHandle &info) {
     met_trace_full();
     
     // Clear OpenGL state
@@ -187,11 +187,11 @@ namespace met {
     info.get_resource<ApplicationData>(global_key, "app_data").unload();
     
     // Signal schedule re-creation and submit empty schedule for main view
-    info.signal_flags = detail::TaskSignalFlags::eClearTasks;
+    info.signal_clear_tasks();
     submit_schedule_empty(info);
   }
   
-  void WindowTask::handle_exit_safe(detail::TaskInfo &info) {
+  void WindowTask::handle_exit_safe(detail::SchedulerHandle &info) {
     met_trace_full();
     
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
@@ -203,7 +203,7 @@ namespace met {
     }
   }
 
-  void WindowTask::handle_exit(detail::TaskInfo &info) {
+  void WindowTask::handle_exit(detail::SchedulerHandle &info) {
     met_trace_full();
     
     ImGui::CloseAnyPopupIfOpen();
@@ -215,10 +215,10 @@ namespace met {
     info.get_resource<gl::Window>(global_key, "window").set_should_close();
     
     // Signal schedule dump
-    info.signal_flags = detail::TaskSignalFlags::eClearTasks;
+    info.signal_clear_tasks();
   }
 
-  void WindowTask::eval(detail::TaskInfo &info) {
+  void WindowTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
     
     // Modals/popups have to be on the same level of stack as OpenPopup(), so track this state
@@ -282,13 +282,13 @@ namespace met {
 
     // Spawn create modal
     if (m_open_create_modal) { 
-      info.emplace_task_after<CreateProjectTask>(info.task_key(), info.task_key() + create_modal_name, create_modal_title);
+      info.emplace_subtask<CreateProjectTask>(info.task_key(), create_modal_name, create_modal_title);
       ImGui::OpenPopup(create_modal_title.c_str()); 
     }
 
     // Spawn close modal
     if (m_open_close_modal)  { 
-      info.emplace_task_after<LambdaTask>(info.task_key(), info.task_key() + close_modal_name, [&](auto &info) {
+      info.emplace_subtask<LambdaTask>(info.task_key(), close_modal_name, [&](auto &info) {
         if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
           ImGui::SpacedSeparator();
@@ -305,7 +305,7 @@ namespace met {
 
     // Spawm exit modal
     if (m_open_exit_modal)   { 
-      info.emplace_task_after<LambdaTask>(info.task_key(), info.task_key() + exit_modal_name, [&](auto &info) {
+      info.emplace_subtask<LambdaTask>(info.task_key(), exit_modal_name, [&](auto &info) {
         if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
           ImGui::SpacedSeparator();
@@ -320,8 +320,8 @@ namespace met {
       ImGui::OpenPopup(exit_modal_title.c_str()); 
     }
 
-    if ((uint) info.signal_flags) {
-      ImGui::DrawFrame();
-    }
+    // if ((uint) info.signal_flags) {
+    //   ImGui::DrawFrame();
+    // }
   }
 } // namespace met

@@ -30,9 +30,9 @@ namespace met {
   public:
     GenColorMappingTask(uint mapping_i);
 
-    void init(detail::TaskInfo &) override;
-    void dstr(detail::TaskInfo &) override;
-    void eval(detail::TaskInfo &) override;
+    void init(detail::SchedulerHandle &) override;
+    void dstr(detail::SchedulerHandle &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 
   class GenColorMappingsTask : public detail::TaskBase {
@@ -43,8 +43,8 @@ namespace met {
     detail::Subtasks<TextureSubTask> m_texture_subtasks;
 
   public:
-    void init(detail::TaskInfo &) override;
-    void dstr(detail::TaskInfo &) override;
-    void eval(detail::TaskInfo &) override;
+    void init(detail::SchedulerHandle &) override;
+    void dstr(detail::SchedulerHandle &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 } // namespace met

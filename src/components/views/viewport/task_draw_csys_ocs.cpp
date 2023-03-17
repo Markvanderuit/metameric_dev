@@ -11,7 +11,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  void ViewportDrawCSysOCSTask::init(detail::TaskInfo &info) {
+  void ViewportDrawCSysOCSTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -55,7 +55,7 @@ namespace met {
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
   }
 
-  void ViewportDrawCSysOCSTask::eval(detail::TaskInfo &info) {
+  void ViewportDrawCSysOCSTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get state objects
@@ -103,7 +103,7 @@ namespace met {
     
     // Update varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      auto &e_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+      auto &e_arcball = info.get_resource<detail::Arcball>("viewport.input", "arcball");
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
     }
 

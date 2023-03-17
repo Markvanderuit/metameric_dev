@@ -8,7 +8,7 @@
 namespace met {
   class ViewportEndTask : public detail::TaskBase {
   public:
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
 
       // Declare scoped ImGui style state

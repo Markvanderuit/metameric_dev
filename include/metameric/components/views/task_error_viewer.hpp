@@ -40,14 +40,14 @@ namespace met {
     gl::ComputeInfo m_error_dispatch;
 
     // Delegating functions
-    void eval_error(detail::TaskInfo &info);
-    void eval_tooltip_copy(detail::TaskInfo &info);
-    void eval_tooltip(detail::TaskInfo &info);
+    void eval_error(detail::SchedulerHandle &info);
+    void eval_tooltip_copy(detail::SchedulerHandle &info);
+    void eval_tooltip(detail::SchedulerHandle &info);
 
   public:
-    void init(detail::TaskInfo &) override;
-    void dstr(detail::TaskInfo &) override;
-    void eval(detail::TaskInfo &) override;
+    void init(detail::SchedulerHandle &) override;
+    void dstr(detail::SchedulerHandle &) override;
+    void eval(detail::SchedulerHandle &) override;
   };
 
 } // namespace met

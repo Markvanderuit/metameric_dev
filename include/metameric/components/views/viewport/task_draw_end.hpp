@@ -16,7 +16,7 @@ namespace met {
     gl::Program     m_program;
     gl::Sampler     m_sampler;
 
-    void init(detail::TaskInfo &info) override {
+    void init(detail::SchedulerHandle &info) override {
       met_trace_full();
 
       // Set up draw components for gamma correction
@@ -28,14 +28,14 @@ namespace met {
       m_program.uniform("u_lrgb_to_srgb", 1u);
     }
 
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
     
       // Get shared resources 
-      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "lrgb_target");
-      auto &e_srgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "srgb_target");
-      auto &e_frame_buffer    = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
-      auto &e_frame_buffer_ms = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer_msaa");
+      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
+      auto &e_srgb_target     = info.get_resource<gl::Texture2d4f>("viewport.begin", "srgb_target");
+      auto &e_frame_buffer    = info.get_resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer");
+      auto &e_frame_buffer_ms = info.get_resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer_msaa");
 
       // Blit color results into the single-sampled framebuffer with attached target draw_texture
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer);

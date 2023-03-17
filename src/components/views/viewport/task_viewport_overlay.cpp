@@ -40,7 +40,7 @@ namespace met {
   constexpr float    overlay_spacing     = 8.f;
   const eig::Array2f overlay_padding     = 8.f;
 
-  void ViewportOverlayTask::init(detail::TaskInfo &info) {
+  void ViewportOverlayTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Share resources
@@ -50,7 +50,7 @@ namespace met {
     info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
-    info.emplace_task_after<DrawColorSolidTask>(info.task_key(), info.task_key() + "_draw_color_solid", info.task_key());
+    info.emplace_subtask<DrawColorSolidTask>(info.task_key(), "draw_color_solid", info.task_key());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -58,20 +58,20 @@ namespace met {
     m_is_cstr_edit_used = false;
   }
 
-  void ViewportOverlayTask::dstr(detail::TaskInfo &info) {
+  void ViewportOverlayTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Remove subtasks
-    info.remove_task(info.task_key() + "_draw_color_solid");
+    info.remove_subtask(info.task_key(), "draw_color_solid");
   }
 
-  void ViewportOverlayTask::eval(detail::TaskInfo &info) {
+  void ViewportOverlayTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     auto &e_window     = info.get_resource<gl::Window>(global_key, "window");
-    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
     auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
@@ -164,12 +164,12 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_vertex(detail::TaskInfo &info, uint i) {
+  void ViewportOverlayTask::eval_overlay_vertex(detail::SchedulerHandle &info, uint i) {
     met_trace_full();
     ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
     // Get shared resources
-    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
     auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
@@ -432,11 +432,11 @@ namespace met {
     ImGui::PopID(); // i
   }
 
-  void ViewportOverlayTask::eval_overlay_color_solid(detail::TaskInfo &info) {
+  void ViewportOverlayTask::eval_overlay_color_solid(detail::SchedulerHandle &info) {
     met_trace_full();
         
     // Get shared resources
-    auto &e_vert_slct   = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_slct   = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
     auto &i_cstr_slct   = info.get_resource<int>("constr_selection");
     auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
     auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_color_solid_target");
@@ -551,7 +551,7 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_plot(detail::TaskInfo &info) {
+  void ViewportOverlayTask::eval_overlay_plot(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -559,7 +559,7 @@ namespace met {
     auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data = e_appl_data.project_data;
     auto &i_cstr_slct = info.get_resource<int>("constr_selection");
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
     auto &e_vert        = e_appl_data.project_data.vertices;
     auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
 

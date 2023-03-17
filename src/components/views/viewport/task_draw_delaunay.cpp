@@ -24,7 +24,7 @@ namespace met {
   constexpr uint init_vert_support = 1024;
   constexpr uint init_elem_support = 1024;
 
-  void ViewportDrawDelaunayTask::init(detail::TaskInfo &info) {
+  void ViewportDrawDelaunayTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -80,7 +80,7 @@ namespace met {
     m_vert_program.uniform("u_value", clear_colr);
   }
 
-  void ViewportDrawDelaunayTask::dstr(detail::TaskInfo &info) {
+  void ViewportDrawDelaunayTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
 
     if (m_size_buffer.is_init() && m_size_buffer.is_mapped()) 
@@ -91,14 +91,14 @@ namespace met {
       m_elem_buffer.unmap();
   }
 
-  void ViewportDrawDelaunayTask::eval(detail::TaskInfo &info) {
+  void ViewportDrawDelaunayTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
     auto &e_pipe_state   = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state   = info.get_resource<ViewportState>("state", "viewport_state");
-    auto &e_frame_buffer = info.get_resource<gl::Framebuffer>("viewport_draw_begin", "frame_buffer");
-    auto &e_arcball      = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_frame_buffer = info.get_resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer");
+    auto &e_arcball      = info.get_resource<detail::Arcball>("viewport.input", "arcball");
     auto &e_appl_data    = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data    = e_appl_data.project_data;
     auto &e_vert_buffer  = info.get_resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
@@ -135,8 +135,8 @@ namespace met {
 
     // On relevant state change, update selection buffer data
     if (e_view_state.vert_selection || e_view_state.vert_mouseover) {
-      auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-      auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
+      auto &e_vert_select = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
+      auto &e_vert_msover = info.get_resource<std::vector<uint>>("viewport.input.vert", "mouseover");
       
       std::ranges::fill(m_size_map, vert_deslct_size);
       std::ranges::for_each(e_vert_msover, [&](uint i) { m_size_map[i] = vert_msover_size; });

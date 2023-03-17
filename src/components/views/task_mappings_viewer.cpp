@@ -10,33 +10,33 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  constexpr auto mapping_subtask_fmt  = FMT_COMPILE("gen_color_mapping_texture_{}");
-  constexpr auto resample_fmt = FMT_COMPILE("mappings_viewer_resample_{}");
+  // constexpr auto mapping_subtask_fmt  = FMT_COMPILE("gen_color_mapping_texture_{}");
+  // constexpr auto resample_fmt = FMT_COMPILE("mappings_viewer_resample_{}");
 
-  namespace detail {
-    // Lambda captures of texture_size parameter and outputs
-    // capture to add a resample task
-    constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
-      return [=](detail::TaskInfo &, uint i) -> std::pair<std::string, MappingsViewerTask::ResampleTaskType> {
-        return std::pair {
-          fmt::format(resample_fmt, i),
-          MappingsViewerTask::ResampleTaskType {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
-                                                  .output_key   = { fmt::format(resample_fmt, i), "texture"        },
-                                                  .texture_info = { .size = texture_size                           },
-                                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                                                    .mag_filter = gl::SamplerMagFilter::eLinear    },
-                                                  .lrgb_to_srgb = true                                             }}
-        };
-      };
-    };
+  // namespace detail {
+  //   // Lambda captures of texture_size parameter and outputs
+  //   // capture to add a resample task
+  //   constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
+  //     return [=](detail::SchedulerHandle &, uint i) -> std::pair<std::string, MappingsViewerTask::ResampleTaskType> {
+  //       return std::pair {
+  //         fmt::format(resample_fmt, i),
+  //         MappingsViewerTask::ResampleTaskType {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
+  //                                                 .output_key   = { fmt::format(resample_fmt, i), "texture"        },
+  //                                                 .texture_info = { .size = texture_size                           },
+  //                                                 .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+  //                                                                   .mag_filter = gl::SamplerMagFilter::eLinear    },
+  //                                                 .lrgb_to_srgb = true                                             }}
+  //       };
+  //     };
+  //   };
 
-    // Lambda capture to remove a resample task
-    constexpr auto resample_subtask_rmv = [](detail::TaskInfo &, uint i) {
-      return fmt::format(resample_fmt, i);
-    };
-  } // namespace detail
+  //   // Lambda capture to remove a resample task
+  //   constexpr auto resample_subtask_rmv = [](detail::SchedulerHandle &, uint i) {
+  //     return fmt::format(resample_fmt, i);
+  //   };
+  // } // namespace detail
 
-  void MappingsViewerTask::eval_tooltip_copy(detail::TaskInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_tooltip_copy(detail::SchedulerHandle &info, uint texture_i) {
     met_trace_full();
 
     // Get shared resources
@@ -58,7 +58,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   }
 
-  void MappingsViewerTask::eval_tooltip(detail::TaskInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_tooltip(detail::SchedulerHandle &info, uint texture_i) {
     met_trace_full();
 
     // Get shared resources
@@ -112,11 +112,11 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void MappingsViewerTask::eval_popout(detail::TaskInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_popout(detail::SchedulerHandle &info, uint texture_i) {
     // ...
   }
 
-  void MappingsViewerTask::eval_save(detail::TaskInfo &info, uint texture_i) {
+  void MappingsViewerTask::eval_save(detail::SchedulerHandle &info, uint texture_i) {
     if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get shared resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
@@ -132,7 +132,7 @@ namespace met {
     }
   }
 
-  void MappingsViewerTask::init(detail::TaskInfo &info) {
+  void MappingsViewerTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     m_resample_size   = 1;
@@ -150,7 +150,7 @@ namespace met {
     }
   }
   
-  void MappingsViewerTask::dstr(detail::TaskInfo &info) {
+  void MappingsViewerTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
     for (auto &buffer : m_tooltip_buffers) {
       buffer.unmap();
@@ -158,7 +158,7 @@ namespace met {
     m_resample_tasks.dstr(info);
   }
 
-  void MappingsViewerTask::eval(detail::TaskInfo &info) {
+  void MappingsViewerTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
     
     if (ImGui::Begin("Mappings viewer")) {
@@ -180,8 +180,20 @@ namespace met {
       if (auto resample_size = texture_size.max(1.f).cast<uint>(); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
-        m_resample_tasks.init(info.task_key(), info, e_mappings_n, 
-          detail::resample_subtask_add(m_resample_size), detail::resample_subtask_rmv);
+        m_resample_tasks.init(info, e_mappings_n,
+          [=](auto &, uint i) -> std::pair<std::string, ResampleTaskType> {
+            return std::pair {
+              fmt::format("gen_resample_{}", i),
+              ResampleTaskType {{ .input_key    = { fmt::format("gen_color_mappings.gen_texture_{}", i), "texture" },
+                                  .output_key   = { "blablabla", "texture"                                         },
+                                  .texture_info = { .size = m_resample_size                                        },
+                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+                                                    .mag_filter = gl::SamplerMagFilter::eLinear                    },
+                                  .lrgb_to_srgb = true                                                             }}
+            };
+          },
+          [](auto &, uint i) { return fmt::format("gen_resample_{}", i); });
+
       } else {
         // Adjust nr. of spawned tasks to correct number
         m_resample_tasks.eval(info, e_mappings_n);
@@ -195,7 +207,7 @@ namespace met {
         ImGui::PushID(fmt::format("mapping_viewer_texture_{}", i).c_str());
 
         // Generate name of task holding texture data
-        auto subtask_tex_key = fmt::format(resample_fmt, i);
+        auto subtask_tex_key = fmt::format("{}.gen_resample_{}", info.task_key(), i);
         
         // Get externally shared resources; note, resources may not be created yet as tasks are
         // added into the schedule at the end of a loop, not during

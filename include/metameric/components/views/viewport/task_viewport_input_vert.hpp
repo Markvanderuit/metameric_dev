@@ -20,7 +20,7 @@ namespace met {
     bool              m_is_gizmo_used;
     
   public:
-    void init(detail::TaskInfo &info) override {
+    void init(detail::SchedulerHandle &info) override {
       met_trace_full();
 
       // Insert shared resources
@@ -31,7 +31,7 @@ namespace met {
       m_is_gizmo_used = false;
     }
 
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
 
       // If active window is not hovered or we are not in vertex mode, exit early
@@ -41,8 +41,8 @@ namespace met {
       auto &io          = ImGui::GetIO();
       auto &i_selection = info.get_resource<std::vector<uint>>("selection");
       auto &i_mouseover = info.get_resource<std::vector<uint>>("mouseover");
-      auto &e_cstr_slct = info.get_resource<int>("viewport_overlay", "constr_selection");
-      auto &i_arcball   = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+      auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
+      auto &i_arcball   = info.get_resource<detail::Arcball>("viewport.input", "arcball");
       auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_app_data.project_data;
       auto &e_verts     = e_app_data.project_data.vertices;

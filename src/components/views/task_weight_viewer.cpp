@@ -6,13 +6,11 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  constexpr auto sub_texture_fmt  = FMT_COMPILE("{}_gen_texture");
-  constexpr auto sub_resample_fmt = FMT_COMPILE("{}_gen_resample");
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  void WeightViewerTask::init(detail::TaskInfo &info) {
+  void WeightViewerTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -39,30 +37,34 @@ namespace met {
 
     // Insert subtask to handle buffer->texture and lrgb->srgb conversion
     TextureSubtask task = {{ .input_key  = { info.task_key(), "colr_buffer" },
-                             .output_key = { fmt::format(sub_texture_fmt, info.task_key()), "colr_texture" },
+                             .output_key = { "blablablabla", "colr_texture" },
                              .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
-    info.insert_task_after(info.task_key(), fmt::format(sub_texture_fmt, info.task_key()), std::move(task));
+    info.insert_subtask(info.task_key(), "gen_texture", std::move(task));
   }
   
-  void WeightViewerTask::dstr(detail::TaskInfo &info) {
+  void WeightViewerTask::dstr(detail::SchedulerHandle &info) {
     met_trace_full();
+
+    info.remove_subtask(info.task_key(), ".gen_texture.gen_resample");
+    info.remove_subtask(info.task_key(), "gen_texture");
 
     if (m_unif_buffer.is_init() && m_unif_buffer.is_mapped()) 
       m_unif_buffer.unmap();
     if (m_vert_buffer.is_init() && m_vert_buffer.is_mapped()) 
       m_vert_buffer.unmap();
-
-    info.remove_task(fmt::format(sub_texture_fmt, info.task_key()));
-    info.remove_task(fmt::format(sub_resample_fmt, info.task_key()));
   }
 
-  void WeightViewerTask::eval(detail::TaskInfo &info) {
+  void WeightViewerTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     if (ImGui::Begin("Weight viewer")) {
       // Get shared resources 
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_txtr_data   = e_appl_data.loaded_texture_f32;
+
+      // Get subtask names
+      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
+      auto resample_subtask_name = fmt::format("{}.gen_resample", texture_subtask_name);
 
       // Weight data is drawn to texture in this function
       eval_draw(info);
@@ -78,16 +80,16 @@ namespace met {
         m_texture_size = texture_size;
 
         // Define new resample subtask
-        ResampleSubtask task = {{ .input_key  = { fmt::format(sub_texture_fmt, info.task_key()), "colr_texture" },
-                                  .output_key = { fmt::format(sub_resample_fmt, info.task_key()), "colr_texture" },
+        ResampleSubtask task = {{ .input_key  = { fmt::format("{}.gen_texture", info.task_key()), "colr_texture" },
+                                  .output_key = { "blablabla", "colr_texture" },
                                   .texture_info = { .size = m_texture_size },
                                   .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
                                                     .mag_filter = gl::SamplerMagFilter::eLinear },
                                   .lrgb_to_srgb = true}};
         
         // Replace task; this is safe if the task does not yet exist
-        info.remove_task(fmt::format(sub_resample_fmt, info.task_key()));
-        info.insert_task_after(fmt::format(sub_texture_fmt, info.task_key()), fmt::format(sub_resample_fmt, info.task_key()), std::move(task));
+        info.remove_subtask(texture_subtask_name, "gen_resample");
+        info.insert_subtask(texture_subtask_name, "gen_resample", std::move(task));
       }
 
       // View data is defined in this function
@@ -96,19 +98,19 @@ namespace met {
     ImGui::End();
   }
 
-  void WeightViewerTask::eval_draw(detail::TaskInfo &info) {
+  void WeightViewerTask::eval_draw(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
     bool activate_flag = e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection;
-    info.get_resource<bool>(fmt::format(sub_texture_fmt, info.task_key()), "activate_flag") = activate_flag;
+    info.get_resource<bool>(fmt::format("{}.gen_texture", info.task_key()), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Continue only if vertex selection is non-empty
     // otherwise, blacken output texture and return
-    auto &e_selection = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
+    auto &e_selection = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
     if (e_selection.empty()) {
       auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
       i_colr_buffer.clear();
@@ -119,7 +121,7 @@ namespace met {
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
-    auto &e_cstr_slct   = info.get_resource<int>("viewport_overlay", "constr_selection");
+    auto &e_cstr_slct   = info.get_resource<int>("viewport.overlay", "constr_selection");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
     auto &e_tetr_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
     auto &e_vert_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
@@ -154,11 +156,11 @@ namespace met {
     gl::dispatch_compute(m_dispatch);
   }
 
-  void WeightViewerTask::eval_view(detail::TaskInfo &info) {
+  void WeightViewerTask::eval_view(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only if the necessary output texture exists; this may not be the case on first run
-    auto st_name = fmt::format(sub_resample_fmt, info.task_key());
+    auto st_name = fmt::format("{}.gen_texture.gen_resample", info.task_key());
     guard(info.has_resource(st_name, "colr_texture"));
 
     // Get shared resources

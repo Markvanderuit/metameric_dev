@@ -18,7 +18,7 @@ namespace met {
     Depthbuffer m_depth_buffer_ms;
     
   public:
-    void init(detail::TaskInfo &info) override {
+    void init(detail::SchedulerHandle &info) override {
       met_trace_full();
     
       // Share uninitialized framebuffer objects; initialized during eval()
@@ -26,12 +26,12 @@ namespace met {
       info.insert_resource("frame_buffer_msaa", gl::Framebuffer());
     }
 
-    void eval(detail::TaskInfo &info) override {
+    void eval(detail::SchedulerHandle &info) override {
       met_trace_full();
     
       // Get shared resources 
       auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport_begin", "lrgb_target");
+      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
       auto &i_frame_buffer    = info.get_resource<gl::Framebuffer>("frame_buffer");
       auto &i_frame_buffer_ms = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
 

@@ -30,7 +30,7 @@ namespace met {
     5, 7, 6, 7
   };
 
-  void ViewportDrawCubeTask::init(detail::TaskInfo &info) {
+  void ViewportDrawCubeTask::init(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -64,11 +64,11 @@ namespace met {
     m_program.uniform("u_value",      clear_colr);
   }
 
-  void ViewportDrawCubeTask::eval(detail::TaskInfo &info) {
+  void ViewportDrawCubeTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball = info.get_resource<detail::Arcball>("viewport_input", "arcball");
+    auto &e_arcball = info.get_resource<detail::Arcball>("viewport.input", "arcball");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

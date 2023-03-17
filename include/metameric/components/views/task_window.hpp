@@ -12,21 +12,21 @@ namespace met {
 
     /* Special handlers */
 
-    bool handle_open(detail::TaskInfo &info);
-    bool handle_save(detail::TaskInfo &info);
-    bool handle_save_as(detail::TaskInfo &info);
+    bool handle_open(detail::SchedulerHandle &info);
+    bool handle_save(detail::SchedulerHandle &info);
+    bool handle_save_as(detail::SchedulerHandle &info);
 
-    bool handle_export(detail::TaskInfo &info);
+    bool handle_export(detail::SchedulerHandle &info);
 
-    void handle_close_safe(detail::TaskInfo &info);
-    void handle_close(detail::TaskInfo &info);
+    void handle_close_safe(detail::SchedulerHandle &info);
+    void handle_close(detail::SchedulerHandle &info);
     
-    void handle_exit_safe(detail::TaskInfo &info);
-    void handle_exit(detail::TaskInfo &info);
+    void handle_exit_safe(detail::SchedulerHandle &info);
+    void handle_exit(detail::SchedulerHandle &info);
 
   public:
-    void init(detail::TaskInfo &info) override;
-    void dstr(detail::TaskInfo &info) override;
-    void eval(detail::TaskInfo &info) override;
+    void init(detail::SchedulerHandle &info) override;
+    void dstr(detail::SchedulerHandle &info) override;
+    void eval(detail::SchedulerHandle &info) override;
   };
 } // namespace met

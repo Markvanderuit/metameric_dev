@@ -81,13 +81,13 @@ namespace met {
     }
   }
   
-  void StateTask::init(detail::TaskInfo &info) {
+  void StateTask::init(detail::SchedulerHandle &info) {
     met_trace();
     info.insert_resource<ProjectState>("pipeline_state",  { });
     info.insert_resource<ViewportState>("viewport_state", { });
   }
 
-  void StateTask::eval(detail::TaskInfo &info) {
+  void StateTask::eval(detail::SchedulerHandle &info) {
     met_trace();
 
     constexpr auto reduce_or = [](auto a, auto b) { return a | b; };
@@ -97,10 +97,10 @@ namespace met {
     auto &i_view_state = info.get_resource<ViewportState>("viewport_state");
     auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport_input", "arcball");
-    auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport_input_vert", "selection");
-    auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport_input_vert", "mouseover");
-    auto &e_cstr_selct = info.get_resource<int>("viewport_overlay", "constr_selection");
+    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport.input", "arcball");
+    auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
+    auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport.input.vert", "mouseover");
+    auto &e_cstr_selct = info.get_resource<int>("viewport.overlay", "constr_selection");
 
     // Iterate over all project data
     bool pre_verts_resize = e_proj_data.vertices.size() != m_verts.size();
