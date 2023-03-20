@@ -33,18 +33,6 @@ namespace met {
     info.insert_resource<gl::Buffer>("vert_buffer", std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
     info.insert_resource<gl::Buffer>("tetr_buffer", std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
-
-  void GenSpectralDataTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-
-    // Get shared resources
-    auto &i_vert_buffer = info.get_resource<gl::Buffer>("vert_buffer");
-    auto &i_tetr_buffer = info.get_resource<gl::Buffer>("tetr_buffer");
-
-    // Unmap mapped buffers
-    if (i_vert_buffer.is_init() && i_vert_buffer.is_mapped()) i_vert_buffer.unmap();
-    if (i_tetr_buffer.is_init() && i_tetr_buffer.is_mapped()) i_tetr_buffer.unmap();
-  }
   
   void GenSpectralDataTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();

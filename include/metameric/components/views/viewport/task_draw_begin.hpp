@@ -1,9 +1,8 @@
 #pragma once
 
 #include <metameric/core/data.hpp>
+#include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
-#include <metameric/core/detail/scheduler_task.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/renderbuffer.hpp>
 #include <small_gl/texture.hpp>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
-#include <metameric/core/detail/scheduler_task.hpp>
+#include <metameric/core/scheduler.hpp>
+#include <metameric/core/spectrum.hpp>
 
 namespace met {
   class ViewportOverlayTask : public detail::TaskBase {
@@ -13,7 +13,6 @@ namespace met {
     
   public:
     void init(detail::SchedulerHandle &info) override;
-    void dstr(detail::SchedulerHandle &info) override;
     void eval(detail::SchedulerHandle &info) override;
 
     void eval_overlay_vertex(detail::SchedulerHandle &info, uint i);

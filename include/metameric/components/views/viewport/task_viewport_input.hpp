@@ -1,11 +1,10 @@
 #pragma once
 
-#include <metameric/core/spectrum.hpp>
 #include <metameric/core/data.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/scheduler.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
-#include <metameric/core/detail/scheduler_task.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/enum.hpp>
@@ -35,11 +34,6 @@ namespace met {
       // Add subtasks, share resources
       info.emplace_subtask<ViewportInputVertTask>(info.task_key(), "vert");
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
-    }
-
-    void dstr(detail::SchedulerHandle &info) override {
-      met_trace_full();
-      info.remove_subtask(info.task_key(), "vert");
     }
 
     void eval(detail::SchedulerHandle &info) override {

@@ -23,20 +23,6 @@ namespace met {
   const static std::string create_modal_name = "create_modal";
   const static std::string close_modal_name  = "close_modal";
   const static std::string exit_modal_name   = "exit_modal";
-
-  void WindowTask::init(detail::SchedulerHandle &info) {
-    met_trace_full();
-    // ...
-  }
-
-  void WindowTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-    
-    // Remove straggling modal subtasks if they exist
-    info.remove_subtask(info.task_key(), create_modal_name);
-    info.remove_subtask(info.task_key(), close_modal_name);
-    info.remove_subtask(info.task_key(), exit_modal_name);
-  }
   
   bool WindowTask::handle_open(detail::SchedulerHandle &info) {
     met_trace_full();

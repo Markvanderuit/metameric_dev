@@ -20,7 +20,6 @@ namespace met {
 
   public:
     void init(detail::SchedulerHandle &) override;
-    void dstr(detail::SchedulerHandle &) override;
     void eval(detail::SchedulerHandle &) override;
   };
 } // namespace met

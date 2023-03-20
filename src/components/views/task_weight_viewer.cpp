@@ -41,18 +41,6 @@ namespace met {
                              .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
     info.insert_subtask(info.task_key(), "gen_texture", std::move(task));
   }
-  
-  void WeightViewerTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-
-    info.remove_subtask(info.task_key(), ".gen_texture.gen_resample");
-    info.remove_subtask(info.task_key(), "gen_texture");
-
-    if (m_unif_buffer.is_init() && m_unif_buffer.is_mapped()) 
-      m_unif_buffer.unmap();
-    if (m_vert_buffer.is_init() && m_vert_buffer.is_mapped()) 
-      m_vert_buffer.unmap();
-  }
 
   void WeightViewerTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();

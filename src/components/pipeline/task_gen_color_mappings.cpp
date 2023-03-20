@@ -46,11 +46,6 @@ namespace met {
     m_init_stale = true;
   }
 
-  void GenColorMappingTask::dstr(detail::SchedulerHandle &info) {
-    if (m_gamut_buffer.is_init() && m_gamut_buffer.is_mapped()) 
-      m_gamut_buffer.unmap();
-  }
-
   void GenColorMappingTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
@@ -109,8 +104,16 @@ namespace met {
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
     auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
-    // Add subtasks to take mapping and format it into gl::Texture2d4f
     std::string parent_key = info.task_key();
+
+    // Add subtasks to perform mapping
+    m_mapping_subtasks.init(info, e_mappings_n,
+      [](auto &, uint i) { return std::pair {
+        fmt::format("gen_mapping_{}", i), MappingSubTask(i)
+      }; }, 
+      [](auto &, uint i) { return fmt::format("gen_mapping_{}", i); });
+
+    // Add subtasks to take mapping and format it into gl::Texture2d4f
     m_texture_subtasks.init(info, e_mappings_n,
       [=](auto &, uint i) -> std::pair<std::string, TextureSubTask> { 
         return std::pair { 
@@ -121,21 +124,6 @@ namespace met {
         }; 
       },
       [](auto &, uint i) { return fmt::format("gen_texture_{}", i); });
-
-    // Add subtasks to perform mapping
-    m_mapping_subtasks.init(info, e_mappings_n,
-      [](auto &, uint i) { return std::pair {
-        fmt::format("gen_mapping_{}", i), MappingSubTask(i)
-      }; }, 
-      [](auto &, uint i) { return fmt::format("gen_mapping_{}", i); });
-  }
-
-  void GenColorMappingsTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-
-    // Remove subtasks
-    m_texture_subtasks.dstr(info);
-    m_mapping_subtasks.dstr(info);
   }
 
   void GenColorMappingsTask::eval(detail::SchedulerHandle &info) {
@@ -146,7 +134,7 @@ namespace met {
     uint e_mappings_n = e_appl_data.project_data.color_systems.size();
 
     // Adjust nr. of subtasks
-    m_texture_subtasks.eval(info, e_mappings_n);
     m_mapping_subtasks.eval(info, e_mappings_n);
+    m_texture_subtasks.eval(info, e_mappings_n);
   }
 } // namespace met

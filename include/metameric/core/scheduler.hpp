@@ -1,6 +1,7 @@
 #pragma once
 
-#include <metameric/core/detail/scheduler_task.hpp>
+#include <metameric/core/detail/scheduler_base.hpp>
+#include <metameric/core/math.hpp>
 #include <memory>
 #include <span>
 #include <sstream>
@@ -38,8 +39,7 @@ namespace met {
   //   void clear_all();    // Clear tasks and resources
   // };
 
-  class LinearScheduler : public detail::TaskSchedulerBase,
-                          public detail::RsrcSchedulerBase {
+  class LinearScheduler : public detail::SchedulerBase {
     friend class LinearSchedulerHandle;
 
     // Private members
@@ -49,11 +49,11 @@ namespace met {
 
     // Virtual method implementations
     virtual const std::string &task_key_impl() const override { return global_key; }
-    virtual void              add_task_impl(detail::AddTaskInfo &&) override;
-    virtual void              rem_task_impl(detail::RemTaskInfo &&) override;
-    virtual detail::RsrcBase *add_rsrc_impl(detail::AddRsrcInfo &&) override;
-    virtual detail::RsrcBase *get_rsrc_impl(detail::GetRsrcInfo &&) override;
-    virtual void              rem_rsrc_impl(detail::RemRsrcInfo &&) override;
+    virtual void              add_task_impl(AddTaskInfo &&) override;
+    virtual void              rem_task_impl(RemTaskInfo &&) override;
+    virtual detail::RsrcBase *add_rsrc_impl(AddRsrcInfo &&) override;
+    virtual detail::RsrcBase *get_rsrc_impl(GetRsrcInfo &&) override;
+    virtual void              rem_rsrc_impl(RemRsrcInfo &&) override;
 
   public: /* public methods */
     // Scheduling
@@ -67,11 +67,18 @@ namespace met {
 
     // Debug
     virtual std::vector<std::string> schedule() const override {
+      met_trace();
       return m_task_order;
+    }
+
+    // Debug
+    virtual const detail::RsrcMap &resources() const override {
+      met_trace();
+      return m_rsrc_registry;
     }
   };
 
-  // Signal flags passed back by TaskInfo object
+  // Signal flags passed back by LinearSchedulerHandle object
   enum class TaskSignalFlags : uint {
     eNone       = 0x000u,
 
@@ -94,11 +101,11 @@ namespace met {
     TaskSignalFlags  m_signal_flags;
 
     // Virtual method implementations
-    virtual void              add_task_impl(detail::AddTaskInfo &&info) override;
-    virtual void              rem_task_impl(detail::RemTaskInfo &&info) override;
-    virtual detail::RsrcBase *add_rsrc_impl(detail::AddRsrcInfo &&info) override;
-    virtual detail::RsrcBase *get_rsrc_impl(detail::GetRsrcInfo &&info) override;
-    virtual void              rem_rsrc_impl(detail::RemRsrcInfo &&info) override;
+    virtual void              add_task_impl(AddTaskInfo &&info) override;
+    virtual void              rem_task_impl(RemTaskInfo &&info) override;
+    virtual detail::RsrcBase *add_rsrc_impl(AddRsrcInfo &&info) override;
+    virtual detail::RsrcBase *get_rsrc_impl(GetRsrcInfo &&info) override;
+    virtual void              rem_rsrc_impl(RemRsrcInfo &&info) override;
 
     virtual const std::string &task_key_impl() const override { 
       return m_task_key;
@@ -113,14 +120,11 @@ namespace met {
     }
 
   public:
-    // Potential operations for scheduler task
-    enum class Operation { eInit, eEval, eDstr };
-
     // Public members
-    std::list<detail::AddTaskInfo> add_task_info;
-    std::list<detail::RemTaskInfo> rem_task_info;
-    std::list<detail::AddRsrcInfo> add_rsrc_info;
-    std::list<detail::RemRsrcInfo> rem_rsrc_info;
+    std::list<AddTaskInfo> add_task_info;
+    std::list<RemTaskInfo> rem_task_info;
+    std::list<AddRsrcInfo> add_rsrc_info;
+    std::list<RemRsrcInfo> rem_rsrc_info;
 
     LinearSchedulerHandle(LinearScheduler &scheduler, const std::string &task_key)
     : m_scheduler(scheduler),
@@ -132,6 +136,12 @@ namespace met {
     // Debug
     virtual std::vector<std::string> schedule() const override {
       return m_scheduler.m_task_order;
+    }
+    
+    // Debug
+    virtual const detail::RsrcMap &resources() const override {
+      met_trace();
+      return m_scheduler.resources();
     }
   };
 } // namespace met

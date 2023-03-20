@@ -94,7 +94,7 @@ namespace met {
     ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
       nullptr, 0.f, 1.f, { 0.f, 64.f });
     ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-      nullptr, 0.f, mapp.illuminant.maxCoeff(), { 0.f, 64.f });
+      nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
 
     ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
 
@@ -148,14 +148,6 @@ namespace met {
       buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
       map = cast_span<eig::Array4f>(buffer.map(map_flags));
     }
-  }
-  
-  void MappingsViewerTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-    for (auto &buffer : m_tooltip_buffers) {
-      buffer.unmap();
-    }
-    m_resample_tasks.dstr(info);
   }
 
   void MappingsViewerTask::eval(detail::SchedulerHandle &info) {

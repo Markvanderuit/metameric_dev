@@ -25,8 +25,6 @@ namespace met {
     void handle_exit(detail::SchedulerHandle &info);
 
   public:
-    void init(detail::SchedulerHandle &info) override;
-    void dstr(detail::SchedulerHandle &info) override;
     void eval(detail::SchedulerHandle &info) override;
   };
 } // namespace met

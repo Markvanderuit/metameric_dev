@@ -12,7 +12,6 @@
 #include <metameric/components/misc/task_state.hpp>
 
 // Pipeline tasks
-// #include <metameric/components/pipeline/task_gen_barycentric_weights.hpp>
 #include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
@@ -27,50 +26,47 @@
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
+// STL
+#include <ranges>
+
 namespace met {
   template <typename Scheduler>
   void submit_schedule_debug(Scheduler &scheduler) {
-    scheduler.emplace_task<LambdaTask>("imgui_demo", [](auto &) {  ImGui::ShowDemoWindow(); });
-    scheduler.emplace_task<LambdaTask>("imgui_metrics", [](auto &) { ImGui::ShowMetricsWindow(); });
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
       // Temporary window to show runtime schedule
       if (ImGui::Begin("Schedule debug")) {
+        const auto &resource_map = info.resources();
         for (const auto &task_key : info.schedule()) {
-          if (ImGui::TreeNodeEx(task_key.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-            ImGui::TreePop();
+          // Split string to get task name without prepend
+          auto count = std::count(range_iter(task_key), '.');
+          auto split = std::views::split(task_key, '.')
+                     | std::views::transform([](const auto &r) { return std::string(range_iter(r)); });
+          auto name = (split | std::views::drop(count)).front();
+
+          // Indent dependent on how much of a subtask something is
+          for (uint i = 0; i < count; ++i) ImGui::Indent(16.f);
+
+          if (!resource_map.contains(task_key)) {
+            if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Bullet))
+              ImGui::TreePop();
+          } else {
+            if (ImGui::TreeNode(name.c_str())) {
+              for (const auto &[key, _] : resource_map.at(task_key)) {
+                if (ImGui::TreeNodeEx(fmt::format("Resource: {}", key).c_str(), ImGuiTreeNodeFlags_Leaf))
+                  ImGui::TreePop();
+              }
+              ImGui::TreePop();
+            }
           }
+
+          // Unindent dependent on how much of a subtask something is
+          for (uint i = 0; i < count; ++i) ImGui::Unindent(16.f);
         }
       }
       ImGui::End();
     });
-    
 
-    /* scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
-      if (ImGui::Begin("Schedule")) {
-        const auto &tasks = scheduler.tasks();
-        const auto &resources = scheduler.resources();
-
-        for (const auto &task : tasks) {
-          if (task->is_subtask()) ImGui::Indent();
-          std::string name = task->name();
-          if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-            ImGui::TreePop();
-          }
-          if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            if (resources.contains(name)) {
-              ImGui::Value("Resources", static_cast<int>(resources.at(name).size()));
-            }
-            ImGui::EndTooltip();
-          }
-          if (task->is_subtask()) ImGui::Unindent();
-        }
-      }
-      ImGui::End();
-    }); */
-
-
-    // Temporary window to plot pca components
+    /* // Temporary window to plot pca components
     scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
       if (ImGui::Begin("PCA plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -85,7 +81,7 @@ namespace met {
         }
       }
       ImGui::End();
-    });
+    }); */
   }
 
   template <typename Scheduler>

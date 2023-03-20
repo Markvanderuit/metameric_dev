@@ -28,8 +28,6 @@ namespace met {
     std::array<TooltipMap,      6> m_tooltip_maps;
     uint                           m_tooltip_cycle_i;
 
-    // Information about what is currently visible in the tooltip
-
     // Local state
     uint         m_mapping_i;     // Current selected mapping
     eig::Array2i m_tooltip_pixel; // Selected pixel in tooltip
@@ -46,7 +44,6 @@ namespace met {
 
   public:
     void init(detail::SchedulerHandle &) override;
-    void dstr(detail::SchedulerHandle &) override;
     void eval(detail::SchedulerHandle &) override;
   };
 

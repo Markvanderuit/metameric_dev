@@ -80,17 +80,6 @@ namespace met {
     m_vert_program.uniform("u_value", clear_colr);
   }
 
-  void ViewportDrawDelaunayTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-
-    if (m_size_buffer.is_init() && m_size_buffer.is_mapped()) 
-      m_size_buffer.unmap();
-    if (m_unif_buffer.is_init() && m_unif_buffer.is_mapped()) 
-      m_unif_buffer.unmap();
-    if (m_elem_buffer.is_init() && m_elem_buffer.is_mapped()) 
-      m_elem_buffer.unmap();
-  }
-
   void ViewportDrawDelaunayTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
@@ -107,7 +96,6 @@ namespace met {
     if (e_pipe_state.any_verts) {
       // Resize fixed-size buffer if current available size is exceeded
       if (e_pipe_state.verts.size() > m_size_map.size()) {
-        m_size_buffer.unmap();
         std::vector<float> size_init(2 * e_pipe_state.verts.size(), vert_deslct_size);
         m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
         m_size_map    = m_size_buffer.map_as<float>(buffer_access_flags);
@@ -120,7 +108,6 @@ namespace met {
       // Resize fixed-size element buffer if current available size is exceeded
       if (trimesh.elems.size() > m_elem_map.size()) {
         m_elem_array.detach_elements();
-        m_elem_buffer.unmap();
         m_elem_buffer = {{ .size = 2 * trimesh.elems.size() * sizeof(eig::Array3u), .flags = buffer_create_flags }};
         m_elem_map    = m_elem_buffer.map_as<eig::Array3u>(buffer_access_flags);
         m_elem_array.attach_elements(m_elem_buffer);  

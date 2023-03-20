@@ -131,16 +131,6 @@ namespace met {
     info.insert_subtask(info.task_key(), "gen_texture", std::move(subtask));
   }
 
-  void ErrorViewerTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-    info.remove_subtask(info.task_key(), "gen_texture");
-    for (auto &buffer_obj : m_tooltip_buffers) {
-      buffer_obj.in_a.unmap();
-      buffer_obj.in_b.unmap();
-      buffer_obj.out.unmap();
-    }
-  }
-
   void ErrorViewerTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 

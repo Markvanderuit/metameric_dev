@@ -1,33 +1,27 @@
 #pragma once
 
-#include <metameric/core/detail/scheduler_info.hpp>
+#include <metameric/core/utility.hpp>
 #include <memory>
 #include <unordered_map>
-#include <utility>
-#include <any>
 
 namespace met::detail {
   // Forward declarations
   struct TaskBase;
   struct RsrcBase;
-  struct TaskInfoBase;
   struct SchedulerBase;
   struct SchedulerHandle;
-
-  template <typename> 
-  struct RsrcImpl;
 
   // Abstract base class for application tasks;
   // Implementations contain majority of program code
   struct TaskBase {
     // Override and implement
     virtual void init(SchedulerHandle &) { };
-    virtual void eval(SchedulerHandle &) = 0;
+    virtual void eval(SchedulerHandle &) { };
     virtual void dstr(SchedulerHandle &) { };
   };
 
   // Abstract base class for application resources;
-  // Implementation described below
+  template <typename> struct RsrcImpl; // FWD of implementing class
   struct RsrcBase {
     template <typename T>
     T & get() {
@@ -50,12 +44,27 @@ namespace met::detail {
   };
 
   // Shorthands for common types
-  using TaskNode = std::unique_ptr<TaskBase>;
-  using RsrcNode = std::unique_ptr<RsrcBase>;
+  using TaskNode = std::shared_ptr<TaskBase>;
+  using RsrcNode = std::shared_ptr<RsrcBase>;
   using TaskMap  = std::unordered_map<std::string, TaskNode>;
   using RsrcMap  = std::unordered_map<std::string, std::unordered_map<std::string, RsrcNode>>;
 
   class TaskSchedulerBase {
+  protected:
+    // Info object for adding a new task to a schedule
+    struct AddTaskInfo {
+      std::string prnt_key = "";      // Key of parent task to which task is appended
+      std::string task_key = "";      // Key of task
+      TaskNode    task     = nullptr; // Pointer to task
+    };
+
+    // Info object for removing a task from the schedule
+    struct RemTaskInfo {
+      std::string prnt_key = "";      // Key of parent task to which task is appended
+      std::string task_key = "";      // Key of task
+    };
+
+    // Virtual functions implementing add/remove tasks
     virtual void add_task_impl(AddTaskInfo &&) = 0;
     virtual void rem_task_impl(RemTaskInfo &&) = 0;
     
@@ -66,7 +75,7 @@ namespace met::detail {
       met_trace();
       add_task_impl(AddTaskInfo { .prnt_key = "",
                                   .task_key = key,
-                                  .task     = std::make_unique<Ty>(args...)});
+                                  .task     = std::make_shared<Ty>(args...)});
     }
 
     template <typename Ty, typename... Args>
@@ -75,7 +84,7 @@ namespace met::detail {
       met_trace();
       add_task_impl(AddTaskInfo { .prnt_key = prnt,
                                   .task_key = key,
-                                  .task     = std::make_unique<Ty>(args...)});
+                                  .task     = std::make_shared<Ty>(args...)});
     }
 
     template <typename Ty>
@@ -84,7 +93,7 @@ namespace met::detail {
       met_trace();
       add_task_impl(AddTaskInfo { .prnt_key = "",
                                   .task_key = key,
-                                  .task = std::make_unique<Ty>(std::move(task)) });
+                                  .task = std::make_shared<Ty>(std::move(task)) });
     }
 
     template <typename Ty>
@@ -93,7 +102,7 @@ namespace met::detail {
       met_trace();
       add_task_impl(AddTaskInfo { .prnt_key = prnt,
                                   .task_key = key,
-                                  .task = std::make_unique<Ty>(std::move(task)) });
+                                  .task = std::make_shared<Ty>(std::move(task)) });
     }
 
     void remove_task(const std::string &key) {
@@ -105,13 +114,30 @@ namespace met::detail {
       met_trace();
       rem_task_impl(RemTaskInfo { .prnt_key = prnt, .task_key = key });
     }
-
-  public: /* debug */
-    virtual std::vector<std::string> schedule() const = 0;
   };
   
   class RsrcSchedulerBase {
   protected:
+    // Info boject for adding a new resource to a task
+    struct AddRsrcInfo {
+      std::string task_key = "";
+      std::string rsrc_key = "";
+      RsrcNode    rsrc     = nullptr; // Pointer to resource
+    };
+
+    // Info object for removing a resource from a task 
+    struct RemRsrcInfo {
+      std::string task_key = "";
+      std::string rsrc_key = "";
+    };
+
+    // Info object for querying a resource from a task 
+    struct GetRsrcInfo {
+      std::string task_key = "";
+      std::string rsrc_key = "";
+    };
+
+    // Virtual functions implementing add/remove/get tasks
     virtual RsrcBase* add_rsrc_impl(AddRsrcInfo &&) = 0; // nullable
     virtual RsrcBase* get_rsrc_impl(GetRsrcInfo &&) = 0; // nullable
     virtual void      rem_rsrc_impl(RemRsrcInfo &&) = 0;
@@ -171,7 +197,7 @@ namespace met::detail {
       debug::check_expr_rel(ptr, fmt::format("get_resource failed for {}, {}", task_key, rsrc_key));
       return ptr->get<Ty>();
     }
-
+    
     bool has_resource(const std::string &task_key, const std::string &rsrc_key) {
       met_trace();
       return get_rsrc_impl(GetRsrcInfo { .task_key = task_key, .rsrc_key = rsrc_key }) != nullptr;
@@ -180,8 +206,15 @@ namespace met::detail {
     const std::string &task_key() const { return task_key_impl(); }
   };
 
-  struct SchedulerHandle : public RsrcSchedulerBase,
-                           public TaskSchedulerBase {
+  struct SchedulerBase : public RsrcSchedulerBase,
+                         public TaskSchedulerBase {
+
+    // Added debug functions
+    virtual std::vector<std::string> schedule() const = 0;
+    virtual const detail::RsrcMap &resources() const = 0;
+  };
+
+  struct SchedulerHandle : public detail::SchedulerBase {
   protected:
     virtual void signal_clear_tasks_impl() = 0;
     virtual void signal_clear_all_impl()   = 0;

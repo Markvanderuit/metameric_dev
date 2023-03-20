@@ -58,13 +58,6 @@ namespace met {
     m_is_cstr_edit_used = false;
   }
 
-  void ViewportOverlayTask::dstr(detail::SchedulerHandle &info) {
-    met_trace_full();
-
-    // Remove subtasks
-    info.remove_subtask(info.task_key(), "draw_color_solid");
-  }
-
   void ViewportOverlayTask::eval(detail::SchedulerHandle &info) {
     met_trace_full();
 
