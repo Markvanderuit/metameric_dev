@@ -57,7 +57,7 @@ namespace met {
 
   public:
     DrawColorSolidTask(const std::string &parent);
-    void init(detail::SchedulerHandle &info) override;
-    void eval(detail::SchedulerHandle &info) override;
+    void init(SchedulerHandle &info) override;
+    void eval(SchedulerHandle &info) override;
   };
 } // namespace met

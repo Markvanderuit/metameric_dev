@@ -7,9 +7,9 @@
 
 namespace met {
   class LambdaTask : public detail::TaskBase {
-    using InitType = std::function<void(detail::SchedulerHandle &)>;
-    using EvalType = std::function<void(detail::SchedulerHandle &)>;
-    using DstrType = std::function<void(detail::SchedulerHandle &)>;
+    using InitType = std::function<void(SchedulerHandle &)>;
+    using EvalType = std::function<void(SchedulerHandle &)>;
+    using DstrType = std::function<void(SchedulerHandle &)>;
 
     InitType _init;
     EvalType _eval;
@@ -25,20 +25,20 @@ namespace met {
     LambdaTask(InitType init, EvalType eval, DstrType dstr)
     : _init(init), _eval(eval), _dstr(dstr) { }
 
-    void init(detail::SchedulerHandle &init_info) override {
+    void init(SchedulerHandle &init_info) override {
       met_trace_full();
 
       if (_init)
         _init(init_info);
     }
 
-    void eval(detail::SchedulerHandle &eval_info) override {
+    void eval(SchedulerHandle &eval_info) override {
       met_trace_full();
 
       _eval(eval_info);
     }
 
-    void dstr(detail::SchedulerHandle &dstr_info) override {
+    void dstr(SchedulerHandle &dstr_info) override {
       met_trace_full();
 
       if (_dstr)

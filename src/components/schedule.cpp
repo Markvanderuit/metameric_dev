@@ -30,8 +30,7 @@
 #include <ranges>
 
 namespace met {
-  template <typename Scheduler>
-  void submit_schedule_debug(Scheduler &scheduler) {
+  void submit_schedule_debug(detail::SchedulerBase &scheduler) {
     scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
       // Temporary window to show runtime schedule
       if (ImGui::Begin("Schedule debug")) {
@@ -84,8 +83,9 @@ namespace met {
     }); */
   }
 
-  template <typename Scheduler>
-  void submit_schedule_main<Scheduler>(Scheduler &scheduler) {
+  void submit_schedule_main(detail::SchedulerBase &scheduler) {
+    scheduler.clear();
+
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
     scheduler.emplace_task<StateTask>("state");
 
@@ -107,19 +107,17 @@ namespace met {
     submit_schedule_debug(scheduler);
 
     scheduler.emplace_task<FrameEndTask>("frame_end", true);
+
+    scheduler.build();
   }
   
-  template <typename Scheduler>
-  void submit_schedule_empty<Scheduler>(Scheduler &scheduler) {
+  void submit_schedule_empty(detail::SchedulerBase &scheduler) {
+    scheduler.clear();
+    
     scheduler.emplace_task<FrameBeginTask>("frame_begin");
     scheduler.emplace_task<WindowTask>("window");
     scheduler.emplace_task<FrameEndTask>("frame_end", false);
+    
+    scheduler.build();
   }
-
-  /* Explicit template instantiations of submit_schedule_*<...> */
-
-  template void submit_schedule_main<LinearScheduler>(LinearScheduler &scheduler);
-  template void submit_schedule_main<detail::SchedulerHandle>(detail::SchedulerHandle &scheduler);
-  template void submit_schedule_empty<LinearScheduler>(LinearScheduler &scheduler);
-  template void submit_schedule_empty<detail::SchedulerHandle>(detail::SchedulerHandle &scheduler);
 } // namespace met

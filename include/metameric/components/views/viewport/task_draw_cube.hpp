@@ -15,7 +15,7 @@ namespace met {
     gl::Program  m_program;
 
   public:
-    void init(detail::SchedulerHandle &) override;
-    void eval(detail::SchedulerHandle &) override;
+    void init(SchedulerHandle &) override;
+    void eval(SchedulerHandle &) override;
   };
 } // namespace met

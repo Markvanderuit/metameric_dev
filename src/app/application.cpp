@@ -33,13 +33,8 @@ namespace met {
         data.unload();
       }
       
-      // data.loaded_basis = io::load_basis("resources/misc/basis.txt");
-      // data.loaded_basis_mean = io::load_spec("resources/misc/basis_avg.spd");
-      auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
-
       // TODO: remove
-      // data.loaded_tree_root.basis = data.loaded_basis;
-      // data.loaded_tree_root.basis_mean = data.loaded_basis_mean;
+      auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
       data.loaded_basis = loaded_tree.basis;
       data.loaded_basis_mean = loaded_tree.basis_mean;
 
@@ -78,9 +73,9 @@ namespace met {
              | gl::WindowCreateFlags::eFocused   
              | gl::WindowCreateFlags::eDecorated
              | gl::WindowCreateFlags::eResizable
-             | gl::WindowCreateFlags::eMSAA               // Support MSAA framebuffers
+             | gl::WindowCreateFlags::eMSAA               // Enable support for MSAA framebuffers
 #if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
-             | gl::WindowCreateFlags::eDebug              // Support OpenGL debug output
+             | gl::WindowCreateFlags::eDebug              // Enable support for OpenGL debug output
 #endif
     });
 
@@ -98,10 +93,10 @@ namespace met {
     detail::init_schedule(scheduler);
 
     // Main runtime loop
-    while (!window.should_close()) { 
+    while (!window.should_close())
       scheduler.run();
-    } 
     
+    // Tear down remaining components
     ImGui::Destr();
   }
 } // namespace met

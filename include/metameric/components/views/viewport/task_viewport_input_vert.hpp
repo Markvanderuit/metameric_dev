@@ -19,7 +19,7 @@ namespace met {
     bool              m_is_gizmo_used;
     
   public:
-    void init(detail::SchedulerHandle &info) override {
+    void init(SchedulerHandle &info) override {
       met_trace_full();
 
       // Insert shared resources
@@ -30,7 +30,7 @@ namespace met {
       m_is_gizmo_used = false;
     }
 
-    void eval(detail::SchedulerHandle &info) override {
+    void eval(SchedulerHandle &info) override {
       met_trace_full();
 
       // If active window is not hovered or we are not in vertex mode, exit early

@@ -33,7 +33,7 @@ namespace met::detail {
     TextureFromBufferTask(InfoType info)
     : m_info(info) { }
     
-    void init(detail::SchedulerHandle &info) override {
+    void init(SchedulerHandle &info) override {
       met_trace_full();
 
       // Emplace texture resource using provided info object
@@ -55,11 +55,10 @@ namespace met::detail {
       m_program.uniform("u_size", dispatch_n);
     }
 
-    void eval(detail::SchedulerHandle &info) override {
+    void eval(SchedulerHandle &info) override {
       met_trace_full();
 
-      // guard(info.has_resource(m_info.input_key.first, m_info.input_key.second));
-      // guard(info.get_resource<bool>("activate_flag"));
+      guard(info.has_resource(m_info.input_key.first, m_info.input_key.second));
 
       // Get shared resources
       auto &e_rsrc = info.get_resource<gl::Buffer>(m_info.input_key.first, m_info.input_key.second);

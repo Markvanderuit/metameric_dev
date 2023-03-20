@@ -11,7 +11,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  void ViewportDrawTextureTask::init(detail::SchedulerHandle &info) {
+  void ViewportDrawTextureTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -32,7 +32,7 @@ namespace met {
     };
   }
 
-  void ViewportDrawTextureTask::eval(detail::SchedulerHandle &info) {
+  void ViewportDrawTextureTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 

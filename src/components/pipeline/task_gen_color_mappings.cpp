@@ -13,7 +13,7 @@ namespace met {
   GenColorMappingTask::GenColorMappingTask(uint mapping_i)
   : m_mapping_i(mapping_i) { }
 
-  void GenColorMappingTask::init(detail::SchedulerHandle &info) {
+  void GenColorMappingTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -46,7 +46,7 @@ namespace met {
     m_init_stale = true;
   }
 
-  void GenColorMappingTask::eval(detail::SchedulerHandle &info) {
+  void GenColorMappingTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Generate color texture only on relevant state changes
@@ -54,7 +54,7 @@ namespace met {
 
     // Continue only on relevant state changes; first time this is always true
     bool activate_flag = m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;
-    info.get_resource<bool>(fmt::format("gen_color_mappings.gen_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
+    // info.get_resource<bool>(fmt::format("gen_color_mappings.gen_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Get shared resources
@@ -96,7 +96,7 @@ namespace met {
     m_init_stale = false;
   }
 
-  void GenColorMappingsTask::init(detail::SchedulerHandle &info) {
+  void GenColorMappingsTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -109,24 +109,12 @@ namespace met {
     // Add subtasks to perform mapping
     m_mapping_subtasks.init(info, e_mappings_n,
       [](auto &, uint i) { return std::pair {
-        fmt::format("gen_mapping_{}", i), MappingSubTask(i)
+        fmt::format("gen_mapping_{}", i), GenColorMappingTask(i)
       }; }, 
       [](auto &, uint i) { return fmt::format("gen_mapping_{}", i); });
-
-    // Add subtasks to take mapping and format it into gl::Texture2d4f
-    m_texture_subtasks.init(info, e_mappings_n,
-      [=](auto &, uint i) -> std::pair<std::string, TextureSubTask> { 
-        return std::pair { 
-          fmt::format("gen_texture_{}", i),
-          TextureSubTask {{ .input_key    = { fmt::format("{}.gen_mapping_{}", parent_key, i), "colr_buffer" },
-                            .output_key   = { fmt::format("{}.gen_texture_{}", parent_key, i), "texture" },
-                            .texture_info = { .size = e_texture_size }}}
-        }; 
-      },
-      [](auto &, uint i) { return fmt::format("gen_texture_{}", i); });
   }
 
-  void GenColorMappingsTask::eval(detail::SchedulerHandle &info) {
+  void GenColorMappingsTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
     // Get shared resources
@@ -135,6 +123,5 @@ namespace met {
 
     // Adjust nr. of subtasks
     m_mapping_subtasks.eval(info, e_mappings_n);
-    m_texture_subtasks.eval(info, e_mappings_n);
   }
 } // namespace met

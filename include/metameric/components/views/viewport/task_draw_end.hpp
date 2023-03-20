@@ -15,7 +15,7 @@ namespace met {
     gl::Program     m_program;
     gl::Sampler     m_sampler;
 
-    void init(detail::SchedulerHandle &info) override {
+    void init(SchedulerHandle &info) override {
       met_trace_full();
 
       // Set up draw components for gamma correction
@@ -27,7 +27,7 @@ namespace met {
       m_program.uniform("u_lrgb_to_srgb", 1u);
     }
 
-    void eval(detail::SchedulerHandle &info) override {
+    void eval(SchedulerHandle &info) override {
       met_trace_full();
     
       // Get shared resources 

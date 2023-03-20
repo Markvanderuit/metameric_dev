@@ -1,9 +1,8 @@
 #pragma once
 
+#include <metameric/core/scheduler.hpp>
+
 namespace met {
-  template <typename Scheduler>
-  void submit_schedule_main(Scheduler &scheduler);
-  
-  template <typename Scheduler>
-  void submit_schedule_empty(Scheduler &scheduler);
+  void submit_schedule_main(detail::SchedulerBase &scheduler);
+  void submit_schedule_empty(detail::SchedulerBase &scheduler);
 } // namespace met

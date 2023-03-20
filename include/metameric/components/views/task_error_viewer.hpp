@@ -38,13 +38,13 @@ namespace met {
     gl::ComputeInfo m_error_dispatch;
 
     // Delegating functions
-    void eval_error(detail::SchedulerHandle &info);
-    void eval_tooltip_copy(detail::SchedulerHandle &info);
-    void eval_tooltip(detail::SchedulerHandle &info);
+    void eval_error(SchedulerHandle &info);
+    void eval_tooltip_copy(SchedulerHandle &info);
+    void eval_tooltip(SchedulerHandle &info);
 
   public:
-    void init(detail::SchedulerHandle &) override;
-    void eval(detail::SchedulerHandle &) override;
+    void init(SchedulerHandle &) override;
+    void eval(SchedulerHandle &) override;
   };
 
 } // namespace met

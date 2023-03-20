@@ -9,14 +9,14 @@ namespace met::detail {
   template <typename TaskType>
   class Subtasks {
     using KeyType = std::string;
-    using AddType = std::function<std::pair<std::string, TaskType> (detail::SchedulerHandle &, uint)>;
-    using RmvType = std::function<std::string                      (detail::SchedulerHandle &, uint)>;
+    using AddType = std::function<std::pair<std::string, TaskType> (SchedulerHandle &, uint)>;
+    using RmvType = std::function<std::string                      (SchedulerHandle &, uint)>;
     
     uint    m_n_tasks = 0;
     AddType m_add;
     RmvType m_rmv;
 
-    void adjust_to(detail::SchedulerHandle &info, uint n_tasks) {
+    void adjust_to(SchedulerHandle &info, uint n_tasks) {
       met_trace_full();
 
       // Adjust nr. of subtasks upwards if necessary
@@ -33,7 +33,7 @@ namespace met::detail {
     }
 
   public:
-    void init(detail::SchedulerHandle &info, uint n_tasks, AddType add, RmvType rmv) {
+    void init(SchedulerHandle &info, uint n_tasks, AddType add, RmvType rmv) {
       met_trace_full();
 
       // Clear out remaining tasks
@@ -46,12 +46,12 @@ namespace met::detail {
       adjust_to(info, n_tasks);
     }
 
-    void eval(detail::SchedulerHandle &info, uint n_tasks) {
+    void eval(SchedulerHandle &info, uint n_tasks) {
       met_trace_full();
       adjust_to(info, n_tasks);
     }
 
-    void dstr(detail::SchedulerHandle &info) {
+    void dstr(SchedulerHandle &info) {
       met_trace_full();
       adjust_to(info, 0);
     }

@@ -3,7 +3,6 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
-#include <metameric/components/pipeline/detail/task_texture_from_buffer.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
@@ -30,19 +29,15 @@ namespace met {
   public:
     GenColorMappingTask(uint mapping_i);
 
-    void init(detail::SchedulerHandle &) override;
-    void eval(detail::SchedulerHandle &) override;
+    void init(SchedulerHandle &) override;
+    void eval(SchedulerHandle &) override;
   };
 
   class GenColorMappingsTask : public detail::TaskBase {
-    using MappingSubTask = GenColorMappingTask;
-    using TextureSubTask = detail::TextureFromBufferTask<gl::Texture2d4f>;
-
-    detail::Subtasks<MappingSubTask> m_mapping_subtasks;
-    detail::Subtasks<TextureSubTask> m_texture_subtasks;
+    detail::Subtasks<GenColorMappingTask> m_mapping_subtasks;
 
   public:
-    void init(detail::SchedulerHandle &) override;
-    void eval(detail::SchedulerHandle &) override;
+    void init(SchedulerHandle &) override;
+    void eval(SchedulerHandle &) override;
   };
 } // namespace met

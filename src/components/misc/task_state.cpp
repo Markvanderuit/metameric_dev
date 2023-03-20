@@ -81,13 +81,13 @@ namespace met {
     }
   }
   
-  void StateTask::init(detail::SchedulerHandle &info) {
+  void StateTask::init(SchedulerHandle &info) {
     met_trace();
     info.insert_resource<ProjectState>("pipeline_state",  { });
     info.insert_resource<ViewportState>("viewport_state", { });
   }
 
-  void StateTask::eval(detail::SchedulerHandle &info) {
+  void StateTask::eval(SchedulerHandle &info) {
     met_trace();
 
     constexpr auto reduce_or = [](auto a, auto b) { return a | b; };

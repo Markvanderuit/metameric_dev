@@ -21,7 +21,7 @@ namespace met {
   DrawColorSolidTask::DrawColorSolidTask(const std::string &parent)
   : m_parent(parent) { }
     
-  void DrawColorSolidTask::init(detail::SchedulerHandle &info) { 
+  void DrawColorSolidTask::init(SchedulerHandle &info) { 
     met_trace_full();
 
     // Get shared resources
@@ -91,7 +91,7 @@ namespace met {
     m_cnstr_program.uniform("u_value", clear_colr);
   }
 
-  void DrawColorSolidTask::eval(detail::SchedulerHandle &info) { 
+  void DrawColorSolidTask::eval(SchedulerHandle &info) { 
     met_trace_full();
   
     // Verify that vertex and constraint are selected before continuing, as this draw operation

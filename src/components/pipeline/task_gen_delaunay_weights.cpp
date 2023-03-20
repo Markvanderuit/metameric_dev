@@ -15,7 +15,7 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  void GenDelaunayWeightsTask::init(detail::SchedulerHandle &info) {
+  void GenDelaunayWeightsTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -51,7 +51,7 @@ namespace met {
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(eig::Array4f) });
   }
 
-  void GenDelaunayWeightsTask::eval(detail::SchedulerHandle &info) {
+  void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only on relevant state change

@@ -18,7 +18,7 @@ namespace met {
     eig::Array<float, wavelength_samples, 1, eig::DontAlign>  illm;
   };
   
-  void GenColorSystemsTask::init(detail::SchedulerHandle &info) {
+  void GenColorSystemsTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Specify a default buffer that can hold a default nr. of mappings
@@ -26,7 +26,7 @@ namespace met {
     info.emplace_resource<gl::Buffer>("mapp_buffer", { .size = m_max_maps * sizeof(ColrSystem), .flags = buffer_flags });
   }
   
-  void GenColorSystemsTask::eval(detail::SchedulerHandle &info) {
+  void GenColorSystemsTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
     // Continue only on relevant state change

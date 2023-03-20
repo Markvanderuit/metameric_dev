@@ -5,6 +5,6 @@
 namespace met {
   class ViewportTask : public detail::TaskBase {
   public:
-    void init(detail::SchedulerHandle &) override;
+    void init(SchedulerHandle &) override;
   };
 } // namespace met

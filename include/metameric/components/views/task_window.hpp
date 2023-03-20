@@ -12,19 +12,19 @@ namespace met {
 
     /* Special handlers */
 
-    bool handle_open(detail::SchedulerHandle &info);
-    bool handle_save(detail::SchedulerHandle &info);
-    bool handle_save_as(detail::SchedulerHandle &info);
+    bool handle_open(SchedulerHandle &info);
+    bool handle_save(SchedulerHandle &info);
+    bool handle_save_as(SchedulerHandle &info);
 
-    bool handle_export(detail::SchedulerHandle &info);
+    bool handle_export(SchedulerHandle &info);
 
-    void handle_close_safe(detail::SchedulerHandle &info);
-    void handle_close(detail::SchedulerHandle &info);
+    void handle_close_safe(SchedulerHandle &info);
+    void handle_close(SchedulerHandle &info);
     
-    void handle_exit_safe(detail::SchedulerHandle &info);
-    void handle_exit(detail::SchedulerHandle &info);
+    void handle_exit_safe(SchedulerHandle &info);
+    void handle_exit(SchedulerHandle &info);
 
   public:
-    void eval(detail::SchedulerHandle &info) override;
+    void eval(SchedulerHandle &info) override;
   };
 } // namespace met

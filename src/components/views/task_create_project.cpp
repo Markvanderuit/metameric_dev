@@ -16,17 +16,17 @@ namespace met {
   CreateProjectTask::CreateProjectTask(const std::string &view_title)
   : m_view_title(view_title) { }
 
-  void CreateProjectTask::init(detail::SchedulerHandle &info) {
+  void CreateProjectTask::init(SchedulerHandle &info) {
     met_trace_full();
     m_proj_data = { };
   }
 
-  void CreateProjectTask::dstr(detail::SchedulerHandle &info) {
+  void CreateProjectTask::dstr(SchedulerHandle &info) {
     met_trace_full();
     m_proj_data = { };
   }
 
-  void CreateProjectTask::eval(detail::SchedulerHandle &info) {
+  void CreateProjectTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -67,7 +67,7 @@ namespace met {
     }
   }
   
-  void CreateProjectTask::eval_images_section(detail::SchedulerHandle &info) {
+  void CreateProjectTask::eval_images_section(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -163,7 +163,7 @@ namespace met {
     }
   }
 
-  void CreateProjectTask::eval_data_section(detail::SchedulerHandle &info) {
+  void CreateProjectTask::eval_data_section(SchedulerHandle &info) {
     ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
     // Get shared resources
@@ -275,7 +275,7 @@ namespace met {
     ImPlot::PopStyleVar();
   }
   
-  void CreateProjectTask::eval_progress_modal(detail::SchedulerHandle &info) {
+  void CreateProjectTask::eval_progress_modal(SchedulerHandle &info) {
     if (ImGui::BeginPopupModal("Warning: unsaved progress")) {
       ImGui::Text("If you continue, you may lose unsaved progress.");
       ImGui::Separator();
@@ -288,7 +288,7 @@ namespace met {
     }
   }
 
-  bool CreateProjectTask::create_project_safe(detail::SchedulerHandle &info) {
+  bool CreateProjectTask::create_project_safe(SchedulerHandle &info) {
     auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
@@ -301,12 +301,11 @@ namespace met {
     }
   }
 
-  bool CreateProjectTask::create_project(detail::SchedulerHandle &info) {
+  bool CreateProjectTask::create_project(SchedulerHandle &info) {
     // Create a new project
     info.get_resource<ApplicationData>(global_key, "app_data").create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
-    info.signal_clear_tasks();
     submit_schedule_main(info);
 
     return true;

@@ -17,7 +17,7 @@ namespace met {
     Depthbuffer m_depth_buffer_ms;
     
   public:
-    void init(detail::SchedulerHandle &info) override {
+    void init(SchedulerHandle &info) override {
       met_trace_full();
     
       // Share uninitialized framebuffer objects; initialized during eval()
@@ -25,7 +25,7 @@ namespace met {
       info.insert_resource("frame_buffer_msaa", gl::Framebuffer());
     }
 
-    void eval(detail::SchedulerHandle &info) override {
+    void eval(SchedulerHandle &info) override {
       met_trace_full();
     
       // Get shared resources 

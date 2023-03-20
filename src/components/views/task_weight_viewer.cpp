@@ -10,7 +10,7 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  void WeightViewerTask::init(detail::SchedulerHandle &info) {
+  void WeightViewerTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -42,7 +42,7 @@ namespace met {
     info.insert_subtask(info.task_key(), "gen_texture", std::move(task));
   }
 
-  void WeightViewerTask::eval(detail::SchedulerHandle &info) {
+  void WeightViewerTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     if (ImGui::Begin("Weight viewer")) {
@@ -52,7 +52,7 @@ namespace met {
 
       // Get subtask names
       auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
-      auto resample_subtask_name = fmt::format("{}.gen_resample", texture_subtask_name);
+      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task_key());
 
       // Weight data is drawn to texture in this function
       eval_draw(info);
@@ -76,8 +76,8 @@ namespace met {
                                   .lrgb_to_srgb = true}};
         
         // Replace task; this is safe if the task does not yet exist
-        info.remove_subtask(texture_subtask_name, "gen_resample");
-        info.insert_subtask(texture_subtask_name, "gen_resample", std::move(task));
+        info.remove_subtask(info.task_key(), "gen_resample");
+        info.insert_subtask(info.task_key(), "gen_resample", std::move(task));
       }
 
       // View data is defined in this function
@@ -86,7 +86,7 @@ namespace met {
     ImGui::End();
   }
 
-  void WeightViewerTask::eval_draw(detail::SchedulerHandle &info) {
+  void WeightViewerTask::eval_draw(SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only on relevant state changes
@@ -144,11 +144,11 @@ namespace met {
     gl::dispatch_compute(m_dispatch);
   }
 
-  void WeightViewerTask::eval_view(detail::SchedulerHandle &info) {
+  void WeightViewerTask::eval_view(SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only if the necessary output texture exists; this may not be the case on first run
-    auto st_name = fmt::format("{}.gen_texture.gen_resample", info.task_key());
+    auto st_name = fmt::format("{}.gen_resample", info.task_key());
     guard(info.has_resource(st_name, "colr_texture"));
 
     // Get shared resources

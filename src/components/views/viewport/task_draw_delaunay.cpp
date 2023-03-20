@@ -24,7 +24,7 @@ namespace met {
   constexpr uint init_vert_support = 1024;
   constexpr uint init_elem_support = 1024;
 
-  void ViewportDrawDelaunayTask::init(detail::SchedulerHandle &info) {
+  void ViewportDrawDelaunayTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -80,7 +80,7 @@ namespace met {
     m_vert_program.uniform("u_value", clear_colr);
   }
 
-  void ViewportDrawDelaunayTask::eval(detail::SchedulerHandle &info) {
+  void ViewportDrawDelaunayTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources

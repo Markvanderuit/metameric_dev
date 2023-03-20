@@ -28,7 +28,7 @@ namespace met {
 
   class ViewportInputTask : public detail::TaskBase {
   public:
-    void init(detail::SchedulerHandle &info) override {
+    void init(SchedulerHandle &info) override {
       met_trace_full();
     
       // Add subtasks, share resources
@@ -36,7 +36,7 @@ namespace met {
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
-    void eval(detail::SchedulerHandle &info) override {
+    void eval(SchedulerHandle &info) override {
       met_trace_full();
                       
       // Get shared resources

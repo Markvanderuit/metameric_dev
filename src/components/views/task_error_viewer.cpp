@@ -10,7 +10,7 @@
 namespace met {
   constexpr float tooltip_width = 256.f;
 
-  void ErrorViewerTask::eval_tooltip_copy(detail::SchedulerHandle &info) {
+  void ErrorViewerTask::eval_tooltip_copy(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -36,7 +36,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   } 
 
-  void ErrorViewerTask::eval_tooltip(detail::SchedulerHandle &info) {
+  void ErrorViewerTask::eval_tooltip(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -64,7 +64,7 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void ErrorViewerTask::eval_error(detail::SchedulerHandle &info) {
+  void ErrorViewerTask::eval_error(SchedulerHandle &info) {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     bool activate_flag = e_pipe_state.any;
@@ -86,7 +86,7 @@ namespace met {
     gl::dispatch_compute(m_error_dispatch);
   }
 
-  void ErrorViewerTask::init(detail::SchedulerHandle &info) {
+  void ErrorViewerTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     m_texture_size = 1;
@@ -131,7 +131,7 @@ namespace met {
     info.insert_subtask(info.task_key(), "gen_texture", std::move(subtask));
   }
 
-  void ErrorViewerTask::eval(detail::SchedulerHandle &info) {
+  void ErrorViewerTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     if (ImGui::Begin("Error viewer")) {
@@ -143,7 +143,7 @@ namespace met {
 
       // Get subtask names
       auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
-      auto resample_subtask_name = fmt::format("{}.gen_resample", texture_subtask_name);
+      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task_key());
 
       // Local state
       bool handle_toolip = false;
@@ -163,12 +163,12 @@ namespace met {
 
         // Remove previous resample subtask and insert a new one
         ResampleSubtask task = {{ .input_key    = { texture_subtask_name, "colr_texture"        },
-                                  .output_key   = { "blablabla", "colr_texture"       },
+                                  .output_key   = { "blablabla", "colr_texture"                 },
                                   .texture_info = { .size = m_texture_size                      },
                                   .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
                                                     .mag_filter = gl::SamplerMagFilter::eLinear }}};
-        info.remove_subtask(texture_subtask_name, "gen_resample");
-        info.insert_subtask(texture_subtask_name, "gen_resample", std::move(task));
+        info.remove_subtask(info.task_key(), "gen_resample");
+        info.insert_subtask(info.task_key(), "gen_resample", std::move(task));
       }
 
       // 3. Display ImGui components to show error and select mapping

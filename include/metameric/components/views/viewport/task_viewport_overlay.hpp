@@ -12,12 +12,12 @@ namespace met {
     bool m_is_cstr_edit_used; // Cnstr edit use state
     
   public:
-    void init(detail::SchedulerHandle &info) override;
-    void eval(detail::SchedulerHandle &info) override;
+    void init(SchedulerHandle &info) override;
+    void eval(SchedulerHandle &info) override;
 
-    void eval_overlay_vertex(detail::SchedulerHandle &info, uint i);
-    void eval_overlay_sample(detail::SchedulerHandle &info, uint i);
-    void eval_overlay_color_solid(detail::SchedulerHandle &info);
-    void eval_overlay_plot(detail::SchedulerHandle &info);
+    void eval_overlay_vertex(SchedulerHandle &info, uint i);
+    void eval_overlay_sample(SchedulerHandle &info, uint i);
+    void eval_overlay_color_solid(SchedulerHandle &info);
+    void eval_overlay_plot(SchedulerHandle &info);
   };
 } // namespace met

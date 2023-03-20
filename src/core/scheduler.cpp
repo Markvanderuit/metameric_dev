@@ -135,7 +135,8 @@ namespace met {
     std::list<AddRsrcInfo> add_rsrc_info;
     std::list<RemRsrcInfo> rem_rsrc_info;
 
-    TaskSignalFlags signal_flags = TaskSignalFlags::eNone;
+    using Flags = LinearSchedulerHandle::ClearFlags;
+    Flags clear_flags = Flags::eNone;
 
     // Run all tasks in vector stored order
     for (const auto &task_key : m_task_order) {
@@ -150,13 +151,14 @@ namespace met {
       add_task_info.splice(add_task_info.end(), handle.add_task_info);
 
       // Signal flag received; halt current run
-      signal_flags |= handle.signal_flags(); 
-      if (static_cast<uint>(signal_flags)) { break; }
+      clear_flags |= handle.clear_flags; 
+      if (static_cast<uint>(clear_flags)) { break; }
     }
 
-    // Process signal flags; clear existing tasks/resources if requested
-    if (has_flag(signal_flags, TaskSignalFlags::eClearTasks)) { clear_tasks(); }
-    if (has_flag(signal_flags, TaskSignalFlags::eClearAll))   { clear_all(); }
+    // Process signal flags; clear existing/all tasks/resources if requested
+    if (has_flag(clear_flags, Flags::eClearTasks)) clear();
+    if (has_flag(clear_flags, Flags::eClearAll))   clear(false);
+    if (has_flag(clear_flags, Flags::eBuild))      build();
 
     // Process task/resource updates
     for (auto &info : rem_rsrc_info) rem_rsrc_impl(std::move(info));
@@ -165,25 +167,26 @@ namespace met {
     for (auto &info : add_task_info) add_task_impl(std::move(info));
   }
   
-  // Deregister all tasks safely; some tasks remove their own subtasks upon destruction
-  // making iteration of m_task_order tricky. Ignore resources, these are removed automatically 
-  // for specific removed tasks
-  void LinearScheduler::clear_tasks() {
+  void LinearScheduler::clear(bool preserve_global) {
     met_trace();
-    std::vector<std::string> task_order_copy(m_task_order);
-    std::ranges::for_each(task_order_copy, [&](const auto &key) { remove_task(key); });
+    if (preserve_global) {
+      std::vector<std::string> task_order_copy(m_task_order);
+      std::ranges::for_each(task_order_copy, [&](const auto &key) { remove_task(key); });
+    } else {
+      m_rsrc_registry.clear();
+      m_task_registry.clear();
+      m_task_order.clear();
+    }
   }
 
-  void LinearScheduler::clear_global() {
+  void LinearSchedulerHandle::build() {
     met_trace();
-    m_rsrc_registry.erase(global_key);
+    clear_flags |= ClearFlags::eBuild;
   }
 
-  void LinearScheduler::clear_all() {
+  void LinearSchedulerHandle::clear(bool preserve_global) {
     met_trace();
-    m_rsrc_registry.clear();
-    m_task_registry.clear();
-    m_task_order.clear();
+    clear_flags |= (preserve_global ? ClearFlags::eClearTasks : ClearFlags::eClearAll);
   }
 
   void LinearSchedulerHandle::add_task_impl(AddTaskInfo &&info) {

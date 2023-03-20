@@ -40,7 +40,7 @@ namespace met {
   constexpr float    overlay_spacing     = 8.f;
   const eig::Array2f overlay_padding     = 8.f;
 
-  void ViewportOverlayTask::init(detail::SchedulerHandle &info) {
+  void ViewportOverlayTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Share resources
@@ -58,7 +58,7 @@ namespace met {
     m_is_cstr_edit_used = false;
   }
 
-  void ViewportOverlayTask::eval(detail::SchedulerHandle &info) {
+  void ViewportOverlayTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Adjust tooltip settings based on current selection
@@ -157,7 +157,7 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_vertex(detail::SchedulerHandle &info, uint i) {
+  void ViewportOverlayTask::eval_overlay_vertex(SchedulerHandle &info, uint i) {
     met_trace_full();
     ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
@@ -425,7 +425,7 @@ namespace met {
     ImGui::PopID(); // i
   }
 
-  void ViewportOverlayTask::eval_overlay_color_solid(detail::SchedulerHandle &info) {
+  void ViewportOverlayTask::eval_overlay_color_solid(SchedulerHandle &info) {
     met_trace_full();
         
     // Get shared resources
@@ -544,7 +544,7 @@ namespace met {
     }
   }
 
-  void ViewportOverlayTask::eval_overlay_plot(detail::SchedulerHandle &info) {
+  void ViewportOverlayTask::eval_overlay_plot(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources

@@ -101,7 +101,7 @@ namespace met {
     }
   } // namespace detail
 
-  void GenColorSolidsTask::init(detail::SchedulerHandle &info) {
+  void GenColorSolidsTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Ger shared resources
@@ -138,7 +138,7 @@ namespace met {
     info.insert_resource("csol_cntr", Colr(0.f));
   }
   
-  void GenColorSolidsTask::eval(detail::SchedulerHandle &info) {
+  void GenColorSolidsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Continue only if constraint selection is sensible

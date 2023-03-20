@@ -30,7 +30,7 @@ namespace met {
     5, 7, 6, 7
   };
 
-  void ViewportDrawCubeTask::init(detail::SchedulerHandle &info) {
+  void ViewportDrawCubeTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -64,7 +64,7 @@ namespace met {
     m_program.uniform("u_value",      clear_colr);
   }
 
-  void ViewportDrawCubeTask::eval(detail::SchedulerHandle &info) {
+  void ViewportDrawCubeTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 

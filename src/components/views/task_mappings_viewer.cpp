@@ -1,6 +1,7 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
@@ -17,10 +18,10 @@ namespace met {
   //   // Lambda captures of texture_size parameter and outputs
   //   // capture to add a resample task
   //   constexpr auto resample_subtask_add = [](const eig::Array2u &texture_size) {
-  //     return [=](detail::SchedulerHandle &, uint i) -> std::pair<std::string, MappingsViewerTask::ResampleTaskType> {
+  //     return [=](SchedulerHandle &, uint i) -> std::pair<std::string, MappingsViewerTask::ResampleSubtask> {
   //       return std::pair {
   //         fmt::format(resample_fmt, i),
-  //         MappingsViewerTask::ResampleTaskType {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
+  //         MappingsViewerTask::ResampleSubtask {{ .input_key    = { fmt::format(mapping_subtask_fmt, i), "texture" },
   //                                                 .output_key   = { fmt::format(resample_fmt, i), "texture"        },
   //                                                 .texture_info = { .size = texture_size                           },
   //                                                 .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
@@ -31,12 +32,12 @@ namespace met {
   //   };
 
   //   // Lambda capture to remove a resample task
-  //   constexpr auto resample_subtask_rmv = [](detail::SchedulerHandle &, uint i) {
+  //   constexpr auto resample_subtask_rmv = [](SchedulerHandle &, uint i) {
   //     return fmt::format(resample_fmt, i);
   //   };
   // } // namespace detail
 
-  void MappingsViewerTask::eval_tooltip_copy(detail::SchedulerHandle &info, uint texture_i) {
+  void MappingsViewerTask::eval_tooltip_copy(SchedulerHandle &info, uint texture_i) {
     met_trace_full();
 
     // Get shared resources
@@ -58,7 +59,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   }
 
-  void MappingsViewerTask::eval_tooltip(detail::SchedulerHandle &info, uint texture_i) {
+  void MappingsViewerTask::eval_tooltip(SchedulerHandle &info, uint texture_i) {
     met_trace_full();
 
     // Get shared resources
@@ -112,11 +113,11 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void MappingsViewerTask::eval_popout(detail::SchedulerHandle &info, uint texture_i) {
+  void MappingsViewerTask::eval_popout(SchedulerHandle &info, uint texture_i) {
     // ...
   }
 
-  void MappingsViewerTask::eval_save(detail::SchedulerHandle &info, uint texture_i) {
+  void MappingsViewerTask::eval_save(SchedulerHandle &info, uint texture_i) {
     if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get shared resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
@@ -132,8 +133,14 @@ namespace met {
     }
   }
 
-  void MappingsViewerTask::init(detail::SchedulerHandle &info) {
+  void MappingsViewerTask::init(SchedulerHandle &info) {
     met_trace_full();
+
+    // Get shared resources
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
+    auto e_texture_size = e_appl_data.loaded_texture_f32.size();
+
 
     m_resample_size   = 1;
     m_tooltip_cycle_i = 0;
@@ -148,17 +155,32 @@ namespace met {
       buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
       map = cast_span<eig::Array4f>(buffer.map(map_flags));
     }
+
+    // Initialize texture generation subtasks
+    m_texture_subtasks.init(info, e_mappings_n,
+      [=](auto &, uint i) -> std::pair<std::string, TextureSubTask> { 
+        return std::pair { 
+          fmt::format("gen_texture_{}", i),
+          TextureSubTask {{ .input_key    = { fmt::format("gen_color_mappings.gen_mapping_{}", i), "colr_buffer" },
+                            .output_key   = { "blablabla", "texture" },
+                            .texture_info = { .size = e_texture_size }}}
+        }; 
+      },
+      [](auto &, uint i) { return fmt::format("gen_texture_{}", i); });
+      
+    m_init_stale = true;
   }
 
-  void MappingsViewerTask::eval(detail::SchedulerHandle &info) {
+  void MappingsViewerTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
+      auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
       auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_appl_data.project_data;
       uint e_mappings_n = e_proj_data.color_systems.size();
-
+      
       // Set up drawing a nr. of textures in a column-based layout; determine texture res.
       uint n_cols = 2;
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
@@ -167,28 +189,38 @@ namespace met {
                                  * e_appl_data.loaded_texture_f32.size().cast<float>().y()
                                  / e_appl_data.loaded_texture_f32.size().cast<float>().x()
                                  * 0.95f / static_cast<float>(n_cols);
-                                 
+
+      // Adjust nr. of subtasks for mapping texture genration
+      m_texture_subtasks.eval(info, e_mappings_n);
+      
+      // Generate mapping textures only on relevant state change
+      for (uint i = 0; i < e_mappings_n; ++i) {
+        bool activate_flag = m_init_stale | e_pipe_state.csys[i] || e_pipe_state.any_verts;
+        if (info.has_resource(fmt::format("{}.gen_texture_{}", info.task_key(), i), "activate_flag"))
+          info.get_resource<bool>(fmt::format("{}.gen_texture_{}", info.task_key(), i), "activate_flag") = activate_flag;
+      }
+
       // If texture size has changed, respawn texture resample tasks
       if (auto resample_size = texture_size.max(1.f).cast<uint>(); !resample_size.isApprox(m_resample_size)) {
         // Reinitialize resample subtasks on texture size change
         m_resample_size = resample_size;
-        m_resample_tasks.init(info, e_mappings_n,
-          [=](auto &, uint i) -> std::pair<std::string, ResampleTaskType> {
+        std::string parent_task = fmt::format("{}.gen_texture", info.task_key());
+        m_resample_subtasks.init(info, e_mappings_n,
+          [=](auto &, uint i) -> std::pair<std::string, ResampleSubtask> {
             return std::pair {
               fmt::format("gen_resample_{}", i),
-              ResampleTaskType {{ .input_key    = { fmt::format("gen_color_mappings.gen_texture_{}", i), "texture" },
-                                  .output_key   = { "blablabla", "texture"                                         },
-                                  .texture_info = { .size = m_resample_size                                        },
-                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                                    .mag_filter = gl::SamplerMagFilter::eLinear                    },
-                                  .lrgb_to_srgb = true                                                             }}
+              ResampleSubtask {{ .input_key    = { fmt::format("{}_{}", parent_task, i), "texture" },
+                                 .output_key   = { "blablabla", "texture"                          },
+                                 .texture_info = { .size = m_resample_size                         },
+                                 .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
+                                                   .mag_filter = gl::SamplerMagFilter::eLinear     },
+                                 .lrgb_to_srgb = true                                              }}
             };
           },
           [](auto &, uint i) { return fmt::format("gen_resample_{}", i); });
-
       } else {
-        // Adjust nr. of spawned tasks to correct number
-        m_resample_tasks.eval(info, e_mappings_n);
+        // Adjust nr. of subtasks for texture resampling
+        m_resample_subtasks.eval(info, e_mappings_n);
       }
 
       // Reset state for tooltip
@@ -244,6 +276,8 @@ namespace met {
       if (m_tooltip_mapping_i != -1) {
         eval_tooltip(info, m_tooltip_mapping_i);
       }
+
+      m_init_stale = false;
     }
     ImGui::End();
   }

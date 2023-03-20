@@ -11,7 +11,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  void ViewportDrawCSysOCSTask::init(detail::SchedulerHandle &info) {
+  void ViewportDrawCSysOCSTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -55,7 +55,7 @@ namespace met {
     m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
   }
 
-  void ViewportDrawCSysOCSTask::eval(detail::SchedulerHandle &info) {
+  void ViewportDrawCSysOCSTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get state objects

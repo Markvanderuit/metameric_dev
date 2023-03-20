@@ -11,7 +11,7 @@
 #include <metameric/components/views/viewport/task_draw_end.hpp>
 
 namespace met {
-  void ViewportTask::init(detail::SchedulerHandle &info) {
+  void ViewportTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Add subtasks
