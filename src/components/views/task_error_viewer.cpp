@@ -124,11 +124,19 @@ namespace met {
     // Insert buffer object to hold error data
     info.emplace_resource<gl::Buffer>("colr_buffer", { .size = generate_n * sizeof(AlColr) });
 
-    // Insert subtask to handle buffer->texture conversion
-    TextureSubtask subtask = {{ .input_key    = { info.task_key(), "colr_buffer" },
-                                .output_key   = { "blablabla", "colr_texture" },
-                                .texture_info = { .size = e_txtr_data.size() }}};
-    info.insert_subtask(info.task_key(), "gen_texture", std::move(subtask));
+    // Create subtask to handle buffer->texture copy
+    TextureSubtask texture_subtask = {{ .input_key    = { info.task_key(), "colr_buffer" },
+                                        .output_key   = { "blablabla", "colr_texture" },
+                                        .texture_info = { .size = e_txtr_data.size() }}};
+                                
+    // Create subtask to handle texture->texture resampling and gamma correction
+    ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task_key()), "colr_texture"        },
+                                          .output_key   = { "blablabla", "colr_texture"                 },
+                                          .texture_info = { .size = 1u                      },
+                                          .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }}};
+                                                
+    info.insert_subtask("gen_texture", std::move(texture_subtask));
+    info.insert_subtask("gen_resample", std::move(resample_subtask));
   }
 
   void ErrorViewerTask::eval(SchedulerHandle &info) {
@@ -160,15 +168,9 @@ namespace met {
       // Check if the resample subtask needs readjusting for a resized output texture
       if (!texture_size.isApprox(m_texture_size)) {
         m_texture_size = texture_size;
-
-        // Remove previous resample subtask and insert a new one
-        ResampleSubtask task = {{ .input_key    = { texture_subtask_name, "colr_texture"        },
-                                  .output_key   = { "blablabla", "colr_texture"                 },
-                                  .texture_info = { .size = m_texture_size                      },
-                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                                    .mag_filter = gl::SamplerMagFilter::eLinear }}};
-        info.remove_subtask(info.task_key(), "gen_resample");
-        info.insert_subtask(info.task_key(), "gen_resample", std::move(task));
+        auto &sub = info.get_subtask<ResampleSubtask>("gen_resample");
+        auto mask = MaskedSchedulerHandle(info, "gen_resample");
+        sub.set_texture_info(mask, { .size = m_texture_size });
       }
 
       // 3. Display ImGui components to show error and select mapping

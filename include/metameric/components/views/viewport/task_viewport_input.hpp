@@ -32,7 +32,7 @@ namespace met {
       met_trace_full();
     
       // Add subtasks, share resources
-      info.emplace_subtask<ViewportInputVertTask>(info.task_key(), "vert");
+      info.emplace_subtask<ViewportInputVertTask>("vert");
       info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 

@@ -29,7 +29,6 @@ namespace met::detail {
     using InfoType    = TextureResampleTaskCreateInfo<TextureType>;
   
   private:
-
     InfoType        m_info;
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
@@ -42,26 +41,14 @@ namespace met::detail {
     void init(SchedulerHandle &info) override {
       met_trace_full();
 
-      // Emplace texture resource using provided info object
-      info.emplace_resource<TextureType, TextureType::InfoType>(m_info.output_key.second, 
-                                                                m_info.texture_info);
-      
-      // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
-      eig::Array2u dispatch_n    = m_info.texture_info.size;
-      eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
-
-      // Initialize objects for texture-to-texture resampling
-      m_sampler = { m_info.sampler_info };
+      // Initialize shader object
       m_program = {{ .type = gl::ShaderType::eCompute,
                      .path = "resources/shaders/misc/texture_resample.comp" }};
-      m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                     .groups_y = dispatch_ndiv.y(),
-                     .bindable_program = &m_program };
-
-      // Set these uniforms once
-      m_program.uniform("u_size", dispatch_n);
-      m_program.uniform("u_sampler", 0);
       m_program.uniform("u_lrgb_to_srgb", static_cast<uint>(m_info.lrgb_to_srgb));
+
+      // Delegate remainder of initialization to set_... functions
+      set_sampler_info(info, m_info.sampler_info);
+      set_texture_info(info, m_info.texture_info);
     }
 
     void eval(SchedulerHandle &info) override {
@@ -88,11 +75,7 @@ namespace met::detail {
 
       m_info.texture_info = texture_info;
 
-      // Strip pre-existing texture resource
-      if (info.has_resource(m_info.output_key.second))
-        info.remove_resource(m_info.output_key.second);
-      
-      // Emplace texture resource using new info object
+      // Emplace texture resource using new info object; scheduler replaces pre-existing resource
       info.emplace_resource<TextureType, TextureType::InfoType>(m_info.output_key.second, 
                                                                 m_info.texture_info);
 
@@ -104,11 +87,16 @@ namespace met::detail {
       m_dispatch = { .groups_x = dispatch_ndiv.x(),
                      .groups_y = dispatch_ndiv.y(),
                      .bindable_program = &m_program };
-
-      // Set these uniforms once
       m_program.uniform("u_size", dispatch_n);
+    }
 
-      fmt::print("{}\n", texture_info.size);
+    void set_sampler_info(SchedulerHandle &info, gl::Sampler::InfoType sampler_info) {
+      met_trace_full();
+
+      m_info.sampler_info = sampler_info;
+
+      m_sampler = { m_info.sampler_info };
+      m_program.uniform("u_sampler", 0);
     }
   };
 } // namespace met::detail

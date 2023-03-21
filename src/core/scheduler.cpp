@@ -99,7 +99,7 @@ namespace met {
       info.task_key = global_key;
     
     // Insert s.t. resource registry is created if nonexistent
-    auto [it, _] = m_rsrc_registry[info.task_key].emplace(info.rsrc_key, std::move(info.rsrc));
+    auto [it, _] = m_rsrc_registry[info.task_key].insert_or_assign(info.rsrc_key, std::move(info.rsrc));
     return it->second.get();
   }
 
@@ -244,56 +244,42 @@ namespace met {
     rem_rsrc_info.emplace_back(std::move(info));
   }
 
-  template <typename SchedulerHandleImpl>
-  void MaskedSchedulerHandle<SchedulerHandleImpl>::build() {
+  void MaskedSchedulerHandle::build() {
     met_trace();
     m_masked_handle.build();
   }
 
-  template <typename SchedulerHandleImpl>
-  void MaskedSchedulerHandle<SchedulerHandleImpl>::clear(bool preserve_global) {
+  void MaskedSchedulerHandle::clear(bool preserve_global) {
     met_trace();
     m_masked_handle.clear(preserve_global);
   }
   
-  template <typename SchedulerHandleImpl>
-  void MaskedSchedulerHandle<SchedulerHandleImpl>::add_task_impl(Base::AddTaskInfo &&info) {
+  void MaskedSchedulerHandle::add_task_impl(AddTaskInfo &&info) {
     met_trace();
-    m_masked_handle.add_task_impl(std::move(info));
+    m_masked_handle.fwd_add_task(std::move(info));
   }
 
-  template <typename SchedulerHandleImpl>
-  void MaskedSchedulerHandle<SchedulerHandleImpl>::rem_task_impl(Base::RemTaskInfo &&info) {
+  void MaskedSchedulerHandle::rem_task_impl(RemTaskInfo &&info) {
     met_trace();
-    m_masked_handle.rem_task_impl(std::move(info));
+    m_masked_handle.fwd_rem_task(std::move(info));
   }
 
-  template <typename SchedulerHandleImpl>
-  detail::TaskBase *MaskedSchedulerHandle<SchedulerHandleImpl>::get_task_impl(Base::GetTaskInfo &&info) {
-    met_trace();
-    return m_masked_handle.get_task_impl(std::move(info));
+  detail::TaskBase *MaskedSchedulerHandle::get_task_impl(GetTaskInfo &&info) {
+    met_trace();  return m_masked_handle.fwd_get_task(std::move(info));
   }
 
-  template <typename SchedulerHandleImpl>
-  detail::RsrcBase *MaskedSchedulerHandle<SchedulerHandleImpl>::add_rsrc_impl(Base::AddRsrcInfo &&info) {
+  detail::RsrcBase *MaskedSchedulerHandle::add_rsrc_impl(AddRsrcInfo &&info) {
     met_trace();
-    return m_masked_handle.add_rsrc_impl(std::move(info));
+    return m_masked_handle.fwd_add_rsrc(std::move(info));
   }
 
-  template <typename SchedulerHandleImpl>
-  detail::RsrcBase *MaskedSchedulerHandle<SchedulerHandleImpl>::get_rsrc_impl(Base::GetRsrcInfo &&info) {
+  detail::RsrcBase *MaskedSchedulerHandle::get_rsrc_impl(GetRsrcInfo &&info) {
     met_trace();
-    return m_masked_handle.get_rsrc_impl(std::move(info));
+    return m_masked_handle.fwd_get_rsrc(std::move(info));
   }
 
-  template <typename SchedulerHandleImpl>
-  void MaskedSchedulerHandle<SchedulerHandleImpl>::rem_rsrc_impl(Base::RemRsrcInfo &&info) {
+  void MaskedSchedulerHandle::rem_rsrc_impl(RemRsrcInfo &&info) {
     met_trace();
-    m_masked_handle.rem_rsrc_impl(std::move(info));
+    m_masked_handle.fwd_rem_rsrc(std::move(info));
   }
-
-  /* Explicit template instantiations follow */
-
-  // template class MaskedSchedulerHandle<SchedulerHandle>;
-  template class MaskedSchedulerHandle<LinearSchedulerHandle>;
 } // namespace met

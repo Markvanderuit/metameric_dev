@@ -99,21 +99,20 @@ namespace met {
       // Used internally; implement as "global" for scheduler, and task key for schedule handle
       virtual const std::string &task_default_key() const = 0;
       
-    public: /* Add/remove task functions */
+    public: /* Forwarding of virtual implementation functions */
+      void      fwd_add_task(AddTaskInfo &&info) { add_task_impl(std::move(info)); }
+      void      fwd_rem_task(RemTaskInfo &&info) { rem_task_impl(std::move(info)); }
+      TaskBase *fwd_get_task(GetTaskInfo &&info) { return get_task_impl(std::move(info)); }
+      RsrcBase *fwd_add_rsrc(AddRsrcInfo &&info) { return add_rsrc_impl(std::move(info)); }
+      RsrcBase *fwd_get_rsrc(GetRsrcInfo &&info) { return get_rsrc_impl(std::move(info)); }
+      void      fwd_rem_rsrc(RemRsrcInfo &&info) { rem_rsrc_impl(std::move(info)); }
+
+    public: /* Add/remove/get task functions */
       template <typename Ty, typename... Args>
       void emplace_task(const std::string &key, Args... args) {
         static_assert(std::is_base_of_v<TaskBase, Ty>);
         met_trace();
         add_task_impl(AddTaskInfo { .prnt_key = "",
-                                    .task_key = key,
-                                    .task     = std::make_shared<Ty>(args...)});
-      }
-
-      template <typename Ty, typename... Args>
-      void emplace_subtask(const std::string &prnt, const std::string &key, Args... args) {
-        static_assert(std::is_base_of_v<TaskBase, Ty>);
-        met_trace();
-        add_task_impl(AddTaskInfo { .prnt_key = prnt,
                                     .task_key = key,
                                     .task     = std::make_shared<Ty>(args...)});
       }
@@ -127,23 +126,9 @@ namespace met {
                                     .task = std::make_shared<Ty>(std::move(task)) });
       }
 
-      template <typename Ty>
-      void insert_subtask(const std::string &prnt, const std::string &key, Ty &&task) {
-        static_assert(std::is_base_of_v<TaskBase, Ty>);
-        met_trace();
-        add_task_impl(AddTaskInfo { .prnt_key = prnt,
-                                    .task_key = key,
-                                    .task = std::make_shared<Ty>(std::move(task)) });
-      }
-
       void remove_task(const std::string &key) {
         met_trace();
         rem_task_impl(RemTaskInfo { .task_key = key });
-      }
-
-      void remove_subtask(const std::string &prnt, const std::string &key) {
-        met_trace();
-        rem_task_impl(RemTaskInfo { .prnt_key = prnt, .task_key = key });
       }
 
       template <typename Ty>
@@ -157,19 +142,6 @@ namespace met {
       bool has_task(const std::string &key) {
         met_trace();
         return get_task_impl(GetTaskInfo { .task_key = key }) != nullptr;
-      }
-
-      template <typename Ty>
-      Ty & get_subtask(const std::string &prnt, const std::string &key) {
-        met_trace();
-        auto ptr = get_task_impl(GetTaskInfo { .prnt_key = prnt, .task_key = key });
-        debug::check_expr_rel(ptr, fmt::format("get_task failed for {}.{}", prnt, key));
-        return *static_cast<Ty *>(ptr);
-      };
-      
-      bool has_subtask(const std::string &prnt, const std::string &key) {
-        met_trace();
-        return get_task_impl(GetTaskInfo { .prnt_key = prnt, .task_key = key }) != nullptr;
       }
 
     public: /* Add/remove/get resource functions */
@@ -272,5 +244,47 @@ namespace met {
   public:
     // Get key of the current active task
     virtual const std::string &task_key() const = 0;
+
+  public: /* Add/remove/get subtask functions */
+    template <typename Ty, typename... Args>
+    void emplace_subtask(const std::string &key, Args... args) {
+      static_assert(std::is_base_of_v<detail::TaskBase, Ty>);
+      met_trace();
+      add_task_impl(AddTaskInfo { .prnt_key = task_default_key(),
+                                  .task_key = key,
+                                  .task     = std::make_shared<Ty>(args...)});
+    }
+
+    template <typename Ty>
+    void insert_subtask(const std::string &key, Ty &&task) {
+      static_assert(std::is_base_of_v<detail::TaskBase, Ty>);
+      met_trace();
+      add_task_impl(AddTaskInfo { .prnt_key = task_default_key(),
+                                  .task_key = key,
+                                  .task = std::make_shared<Ty>(std::move(task)) });
+    }
+
+    void remove_subtask(const std::string &key) {
+      met_trace();
+      rem_task_impl(RemTaskInfo { .prnt_key = task_default_key(), .task_key = key });
+    }
+    
+    template <typename Ty>
+    Ty & get_subtask(const std::string &key) {
+      met_trace();
+      auto ptr = get_task_impl(GetTaskInfo { .prnt_key = task_default_key(), .task_key = key });
+      debug::check_expr_rel(ptr, fmt::format("get_task failed for {}.{}", task_default_key(), key));
+      return *static_cast<Ty *>(ptr);
+    };
+    
+    bool has_subtask(const std::string &key) {
+      met_trace();
+      return get_task_impl(GetTaskInfo { .prnt_key = task_default_key(), .task_key = key }) != nullptr;
+    }
+    
+    bool has_subtask_global(const std::string &prnt, const std::string &key) {
+      met_trace();
+      return get_task_impl(GetTaskInfo { .prnt_key = prnt, .task_key = key }) != nullptr;
+    }
   };
 } // namespace met::detail

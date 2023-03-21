@@ -47,8 +47,8 @@ namespace met {
                                           .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
                                           .lrgb_to_srgb = true}};
 
-    info.insert_subtask(info.task_key(), "gen_texture", std::move(texture_subtask));
-    info.insert_subtask(info.task_key(), "gen_resample", std::move(resample_subtask));
+    info.insert_subtask("gen_texture", std::move(texture_subtask));
+    info.insert_subtask("gen_resample", std::move(resample_subtask));
   }
 
   void WeightViewerTask::eval(SchedulerHandle &info) {
@@ -71,22 +71,9 @@ namespace met {
       // Check if the resample subtask needs readjusting for a resized output texture
       if (!texture_size.isApprox(m_texture_size)) {
         m_texture_size = texture_size;
-
-        auto &subtask = info.get_subtask<ResampleSubtask>(info.task_key(), "gen_resample");
-        auto mask = MaskedSchedulerHandle(info, fmt::format("{}.{}", info.task_key(), "gen_resample"));
-        subtask.set_texture_info(mask, { .size = m_texture_size });
-
-        /* // Define new resample subtask
-        ResampleSubtask task = {{ .input_key  = { fmt::format("{}.gen_texture", info.task_key()), "colr_texture" },
-                                  .output_key = { "blablabla", "colr_texture" },
-                                  .texture_info = { .size = m_texture_size },
-                                  .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear,
-                                                    .mag_filter = gl::SamplerMagFilter::eLinear },
-                                  .lrgb_to_srgb = true}};
-        
-        // Replace task; this is safe if the task does not yet exist
-        info.remove_subtask(info.task_key(), "gen_resample");
-        info.insert_subtask(info.task_key(), "gen_resample", std::move(task)); */
+        auto &sub = info.get_subtask<ResampleSubtask>("gen_resample");
+        auto mask = MaskedSchedulerHandle(info, "gen_resample");
+        sub.set_texture_info(mask, { .size = m_texture_size });
       }
 
       // View data is defined in this function

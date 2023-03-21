@@ -13,17 +13,14 @@
 namespace met {
   void ViewportTask::init(SchedulerHandle &info) {
     met_trace_full();
-
-    // Add subtasks
-    const auto &prnt_key = info.task_key();
-    info.emplace_subtask<ViewportBeginTask>(prnt_key,        "begin");
-    info.emplace_subtask<ViewportOverlayTask>(prnt_key,      "overlay");
-    info.emplace_subtask<ViewportInputTask>(prnt_key,        "input");
-    info.emplace_subtask<ViewportEndTask>(prnt_key,          "end");
-    info.emplace_subtask<ViewportDrawBeginTask>(prnt_key,    "draw_begin");
-    info.emplace_subtask<ViewportDrawCSysOCSTask>(prnt_key,  "draw_csys_ocs");
-    info.emplace_subtask<ViewportDrawDelaunayTask>(prnt_key, "draw_delaunay");
-    info.emplace_subtask<ViewportDrawTextureTask>(prnt_key,  "draw_texture");
-    info.emplace_subtask<ViewportDrawEndTask>(prnt_key,      "draw_end");
+    info.emplace_subtask<ViewportBeginTask>("begin");
+    info.emplace_subtask<ViewportOverlayTask>("overlay");
+    info.emplace_subtask<ViewportInputTask>("input");
+    info.emplace_subtask<ViewportEndTask>("end");
+    info.emplace_subtask<ViewportDrawBeginTask>("draw_begin");
+    info.emplace_subtask<ViewportDrawCSysOCSTask>("draw_csys_ocs");
+    info.emplace_subtask<ViewportDrawDelaunayTask>("draw_delaunay");
+    info.emplace_subtask<ViewportDrawTextureTask>("draw_texture");
+    info.emplace_subtask<ViewportDrawEndTask>("draw_end");
   }
 } // namespace met

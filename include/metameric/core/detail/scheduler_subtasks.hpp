@@ -22,13 +22,13 @@ namespace met::detail {
       // Adjust nr. of subtasks upwards if necessary
       for (; m_n_tasks < n_tasks; ++m_n_tasks) {
         auto [key, task] = m_add(info, m_n_tasks);
-        info.insert_subtask(info.task_key(), key, std::move(task));
+        info.insert_subtask(key, std::move(task));
       }
 
       // Adjust nr. of subtasks downwards if necessary
       for (; m_n_tasks > n_tasks; --m_n_tasks) {
         auto key = m_rmv(info, m_n_tasks - 1);
-        info.remove_subtask(info.task_key(), key);
+        info.remove_subtask(key);
       }
     }
 

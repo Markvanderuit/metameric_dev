@@ -58,7 +58,7 @@ namespace met {
   protected:
     // Private members
     LinearScheduler &m_scheduler;
-    std::string      m_task_key;
+    std::string              m_task_key;
 
     // Friend private members
     ClearFlags             clear_flags;
@@ -95,29 +95,25 @@ namespace met {
     virtual const RsrcMap &resources() const override { return m_scheduler.resources(); }
   };
 
-  template <typename SchedulerHandleImpl>
-  class MaskedSchedulerHandle : public SchedulerHandleImpl {
-    using Base = SchedulerHandleImpl;
-    static_assert(std::is_base_of_v<SchedulerHandle, Base>);
-
+  class MaskedSchedulerHandle : public SchedulerHandle {
   protected:
-    Base        &m_masked_handle;
-    std::string  m_task_key;
+    SchedulerHandle &m_masked_handle;
+    std::string      m_task_key;
 
     // Virtual method implementations
-    virtual void              add_task_impl(Base::AddTaskInfo &&) override;
-    virtual void              rem_task_impl(Base::RemTaskInfo &&) override;
-    virtual detail::TaskBase *get_task_impl(Base::GetTaskInfo &&) override;
-    virtual detail::RsrcBase *add_rsrc_impl(Base::AddRsrcInfo &&) override;
-    virtual detail::RsrcBase *get_rsrc_impl(Base::GetRsrcInfo &&) override;
-    virtual void              rem_rsrc_impl(Base::RemRsrcInfo &&) override;
+    virtual void              add_task_impl(AddTaskInfo &&) override;
+    virtual void              rem_task_impl(RemTaskInfo &&) override;
+    virtual detail::TaskBase *get_task_impl(GetTaskInfo &&) override;
+    virtual detail::RsrcBase *add_rsrc_impl(AddRsrcInfo &&) override;
+    virtual detail::RsrcBase *get_rsrc_impl(GetRsrcInfo &&) override;
+    virtual void              rem_rsrc_impl(RemRsrcInfo &&) override;
 
   public:
-    MaskedSchedulerHandle(Base &masked_handle, const std::string &task_key)
+    MaskedSchedulerHandle(SchedulerHandle &masked_handle, const std::string &task_key, bool is_full_key = false)
     : m_masked_handle(masked_handle),
-      m_task_key(task_key) { }
+      m_task_key(is_full_key ? task_key : fmt::format("{}.{}", masked_handle.task_key(), task_key)) { }
 
-    virtual void build() override;                            // Build schedule given current tasks/resources
+    virtual void build()                            override; // Build schedule given current tasks/resources
     virtual void clear(bool preserve_global = true) override; // Clear current schedule and resources
 
     // Get key of current masking task
@@ -125,7 +121,7 @@ namespace met {
 
     // Debug methods
     virtual std::vector<std::string> schedule() const override { return m_masked_handle.schedule(); }
-    virtual const typename Base::RsrcMap &resources() const override { return m_masked_handle.resources(); }
+    virtual const RsrcMap &resources() const override { return m_masked_handle.resources(); }
   };
 
   met_declare_bitflag(LinearSchedulerHandle::ClearFlags);
