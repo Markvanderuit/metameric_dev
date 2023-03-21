@@ -35,11 +35,20 @@ namespace met {
     // Initialize buffer object for storing intermediate results
     info.emplace_resource<gl::Buffer>("colr_buffer", { .size = sizeof(AlColr) * dispatch_n });
 
-    // Insert subtask to handle buffer->texture and lrgb->srgb conversion
-    TextureSubtask task = {{ .input_key  = { info.task_key(), "colr_buffer" },
-                             .output_key = { "blablablabla", "colr_texture" },
-                             .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
-    info.insert_subtask(info.task_key(), "gen_texture", std::move(task));
+    // Create subtask to handle buffer->texture copy
+    TextureSubtask texture_subtask = {{ .input_key  = { info.task_key(), "colr_buffer" },
+                                        .output_key = { "blablablabla", "colr_texture" },
+                                        .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
+
+    // Create subtask to handle texture->texture resampling and gamma correction
+    ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task_key()), "colr_texture" },
+                                          .output_key   = { "blablabla", "colr_texture" },
+                                          .texture_info = { .size = 1u },
+                                          .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
+                                          .lrgb_to_srgb = true}};
+
+    info.insert_subtask(info.task_key(), "gen_texture", std::move(texture_subtask));
+    info.insert_subtask(info.task_key(), "gen_resample", std::move(resample_subtask));
   }
 
   void WeightViewerTask::eval(SchedulerHandle &info) {
@@ -49,10 +58,6 @@ namespace met {
       // Get shared resources 
       auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
       auto &e_txtr_data   = e_appl_data.loaded_texture_f32;
-
-      // Get subtask names
-      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
-      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task_key());
 
       // Weight data is drawn to texture in this function
       eval_draw(info);
@@ -67,7 +72,11 @@ namespace met {
       if (!texture_size.isApprox(m_texture_size)) {
         m_texture_size = texture_size;
 
-        // Define new resample subtask
+        auto &subtask = info.get_subtask<ResampleSubtask>(info.task_key(), "gen_resample");
+        auto mask = MaskedSchedulerHandle(info, fmt::format("{}.{}", info.task_key(), "gen_resample"));
+        subtask.set_texture_info(mask, { .size = m_texture_size });
+
+        /* // Define new resample subtask
         ResampleSubtask task = {{ .input_key  = { fmt::format("{}.gen_texture", info.task_key()), "colr_texture" },
                                   .output_key = { "blablabla", "colr_texture" },
                                   .texture_info = { .size = m_texture_size },
@@ -77,7 +86,7 @@ namespace met {
         
         // Replace task; this is safe if the task does not yet exist
         info.remove_subtask(info.task_key(), "gen_resample");
-        info.insert_subtask(info.task_key(), "gen_resample", std::move(task));
+        info.insert_subtask(info.task_key(), "gen_resample", std::move(task)); */
       }
 
       // View data is defined in this function

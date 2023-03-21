@@ -21,11 +21,12 @@ namespace met {
     std::vector<std::string> m_task_order;
 
     // Virtual method implementations
-    virtual void               add_task_impl(AddTaskInfo &&) override;
-    virtual void               rem_task_impl(RemTaskInfo &&) override;
-    virtual detail::RsrcBase  *add_rsrc_impl(AddRsrcInfo &&) override;
-    virtual detail::RsrcBase  *get_rsrc_impl(GetRsrcInfo &&) override;
-    virtual void               rem_rsrc_impl(RemRsrcInfo &&) override;
+    virtual void              add_task_impl(AddTaskInfo &&) override;
+    virtual void              rem_task_impl(RemTaskInfo &&) override;
+    virtual detail::TaskBase *get_task_impl(GetTaskInfo &&) override;
+    virtual detail::RsrcBase *add_rsrc_impl(AddRsrcInfo &&) override;
+    virtual detail::RsrcBase *get_rsrc_impl(GetRsrcInfo &&) override;
+    virtual void              rem_rsrc_impl(RemRsrcInfo &&) override;
 
   public: /* public methods */
     // Friend class has access to internal components
@@ -54,7 +55,7 @@ namespace met {
       eBuild      = 0x004u, // Signal that schedule needs to be rebuilt after run
     };
     
-  private:
+  protected:
     // Private members
     LinearScheduler &m_scheduler;
     std::string      m_task_key;
@@ -67,11 +68,12 @@ namespace met {
     std::list<RemRsrcInfo> rem_rsrc_info;
 
     // Virtual method implementations
-    virtual void              add_task_impl(AddTaskInfo &&info) override;
-    virtual void              rem_task_impl(RemTaskInfo &&info) override;
-    virtual detail::RsrcBase *add_rsrc_impl(AddRsrcInfo &&info) override;
-    virtual detail::RsrcBase *get_rsrc_impl(GetRsrcInfo &&info) override;
-    virtual void              rem_rsrc_impl(RemRsrcInfo &&info) override;
+    virtual void              add_task_impl(AddTaskInfo &&) override;
+    virtual void              rem_task_impl(RemTaskInfo &&) override;
+    virtual detail::TaskBase *get_task_impl(GetTaskInfo &&) override;
+    virtual detail::RsrcBase *add_rsrc_impl(AddRsrcInfo &&) override;
+    virtual detail::RsrcBase *get_rsrc_impl(GetRsrcInfo &&) override;
+    virtual void              rem_rsrc_impl(RemRsrcInfo &&) override;
 
   public:
     // Friend class has access to internal components
@@ -90,7 +92,40 @@ namespace met {
 
     // Debug methods
     virtual std::vector<std::string> schedule() const override { return m_scheduler.m_task_order; }
-    virtual const LinearScheduler::RsrcMap &resources() const override { return m_scheduler.resources(); }
+    virtual const RsrcMap &resources() const override { return m_scheduler.resources(); }
+  };
+
+  template <typename SchedulerHandleImpl>
+  class MaskedSchedulerHandle : public SchedulerHandleImpl {
+    using Base = SchedulerHandleImpl;
+    static_assert(std::is_base_of_v<SchedulerHandle, Base>);
+
+  protected:
+    Base        &m_masked_handle;
+    std::string  m_task_key;
+
+    // Virtual method implementations
+    virtual void              add_task_impl(Base::AddTaskInfo &&) override;
+    virtual void              rem_task_impl(Base::RemTaskInfo &&) override;
+    virtual detail::TaskBase *get_task_impl(Base::GetTaskInfo &&) override;
+    virtual detail::RsrcBase *add_rsrc_impl(Base::AddRsrcInfo &&) override;
+    virtual detail::RsrcBase *get_rsrc_impl(Base::GetRsrcInfo &&) override;
+    virtual void              rem_rsrc_impl(Base::RemRsrcInfo &&) override;
+
+  public:
+    MaskedSchedulerHandle(Base &masked_handle, const std::string &task_key)
+    : m_masked_handle(masked_handle),
+      m_task_key(task_key) { }
+
+    virtual void build() override;                            // Build schedule given current tasks/resources
+    virtual void clear(bool preserve_global = true) override; // Clear current schedule and resources
+
+    // Get key of current masking task
+    virtual const std::string &task_key() const override { return m_task_key; };
+
+    // Debug methods
+    virtual std::vector<std::string> schedule() const override { return m_masked_handle.schedule(); }
+    virtual const typename Base::RsrcMap &resources() const override { return m_masked_handle.resources(); }
   };
 
   met_declare_bitflag(LinearSchedulerHandle::ClearFlags);
