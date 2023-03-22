@@ -30,7 +30,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_window = info.get_resource<gl::Window>(global_key, "window");
+    const auto &e_window = info.resource<gl::Window>(global_key, "window");
     
     if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       // Primary image and data sections are nested within headers
@@ -71,7 +71,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_window = info.get_resource<gl::Window>(global_key, "window");
+    const auto &e_window = info.resource<gl::Window>(global_key, "window");
 
     const float child_height = img_sec_height * e_window.content_scale();
     if (ImGui::BeginChild("##images_wrapper", { 2 * child_height, child_height }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
@@ -167,8 +167,8 @@ namespace met {
     ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
     // Get shared resources
-    auto &e_window = info.get_resource<gl::Window>(global_key, "window");
-
+    const auto &e_window = info.resource<gl::Window>(global_key, "window");
+    
     // Get wavelength values for x-axis in plots
     Spec x_values;
     for (uint i = 0; i < x_values.size(); ++i)
@@ -289,7 +289,7 @@ namespace met {
   }
 
   bool CreateProjectTask::create_project_safe(SchedulerHandle &info) {
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    const auto &e_app_data = info.resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
@@ -303,7 +303,7 @@ namespace met {
 
   bool CreateProjectTask::create_project(SchedulerHandle &info) {
     // Create a new project
-    info.get_resource<ApplicationData>(global_key, "app_data").create(std::move(m_proj_data));
+    info.use_resource<ApplicationData>(global_key, "app_data").create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
     submit_schedule_main(info);

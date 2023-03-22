@@ -28,7 +28,7 @@ namespace met {
       ImGui::DrawFrame();
 
       // Handle window events
-      auto &e_window = info.get_resource<gl::Window>(global_key, "window");
+      auto &e_window = info.use_resource<gl::Window>(global_key, "window");
       e_window.swap_buffers();
       e_window.poll_events();
 

@@ -105,8 +105,8 @@ namespace met {
     met_trace_full();
 
     // Ger shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data = e_appl_data.project_data;
 
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
     for (uint i = 1; i <= n_constraints; ++i) {
@@ -142,23 +142,25 @@ namespace met {
     met_trace_full();
 
     // Continue only if constraint selection is sensible
-    auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
+    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
     guard(e_cstr_slct != -1);
 
     // Continue only on relevant state change
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
-    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    const auto &e_vert_slct  = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
     guard((!e_vert_slct.empty() && (e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection)) || e_view_state.cstr_selection);
 
-    // Get shared resources
-    auto &e_appl_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data    = e_appl_data.project_data;
-    auto &e_vert         = e_appl_data.project_data.vertices[e_vert_slct[0]];
-    auto &e_vert_sd      = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[e_vert_slct[0]];
-    auto &i_csol_data    = info.get_resource<std::vector<Colr>>("csol_data");
-    auto &i_csol_data_al = info.get_resource<std::vector<AlColr>>("csol_data_al");
-    auto &i_csol_cntr    = info.get_resource<Colr>("csol_cntr");
+    // Get external resources
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data = e_appl_data.project_data;
+    const auto &e_vert      = e_appl_data.project_data.vertices[e_vert_slct[0]];
+    const auto &e_vert_sd   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[e_vert_slct[0]];
+
+    // Get modified resources
+    auto &i_csol_data    = info.use_resource<std::vector<Colr>>("csol_data");
+    auto &i_csol_data_al = info.use_resource<std::vector<AlColr>>("csol_data_al");
+    auto &i_csol_cntr    = info.use_resource<Colr>("csol_cntr");
 
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
@@ -173,7 +175,7 @@ namespace met {
     CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
-    const auto &i_samples = info.get_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
+    const auto &i_samples = info.use_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
 
     // Generate points on metamer set boundary; store in aligned format
     i_csol_data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 
@@ -183,6 +185,7 @@ namespace met {
                                                .system_j  = cmfs_j, 
                                                .samples   = i_samples });
     i_csol_data_al = std::vector<AlColr>(range_iter(i_csol_data));
+    fmt::print("i_csol_data_al : {}\n", i_csol_data_al.size());
     
     // Compute center of metamer set boundary
     constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };

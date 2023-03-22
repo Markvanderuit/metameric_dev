@@ -33,8 +33,8 @@ namespace met {
   void ViewportDrawCubeTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources
-    auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+    // Get external resources
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_uniform.vert" },
@@ -68,7 +68,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball = info.get_resource<detail::Arcball>("viewport.input", "arcball");
+    auto &e_arcball = info.use_resource<detail::Arcball>("viewport.input", "arcball");
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

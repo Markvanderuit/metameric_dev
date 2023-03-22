@@ -30,13 +30,15 @@ namespace met {
     met_trace_full();
     
     // Continue only on relevant state change
-    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
     guard(e_pipe_state.any_csys);
 
-    // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
-    auto &i_buffer    = info.get_resource<gl::Buffer>("mapp_buffer");
+    // Get external resources
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data = e_appl_data.project_data;
+
+    // Get modified resources
+    auto &i_buffer = info.use_resource<gl::Buffer>("mapp_buffer");
     
     if (e_proj_data.color_systems.size() > m_max_maps) {
       // If the maximum allowed nr. of mappings is exceeded, re-allocate with room to spare

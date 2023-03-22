@@ -7,8 +7,8 @@
 namespace met {
   /* Info struct for generation of a spectral reflectance, given color signals and color systems */
   struct GenerateSpectrumInfo {
-    Basis                &basis;         // Spectral basis functions
-    Spec                 &basis_mean;    // Average of spectral basis function data
+    const Basis          &basis;         // Spectral basis functions
+    const Spec           &basis_mean;    // Average of spectral basis function data
     std::span<const CMFS> systems;       // Color systems in which signals are available
     std::span<const Colr> signals;       // Signal samples in their respective color systems
     bool impose_boundedness = true;      // Impose boundedness cosntraints
@@ -18,16 +18,16 @@ namespace met {
   
   /* Info struct for sampling-based generation of points on the object color solid of a color system */
   struct GenerateOCSBoundaryInfo {
-    Basis                &basis;  // Spectral basis functions
-    Spec                 &basis_avg;
+    const Basis          &basis;  // Spectral basis functions
+    const Spec           &basis_avg;
     CMFS                  system; // Color system spectra describing the expected gamut
     std::span<const Colr> samples; // Random unit vector samples in 3 dimensions
   };
 
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
   struct GenerateMismatchBoundaryInfo {
-    Basis                        &basis;     // Spectral basis functions
-    Spec                         &basis_avg;
+    const Basis                  &basis;     // Spectral basis functions
+    const Spec                   &basis_avg;
     std::span<const CMFS>         systems_i; // Color system spectra for prior color signals
     std::span<const Colr>         signals_i; // Color signals for prior constraints
     const CMFS                   &system_j;  // Color system for mismatching region
@@ -47,8 +47,8 @@ namespace met {
       uint syst_i; // Color system index for this given color signal
     };
 
-    Basis             &basis;   // Spectral basis functions
-    Spec              &basis_avg;
+    const Basis        &basis;   // Spectral basis functions
+    const Spec         &basis_avg;
     std::vector<Colr>   gamut;   // Known gamut
     std::vector<CMFS>   systems; // Color systems
     std::vector<Signal> signals; // Color signals and corresponding information

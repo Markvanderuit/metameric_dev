@@ -90,17 +90,17 @@ namespace met {
   void StateTask::eval(SchedulerHandle &info) {
     met_trace();
 
-    constexpr auto reduce_or = [](auto a, auto b) { return a | b; };
+    // Get external resources
+    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data  = e_appl_data.project_data;
+    const auto &e_arcball    = info.resource<detail::Arcball>("viewport.input", "arcball");
+    const auto &e_vert_selct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_vert_mover = info.resource<std::vector<uint>>("viewport.input.vert", "mouseover");
+    const auto &e_cstr_selct = info.resource<int>("viewport.overlay", "constr_selection");
 
-    // Get shared resources
-    auto &i_pipe_state = info.get_resource<ProjectState>("pipeline_state");
-    auto &i_view_state = info.get_resource<ViewportState>("viewport_state");
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_arcball    = info.get_resource<detail::Arcball>("viewport.input", "arcball");
-    auto &e_vert_selct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &e_vert_mover = info.get_resource<std::vector<uint>>("viewport.input.vert", "mouseover");
-    auto &e_cstr_selct = info.get_resource<int>("viewport.overlay", "constr_selection");
+    // Get modified resources
+    auto &i_view_state = info.use_resource<ViewportState>("viewport_state");
+    auto &i_pipe_state = info.use_resource<ProjectState>("pipeline_state");
 
     // Iterate over all project data
     bool pre_verts_resize = e_proj_data.vertices.size() != m_verts.size();
@@ -120,8 +120,8 @@ namespace met {
         vert_state.csys_j[j] = vert_state.csys_j[j] | i_pipe_state.csys[vert_data.csys_j[j]];
       
       // Update summary flags per vertex
-      vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, reduce_or);
-      vert_state.any_csys_j |= std::reduce(range_iter(vert_state.csys_j), false, reduce_or);
+      vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, [](auto a, auto b) { return a | b; });
+      vert_state.any_csys_j |= std::reduce(range_iter(vert_state.csys_j), false, [](auto a, auto b) { return a | b; });
       vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_csys_j;
     }
 

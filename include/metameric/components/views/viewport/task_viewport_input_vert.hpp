@@ -38,11 +38,11 @@ namespace met {
 
       // Get shared resources
       auto &io          = ImGui::GetIO();
-      auto &i_selection = info.get_resource<std::vector<uint>>("selection");
-      auto &i_mouseover = info.get_resource<std::vector<uint>>("mouseover");
-      auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
-      auto &i_arcball   = info.get_resource<detail::Arcball>("viewport.input", "arcball");
-      auto &e_app_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &i_selection = info.use_resource<std::vector<uint>>("selection");
+      auto &i_mouseover = info.use_resource<std::vector<uint>>("mouseover");
+      auto &e_cstr_slct = info.use_resource<int>("viewport.overlay", "constr_selection");
+      auto &i_arcball   = info.use_resource<detail::Arcball>("viewport.input", "arcball");
+      auto &e_app_data  = info.use_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_app_data.project_data;
       auto &e_verts     = e_app_data.project_data.vertices;
 

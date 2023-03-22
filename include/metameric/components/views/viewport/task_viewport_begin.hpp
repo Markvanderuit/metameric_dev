@@ -21,8 +21,8 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_target");
-      auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_target");
+      auto &i_lrgb_target = info.use_resource<gl::Texture2d4f>("lrgb_target");
+      auto &i_srgb_target = info.use_resource<gl::Texture2d4f>("srgb_target");
 
       // Declare scoped ImGui style state
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 

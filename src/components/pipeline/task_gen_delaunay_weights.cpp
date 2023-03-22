@@ -19,9 +19,9 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_rgb_texture = info.resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data   = e_appl_data.project_data;
 
     const uint generate_n    = e_rgb_texture.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u);
@@ -55,16 +55,18 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
     guard(e_pipe_state.any_verts);
 
-    // Get shared resources
-    auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
-    auto &i_bary_buffer = info.get_resource<gl::Buffer>("bary_buffer");
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_vert_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
-    auto &e_tetr_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
-    auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+    // Get external resources
+    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_vert_buffer = info.resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
+    const auto &e_tetr_buffer = info.resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
+    const auto &e_delaunay    = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+    
+    // Get modified resources
+    auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
+    auto &i_bary_buffer = info.use_resource<gl::Buffer>("bary_buffer");
 
     // Update uniform data
     m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();

@@ -17,7 +17,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
     
     // Determine dispatch group size
     const uint mapping_n    = e_appl_data.loaded_texture_f32.size().prod();
@@ -49,22 +49,20 @@ namespace met {
   void GenColorMappingTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Generate color texture only on relevant state changes
-    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
+    // Continue only on relevant state changes; on init this is always true
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    guard(m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts);
 
-    // Continue only on relevant state changes; first time this is always true
-    bool activate_flag = m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;
-    // info.get_resource<bool>(fmt::format("gen_color_mappings.gen_texture_{}", m_mapping_i), "activate_flag") = activate_flag;
-    guard(activate_flag);
+    // Get external resources
+    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_bary_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
+    const auto &e_tetr_buffer = info.resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
+    const auto &e_vert_spec   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+    const auto &e_delaunay    = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
-    // Get shared resources
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
-    auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");
-    auto &e_tetr_buffer = info.get_resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
-    auto &e_vert_spec   = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
-    auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+    // Get modified resources
+    auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
 
     // Update uniform data
     if (e_pipe_state.any_verts || m_init_stale) {
@@ -77,7 +75,7 @@ namespace met {
     // Update gamut data, given any state change
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
     for (uint i = 0; i < e_proj_data.vertices.size(); ++i) {
-      guard_continue(activate_flag || e_pipe_state.verts[i].any);
+      guard_continue(m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.verts[i].any);
 
       m_gamut_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
       m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
@@ -100,7 +98,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
     auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
@@ -118,7 +116,7 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
     uint e_mappings_n = e_appl_data.project_data.color_systems.size();
 
     // Adjust nr. of subtasks

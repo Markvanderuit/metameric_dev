@@ -6,10 +6,12 @@
 
 namespace met {
   // Forward declarations
-  struct SchedulerBase;
-  struct SchedulerHandle;
+  class SchedulerBase;
+  class SchedulerHandle;
 
   namespace detail {
+    enum class StateFlag { eFresh, eModified };
+
     // Virtual base class for tasks submitted to application scheduler
     // Implementations contain majority of program code
     struct TaskBase {
@@ -20,17 +22,30 @@ namespace met {
     };
 
     // Abstract base class for application resources;
-    template <typename> struct RsrcImpl; // FWD of implementing class
+    template <typename> struct RsrcImpl; // FWD of container class
     struct RsrcBase {
+    private:
+      // Internal state flags for resource data; default is modified
+      enum class StateFlag { eFresh, eModified } m_state = StateFlag::eModified;
+
+    public:
+      // Non-const accessor of underlying data; flag as modified
       template <typename T>
       T & get() {
+        set_modify();
         return static_cast<RsrcImpl<T> *>(this)->m_object;
       }
 
+      // Const accessor of underlying data
       template <typename T>
       const T & get() const {
-        return static_cast<RsrcImpl<T> *>(this)->m_object;
+        return static_cast<const RsrcImpl<T> *>(this)->m_object;
       }
+
+      // State operands/queries; the resource is either modified, or not
+      void set_modify()        { m_state = StateFlag::eModified; }
+      void clear_modify()      { m_state = StateFlag::eFresh; }
+      bool is_modified() const { return m_state == StateFlag::eModified; }
     };
 
     // Implementation class for application resource to hold specific type
@@ -42,171 +57,115 @@ namespace met {
       : m_object(std::move(object)) { }
     };
 
-    // Shorthands for common types
+    // Shorthands for shared_ptr wrapper
     using TaskNode = std::shared_ptr<TaskBase>;
     using RsrcNode = std::shared_ptr<RsrcBase>;
 
     class SchedulerBase {
     protected:
-      // Info object for adding a new task to a schedule
-      struct AddTaskInfo {
-        std::string prnt_key = "";      // Key of parent task to which task is appended
-        std::string task_key = "";      // Key of task
-        TaskNode    task     = nullptr; // Pointer to task
-      };
-
-      // Info object for removing a task from the schedule
-      struct RemTaskInfo {
-        std::string prnt_key = "";      // Key of parent task to which task is appended
-        std::string task_key = "";      // Key of task
-      };
-
-      // Info object for querying a task in the schedule
-      struct GetTaskInfo {
-        std::string prnt_key = "";      // Key of parent task to which task is appended
-        std::string task_key = "";      // Key of task
-      };
-
-      // Info object for adding a new resource to a task
-      struct AddRsrcInfo {
-        std::string task_key = "";
-        std::string rsrc_key = "";
-        RsrcNode    rsrc     = nullptr; // Pointer to resource
-      };
-
-      // Info object for removing a resource from a task 
-      struct RemRsrcInfo {
-        std::string task_key = "";
-        std::string rsrc_key = "";
-      };
-
-      // Info object for querying a resource from a task 
-      struct GetRsrcInfo {
-        std::string task_key = "";
-        std::string rsrc_key = "";
-      };
-
-      // Virtual functions implementing add/remove tasks
-      virtual void      add_task_impl(AddTaskInfo &&) = 0;
-      virtual void      rem_task_impl(RemTaskInfo &&) = 0;
-      virtual TaskBase *get_task_impl(GetTaskInfo &&) = 0; // nullable
-
-      // Virtual functions implementing add/remove/get resources
-      virtual RsrcBase *add_rsrc_impl(AddRsrcInfo &&) = 0; // nullable
-      virtual RsrcBase *get_rsrc_impl(GetRsrcInfo &&) = 0; // nullable
-      virtual void      rem_rsrc_impl(RemRsrcInfo &&) = 0;
-
       // Used internally; implement as "global" for scheduler, and task key for schedule handle
       virtual const std::string &task_default_key() const = 0;
-      
-    public: /* Forwarding of virtual implementation functions */
-      void      fwd_add_task(AddTaskInfo &&info) { add_task_impl(std::move(info)); }
-      void      fwd_rem_task(RemTaskInfo &&info) { rem_task_impl(std::move(info)); }
-      TaskBase *fwd_get_task(GetTaskInfo &&info) { return get_task_impl(std::move(info)); }
-      RsrcBase *fwd_add_rsrc(AddRsrcInfo &&info) { return add_rsrc_impl(std::move(info)); }
-      RsrcBase *fwd_get_rsrc(GetRsrcInfo &&info) { return get_rsrc_impl(std::move(info)); }
-      void      fwd_rem_rsrc(RemRsrcInfo &&info) { rem_rsrc_impl(std::move(info)); }
 
+      // Internal parameter objects for adding/removing/accessing tasks/resources in a schedule
+      struct TaskInfo { std::string prnt_key = "", task_key = ""; TaskNode ptr = nullptr; };
+      struct RsrcInfo { std::string task_key = "", rsrc_key = ""; RsrcNode ptr = nullptr; };
+
+    public: /* Virtual implementation functions for add/remove/get of tasks/resources */
+      virtual void      add_task_impl(TaskInfo &&)       = 0;
+      virtual TaskBase *get_task_impl(TaskInfo &&) const = 0; // nullable return value
+      virtual void      rem_task_impl(TaskInfo &&)       = 0;
+      virtual RsrcBase *add_rsrc_impl(RsrcInfo &&)       = 0; // nullable return value
+      virtual RsrcBase *get_rsrc_impl(RsrcInfo &&) const = 0; // nullable return value
+      virtual void      rem_rsrc_impl(RsrcInfo &&)       = 0;
+      
     public: /* Add/remove/get task functions */
       template <typename Ty, typename... Args>
       void emplace_task(const std::string &key, Args... args) {
         static_assert(std::is_base_of_v<TaskBase, Ty>);
         met_trace();
-        add_task_impl(AddTaskInfo { .prnt_key = "",
-                                    .task_key = key,
-                                    .task     = std::make_shared<Ty>(args...)});
+        add_task_impl({ .task_key = key, .ptr = std::make_shared<Ty>(args...) });
       }
 
       template <typename Ty>
       void insert_task(const std::string &key, Ty &&task) {
         static_assert(std::is_base_of_v<TaskBase, Ty>);
         met_trace();
-        add_task_impl(AddTaskInfo { .prnt_key = "",
-                                    .task_key = key,
-                                    .task = std::make_shared<Ty>(std::move(task)) });
+        add_task_impl({ .task_key = key, .ptr = std::make_shared<Ty>(std::move(task)) });
       }
 
       void remove_task(const std::string &key) {
         met_trace();
-        rem_task_impl(RemTaskInfo { .task_key = key });
+        rem_task_impl({ .task_key = key });
       }
+
+      template <typename Ty>
+      const Ty & get_task(const std::string &key) const {
+        met_trace();
+        const TaskBase *ptr = get_task_impl({ .task_key = key });
+        debug::check_expr_rel(ptr, fmt::format("get_task failed for {}", key));
+        return *static_cast<Ty *>(ptr);
+      };
 
       template <typename Ty>
       Ty & get_task(const std::string &key) {
         met_trace();
-        auto ptr = get_task_impl(GetTaskInfo { .task_key = key });
+        TaskBase *ptr = get_task_impl({ .task_key = key });
         debug::check_expr_rel(ptr, fmt::format("get_task failed for {}", key));
         return *static_cast<Ty *>(ptr);
       };
       
-      bool has_task(const std::string &key) {
+      bool has_task(const std::string &key) const {
         met_trace();
-        return get_task_impl(GetTaskInfo { .task_key = key }) != nullptr;
+        return get_task_impl({ .task_key = key }) != nullptr;
       }
 
     public: /* Add/remove/get resource functions */
       template <typename Ty, typename InfoTy = Ty::InfoType>
       Ty & emplace_resource(const std::string &key, InfoTy info) {
         met_trace();
-        auto *rsrc = add_rsrc_impl(AddRsrcInfo { .task_key = task_default_key(),
-                                                 .rsrc_key = key,
-                                                 .rsrc     = std::make_unique<detail::RsrcImpl<Ty>>(Ty(info)) });
-        return rsrc->get<Ty>();
+        RsrcBase *ptr = add_rsrc_impl({ .task_key = task_default_key(), 
+                                        .rsrc_key = key, 
+                                        .ptr      = std::make_shared<detail::RsrcImpl<Ty>>(Ty(info)) });
+        return ptr->get<Ty>();
       }
 
       template <typename Ty>
       void insert_resource(const std::string &key, Ty &&rsrc) {
         met_trace();
-        add_rsrc_impl(AddRsrcInfo { .task_key = task_default_key(),
-                                    .rsrc_key = key,
-                                    .rsrc     = std::make_unique<detail::RsrcImpl<Ty>>(std::move(rsrc)) });
+        RsrcBase *ptr = add_rsrc_impl({ .task_key = task_default_key(), 
+                                        .rsrc_key = key, 
+                                        .ptr      = std::make_shared<detail::RsrcImpl<Ty>>(std::move(rsrc)) });
       }
 
       void remove_resource(const std::string &key) {
         met_trace();
-        rem_rsrc_impl(RemRsrcInfo { .task_key = task_default_key(), .rsrc_key = key });
+        rem_rsrc_impl({ .task_key = task_default_key(), .rsrc_key = key });
       }
 
       template <typename Ty>
-      const Ty & get_resource(const std::string &key) const {
+      const Ty & resource(const std::string &task_key, const std::string &rsrc_key) const {
         met_trace();
-        auto ptr = get_rsrc_impl(GetRsrcInfo { .task_key = task_default_key(), .rsrc_key = key });
-        debug::check_expr_rel(ptr, fmt::format("get_resource failed for {}, {}", task_default_key(), key));
+        const RsrcBase *ptr = get_rsrc_impl({ .task_key = task_key, .rsrc_key = rsrc_key });
+        debug::check_expr_rel(ptr, fmt::format("use_resource failed for {}, {}", task_key, rsrc_key));
         return ptr->get<Ty>();
       }
 
       template <typename Ty>
-      Ty & get_resource(const std::string &key) {
+      Ty & use_resource(const std::string &task_key, const std::string &rsrc_key) {
         met_trace();
-        auto ptr = get_rsrc_impl(GetRsrcInfo { .task_key = task_default_key(), .rsrc_key = key });
-        debug::check_expr_rel(ptr, fmt::format("get_resource failed for {}, {}", task_default_key(), key));
+        RsrcBase *ptr = get_rsrc_impl({ .task_key = task_key, .rsrc_key = rsrc_key});
+        debug::check_expr_rel(ptr, fmt::format("use_resource failed for {}, {}", task_key, rsrc_key));
         return ptr->get<Ty>();
+      }
+
+      bool is_resource_modified(const std::string &task_key, const std::string &key) const {
+        met_trace();
+        return get_rsrc_impl({ .task_key = task_key, .rsrc_key = key })->is_modified();
       }
       
-      bool has_resource(const std::string &key) {
+      bool has_resource(const std::string &task_key, const std::string &rsrc_key) const {
         met_trace();
-        return get_rsrc_impl(GetRsrcInfo { .task_key = task_default_key(), .rsrc_key = key }) != nullptr;
-      }
-
-      template <typename Ty>
-      const Ty & get_resource(const std::string &task_key, const std::string &rsrc_key) const {
-        met_trace();
-        auto ptr = get_rsrc_impl(GetRsrcInfo { .task_key = task_key, .rsrc_key = rsrc_key });
-        debug::check_expr_rel(ptr, fmt::format("get_resource failed for {}, {}", task_key, rsrc_key));
-        return ptr->get<Ty>();
-      }
-
-      template <typename Ty>
-      Ty & get_resource(const std::string &task_key, const std::string &rsrc_key) {
-        met_trace();
-        auto ptr = get_rsrc_impl(GetRsrcInfo { .task_key = task_key, .rsrc_key = rsrc_key });
-        debug::check_expr_rel(ptr, fmt::format("get_resource failed for {}, {}", task_key, rsrc_key));
-        return ptr->get<Ty>();
-      }
-      
-      bool has_resource(const std::string &task_key, const std::string &rsrc_key) {
-        met_trace();
-        return get_rsrc_impl(GetRsrcInfo { .task_key = task_key, .rsrc_key = rsrc_key }) != nullptr;
+        return get_rsrc_impl({ .task_key = task_key, .rsrc_key = rsrc_key }) != nullptr;
       }
 
     public: /* Miscellaneous functions */
@@ -230,10 +189,15 @@ namespace met {
   struct SchedulerBase : public detail::SchedulerBase {
   protected:
     virtual const std::string &task_default_key() const { return global_key; }
+    virtual void run_clear_state_impl() = 0; // Used internally; set all resources to 'unmodified'
+    virtual void run_schedule_impl()    = 0; // Used internally; run all tasks in order
 
   public:
     // Run the currently built schedule
-    virtual void run() = 0;
+    void run() {
+      run_clear_state_impl();
+      run_schedule_impl();
+    };
   };
 
   // Virtual base class for scheduler handle, passed to task nodes
@@ -245,46 +209,78 @@ namespace met {
     // Get key of the current active task
     virtual const std::string &task_key() const = 0;
 
-  public: /* Add/remove/get subtask functions */
+  public: /* Add/remove/get local subtask functions */
     template <typename Ty, typename... Args>
     void emplace_subtask(const std::string &key, Args... args) {
       static_assert(std::is_base_of_v<detail::TaskBase, Ty>);
       met_trace();
-      add_task_impl(AddTaskInfo { .prnt_key = task_default_key(),
-                                  .task_key = key,
-                                  .task     = std::make_shared<Ty>(args...)});
+      add_task_impl({ .prnt_key = task_default_key(), .task_key = key, .ptr = std::make_shared<Ty>(args...) });
     }
 
     template <typename Ty>
     void insert_subtask(const std::string &key, Ty &&task) {
       static_assert(std::is_base_of_v<detail::TaskBase, Ty>);
       met_trace();
-      add_task_impl(AddTaskInfo { .prnt_key = task_default_key(),
-                                  .task_key = key,
-                                  .task = std::make_shared<Ty>(std::move(task)) });
+      add_task_impl({ .prnt_key = task_default_key(), .task_key = key, .ptr = std::make_shared<Ty>(std::move(task)) });
     }
 
     void remove_subtask(const std::string &key) {
       met_trace();
-      rem_task_impl(RemTaskInfo { .prnt_key = task_default_key(), .task_key = key });
+      rem_task_impl({ .prnt_key = task_default_key(), .task_key = key });
     }
     
     template <typename Ty>
-    Ty & get_subtask(const std::string &key) {
+    const Ty & get_subtask(const std::string &key) const {
       met_trace();
-      auto ptr = get_task_impl(GetTaskInfo { .prnt_key = task_default_key(), .task_key = key });
+      const detail::TaskBase *ptr = get_task_impl({ .prnt_key = task_default_key(), .task_key = key });
       debug::check_expr_rel(ptr, fmt::format("get_task failed for {}.{}", task_default_key(), key));
       return *static_cast<Ty *>(ptr);
     };
     
-    bool has_subtask(const std::string &key) {
+    template <typename Ty>
+    Ty & get_subtask(const std::string &key) {
       met_trace();
-      return get_task_impl(GetTaskInfo { .prnt_key = task_default_key(), .task_key = key }) != nullptr;
+      detail::TaskBase *ptr = get_task_impl({ .prnt_key = task_default_key(), .task_key = key });
+      debug::check_expr_rel(ptr, fmt::format("get_task failed for {}.{}", task_default_key(), key));
+      return *static_cast<Ty *>(ptr);
+    };
+    
+    bool has_subtask(const std::string &key) const {
+      met_trace();
+      return get_task_impl({ .prnt_key = task_default_key(), .task_key = key }) != nullptr;
+    }
+
+  public: /* Add/remove/get local resource functions */
+    // Ensure parent method names are available
+    using detail::SchedulerBase::resource;
+    using detail::SchedulerBase::use_resource;
+    using detail::SchedulerBase::is_resource_modified;
+    using detail::SchedulerBase::has_resource;
+
+    template <typename Ty>
+    const Ty & resource(const std::string &key) const {
+      met_trace();
+      const detail::RsrcBase *ptr = get_rsrc_impl({ .task_key = task_default_key(), .rsrc_key = key });
+      debug::check_expr_rel(ptr, fmt::format("use_resource failed for {}, {}", task_default_key(), key));
+      return ptr->get<Ty>();
+    }
+
+    template <typename Ty>
+    Ty & use_resource(const std::string &key) {
+      met_trace();
+      detail::RsrcBase *ptr = get_rsrc_impl({ .task_key = task_default_key(), .rsrc_key = key });
+      debug::check_expr_rel(ptr, fmt::format("use_resource failed for {}, {}", task_default_key(), key));
+      return ptr->get<Ty>();
+    }
+
+    bool is_resource_modified(const std::string &key) const {
+      met_trace();
+      return get_rsrc_impl({ .task_key = task_default_key(), .rsrc_key = key })->is_modified();
     }
     
-    bool has_subtask_global(const std::string &prnt, const std::string &key) {
+    bool has_resource(const std::string &key) const {
       met_trace();
-      return get_task_impl(GetTaskInfo { .prnt_key = prnt, .task_key = key }) != nullptr;
+      return get_rsrc_impl({ .task_key = task_default_key(), .rsrc_key = key }) != nullptr;
     }
   };
 } // namespace met::detail

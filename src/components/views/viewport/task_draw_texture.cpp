@@ -14,8 +14,8 @@ namespace met {
   void ViewportDrawTextureTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources
-    auto &e_texture_data   = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    // Get external resources
+    const auto &e_texture_data = info.resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv_opt", .is_spirv_binary = true },
@@ -35,10 +35,10 @@ namespace met {
   void ViewportDrawTextureTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources 
-    auto &e_arcball     = info.get_resource<detail::Arcball>("viewport.input", "arcball");
-    auto &e_pack_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "pack_buffer");
-    auto &e_err_buffer  = info.get_resource<gl::Buffer>("error_viewer", "colr_buffer");
+    // Get external resources 
+    const auto &e_arcball     = info.resource<detail::Arcball>("viewport.input", "arcball");
+    const auto &e_pack_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "pack_buffer");
+    const auto &e_err_buffer  = info.resource<gl::Buffer>("error_viewer", "colr_buffer");
 
     // Declare scoped OpenGL state
     gl::state::set_op(gl::CullOp::eBack);

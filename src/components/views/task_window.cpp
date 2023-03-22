@@ -30,7 +30,7 @@ namespace met {
     // Open a file picker
     if (fs::path path; detail::load_dialog(path, "json")) {
       // Initialize existing project
-      info.get_resource<ApplicationData>(global_key, "app_data").load(path);
+      info.use_resource<ApplicationData>(global_key, "app_data").load(path);
 
       // Clear OpenGL state
       gl::Program::unbind_all();
@@ -46,7 +46,7 @@ namespace met {
   bool WindowTask::handle_save(SchedulerHandle &info) {
     met_trace_full();
     
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_app_data = info.use_resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eNew) {
       return handle_save_as(info);
     } else {
@@ -59,7 +59,7 @@ namespace met {
     met_trace_full();
     
     if (fs::path path; detail::save_dialog(path, "json")) {
-      info.get_resource<ApplicationData>(global_key, "app_data").save(io::path_with_ext(path, ".json"));
+      info.use_resource<ApplicationData>(global_key, "app_data").save(io::path_with_ext(path, ".json"));
       return true;
     }
     return false;
@@ -70,11 +70,11 @@ namespace met {
 
     if (fs::path path; detail::save_dialog(path, "met")) {
       // Get shared resources
-      auto &e_app_data    = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_prj_data    = e_app_data.project_data;
-      auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
-      auto &e_spectra     = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
-      auto &e_delaunay    = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+      const auto &e_app_data    = info.resource<ApplicationData>(global_key, "app_data");
+      const auto &e_prj_data    = e_app_data.project_data;
+      const auto &e_bary_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
+      const auto &e_spectra     = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+      const auto &e_delaunay    = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 
@@ -153,7 +153,7 @@ namespace met {
   void WindowTask::handle_close_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    const auto &e_app_data = info.resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eUnsaved 
      || e_app_data.project_save == SaveFlag::eNew) {
       m_open_close_modal = true;
@@ -170,7 +170,7 @@ namespace met {
     gl::Program::unbind_all();
 
     // Empty application data as project is closed
-    info.get_resource<ApplicationData>(global_key, "app_data").unload();
+    info.use_resource<ApplicationData>(global_key, "app_data").unload();
     
     // Signal schedule re-creation and submit empty schedule for main view
     submit_schedule_empty(info);
@@ -179,7 +179,7 @@ namespace met {
   void WindowTask::handle_exit_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+    const auto &e_app_data = info.resource<ApplicationData>(global_key, "app_data");
     if (e_app_data.project_save == SaveFlag::eUnsaved 
      || e_app_data.project_save == SaveFlag::eNew) {
       m_open_exit_modal = true;
@@ -194,10 +194,10 @@ namespace met {
     ImGui::CloseAnyPopupIfOpen();
 
     // Empty application data as project is closed
-    info.get_resource<ApplicationData>(global_key, "app_data").unload();
+    info.use_resource<ApplicationData>(global_key, "app_data").unload();
 
     // Signal to window that it should close itself
-    info.get_resource<gl::Window>(global_key, "window").set_should_close();
+    info.use_resource<gl::Window>(global_key, "window").set_should_close();
     
     // Signal scheduler end
     info.clear();
@@ -217,7 +217,7 @@ namespace met {
       /* File menu follows */
       
       if (ImGui::BeginMenu("File")) {
-        auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+        const auto &e_app_data = info.resource<ApplicationData>(global_key, "app_data");
         const bool is_loaded   = e_app_data.project_save != SaveFlag::eUnloaded;
         const bool enable_save = e_app_data.project_save != SaveFlag::eSaved 
           && e_app_data.project_save != SaveFlag::eNew && is_loaded;
@@ -251,7 +251,7 @@ namespace met {
       /* Edit menu follows */
 
       if (ImGui::BeginMenu("Edit")) {
-        auto &e_app_data = info.get_resource<ApplicationData>(global_key, "app_data");
+        auto &e_app_data = info.use_resource<ApplicationData>(global_key, "app_data");
         const bool is_undo = e_app_data.mod_i >= 0;
         const bool is_redo = e_app_data.mod_i < int(e_app_data.mods.size()) - 1;
         if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_app_data.undo(); }

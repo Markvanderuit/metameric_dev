@@ -30,11 +30,13 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
     
-      // Get shared resources 
-      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
-      auto &e_srgb_target     = info.get_resource<gl::Texture2d4f>("viewport.begin", "srgb_target");
-      auto &e_frame_buffer    = info.get_resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer");
-      auto &e_frame_buffer_ms = info.get_resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer_msaa");
+      // Get external resources 
+      const auto &e_frame_buffer_ms = info.resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer_msaa");
+
+      // Get modified resources 
+      auto &e_lrgb_target  = info.use_resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
+      auto &e_srgb_target  = info.use_resource<gl::Texture2d4f>("viewport.begin", "srgb_target");
+      auto &e_frame_buffer = info.use_resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer");
 
       // Blit color results into the single-sampled framebuffer with attached target draw_texture
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer);

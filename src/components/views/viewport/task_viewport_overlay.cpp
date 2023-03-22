@@ -61,14 +61,16 @@ namespace met {
   void ViewportOverlayTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Adjust tooltip settings based on current selection
-    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
-    auto &e_window     = info.get_resource<gl::Window>(global_key, "window");
-    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_verts      = e_proj_data.vertices;
+    // Get external resources
+    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
+    const auto &e_window     = info.resource<gl::Window>(global_key, "window");
+    const auto &e_vert_slct  = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data  = e_appl_data.project_data;
+    const auto &e_verts      = e_proj_data.vertices;
+
+    // Get modified resources
+    auto &i_cstr_slct  = info.use_resource<int>("constr_selection");
 
     // Only spawn any tooltips on non-empty gamut selection; only allow constraint selection
     // on a single vertex
@@ -161,13 +163,15 @@ namespace met {
     met_trace_full();
     ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
-    // Get shared resources
-    auto &e_vert_slct  = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &i_cstr_slct  = info.get_resource<int>("constr_selection");
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data  = e_appl_data.project_data;
-    auto &e_vert       = e_proj_data.vertices[i];
-    auto &e_spec       = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[i];
+    // Get external resources
+    const auto &e_spec = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[i];
+
+    // Get modified resources
+    auto &e_appl_data = info.use_resource<ApplicationData>(global_key, "app_data");
+    auto &e_proj_data = e_appl_data.project_data;
+    auto &e_vert      = e_proj_data.vertices[i];
+    auto &e_vert_slct = info.use_resource<std::vector<uint>>("viewport.input.vert", "selection");
+    auto &i_cstr_slct = info.use_resource<int>("constr_selection");
 
     // Local state
     float mapp_width, edit3_width;
@@ -179,7 +183,6 @@ namespace met {
       }
       ImGui::Separator();
     }
-  
 
     // Plot vertex settings for primary color
     {
@@ -428,16 +431,18 @@ namespace met {
   void ViewportOverlayTask::eval_overlay_color_solid(SchedulerHandle &info) {
     met_trace_full();
         
-    // Get shared resources
-    auto &e_vert_slct   = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &i_cstr_slct   = info.get_resource<int>("constr_selection");
-    auto &i_arcball     = info.get_resource<detail::Arcball>("arcball");
-    auto &i_lrgb_target = info.get_resource<gl::Texture2d4f>("lrgb_color_solid_target");
-    auto &i_srgb_target = info.get_resource<gl::Texture2d4f>("srgb_color_solid_target");
-    auto &e_csol_cntr   = info.get_resource<Colr>("gen_color_solids", "csol_cntr");
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    // Get external resources
+    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_csol_cntr = info.resource<Colr>("gen_color_solids", "csol_cntr");
+
+    // Get mnodified resources
+    auto &e_appl_data   = info.use_resource<ApplicationData>(global_key, "app_data");
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_vert        = e_appl_data.project_data.vertices[e_vert_slct[0]];
+    auto &i_cstr_slct   = info.use_resource<int>("constr_selection");
+    auto &i_arcball     = info.use_resource<detail::Arcball>("arcball");
+    auto &i_lrgb_target = info.use_resource<gl::Texture2d4f>("lrgb_color_solid_target");
+    auto &i_srgb_target = info.use_resource<gl::Texture2d4f>("srgb_color_solid_target");
 
     // Only continue if at least one secondary color constriant is present
     guard(!e_vert.colr_j.empty());
@@ -547,14 +552,16 @@ namespace met {
   void ViewportOverlayTask::eval_overlay_plot(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources
-    auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
-    auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data = e_appl_data.project_data;
-    auto &i_cstr_slct = info.get_resource<int>("constr_selection");
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &e_vert        = e_appl_data.project_data.vertices;
-    auto &e_spec      = info.get_resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+    // Get external resources
+    const auto &e_window    = info.resource<gl::Window>(global_key, "window");
+    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_spec      = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data = e_appl_data.project_data;
+    const auto &e_vert      = e_appl_data.project_data.vertices;
+
+    // Get modified resources
+    auto &i_cstr_slct = info.use_resource<int>("constr_selection");
 
     const ImVec2 refl_size = { -1.f, overlay_plot_height * e_window.content_scale() };
     const auto   refl_flag = ImPlotFlags_NoInputs | ImPlotFlags_NoFrame;

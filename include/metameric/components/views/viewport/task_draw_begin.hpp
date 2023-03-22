@@ -28,11 +28,13 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
     
-      // Get shared resources 
-      auto &e_appl_data       = info.get_resource<ApplicationData>(global_key, "app_data");
-      auto &e_lrgb_target     = info.get_resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
-      auto &i_frame_buffer    = info.get_resource<gl::Framebuffer>("frame_buffer");
-      auto &i_frame_buffer_ms = info.get_resource<gl::Framebuffer>("frame_buffer_msaa");
+      // Get external resources 
+      const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+      const auto &e_lrgb_target = info.resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
+
+      // Get modified resources 
+      auto &i_frame_buffer    = info.use_resource<gl::Framebuffer>("frame_buffer");
+      auto &i_frame_buffer_ms = info.use_resource<gl::Framebuffer>("frame_buffer_msaa");
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
       if (!i_frame_buffer.is_init() || (e_lrgb_target.size() != m_color_buffer_ms.size()).any()) {

@@ -24,8 +24,8 @@ namespace met {
   void DrawColorSolidTask::init(SchedulerHandle &info) { 
     met_trace_full();
 
-    // Get shared resources
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    // Get external resources
+    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
 
     // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
     auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
@@ -96,20 +96,22 @@ namespace met {
   
     // Verify that vertex and constraint are selected before continuing, as this draw operation
     // is otherwise not even visible
-    auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-    auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
+    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
     guard(e_vert_slct.size() == 1 && e_cstr_slct != -1);
 
-    // Get shared resources
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
-    auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_vert        = e_proj_data.vertices[e_vert_slct[0]];
-    auto &e_pipe_state  = info.get_resource<ProjectState>("state", "pipeline_state");
-    auto &e_view_state  = info.get_resource<ViewportState>("state", "viewport_state");
-    auto &e_lrgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
-    auto &e_srgb_target = info.get_resource<gl::Texture2d4f>(m_parent, "srgb_color_solid_target");
-    auto &e_arcball     = info.get_resource<detail::Arcball>(m_parent, "arcball");
-    auto &e_csol_cntr   = info.get_resource<Colr>("gen_color_solids", "csol_cntr");
+    // Get external resources
+    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_vert        = e_proj_data.vertices[e_vert_slct[0]];
+    const auto &e_pipe_state  = info.resource<ProjectState>("state", "pipeline_state");
+    const auto &e_view_state  = info.resource<ViewportState>("state", "viewport_state");
+    const auto &e_arcball     = info.resource<detail::Arcball>(m_parent, "arcball");
+    const auto &e_csol_cntr   = info.resource<Colr>("gen_color_solids", "csol_cntr");
+
+    // Get modified resources
+    auto &e_lrgb_target = info.use_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
+    auto &e_srgb_target = info.use_resource<gl::Texture2d4f>(m_parent, "srgb_color_solid_target");
 
     // (Re-)create framebuffers. Multisampled framebuffer uses multisampled renderbuffers as 
     // attachments, while the non-multisampled framebuffer targets the lrgb texture for output;
@@ -134,7 +136,7 @@ namespace met {
     bool recreate_chull = e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
     if (recreate_chull) {
       // Get color solid data, if available
-      auto &e_csol_data = info.get_resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");
+      const auto &e_csol_data = info.resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");
       guard(!e_csol_data.empty());
 
       // Generate convex hull mesh and convert to buffer format
@@ -145,12 +147,6 @@ namespace met {
       m_chull_elems.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
       m_chull_dispatch.vertex_count = elems.size() * 3;
       m_point_dispatch.vertex_count = verts.size();
-
-      // fmt::print("{}\n", e_csol_data.size());
-      // fmt::print("a = {}, {}, {}, {}\n", e_csol_data[8], e_csol_data[16], e_csol_data[32], e_csol_data[48]);
-      // fmt::print("a = {}, {}, {}, {}\n", elems[8], elems[16], elems[32], elems[48]);
-      // fmt::print("a = {}, {}, {}, {}\n", e_csol_data[8], e_csol_data[16], e_csol_data[32], e_csol_data[48]);
-      // fmt::print("b = {}, {}, {}, {}\n", verts[8], verts[16], verts[32], verts[48]);
     }
 
     eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark

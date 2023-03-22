@@ -41,13 +41,13 @@ namespace met {
                       
       // Get shared resources
       auto &io          = ImGui::GetIO();
-      auto &e_window    = info.get_resource<gl::Window>(global_key, "window");
-      auto &i_arcball   = info.get_resource<detail::Arcball>("arcball");
-      auto &e_vert_slct = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
-      auto &e_cstr_slct = info.get_resource<int>("viewport.overlay", "constr_selection");
-      auto &e_appl_data = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_window    = info.use_resource<gl::Window>(global_key, "window");
+      auto &i_arcball   = info.use_resource<detail::Arcball>("arcball");
+      auto &e_vert_slct = info.use_resource<std::vector<uint>>("viewport.input.vert", "selection");
+      auto &e_cstr_slct = info.use_resource<int>("viewport.overlay", "constr_selection");
+      auto &e_appl_data = info.use_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_appl_data.project_data;
-      auto &e_delaunay  = info.get_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+      auto &e_delaunay  = info.use_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 

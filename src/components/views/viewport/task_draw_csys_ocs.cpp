@@ -15,7 +15,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_csys_ocs_mesh = info.get_resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
+    const auto &e_csys_ocs_mesh = info.resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
     auto [verts, elems] = convert_mesh<AlignedMeshData>(e_csys_ocs_mesh);
 
     // Setup array object and corresponding buffers for mesh data
@@ -59,15 +59,17 @@ namespace met {
     met_trace_full();
 
     // Get state objects
-    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    auto &e_view_state = info.get_resource<ViewportState>("state", "viewport_state");
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
 
     // Experimental clamping code
     if (e_pipe_state.any_verts) {
-      // Get shared resources
-      auto &e_chull_mesh = info.get_resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
-      auto &e_chull_cntr = info.get_resource<Colr>("gen_color_solids", "csys_ocs_cntr");
-      auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+      // Get external resources
+      const auto &e_chull_mesh = info.resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
+      const auto &e_chull_cntr = info.resource<Colr>("gen_color_solids", "csys_ocs_cntr");
+
+      // Get modified resources
+      auto &e_appl_data  = info.use_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data  = e_appl_data.project_data;
       
       #pragma omp parallel for
@@ -103,7 +105,7 @@ namespace met {
     
     // Update varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      auto &e_arcball = info.get_resource<detail::Arcball>("viewport.input", "arcball");
+      auto &e_arcball = info.use_resource<detail::Arcball>("viewport.input", "arcball");
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
     }
 

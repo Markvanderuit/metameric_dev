@@ -1,23 +1,16 @@
-// Metameric includes
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
-
-// Miscellaneous tasks
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
 #include <metameric/components/misc/task_state.hpp>
-
-// Pipeline tasks
 #include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/pipeline/task_gen_color_solids.hpp>
-
-// View tasks
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/task_weight_viewer.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
@@ -25,8 +18,6 @@
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-
-// STL
 #include <ranges>
 
 namespace met {
@@ -45,7 +36,18 @@ namespace met {
           // Indent dependent on how much of a subtask something is
           for (uint i = 0; i < count; ++i) ImGui::Indent(16.f);
 
-          if (!resource_map.contains(task_key)) {
+          if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+            if (ImGui::IsItemHovered() && resource_map.contains(task_key)) {
+              ImGui::BeginTooltip();
+              for (const auto &[key, _] : resource_map.at(task_key)) {
+                ImGui::Text(key.c_str());
+              }
+              ImGui::EndTooltip();
+            }
+            ImGui::TreePop();
+          }
+
+          /* if (!resource_map.contains(task_key)) {
             if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Bullet))
               ImGui::TreePop();
           } else {
@@ -56,7 +58,7 @@ namespace met {
               }
               ImGui::TreePop();
             }
-          }
+          } */
 
           // Unindent dependent on how much of a subtask something is
           for (uint i = 0; i < count; ++i) ImGui::Unindent(16.f);
@@ -73,7 +75,7 @@ namespace met {
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        auto &pca = info.get_resource<ApplicationData>(global_key, "app_data").loaded_basis;
+        auto &pca = info.use_resource<ApplicationData>(global_key, "app_data").loaded_basis;
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);

@@ -49,7 +49,7 @@ namespace met {
     }
 
     void init_schedule(LinearScheduler &scheduler) {
-      auto &app_data = scheduler.get_resource<ApplicationData>(global_key, "app_data");
+      auto &app_data = scheduler.use_resource<ApplicationData>(global_key, "app_data");
       if (app_data.project_save == SaveFlag::eSaved) {
         submit_schedule_main(scheduler);
       } else {
