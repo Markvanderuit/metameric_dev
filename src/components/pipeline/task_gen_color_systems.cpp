@@ -23,24 +23,24 @@ namespace met {
 
     // Specify a default buffer that can hold a default nr. of mappings
     m_max_maps = default_nr_maps;
-    info.emplace_resource<gl::Buffer>("mapp_buffer", { .size = m_max_maps * sizeof(ColrSystem), .flags = buffer_flags });
+    info.resource("mapp_buffer").init<gl::Buffer>({ .size = m_max_maps * sizeof(ColrSystem), .flags = buffer_flags });
   }
   
   bool GenColorSystemsTask::eval_state(SchedulerHandle &info) {
     met_trace_full();
-    return info.resource<ProjectState>("state", "pipeline_state").any_csys;
+    return info.resource("state", "pipeline_state").read_only<ProjectState>().any_csys;
   }
 
   void GenColorSystemsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_buffer = info.use_resource<gl::Buffer>("mapp_buffer");
+    auto &i_buffer = info.resource("mapp_buffer").writeable<gl::Buffer>();
     
     if (e_proj_data.color_systems.size() > m_max_maps) {
       // If the maximum allowed nr. of mappings is exceeded, re-allocate with room to spare

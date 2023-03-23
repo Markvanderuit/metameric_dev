@@ -44,13 +44,13 @@ namespace met {
     met_trace_full();
 
     // Share resources
-    info.emplace_resource<int>("constr_selection", -1);
-    info.emplace_resource<gl::Texture2d4f>("lrgb_color_solid_target", { .size = 1 });
-    info.emplace_resource<gl::Texture2d4f>("srgb_color_solid_target", { .size = 1 });
-    info.emplace_resource<detail::Arcball>("arcball", { .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
+    info.resource("constr_selection").set(-1);
+    info.resource("lrgb_color_solid_target").init<gl::Texture2d4f>({ .size = 1 });
+    info.resource("srgb_color_solid_target").init<gl::Texture2d4f>({ .size = 1 });
+    info.resource("arcball").init<detail::Arcball>({ .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
-    info.emplace_subtask<DrawColorSolidTask>("draw_color_solid", info.task_key());
+    info.subtask("draw_color_solid").init<DrawColorSolidTask>(info.task_key());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -62,11 +62,11 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
-    const auto &e_window     = info.resource<gl::Window>(global_key, "window");
-    const auto &e_vert_slct  = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &i_cstr_slct  = info.resource<int>("constr_selection");
-    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_window     = info.resource(global_key, "window").read_only<gl::Window>();
+    const auto &e_vert_slct  = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &i_cstr_slct  = info.resource("constr_selection").read_only<int>();
+    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_verts      = e_proj_data.vertices;
 
@@ -74,7 +74,7 @@ namespace met {
     // on a single vertex
     guard(!e_vert_slct.empty());
     if (e_vert_slct.size() > 1)
-      info.use_resource<int>("constr_selection") = -1;
+      info.resource("constr_selection").writeable<int>() = -1;
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -128,7 +128,7 @@ namespace met {
 
       // Window was closed, deselect constraint
       if (!window_open)
-        info.use_resource<int>("constr_selection") = -1;
+        info.resource("constr_selection").writeable<int>() = -1;
         
       // Capture window size to offset next window by this amount
       view_size = static_cast<eig::Array2f>(ImGui::GetWindowSize());  
@@ -162,12 +162,12 @@ namespace met {
     ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
     // Get external resources
-    const auto &e_spec      = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[i];
-    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &i_cstr_slct = info.resource<int>("constr_selection");
+    const auto &e_spec      = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>()[i];
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &i_cstr_slct = info.resource("constr_selection").read_only<int>();
 
     // Get modified resources
-    auto &e_appl_data = info.use_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data = info.resource(global_key, "app_data").writeable<ApplicationData>();
     auto &e_proj_data = e_appl_data.project_data;
     auto &e_vert      = e_proj_data.vertices[i];
 
@@ -177,7 +177,7 @@ namespace met {
     // Add "focus" button to identify a specific vertex
     if (e_vert_slct.size() > 1) {
       if (ImGui::Button("Focus selection")) {
-        info.use_resource<std::vector<uint>>("viewport.input.vert", "selection") = { i };
+        info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>() = { i };
       }
       ImGui::Separator();
     }
@@ -347,8 +347,8 @@ namespace met {
         ImGui::PushID(j);
         bool is_editing = i_cstr_slct == j && e_vert_slct[0] == i;
         if (ImGui::Button(is_editing ? "Editing" : "Edit")) {
-          info.use_resource<int>("constr_selection") = j;
-          info.use_resource<std::vector<uint>>("viewport.input.vert", "selection") = { i };
+          info.resource("constr_selection").writeable<int>() = j;
+          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>() = { i };
         }
         ImGui::PopID();
       }
@@ -401,7 +401,7 @@ namespace met {
           }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.vertices[i] = edit; }});
 
           // Sanitize selected constraint in case this was deleted
-          info.use_resource<int>("constr_selection") = std::min(i_cstr_slct, static_cast<int>(e_vert.colr_j.size() - 1));
+          info.resource("constr_selection").writeable<int>() = std::min(i_cstr_slct, static_cast<int>(e_vert.colr_j.size() - 1));
         }
 
         ImGui::PopID();
@@ -418,7 +418,7 @@ namespace met {
 
       // Set displayed constraint in viewport to this constraint, iff a constraint was selected
       if (i_cstr_slct != -1)
-        info.use_resource<int>("constr_selection") = e_vert.colr_j.size() - 1;
+        info.resource("constr_selection").writeable<int>() = e_vert.colr_j.size() - 1;
     }
 
     ImGui::PopID(); // i
@@ -428,24 +428,24 @@ namespace met {
     met_trace_full();
         
     // Get external resources
-    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &e_csol_cntr = info.resource<Colr>("gen_color_solids", "csol_cntr");
-    const auto &i_cstr_slct = info.resource<int>("constr_selection");
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_csol_cntr = info.resource("gen_color_solids", "csol_cntr").read_only<Colr>();
+    const auto &i_cstr_slct = info.resource("constr_selection").read_only<int>();
 
     // Get mnodified resources
-    auto &e_appl_data   = info.use_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data   = info.resource(global_key, "app_data").writeable<ApplicationData>();
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_vert        = e_appl_data.project_data.vertices[e_vert_slct[0]];
-    auto &i_arcball     = info.use_resource<detail::Arcball>("arcball");
-    auto &i_lrgb_target = info.use_resource<gl::Texture2d4f>("lrgb_color_solid_target");
-    auto &i_srgb_target = info.use_resource<gl::Texture2d4f>("srgb_color_solid_target");
+    auto &i_arcball     = info.resource("arcball").writeable<detail::Arcball>();
+    auto &i_lrgb_target = info.resource("lrgb_color_solid_target").writeable<gl::Texture2d4f>();
+    auto &i_srgb_target = info.resource("srgb_color_solid_target").writeable<gl::Texture2d4f>();
 
     // Only continue if at least one secondary color constriant is present
     guard(!e_vert.colr_j.empty());
     
     // Ensure constraint selection is viable, in case a constraint was deleted
     if (i_cstr_slct >= e_vert.colr_j.size())
-      info.use_resource<int>("constr_selection") = e_vert.colr_j.size() - 1;
+      info.resource("constr_selection").writeable<int>() = e_vert.colr_j.size() - 1;
 
     // Compute viewport size minus ImGui's tab bars etc
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -549,10 +549,10 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_window    = info.resource<gl::Window>(global_key, "window");
-    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &e_spec      = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_window    = info.resource(global_key, "window").read_only<gl::Window>();
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_spec      = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices;
 

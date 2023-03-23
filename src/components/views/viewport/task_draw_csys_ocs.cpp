@@ -15,7 +15,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_csys_ocs_mesh = info.resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
+    const auto &e_csys_ocs_mesh = info.resource("gen_color_solids", "csys_ocs_mesh").read_only<HalfedgeMeshData>();
     auto [verts, elems] = convert_mesh<AlignedMeshData>(e_csys_ocs_mesh);
 
     // Setup array object and corresponding buffers for mesh data
@@ -59,17 +59,17 @@ namespace met {
     met_trace_full();
 
     // Get state objects
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
+    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
 
     // Experimental clamping code
     if (e_pipe_state.any_verts) {
       // Get external resources
-      const auto &e_chull_mesh = info.resource<HalfedgeMeshData>("gen_color_solids", "csys_ocs_mesh");
-      const auto &e_chull_cntr = info.resource<Colr>("gen_color_solids", "csys_ocs_cntr");
+      const auto &e_chull_mesh = info.resource("gen_color_solids", "csys_ocs_mesh").read_only<HalfedgeMeshData>();
+      const auto &e_chull_cntr = info.resource("gen_color_solids", "csys_ocs_cntr").read_only<Colr>();
 
       // Get modified resources
-      auto &e_appl_data  = info.use_resource<ApplicationData>(global_key, "app_data");
+      auto &e_appl_data  = info.resource(global_key, "app_data").writeable<ApplicationData>();
       auto &e_proj_data  = e_appl_data.project_data;
       
       #pragma omp parallel for
@@ -105,7 +105,7 @@ namespace met {
     
     // Update varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      auto &e_arcball = info.use_resource<detail::Arcball>("viewport.input", "arcball");
+      auto &e_arcball = info.resource("viewport.input", "arcball").writeable<detail::Arcball>();
       m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
     }
 

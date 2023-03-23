@@ -21,20 +21,20 @@ namespace met {
       met_trace_full();
     
       // Share uninitialized framebuffer objects; initialized during eval()
-      info.insert_resource("frame_buffer", gl::Framebuffer());
-      info.insert_resource("frame_buffer_msaa", gl::Framebuffer());
+      info.resource("frame_buffer").set<gl::Framebuffer>({ });
+      info.resource("frame_buffer_msaa").set<gl::Framebuffer>({ });
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
     
       // Get external resources 
-      const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
-      const auto &e_lrgb_target = info.resource<gl::Texture2d4f>("viewport.begin", "lrgb_target");
+      const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+      const auto &e_lrgb_target = info.resource("viewport.begin", "lrgb_target").read_only<gl::Texture2d4f>();
 
       // Get modified resources 
-      auto &i_frame_buffer    = info.use_resource<gl::Framebuffer>("frame_buffer");
-      auto &i_frame_buffer_ms = info.use_resource<gl::Framebuffer>("frame_buffer_msaa");
+      auto &i_frame_buffer    = info.resource("frame_buffer").writeable<gl::Framebuffer>();
+      auto &i_frame_buffer_ms = info.resource("frame_buffer_msaa").writeable<gl::Framebuffer>();
 
       // (Re-)create framebuffers and renderbuffers if the viewport has resized
       if (!i_frame_buffer.is_init() || (e_lrgb_target.size() != m_color_buffer_ms.size()).any()) {

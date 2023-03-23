@@ -11,18 +11,16 @@ namespace met {
   public:
     void init(SchedulerHandle &info) override {
       met_trace_full();
-
-      // Share resources
-      info.emplace_resource<gl::Texture2d4f>("lrgb_target", { .size = 1 });
-      info.emplace_resource<gl::Texture2d4f>("srgb_target", { .size = 1 });
+      info.resource("lrgb_target").init<gl::Texture2d4f>({ .size = 1 });
+      info.resource("srgb_target").init<gl::Texture2d4f>({ .size = 1 });
     }
     
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
       // Get shared resources
-      auto &i_lrgb_target = info.use_resource<gl::Texture2d4f>("lrgb_target");
-      auto &i_srgb_target = info.use_resource<gl::Texture2d4f>("srgb_target");
+      auto &i_lrgb_target = info.resource("lrgb_target").writeable<gl::Texture2d4f>();
+      auto &i_srgb_target = info.resource("srgb_target").writeable<gl::Texture2d4f>();
 
       // Declare scoped ImGui style state
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 

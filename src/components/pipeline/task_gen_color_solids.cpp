@@ -105,13 +105,13 @@ namespace met {
     met_trace_full();
 
     // Ger shared resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
     for (uint i = 1; i <= n_constraints; ++i) {
       const uint dims = 3 + 3 * i;
-      info.insert_resource(fmt::format("samples_{}", i), detail::gen_unit_dirs_x(n_samples_mmv, dims));
+      info.resource(fmt::format("samples_{}", i)).set(detail::gen_unit_dirs_x(n_samples_mmv, dims));
     }
 
     // Register resources to hold convex hull data for a primary color system OCS
@@ -128,14 +128,14 @@ namespace met {
       csys_ocs_mesh.points(), csys_ocs_mesh.points() + csys_ocs_mesh.n_vertices(),
       omesh::Vec3f(0.f), f_add) / static_cast<float>(csys_ocs_mesh.n_vertices());
     
-    info.insert_resource("csys_ocs_data", std::move(csys_ocs));
-    info.insert_resource("csys_ocs_mesh", std::move(csys_ocs_mesh));
-    info.insert_resource("csys_ocs_cntr", to_eig<float, 3>(csys_ocs_cntr));
+    info.resource("csys_ocs_data").set(std::move(csys_ocs));
+    info.resource("csys_ocs_mesh").set(std::move(csys_ocs_mesh));
+    info.resource("csys_ocs_cntr").set(to_eig<float, 3>(csys_ocs_cntr));
 
     // Register resources to hold convex hull data for a metamer mismatch volume OCS
-    info.insert_resource("csol_data", std::vector<Colr>());
-    info.insert_resource("csol_data_al", std::vector<AlColr>());
-    info.insert_resource("csol_cntr", Colr(0.f));
+    info.resource("csol_data"   ).set(std::vector<Colr>());
+    info.resource("csol_data_al").set(std::vector<AlColr>());
+    info.resource("csol_cntr"   ).set(Colr(0.f));
   }
 
   bool GenColorSolidsTask::eval_state(SchedulerHandle &info) {
@@ -145,14 +145,14 @@ namespace met {
     //       info.is_resource_modified("viewport.input.vert", "selection"), false);
     // fmt::print("changed selection\n");
 
-    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
-    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
 
     guard(e_cstr_slct != -1 && !e_vert_slct.empty(), false);
     fmt::print("visible selection\n");
 
-    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
     
     return e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection;
   }
@@ -161,17 +161,17 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
-    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &e_vert_sd   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[e_vert_slct[0]];
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_vert_sd   = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>()[e_vert_slct[0]];
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices[e_vert_slct[0]];
 
     // Get modified resources
-    auto &i_csol_data    = info.use_resource<std::vector<Colr>>("csol_data");
-    auto &i_csol_data_al = info.use_resource<std::vector<AlColr>>("csol_data_al");
-    auto &i_csol_cntr    = info.use_resource<Colr>("csol_cntr");
+    auto &i_csol_data    = info.resource("csol_data").writeable<std::vector<Colr>>();
+    auto &i_csol_data_al = info.resource("csol_data_al").writeable<std::vector<AlColr>>();
+    auto &i_csol_cntr    = info.resource("csol_cntr").writeable<Colr>();
 
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
@@ -186,7 +186,7 @@ namespace met {
     CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
-    const auto &i_samples = info.resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
+    const auto &i_samples = info.resource(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
 
     // Generate points on metamer set boundary; store in aligned format
     i_csol_data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 

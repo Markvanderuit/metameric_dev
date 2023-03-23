@@ -22,7 +22,7 @@
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
-    scheduler.emplace_task<LambdaTask>("schedule_view", [&](auto &info) {
+    scheduler.task("schedule_view").init<LambdaTask>([&](auto &info) {
       // Temporary window to show runtime schedule
       if (ImGui::Begin("Schedule debug")) {
         const auto &resource_map = info.resources();
@@ -47,19 +47,6 @@ namespace met {
             ImGui::TreePop();
           }
 
-          /* if (!resource_map.contains(task_key)) {
-            if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Bullet))
-              ImGui::TreePop();
-          } else {
-            if (ImGui::TreeNode(name.c_str())) {
-              for (const auto &[key, _] : resource_map.at(task_key)) {
-                if (ImGui::TreeNodeEx(fmt::format("Resource: {}", key).c_str(), ImGuiTreeNodeFlags_Leaf))
-                  ImGui::TreePop();
-              }
-              ImGui::TreePop();
-            }
-          } */
-
           // Unindent dependent on how much of a subtask something is
           for (uint i = 0; i < count; ++i) ImGui::Unindent(16.f);
         }
@@ -75,7 +62,7 @@ namespace met {
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        auto &pca = info.use_resource<ApplicationData>(global_key, "app_data").loaded_basis;
+        auto &pca = info.resource(global_key, "app_data").loaded_basis.writeable<ApplicationData>();
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
@@ -88,38 +75,36 @@ namespace met {
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
     scheduler.clear();
 
-    scheduler.emplace_task<FrameBeginTask>("frame_begin");
-    scheduler.emplace_task<StateTask>("state");
+    scheduler.task("frame_begin").init<FrameBeginTask>();
+    scheduler.task("state").init<StateTask>();
 
     // The following tasks define the color->spectrum uplifting pipeline and view data
-    scheduler.emplace_task<GenSpectralDataTask>("gen_spectral_data");            
-    scheduler.emplace_task<GenDelaunayWeightsTask>("gen_delaunay_weights");
-    scheduler.emplace_task<GenColorSolidsTask>("gen_color_solids");
-    scheduler.emplace_task<GenColorMappingsTask>("gen_color_mappings");
+    scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
+    scheduler.task("gen_delaunay_weights").init<GenDelaunayWeightsTask>();
+    scheduler.task("gen_color_solids").init<GenColorSolidsTask>();
+    scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
 
     // The following tasks define view components and windows
-    scheduler.emplace_task<WindowTask>("window");
-    scheduler.emplace_task<ViewportTask>("viewport");
-    scheduler.emplace_task<SpectraEditorTask>("spectra_editor");
-    scheduler.emplace_task<MappingsViewerTask>("mappings_viewer");
-    scheduler.emplace_task<ErrorViewerTask>("error_viewer");
-    scheduler.emplace_task<WeightViewerTask>("weight_viewer");
+    scheduler.task("window").init<WindowTask>();
+    scheduler.task("viewport").init<ViewportTask>();
+    scheduler.task("spectra_editor").init<SpectraEditorTask>();
+    scheduler.task("mappings_viewer").init<MappingsViewerTask>();
+    scheduler.task("error_viewer").init<ErrorViewerTask>();
+    scheduler.task("weight_viewer").init<WeightViewerTask>();
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);
 
-    scheduler.emplace_task<FrameEndTask>("frame_end", true);
+    scheduler.task("frame_end").init<FrameEndTask>();
 
     scheduler.build();
   }
   
   void submit_schedule_empty(detail::SchedulerBase &scheduler) {
     scheduler.clear();
-    
-    scheduler.emplace_task<FrameBeginTask>("frame_begin");
-    scheduler.emplace_task<WindowTask>("window");
-    scheduler.emplace_task<FrameEndTask>("frame_end", false);
-    
+    scheduler.task("frame_begin").init<FrameBeginTask>();
+    scheduler.task("window").init<WindowTask>();
+    scheduler.task("frame_end").init<FrameEndTask>();
     scheduler.build();
   }
 } // namespace met

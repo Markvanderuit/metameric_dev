@@ -30,7 +30,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_window = info.resource<gl::Window>(global_key, "window");
+    const auto &e_window = info.resource(global_key, "window").read_only<gl::Window>();
     
     if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       // Primary image and data sections are nested within headers
@@ -44,13 +44,13 @@ namespace met {
       if (m_proj_data.images.empty()) ImGui::BeginDisabled();
       if (ImGui::Button("Create") && create_project_safe(info)) { 
         ImGui::CloseAnyPopupIfOpen();
-        info.remove_task(info.task_key());
+        info.task(info.task_key()).dstr();
       }
       if (m_proj_data.images.empty()) ImGui::EndDisabled();
       ImGui::SameLine();      
       if (ImGui::Button("Cancel")) { 
         ImGui::CloseCurrentPopup();
-        info.remove_task(info.task_key());
+        info.task(info.task_key()).dstr();
       }
       
       // Define convex hull vertex slider
@@ -71,7 +71,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_window = info.resource<gl::Window>(global_key, "window");
+    const auto &e_window = info.resource(global_key, "window").read_only<gl::Window>();
 
     const float child_height = img_sec_height * e_window.content_scale();
     if (ImGui::BeginChild("##images_wrapper", { 2 * child_height, child_height }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
@@ -167,7 +167,7 @@ namespace met {
     ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
     // Get shared resources
-    const auto &e_window = info.resource<gl::Window>(global_key, "window");
+    const auto &e_window = info.resource(global_key, "window").read_only<gl::Window>();
     
     // Get wavelength values for x-axis in plots
     Spec x_values;
@@ -289,7 +289,7 @@ namespace met {
   }
 
   bool CreateProjectTask::create_project_safe(SchedulerHandle &info) {
-    const auto &e_app_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_app_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
     if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
@@ -303,7 +303,7 @@ namespace met {
 
   bool CreateProjectTask::create_project(SchedulerHandle &info) {
     // Create a new project
-    info.use_resource<ApplicationData>(global_key, "app_data").create(std::move(m_proj_data));
+    info.resource(global_key, "app_data").writeable<ApplicationData>().create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
     submit_schedule_main(info);

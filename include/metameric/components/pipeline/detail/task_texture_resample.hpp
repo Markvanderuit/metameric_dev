@@ -59,16 +59,15 @@ namespace met::detail {
       met_trace_full();
 
       // Run computation only if input exists and has been modified
-      return info.has_resource(m_info.input_key.first, m_info.input_key.second) && 
-             (m_is_resized || info.is_resource_modified(m_info.input_key.first, m_info.input_key.second));
+      return info.resource(m_info.input_key.first, m_info.input_key.second).is_mutated() || m_is_resized;
     }
     
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
       // Get shared resources
-      const auto &e_rsrc = info.resource<TextureType>(m_info.input_key.first, m_info.input_key.second);
-      auto &i_rsrc = info.use_resource<TextureType>(m_info.output_key);
+      const auto &e_rsrc = info.resource(m_info.input_key.first, m_info.input_key.second).read_only<TextureType>();
+      auto &i_rsrc       = info.resource(m_info.output_key).writeable<TextureType>();
 
       // Bind resources
       m_sampler.bind_to(0);
@@ -90,7 +89,7 @@ namespace met::detail {
       m_info.texture_info = texture_info;
 
       // Emplace texture resource using new info object; scheduler replaces pre-existing resource
-      info.emplace_resource<TextureType, TextureType::InfoType>(m_info.output_key, m_info.texture_info);
+      info.resource(m_info.output_key).init<TextureType, TextureType::InfoType>(m_info.texture_info);
 
       // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
       eig::Array2u dispatch_n    = m_info.texture_info.size;

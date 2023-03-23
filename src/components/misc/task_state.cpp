@@ -83,24 +83,24 @@ namespace met {
   
   void StateTask::init(SchedulerHandle &info) {
     met_trace();
-    info.insert_resource<ProjectState>("pipeline_state",  { });
-    info.insert_resource<ViewportState>("viewport_state", { });
+    info.resource("pipeline_state").set<ProjectState>({ });
+    info.resource("viewport_state").set<ViewportState>({ });
   }
 
   void StateTask::eval(SchedulerHandle &info) {
     met_trace();
 
     // Get external resources
-    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
-    const auto &e_arcball    = info.resource<detail::Arcball>("viewport.input", "arcball");
-    const auto &e_vert_selct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &e_vert_mover = info.resource<std::vector<uint>>("viewport.input.vert", "mouseover");
-    const auto &e_cstr_selct = info.resource<int>("viewport.overlay", "constr_selection");
+    const auto &e_arcball    = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
+    const auto &e_vert_selct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_vert_mover = info.resource("viewport.input.vert", "mouseover").read_only<std::vector<uint>>();
+    const auto &e_cstr_selct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
 
     // Get modified resources
-    auto &i_view_state = info.use_resource<ViewportState>("viewport_state");
-    auto &i_pipe_state = info.use_resource<ProjectState>("pipeline_state");
+    auto &i_view_state = info.resource("viewport_state").writeable<ViewportState>();
+    auto &i_pipe_state = info.resource("pipeline_state").writeable<ProjectState>();
 
     // Iterate over all project data
     bool pre_verts_resize = e_proj_data.vertices.size() != m_verts.size();

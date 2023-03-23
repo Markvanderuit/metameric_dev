@@ -32,21 +32,21 @@ namespace met {
       met_trace_full();
     
       // Add subtasks, share resources
-      info.emplace_subtask<ViewportInputVertTask>("vert");
-      info.emplace_resource<detail::Arcball>("arcball", { .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
+      info.subtask("vert").init<ViewportInputVertTask>();
+      info.resource("arcball").init<detail::Arcball>({ .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
       // Get external resources
-      const auto &e_delaunay  = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
-      const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-      const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
-      const auto &e_window    = info.resource<gl::Window>(global_key, "window");
+      const auto &e_delaunay  = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+      const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
+      const auto &e_window    = info.resource(global_key, "window").read_only<gl::Window>();
 
       // Get modified resources
-      auto &e_appl_data = info.use_resource<ApplicationData>(global_key, "app_data");
+      auto &e_appl_data = info.resource(global_key, "app_data").writeable<ApplicationData>();
       auto &e_proj_data = e_appl_data.project_data;
       auto &io          = ImGui::GetIO();
 
@@ -79,8 +79,8 @@ namespace met {
           });
 
           // Select newly added vertex
-          info.use_resource<std::vector<uint>>("viewport.input.vert", "selection") = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
-          info.use_resource<int>("viewport.overlay", "constr_selection") = -1;
+          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>() = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
+          info.resource("viewport.overlay", "constr_selection").writeable<int>() = -1;
         }
 
         ImGui::SameLine();
@@ -104,8 +104,8 @@ namespace met {
           });
 
           // Clear selection after deleting vertex
-          info.use_resource<std::vector<uint>>("viewport.input.vert", "selection").clear();
-          info.use_resource<int>("viewport.overlay", "constr_selection") = -1;
+          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>().clear();
+          info.resource("viewport.overlay", "constr_selection").writeable<int>() = -1;
         }
         if (e_vert_slct.empty()) ImGui::EndDisabled();
       }
@@ -209,7 +209,7 @@ namespace met {
       guard(ImGui::IsItemHovered());
 
       // Get modified resources
-      auto &i_arcball   = info.use_resource<detail::Arcball>("arcball");
+      auto &i_arcball   = info.resource("arcball").writeable<detail::Arcball>();
 
       // Handle camera update: aspect ratio, scroll delta, move delta dependent on ImGui i/o
       i_arcball.m_aspect = viewport_size.x() / viewport_size.y();

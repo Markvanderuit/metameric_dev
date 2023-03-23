@@ -37,7 +37,7 @@ namespace met::detail {
       met_trace_full();
 
       // Emplace texture resource using provided info object
-      info.emplace_resource<TextureType, TextureType::InfoType>(m_info.output_key, m_info.texture_info);
+      info.resource(m_info.output_key).init<TextureType, TextureType::InfoType>(m_info.texture_info);
       
       // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
       eig::Array2u dispatch_n    = m_info.texture_info.size;
@@ -56,16 +56,16 @@ namespace met::detail {
       met_trace_full();
 
       // Run computation only if input exists and has been modified
-      return info.has_resource(m_info.input_key.first, m_info.input_key.second) && 
-             info.is_resource_modified(m_info.input_key.first, m_info.input_key.second);
+      auto rsrc = info.resource(m_info.input_key.first, m_info.input_key.second);
+      return rsrc.is_init() && rsrc.is_mutated();
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
       // Get shared resources
-      const auto &e_rsrc = info.resource<gl::Buffer>(m_info.input_key.first, m_info.input_key.second);
-      auto &i_rsrc = info.use_resource<TextureType>(m_info.output_key);
+      const auto &e_rsrc = info.resource(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>();
+      auto &i_rsrc       = info.resource(m_info.output_key).writeable<TextureType>();
 
       // Bind resources to correct buffer/image targets
       e_rsrc.bind_to(gl::BufferTargetType::eShaderStorage,   0);

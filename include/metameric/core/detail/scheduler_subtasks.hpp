@@ -20,11 +20,11 @@ namespace met::detail {
 
       // Adjust nr. of subtasks upwards if necessary
       for (; m_n_tasks < n_tasks; ++m_n_tasks)
-        info.insert_subtask(m_key_func(m_n_tasks), m_add_func(info, m_n_tasks));
+        info.subtask(m_key_func(m_n_tasks)).set(m_add_func(info, m_n_tasks));
 
       // Adjust nr. of subtasks downwards if necessary
       for (; m_n_tasks > n_tasks; --m_n_tasks)
-        info.remove_subtask(m_key_func(m_n_tasks - 1));
+        info.subtask(m_key_func(m_n_tasks - 1)).dstr();
     }
 
   public:

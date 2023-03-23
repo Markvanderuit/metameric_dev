@@ -15,8 +15,8 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_bary_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
-    const auto &e_tex_data    = info.resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
+    const auto &e_tex_data    = info.resource(global_key, "app_data").read_only<ApplicationData>().loaded_texture_f32;
 
     // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
@@ -37,10 +37,10 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
-    const auto &e_vert_spec = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
-    const auto &e_delaunay  = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+    const auto &e_vert_spec = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_delaunay  = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
 
     // Spawn tooltip
     ImGui::BeginTooltip();
@@ -95,8 +95,8 @@ namespace met {
     if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get external resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
-      const auto &e_colr_buffer = info.resource<gl::Buffer>(color_task_key, "colr_buffer");
-      const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+      const auto &e_colr_buffer = info.resource(color_task_key, "colr_buffer").read_only<gl::Buffer>();
+      const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
 
       // Obtain cpu-side texture
       Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture_f32.size() }};
@@ -111,7 +111,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
     auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
@@ -154,8 +154,8 @@ namespace met {
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
-      const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-      const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+      const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+      const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
       uint e_mappings_n = e_proj_data.color_systems.size();
       
@@ -179,7 +179,7 @@ namespace met {
         std::string gen_name = fmt::format("gen_texture_{}", i);
         std::string res_name = fmt::format("gen_resample_{}", i);
         
-        guard_continue(info.has_subtask(gen_name) && info.has_subtask(res_name));
+        guard_continue(info.subtask(gen_name).is_init() && info.subtask(res_name).is_init());
 
         // Notify texture/resample subtasks of input changes
         /* if (e_pipe_state.csys[i] || e_pipe_state.any_verts) {
@@ -189,7 +189,7 @@ namespace met {
         
         // Notify resample subtask of potential resize
         auto mask = MaskedSchedulerHandle(info, res_name);
-        info.subtask<ResampleSubtask>(res_name).set_texture_info(mask, { .size = m_resample_size });
+        info.subtask(res_name).realize<ResampleSubtask>().set_texture_info(mask, { .size = m_resample_size });
       }
 
       // Reset state for tooltip
@@ -205,8 +205,8 @@ namespace met {
         
         // Get externally shared resources; note, resources may not be created yet as tasks are
         // added into the schedule at the end of a loop, not during
-        guard_continue(info.has_task(gen_name) || info.has_task(res_name));
-        auto &e_texture = info.resource<gl::Texture2d4f>(res_name, "texture");
+        guard_continue(info.task(gen_name).is_init() || info.task(res_name).is_init());
+        const auto &e_texture = info.resource(res_name, "texture").read_only<gl::Texture2d4f>();
 
         // Draw image
         ImGui::BeginGroup();

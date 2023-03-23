@@ -7,7 +7,7 @@
 #include <fmt/core.h>
 
 namespace met {
-  void LinearScheduler::add_task_impl(TaskInfo &&info) {
+  detail::TaskBase *LinearScheduler::add_task_impl(TaskInfo &&info) {
     met_trace();
 
     // Final task key is parent_key.child_key
@@ -20,24 +20,36 @@ namespace met {
     info.ptr->init(handle);
 
     // Move task into registry
-    m_task_registry.emplace(std::pair { task_key, std::move(info.ptr) });
+    auto it = m_task_registry.emplace(std::pair { task_key, std::move(info.ptr) }).first;
     if (info.prnt_key.empty()) {
       // No previous task key provided; insert at end of list
       m_task_order.emplace_back(task_key);
     } else {
       // Parent task key provided; Find end of range of said parent's other subtasks
-      auto filt = m_task_order 
-                | std::views::filter([&](const auto &s) { return s.starts_with(info.prnt_key); });
-      debug::check_expr_dbg(!filt.empty(), "Added subtask to nonexistent parent");
-                
-      // Insert subtask at end of range
-      auto it = m_task_order.begin() + std::distance(m_task_order.data(), &filt.back());
-      m_task_order.emplace(it == m_task_order.end() ? it : it + 1, task_key);
+      auto it = std::ranges::find_if(std::views::reverse(m_task_order), 
+        [&](const auto &s) { return s.starts_with(info.prnt_key); }).base();
+      m_task_order.emplace(it, task_key);
     }
     
     // Update task registries
     for (auto &info : handle.rem_task_info) rem_task_impl(std::move(info));
     for (auto &info : handle.add_task_info) add_task_impl(std::move(info));
+
+    return it->second.get();
+  }
+
+  detail::TaskBase *LinearScheduler::get_task_impl(TaskInfo &&info) const {
+    met_trace();
+    
+    // Final task key is parent_key.child_key
+    std::string task_key = info.prnt_key.empty() 
+                         ? info.task_key
+                         : fmt::format("{}.{}", info.prnt_key, info.task_key);
+
+    auto it = m_task_registry.find(task_key);
+    guard(it != m_task_registry.end(), nullptr);
+
+    return it->second.get();
   }
 
   void LinearScheduler::rem_task_impl(TaskInfo &&info) {
@@ -73,20 +85,6 @@ namespace met {
       for (auto &info : handle.rem_task_info) rem_task_impl(std::move(info));
       for (auto &info : handle.add_task_info) add_task_impl(std::move(info));
     }
-  }
-
-  detail::TaskBase *LinearScheduler::get_task_impl(TaskInfo &&info) const {
-    met_trace();
-    
-    // Final task key is parent_key.child_key
-    std::string task_key = info.prnt_key.empty() 
-                         ? info.task_key
-                         : fmt::format("{}.{}", info.prnt_key, info.task_key);
-
-    auto it = m_task_registry.find(task_key);
-    guard(it != m_task_registry.end(), nullptr);
-
-    return it->second.get();
   }
 
   detail::RsrcBase *LinearScheduler::add_rsrc_impl(RsrcInfo &&info) {
@@ -155,48 +153,43 @@ namespace met {
     // Store task updates
     std::list<TaskInfo> add_task_info;
     std::list<TaskInfo> rem_task_info;
+    Flags               flags = Flags::eNone;
 
-    Flags flags = Flags::eNone;
-
-    // Run all tasks in vector stored order
+    // Run all current tasks in copy of vector stored order
     for (const auto &task_key : m_task_order) {
-      auto &task = m_task_registry.at(task_key);
+      auto task = m_task_registry.at(task_key);
 
       // Reset cache state on task's owned resources
       if (auto it = m_rsrc_registry.find(task_key); it != m_rsrc_registry.end())
-        std::ranges::for_each(it->second, [](auto &pair) { pair.second->clear_modify(); });
+        std::ranges::for_each(it->second, [](auto &pair) { pair.second->set_mutated(false); });
 
       // Parse task info object by consuming task::eval_state() and task::eval()
       LinearSchedulerHandle handle(*this, task_key);
       guard_continue(task->eval_state(handle));
-      m_task_registry.at(task_key)->eval(handle);
+      task->eval(handle);
 
-      // Defer task updates until current run is complete
-      rem_task_info.splice(rem_task_info.end(), handle.rem_task_info);
-      add_task_info.splice(add_task_info.end(), handle.add_task_info);
+      // Process signal flags; clear tasks/resources if requested
+      flags |= handle.return_flags;
+      if (has_flag(flags, Flags::eClearTasks)) clear();
+      if (has_flag(flags, Flags::eClearAll))   clear(false);
+      
+      // Defer task updates until current task is complete
+      for (auto &info : handle.rem_task_info) rem_task_impl(std::move(info));
+      for (auto &info : handle.add_task_info) add_task_impl(std::move(info));
 
       // Signal flag received; halt current run
-      flags |= handle.return_flags;
       guard_break(!static_cast<uint>(flags)); 
     }
 
-    // Process signal flags; clear existing/all tasks/resources if requested
-    if (has_flag(flags, Flags::eClearTasks)) clear();
-    if (has_flag(flags, Flags::eClearAll))   clear(false);
-
-    // Process task updates
-    for (auto &info : rem_task_info) rem_task_impl(std::move(info));
-    for (auto &info : add_task_info) add_task_impl(std::move(info));
-
-    // Process signal flags; rebuild schedule if requested
+    // Process signal flag; rebuild schedule if requested
     if (has_flag(flags, Flags::eBuild)) build();
   }
   
   void LinearScheduler::clear(bool preserve_global) {
     met_trace();
     if (preserve_global) {
-      std::vector<std::string> task_order_copy(m_task_order);
-      std::ranges::for_each(task_order_copy, [&](const auto &key) { remove_task(key); });
+      std::list<std::string> task_order_copy(m_task_order);
+      std::ranges::for_each(task_order_copy, [&](const auto &key) { rem_task_impl({ .task_key = key }); });
     } else {
       m_rsrc_registry.clear();
       m_task_registry.clear();
@@ -214,9 +207,10 @@ namespace met {
     return_flags |= (preserve_global ? HandleReturnFlags::eClearTasks : HandleReturnFlags::eClearAll);
   }
 
-  void LinearSchedulerHandle::add_task_impl(TaskInfo &&info) {
+  detail::TaskBase *LinearSchedulerHandle::add_task_impl(TaskInfo &&info) {
     met_trace();
     add_task_info.emplace_back(std::move(info));
+    return nullptr; // Task add is deferred to end of run, so cannot return
   }
 
   void LinearSchedulerHandle::rem_task_impl(TaskInfo &&info) {
@@ -263,9 +257,9 @@ namespace met {
     m_masked_handle.clear(preserve_global);
   }
   
-  void MaskedSchedulerHandle::add_task_impl(TaskInfo &&info) {
+  detail::TaskBase *MaskedSchedulerHandle::add_task_impl(TaskInfo &&info) {
     met_trace();
-    m_masked_handle.add_task_impl(std::move(info));
+    return m_masked_handle.add_task_impl(std::move(info));
   }
 
   void MaskedSchedulerHandle::rem_task_impl(TaskInfo &&info) {

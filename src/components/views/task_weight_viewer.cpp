@@ -14,7 +14,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
 
     // Determine dispatch group size
     const uint dispatch_n    = e_appl_data.loaded_texture_f32.size().prod();
@@ -33,7 +33,7 @@ namespace met {
     m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
 
     // Initialize buffer object for storing intermediate results
-    info.emplace_resource<gl::Buffer>("colr_buffer", { .size = sizeof(AlColr) * dispatch_n });
+    info.resource("colr_buffer").init<gl::Buffer>({ .size = sizeof(AlColr) * dispatch_n });
 
     // Create subtask to handle buffer->texture copy
     TextureSubtask texture_subtask = {{ .input_key  = { info.task_key(), "colr_buffer" }, .output_key = "colr_texture",
@@ -44,8 +44,8 @@ namespace met {
                                           .texture_info = { .size = 1u }, .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
                                           .lrgb_to_srgb = true}};
 
-    info.insert_subtask("gen_texture", std::move(texture_subtask));
-    info.insert_subtask("gen_resample", std::move(resample_subtask));
+    info.subtask("gen_texture").set(std::move(texture_subtask));
+    info.subtask("gen_resample").set(std::move(resample_subtask));
   }
 
   void WeightViewerTask::eval(SchedulerHandle &info) {
@@ -53,8 +53,12 @@ namespace met {
 
     if (ImGui::Begin("Weight viewer")) {
       // Get external resources 
-      const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+      const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
       const auto &e_txtr_data = e_appl_data.loaded_texture_f32;
+
+      // Get subtask names
+      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
+      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task_key());
 
       // Weight data is drawn to texture in this function
       eval_draw(info);
@@ -67,13 +71,14 @@ namespace met {
 
       // Ensure the resample subtask can readjust for a resized output texture
       {
-        auto &sub = info.subtask<ResampleSubtask>("gen_resample");
         auto mask = MaskedSchedulerHandle(info, "gen_resample");
-        sub.set_texture_info(mask, { .size = m_texture_size });
+        info.subtask("gen_resample").realize<ResampleSubtask>().set_texture_info(mask, { .size = m_texture_size });
       }
 
-      // View data is defined in this function
-      eval_view(info);
+      // Display ImGui components
+      if (auto rsrc = info.resource(resample_subtask_name, "colr_texture"); rsrc.is_init()) {
+        ImGui::Image(ImGui::to_ptr(rsrc.read_only<gl::Texture2d4f>().object()), m_texture_size.cast<float>().eval());
+      }
     }
     ImGui::End();
   }
@@ -82,31 +87,30 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state changes
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
+    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
     bool activate_flag = e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection;
     guard(activate_flag);
 
     // Continue only if vertex selection is non-empty
     // otherwise, blacken output texture and return
-    const auto &e_selection = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_selection = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     if (e_selection.empty()) {
-      auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
-      i_colr_buffer.clear();
+      info.resource("colr_buffer").writeable<gl::Buffer>().clear();
       return;
     }
 
     // Get external resources 
-    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_delaunay    = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
-    const auto &e_cstr_slct   = info.resource<int>("viewport.overlay", "constr_selection");
-    const auto &e_bary_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
-    const auto &e_tetr_buffer = info.resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
-    const auto &e_vert_spec   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
+    const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+    const auto &e_cstr_slct   = info.resource("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
+    const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
+    const auto &e_vert_spec   = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
 
     // Get modified resources 
-    auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
+    auto &i_colr_buffer = info.resource("colr_buffer").writeable<gl::Buffer>();
 
     // Index of selected mapping is used for color queries
     uint mapping_i = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
@@ -137,18 +141,5 @@ namespace met {
     // Dispatch shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
     gl::dispatch_compute(m_dispatch);
-  }
-
-  void WeightViewerTask::eval_view(SchedulerHandle &info) {
-    met_trace_full();
-
-    // Continue only if the necessary output texture exists; this may not be the case on first run
-    auto st_name = fmt::format("{}.gen_resample", info.task_key());
-    guard(info.has_resource(st_name, "colr_texture"));
-
-    // Get shared resources
-    const auto &e_texture = info.resource<gl::Texture2d4f>(st_name, "colr_texture");
-
-    ImGui::Image(ImGui::to_ptr(e_texture.object()), m_texture_size.cast<float>().eval());
   }
 } // namespace met

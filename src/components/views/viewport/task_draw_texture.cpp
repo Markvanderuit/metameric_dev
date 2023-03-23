@@ -15,7 +15,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_texture_data = info.resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    const auto &e_texture_data = info.resource(global_key, "app_data").read_only<ApplicationData>().loaded_texture_f32;
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv_opt", .is_spirv_binary = true },
@@ -36,9 +36,9 @@ namespace met {
     met_trace_full();
 
     // Get external resources 
-    const auto &e_arcball     = info.resource<detail::Arcball>("viewport.input", "arcball");
-    const auto &e_pack_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "pack_buffer");
-    const auto &e_err_buffer  = info.resource<gl::Buffer>("error_viewer", "colr_buffer");
+    const auto &e_arcball     = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
+    const auto &e_pack_buffer = info.resource("gen_delaunay_weights", "pack_buffer").read_only<gl::Buffer>();
+    const auto &e_err_buffer  = info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>();
 
     // Declare scoped OpenGL state
     gl::state::set_op(gl::CullOp::eBack);

@@ -19,8 +19,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_rgb_texture = info.resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
-    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_rgb_texture = info.resource(global_key, "app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
 
     const uint generate_n    = e_rgb_texture.size().prod();
@@ -46,31 +46,31 @@ namespace met {
     });
 
     // Initialize buffer holding barycentric weights
-    info.emplace_resource<gl::Buffer>("pack_buffer", { .data = cnt_span<const std::byte>(packed_data) });
-    info.emplace_resource<gl::Buffer>("colr_buffer", { .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info.emplace_resource<gl::Buffer>("elem_buffer", { .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
-    info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(eig::Array4f) });
+    info.resource("pack_buffer").init<gl::Buffer>({ .data = cnt_span<const std::byte>(packed_data) });
+    info.resource("colr_buffer").init<gl::Buffer>({ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
+    info.resource("elem_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
+    info.resource("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) });
   }
   
   bool GenDelaunayWeightsTask::eval_state(SchedulerHandle &info) {
     met_trace_full();
-    return info.is_resource_modified("gen_spectral_data", "vert_buffer") ||
-           info.is_resource_modified("gen_spectral_data", "tetr_buffer") ||
-           info.is_resource_modified("gen_spectral_data", "delaunay");
+    return info.resource("gen_spectral_data", "vert_buffer").is_mutated() ||
+           info.resource("gen_spectral_data", "tetr_buffer").is_mutated() ||
+           info.resource("gen_spectral_data", "delaunay").is_mutated();
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
-    const auto &e_vert_buffer = info.resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
-    const auto &e_tetr_buffer = info.resource<gl::Buffer>("gen_spectral_data", "tetr_buffer");
-    const auto &e_delaunay    = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_vert_buffer = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
+    const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
+    const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
     
     // Get modified resources
-    auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
-    auto &i_bary_buffer = info.use_resource<gl::Buffer>("bary_buffer");
+    auto &i_colr_buffer = info.resource("colr_buffer").writeable<gl::Buffer>();
+    auto &i_bary_buffer = info.resource("bary_buffer").writeable<gl::Buffer>();
 
     // Update uniform data
     m_uniform_map->n_verts = e_delaunay.verts.size();

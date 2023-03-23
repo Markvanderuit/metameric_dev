@@ -36,7 +36,6 @@ namespace met {
     std::span<AlColr> m_vert_map;
 
     // Subfunctions
-    void eval_view(SchedulerHandle &);
     void eval_draw(SchedulerHandle &);
 
   public:

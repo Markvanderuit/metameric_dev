@@ -25,7 +25,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
 
     // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
     auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
@@ -96,22 +96,22 @@ namespace met {
   
     // Verify that vertex and constraint are selected before continuing, as this draw operation
     // is otherwise not even visible
-    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
     guard(e_vert_slct.size() == 1 && e_cstr_slct != -1);
 
     // Get external resources
-    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_vert        = e_proj_data.vertices[e_vert_slct[0]];
-    const auto &e_pipe_state  = info.resource<ProjectState>("state", "pipeline_state");
-    const auto &e_view_state  = info.resource<ViewportState>("state", "viewport_state");
-    const auto &e_arcball     = info.resource<detail::Arcball>(m_parent, "arcball");
-    const auto &e_csol_cntr   = info.resource<Colr>("gen_color_solids", "csol_cntr");
+    const auto &e_pipe_state  = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state  = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_arcball     = info.resource(m_parent, "arcball").read_only<detail::Arcball>();
+    const auto &e_csol_cntr   = info.resource("gen_color_solids", "csol_cntr").read_only<Colr>();
 
     // Get modified resources
-    auto &e_lrgb_target = info.use_resource<gl::Texture2d4f>(m_parent, "lrgb_color_solid_target");
-    auto &e_srgb_target = info.use_resource<gl::Texture2d4f>(m_parent, "srgb_color_solid_target");
+    auto &e_lrgb_target = info.resource(m_parent, "lrgb_color_solid_target").writeable<gl::Texture2d4f>();
+    auto &e_srgb_target = info.resource(m_parent, "srgb_color_solid_target").writeable<gl::Texture2d4f>();
 
     // (Re-)create framebuffers. Multisampled framebuffer uses multisampled renderbuffers as 
     // attachments, while the non-multisampled framebuffer targets the lrgb texture for output;
@@ -136,7 +136,7 @@ namespace met {
     bool recreate_chull = e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
     if (recreate_chull) {
       // Get color solid data, if available
-      const auto &e_csol_data = info.resource<std::vector<AlColr>>("gen_color_solids", "csol_data_al");
+      const auto &e_csol_data = info.resource("gen_color_solids", "csol_data_al").read_only<std::vector<AlColr>>();
       guard(!e_csol_data.empty());
 
       // Generate convex hull mesh and convert to buffer format

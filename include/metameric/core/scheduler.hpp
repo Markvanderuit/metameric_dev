@@ -9,8 +9,8 @@
 
 namespace met {
   class LinearScheduler : public SchedulerBase {
-    using RsrcMap  = std::unordered_map<std::string, std::unordered_map<std::string, detail::RsrcNode>>;
-    using TaskMap  = std::unordered_map<std::string, detail::TaskNode>;
+    using RsrcMap  = std::unordered_map<std::string, std::unordered_map<std::string, detail::RsrcBasePtr>>;
+    using TaskMap  = std::unordered_map<std::string, detail::TaskBasePtr>;
     
   public:
     
@@ -18,15 +18,15 @@ namespace met {
     // Private members
     RsrcMap                  m_rsrc_registry;
     TaskMap                  m_task_registry;
-    std::vector<std::string> m_task_order;
+    std::list<std::string>   m_task_order;
 
     // Virtual method implementations
-    virtual void              add_task_impl(TaskInfo &&)       override;
+    virtual detail::TaskBase *add_task_impl(TaskInfo &&)       override; // nullable return value
     virtual detail::TaskBase *get_task_impl(TaskInfo &&) const override; // nullable return value
     virtual void              rem_task_impl(TaskInfo &&)       override;
     virtual detail::RsrcBase *add_rsrc_impl(RsrcInfo &&)       override; // nullable return value
     virtual detail::RsrcBase *get_rsrc_impl(RsrcInfo &&) const override; // nullable return value
-    virtual void              rem_rsrc_impl(RsrcInfo &&)       override;
+    virtual void                  rem_rsrc_impl(RsrcInfo &&)       override;
 
     // Virtual method implementations
     virtual void run_clear_state_impl() override;
@@ -40,7 +40,7 @@ namespace met {
     virtual void clear(bool preserve_global = true) override; // Clear current schedule and resources
 
     // Debug methods
-    virtual std::vector<std::string> schedule() const override { return m_task_order; }
+    virtual std::list<std::string> schedule() const override { return m_task_order; }
     virtual const RsrcMap &resources() const override { return m_rsrc_registry; }
   };
 
@@ -69,7 +69,7 @@ namespace met {
     std::list<TaskInfo> rem_task_info;
 
     // Virtual method implementations
-    virtual void              add_task_impl(TaskInfo &&)       override;
+    virtual detail::TaskBase *add_task_impl(TaskInfo &&)       override; // nullable return value
     virtual detail::TaskBase *get_task_impl(TaskInfo &&) const override; // nullable return value
     virtual void              rem_task_impl(TaskInfo &&)       override;
     virtual detail::RsrcBase *add_rsrc_impl(RsrcInfo &&)       override; // nullable return value
@@ -92,7 +92,7 @@ namespace met {
     virtual const std::string &task_key() const override { return m_task_key; };
 
     // Debug methods
-    virtual std::vector<std::string> schedule() const override { return m_scheduler.m_task_order; }
+    virtual std::list<std::string> schedule() const override { return m_scheduler.m_task_order; }
     virtual const RsrcMap &resources() const override { return m_scheduler.resources(); }
   };
 
@@ -102,7 +102,7 @@ namespace met {
     std::string      m_task_key;
 
     // Virtual method implementations
-    virtual void              add_task_impl(TaskInfo &&)       override;
+    virtual detail::TaskBase *add_task_impl(TaskInfo &&)       override; // nullable return value
     virtual detail::TaskBase *get_task_impl(TaskInfo &&) const override; // nullable return value
     virtual void              rem_task_impl(TaskInfo &&)       override;
     virtual detail::RsrcBase *add_rsrc_impl(RsrcInfo &&)       override; // nullable return value
@@ -121,7 +121,7 @@ namespace met {
     virtual const std::string &task_key() const override { return m_task_key; };
 
     // Debug methods
-    virtual std::vector<std::string> schedule() const override { return m_masked_handle.schedule(); }
+    virtual std::list<std::string> schedule() const override { return m_masked_handle.schedule(); }
     virtual const RsrcMap &resources() const override { return m_masked_handle.resources(); }
   };
 

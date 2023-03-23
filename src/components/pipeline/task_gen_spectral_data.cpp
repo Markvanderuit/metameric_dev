@@ -28,30 +28,30 @@ namespace met {
     m_tetr_map = tetr_buffer.map_as<eig::Array4u>(buffer_access_flags);
 
     // Submit shared resources 
-    info.insert_resource<std::vector<Spec>>("vert_spec",               { }); // CPU-side generated reflectance spectra for each vertex
-    info.insert_resource<AlignedDelaunayData>("delaunay",              { }); // Generated delaunay tetrahedralization over input vertices
-    info.insert_resource<gl::Buffer>("vert_buffer", std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
-    info.insert_resource<gl::Buffer>("tetr_buffer", std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
+    info.resource("vert_spec").set<std::vector<Spec>>({ });               // CPU-side generated reflectance spectra for each vertex
+    info.resource("delaunay").set<AlignedDelaunayData>({ });              // Generated delaunay tetrahedralization over input vertices
+    info.resource("vert_buffer").set<gl::Buffer>(std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
+    info.resource("tetr_buffer").set<gl::Buffer>(std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
 
   bool GenSpectralDataTask::eval_state(SchedulerHandle &info) {
     met_trace_full();
-    return info.resource<ProjectState>("state", "pipeline_state").any_verts;
+    return info.resource("state", "pipeline_state").read_only<ProjectState>().any_verts;
   }
   
   void GenSpectralDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
     // Get external resources
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_spectra     = info.use_resource<std::vector<Spec>>("vert_spec");
-    auto &i_delaunay    = info.use_resource<AlignedDelaunayData>("delaunay");
-    auto &i_vert_buffer = info.use_resource<gl::Buffer>("vert_buffer");
-    auto &i_tetr_buffer = info.use_resource<gl::Buffer>("tetr_buffer");
+    auto &i_spectra     = info.resource("vert_spec").writeable<std::vector<Spec>>();
+    auto &i_delaunay    = info.resource("delaunay").writeable<AlignedDelaunayData>();
+    auto &i_vert_buffer = info.resource("vert_buffer").writeable<gl::Buffer>();
+    auto &i_tetr_buffer = info.resource("tetr_buffer").writeable<gl::Buffer>();
 
     // Generate new delaunay structure
     std::vector<Colr> delaunay_input(e_proj_data.vertices.size());

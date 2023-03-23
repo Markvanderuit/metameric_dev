@@ -28,9 +28,9 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_vert_buffer = info.resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
+    const auto &e_vert_buffer = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
 
     // Setup mapped buffer objects
     std::vector<float> size_init(init_vert_support, vert_deslct_size);
@@ -84,13 +84,13 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state   = info.resource<ProjectState>("state", "pipeline_state");
-    const auto &e_view_state   = info.resource<ViewportState>("state", "viewport_state");
-    const auto &e_frame_buffer = info.resource<gl::Framebuffer>("viewport.draw_begin", "frame_buffer");
-    const auto &e_arcball      = info.resource<detail::Arcball>("viewport.input", "arcball");
-    const auto &e_appl_data    = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_pipe_state   = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state   = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_frame_buffer = info.resource("viewport.draw_begin", "frame_buffer").read_only<gl::Framebuffer>();
+    const auto &e_arcball      = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
+    const auto &e_appl_data    = info.resource(global_key, "app_data").read_only<ApplicationData>();
     const auto &e_proj_data    = e_appl_data.project_data;
-    const auto &e_vert_buffer  = info.resource<gl::Buffer>("gen_spectral_data", "vert_buffer");
+    const auto &e_vert_buffer  = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
 
     // On relevant state change, update mesh buffer data
     if (e_pipe_state.any_verts) {
@@ -102,7 +102,7 @@ namespace met {
       }
 
       // Generate triangulated mesh over tetrahedral delaunay structure
-      const auto &e_delaunay = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+      const auto &e_delaunay = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
       auto trimesh = convert_mesh<AlignedMeshData>(convert_mesh<IndexedDelaunayData>(e_delaunay));
 
       // Resize fixed-size element buffer if current available size is exceeded
@@ -122,8 +122,8 @@ namespace met {
 
     // On relevant state change, update selection buffer data
     if (e_view_state.vert_selection || e_view_state.vert_mouseover) {
-      const auto &e_vert_select = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-      const auto &e_vert_msover = info.resource<std::vector<uint>>("viewport.input.vert", "mouseover");
+      const auto &e_vert_select = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+      const auto &e_vert_msover = info.resource("viewport.input.vert", "mouseover").read_only<std::vector<uint>>();
       
       std::ranges::fill(m_size_map, vert_deslct_size);
       std::ranges::for_each(e_vert_msover, [&](uint i) { m_size_map[i] = vert_msover_size; });
