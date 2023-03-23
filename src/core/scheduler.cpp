@@ -141,10 +141,10 @@ namespace met {
 
   void LinearScheduler::run_clear_state_impl() {
     met_trace();
-    std::for_each(std::execution::par_unseq, range_iter(m_rsrc_registry), [](auto &pair) {
+    /* std::for_each(std::execution::par_unseq, range_iter(m_rsrc_registry), [](auto &pair) {
       for (auto &[_, node_ptr] : pair.second)
         node_ptr->clear_modify();
-    });
+    }); */
   }
 
   void LinearScheduler::run_schedule_impl() {
@@ -160,8 +160,15 @@ namespace met {
 
     // Run all tasks in vector stored order
     for (const auto &task_key : m_task_order) {
-      // Parse task info object by consuming task::eval()
+      auto &task = m_task_registry.at(task_key);
+
+      // Reset cache state on task's owned resources
+      if (auto it = m_rsrc_registry.find(task_key); it != m_rsrc_registry.end())
+        std::ranges::for_each(it->second, [](auto &pair) { pair.second->clear_modify(); });
+
+      // Parse task info object by consuming task::eval_state() and task::eval()
       LinearSchedulerHandle handle(*this, task_key);
+      guard_continue(task->eval_state(handle));
       m_task_registry.at(task_key)->eval(handle);
 
       // Defer task updates until current run is complete

@@ -35,7 +35,8 @@ namespace met {
 
     // Initialize uniform buffer and writeable, flushable mapping
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_uniform_map = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_uniform_map->n = e_appl_data.loaded_texture_f32.size().prod();
 
     // Generate packed texture data
     std::vector<uint> packed_data(e_rgb_texture.size().prod());
@@ -50,13 +51,16 @@ namespace met {
     info.emplace_resource<gl::Buffer>("elem_buffer", { .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
     info.emplace_resource<gl::Buffer>("bary_buffer", { .size = generate_n * sizeof(eig::Array4f) });
   }
+  
+  bool GenDelaunayWeightsTask::eval_state(SchedulerHandle &info) {
+    met_trace_full();
+    return info.is_resource_modified("gen_spectral_data", "vert_buffer") ||
+           info.is_resource_modified("gen_spectral_data", "tetr_buffer") ||
+           info.is_resource_modified("gen_spectral_data", "delaunay");
+  }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
-
-    // Continue only on relevant state change
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.any_verts);
 
     // Get external resources
     const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
@@ -69,7 +73,6 @@ namespace met {
     auto &i_bary_buffer = info.use_resource<gl::Buffer>("bary_buffer");
 
     // Update uniform data
-    m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
     m_uniform_map->n_verts = e_delaunay.verts.size();
     m_uniform_map->n_elems = e_delaunay.elems.size();
     m_uniform_buffer.flush();

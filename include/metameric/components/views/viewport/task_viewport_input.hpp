@@ -38,16 +38,17 @@ namespace met {
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
-                      
-      // Get shared resources
-      auto &io          = ImGui::GetIO();
-      auto &e_window    = info.use_resource<gl::Window>(global_key, "window");
-      auto &i_arcball   = info.use_resource<detail::Arcball>("arcball");
-      auto &e_vert_slct = info.use_resource<std::vector<uint>>("viewport.input.vert", "selection");
-      auto &e_cstr_slct = info.use_resource<int>("viewport.overlay", "constr_selection");
+
+      // Get external resources
+      const auto &e_delaunay  = info.resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+      const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+      const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
+      const auto &e_window    = info.resource<gl::Window>(global_key, "window");
+
+      // Get modified resources
       auto &e_appl_data = info.use_resource<ApplicationData>(global_key, "app_data");
       auto &e_proj_data = e_appl_data.project_data;
-      auto &e_delaunay  = info.use_resource<AlignedDelaunayData>("gen_spectral_data", "delaunay");
+      auto &io          = ImGui::GetIO();
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -78,8 +79,8 @@ namespace met {
           });
 
           // Select newly added vertex
-          e_vert_slct = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
-          e_cstr_slct = -1;
+          info.use_resource<std::vector<uint>>("viewport.input.vert", "selection") = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
+          info.use_resource<int>("viewport.overlay", "constr_selection") = -1;
         }
 
         ImGui::SameLine();
@@ -103,8 +104,8 @@ namespace met {
           });
 
           // Clear selection after deleting vertex
-          e_vert_slct.clear();
-          e_cstr_slct = -1;
+          info.use_resource<std::vector<uint>>("viewport.input.vert", "selection").clear();
+          info.use_resource<int>("viewport.overlay", "constr_selection") = -1;
         }
         if (e_vert_slct.empty()) ImGui::EndDisabled();
       }
@@ -206,6 +207,9 @@ namespace met {
 
       // If window is not hovered, exit now instead of handling camera input
       guard(ImGui::IsItemHovered());
+
+      // Get modified resources
+      auto &i_arcball   = info.use_resource<detail::Arcball>("arcball");
 
       // Handle camera update: aspect ratio, scroll delta, move delta dependent on ImGui i/o
       i_arcball.m_aspect = viewport_size.x() / viewport_size.y();

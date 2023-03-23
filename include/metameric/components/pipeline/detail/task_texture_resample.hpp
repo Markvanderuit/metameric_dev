@@ -20,7 +20,6 @@ namespace met::detail {
     TextureInfo texture_info  = {};    // Info about output gl texture object
     SamplerInfo sampler_info  = {};    // Info about internal gl sampler object
     bool        lrgb_to_srgb  = false; // Perform gamma correction during resampling
-    bool        run_on_notify = false; // Run task only on call of notify()?
   };
 
   template <class TextureTy>
@@ -34,11 +33,12 @@ namespace met::detail {
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::Sampler     m_sampler;
-    bool            m_notified;
+    bool            m_is_resized;
 
   public:
     TextureResampleTask(InfoType info)
-    : m_info(info) { }
+    : m_info(info),
+      m_is_resized(false) { }
                         
     void init(SchedulerHandle &info) override {
       met_trace_full();
@@ -53,15 +53,18 @@ namespace met::detail {
       m_info.texture_info = { };
       set_sampler_info(info, _info.sampler_info);
       set_texture_info(info, _info.texture_info);
-
-      notify();
     }
 
-    void eval(SchedulerHandle &info) override {
+    bool eval_state(SchedulerHandle &info) override {
       met_trace_full();
 
-      // Check input exists
-      guard(is_notified() && info.has_resource(m_info.input_key.first, m_info.input_key.second));
+      // Run computation only if input exists and has been modified
+      return info.has_resource(m_info.input_key.first, m_info.input_key.second) && 
+             (m_is_resized || info.is_resource_modified(m_info.input_key.first, m_info.input_key.second));
+    }
+    
+    void eval(SchedulerHandle &info) override {
+      met_trace_full();
 
       // Get shared resources
       const auto &e_rsrc = info.resource<TextureType>(m_info.input_key.first, m_info.input_key.second);
@@ -75,8 +78,8 @@ namespace met::detail {
 
       // Dispatch shader, sampling texture into texture image
       gl::dispatch_compute(m_dispatch);
-
-      m_notified = false;
+      
+      m_is_resized = false;
     }
 
     void set_texture_info(SchedulerHandle &info, TextureType::InfoType texture_info) {
@@ -99,7 +102,7 @@ namespace met::detail {
                      .bindable_program = &m_program };
       m_program.uniform("u_size", dispatch_n);
 
-      notify();
+      m_is_resized = true;
     }
 
     void set_sampler_info(SchedulerHandle &info, gl::Sampler::InfoType sampler_info) {
@@ -109,14 +112,6 @@ namespace met::detail {
 
       m_sampler = { m_info.sampler_info };
       m_program.uniform("u_sampler", 0);
-    }
-
-    void notify() {
-      m_notified = true;
-    }
-
-    bool is_notified() const {
-      return !m_info.run_on_notify || m_notified;
     }
   };
 } // namespace met::detail

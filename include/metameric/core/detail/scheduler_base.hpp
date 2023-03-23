@@ -15,10 +15,17 @@ namespace met {
     // Virtual base class for tasks submitted to application scheduler
     // Implementations contain majority of program code
     struct TaskBase {
-      // Override and implement
+      // Override and implement; setup of task
       virtual void init(SchedulerHandle &) { };
+
+      // Override and implement; main body of task
       virtual void eval(SchedulerHandle &) { };
+
+      // Override and implement; teardown of task
       virtual void dstr(SchedulerHandle &) { };
+
+      // Override and implement; on false return, eval(...) is not called
+      virtual bool eval_state(SchedulerHandle &) { return true; }
     };
 
     // Abstract base class for application resources;
@@ -99,18 +106,18 @@ namespace met {
       }
 
       template <typename Ty>
-      const Ty & get_task(const std::string &key) const {
+      const Ty & task(const std::string &key) const {
         met_trace();
         const TaskBase *ptr = get_task_impl({ .task_key = key });
-        debug::check_expr_rel(ptr, fmt::format("get_task failed for {}", key));
+        debug::check_expr_rel(ptr, fmt::format("task failed for {}", key));
         return *static_cast<Ty *>(ptr);
       };
 
       template <typename Ty>
-      Ty & get_task(const std::string &key) {
+      Ty & task(const std::string &key) {
         met_trace();
         TaskBase *ptr = get_task_impl({ .task_key = key });
-        debug::check_expr_rel(ptr, fmt::format("get_task failed for {}", key));
+        debug::check_expr_rel(ptr, fmt::format("task failed for {}", key));
         return *static_cast<Ty *>(ptr);
       };
       
@@ -230,18 +237,18 @@ namespace met {
     }
     
     template <typename Ty>
-    const Ty & get_subtask(const std::string &key) const {
+    const Ty & subtask(const std::string &key) const {
       met_trace();
       const detail::TaskBase *ptr = get_task_impl({ .prnt_key = task_default_key(), .task_key = key });
-      debug::check_expr_rel(ptr, fmt::format("get_task failed for {}.{}", task_default_key(), key));
+      debug::check_expr_rel(ptr, fmt::format("task failed for {}.{}", task_default_key(), key));
       return *static_cast<Ty *>(ptr);
     };
     
     template <typename Ty>
-    Ty & get_subtask(const std::string &key) {
+    Ty & subtask(const std::string &key) {
       met_trace();
       detail::TaskBase *ptr = get_task_impl({ .prnt_key = task_default_key(), .task_key = key });
-      debug::check_expr_rel(ptr, fmt::format("get_task failed for {}.{}", task_default_key(), key));
+      debug::check_expr_rel(ptr, fmt::format("task failed for {}.{}", task_default_key(), key));
       return *static_cast<Ty *>(ptr);
     };
     

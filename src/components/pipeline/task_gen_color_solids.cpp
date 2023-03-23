@@ -137,25 +137,36 @@ namespace met {
     info.insert_resource("csol_data_al", std::vector<AlColr>());
     info.insert_resource("csol_cntr", Colr(0.f));
   }
+
+  bool GenColorSolidsTask::eval_state(SchedulerHandle &info) {
+    met_trace_full();
+    
+    // guard(info.is_resource_modified("viewport.overlay", "constr_selection") ||
+    //       info.is_resource_modified("viewport.input.vert", "selection"), false);
+    // fmt::print("changed selection\n");
+
+    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
+    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+
+    guard(e_cstr_slct != -1 && !e_vert_slct.empty(), false);
+    fmt::print("visible selection\n");
+
+    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    
+    return e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection;
+  }
   
   void GenColorSolidsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Continue only if constraint selection is sensible
-    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
-    guard(e_cstr_slct != -1);
-
-    // Continue only on relevant state change
-    const auto &e_vert_slct  = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
-    const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    guard((!e_vert_slct.empty() && (e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection)) || e_view_state.cstr_selection);
-
     // Get external resources
+    const auto &e_cstr_slct = info.resource<int>("viewport.overlay", "constr_selection");
+    const auto &e_vert_slct = info.resource<std::vector<uint>>("viewport.input.vert", "selection");
+    const auto &e_vert_sd   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[e_vert_slct[0]];
     const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices[e_vert_slct[0]];
-    const auto &e_vert_sd   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec")[e_vert_slct[0]];
 
     // Get modified resources
     auto &i_csol_data    = info.use_resource<std::vector<Colr>>("csol_data");
@@ -175,7 +186,7 @@ namespace met {
     CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
-    const auto &i_samples = info.use_resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
+    const auto &i_samples = info.resource<std::vector<eig::ArrayXf>>(fmt::format("samples_{}", cmfs_i.size()));
 
     // Generate points on metamer set boundary; store in aligned format
     i_csol_data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 
@@ -185,7 +196,6 @@ namespace met {
                                                .system_j  = cmfs_j, 
                                                .samples   = i_samples });
     i_csol_data_al = std::vector<AlColr>(range_iter(i_csol_data));
-    fmt::print("i_csol_data_al : {}\n", i_csol_data_al.size());
     
     // Compute center of metamer set boundary
     constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };

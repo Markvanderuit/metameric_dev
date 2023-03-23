@@ -36,15 +36,15 @@ namespace met {
       // If active window is not hovered or we are not in vertex mode, exit early
       guard(ImGui::IsItemHovered());
 
-      // Get shared resources
-      auto &io          = ImGui::GetIO();
-      auto &i_selection = info.use_resource<std::vector<uint>>("selection");
-      auto &i_mouseover = info.use_resource<std::vector<uint>>("mouseover");
-      auto &e_cstr_slct = info.use_resource<int>("viewport.overlay", "constr_selection");
-      auto &i_arcball   = info.use_resource<detail::Arcball>("viewport.input", "arcball");
+      // Get external resources
+      const auto &i_arcball         = info.resource<detail::Arcball>("viewport.input", "arcball");
+      const auto &e_cstr_slct       = info.resource<int>("viewport.overlay", "constr_selection");
+      const auto &i_selection_const = info.resource<std::vector<uint>>("selection");
+
+      // Get modified resources
       auto &e_app_data  = info.use_resource<ApplicationData>(global_key, "app_data");
-      auto &e_proj_data = e_app_data.project_data;
       auto &e_verts     = e_app_data.project_data.vertices;
+      auto &io          = ImGui::GetIO();
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -70,9 +70,9 @@ namespace met {
           return (p - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance;
         });
 
-        // Apply mouseover on every iteration
-        i_mouseover.clear();
-        std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near, std::back_inserter(i_mouseover));
+        // Start new list of mouseovers on every iteration
+        std::vector<uint> mouseover;
+        std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near, std::back_inserter(mouseover));
 
         // Apply selection area: right mouse OR left mouse + shift
         if (io.MouseDown[1]) {
@@ -82,7 +82,7 @@ namespace met {
           ImGui::GetWindowDrawList()->AddRectFilled(selector_ul, selector_br, col);
 
           // Push vertex indices on mouseover list
-          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(i_mouseover));
+          std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(mouseover));
         }
 
         // Right-click-release fixes the selection area; then determine selected gamut position idxs
@@ -92,33 +92,39 @@ namespace met {
           auto br = eig::Array2f(io.MouseClickedPos[1]).max(eig::Array2f(io.MousePos)).eval();
                     
           // Push vertex indices on selection list
+          auto &i_selection = info.use_resource<std::vector<uint>>("selection");
           i_selection.clear();
           std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(i_selection));
         }
 
         // Left-click selects a single gamut position
-        if (io.MouseClicked[0] && (i_selection.empty() || !ImGuizmo::IsOver())) {
+        if (io.MouseClicked[0] && (i_selection_const.empty() || !ImGuizmo::IsOver())) {
+          auto &i_selection = info.use_resource<std::vector<uint>>("selection");
           i_selection.clear();
           std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near | std::views::take(1), std::back_inserter(i_selection));
         }
+
+        // Store new_mouseover on change
+        if (!std::ranges::equal(info.resource<std::vector<uint>>("mouseover"), mouseover))
+          info.use_resource<std::vector<uint>>("mouseover") = mouseover;
       }
 
       // Continue only if a selection has been made
-      if (i_selection.empty()) {
+      if (i_selection_const.empty()) {
         m_is_gizmo_used = false;
         return;
       }
 
       // Sanitize constraint selection index in viewport overlay
-      e_cstr_slct = i_selection.empty()
-                  ? -1
-                  : std::min(e_cstr_slct, 
-                             static_cast<int>(e_verts[i_selection[0]].colr_j.size() - 1));
+      int new_cstr_slct = i_selection_const.empty()
+        ? -1 : std::min(e_cstr_slct, static_cast<int>(e_verts[i_selection_const[0]].colr_j.size() - 1));
+      if (e_cstr_slct != new_cstr_slct)
+        info.use_resource<int>("viewport.overlay", "constr_selection") = new_cstr_slct;
 
       // Range over- and center of selected gamut positions
       constexpr
       auto i_get = [](auto &v) { return [&v](const auto &i) -> auto& { return v[i]; }; };
-      auto selected_verts = i_selection | std::views::transform(i_get(e_verts));
+      auto selected_verts = i_selection_const | std::views::transform(i_get(e_verts));
       Colr selected_centr = std::reduce(range_iter(selected_verts), Colr(0.f),
         [](const auto &c, const auto &v) { return c + v.colr_i; }) 
         / static_cast<float>(selected_verts.size()); 

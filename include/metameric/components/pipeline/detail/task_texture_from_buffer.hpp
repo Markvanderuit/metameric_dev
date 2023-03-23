@@ -18,7 +18,6 @@ namespace met::detail {
     StringPair  input_key;             // Key to input resource
     std::string output_key;            // Key to output resource
     TextureInfo texture_info = {};     // Info about output gl texture object
-    bool        run_on_notify = false; // Run task only on call of notify()?
   };
 
   template <class TextureType>
@@ -29,7 +28,6 @@ namespace met::detail {
     InfoType        m_info;
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
-    bool            m_notified;
 
   public:
     TextureFromBufferTask(InfoType info)
@@ -40,7 +38,6 @@ namespace met::detail {
 
       // Emplace texture resource using provided info object
       info.emplace_resource<TextureType, TextureType::InfoType>(m_info.output_key, m_info.texture_info);
-      info.emplace_resource<bool>("activate_flag", false);
       
       // Compute nr. of workgroups as nearest upper divide of n / (16, 16), implying wg size of 256
       eig::Array2u dispatch_n    = m_info.texture_info.size;
@@ -53,15 +50,18 @@ namespace met::detail {
                      .groups_y = dispatch_ndiv.y(),
                      .bindable_program = &m_program };
       m_program.uniform("u_size", dispatch_n);
+    }
 
-      notify();
+    bool eval_state(SchedulerHandle &info) override {
+      met_trace_full();
+
+      // Run computation only if input exists and has been modified
+      return info.has_resource(m_info.input_key.first, m_info.input_key.second) && 
+             info.is_resource_modified(m_info.input_key.first, m_info.input_key.second);
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
-
-      // Check input exists
-      guard(is_notified() && info.has_resource(m_info.input_key.first, m_info.input_key.second));
 
       // Get shared resources
       const auto &e_rsrc = info.resource<gl::Buffer>(m_info.input_key.first, m_info.input_key.second);
@@ -74,16 +74,6 @@ namespace met::detail {
 
       // Dispatch shader, copying buffer into texture object
       gl::dispatch_compute(m_dispatch);
-
-      m_notified = false;
-    }
-
-    void notify() {
-      m_notified = true;
-    }
-    
-    bool is_notified() const {
-      return !m_info.run_on_notify || m_notified;
     }
   };
 } // namespace met::detail

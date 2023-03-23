@@ -130,28 +130,23 @@ namespace met {
     }
 
     // Initialize texture generation subtasks
-    m_texture_subtasks.init(info, e_mappings_n,
-      [=](auto &, uint i) -> std::pair<std::string, TextureSubTask> { 
-        return std::pair { 
-          fmt::format("gen_texture_{}", i),
-          TextureSubTask {{ .input_key = { fmt::format("gen_color_mappings.gen_mapping_{}", i), "colr_buffer" }, .output_key    = "texture",
-                            .texture_info  = { .size = e_texture_size }, .run_on_notify = true }}
-        }; 
-      },
-      [](auto &, uint i) { return fmt::format("gen_texture_{}", i); });
+    m_texture_subtasks.init(info, e_mappings_n, [](uint i) { return fmt::format("gen_texture_{}", i); },
+    [=](auto &, uint i) { return TextureSubTask {{ 
+      .input_key = { fmt::format("gen_color_mappings.gen_mapping_{}", i), "colr_buffer" }, 
+      .output_key    = "texture",
+      .texture_info  = { .size = e_texture_size } 
+    }}; });
       
     // Initialize texture resampling subtasks
     std::string parent_task = fmt::format("{}.gen_texture", info.task_key());
-    m_resample_subtasks.init(info, e_mappings_n,
-      [=](auto &, uint i) -> std::pair<std::string, ResampleSubtask> {
-        return std::pair {
-          fmt::format("gen_resample_{}", i),
-          ResampleSubtask {{ .input_key = { fmt::format("{}_{}", parent_task, i), "texture" }, .output_key    = "texture",
-                             .texture_info  = { .size = 1u }, .sampler_info  = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
-                             .lrgb_to_srgb  = true, .run_on_notify = true }}
-        };
-      },
-      [](auto &, uint i) { return fmt::format("gen_resample_{}", i); });
+    m_resample_subtasks.init(info, e_mappings_n, [](uint i) { return fmt::format("gen_resample_{}", i); },
+    [=](auto &, uint i) { return ResampleSubtask {{ 
+      .input_key = { fmt::format("{}_{}", parent_task, i), "texture" }, 
+      .output_key    = "texture",
+      .texture_info  = { .size = 1u }, 
+      .sampler_info  = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
+      .lrgb_to_srgb  = true 
+    }}; });
   }
 
   void MappingsViewerTask::eval(SchedulerHandle &info) {
@@ -187,14 +182,14 @@ namespace met {
         guard_continue(info.has_subtask(gen_name) && info.has_subtask(res_name));
 
         // Notify texture/resample subtasks of input changes
-        if (e_pipe_state.csys[i] || e_pipe_state.any_verts) {
-          info.get_subtask<TextureSubTask>(gen_name).notify();
-          info.get_subtask<ResampleSubtask>(res_name).notify();
-        }
+        /* if (e_pipe_state.csys[i] || e_pipe_state.any_verts) {
+          info.subtask<TextureSubTask>(gen_name).notify();
+          info.subtask<ResampleSubtask>(res_name).notify();
+        } */
         
         // Notify resample subtask of potential resize
         auto mask = MaskedSchedulerHandle(info, res_name);
-        info.get_subtask<ResampleSubtask>(res_name).set_texture_info(mask, { .size = m_resample_size });
+        info.subtask<ResampleSubtask>(res_name).set_texture_info(mask, { .size = m_resample_size });
       }
 
       // Reset state for tooltip

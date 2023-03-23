@@ -8,39 +8,34 @@
 namespace met::detail {
   template <typename TaskType>
   class Subtasks {
-    using KeyType = std::string;
-    using AddType = std::function<std::pair<std::string, TaskType> (SchedulerHandle &, uint)>;
-    using RmvType = std::function<std::string                      (SchedulerHandle &, uint)>;
+    using AddFuncType = std::function<TaskType    (SchedulerHandle &, uint)>;
+    using KeyFuncType = std::function<std::string (uint)>;
     
-    uint    m_n_tasks = 0;
-    AddType m_add;
-    RmvType m_rmv;
+    uint        m_n_tasks = 0;
+    AddFuncType m_add_func;
+    KeyFuncType m_key_func;
 
     void adjust_to(SchedulerHandle &info, uint n_tasks) {
       met_trace_full();
 
       // Adjust nr. of subtasks upwards if necessary
-      for (; m_n_tasks < n_tasks; ++m_n_tasks) {
-        auto [key, task] = m_add(info, m_n_tasks);
-        info.insert_subtask(key, std::move(task));
-      }
+      for (; m_n_tasks < n_tasks; ++m_n_tasks)
+        info.insert_subtask(m_key_func(m_n_tasks), m_add_func(info, m_n_tasks));
 
       // Adjust nr. of subtasks downwards if necessary
-      for (; m_n_tasks > n_tasks; --m_n_tasks) {
-        auto key = m_rmv(info, m_n_tasks - 1);
-        info.remove_subtask(key);
-      }
+      for (; m_n_tasks > n_tasks; --m_n_tasks)
+        info.remove_subtask(m_key_func(m_n_tasks - 1));
     }
 
   public:
-    void init(SchedulerHandle &info, uint n_tasks, AddType add, RmvType rmv) {
+    void init(SchedulerHandle &info, uint n_tasks, KeyFuncType key_func, AddFuncType add_func) {
       met_trace_full();
 
       // Clear out remaining tasks
       adjust_to(info, 0);
       
-      m_add  = add;
-      m_rmv  = rmv;
+      m_add_func = add_func;
+      m_key_func = key_func;
  
       // Spawn initial subtasks
       adjust_to(info, n_tasks);

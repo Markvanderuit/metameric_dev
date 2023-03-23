@@ -67,7 +67,7 @@ namespace met {
 
       // Ensure the resample subtask can readjust for a resized output texture
       {
-        auto &sub = info.get_subtask<ResampleSubtask>("gen_resample");
+        auto &sub = info.subtask<ResampleSubtask>("gen_resample");
         auto mask = MaskedSchedulerHandle(info, "gen_resample");
         sub.set_texture_info(mask, { .size = m_texture_size });
       }
@@ -85,7 +85,6 @@ namespace met {
     const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
     const auto &e_view_state = info.resource<ViewportState>("state", "viewport_state");
     bool activate_flag = e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection;
-    info.use_resource<bool>(fmt::format("{}.gen_texture", info.task_key()), "activate_flag") = activate_flag;
     guard(activate_flag);
 
     // Continue only if vertex selection is non-empty
@@ -107,7 +106,7 @@ namespace met {
     const auto &e_vert_spec   = info.resource<std::vector<Spec>>("gen_spectral_data", "vert_spec");
 
     // Get modified resources 
-    const auto &i_colr_buffer = info.resource<gl::Buffer>("colr_buffer");
+    auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
 
     // Index of selected mapping is used for color queries
     uint mapping_i = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;

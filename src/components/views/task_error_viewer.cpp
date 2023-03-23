@@ -69,9 +69,7 @@ namespace met {
   void ErrorViewerTask::eval_error(SchedulerHandle &info) {
     // Continue only on relevant state changes
     auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    bool activate_flag = e_pipe_state.any;
-    info.use_resource<bool>(fmt::format("{}.gen_texture", info.task_key()), "activate_flag") = activate_flag;
-    guard(activate_flag);
+    guard(info.resource<ProjectState>("state", "pipeline_state").any);
 
     // Get external resources
     const auto &e_color_input  = info.resource<gl::Buffer>("gen_delaunay_weights", "colr_buffer");
@@ -166,9 +164,8 @@ namespace met {
 
       // Ensure the resample subtask can readjust for a resized output texture
       {
-        auto &sub = info.get_subtask<ResampleSubtask>("gen_resample");
         auto mask = MaskedSchedulerHandle(info, "gen_resample");
-        sub.set_texture_info(mask, { .size = texture_size });
+        info.subtask<ResampleSubtask>("gen_resample").set_texture_info(mask, { .size = texture_size });
       }
 
       // 3. Display ImGui components to show error and select mapping

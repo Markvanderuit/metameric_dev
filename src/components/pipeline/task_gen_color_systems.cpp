@@ -26,16 +26,18 @@ namespace met {
     info.emplace_resource<gl::Buffer>("mapp_buffer", { .size = m_max_maps * sizeof(ColrSystem), .flags = buffer_flags });
   }
   
+  bool GenColorSystemsTask::eval_state(SchedulerHandle &info) {
+    met_trace_full();
+    return info.resource<ProjectState>("state", "pipeline_state").any_csys;
+  }
+
   void GenColorSystemsTask::eval(SchedulerHandle &info) {
     met_trace_full();
-    
-    // Continue only on relevant state change
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.any_csys);
 
     // Get external resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
-    const auto &e_proj_data = e_appl_data.project_data;
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
     auto &i_buffer = info.use_resource<gl::Buffer>("mapp_buffer");

@@ -46,14 +46,16 @@ namespace met {
     m_init_stale = true;
   }
 
+  bool GenColorMappingTask::eval_state(SchedulerHandle &info) {
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    return m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;
+  }
+
   void GenColorMappingTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Continue only on relevant state changes; on init this is always true
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    guard(m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts);
-
     // Get external resources
+    const auto &e_pipe_state  = info.resource<ProjectState>("state", "pipeline_state");
     const auto &e_appl_data   = info.resource<ApplicationData>(global_key, "app_data");
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_bary_buffer = info.resource<gl::Buffer>("gen_delaunay_weights", "bary_buffer");
@@ -65,18 +67,15 @@ namespace met {
     auto &i_colr_buffer = info.use_resource<gl::Buffer>("colr_buffer");
 
     // Update uniform data
-    if (e_pipe_state.any_verts || m_init_stale) {
-      m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
-      m_uniform_map->n_verts = e_delaunay.verts.size();
-      m_uniform_map->n_elems = e_delaunay.elems.size();
-      m_uniform_buffer.flush();
-    }
-    
+    m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
+    m_uniform_map->n_verts = e_delaunay.verts.size();
+    m_uniform_map->n_elems = e_delaunay.elems.size();
+    m_uniform_buffer.flush();
+  
     // Update gamut data, given any state change
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
     for (uint i = 0; i < e_proj_data.vertices.size(); ++i) {
       guard_continue(m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.verts[i].any);
-
       m_gamut_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
       m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }
@@ -105,11 +104,9 @@ namespace met {
     std::string parent_key = info.task_key();
 
     // Add subtasks to perform mapping
-    m_mapping_subtasks.init(info, e_mappings_n,
-      [](auto &, uint i) { return std::pair {
-        fmt::format("gen_mapping_{}", i), GenColorMappingTask(i)
-      }; }, 
-      [](auto &, uint i) { return fmt::format("gen_mapping_{}", i); });
+    m_mapping_subtasks.init(info, e_mappings_n, 
+      [](uint i)         { return fmt::format("gen_mapping_{}", i); },
+      [](auto &, uint i) { return GenColorMappingTask(i); });
   }
 
   void GenColorMappingsTask::eval(SchedulerHandle &info) {

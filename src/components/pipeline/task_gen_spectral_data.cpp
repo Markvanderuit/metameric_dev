@@ -33,25 +33,19 @@ namespace met {
     info.insert_resource<gl::Buffer>("vert_buffer", std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
     info.insert_resource<gl::Buffer>("tetr_buffer", std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
+
+  bool GenSpectralDataTask::eval_state(SchedulerHandle &info) {
+    met_trace_full();
+    return info.resource<ProjectState>("state", "pipeline_state").any_verts;
+  }
   
   void GenSpectralDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
-
-    // Continue only on relevant state change
-    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.any_verts);
     
     // Get external resources
-    const auto &e_appl_data = info.resource<ApplicationData>(global_key, "app_data");
-    const auto &e_proj_data = e_appl_data.project_data;
-
-    {
-      fmt::print("is_modified 0 : {}\n", info.is_resource_modified("vert_spec"));
-      const auto &i_spectra_1 = info.resource<std::vector<Spec>>("vert_spec");
-      fmt::print("is_modified 1 : {}\n", info.is_resource_modified("vert_spec"));
-      auto &i_spectra_2 = info.use_resource<std::vector<Spec>>("vert_spec");
-      fmt::print("is_modified 2 : {}\n", info.is_resource_modified("vert_spec"));
-    }
+    const auto &e_pipe_state = info.resource<ProjectState>("state", "pipeline_state");
+    const auto &e_appl_data  = info.resource<ApplicationData>(global_key, "app_data");
+    const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
     auto &i_spectra     = info.use_resource<std::vector<Spec>>("vert_spec");

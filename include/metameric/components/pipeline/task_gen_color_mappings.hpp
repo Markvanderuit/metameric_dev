@@ -30,6 +30,7 @@ namespace met {
     GenColorMappingTask(uint mapping_i);
 
     void init(SchedulerHandle &) override;
+    bool eval_state(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
   };
 
