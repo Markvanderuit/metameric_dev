@@ -99,8 +99,6 @@ namespace met {
     }
 
     // Set shared OpenGL state for coming draw operations
-    gl::state::set_op(gl::CullOp::eBack);
-    gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,    true),
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
     

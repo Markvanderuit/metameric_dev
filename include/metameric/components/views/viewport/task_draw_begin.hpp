@@ -57,9 +57,11 @@ namespace met {
       // Specify viewport for next subtasks
       gl::state::set_viewport(m_color_buffer_ms.size());    
 
-      // Specify depth state for next tasks
+      // Specify shared state for next tasks
       gl::state::set_depth_range(0.f, 1.f);
       gl::state::set_op(gl::DepthOp::eLess);
+      gl::state::set_op(gl::CullOp::eBack);
+      gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     }
   };
 } // namespace met

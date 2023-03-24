@@ -9,6 +9,7 @@
 namespace met {
   class ViewportDrawTextureTask : public detail::TaskNode {
     gl::Array    m_array;
+    gl::Buffer   m_data;
     gl::DrawInfo m_draw;
     gl::Program  m_program;
 

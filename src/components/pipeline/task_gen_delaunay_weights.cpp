@@ -38,15 +38,7 @@ namespace met {
     m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
     m_uniform_map->n = e_appl_data.loaded_texture_f32.size().prod();
 
-    // Generate packed texture data
-    std::vector<uint> packed_data(e_rgb_texture.size().prod());
-    std::transform(std::execution::par_unseq, range_iter(e_rgb_texture.data()), packed_data.begin(), [](const auto &v_) {
-      eig::Array3u v = (v_.max(0.f).min(1.f) * 255.f).round().cast<uint>().eval();
-      return v[0] | (v[1] << 8) | (v[2] << 16);
-    });
-
     // Initialize buffer holding barycentric weights
-    info.resource("pack_buffer").init<gl::Buffer>({ .data = cnt_span<const std::byte>(packed_data) });
     info.resource("colr_buffer").init<gl::Buffer>({ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
     info.resource("elem_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
     info.resource("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) });
