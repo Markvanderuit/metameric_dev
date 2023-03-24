@@ -11,6 +11,7 @@
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/pipeline/task_gen_color_solids.hpp>
+#include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/task_weight_viewer.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
@@ -109,6 +110,7 @@ namespace met {
     scheduler.task("gen_delaunay_weights").init<GenDelaunayWeightsTask>();
     scheduler.task("gen_color_solids").init<GenColorSolidsTask>();
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
+    scheduler.task("gen_color_system_solid").init<GenColorSystemSolidTask>();
 
     // The following tasks define view components and windows
     scheduler.task("window").init<WindowTask>();

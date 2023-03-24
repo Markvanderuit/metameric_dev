@@ -112,24 +112,6 @@ namespace met {
       info.resource(fmt::format("samples_{}", i)).set(detail::gen_unit_dirs_x(n_samples_mmv, dims));
     }
 
-    // Register resources to hold convex hull data for a primary color system OCS
-    auto csys_ocs = generate_ocs_boundary({ .basis = e_appl_data.loaded_basis,
-                                            .basis_avg = e_appl_data.loaded_basis_mean, 
-                                            .system = e_proj_data.csys(0).finalize_direct(), 
-                                            .samples = detail::gen_unit_dirs<3>(n_samples_ocs) });
-    auto csys_ocs_mesh = simplify_edge_length<HalfedgeMeshData>(
-      generate_convex_hull<HalfedgeMeshData, eig::Array3f>(csys_ocs), 0.001f);
-
-    // Compute center of convex hull
-    constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };
-    auto csys_ocs_cntr = std::reduce(std::execution::par_unseq, 
-      csys_ocs_mesh.points(), csys_ocs_mesh.points() + csys_ocs_mesh.n_vertices(),
-      omesh::Vec3f(0.f), f_add) / static_cast<float>(csys_ocs_mesh.n_vertices());
-    
-    info.resource("csys_ocs_data").set(std::move(csys_ocs));
-    info.resource("csys_ocs_mesh").set(std::move(csys_ocs_mesh));
-    info.resource("csys_ocs_cntr").set(to_eig<float, 3>(csys_ocs_cntr));
-
     // Register resources to hold convex hull data for a metamer mismatch volume OCS
     info.resource("csol_data"   ).set(std::vector<Colr>());
     info.resource("csol_data_al").set(std::vector<AlColr>());
@@ -139,10 +121,6 @@ namespace met {
   bool GenColorSolidsTask::eval_state(SchedulerHandle &info) {
     met_trace_full();
     
-    // guard(info.is_resource_modified("viewport.overlay", "constr_selection") ||
-    //       info.is_resource_modified("viewport.input.vert", "selection"), false);
-    // fmt::print("changed selection\n");
-
     const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
 

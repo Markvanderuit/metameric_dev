@@ -120,18 +120,16 @@ namespace met {
                                         .samples = detail::gen_unit_dirs<3>(n_samples) });
 
     // Generate cleaned mesh from data
-    auto mesh = simplify_edge_length<HalfedgeMeshData>(
+    auto mesh = simplify_edge_length<AlignedMeshData>(
       generate_convex_hull<HalfedgeMeshData, eig::Array3f>(data), 0.001f);
 
     // Compute center of convex hull
     constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };
-    auto cntr = std::reduce(std::execution::par_unseq, 
-      mesh.points(), mesh.points() + mesh.n_vertices(),
-      omesh::Vec3f(0.f), f_add) / static_cast<float>(mesh.n_vertices());
+    auto cntr = std::reduce(std::execution::par_unseq, range_iter(mesh.verts), eig::AlArray3f(0), f_add) 
+              / static_cast<float>(mesh.verts.size());
 
-    // Submit data as (modified) resources
-    info.resource("chull_data").set<std::vector<Colr>>(std::move(data));
-    info.resource("chull_mesh").set<AlignedMeshData>(convert_mesh<AlignedMeshData>(mesh));
-    info.resource("chull_cntr").set<eig::Vector3f>(to_eig<float, 3>(cntr));
+    // Submit mesh and center as resources; used by viewport draw tasks
+    info.resource("chull_mesh").set<AlignedMeshData>(std::move(mesh));
+    info.resource("chull_cntr").set<eig::Array3f>(cntr);
   }
 } // namespace met

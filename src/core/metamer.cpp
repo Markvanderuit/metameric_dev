@@ -82,6 +82,8 @@ namespace met {
   }
 
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {
+    met_trace();
+
     std::vector<Colr> out(info.samples.size());
 
     std::transform(std::execution::par_unseq, range_iter(info.samples), out.begin(), [&](const Colr &sample) {
