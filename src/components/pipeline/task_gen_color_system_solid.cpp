@@ -19,6 +19,7 @@ namespace met {
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
     // distributed over a gaussian distribution
+    inline
     auto inv_gaussian_cdf(const auto &x) {
       met_trace();
       auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
@@ -28,12 +29,14 @@ namespace met {
     
     // Given a random vector in RN bounded to [-1, 1], return a uniformly
     // distributed point on the unit sphere
+    inline
     auto inv_unit_sphere_cdf(const auto &x) {
       met_trace();
       return inv_gaussian_cdf(x).matrix().normalized().eval();
     }
 
     // Generate a set of random, uniformly distributed unit vectors in RN
+    inline
     std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_samples, uint n_dims) {
       met_trace();
 
@@ -66,6 +69,7 @@ namespace met {
 
     // Generate a set of random, uniformly distributed unit vectors in RN
     template <uint N>
+    inline
     std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
       met_trace();
       
@@ -125,7 +129,7 @@ namespace met {
       mesh.points(), mesh.points() + mesh.n_vertices(),
       omesh::Vec3f(0.f), f_add) / static_cast<float>(mesh.n_vertices());
 
-    // Submit data to modified resources
+    // Submit data as (modified) resources
     info.resource("chull_data").set<std::vector<Colr>>(std::move(data));
     info.resource("chull_mesh").set<AlignedMeshData>(convert_mesh<AlignedMeshData>(mesh));
     info.resource("chull_cntr").set<eig::Vector3f>(to_eig<float, 3>(cntr));
