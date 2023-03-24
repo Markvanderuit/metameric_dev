@@ -102,7 +102,7 @@ namespace met {
   void GenColorSolidsTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Ger shared resources
+    // Get shared resources
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
