@@ -429,7 +429,7 @@ namespace met {
         
     // Get external resources
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_csol_cntr = info.resource("gen_color_solids", "csol_cntr").read_only<Colr>();
+    const auto &e_csol_cntr = info.resource("gen_mismatch_solid", "chull_cntr").read_only<Colr>();
     const auto &i_cstr_slct = info.resource("constr_selection").read_only<int>();
 
     // Get mnodified resources

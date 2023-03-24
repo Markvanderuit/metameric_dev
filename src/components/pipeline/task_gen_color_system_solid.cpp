@@ -14,7 +14,7 @@
 #include <ranges>
 
 namespace met {
-  constexpr uint n_samples = 4096; // Nr. of samples for color system OCS generation
+  constexpr uint n_samples = 1024; // Nr. of samples for color system OCS generation
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector

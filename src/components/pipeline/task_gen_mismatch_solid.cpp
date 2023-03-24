@@ -5,7 +5,7 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/components/pipeline/task_gen_color_solids.hpp>
+#include <metameric/components/pipeline/task_gen_mismatch_solid.hpp>
 #include <omp.h>
 #include <algorithm>
 #include <execution>
@@ -14,13 +14,13 @@
 #include <ranges>
 
 namespace met {
-  constexpr uint n_samples_ocs = 4096; // Nr. of samples for color system OCS generation
-  constexpr uint n_samples_mmv = 64;   // Nr. of samples for metamer mismatch volume OCS generation
+  constexpr uint n_samples     = 64;   // Nr. of samples for metamer mismatch volume OCS generation
   constexpr uint n_constraints = 4;    // Maximum nr. of secondary color constraints
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
     // distributed over a gaussian distribution
+    inline
     auto inv_gaussian_cdf(const auto &x) {
       met_trace();
       auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
@@ -30,12 +30,14 @@ namespace met {
     
     // Given a random vector in RN bounded to [-1, 1], return a uniformly
     // distributed point on the unit sphere
+    inline
     auto inv_unit_sphere_cdf(const auto &x) {
       met_trace();
       return inv_gaussian_cdf(x).matrix().normalized().eval();
     }
 
     // Generate a set of random, uniformly distributed unit vectors in RN
+    inline
     std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_samples, uint n_dims) {
       met_trace();
 
@@ -68,6 +70,7 @@ namespace met {
 
     // Generate a set of random, uniformly distributed unit vectors in RN
     template <uint N>
+    inline
     std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
       met_trace();
       
@@ -99,26 +102,25 @@ namespace met {
     }
   } // namespace detail
 
-  void GenColorSolidsTask::init(SchedulerHandle &info) {
+  void GenMismatchSolidTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources
+    // Get external resources
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
     for (uint i = 1; i <= n_constraints; ++i) {
       const uint dims = 3 + 3 * i;
-      info.resource(fmt::format("samples_{}", i)).set(detail::gen_unit_dirs_x(n_samples_mmv, dims));
+      info.resource(fmt::format("samples_{}", i)).set(detail::gen_unit_dirs_x(n_samples, dims));
     }
 
-    // Register resources to hold convex hull data for a metamer mismatch volume OCS
-    info.resource("csol_data"   ).set(std::vector<Colr>());
-    info.resource("csol_data_al").set(std::vector<AlColr>());
-    info.resource("csol_cntr"   ).set(Colr(0.f));
+    // Register resources to hold convex hull data
+    info.resource("chull_mesh").set<AlignedMeshData>({ });
+    info.resource("chull_cntr").set(Colr(0.f));
   }
 
-  bool GenColorSolidsTask::eval_state(SchedulerHandle &info) {
+  bool GenMismatchSolidTask::eval_state(SchedulerHandle &info) {
     met_trace_full();
     
     const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
@@ -132,7 +134,7 @@ namespace met {
     return e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection;
   }
   
-  void GenColorSolidsTask::eval(SchedulerHandle &info) {
+  void GenMismatchSolidTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
@@ -142,11 +144,6 @@ namespace met {
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices[e_vert_slct[0]];
-
-    // Get modified resources
-    auto &i_csol_data    = info.resource("csol_data").writeable<std::vector<Colr>>();
-    auto &i_csol_data_al = info.resource("csol_data_al").writeable<std::vector<AlColr>>();
-    auto &i_csol_cntr    = info.resource("csol_cntr").writeable<Colr>();
 
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
@@ -164,17 +161,23 @@ namespace met {
     const auto &i_samples = info.resource(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
 
     // Generate points on metamer set boundary; store in aligned format
-    i_csol_data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 
-                                               .basis_avg = e_appl_data.loaded_basis_mean, 
-                                               .systems_i = cmfs_i, 
-                                               .signals_i = sign_i, 
-                                               .system_j  = cmfs_j, 
-                                               .samples   = i_samples });
-    i_csol_data_al = std::vector<AlColr>(range_iter(i_csol_data));
+    auto data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 
+                                             .basis_avg = e_appl_data.loaded_basis_mean, 
+                                             .systems_i = cmfs_i, 
+                                             .signals_i = sign_i, 
+                                             .system_j  = cmfs_j, 
+                                             .samples   = i_samples });
     
+    // Generate cleaned mesh from data
+    auto mesh = generate_convex_hull<AlignedMeshData, eig::Array3f>(data);
+
     // Compute center of metamer set boundary
     constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
-    i_csol_cntr = std::reduce(std::execution::par_unseq, range_iter(i_csol_data), 
-      Colr(0.f), f_add) / static_cast<float>(i_csol_data.size());
+    auto cntr = std::reduce(std::execution::par_unseq, range_iter(data), Colr(0.f), f_add)
+              / static_cast<float>(data.size());
+
+    // Submit mesh data
+    info.resource("chull_mesh").writeable<AlignedMeshData>() = std::move(mesh);
+    info.resource("chull_cntr").writeable<Colr>() = cntr;
   }
 } // namespace met

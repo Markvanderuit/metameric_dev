@@ -107,7 +107,7 @@ namespace met {
     const auto &e_pipe_state  = info.resource("state", "pipeline_state").read_only<ProjectState>();
     const auto &e_view_state  = info.resource("state", "viewport_state").read_only<ViewportState>();
     const auto &e_arcball     = info.resource(m_parent, "arcball").read_only<detail::Arcball>();
-    const auto &e_csol_cntr   = info.resource("gen_color_solids", "csol_cntr").read_only<Colr>();
+    const auto &e_csol_cntr   = info.resource("gen_mismatch_solid", "chull_cntr").read_only<Colr>();
 
     // Get modified resources
     auto &e_lrgb_target = info.resource(m_parent, "lrgb_color_solid_target").writeable<gl::Texture2d4f>();
@@ -131,16 +131,11 @@ namespace met {
       m_srgb_program.uniform("u_size", dispatch_n);
     }
 
-    // (Re-)create convex hull mesh data. If the selected vertex/constraint has in any way changed, a new
-    // convex hull mesh needs to be computed and uploaded to the chull/point buffers
-    bool recreate_chull = e_view_state.vert_selection || e_view_state.cstr_selection || e_pipe_state.verts[e_vert_slct[0]].any;
-    if (recreate_chull) {
-      // Get color solid data, if available
-      const auto &e_csol_data = info.resource("gen_color_solids", "csol_data_al").read_only<std::vector<AlColr>>();
-      guard(!e_csol_data.empty());
-
-      // Generate convex hull mesh and convert to buffer format
-      auto [verts, elems] = generate_convex_hull<AlignedMeshData, AlColr>(e_csol_data);
+    // Stream data to vertex array if mesh data has changed; this change is on-line, so
+    // we copy to existing buffers
+    if (auto rsrc = info.resource("gen_mismatch_solid", "chull_mesh"); rsrc.is_mutated()) {
+      const auto &[verts, elems] = rsrc.read_only<AlignedMeshData>();
+      guard(!verts.empty());
 
       // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
       m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));

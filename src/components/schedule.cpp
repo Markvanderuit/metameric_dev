@@ -10,8 +10,8 @@
 #include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
-#include <metameric/components/pipeline/task_gen_color_solids.hpp>
 #include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
+#include <metameric/components/pipeline/task_gen_mismatch_solid.hpp>
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/task_weight_viewer.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
@@ -105,12 +105,12 @@ namespace met {
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("state").init<StateTask>();
 
-    // The following tasks define the color->spectrum uplifting pipeline and view data
+    // The following tasks define the color->spectrum uplifting pipeline and dependent data
     scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
     scheduler.task("gen_delaunay_weights").init<GenDelaunayWeightsTask>();
-    scheduler.task("gen_color_solids").init<GenColorSolidsTask>();
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
     scheduler.task("gen_color_system_solid").init<GenColorSystemSolidTask>();
+    scheduler.task("gen_mismatch_solid").init<GenMismatchSolidTask>();
 
     // The following tasks define view components and windows
     scheduler.task("window").init<WindowTask>();
