@@ -12,7 +12,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class WeightViewerTask : public detail::TaskBase {
+  class WeightViewerTask : public detail::TaskNode {
     using TextureSubtask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
     using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
     

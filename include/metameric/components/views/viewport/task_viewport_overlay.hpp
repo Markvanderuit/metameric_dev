@@ -5,7 +5,7 @@
 #include <metameric/core/spectrum.hpp>
 
 namespace met {
-  class ViewportOverlayTask : public detail::TaskBase {
+  class ViewportOverlayTask : public detail::TaskNode {
     Colr m_colr_prev;
     bool m_is_gizmo_used;     // Gizmo use state
     bool m_is_vert_edit_used; // Color edit use state

@@ -25,7 +25,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
 
     // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
     auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
@@ -101,7 +101,7 @@ namespace met {
     guard(e_vert_slct.size() == 1 && e_cstr_slct != -1);
 
     // Get external resources
-    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_vert        = e_proj_data.vertices[e_vert_slct[0]];
     const auto &e_pipe_state  = info.resource("state", "pipeline_state").read_only<ProjectState>();

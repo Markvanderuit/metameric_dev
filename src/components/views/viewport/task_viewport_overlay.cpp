@@ -50,7 +50,7 @@ namespace met {
     info.resource("arcball").init<detail::Arcball>({ .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
-    info.subtask("draw_color_solid").init<DrawColorSolidTask>(info.task_key());
+    info.subtask("draw_color_solid").init<DrawColorSolidTask>(info.task().key());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;
@@ -63,10 +63,10 @@ namespace met {
 
     // Get external resources
     const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
-    const auto &e_window     = info.resource(global_key, "window").read_only<gl::Window>();
+    const auto &e_window     = info.global("window").read_only<gl::Window>();
     const auto &e_vert_slct  = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &i_cstr_slct  = info.resource("constr_selection").read_only<int>();
-    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_verts      = e_proj_data.vertices;
 
@@ -167,7 +167,7 @@ namespace met {
     const auto &i_cstr_slct = info.resource("constr_selection").read_only<int>();
 
     // Get modified resources
-    auto &e_appl_data = info.resource(global_key, "app_data").writeable<ApplicationData>();
+    auto &e_appl_data = info.global("app_data").writeable<ApplicationData>();
     auto &e_proj_data = e_appl_data.project_data;
     auto &e_vert      = e_proj_data.vertices[i];
 
@@ -433,7 +433,7 @@ namespace met {
     const auto &i_cstr_slct = info.resource("constr_selection").read_only<int>();
 
     // Get mnodified resources
-    auto &e_appl_data   = info.resource(global_key, "app_data").writeable<ApplicationData>();
+    auto &e_appl_data   = info.global("app_data").writeable<ApplicationData>();
     auto &e_proj_data   = e_appl_data.project_data;
     auto &e_vert        = e_appl_data.project_data.vertices[e_vert_slct[0]];
     auto &i_arcball     = info.resource("arcball").writeable<detail::Arcball>();
@@ -549,10 +549,10 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_window    = info.resource(global_key, "window").read_only<gl::Window>();
+    const auto &e_window    = info.global("window").read_only<gl::Window>();
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &e_spec      = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices;
 

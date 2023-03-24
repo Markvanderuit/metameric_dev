@@ -8,7 +8,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class ViewportDrawBeginTask : public detail::TaskBase {
+  class ViewportDrawBeginTask : public detail::TaskNode {
     using Colorbuffer = gl::Renderbuffer<float, 4, gl::RenderbufferType::eMultisample>;
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1, gl::RenderbufferType::eMultisample>;
 
@@ -29,7 +29,7 @@ namespace met {
       met_trace_full();
     
       // Get external resources 
-      const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+      const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
       const auto &e_lrgb_target = info.resource("viewport.begin", "lrgb_target").read_only<gl::Texture2d4f>();
 
       // Get modified resources 

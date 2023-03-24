@@ -22,24 +22,32 @@
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
-    scheduler.task("schedule_view").init<LambdaTask>([&](auto &info) {
+    scheduler.task("schedule_view").init<LambdaTask>([&](SchedulerHandle &info) {
+      // Check if the scheduler handle implements a MapBasedSchedule
+      auto *info_data = dynamic_cast<MapBasedSchedule *>(&info);
+      guard(info_data);
+
       // Temporary window to show runtime schedule
-      if (ImGui::Begin("Schedule debug")) {
-        const auto &resource_map = info.resources();
-        for (const auto &task_key : info.schedule()) {
+      if (ImGui::Begin("Scheduler info")) {
+        // Query MapBasedSchedule information
+        const auto &rsrc_map = info_data->resources();
+        const auto &task_map = info_data->tasks();
+        const auto  schedule = info_data->schedule();
+
+        for (const auto &task_key : schedule) {
           // Split string to get task name without prepend
           auto count = std::count(range_iter(task_key), '.');
           auto split = std::views::split(task_key, '.')
                      | std::views::transform([](const auto &r) { return std::string(range_iter(r)); });
           auto name = (split | std::views::drop(count)).front();
-
+          
           // Indent dependent on how much of a subtask something is
           for (uint i = 0; i < count; ++i) ImGui::Indent(16.f);
 
           if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-            if (ImGui::IsItemHovered() && resource_map.contains(task_key)) {
+            if (ImGui::IsItemHovered() && rsrc_map.contains(task_key)) {
               ImGui::BeginTooltip();
-              for (const auto &[key, _] : resource_map.at(task_key)) {
+              for (const auto &[key, _] : rsrc_map.at(task_key)) {
                 ImGui::Text(key.c_str());
               }
               ImGui::EndTooltip();
@@ -50,6 +58,24 @@ namespace met {
           // Unindent dependent on how much of a subtask something is
           for (uint i = 0; i < count; ++i) ImGui::Unindent(16.f);
         }
+
+        /* if (ImGui::BeginTabBar("#SchedulerTabBar")) {
+          if (ImGui::BeginTabItem("Task nodes", 0)) {
+
+            ImGui::EndTabItem();
+          }
+
+          if (ImGui::BeginTabItem("Resource nodes", 0)) {
+
+            ImGui::EndTabItem();
+          }
+          
+          if (ImGui::BeginTabItem("Schedule", 0)) {
+
+            ImGui::EndTabItem();
+          }
+          ImGui::EndTabBar();
+        } */
       }
       ImGui::End();
     });
@@ -62,7 +88,7 @@ namespace met {
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        auto &pca = info.resource(global_key, "app_data").loaded_basis.writeable<ApplicationData>();
+        auto &pca = info.global("app_data").loaded_basis.writeable<ApplicationData>();
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
@@ -96,8 +122,6 @@ namespace met {
     submit_schedule_debug(scheduler);
 
     scheduler.task("frame_end").init<FrameEndTask>();
-
-    scheduler.build();
   }
   
   void submit_schedule_empty(detail::SchedulerBase &scheduler) {
@@ -105,6 +129,5 @@ namespace met {
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
     scheduler.task("frame_end").init<FrameEndTask>();
-    scheduler.build();
   }
 } // namespace met

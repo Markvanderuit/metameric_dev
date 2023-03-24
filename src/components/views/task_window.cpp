@@ -30,7 +30,7 @@ namespace met {
     // Open a file picker
     if (fs::path path; detail::load_dialog(path, "json")) {
       // Initialize existing project
-      info.resource(global_key, "app_data").writeable<ApplicationData>().load(path);
+      info.global("app_data").writeable<ApplicationData>().load(path);
 
       // Clear OpenGL state
       gl::Program::unbind_all();
@@ -46,7 +46,7 @@ namespace met {
   bool WindowTask::handle_save(SchedulerHandle &info) {
     met_trace_full();
     
-    auto &e_app_data = info.resource(global_key, "app_data").writeable<ApplicationData>();
+    auto &e_app_data = info.global("app_data").writeable<ApplicationData>();
     if (e_app_data.project_save == SaveFlag::eNew) {
       return handle_save_as(info);
     } else {
@@ -59,7 +59,7 @@ namespace met {
     met_trace_full();
     
     if (fs::path path; detail::save_dialog(path, "json")) {
-      info.resource(global_key, "app_data").writeable<ApplicationData>().save(io::path_with_ext(path, ".json"));
+      info.global("app_data").writeable<ApplicationData>().save(io::path_with_ext(path, ".json"));
       return true;
     }
     return false;
@@ -70,7 +70,7 @@ namespace met {
 
     if (fs::path path; detail::save_dialog(path, "met")) {
       // Get shared resources
-      const auto &e_app_data    = info.resource(global_key, "app_data").read_only<ApplicationData>();
+      const auto &e_app_data    = info.global("app_data").read_only<ApplicationData>();
       const auto &e_prj_data    = e_app_data.project_data;
       const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
       const auto &e_spectra     = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
@@ -153,7 +153,7 @@ namespace met {
   void WindowTask::handle_close_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    const auto &e_app_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
     if (e_app_data.project_save == SaveFlag::eUnsaved 
      || e_app_data.project_save == SaveFlag::eNew) {
       m_open_close_modal = true;
@@ -170,7 +170,7 @@ namespace met {
     gl::Program::unbind_all();
 
     // Empty application data as project is closed
-    info.resource(global_key, "app_data").writeable<ApplicationData>().unload();
+    info.global("app_data").writeable<ApplicationData>().unload();
     
     // Signal schedule re-creation and submit empty schedule for main view
     submit_schedule_empty(info);
@@ -179,7 +179,7 @@ namespace met {
   void WindowTask::handle_exit_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    const auto &e_app_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
     if (e_app_data.project_save == SaveFlag::eUnsaved 
      || e_app_data.project_save == SaveFlag::eNew) {
       m_open_exit_modal = true;
@@ -194,10 +194,10 @@ namespace met {
     ImGui::CloseAnyPopupIfOpen();
 
     // Empty application data as project is closed
-    info.resource(global_key, "app_data").writeable<ApplicationData>().unload();
+    info.global("app_data").writeable<ApplicationData>().unload();
 
     // Signal to window that it should close itself
-    info.resource(global_key, "window").writeable<gl::Window>().set_should_close();
+    info.global("window").writeable<gl::Window>().set_should_close();
     
     // Signal scheduler end
     info.clear();
@@ -217,7 +217,7 @@ namespace met {
       /* File menu follows */
       
       if (ImGui::BeginMenu("File")) {
-        const auto &e_app_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+        const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
         const bool is_loaded   = e_app_data.project_save != SaveFlag::eUnloaded;
         const bool enable_save = e_app_data.project_save != SaveFlag::eSaved 
           && e_app_data.project_save != SaveFlag::eNew && is_loaded;
@@ -251,7 +251,7 @@ namespace met {
       /* Edit menu follows */
 
       if (ImGui::BeginMenu("Edit")) {
-        auto &e_app_data = info.resource(global_key, "app_data").writeable<ApplicationData>();
+        auto &e_app_data = info.global("app_data").writeable<ApplicationData>();
         const bool is_undo = e_app_data.mod_i >= 0;
         const bool is_redo = e_app_data.mod_i < int(e_app_data.mods.size()) - 1;
         if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_app_data.undo(); }
@@ -282,7 +282,7 @@ namespace met {
           if (ImGui::Button("Close without saving")) { handle_close(info); }
           ImGui::SameLine();
           if (ImGui::Button("Cancel")) { 
-            info.task(info.task_key()).dstr();
+            info.task().dstr();
             ImGui::CloseCurrentPopup(); 
           }
           ImGui::EndPopup();
@@ -302,7 +302,7 @@ namespace met {
           if (ImGui::Button("Exit without saving")) { handle_exit(info); }
           ImGui::SameLine();
           if (ImGui::Button("Cancel")) { 
-            info.task(info.task_key()).dstr();
+            info.task().dstr();
             ImGui::CloseCurrentPopup(); 
           }
           ImGui::EndPopup();

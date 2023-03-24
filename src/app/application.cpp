@@ -38,18 +38,18 @@ namespace met {
       data.loaded_basis = loaded_tree.basis;
       data.loaded_basis_mean = loaded_tree.basis_mean;
 
-      scheduler.resource("app_data").set(std::move(data));
+      scheduler.global("app_data").set(std::move(data));
     }
 
     void init_parser(LinearScheduler &scheduler) {
       glp::Parser parser;
       parser.add_string("MET_SUBGROUP_SIZE", 
         std::to_string(gl::state::get_variable_int(gl::VariableName::eSubgroupSize)));
-      scheduler.resource("glsl_parser").set(std::move(parser));
+      scheduler.global("glsl_parser").set(std::move(parser));
     }
 
     void init_schedule(LinearScheduler &scheduler) {
-      auto &app_data = scheduler.resource("app_data").writeable<ApplicationData>();
+      auto &app_data = scheduler.global("app_data").writeable<ApplicationData>();
       if (app_data.project_save == SaveFlag::eSaved) {
         submit_schedule_main(scheduler);
       } else {
@@ -66,7 +66,7 @@ namespace met {
     LinearScheduler scheduler;
 
     // Initialize OpenGL context (and primary window) and submit to scheduler
-    auto &window = scheduler.resource("window").init<gl::Window>({ 
+    auto &window = scheduler.global("window").init<gl::Window>({ 
       .size  = { 1680, 1024 }, 
       .title = "Metameric",
       .flags = gl::WindowCreateFlags::eVisible

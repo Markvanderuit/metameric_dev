@@ -11,7 +11,7 @@
 #include <array>
 
 namespace met {
-  class MappingsViewerTask : public detail::TaskBase {
+  class MappingsViewerTask : public detail::TaskNode {
     using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
     using TextureSubTask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
 

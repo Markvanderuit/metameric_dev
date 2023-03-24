@@ -23,7 +23,7 @@ namespace met::detail {
   };
 
   template <class TextureTy>
-  class TextureResampleTask : public detail::TaskBase {
+  class TextureResampleTask : public detail::TaskNode {
   public:
     using TextureType = TextureTy;
     using InfoType    = TextureResampleTaskCreateInfo<TextureType>;

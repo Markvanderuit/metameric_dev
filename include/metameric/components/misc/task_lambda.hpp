@@ -6,7 +6,7 @@
 #include <functional>
 
 namespace met {
-  class LambdaTask : public detail::TaskBase {
+  class LambdaTask : public detail::TaskNode {
     using InitType = std::function<void(SchedulerHandle &)>;
     using EvalType = std::function<void(SchedulerHandle &)>;
     using DstrType = std::function<void(SchedulerHandle &)>;

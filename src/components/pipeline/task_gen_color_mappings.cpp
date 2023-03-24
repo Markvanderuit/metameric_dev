@@ -17,7 +17,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     
     // Determine dispatch group size
     const uint mapping_n    = e_appl_data.loaded_texture_f32.size().prod();
@@ -57,7 +57,7 @@ namespace met {
 
     // Get external resources
     const auto &e_pipe_state  = info.resource("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
     const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
@@ -98,7 +98,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
     auto e_texture_size = e_appl_data.loaded_texture_f32.size();
 
@@ -112,7 +112,7 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     uint e_mappings_n = e_appl_data.project_data.color_systems.size();
 
     // Adjust nr. of subtasks

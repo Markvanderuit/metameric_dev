@@ -6,7 +6,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class GenDelaunayWeightsTask : public detail::TaskBase {
+  class GenDelaunayWeightsTask : public detail::TaskNode {
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining surrounding hull

@@ -14,7 +14,7 @@
 namespace met {
   constexpr float selector_near_distance = 12.f;
 
-  class ViewportInputVertTask : public detail::TaskBase {
+  class ViewportInputVertTask : public detail::TaskNode {
     std::vector<Colr> m_colrs_prev;
     bool              m_is_gizmo_used;
     
@@ -42,7 +42,7 @@ namespace met {
       const auto &i_selection_const = info.resource("selection").read_only<std::vector<uint>>();
 
       // Get modified resources
-      auto &e_app_data  = info.resource(global_key, "app_data").writeable<ApplicationData>();
+      auto &e_app_data  = info.global("app_data").writeable<ApplicationData>();
       auto &e_verts     = e_app_data.project_data.vertices;
       auto &io          = ImGui::GetIO();
 

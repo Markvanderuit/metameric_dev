@@ -4,7 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class GenSpectralDataTask : public detail::TaskBase {
+  class GenSpectralDataTask : public detail::TaskNode {
     std::span<AlColr>       m_vert_map;
     std::span<eig::Array4u> m_tetr_map;
 

@@ -19,8 +19,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_rgb_texture = info.resource(global_key, "app_data").read_only<ApplicationData>().loaded_texture_f32;
-    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_rgb_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
 
     const uint generate_n    = e_rgb_texture.size().prod();
@@ -63,7 +63,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_vert_buffer = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
     const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
     const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();

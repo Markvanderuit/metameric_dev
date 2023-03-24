@@ -69,7 +69,7 @@ namespace met {
       const auto &e_chull_cntr = info.resource("gen_color_solids", "csys_ocs_cntr").read_only<Colr>();
 
       // Get modified resources
-      auto &e_appl_data  = info.resource(global_key, "app_data").writeable<ApplicationData>();
+      auto &e_appl_data  = info.global("app_data").writeable<ApplicationData>();
       auto &e_proj_data  = e_appl_data.project_data;
       
       #pragma omp parallel for

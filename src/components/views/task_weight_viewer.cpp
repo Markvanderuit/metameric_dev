@@ -14,7 +14,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
 
     // Determine dispatch group size
     const uint dispatch_n    = e_appl_data.loaded_texture_f32.size().prod();
@@ -36,11 +36,11 @@ namespace met {
     info.resource("colr_buffer").init<gl::Buffer>({ .size = sizeof(AlColr) * dispatch_n });
 
     // Create subtask to handle buffer->texture copy
-    TextureSubtask texture_subtask = {{ .input_key  = { info.task_key(), "colr_buffer" }, .output_key = "colr_texture",
+    TextureSubtask texture_subtask = {{ .input_key  = { info.task().key(), "colr_buffer" }, .output_key = "colr_texture",
                                         .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
 
     // Create subtask to handle texture->texture resampling and gamma correction
-    ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task_key()), "colr_texture" }, .output_key   = "colr_texture",
+    ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task().key()), "colr_texture" }, .output_key   = "colr_texture",
                                           .texture_info = { .size = 1u }, .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
                                           .lrgb_to_srgb = true}};
 
@@ -53,12 +53,12 @@ namespace met {
 
     if (ImGui::Begin("Weight viewer")) {
       // Get external resources 
-      const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+      const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
       const auto &e_txtr_data = e_appl_data.loaded_texture_f32;
 
       // Get subtask names
-      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task_key());
-      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task_key());
+      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task().key());
+      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task().key());
 
       // Weight data is drawn to texture in this function
       eval_draw(info);
@@ -71,8 +71,9 @@ namespace met {
 
       // Ensure the resample subtask can readjust for a resized output texture
       {
-        auto mask = MaskedSchedulerHandle(info, "gen_resample");
-        info.subtask("gen_resample").realize<ResampleSubtask>().set_texture_info(mask, { .size = m_texture_size });
+        auto task = info.subtask("gen_resample");
+        auto mask = task.mask(info);
+        task.realize<ResampleSubtask>().set_texture_info(mask, { .size = m_texture_size });
       }
 
       // Display ImGui components
@@ -101,7 +102,7 @@ namespace met {
     }
 
     // Get external resources 
-    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
     const auto &e_cstr_slct   = info.resource("viewport.overlay", "constr_selection").read_only<int>();

@@ -44,7 +44,7 @@ namespace met {
     
     // Get external resources
     const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources

@@ -34,7 +34,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_uniform.vert" },

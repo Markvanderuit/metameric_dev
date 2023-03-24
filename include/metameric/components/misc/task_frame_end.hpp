@@ -8,7 +8,7 @@
 #include <small_gl/window.hpp>
 
 namespace met {
-  struct FrameEndTask : public detail::TaskBase {
+  struct FrameEndTask : public detail::TaskNode {
     bool m_bind_default_fbo;
 
     FrameEndTask(bool bind_default_fbo = true)
@@ -28,7 +28,7 @@ namespace met {
       ImGui::DrawFrame();
 
       // Handle window events
-      auto &e_window = info.resource(global_key, "window").writeable<gl::Window>();
+      auto &e_window = info.global("window").writeable<gl::Window>();
       e_window.swap_buffers();
       e_window.poll_events();
 

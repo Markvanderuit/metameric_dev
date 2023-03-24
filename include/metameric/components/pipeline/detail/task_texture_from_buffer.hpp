@@ -21,7 +21,7 @@ namespace met::detail {
   };
 
   template <class TextureType>
-  class TextureFromBufferTask : public detail::TaskBase {
+  class TextureFromBufferTask : public detail::TaskNode {
     using InfoType = TextureFromBufferTaskCreateInfo<TextureType>;
     using StrPair = std::pair<std::string, std::string>;
 

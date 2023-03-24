@@ -15,7 +15,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_texture_data = info.resource(global_key, "app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_texture_data = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv_opt", .is_spirv_binary = true },

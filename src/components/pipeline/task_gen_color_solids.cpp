@@ -105,7 +105,7 @@ namespace met {
     met_trace_full();
 
     // Ger shared resources
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
@@ -149,7 +149,6 @@ namespace met {
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
 
     guard(e_cstr_slct != -1 && !e_vert_slct.empty(), false);
-    fmt::print("visible selection\n");
 
     const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
     const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
@@ -164,7 +163,7 @@ namespace met {
     const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &e_vert_sd   = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>()[e_vert_slct[0]];
-    const auto &e_appl_data = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices[e_vert_slct[0]];
 

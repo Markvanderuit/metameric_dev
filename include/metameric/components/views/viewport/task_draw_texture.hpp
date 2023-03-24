@@ -7,7 +7,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class ViewportDrawTextureTask : public detail::TaskBase {
+  class ViewportDrawTextureTask : public detail::TaskNode {
     gl::Array    m_array;
     gl::DrawInfo m_draw;
     gl::Program  m_program;

@@ -7,7 +7,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class ViewportDrawCSysOCSTask : public detail::TaskBase {
+  class ViewportDrawCSysOCSTask : public detail::TaskNode {
     gl::Buffer   m_vert_buffer;
     gl::Buffer   m_elem_buffer;
     gl::Array    m_array;

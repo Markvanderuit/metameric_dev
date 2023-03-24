@@ -11,7 +11,7 @@
 #include <string>
 
 namespace met {
-  class CreateProjectTask : public detail::TaskBase {
+  class CreateProjectTask : public detail::TaskNode {
     std::string m_view_title;
 
     ProjectCreateInfo                                    m_proj_data;

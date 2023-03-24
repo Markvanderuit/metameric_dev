@@ -10,7 +10,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  struct ViewportDrawEndTask : public detail::TaskBase {
+  struct ViewportDrawEndTask : public detail::TaskNode {
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::Sampler     m_sampler;

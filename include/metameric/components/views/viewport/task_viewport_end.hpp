@@ -5,7 +5,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  class ViewportEndTask : public detail::TaskBase {
+  class ViewportEndTask : public detail::TaskNode {
   public:
     void eval(SchedulerHandle &info) override {
       met_trace_full();

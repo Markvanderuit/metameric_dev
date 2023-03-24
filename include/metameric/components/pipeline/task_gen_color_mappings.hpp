@@ -9,7 +9,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class GenColorMappingTask : public detail::TaskBase {
+  class GenColorMappingTask : public detail::TaskNode {
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining delaunay
@@ -34,7 +34,7 @@ namespace met {
     void eval(SchedulerHandle &) override;
   };
 
-  class GenColorMappingsTask : public detail::TaskBase {
+  class GenColorMappingsTask : public detail::TaskNode {
     detail::Subtasks<GenColorMappingTask> m_mapping_subtasks;
 
   public:

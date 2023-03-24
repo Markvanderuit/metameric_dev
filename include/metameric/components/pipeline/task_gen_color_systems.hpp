@@ -4,7 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class GenColorSystemsTask : public detail::TaskBase {
+  class GenColorSystemsTask : public detail::TaskNode {
     uint m_max_maps;
     
   public:

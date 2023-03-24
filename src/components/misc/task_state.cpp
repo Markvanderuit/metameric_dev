@@ -91,7 +91,7 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_appl_data  = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_arcball    = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
     const auto &e_vert_selct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();

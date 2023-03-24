@@ -7,7 +7,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  class ViewportBeginTask : public detail::TaskBase {
+  class ViewportBeginTask : public detail::TaskNode {
   public:
     void init(SchedulerHandle &info) override {
       met_trace_full();

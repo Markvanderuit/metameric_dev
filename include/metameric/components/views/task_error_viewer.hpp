@@ -14,7 +14,7 @@
 #include <array>
 
 namespace met {
-  class ErrorViewerTask : public detail::TaskBase {
+  class ErrorViewerTask : public detail::TaskNode {
     using TextureSubtask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
     using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
 

@@ -12,7 +12,7 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  class DrawColorSolidTask : public detail::TaskBase {
+  class DrawColorSolidTask : public detail::TaskNode {
     // Shorthands for multisampled framebuffer attachment types
     using Colorbuffer = gl::Renderbuffer<
       float, 

@@ -4,7 +4,7 @@
 #include <metameric/core/data.hpp>
 
 namespace met {
-  class StateTask : public detail::TaskBase {
+  class StateTask : public detail::TaskNode {
     // Copies of project data to check for and report state changes
     std::vector<ProjectData::Vert>            m_verts;
     std::vector<ProjectData::CSys>            m_csys;

@@ -28,7 +28,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data   = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_vert_buffer = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
 
@@ -88,7 +88,7 @@ namespace met {
     const auto &e_view_state   = info.resource("state", "viewport_state").read_only<ViewportState>();
     const auto &e_frame_buffer = info.resource("viewport.draw_begin", "frame_buffer").read_only<gl::Framebuffer>();
     const auto &e_arcball      = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_appl_data    = info.resource(global_key, "app_data").read_only<ApplicationData>();
+    const auto &e_appl_data    = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data    = e_appl_data.project_data;
     const auto &e_vert_buffer  = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
 

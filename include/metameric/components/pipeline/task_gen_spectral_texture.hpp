@@ -6,7 +6,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class GenSpectralTextureTask : public detail::TaskBase {
+  class GenSpectralTextureTask : public detail::TaskNode {
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining surrounding hull

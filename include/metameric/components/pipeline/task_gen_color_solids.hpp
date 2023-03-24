@@ -4,7 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  class GenColorSolidsTask : public detail::TaskBase {
+  class GenColorSolidsTask : public detail::TaskNode {
   public:
     void init(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
