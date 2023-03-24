@@ -5,7 +5,6 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_color_solids.hpp>
 #include <omp.h>
 #include <algorithm>
@@ -13,7 +12,6 @@
 #include <numbers>
 #include <random>
 #include <ranges>
-#include <unordered_map>
 
 namespace met {
   constexpr uint n_samples_ocs = 4096; // Nr. of samples for color system OCS generation
