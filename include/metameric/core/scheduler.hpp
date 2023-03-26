@@ -22,7 +22,8 @@ namespace met {
     eClearAll   = 0x002u, // Signal that tasks and global resources are to be destroyed after run
   };
   met_declare_bitflag(LinearSchedulerHandleFlags);
-
+  
+  // Implementing scheduler
   class LinearScheduler : public Scheduler,
                           public MapBasedSchedule {
     // Private members
@@ -52,10 +53,8 @@ namespace met {
     std::vector<std::string> schedule() const override { return std::vector<std::string>(range_iter(m_schedule)); }
   };
 
-  /**
-   * Class that consumes application tasks and updates the environment
-   * in which they exist.
-   */
+
+  // Implementing scheduler handle, passed to task nodes during scheduler run
   class LinearSchedulerHandle : public SchedulerHandle,
                                 public MapBasedSchedule {
     // Private members
