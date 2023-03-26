@@ -55,7 +55,7 @@ namespace met::detail {
       set_texture_info(info, _info.texture_info);
     }
 
-    bool eval_state(SchedulerHandle &info) override {
+    bool is_active(SchedulerHandle &info) override {
       met_trace_full();
 
       // Run computation only if input exists and has been modified

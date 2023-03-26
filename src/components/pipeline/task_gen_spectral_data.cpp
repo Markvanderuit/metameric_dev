@@ -34,7 +34,7 @@ namespace met {
     info.resource("tetr_buffer").set<gl::Buffer>(std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
 
-  bool GenSpectralDataTask::eval_state(SchedulerHandle &info) {
+  bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
     met_trace_full();
     return info.resource("state", "pipeline_state").read_only<ProjectState>().any_verts;
   }

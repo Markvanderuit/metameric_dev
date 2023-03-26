@@ -46,7 +46,7 @@ namespace met {
     m_init_stale = true;
   }
 
-  bool GenColorMappingTask::eval_state(SchedulerHandle &info) {
+  bool GenColorMappingTask::is_active(SchedulerHandle &info) {
     met_trace();
     const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
     return m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;

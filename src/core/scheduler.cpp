@@ -140,7 +140,7 @@ namespace met {
 
       // Parse task info object by consuming task::eval_state() and task::eval()
       LinearSchedulerHandle handle(*this, task_key);
-      guard_continue(task->eval_state(handle));
+      guard_continue(task->is_active(handle));
       task->eval(handle);
 
       // Process signal flags; clear tasks/resources if requested

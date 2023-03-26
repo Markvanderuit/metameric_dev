@@ -120,7 +120,7 @@ namespace met {
     info.resource("chull_cntr").set(Colr(0.f));
   }
 
-  bool GenMismatchSolidTask::eval_state(SchedulerHandle &info) {
+  bool GenMismatchSolidTask::is_active(SchedulerHandle &info) {
     met_trace_full();
     
     const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();

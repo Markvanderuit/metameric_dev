@@ -39,7 +39,7 @@ namespace met {
       virtual void dstr(SchedulerHandle &) { };
 
       // Override and implement; on false return, eval(...) is not called
-      virtual bool eval_state(SchedulerHandle &) { return true; }
+      virtual bool is_active(SchedulerHandle &) { return true; }
     };
 
     // Abstract base class for application resources;

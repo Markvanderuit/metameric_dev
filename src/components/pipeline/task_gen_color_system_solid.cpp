@@ -101,7 +101,7 @@ namespace met {
     }
   } // namespace detail
 
-  bool GenColorSystemSolidTask::eval_state(SchedulerHandle &info) {
+  bool GenColorSystemSolidTask::is_active(SchedulerHandle &info) {
     met_trace_full();
     return info.resource("state", "pipeline_state").read_only<ProjectState>().csys[0];
   }

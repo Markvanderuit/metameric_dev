@@ -26,7 +26,7 @@ namespace met {
     info.resource("mapp_buffer").init<gl::Buffer>({ .size = m_max_maps * sizeof(ColrSystem), .flags = buffer_flags });
   }
   
-  bool GenColorSystemsTask::eval_state(SchedulerHandle &info) {
+  bool GenColorSystemsTask::is_active(SchedulerHandle &info) {
     met_trace_full();
     return info.resource("state", "pipeline_state").read_only<ProjectState>().any_csys;
   }

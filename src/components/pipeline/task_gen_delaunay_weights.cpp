@@ -44,7 +44,7 @@ namespace met {
     info.resource("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) });
   }
   
-  bool GenDelaunayWeightsTask::eval_state(SchedulerHandle &info) {
+  bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
     met_trace_full();
     return info.resource("gen_spectral_data", "vert_buffer").is_mutated() ||
            info.resource("gen_spectral_data", "tetr_buffer").is_mutated() ||

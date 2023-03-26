@@ -7,6 +7,6 @@ namespace met {
   public:
     void init(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
-    bool eval_state(SchedulerHandle &) override;
+    bool is_active(SchedulerHandle &) override;
   };
 } // namespace met

@@ -52,7 +52,7 @@ namespace met::detail {
       m_program.uniform("u_size", dispatch_n);
     }
 
-    bool eval_state(SchedulerHandle &info) override {
+    bool is_active(SchedulerHandle &info) override {
       met_trace_full();
 
       // Run computation only if input exists and has been modified
