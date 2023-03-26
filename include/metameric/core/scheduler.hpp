@@ -14,10 +14,17 @@ namespace met {
     virtual const RsrcMap &resources()          const = 0;
     virtual std::vector<std::string> schedule() const = 0;
   };
+  
+  // Signal flags passed back by LinearSchedulerHandle object back to scheduler
+  enum class LinearSchedulerHandleFlags : uint {
+    eNone       = 0x000u, // Default value
+    eClearTasks = 0x001u, // Signal that tasks and owned resources are to be destroyed after run
+    eClearAll   = 0x002u, // Signal that tasks and global resources are to be destroyed after run
+  };
+  met_declare_bitflag(LinearSchedulerHandleFlags);
 
   class LinearScheduler : public Scheduler,
                           public MapBasedSchedule {
-  private:
     // Private members
     MapBasedSchedule::RsrcMap m_rsrc_registry;
     MapBasedSchedule::TaskMap m_task_registry;
@@ -51,22 +58,13 @@ namespace met {
    */
   class LinearSchedulerHandle : public SchedulerHandle,
                                 public MapBasedSchedule {
-  public:
-    // Signal flags passed back by handle object back to scheduler
-    enum class HandleReturnFlags : uint {
-      eNone       = 0x000u, // Default value
-      eClearTasks = 0x001u, // Signal that tasks and owned resources are to be destroyed after run
-      eClearAll   = 0x002u, // Signal that tasks and global resources are to be destroyed after run
-    };
-
-  private:
     // Private members
     LinearScheduler &m_scheduler;
 
     // Friend private members
-    HandleReturnFlags           return_flags;
-    std::list<detail::TaskInfo> add_task_info;
-    std::list<detail::TaskInfo> rem_task_info;
+    LinearSchedulerHandleFlags return_flags;
+    std::list<detail::TaskInfo>        add_task_info;
+    std::list<detail::TaskInfo>        rem_task_info;
 
     // Virtual method implementations for SchedulerHandle
     detail::TaskNode *add_task_impl(detail::TaskInfo &&)       override; // nullable return value
@@ -83,7 +81,7 @@ namespace met {
     LinearSchedulerHandle(LinearScheduler &scheduler, const std::string &task_key)
     : SchedulerHandle(task_key),
       m_scheduler(scheduler),
-      return_flags(HandleReturnFlags::eNone) { }
+      return_flags(LinearSchedulerHandleFlags::eNone) { }
 
     // Virtual method implementations for SchedulerHandle
     void clear(bool preserve_global = true) override; // Clear current schedule and resources
@@ -93,7 +91,4 @@ namespace met {
     const RsrcMap &resources()          const override { return m_scheduler.resources(); }
     std::vector<std::string> schedule() const override { return m_scheduler.schedule(); }
   };
-
-  // LinearSchedulerHandle::HandleReturnFlags function sugar
-  met_declare_bitflag(LinearSchedulerHandle::HandleReturnFlags);
 } // namespace met

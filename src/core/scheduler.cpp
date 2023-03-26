@@ -120,8 +120,6 @@ namespace met {
   }
 
   void LinearScheduler::run() {
-    using Flags = LinearSchedulerHandle::HandleReturnFlags;
-
     met_trace();
 
     // Run all current tasks in copy of schedule order
@@ -144,8 +142,8 @@ namespace met {
       task->eval(handle);
 
       // Process signal flags; clear tasks/resources if requested
-      if (has_flag(handle.return_flags, Flags::eClearTasks)) clear();
-      if (has_flag(handle.return_flags, Flags::eClearAll))   clear(false);
+      if (has_flag(handle.return_flags, LinearSchedulerHandleFlags::eClearTasks)) clear();
+      if (has_flag(handle.return_flags, LinearSchedulerHandleFlags::eClearAll))   clear(false);
       
       // Defer task updates until current task is complete
       for (auto &info : handle.rem_task_info) rem_task_impl(std::move(info));
@@ -171,7 +169,9 @@ namespace met {
 
   void LinearSchedulerHandle::clear(bool preserve_global) {
     met_trace();
-    return_flags |= (preserve_global ? HandleReturnFlags::eClearTasks : HandleReturnFlags::eClearAll);
+    return_flags |= (preserve_global 
+      ? LinearSchedulerHandleFlags::eClearTasks 
+      : LinearSchedulerHandleFlags::eClearAll);
   }
 
   detail::TaskNode *LinearSchedulerHandle::add_task_impl(detail::TaskInfo &&info) {
