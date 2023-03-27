@@ -25,8 +25,8 @@ namespace met {
 
     // Initialize objects for convex-combination mapping
     m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.spv_opt",
-                   .is_spirv_binary = true }};
+                   .path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.spv",
+                   .is_spirv = true }};
     m_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_program };
 
     // Set up gamut buffer and establish a flushable mapping

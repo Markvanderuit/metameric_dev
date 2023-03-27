@@ -112,7 +112,6 @@ string(CONCAT glsl_parser_arg_string
 # replaced at runtime with the correct values
 string(CONCAT glsl_parser_placeholder_string "MET_SUBGROUP_SIZE=32")
 
-
 # Process shaders
 foreach(glsl_src ${glsl_srcs})
   # Obtain path, stripped of lead, and filename
@@ -123,10 +122,10 @@ foreach(glsl_src ${glsl_srcs})
 
   set(shader_preprocess_out 
     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
-  set(shader_binary_out 
+  set(shader_binary_out_temp 
+    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.temp.spv")
+  set(shader_binary_out
     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv")
-  set(shader_binary_opt_out 
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv_opt")
   set(shader_reflect_out
     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
   
@@ -143,34 +142,34 @@ foreach(glsl_src ${glsl_srcs})
 
   # Generate spir-v binary using glslangValidator
   add_custom_command(
-    OUTPUT  ${shader_binary_out}
+    OUTPUT  ${shader_binary_out_temp}
     COMMAND ${glslangValidator} ${shader_preprocess_out} 
-            -o ${shader_binary_out} --client opengl100 --target-env spirv1.5 -l
+            -o ${shader_binary_out_temp} --client opengl100 --target-env spirv1.5 -l
     DEPENDS ${shader_preprocess_out}
     VERBATIM
   )
 
   # Generate optimized spir-v binary using spirv-opt from spirv-tools
   add_custom_command(
-    OUTPUT  ${shader_binary_opt_out}
-    COMMAND ${spirv-opt} ${shader_binary_out} 
-            -o ${shader_binary_opt_out} -O --strength-reduction --combine-access-chains
-    DEPENDS ${shader_binary_out}
+    OUTPUT  ${shader_binary_out}
+    COMMAND ${spirv-opt} ${shader_binary_out_temp} 
+            -o ${shader_binary_out} -O --strength-reduction --combine-access-chains
+    DEPENDS ${shader_binary_out_temp}
     VERBATIM
   )
 
   # Generate spir-v reflection information in .json files using spirv-cross
   add_custom_command(
     OUTPUT  ${shader_reflect_out}
-    COMMAND ${spirv-cross} ${shader_binary_opt_out} 
+    COMMAND ${spirv-cross} ${shader_binary_out_temp} 
             --output ${shader_reflect_out} --reflect
-    DEPENDS ${shader_binary_opt_out}
+    DEPENDS ${shader_binary_out_temp}
     VERBATIM
   )
 
   # Set uo list of dependency commands
   list(APPEND shaders_preprocess_list 
-    ${shader_preprocess_out} ${shader_binary_out} ${shader_binary_opt_out} ${shader_reflect_out}
+    ${shader_preprocess_out} ${shader_binary_out_temp} ${shader_binary_out} ${shader_reflect_out}
   )
 endforeach()
 

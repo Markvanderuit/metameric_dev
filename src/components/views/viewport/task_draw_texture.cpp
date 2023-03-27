@@ -32,8 +32,8 @@ namespace met {
     m_data = {{ .data = cnt_span<const std::byte>(packed_data) }};
 
     // Setup program for instanced billboard point draw
-    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv_opt", .is_spirv_binary = true },
-                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_texture.frag.spv_opt", .is_spirv_binary = true }};
+    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv", .is_spirv = true },
+                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_texture.frag.spv", .is_spirv = true }};
 
     // Specify array and draw object
     m_array = {{ }};

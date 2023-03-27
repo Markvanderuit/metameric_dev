@@ -25,7 +25,7 @@ namespace met {
 
     // Initialize objects for clustered shader call
     m_program_cl = {{ .type = gl::ShaderType::eCompute,
-                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv_opt",
+                      .path = "resources/shaders/gen_spectral_texture/gen_spectral_texture.comp.spv",
                       .is_spirv_binary = true }};
     m_dispatch_cl = { .groups_x = generate_ndiv_cl, 
                       .bindable_program = &m_program_cl }; 
