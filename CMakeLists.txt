@@ -116,23 +116,20 @@ string(CONCAT glsl_parser_placeholder_string "MET_SUBGROUP_SIZE=32")
 foreach(glsl_src ${glsl_srcs})
   # Obtain path, stripped of lead, and filename
   cmake_path(RELATIVE_PATH glsl_src
-    BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src
-    OUTPUT_VARIABLE relative_path)
-  message(STATUS "Found shader : ${relative_path}")
+             BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src
+             OUTPUT_VARIABLE relative_path)
 
-  set(shader_preprocess_out 
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
-  set(shader_binary_out_temp 
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.temp.spv")
-  set(shader_binary_out
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv")
-  set(shader_reflect_out
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
+  message(STATUS "Compiling shader : ${relative_path}")
+  
+  set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
+  set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.temp")
+  set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv")
+  set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
   
   # Preprocess shader includes and preprocess strings using small_gl_parser
   add_custom_command(
-    OUTPUT  ${shader_preprocess_out}
-    COMMAND small_gl_parser_exec ${glsl_src} ${shader_preprocess_out} 
+    OUTPUT  ${spirv_parse_fp}
+    COMMAND small_gl_parser_exec ${glsl_src} ${spirv_parse_fp} 
             -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
             -s "${glsl_parser_arg_string}"
             -d "${glsl_parser_placeholder_string}"
@@ -140,41 +137,39 @@ foreach(glsl_src ${glsl_srcs})
     VERBATIM
   )
 
-  # Generate spir-v binary using glslangValidator
+  # Generate spir-v binary using glslangValidator, store in .temp file
   add_custom_command(
-    OUTPUT  ${shader_binary_out_temp}
-    COMMAND ${glslangValidator} ${shader_preprocess_out} 
-            -o ${shader_binary_out_temp} --client opengl100 --target-env spirv1.5 -l
-    DEPENDS ${shader_preprocess_out}
+    OUTPUT  ${spirv_temp_fp}
+    COMMAND ${glslangValidator} ${spirv_parse_fp} 
+            -o ${spirv_temp_fp} --client opengl100 --target-env spirv1.5 -l
+    DEPENDS ${spirv_parse_fp}
     VERBATIM
   )
 
   # Generate optimized spir-v binary using spirv-opt from spirv-tools
   add_custom_command(
-    OUTPUT  ${shader_binary_out}
-    COMMAND ${spirv-opt} ${shader_binary_out_temp} 
-            -o ${shader_binary_out} -O --strength-reduction --combine-access-chains
-    DEPENDS ${shader_binary_out_temp}
+    OUTPUT  ${spirv_bin_fp}
+    COMMAND ${spirv-opt} ${spirv_temp_fp} 
+            -o ${spirv_bin_fp} -O --strength-reduction --combine-access-chains
+    DEPENDS ${spirv_temp_fp}
     VERBATIM
   )
 
   # Generate spir-v reflection information in .json files using spirv-cross
   add_custom_command(
-    OUTPUT  ${shader_reflect_out}
-    COMMAND ${spirv-cross} ${shader_binary_out_temp} 
-            --output ${shader_reflect_out} --reflect
-    DEPENDS ${shader_binary_out_temp}
+    OUTPUT  ${spirv_refl_fp}
+    COMMAND ${spirv-cross} ${spirv_temp_fp} 
+            --output ${spirv_refl_fp} --reflect
+    DEPENDS ${spirv_temp_fp}
     VERBATIM
   )
 
-  # Set uo list of dependency commands
-  list(APPEND shaders_preprocess_list 
-    ${shader_preprocess_out} ${shader_binary_out_temp} ${shader_binary_out} ${shader_reflect_out}
-  )
+  # Set up list of dependency commands for outputs
+  list(APPEND shader_dependencies ${spirv_bin_fp} ${spirv_refl_fp})
 endforeach()
 
 # Add single target to perform all shader preprocessing/validation
-add_custom_target(shaders_preprocess DEPENDS ${shaders_preprocess_list})
+add_custom_target(shaders DEPENDS ${shader_dependencies})
 
 # Add commands to copy resources/misc files
 file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/misc/*)
@@ -255,7 +250,7 @@ target_link_libraries(components PUBLIC
   implot::implot
   unofficial::nativefiledialog::nfd
 )
-add_dependencies(components shaders_preprocess misc_copy)
+add_dependencies(components shaders misc_copy)
 
 # Set up app library
 add_library_r(app app)

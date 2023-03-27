@@ -1,14 +1,9 @@
-// Metameric includes
 #include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-
-// Third party includes
 #include <nlohmann/json.hpp>
 #include <zstr.hpp>
-
-// STL includes
 #include <algorithm>
 #include <execution>
 #include <fstream>
