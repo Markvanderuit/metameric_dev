@@ -69,14 +69,10 @@ find_package(ZLIB      REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Include third party shader-related libraries provided through vcpkg
-find_package(glslang             CONFIG REQUIRED)
-find_package(spirv_cross_core    CONFIG REQUIRED)
-find_package(spirv_cross_glsl    CONFIG REQUIRED)
-find_package(spirv_cross_util    CONFIG REQUIRED)
-find_package(spirv_cross_reflect CONFIG REQUIRED)
-find_package(SPIRV-Tools         CONFIG REQUIRED)
-find_package(SPIRV-Tools-opt     CONFIG REQUIRED)
+# Include third party shader-related tools provided through vcpkg
+find_program(glslangValidator NAMES glslangValidator PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
+find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
+find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 
 # Include small_gl library directly
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
@@ -91,11 +87,6 @@ message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
 message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 message(STATUS "Metameric : Barycentric weights = ${MET_MVC_WEIGHTS}")
-
-# Find glslLangValidator program on system
-find_program(glsl_validator_path glslangValidator HINTS 
-  /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/
-)
 
 # Recursively find all shader files
 file(GLOB_RECURSE glsl_srcs
@@ -119,9 +110,8 @@ string(CONCAT glsl_parser_arg_string
 
 # Add together placeholder args to pass into glsl parser;
 # replaced at runtime with the correct values
-string(CONCAT glsl_parser_placeholder_string
-  "MET_SUBGROUP_SIZE=32"
-)
+string(CONCAT glsl_parser_placeholder_string "MET_SUBGROUP_SIZE=32")
+
 
 # Process shaders
 foreach(glsl_src ${glsl_srcs})
@@ -140,11 +130,10 @@ foreach(glsl_src ${glsl_srcs})
   set(shader_reflect_out
     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
   
-  # Preprocess shader includes and preprocess strings
+  # Preprocess shader includes and preprocess strings using small_gl_parser
   add_custom_command(
     OUTPUT  ${shader_preprocess_out}
-    COMMAND small_gl_parser_exec 
-            ${glsl_src} ${shader_preprocess_out} 
+    COMMAND small_gl_parser_exec ${glsl_src} ${shader_preprocess_out} 
             -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
             -s "${glsl_parser_arg_string}"
             -d "${glsl_parser_placeholder_string}"
@@ -155,42 +144,33 @@ foreach(glsl_src ${glsl_srcs})
   # Generate spir-v binary using glslangValidator
   add_custom_command(
     OUTPUT  ${shader_binary_out}
-    COMMAND ${glsl_validator_path}
-            ${shader_preprocess_out}
-            -o ${shader_binary_out}
-            --client opengl100 --target-env spirv1.5 -l
-    DEPENDS ${glsl_validator_path} ${shader_preprocess_out}
+    COMMAND ${glslangValidator} ${shader_preprocess_out} 
+            -o ${shader_binary_out} --client opengl100 --target-env spirv1.5 -l
+    DEPENDS ${shader_preprocess_out}
     VERBATIM
   )
 
   # Generate optimized spir-v binary using spirv-opt from spirv-tools
   add_custom_command(
     OUTPUT  ${shader_binary_opt_out}
-    COMMAND spirv-opt
-            ${shader_binary_out}
-            -o ${shader_binary_opt_out}
-            -O --strength-reduction --combine-access-chains
-    DEPENDS SPIRV-Tools-opt ${shader_binary_out}
+    COMMAND ${spirv-opt} ${shader_binary_out} 
+            -o ${shader_binary_opt_out} -O --strength-reduction --combine-access-chains
+    DEPENDS ${shader_binary_out}
     VERBATIM
   )
 
-  # Generate spir-v reflection information using spirv-cross
+  # Generate spir-v reflection information in .json files using spirv-cross
   add_custom_command(
     OUTPUT  ${shader_reflect_out}
-    COMMAND spirv-cross
-            ${shader_binary_out}
-            --output ${shader_reflect_out}
-            --reflect
-    DEPENDS spirv-cross-core ${shader_binary_out}
+    COMMAND ${spirv-cross} ${shader_binary_opt_out} 
+            --output ${shader_reflect_out} --reflect
+    DEPENDS ${shader_binary_opt_out}
     VERBATIM
   )
 
   # Set uo list of dependency commands
   list(APPEND shaders_preprocess_list 
-    ${shader_preprocess_out} 
-    ${shader_binary_out} 
-    ${shader_binary_opt_out}
-    ${shader_reflect_out}
+    ${shader_preprocess_out} ${shader_binary_out} ${shader_binary_opt_out} ${shader_reflect_out}
   )
 endforeach()
 

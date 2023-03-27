@@ -6,17 +6,15 @@
     "clp",
     "cxxopts",
     "eigen3",
-
     "glslang",
     "spirv-cross",
     "spirv-tools",
-
     "fmt",
     { "name": "glad", 
       "features": [ "extensions", "gl-api-latest" ] },
     { "name" : "imgui", 
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
-    "imguizmo",
+    "imguizmo", 
     "implot",
     "nativefiledialog",
     "nlohmann-json",
