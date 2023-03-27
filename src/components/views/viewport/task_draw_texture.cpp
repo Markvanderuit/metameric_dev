@@ -1,5 +1,6 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
@@ -51,6 +52,7 @@ namespace met {
     // Get external resources 
     const auto &e_arcball    = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
     const auto &e_err_buffer = info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>();
+    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,     false),
@@ -58,8 +60,10 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
     
     // Set varying program uniforms
-    m_program.uniform("u_camera_matrix",    e_arcball.full().matrix());
-    m_program.uniform("u_billboard_aspect", eig::Vector2f { 1.f, e_arcball.m_aspect });
+    if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
+      m_program.uniform("u_camera_matrix",    e_arcball.full().matrix());
+      m_program.uniform("u_billboard_aspect", eig::Vector2f { 1.f, e_arcball.m_aspect });
+    }
 
     // Bind resources to buffer targets
     m_data.bind_to(gl::BufferTargetType::eShaderStorage, 0);

@@ -108,21 +108,27 @@ namespace met {
   }
 
   template <>
+  IndexedDelaunayData convert_mesh<IndexedDelaunayData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
+    met_trace_n("AlignedDelaunayData -> IndexedDelaunayData");
+    return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
+  }
+
+  template <>
+  AlignedDelaunayData convert_mesh<AlignedDelaunayData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> AlignedDelaunayData");
+    return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
+  }
+
+  template <>
   AlignedMeshData convert_mesh<AlignedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
     met_trace_n("IndexedDelaunayData -> AlignedMeshData");
     return convert_mesh<AlignedMeshData>(convert_mesh<IndexedMeshData>(mesh));
   }
 
   template <>
-  IndexedDelaunayData convert_mesh<IndexedDelaunayData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
-    met_trace_n("IndexedDelaunayData -> IndexedDelaunayData");
-    return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
-  }
-
-  template <>
-  AlignedDelaunayData convert_mesh<AlignedDelaunayData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
-    met_trace_n("IndexedDelaunayData -> IndexedDelaunayData");
-    return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
+  AlignedMeshData convert_mesh<AlignedMeshData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
+    met_trace_n("AlignedDelaunayData -> AlignedMeshData");
+    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedDelaunayData>(mesh));
   }
 
   template <typename Mesh>

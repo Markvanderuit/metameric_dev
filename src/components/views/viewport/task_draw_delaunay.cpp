@@ -92,32 +92,30 @@ namespace met {
     const auto &e_proj_data    = e_appl_data.project_data;
     const auto &e_vert_buffer  = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
 
-    // On relevant state change, update mesh buffer data
-    if (e_pipe_state.any_verts) {
-      // Resize fixed-size buffer if current available size is exceeded
-      if (e_pipe_state.verts.size() > m_size_map.size()) {
-        std::vector<float> size_init(2 * e_pipe_state.verts.size(), vert_deslct_size);
+    // On relevant delaunay state change, update mesh buffer data
+    if (auto rsrc = info.resource("gen_spectral_data", "delaunay"); rsrc.is_mutated()) {
+      // Get triangulated mesh data from delaunay structure
+      auto [verts, elems] = convert_mesh<AlignedMeshData>(rsrc.read_only<AlignedDelaunayData>());
+
+      // Verify fixed-size vertex buffer size limits, or reallocate
+      if (verts.size() > m_size_map.size()) {
+        std::vector<float> size_init(2 * verts.size(), vert_deslct_size);
         m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
         m_size_map    = m_size_buffer.map_as<float>(buffer_access_flags);
       }
 
-      // Generate triangulated mesh over tetrahedral delaunay structure
-      const auto &e_delaunay = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
-      auto trimesh = convert_mesh<AlignedMeshData>(convert_mesh<IndexedDelaunayData>(e_delaunay));
-
-      // Resize fixed-size element buffer if current available size is exceeded
-      if (trimesh.elems.size() > m_elem_map.size()) {
+      // Verify fixed-size element buffer size limits, or reallocate
+      if (elems.size() > m_elem_map.size()) {
         m_elem_array.detach_elements();
-        m_elem_buffer = {{ .size = 2 * trimesh.elems.size() * sizeof(eig::Array3u), .flags = buffer_create_flags }};
+        m_elem_buffer = {{ .size = 2 * elems.size() * sizeof(eig::Array3u), .flags = buffer_create_flags }};
         m_elem_map    = m_elem_buffer.map_as<eig::Array3u>(buffer_access_flags);
         m_elem_array.attach_elements(m_elem_buffer);  
       }
 
-      std::ranges::copy(trimesh.elems, m_elem_map.begin());
-      m_elem_buffer.flush(sizeof(eig::Array3u) * trimesh.elems.size());
-
-      m_vert_draw.vertex_count = 3 * e_proj_data.vertices.size();
-      m_elem_draw.vertex_count = 3 * trimesh.elems.size();
+      // Copy data to mapped buffers and adjust draw count
+      std::ranges::copy(elems, m_elem_map.begin());
+      m_vert_draw.vertex_count = 3 * verts.size();
+      m_elem_draw.vertex_count = 3 * elems.size();
     }
 
     // On relevant state change, update selection buffer data

@@ -52,6 +52,7 @@ namespace met {
 
       m_vert_buffer = {{ .data = cnt_span<const std::byte>(e_verts) }};
       m_elem_buffer = {{ .data = cnt_span<const std::byte>(e_elems) }};
+      
       m_array = {{
         .buffers = {{ .buffer = &m_vert_buffer,  .index = 0, .stride = sizeof(AlColr) }},
         .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},

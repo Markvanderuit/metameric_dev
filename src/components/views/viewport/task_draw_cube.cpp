@@ -1,5 +1,6 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/viewport/task_draw_cube.hpp>
@@ -68,7 +69,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    auto &e_arcball = info.resource("viewport.input", "arcball").writeable<detail::Arcball>();
+    const auto &e_arcball    = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
+    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
@@ -76,7 +78,8 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, true) };
     
     // Update varying program uniforms
-    m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
+    if (e_view_state.camera_matrix)
+      m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
 
     // Submit draw information
     gl::dispatch_draw(m_draw);
