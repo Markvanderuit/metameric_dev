@@ -8,10 +8,17 @@
 
 namespace met {
   class ViewportDrawTextureTask : public detail::TaskNode {
-    gl::Array    m_array;
-    gl::Buffer   m_data;
-    gl::DrawInfo m_draw;
-    gl::Program  m_program;
+    struct UniformBuffer {
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(16) eig::Vector2f camera_aspect;
+    };
+    
+    gl::Array      m_array;
+    gl::DrawInfo   m_draw;
+    gl::Program    m_program;
+    gl::Buffer     m_data_buffer;
+    gl::Buffer     m_uniform_buffer;
+    UniformBuffer *m_uniform_map;
 
   public:
     void init(SchedulerHandle &) override;

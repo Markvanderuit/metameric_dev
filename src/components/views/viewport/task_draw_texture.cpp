@@ -16,6 +16,9 @@
 #include <unordered_set>
 
 namespace met {
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
   void ViewportDrawTextureTask::init(SchedulerHandle &info) {
     met_trace_full();
 
@@ -29,17 +32,25 @@ namespace met {
       return v[0] | (v[1] << 8) | (v[2] << 16);
     });
     std::vector<uint> packed_data(range_iter(packed_set));
-    m_data = {{ .data = cnt_span<const std::byte>(packed_data) }};
 
-    // Setup program for instanced billboard point draw
-    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_texture_inst.vert.spv", .is_spirv = true },
-                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_texture.frag.spv", .is_spirv = true }};
+    // Setup buffers and buffer mappings
+    m_data_buffer = {{ .data = cnt_span<const std::byte>(packed_data) }};
+    m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
+
+    // Setup program for billboard point draw
+    m_program = {{ .type       = gl::ShaderType::eVertex,   
+                   .spirv_path = "resources/shaders/viewport/draw_texture.vert.spv",
+                   .cross_path = "resources/shaders/viewport/draw_texture.vert.json" },
+                 { .type       = gl::ShaderType::eFragment, 
+                   .spirv_path = "resources/shaders/viewport/draw_texture.frag.spv",
+                   .cross_path = "resources/shaders/viewport/draw_texture.frag.json" }};
 
     // Specify array and draw object
     m_array = {{ }};
     m_draw = {
       .type             = gl::PrimitiveType::eTriangles,
-      .vertex_count     = 3 * static_cast<uint>(m_data.size() / sizeof(uint)),
+      .vertex_count     = 3 * static_cast<uint>(m_data_buffer.size() / sizeof(uint)),
       .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_array,
       .bindable_program = &m_program
@@ -50,8 +61,6 @@ namespace met {
     met_trace_full();
 
     // Get external resources 
-    const auto &e_arcball    = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_err_buffer = info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>();
     const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
 
     // Declare scoped OpenGL state
@@ -61,15 +70,16 @@ namespace met {
     
     // Set varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      m_program.uniform("u_camera_matrix",    e_arcball.full().matrix());
-      m_program.uniform("u_billboard_aspect", eig::Vector2f { 1.f, e_arcball.m_aspect });
+      const auto &e_arcball = info("viewport.input", "arcball").read_only<detail::Arcball>();
+      m_uniform_map->camera_matrix = e_arcball.full().matrix();
+      m_uniform_map->camera_aspect = { 1.f, e_arcball.m_aspect };
+      m_uniform_buffer.flush();
     }
 
-    // Bind resources to buffer targets
-    m_data.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_err_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-
-    // Submit draw information
+    // Bind resources and submit draw
+    m_program.bind("b_unif_buffer", m_uniform_buffer);
+    m_program.bind("b_data_buffer", m_data_buffer);
+    m_program.bind("b_erro_buffer", info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>());
     gl::dispatch_draw(m_draw);
   }
 } // namespace met
