@@ -4,13 +4,13 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(binding = 0, std430)  restrict readonly buffer           b_0 { vec3 b_0_color_in[]; };
-layout(binding = 0, rgba32f) restrict writeonly uniform image2D b_1_color_out;
+layout(binding = 0, std430)  restrict readonly buffer           b_buffer { vec3 data[]; };
+layout(binding = 0, rgba32f) restrict writeonly uniform image2D i_image;
 
 layout(location = 0) uniform uvec2 u_size;
 
 void main() {
   const uvec2 v = gl_GlobalInvocationID.xy;
   guard(min(v, u_size - 1) == v);
-  imageStore(b_1_color_out, ivec2(v), vec4(b_0_color_in[u_size.x * v.y + v.x], 1));
+  imageStore(i_image, ivec2(v), vec4(data[u_size.x * v.y + v.x], 1));
 }

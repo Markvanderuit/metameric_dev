@@ -25,8 +25,8 @@ namespace met {
 
     // Initialize objects for convex-combination mapping
     m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.spv",
-                   .is_spirv = true }};
+                   .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.spv",
+                   .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.json" }};
     m_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_program };
 
     // Set up gamut buffer and establish a flushable mapping
@@ -38,17 +38,14 @@ namespace met {
     m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
 
     // Create color buffer output for this task
-    info.resource("colr_buffer").init<gl::Buffer>({
-      .size  = (size_t) mapping_n * sizeof(AlColr),
-      .flags = gl::BufferCreateFlags::eMapRead 
-    });
+    info("colr_buffer").init<gl::Buffer>({ .size  = (size_t) mapping_n * sizeof(AlColr)  });
 
     m_init_stale = true;
   }
 
   bool GenColorMappingTask::is_active(SchedulerHandle &info) {
     met_trace();
-    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     return m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.any_verts;
   }
 
@@ -56,16 +53,11 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state  = info.resource("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
-    const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
-    const auto &e_vert_spec   = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-    const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
-
-    // Get modified resources
-    auto &i_colr_buffer = info.resource("colr_buffer").writeable<gl::Buffer>();
+    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_proj_data  = e_appl_data.project_data;
+    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_vert_spec  = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_delaunay   = info("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
 
     // Update uniform data
     m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
@@ -73,7 +65,7 @@ namespace met {
     m_uniform_map->n_elems = e_delaunay.elems.size();
     m_uniform_buffer.flush();
   
-    // Update gamut data, given any state change
+    // Push gamut data, given any state change
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
     for (uint i = 0; i < e_proj_data.vertices.size(); ++i) {
       guard_continue(m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.verts[i].any);
@@ -82,11 +74,11 @@ namespace met {
     }
 
     // Bind required buffers to corresponding targets
-    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,     0);
-    e_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  0);
-    m_gamut_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    e_tetr_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  2);
-    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  3);
+    m_program.bind("b_unif", m_uniform_buffer);
+    m_program.bind("b_bary", info("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_vert", m_gamut_buffer);
+    m_program.bind("b_elem", info("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
 
     // Dispatch shader to generate color-mapped buffer
     gl::dispatch_compute(m_dispatch);

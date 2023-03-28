@@ -103,7 +103,7 @@ namespace met {
 
   bool GenColorSystemSolidTask::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info.resource("state", "pipeline_state").read_only<ProjectState>().csys[0];
+    return info("state", "pipeline_state").read_only<ProjectState>().csys[0];
   }
 
   void GenColorSystemSolidTask::eval(SchedulerHandle &info) {
@@ -129,7 +129,7 @@ namespace met {
               / static_cast<float>(mesh.verts.size());
 
     // Submit mesh and center as resources; used by viewport draw tasks
-    info.resource("chull_mesh").set<AlignedMeshData>(std::move(mesh));
-    info.resource("chull_cntr").set<eig::Array3f>(cntr);
+    info("chull_mesh").set<AlignedMeshData>(std::move(mesh));
+    info("chull_cntr").set<eig::Array3f>(cntr);
   }
 } // namespace met

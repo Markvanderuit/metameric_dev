@@ -4,9 +4,10 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
-#include <metameric/components/pipeline/detail/task_texture_resample.hpp>
-#include <metameric/components/pipeline/detail/task_texture_from_buffer.hpp>
+#include <metameric/components/views/detail/task_texture_resample.hpp>
+#include <metameric/components/views/detail/task_texture_from_buffer.hpp>
 #include <small_gl/buffer.hpp>
+#include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <array>
 

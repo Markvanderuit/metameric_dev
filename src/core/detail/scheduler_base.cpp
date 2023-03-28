@@ -24,6 +24,16 @@ namespace met {
     met_trace();
     return ResourceHandle(this, { .task_key = task_key, .rsrc_key = rsrc_key });
   }
+  
+  ResourceHandle SchedulerHandle::operator()(const std::string &rsrc_key) {
+    met_trace();
+    return ResourceHandle(this, { .task_key = m_task_key, .rsrc_key = rsrc_key });
+  }
+
+  ResourceHandle SchedulerHandle::operator()(const std::string &task_key, const std::string &rsrc_key) {
+    met_trace();
+    return ResourceHandle(this, { .task_key = task_key, .rsrc_key = rsrc_key });
+  }
 
   TaskHandle SchedulerHandle::task() {
     met_trace();

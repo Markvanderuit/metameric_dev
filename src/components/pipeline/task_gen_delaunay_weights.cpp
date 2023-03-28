@@ -27,9 +27,9 @@ namespace met {
     const uint generate_ndiv = ceil_div(generate_n, 256u);
 
     // Initialize objects for shader call
-    m_program = {{ .type = gl::ShaderType::eCompute,
-                   .path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.spv",
-                   .is_spirv = true }};
+    m_program = {{ .type       = gl::ShaderType::eCompute,
+                   .spirv_path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.spv",
+                   .cross_path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.json" }};
     m_dispatch = { .groups_x = generate_ndiv, 
                    .bindable_program = &m_program }; 
 
@@ -39,30 +39,24 @@ namespace met {
     m_uniform_map->n = e_appl_data.loaded_texture_f32.size().prod();
 
     // Initialize buffer holding barycentric weights
-    info.resource("colr_buffer").init<gl::Buffer>({ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info.resource("elem_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
-    info.resource("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) });
+    info("colr_buffer").init<gl::Buffer>({ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
+    info("elem_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
+    info("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) });
   }
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info.resource("gen_spectral_data", "vert_buffer").is_mutated() ||
-           info.resource("gen_spectral_data", "tetr_buffer").is_mutated() ||
-           info.resource("gen_spectral_data", "delaunay").is_mutated();
+    return info("gen_spectral_data", "vert_buffer").is_mutated() ||
+           info("gen_spectral_data", "tetr_buffer").is_mutated() ||
+           info("gen_spectral_data", "delaunay").is_mutated();
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
-    const auto &e_vert_buffer = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
-    const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
-    const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
-    
-    // Get modified resources
-    auto &i_colr_buffer = info.resource("colr_buffer").writeable<gl::Buffer>();
-    auto &i_bary_buffer = info.resource("bary_buffer").writeable<gl::Buffer>();
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_delaunay  = info("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
 
     // Update uniform data
     m_uniform_map->n_verts = e_delaunay.verts.size();
@@ -70,13 +64,13 @@ namespace met {
     m_uniform_buffer.flush();
 
     // Bind required buffers to corresponding targets
-    m_uniform_buffer.bind_to(gl::BufferTargetType::eUniform,    0);
-    e_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 0);
-    e_tetr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_colr_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 2);
-    i_bary_buffer.bind_to(gl::BufferTargetType::eShaderStorage, 3);
+    m_program.bind("b_unif", m_uniform_buffer);
+    m_program.bind("b_vert", info("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_elem", info("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
-    // Dispatch shader to generate unnormalized barycentric weights in i_bary_buffer
+    // Dispatch shader
     gl::dispatch_compute(m_dispatch);
   }
 } // namespace met

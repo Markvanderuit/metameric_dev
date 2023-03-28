@@ -112,24 +112,24 @@ namespace met {
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
     for (uint i = 1; i <= n_constraints; ++i) {
       const uint dims = 3 + 3 * i;
-      info.resource(fmt::format("samples_{}", i)).set(detail::gen_unit_dirs_x(n_samples, dims));
+      info(fmt::format("samples_{}", i)).set(detail::gen_unit_dirs_x(n_samples, dims));
     }
 
     // Register resources to hold convex hull data
-    info.resource("chull_mesh").set<AlignedMeshData>({ });
-    info.resource("chull_cntr").set(Colr(0.f));
+    info("chull_mesh").set<AlignedMeshData>({ });
+    info("chull_cntr").set(Colr(0.f));
   }
 
   bool GenMismatchSolidTask::is_active(SchedulerHandle &info) {
     met_trace_full();
     
-    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
-    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
 
     guard(e_cstr_slct != -1 && !e_vert_slct.empty(), false);
 
-    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
-    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     
     return e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection;
   }
@@ -138,9 +138,9 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
-    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_vert_sd   = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>()[e_vert_slct[0]];
+    const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_vert_sd   = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>()[e_vert_slct[0]];
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.vertices[e_vert_slct[0]];
@@ -177,7 +177,7 @@ namespace met {
               / static_cast<float>(data.size());
 
     // Submit mesh data
-    info.resource("chull_mesh").writeable<AlignedMeshData>() = std::move(mesh);
-    info.resource("chull_cntr").writeable<Colr>() = cntr;
+    info("chull_mesh").writeable<AlignedMeshData>() = std::move(mesh);
+    info("chull_cntr").writeable<Colr>() = cntr;
   }
 } // namespace met

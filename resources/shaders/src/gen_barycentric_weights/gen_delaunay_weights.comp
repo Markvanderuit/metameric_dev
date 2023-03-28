@@ -9,31 +9,31 @@ layout(std430)             buffer;
 layout(std140)             uniform;
 
 // Shader storage buffer declarations
-layout(binding = 0) restrict readonly  buffer b_0 { vec3  data[]; } b_vert_in;
-layout(binding = 1) restrict readonly  buffer b_1 { uvec4 data[]; } b_elem_in;
-layout(binding = 2) restrict readonly  buffer b_2 { vec3  data[]; } b_posi_in;
-layout(binding = 3) restrict writeonly buffer b_3 { vec4  data[]; } b_bary_out;
+layout(binding = 0) restrict readonly  buffer b_vert { vec3  data[]; } vert_in;
+layout(binding = 1) restrict readonly  buffer b_elem { uvec4 data[]; } elem_in;
+layout(binding = 2) restrict readonly  buffer b_posi { vec3  data[]; } posi_in;
+layout(binding = 3) restrict writeonly buffer b_bary { vec4  data[]; } bary_out;
 
 // Uniform buffer declarations
-layout(binding = 0) uniform u_0 {
+layout(binding = 0) uniform b_unif {
   uint n;
   uint n_verts;
   uint n_elems;
-} b_unif;
+} unif_in;
 
 // Constants
 const uint max_verts_support = 1024;
 const uint max_elems_support = 1024;
 
 // Shared memory declarations
-shared vec3  s_verts_in[max_verts_support]; // Shared load of b_vert_in buffer
-shared uvec4 s_elems_in[max_elems_support]; // Shared load of b_elem_in buffer
+shared vec3  s_verts_in[max_verts_support]; // Shared load of vert_in buffer
+shared uvec4 s_elems_in[max_elems_support]; // Shared load of elem_in buffer
 
 void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
-    s_verts_in[i] = b_vert_in.data[i];
-  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_elems; i += gl_WorkGroupSize.x)
-    s_elems_in[i] = b_elem_in.data[i];
+  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_verts; i += gl_WorkGroupSize.x)
+    s_verts_in[i] = vert_in.data[i];
+  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
+    s_elems_in[i] = elem_in.data[i];
   memoryBarrierShared();
   barrier();
 }
@@ -42,15 +42,15 @@ void main() {
   load_shared();
   
   const uint i = gl_GlobalInvocationID.x;
-  guard(i < b_unif.n);
+  guard(i < unif_in.n);
   
-  vec3 p = b_posi_in.data[i];
+  vec3 p = posi_in.data[i];
   
   float result_err  = FLT_MAX;
   vec4 result_bary;
   uint result_indx;
 
-  for (uint j = 0; j < b_unif.n_elems; ++j) {
+  for (uint j = 0; j < unif_in.n_elems; ++j) {
     uvec4 elem = s_elems_in[j];
 
     // Compute barycentric weights for this tetrahedron
@@ -73,5 +73,5 @@ void main() {
   }
 
   // Store result, packing 3/4th of weights, together with the tetrahedron's index
-  b_bary_out.data[i] = vec4(result_bary.xyz, uintBitsToFloat(result_indx));
+  bary_out.data[i] = vec4(result_bary.xyz, uintBitsToFloat(result_indx));
 }

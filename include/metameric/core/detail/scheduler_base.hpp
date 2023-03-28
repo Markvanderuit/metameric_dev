@@ -118,13 +118,15 @@ namespace met {
     : m_task_key(task_key) { }
     
     // Task node handle access
-    TaskHandle task();                                                                 // Handle to current task
-    TaskHandle subtask(const std::string &task_key);                                   // Handle to other task relative to current task
+    TaskHandle task();                                                                   // Handle to current task
+    TaskHandle subtask(const std::string &task_key);                                     // Handle to other task relative to current task
     
     // Resource node handle access
-    ResourceHandle global(const std::string &rsrc_key);                                // Handle to unowned resource
-    ResourceHandle resource(const std::string &rsrc_key);                              // Handle to current task's resource
-    ResourceHandle resource(const std::string &task_key, const std::string &rsrc_key); // Handle to other task's resource
+    ResourceHandle global(const std::string &rsrc_key);                                  // Handle to unowned resource
+    ResourceHandle resource(const std::string &rsrc_key);                                // Handle to current task's resource
+    ResourceHandle resource(const std::string &task_key, const std::string &rsrc_key);   // Handle to other task's resource
+    ResourceHandle operator()(const std::string &rsrc_key);                              // Handle to current task's resource
+    ResourceHandle operator()(const std::string &task_key, const std::string &rsrc_key); // Handle to other task's resource
   };
   
   // Implementing class for masked scheduler handle, passed to containing task nodes
