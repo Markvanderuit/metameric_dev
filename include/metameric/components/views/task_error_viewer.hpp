@@ -34,6 +34,7 @@ namespace met {
     eig::Array2u m_texture_size; // Current output size of texture
 
     // Components for error computation
+    gl::Buffer      m_error_uniform;
     gl::Program     m_error_program;
     gl::ComputeInfo m_error_dispatch;
 

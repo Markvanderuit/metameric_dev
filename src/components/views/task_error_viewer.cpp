@@ -71,16 +71,17 @@ namespace met {
     guard(info.resource("state", "pipeline_state").read_only<ProjectState>().any);
 
     // Get external resources
-    const auto &e_color_input  = info.resource("gen_delaunay_weights", "colr_buffer").read_only<gl::Buffer>();
-    const auto &e_color_output = info.resource("gen_color_mappings.gen_mapping_0", "colr_buffer").read_only<gl::Buffer>();
+    const auto &e_color_input  = info("gen_delaunay_weights", "colr_buffer").read_only<gl::Buffer>();
+    const auto &e_color_output = info("gen_color_mappings.gen_mapping_0", "colr_buffer").read_only<gl::Buffer>();
 
     // Get modified resources
-    auto &i_color_error = info.resource("colr_buffer").writeable<gl::Buffer>();
+    auto &i_color_error = info("colr_buffer").writeable<gl::Buffer>();
 
-    // Bind resources to buffer targets
-    e_color_input.bind_to(gl::BufferTargetType::eShaderStorage,  0);
-    e_color_output.bind_to(gl::BufferTargetType::eShaderStorage, 1);
-    i_color_error.bind_to(gl::BufferTargetType::eShaderStorage,  2);
+    // Bind resources
+    m_error_program.bind("b_unif", m_error_uniform);
+    m_error_program.bind("b_in_a", e_color_input);
+    m_error_program.bind("b_in_b", e_color_output);
+    m_error_program.bind("b_err",  info("colr_buffer").writeable<gl::Buffer>());
 
     // Dispatch shader to generate spectral dataw
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
@@ -110,18 +111,17 @@ namespace met {
     const auto &e_txtr_data = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
 
     // Initialize error computation components
-    const uint generate_n    = e_txtr_data.size().prod();
-    const uint generate_ndiv = ceil_div(generate_n, 256u);
+    const uint dispatch_n    = e_txtr_data.size().prod();
+    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
     m_error_program = {{ .type = gl::ShaderType::eCompute,
-                         .path = "resources/shaders/misc/buffer_error.comp" }};
-    m_error_dispatch = { .groups_x = generate_ndiv, 
+                         .spirv_path = "resources/shaders/misc/buffer_error.comp.spv",
+                         .cross_path = "resources/shaders/misc/buffer_error.comp.json" }};
+    m_error_dispatch = { .groups_x = dispatch_ndiv, 
                          .bindable_program = &m_error_program };
+    m_error_uniform = {{ .data = obj_span<const std::byte>(dispatch_n) }};
     
-    // Set these uniforms once
-    m_error_program.uniform("u_n", generate_n);
-
     // Insert buffer object to hold error data
-    info.resource("colr_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(AlColr) });
+    info.resource("colr_buffer").init<gl::Buffer>({ .size = dispatch_n * sizeof(AlColr) });
 
     // Create subtask to handle buffer->texture copy
     TextureSubtask texture_subtask = {{ .input_key    = { info.task().key(), "colr_buffer" }, .output_key   = "colr_texture",
@@ -130,7 +130,8 @@ namespace met {
     // Create subtask to handle texture->texture resampling and gamma correction
     ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task().key()), "colr_texture" }, .output_key   = "colr_texture",
                                           .texture_info = { .size = 1u }, .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }}};
-                                                
+    
+    // Submit subtasks to scheduler
     info.subtask("gen_texture").set(std::move(texture_subtask));
     info.subtask("gen_resample").set(std::move(resample_subtask));
   }

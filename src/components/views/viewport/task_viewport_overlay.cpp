@@ -238,10 +238,6 @@ namespace met {
       // End the second of two groups
       ImGui::EndGroup();
 
-      if (ImGui::SmallButton("->")) {
-        fmt::print("{}\n", rtrip_i);
-      }
-
       // End full group
       ImGui::EndGroup();
       mapp_width = ImGui::GetItemRectSize().x;
