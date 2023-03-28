@@ -34,7 +34,7 @@ namespace met {
     std::vector<uint> packed_data(range_iter(packed_set));
 
     // Setup buffers and buffer mappings
-    m_data_buffer = {{ .data = cnt_span<const std::byte>(packed_data) }};
+    m_data_buffer    = {{ .data = cnt_span<const std::byte>(packed_data) }};
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
 

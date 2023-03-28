@@ -21,7 +21,7 @@ namespace met::detail {
     m_dispatch = { .groups_x = dispatch_ndiv.x(),
                    .groups_y = dispatch_ndiv.y(),
                    .bindable_program = &m_program };
-    m_program.uniform("u_size", dispatch_n);
+    m_uniform = {{ .data = cnt_span<const std::byte>(dispatch_n) }};
   }
 
   template <typename Ty>
@@ -36,8 +36,9 @@ namespace met::detail {
     met_trace_full();
 
     // Bind buffer/image resources, then dispatch shader to perform copy
-    m_program.bind("b_buffer", info(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>());
-    m_program.bind("i_image",  info(m_info.output_key).writeable<Ty>());
+    m_program.bind("b_uniform", m_uniform);
+    m_program.bind("b_buffer",  info(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>());
+    m_program.bind("i_image",   info(m_info.output_key).writeable<Ty>());
     gl::dispatch_compute(m_dispatch);
   }
 

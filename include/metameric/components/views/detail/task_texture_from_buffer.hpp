@@ -20,9 +20,14 @@ namespace met::detail {
   class TextureFromBufferTask : public detail::TaskNode {
     using InfoType = TextureFromBufferTaskCreateInfo<TextureType>;
 
+    struct UniformBuffer {
+      eig::Array2u size;
+    };
+
     InfoType        m_info;
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
+    gl::Buffer      m_uniform;
 
   public:
     TextureFromBufferTask(InfoType info)
