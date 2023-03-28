@@ -55,11 +55,19 @@ namespace met {
     }};
 
     // Load shader program objects
-    m_cnstr_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_point.vert" },
-                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_point.frag" }};
-    m_draw_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_array.vert" },
-                      { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
-    m_srgb_program = {{ .type = gl::ShaderType::eCompute,  
+    m_cnstr_program = {{ .type       = gl::ShaderType::eVertex,   
+                         .spirv_path = "resources/shaders/viewport/draw_point.vert.spv",
+                         .cross_path = "resources/shaders/viewport/draw_point.vert.json" },
+                       { .type       = gl::ShaderType::eFragment, 
+                         .spirv_path = "resources/shaders/viewport/draw_point.frag.spv",
+                         .cross_path = "resources/shaders/viewport/draw_point.frag.json" }};
+    m_draw_program = {{ .type       = gl::ShaderType::eVertex,   
+                        .spirv_path = "resources/shaders/viewport/draw_color_array.vert.spv",
+                        .cross_path = "resources/shaders/viewport/draw_color_array.vert.json" },
+                      { .type       = gl::ShaderType::eFragment, 
+                        .spirv_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.spv",
+                        .cross_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.json" }};
+    m_srgb_program = {{ .type       = gl::ShaderType::eCompute,  
                         .spirv_path = "resources/shaders/misc/texture_resample.comp.spv",
                         .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
 
@@ -78,21 +86,23 @@ namespace met {
                          .bindable_program = &m_draw_program };
     m_srgb_dispatch = { .bindable_program = &m_srgb_program };
 
+    m_cnstr_uniform_buffer = {{ .size = sizeof(CnstrUniformBuffer), .flags = buffer_create_flags }};
+    m_cnstr_uniform_map    = m_cnstr_uniform_buffer.map_as<CnstrUniformBuffer>(buffer_access_flags).data();
+    m_cnstr_uniform_map->point_size  = quad_vert_size;
+    m_cnstr_uniform_map->point_color = e_appl_data.color_mode == AppColorMode::eDark
+                                     ? 1
+                                     : eig::Vector4f { 0, 0, 0, 1 };
+
+    m_draw_uniform_buffer = {{ .size = sizeof(DrawUniformBuffer), .flags = buffer_create_flags }};
+    m_draw_uniform_map    = m_draw_uniform_buffer.map_as<DrawUniformBuffer>(buffer_access_flags).data();
+    m_draw_uniform_map->alpha = 1.f;
+
     // Create sampler object used in gamma correction step
     // Instantiate objects for gamma correction step
     m_srgb_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
-    m_srgb_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_srgb_uniform_map    = &m_srgb_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_srgb_uniform_buffer = {{ .size = sizeof(SrgbUniformBuffer), .flags = buffer_create_flags }};
+    m_srgb_uniform_map    = m_srgb_uniform_buffer.map_as<SrgbUniformBuffer>(buffer_access_flags).data();
     m_srgb_uniform_map->lrgb_to_srgb = true;
-
-    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
-                            ? 1
-                            : eig::Array4f { 0, 0, 0, 1 };
-
-    // Set these uniforms once
-    m_draw_program.uniform("u_alpha", 1.f);
-    m_cnstr_program.uniform("u_size", quad_vert_size);
-    m_cnstr_program.uniform("u_value", clear_colr);
   }
 
   void DrawColorSolidTask::eval(SchedulerHandle &info) { 
@@ -168,8 +178,10 @@ namespace met {
     
     // Set model/camera translations to center viewport on convex hull
     eig::Affine3f transl(eig::Translation3f(-e_csol_cntr.matrix().eval()));
-    m_draw_program.uniform("u_model_matrix",  transl.matrix());
-    m_draw_program.uniform("u_camera_matrix", e_arcball.full().matrix());  
+    m_draw_uniform_map->model_matrix = transl.matrix();
+    m_draw_uniform_map->camera_matrix = e_arcball.full().matrix();
+    m_draw_uniform_buffer.flush();
+    m_draw_program.bind("b_uniform", m_draw_uniform_buffer);
 
     // Dispatch line draw of the full mesh, such that it is etched over the entire structure
     {
@@ -190,9 +202,7 @@ namespace met {
                                   gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
                                 
       gl::state::set_op(gl::DrawOp::eFill);
-      m_draw_program.uniform("u_alpha", .75f);
       gl::dispatch_draw(m_chull_dispatch);
-      m_draw_program.uniform("u_alpha", 1.f);
       gl::dispatch_draw(m_point_dispatch);
     }
 
@@ -203,11 +213,13 @@ namespace met {
                                   gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
 
       // Update uniform data for upcoming draw
-      m_cnstr_program.uniform("u_model_matrix",  transl.matrix());
-      m_cnstr_program.uniform("u_camera_matrix", e_arcball.full().matrix());
-      m_cnstr_program.uniform("u_position",      e_vert.colr_j[e_cstr_slct]);
-      m_cnstr_program.uniform("u_aspect",        eig::Vector2f { 1.f, e_arcball.m_aspect });
+      m_cnstr_uniform_map->model_matrix   = transl.matrix();
+      m_cnstr_uniform_map->camera_matrix  = e_arcball.full().matrix();
+      m_cnstr_uniform_map->point_position = e_vert.colr_j[e_cstr_slct];
+      m_cnstr_uniform_map->point_aspect   = { 1.f, e_arcball.m_aspect };
+      m_cnstr_uniform_buffer.flush();
 
+      m_cnstr_program.bind("b_uniform", m_cnstr_uniform_buffer);
       gl::dispatch_draw(m_cnstr_dispatch);
     }
 

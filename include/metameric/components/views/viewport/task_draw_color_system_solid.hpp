@@ -8,12 +8,22 @@
 
 namespace met {
   class ViewportDrawColorSystemSolid : public detail::TaskNode {
-    gl::Buffer   m_vert_buffer;
-    gl::Buffer   m_elem_buffer;
-    gl::Array    m_array;
-    gl::DrawInfo m_draw_line;
-    gl::DrawInfo m_draw_fill;
-    gl::Program  m_program;
+    struct UniformBuffer {
+      alignas(64) eig::Matrix4f model_matrix;
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(4)  float alpha;
+    };
+    
+    gl::Buffer     m_unif_buffer_line;
+    gl::Buffer     m_unif_buffer_fill;
+    UniformBuffer *m_unif_map_line;
+    UniformBuffer *m_unif_map_fill;
+    gl::Buffer     m_vert_buffer;
+    gl::Buffer     m_elem_buffer;
+    gl::Array      m_array;
+    gl::DrawInfo   m_draw_line;
+    gl::DrawInfo   m_draw_fill;
+    gl::Program    m_program;
 
   public:
     void init(SchedulerHandle &) override;

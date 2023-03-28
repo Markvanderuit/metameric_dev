@@ -1,13 +1,23 @@
 #version 460 core
 
+#include <math.glsl>
+
 layout(location = 0) in  vec2 in_value_vert;
 layout(location = 0) out vec4 out_value_colr;
 
-layout(location = 5) uniform vec4 u_value;
+// Uniform buffer declaration
+layout(binding = 0, std140) uniform b_uniform {
+  mat4  model_matrix;
+  mat4  camera_matrix;
+  vec4  point_color;
+  vec3  point_position;
+  vec2  point_aspect;
+  float point_size;
+} unif;
 
 void main() {
-  if (length(in_value_vert) > 1.f) {
+  if (sdot(in_value_vert) > 1)
     discard;
-  }
-  out_value_colr = u_value;
+    
+  out_value_colr = unif.point_color;
 }

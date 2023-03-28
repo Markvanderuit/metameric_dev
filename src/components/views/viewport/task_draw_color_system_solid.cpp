@@ -11,13 +11,19 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
   void ViewportDrawColorSystemSolid::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Setup program object for mesh draw
-    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_array.vert" },
-                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
-    m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
+    // Setup program object
+    m_program = {{ .type = gl::ShaderType::eVertex,   
+                   .spirv_path = "resources/shaders/viewport/draw_color_array.vert.spv",
+                   .cross_path = "resources/shaders/viewport/draw_color_array.vert.json" },
+                 { .type = gl::ShaderType::eFragment, 
+                   .spirv_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.spv",
+                   .cross_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.json" }};
    
     // Setup dispatch object for mesh draw, but do not provide mesh data just yet
     m_draw_line = {
@@ -36,6 +42,18 @@ namespace met {
       .bindable_array   = &m_array,
       .bindable_program = &m_program
     };
+    
+    // Instantiate uniform buffers
+    m_unif_buffer_line = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_unif_buffer_fill = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_unif_map_line    = m_unif_buffer_line.map_as<UniformBuffer>(buffer_access_flags).data();
+    m_unif_map_fill    = m_unif_buffer_fill.map_as<UniformBuffer>(buffer_access_flags).data();
+
+    // Instantiate unchanging uniform data
+    m_unif_map_line->alpha = 0.25f;
+    m_unif_map_line->model_matrix = eig::Matrix4f::Identity();
+    m_unif_map_fill->alpha = 0.01f;
+    m_unif_map_fill->model_matrix = eig::Matrix4f::Identity();
   }
 
   void ViewportDrawColorSystemSolid::eval(SchedulerHandle &info) {
@@ -61,6 +79,16 @@ namespace met {
 
       m_draw_line.vertex_count = 3 * static_cast<uint>(e_elems.size());
       m_draw_fill.vertex_count = 3 * static_cast<uint>(e_elems.size());
+    }
+    
+    // Update varying uniform data
+    if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
+      auto &e_arcball = info.resource("viewport.input", "arcball").writeable<detail::Arcball>();
+      auto camera_matrix = e_arcball.full().matrix();
+      m_unif_map_line->camera_matrix = camera_matrix;
+      m_unif_map_fill->camera_matrix = camera_matrix;
+      m_unif_buffer_line.flush();
+      m_unif_buffer_fill.flush();
     }
 
     // Experimental clamping code for vertex modification
@@ -102,17 +130,13 @@ namespace met {
     // Set shared OpenGL state for coming draw operations
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,    true),
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
-    
-    // Update varying program uniforms
-    if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      auto &e_arcball = info.resource("viewport.input", "arcball").writeable<detail::Arcball>();
-      m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
-    }
 
-    // Submit draw information with varying alpha
-    m_program.uniform("u_alpha", .25f);
+    // Submit line draw information 
+    m_program.bind("b_uniform", m_unif_buffer_line);
     gl::dispatch_draw(m_draw_line);
-    m_program.uniform("u_alpha", .01f);
+    
+    // Submit fill draw information 
+    m_program.bind("b_uniform", m_unif_buffer_fill);
     gl::dispatch_draw(m_draw_fill);
   }
 } // namespace met

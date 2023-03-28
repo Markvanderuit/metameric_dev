@@ -25,7 +25,22 @@ namespace met {
       gl::RenderbufferType::eMultisample
     >;
 
-    struct UniformBuffer {
+    struct CnstrUniformBuffer {
+      alignas(64) eig::Matrix4f model_matrix;
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(16) eig::Vector4f point_color;
+      alignas(16) eig::Vector3f point_position;
+      alignas(8)  eig::Vector2f point_aspect;
+      alignas(4)  float         point_size;
+    };
+
+    struct DrawUniformBuffer {
+      alignas(64) eig::Matrix4f model_matrix;
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(4)  float alpha;
+    };
+
+    struct SrgbUniformBuffer {
       alignas(8) eig::Array2u size;
       alignas(4) uint lrgb_to_srgb;
     };
@@ -54,13 +69,17 @@ namespace met {
     gl::DrawInfo  m_chull_dispatch;
     gl::Program   m_cnstr_program;
     gl::Program   m_draw_program;
+    gl::Buffer    m_draw_uniform_buffer;
+    gl::Buffer    m_cnstr_uniform_buffer;
+    DrawUniformBuffer *m_draw_uniform_map;
+    CnstrUniformBuffer *m_cnstr_uniform_map;
 
     // Gamma correction components
     gl::ComputeInfo m_srgb_dispatch;
     gl::Program     m_srgb_program;
     gl::Sampler     m_srgb_sampler;
     gl::Buffer      m_srgb_uniform_buffer;
-    UniformBuffer  *m_srgb_uniform_map;
+    SrgbUniformBuffer *m_srgb_uniform_map;
 
   public:
     DrawColorSolidTask(const std::string &parent);
