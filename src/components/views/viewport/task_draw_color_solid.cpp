@@ -59,7 +59,9 @@ namespace met {
                        { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_point.frag" }};
     m_draw_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_array.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color_uniform_alpha.frag" }};
-    m_srgb_program = {{ .type = gl::ShaderType::eCompute,  .path = "resources/shaders/misc/texture_resample.comp" }};
+    m_srgb_program = {{ .type = gl::ShaderType::eCompute,  
+                        .spirv_path = "resources/shaders/misc/texture_resample.comp.spv",
+                        .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
 
     // Create dispatch objects to summarize draw/compute operations
     m_cnstr_dispatch = { .type             = gl::PrimitiveType::eTriangles,
@@ -77,7 +79,11 @@ namespace met {
     m_srgb_dispatch = { .bindable_program = &m_srgb_program };
 
     // Create sampler object used in gamma correction step
+    // Instantiate objects for gamma correction step
     m_srgb_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
+    m_srgb_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_srgb_uniform_map    = &m_srgb_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_srgb_uniform_map->lrgb_to_srgb = true;
 
     eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                             ? 1
@@ -85,8 +91,6 @@ namespace met {
 
     // Set these uniforms once
     m_draw_program.uniform("u_alpha", 1.f);
-    m_srgb_program.uniform("u_sampler", 0);
-    m_srgb_program.uniform("u_lrgb_to_srgb", true);
     m_cnstr_program.uniform("u_size", quad_vert_size);
     m_cnstr_program.uniform("u_value", clear_colr);
   }
@@ -128,7 +132,8 @@ namespace met {
       eig::Array2u dispatch_ndiv = ceil_div(e_srgb_target.size(), 16u);
       m_srgb_dispatch.groups_x = dispatch_ndiv.x();
       m_srgb_dispatch.groups_y = dispatch_ndiv.y();
-      m_srgb_program.uniform("u_size", dispatch_n);
+      m_srgb_uniform_map->size = dispatch_n;
+      m_srgb_uniform_buffer.flush();
     }
 
     // Stream data to vertex array if mesh data has changed; this change is on-line, so
@@ -214,9 +219,10 @@ namespace met {
       gl::FramebufferMaskFlags::eColor | gl::FramebufferMaskFlags::eDepth);
 
     // Bind relevant resources to texture/image/sampler units for the coming compute operation
-    e_lrgb_target.bind_to(gl::TextureTargetType::eTextureUnit,    0);
-    e_srgb_target.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
-    m_srgb_sampler.bind_to(0);
+    m_srgb_program.bind("b_uniform", m_srgb_uniform_buffer);
+    m_srgb_program.bind("s_image_r", m_srgb_sampler);
+    m_srgb_program.bind("s_image_r", e_lrgb_target);
+    m_srgb_program.bind("i_image_w", e_srgb_target);
 
     // Dispatch gamma correction compute operation
     gl::dispatch_compute(m_srgb_dispatch);

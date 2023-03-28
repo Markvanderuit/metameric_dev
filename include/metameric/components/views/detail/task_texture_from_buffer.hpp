@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 

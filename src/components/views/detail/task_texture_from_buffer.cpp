@@ -1,5 +1,4 @@
 #include <metameric/components/views/detail/task_texture_from_buffer.hpp>
-#include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 
@@ -35,16 +34,6 @@ namespace met::detail {
   template <typename Ty>
   void TextureFromBufferTask<Ty>::eval(SchedulerHandle &info) {
     met_trace_full();
-
-    // Get shared resources
-    // const auto &e_rsrc = info(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>();
-    // auto &i_rsrc       = info(m_info.output_key).writeable<Ty>();
-
-    // Bind resources to correct buffer/image targets
-    // const gl::Buffer &buffer = info(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>();
-    // e_rsrc.bind_to(gl::BufferTargetType::eShaderStorage,   0);
-    // i_rsrc.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
-    // gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
 
     // Bind buffer/image resources, then dispatch shader to perform copy
     m_program.bind("b_buffer", info(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>());

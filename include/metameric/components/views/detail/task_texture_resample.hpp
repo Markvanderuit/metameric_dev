@@ -2,10 +2,10 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/sampler.hpp>
-
 
 namespace met::detail {
   template <class TextureType>
@@ -23,21 +23,26 @@ namespace met::detail {
 
   template <class TextureTy>
   class TextureResampleTask : public detail::TaskNode {
-  public:
     using TextureType = TextureTy;
     using InfoType    = TextureResampleTaskCreateInfo<TextureType>;
+
+    struct UniformBuffer {
+      alignas(8) eig::Array2u size;
+      alignas(4) uint lrgb_to_srgb;
+    };
   
-  private:
     InfoType        m_info;
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::Sampler     m_sampler;
-    bool            m_is_resized;
+    gl::Buffer      m_uniform_buffer;
+    UniformBuffer  *m_uniform_map;
+    bool            m_is_mutated;
 
   public:
     TextureResampleTask(InfoType info)
     : m_info(info),
-      m_is_resized(false) { }
+      m_is_mutated(false) { }
                         
     void init(SchedulerHandle &info) override;
     bool is_active(SchedulerHandle &info) override;

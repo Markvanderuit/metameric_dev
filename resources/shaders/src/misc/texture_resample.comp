@@ -3,20 +3,27 @@
 #include <guard.glsl>
 #include <color.glsl>
 
+// General layout rule declarations
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(std140) uniform;
 
-layout(binding = 0, rgba32f) restrict writeonly uniform image2D b_0_color_out;
+// Sampler/image binding declarations
+layout(location = 0) uniform sampler2D s_image_r;
+layout(binding = 0, rgba32f) restrict writeonly uniform image2D i_image_w;
 
-layout(location = 0) uniform uvec2     u_size;
-layout(location = 1) uniform sampler2D u_sampler;
-layout(location = 2) uniform uint      u_lrgb_to_srgb;
+// Uniform buffer declaration
+layout(binding = 0, std140) uniform b_uniform {
+  uvec2 size;
+  bool  lrgb_to_srgb; 
+} unif;
 
 void main() {
   const uvec2 i = gl_GlobalInvocationID.xy;
-  guard(min(i, u_size - 1) == i);
+  guard(min(i, unif.size - 1) == i);
 
-  const vec2 p = (vec2(i) + vec2(0.5)) / vec2(u_size);
-  const vec4 v = texture(u_sampler, p);
+  const vec2 p = (vec2(i) + vec2(0.5)) / vec2(unif.size);
+  const vec4 v = texture(s_image_r, p);
   
-  imageStore(b_0_color_out, ivec2(i), bool(u_lrgb_to_srgb) ? lrgb_to_srgb(v) : v);
+  imageStore(i_image_w, ivec2(i), lrgb_to_srgb(v));
+  imageStore(i_image_w, ivec2(i), unif.lrgb_to_srgb ? lrgb_to_srgb(v) : v);
 }

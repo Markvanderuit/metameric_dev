@@ -1,16 +1,25 @@
 #include <metameric/components/views/detail/task_texture_resample.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 
 namespace met::detail {
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+  
   template <typename Ty>
   void TextureResampleTask<Ty>::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Initialize shader object
     m_program = {{ .type = gl::ShaderType::eCompute,
-                    .path = "resources/shaders/misc/texture_resample.comp" }};
-    m_program.uniform("u_lrgb_to_srgb", static_cast<uint>(m_info.lrgb_to_srgb));
+                   .spirv_path = "resources/shaders/misc/texture_resample.comp.spv",
+                   .cross_path = "resources/shaders/misc/texture_resample.comp.json", }};
+
+    // Initialize uniform buffer and writeable, flushable mapping
+    m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+    m_uniform_map->lrgb_to_srgb = m_info.lrgb_to_srgb;
 
     // Delegate remainder of initialization to set_... functions
     auto _info = m_info;
@@ -22,27 +31,21 @@ namespace met::detail {
   template <typename Ty>
   bool TextureResampleTask<Ty>::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info(m_info.input_key.first, m_info.input_key.second).is_mutated() || m_is_resized;
+    return m_is_mutated || info(m_info.input_key.first, m_info.input_key.second).is_mutated();
   }
 
   template <typename Ty>
   void TextureResampleTask<Ty>::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources
-    const auto &e_rsrc = info(m_info.input_key.first, m_info.input_key.second).read_only<Ty>();
-    auto &i_rsrc       = info(m_info.output_key).writeable<Ty>();
-
-    // Bind resources
-    m_sampler.bind_to(0);
-    e_rsrc.bind_to(gl::TextureTargetType::eTextureUnit,    0);
-    i_rsrc.bind_to(gl::TextureTargetType::eImageWriteOnly, 0);
-    gl::sync::memory_barrier(gl::BarrierFlags::eTextureFetch);
-
-    // Dispatch shader, sampling texture into texture image
+    // Bind image/sampler resources, then dispatch shader to perform resample
+    m_program.bind("b_uniform", m_uniform_buffer);
+    m_program.bind("s_image_r", m_sampler);
+    m_program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).read_only<Ty>());
+    m_program.bind("i_image_w", info(m_info.output_key).writeable<Ty>());
     gl::dispatch_compute(m_dispatch);
     
-    m_is_resized = false;
+    m_is_mutated = false;
   }
 
   template <typename Ty>
@@ -60,13 +63,12 @@ namespace met::detail {
     eig::Array2u dispatch_n    = m_info.texture_info.size;
     eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
 
-    // Initialize objects for texture-to-texture resampling
     m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                    .groups_y = dispatch_ndiv.y(),
-                    .bindable_program = &m_program };
-    m_program.uniform("u_size", dispatch_n);
-
-    m_is_resized = true;
+                   .groups_y = dispatch_ndiv.y(),
+                   .bindable_program = &m_program };
+    m_uniform_map->size = dispatch_n;
+    m_uniform_buffer.flush();
+    m_is_mutated = true;
   }
 
   template <typename Ty>
@@ -74,9 +76,8 @@ namespace met::detail {
     met_trace_full();
 
     m_info.sampler_info = sampler_info;
-
     m_sampler = { m_info.sampler_info };
-    m_program.uniform("u_sampler", 0);
+    m_is_mutated = true;
   }
 
   /* Explicit template instantiations for TextureResampleTask<> */

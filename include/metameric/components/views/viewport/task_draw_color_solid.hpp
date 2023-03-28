@@ -25,12 +25,17 @@ namespace met {
       gl::RenderbufferType::eMultisample
     >;
 
+    struct UniformBuffer {
+      alignas(8) eig::Array2u size;
+      alignas(4) uint lrgb_to_srgb;
+    };
+
     // State information
     std::string m_parent;
 
     // Constraint-point draw components
-    gl::Buffer           m_quad_verts;
-    gl::Buffer           m_quad_elems;
+    gl::Buffer      m_quad_verts;
+    gl::Buffer      m_quad_elems;
     
     // (Multisampled) framebuffer and attachments
     Colorbuffer     m_color_buffer_ms;
@@ -54,6 +59,8 @@ namespace met {
     gl::ComputeInfo m_srgb_dispatch;
     gl::Program     m_srgb_program;
     gl::Sampler     m_srgb_sampler;
+    gl::Buffer      m_srgb_uniform_buffer;
+    UniformBuffer  *m_srgb_uniform_map;
 
   public:
     DrawColorSolidTask(const std::string &parent);
