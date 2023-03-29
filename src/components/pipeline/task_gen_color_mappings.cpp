@@ -20,14 +20,14 @@ namespace met {
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     
     // Determine dispatch group size
-    const uint mapping_n    = e_appl_data.loaded_texture.size().prod();
-    const uint mapping_ndiv = ceil_div(mapping_n, 256u);
+    const uint dispatch_n    = e_appl_data.loaded_texture.size().prod();
+    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
 
-    // Initialize objects for convex-combination mapping
+    // Initialize dispatch objects
     m_program = {{ .type = gl::ShaderType::eCompute,
                    .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.spv",
                    .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping.comp.json" }};
-    m_dispatch = { .groups_x = mapping_ndiv, .bindable_program = &m_program };
+    m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
 
     // Set up gamut buffer and establish a flushable mapping
     m_gamut_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
@@ -38,7 +38,7 @@ namespace met {
     m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
 
     // Create color buffer output for this task
-    info("colr_buffer").init<gl::Buffer>({ .size  = (size_t) mapping_n * sizeof(AlColr)  });
+    info("colr_buffer").init<gl::Buffer>({ .size  = (size_t) dispatch_n * sizeof(AlColr)  });
 
     m_init_stale = true;
   }
@@ -89,13 +89,11 @@ namespace met {
   void GenColorMappingsTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get shared resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
-    uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
-    auto e_texture_size = e_appl_data.loaded_texture.size();
+    // Get external resources
+    const auto &e_proj_data = info.global("app_data").read_only<ApplicationData>().project_data;
 
     // Add subtasks to perform mapping
-    m_mapping_subtasks.init(info, e_mappings_n, 
+    m_mapping_subtasks.init(info, e_proj_data.color_systems.size(), 
       [](uint i)         { return fmt::format("gen_mapping_{}", i); },
       [](auto &, uint i) { return GenColorMappingTask(i); });
   }
@@ -103,11 +101,10 @@ namespace met {
   void GenColorMappingsTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
-    // Get shared resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
-    uint e_mappings_n = e_appl_data.project_data.color_systems.size();
+    // Get external resources
+    const auto &e_proj_data = info.global("app_data").read_only<ApplicationData>().project_data;
 
     // Adjust nr. of subtasks
-    m_mapping_subtasks.eval(info, e_mappings_n);
+    m_mapping_subtasks.eval(info, e_proj_data.color_systems.size());
   }
 } // namespace met

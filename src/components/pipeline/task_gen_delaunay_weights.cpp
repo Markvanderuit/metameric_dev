@@ -3,7 +3,6 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
 #include <small_gl/utility.hpp>
 #include <algorithm>
@@ -91,7 +90,7 @@ namespace met {
     m_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
     m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
-    // Dispatch shader
+    // Dispatch shader to compute convex weights
     gl::dispatch_compute(m_dispatch);
   }
 } // namespace met
