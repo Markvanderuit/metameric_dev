@@ -13,15 +13,28 @@ namespace met {
   enum class AppColorMode { eDark, eLight };
 
   /* Save states in which project data can exist */
-  enum class SaveFlag {
+  enum class ProjectSaveState {
     eUnloaded, // Project is not currently loaded
     eNew,      // Project has no previous save, is newly created
     eSaved,    // Project has previous save, and has not been modified
     eUnsaved,  // Project has previous save, and has been modified
   };
 
+  /* Mesh structure types for project data */
+  enum class ProjectMeshingType {
+    eConvexHull, // Points on a meshed convex hull
+    ePoints      // Generalized points in color space
+  };
+  
+  /* Convex weighting types for mesh interpolation */
+  enum class ProjectWeightsType {
+    eGeneralized, // Generalized barycentric coordinates of hull interior
+    eDelaunay     // Delaunay triangulation of mesh structure
+  };
+
   /* Wrapper object to hold information for project instantiation */
   struct ProjectCreateInfo {
+    // Internal image data structure
     struct ImageData {
       Texture2d3f image;
       uint cmfs, illuminant;
@@ -37,11 +50,15 @@ namespace met {
     // Input spectral information
     std::vector<std::pair<std::string, Spec>> illuminants;
     std::vector<std::pair<std::string, CMFS>> cmfs;
+
+    // Input project type information
+    ProjectMeshingType meshing_type;
+    ProjectWeightsType weights_type;
   };
 
   /* Wrapper object to hold all saveable project data */
   struct ProjectData {
-  public: /* internal data structures */
+  public: /* project data structures */
     // Data structure for a single vertex of the project's convex hull mesh
     struct Vert {
       Colr colr_i;              // The expected vertex color under a primary color system
@@ -76,9 +93,9 @@ namespace met {
   struct ApplicationData {
   public: /* public data */
     // Saved project data
-    ProjectData project_data;
-    fs::path    project_path;
-    SaveFlag    project_save = SaveFlag::eUnloaded; 
+    ProjectData      project_data;
+    fs::path         project_path;
+    ProjectSaveState project_save = ProjectSaveState::eUnloaded; 
     
     // Misc application data
     Texture2d3f   loaded_texture_f32; // F32 RGB image extracted from project data

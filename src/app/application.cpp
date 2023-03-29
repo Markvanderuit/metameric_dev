@@ -50,7 +50,7 @@ namespace met {
 
     void init_schedule(LinearScheduler &scheduler) {
       auto &app_data = scheduler.global("app_data").writeable<ApplicationData>();
-      if (app_data.project_save == SaveFlag::eSaved) {
+      if (app_data.project_save == ProjectSaveState::eSaved) {
         submit_schedule_main(scheduler);
       } else {
         submit_schedule_empty(scheduler);

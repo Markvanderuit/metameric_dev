@@ -47,7 +47,7 @@ namespace met {
     met_trace_full();
     
     auto &e_app_data = info.global("app_data").writeable<ApplicationData>();
-    if (e_app_data.project_save == SaveFlag::eNew) {
+    if (e_app_data.project_save == ProjectSaveState::eNew) {
       return handle_save_as(info);
     } else {
       e_app_data.save(e_app_data.project_path);
@@ -154,8 +154,8 @@ namespace met {
     met_trace_full();
     
     const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-    if (e_app_data.project_save == SaveFlag::eUnsaved 
-     || e_app_data.project_save == SaveFlag::eNew) {
+    if (e_app_data.project_save == ProjectSaveState::eUnsaved 
+     || e_app_data.project_save == ProjectSaveState::eNew) {
       m_open_close_modal = true;
     } else {
       handle_close(info);
@@ -180,8 +180,8 @@ namespace met {
     met_trace_full();
     
     const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-    if (e_app_data.project_save == SaveFlag::eUnsaved 
-     || e_app_data.project_save == SaveFlag::eNew) {
+    if (e_app_data.project_save == ProjectSaveState::eUnsaved 
+     || e_app_data.project_save == ProjectSaveState::eNew) {
       m_open_exit_modal = true;
     } else {
       handle_exit(info);
@@ -218,9 +218,9 @@ namespace met {
       
       if (ImGui::BeginMenu("File")) {
         const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-        const bool is_loaded   = e_app_data.project_save != SaveFlag::eUnloaded;
-        const bool enable_save = e_app_data.project_save != SaveFlag::eSaved 
-          && e_app_data.project_save != SaveFlag::eNew && is_loaded;
+        const bool is_loaded   = e_app_data.project_save != ProjectSaveState::eUnloaded;
+        const bool enable_save = e_app_data.project_save != ProjectSaveState::eSaved 
+          && e_app_data.project_save != ProjectSaveState::eNew && is_loaded;
         
         /* Main section follows */
 

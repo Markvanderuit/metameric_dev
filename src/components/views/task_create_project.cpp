@@ -290,7 +290,7 @@ namespace met {
 
   bool CreateProjectTask::create_project_safe(SchedulerHandle &info) {
     const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-    if (e_app_data.project_save == SaveFlag::eUnsaved || e_app_data.project_save == SaveFlag::eNew) {
+    if (e_app_data.project_save == ProjectSaveState::eUnsaved || e_app_data.project_save == ProjectSaveState::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
     /* } else if (!fs::exists(m_input_path)) {

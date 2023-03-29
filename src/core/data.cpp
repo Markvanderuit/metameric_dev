@@ -109,7 +109,7 @@ namespace met {
     debug::check_expr_rel(!info.images.empty(), "ProjectCreateInfo::images must not be empty");
 
     // Reset project data
-    project_save = SaveFlag::eNew;
+    project_save = ProjectSaveState::eNew;
     project_path = ""; // TBD on first save
     project_data = ProjectData();
 
@@ -140,7 +140,7 @@ namespace met {
   void ApplicationData::save(const fs::path &path) {
     met_trace();
 
-    project_save = SaveFlag::eSaved;
+    project_save = ProjectSaveState::eSaved;
     project_path = io::path_with_ext(path, ".json");
 
     io::save_json(project_path, project_data);
@@ -150,7 +150,7 @@ namespace met {
   void ApplicationData::load(const fs::path &path) {
     met_trace();
 
-    project_save   = SaveFlag::eSaved;
+    project_save   = ProjectSaveState::eSaved;
     project_path   = io::path_with_ext(path, ".json");
     project_data   = io::load_json(path).get<ProjectData>();
     loaded_texture_f32 = io::load_texture2d<Colr>(io::path_with_ext(project_path,".exr"), true);
@@ -173,8 +173,8 @@ namespace met {
     mods.resize(mod_i);
     mods.push_back(mod);   
     
-    if (project_save == SaveFlag::eSaved) {
-      project_save = SaveFlag::eUnsaved;
+    if (project_save == ProjectSaveState::eSaved) {
+      project_save = ProjectSaveState::eUnsaved;
     }
   }
 
@@ -186,8 +186,8 @@ namespace met {
     mod_i += 1;
     mods[mod_i].redo(project_data);
 
-    if (project_save == SaveFlag::eSaved) {
-      project_save = SaveFlag::eUnsaved;
+    if (project_save == ProjectSaveState::eSaved) {
+      project_save = ProjectSaveState::eUnsaved;
     }
   }
 
@@ -199,15 +199,15 @@ namespace met {
     mods[mod_i].undo(project_data);
     mod_i -= 1;
 
-    if (project_save == SaveFlag::eSaved) {
-      project_save = SaveFlag::eUnsaved;
+    if (project_save == ProjectSaveState::eSaved) {
+      project_save = ProjectSaveState::eUnsaved;
     }
   }
 
   void ApplicationData::unload() {
     met_trace();
 
-    project_save = SaveFlag::eUnloaded;
+    project_save = ProjectSaveState::eUnloaded;
     project_path  = "";
     project_data  = { };
 
