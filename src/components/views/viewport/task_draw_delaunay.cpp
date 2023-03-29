@@ -17,8 +17,8 @@ namespace met {
   constexpr float vert_msover_size = 0.045f;
 
   // Buffer flags for flushable, persistent, write-only mapping
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
   // Initial allocation sizes for vertex/element dependent buffers
   constexpr uint init_vert_support = 1024;
@@ -36,10 +36,13 @@ namespace met {
     std::vector<float> size_init(init_vert_support, vert_deslct_size);
     m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
     m_size_map    = m_size_buffer.map_as<float>(buffer_access_flags);
-    m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
     m_elem_buffer = {{ .size = init_elem_support * sizeof(eig::Array3u), .flags = buffer_create_flags }};
     m_elem_map    = m_elem_buffer.map_as<eig::Array3u>(buffer_access_flags);
+
+    m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_camr_buffer = {{ .size = sizeof(CameraBuffer), .flags = buffer_create_flags }};
+    m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
+    m_camr_map    = m_camr_buffer.map_as<CameraBuffer>(buffer_access_flags).data();
 
     // Setup array objects for (A) instanced quad draw and (B) mesh line draw
     m_vert_array = {{ }};
@@ -67,30 +70,38 @@ namespace met {
     };
 
     // Load shader program objects
-    m_vert_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_delaunay_vert.vert" },
-                      { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_delaunay_vert.frag" }};
-    m_elem_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_delaunay_elem.vert" },
-                      { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_delaunay_elem.frag" }};
+    m_vert_program = {{ .type = gl::ShaderType::eVertex,   
+                        .spirv_path = "resources/shaders/viewport/draw_delaunay_vert.vert.spv",
+                        .cross_path = "resources/shaders/viewport/draw_delaunay_vert.vert.json" },
+                      { .type = gl::ShaderType::eFragment, 
+                        .spirv_path = "resources/shaders/viewport/draw_delaunay_vert.frag.spv",
+                        .cross_path = "resources/shaders/viewport/draw_delaunay_vert.frag.json" }};
+    m_elem_program = {{ .type = gl::ShaderType::eVertex,   
+                        .spirv_path = "resources/shaders/viewport/draw_delaunay_elem.vert.spv",
+                        .cross_path = "resources/shaders/viewport/draw_delaunay_elem.vert.json" },
+                      { .type = gl::ShaderType::eFragment, 
+                        .spirv_path = "resources/shaders/viewport/draw_delaunay_elem.frag.spv",
+                        .cross_path = "resources/shaders/viewport/draw_delaunay_elem.frag.json" }};
 
     eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
                             ? eig::Array4f { 1, 1, 1, 1 }
                             : eig::Array4f { 0, 0, 0, 1 };
 
     // Set non-changing uniform values
-    m_vert_program.uniform("u_value", clear_colr);
+    m_unif_map->value = e_appl_data.color_mode == AppColorMode::eDark
+                        ? eig::Array4f { 1, 1, 1, 1 }
+                        : eig::Array4f { 0, 0, 0, 1 };
+    m_unif_buffer.flush();
   }
 
   void ViewportDrawDelaunayTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state   = info.resource("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_view_state   = info.resource("state", "viewport_state").read_only<ViewportState>();
-    const auto &e_frame_buffer = info.resource("viewport.draw_begin", "frame_buffer").read_only<gl::Framebuffer>();
-    const auto &e_arcball      = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_appl_data    = info.global("app_data").read_only<ApplicationData>();
-    const auto &e_proj_data    = e_appl_data.project_data;
-    const auto &e_vert_buffer  = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
+    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_proj_data  = e_appl_data.project_data;
 
     // On relevant delaunay state change, update mesh buffer data
     if (auto rsrc = info.resource("gen_spectral_data", "delaunay"); rsrc.is_mutated()) {
@@ -131,24 +142,27 @@ namespace met {
 
     // On relevant state change, update uniform buffer data
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      m_unif_map->camera_matrix = e_arcball.full().matrix();
-      m_unif_map->camera_aspect = { 1.f, e_arcball.m_aspect };
-      m_unif_buffer.flush();
+      const auto &e_arcball = info("viewport.input", "arcball").read_only<detail::Arcball>();
+      m_camr_map->matrix = e_arcball.full().matrix();
+      m_camr_map->aspect = { 1.f, e_arcball.m_aspect };
+      m_camr_buffer.flush();
     }
 
-    // Set OpenGL state shared between coming draw operations
-    auto shared_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest,  true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,    true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eCullOp,     true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true) };
+    // Set OpenGL state shared for the coming draw operations
+    auto shared_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eMSAA,      true) };
     
-    // Bind buffers to relevant buffer targets
-    m_unif_buffer.bind_to(gl::BufferTargetType::eUniform,        0);
-    e_vert_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  0);
-    m_size_buffer.bind_to(gl::BufferTargetType::eShaderStorage,  1);
-
-    // Dispatch draw calls
+    // Bind resources and dispatch element draw
+    m_elem_program.bind("b_camera", m_camr_buffer);
     gl::dispatch_draw(m_elem_draw);
+
+    // Bind resources and dispatch vertex draw
+    m_vert_program.bind("b_posi",   info("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>());
+    m_vert_program.bind("b_size",   m_size_buffer);
+    m_vert_program.bind("b_camera", m_camr_buffer);
+    m_vert_program.bind("b_value",  m_unif_buffer);
     gl::dispatch_draw(m_vert_draw);
   }
 } // namespace met

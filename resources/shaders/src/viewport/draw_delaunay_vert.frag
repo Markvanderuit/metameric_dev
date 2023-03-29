@@ -4,15 +4,25 @@
 
 layout(location = 0) uniform vec4 u_value;
 
-// Fragment input declarations
-layout(location = 0) in vec2 in_value_vert;
+// Buffer layout declarations
+layout(std140) uniform;
 
-// Fragment output declarations
-layout(location = 0) out vec4 out_value_colr;
+// Fragment stage declarations
+layout(location = 0) in  vec2 value_in;
+layout(location = 0) out vec4 value_out;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_camera { // unused in stage
+  mat4 matrix;
+  vec2 aspect;
+} camera;
+layout(binding = 1) uniform b_value {
+  vec4 value;
+} unif;
 
 void main() {
-  if (sdot(in_value_vert) > 1)
+  if (sdot(value_in) > 1)
     discard;
 
-  out_value_colr = u_value;
+  value_out = unif.value;
 }

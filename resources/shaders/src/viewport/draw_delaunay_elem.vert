@@ -1,19 +1,16 @@
 #version 460 core
 
-// Input/output variables
-layout(location = 0) in vec3  in_value_vert;
-layout(location = 0) out vec3 out_value_vert;
-
-// Buffer layout declarations
-layout(std140) uniform;
+// Vertex stage declarations
+layout(location = 0) in vec3  value_in;
+layout(location = 0) out vec3 value_out;
 
 // Uniform buffer declarations
-layout(binding = 0) uniform u_0 {
-  mat4 camera_matrix;
-  vec2 camera_aspect;
-} b_unif;
+layout(binding = 0, std140) uniform b_camera {
+  mat4 matrix;
+  vec2 aspect;
+} camera;
 
 void main() {
-  out_value_vert = in_value_vert;
-  gl_Position = b_unif.camera_matrix * vec4(in_value_vert.xyz, 1);
+  value_out = value_in;
+  gl_Position = camera.matrix * vec4(value_in.xyz, 1);
 }

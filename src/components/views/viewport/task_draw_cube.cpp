@@ -9,6 +9,10 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
+  // Buffer flags for flushable, persistent, write-only mapping
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
   constexpr std::array<float, 3 * 8> verts = {
     0.f, 0.f, 0.f,
     0.f, 0.f, 1.f,
@@ -38,8 +42,12 @@ namespace met {
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
 
     // Setup program for instanced billboard point draw
-    m_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_color_uniform.vert" },
-                 { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_color.frag" }};
+    m_program = {{ .type = gl::ShaderType::eVertex,   
+                   .spirv_path = "resources/shaders/viewport/draw_color_uniform.vert.spv",
+                   .cross_path = "resources/shaders/viewport/draw_color_uniform.vert.json" },
+                 { .type = gl::ShaderType::eFragment, 
+                   .spirv_path = "resources/shaders/viewport/draw_color.frag.spv",
+                   .cross_path = "resources/shaders/viewport/draw_color.frag.json" }};
 
     // Setup objects for instanced quad draw
     m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};
@@ -56,21 +64,21 @@ namespace met {
       .bindable_program = &m_program
     };
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
+    // Setup uniform buffer structure
+    m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
+    m_unif_map->model_matrix = eig::Matrix4f::Identity();
+    m_unif_map->color_value = e_appl_data.color_mode == AppColorMode::eDark
                             ? 1
-                            : eig::Array4f { 0, 0, 0, 1 };
-                            
-    // Set constant uniforms
-    m_program.uniform("u_model_matrix", eig::Matrix4f::Identity().eval());
-    m_program.uniform("u_value",      clear_colr);
+                            : eig::Vector4f { 0, 0, 0, 1 };
   }
 
   void ViewportDrawCubeTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources 
-    const auto &e_arcball    = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_arcball    = info("viewport.input", "arcball").read_only<detail::Arcball>();
+    const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),
@@ -78,10 +86,13 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eLineSmooth, true) };
     
     // Update varying program uniforms
-    if (e_view_state.camera_matrix)
-      m_program.uniform("u_camera_matrix", e_arcball.full().matrix());
+    if (e_view_state.camera_matrix) {
+      m_unif_map->camera_matrix = e_arcball.full().matrix();
+      m_unif_buffer.flush();
+    }
 
-    // Submit draw information
+    // Bind resources and submit draw information
+    m_program.bind("m_uniform", m_unif_buffer);
     gl::dispatch_draw(m_draw);
   }
 } // namespace met
