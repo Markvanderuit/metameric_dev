@@ -21,17 +21,8 @@ namespace met {
   void GenSpectralDataTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Setup buffer data and corresponding maps
-    gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
-    gl::Buffer tetr_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
-    m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
-    m_tetr_map = tetr_buffer.map_as<eig::Array4u>(buffer_access_flags);
-
     // Submit shared resources 
     info("vert_spec").set<std::vector<Spec>>({ });               // CPU-side generated reflectance spectra for each vertex
-    info("delaunay").set<AlignedDelaunayData>({ });              // Generated delaunay tetrahedralization over input vertices
-    info("vert_buffer").set<gl::Buffer>(std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
-    info("tetr_buffer").set<gl::Buffer>(std::move(tetr_buffer)); // OpenGL buffer storing (aligned) delaunay tetrahedral elements for compute
   }
 
   bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
@@ -48,22 +39,7 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_spectra     = info("vert_spec").writeable<std::vector<Spec>>();
-    auto &i_delaunay    = info("delaunay").writeable<AlignedDelaunayData>();
-    auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
-    auto &i_tetr_buffer = info("tetr_buffer").writeable<gl::Buffer>();
-
-    // Generate new delaunay structure
-    std::vector<Colr> delaunay_input(e_proj_data.vertices.size());
-    std::ranges::transform(e_proj_data.vertices, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
-    i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
-
-    // TODO: Optimize data push
-    // Push new delaunay data to buffers
-    std::ranges::copy(i_delaunay.verts, m_vert_map.begin());
-    std::ranges::copy(i_delaunay.elems, m_tetr_map.begin());
-    i_vert_buffer.flush(i_delaunay.verts.size() * sizeof(eig::AlArray3f));
-    i_tetr_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
+    auto &i_spectra = info("vert_spec").writeable<std::vector<Spec>>();
 
     // Generate spectra at stale gamut vertices in parallel
     i_spectra.resize(e_proj_data.vertices.size()); // vector-resize is non-destructive on vector growth

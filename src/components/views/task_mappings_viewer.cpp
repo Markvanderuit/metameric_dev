@@ -40,7 +40,7 @@ namespace met {
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert_spec = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-    const auto &e_delaunay  = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+    const auto &e_delaunay  = info.resource("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
 
     // Spawn tooltip
     ImGui::BeginTooltip();

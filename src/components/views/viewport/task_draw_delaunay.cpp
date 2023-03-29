@@ -30,7 +30,7 @@ namespace met {
     // Get shared resources
     const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_vert_buffer = info.resource("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>();
+    const auto &e_vert_buffer = info.resource("gen_delaunay_weights", "vert_buffer").read_only<gl::Buffer>();
 
     // Setup mapped buffer objects
     std::vector<float> size_init(init_vert_support, vert_deslct_size);
@@ -104,7 +104,7 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // On relevant delaunay state change, update mesh buffer data
-    if (auto rsrc = info.resource("gen_spectral_data", "delaunay"); rsrc.is_mutated()) {
+    if (auto rsrc = info.resource("gen_delaunay_weights", "delaunay"); rsrc.is_mutated()) {
       // Get triangulated mesh data from delaunay structure
       auto [verts, elems] = convert_mesh<AlignedMeshData>(rsrc.read_only<AlignedDelaunayData>());
 
@@ -159,7 +159,7 @@ namespace met {
     gl::dispatch_draw(m_elem_draw);
 
     // Bind resources and dispatch vertex draw
-    m_vert_program.bind("b_posi",   info("gen_spectral_data", "vert_buffer").read_only<gl::Buffer>());
+    m_vert_program.bind("b_posi",   info("gen_delaunay_weights", "vert_buffer").read_only<gl::Buffer>());
     m_vert_program.bind("b_size",   m_size_buffer);
     m_vert_program.bind("b_camera", m_camr_buffer);
     m_vert_program.bind("b_value",  m_unif_buffer);

@@ -57,7 +57,7 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     const auto &e_vert_spec  = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-    const auto &e_delaunay   = info("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+    const auto &e_delaunay   = info("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
 
     // Update uniform data
     m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
@@ -77,7 +77,7 @@ namespace met {
     m_program.bind("b_unif", m_uniform_buffer);
     m_program.bind("b_bary", info("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>());
     m_program.bind("b_vert", m_gamut_buffer);
-    m_program.bind("b_elem", info("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_elem", info("gen_delaunay_weights", "elem_buffer").read_only<gl::Buffer>());
     m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
 
     // Dispatch shader to generate color-mapped buffer

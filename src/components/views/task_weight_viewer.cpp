@@ -104,10 +104,10 @@ namespace met {
     // Get external resources 
     const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+    const auto &e_delaunay    = info.resource("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
     const auto &e_cstr_slct   = info.resource("viewport.overlay", "constr_selection").read_only<int>();
     const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_tetr_buffer = info.resource("gen_spectral_data", "tetr_buffer").read_only<gl::Buffer>();
+    const auto &e_tetr_buffer = info.resource("gen_delaunay_weights", "elem_buffer").read_only<gl::Buffer>();
     const auto &e_vert_spec   = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
 
     // Get modified resources 

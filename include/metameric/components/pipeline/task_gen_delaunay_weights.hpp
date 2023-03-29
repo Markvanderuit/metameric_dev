@@ -13,10 +13,12 @@ namespace met {
       uint n_elems; // Nr. of elements defining surrounding hull
     };
 
-    gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
-    gl::Buffer      m_uniform_buffer;
-    UniformBuffer  *m_uniform_map;
+    gl::ComputeInfo           m_dispatch;
+    gl::Program               m_program;
+    gl::Buffer                m_uniform_buffer;
+    UniformBuffer            *m_uniform_map;
+    std::span<eig::AlArray3f> m_vert_map;
+    std::span<eig::Array4u>   m_elem_map;
 
   public:
     void init(SchedulerHandle &) override;

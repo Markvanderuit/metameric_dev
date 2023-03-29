@@ -74,7 +74,7 @@ namespace met {
       const auto &e_prj_data    = e_app_data.project_data;
       const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
       const auto &e_spectra     = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-      const auto &e_delaunay    = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_delaunay    = info.resource("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 

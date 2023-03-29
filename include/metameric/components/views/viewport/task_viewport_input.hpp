@@ -40,7 +40,7 @@ namespace met {
       met_trace_full();
 
       // Get external resources
-      const auto &e_delaunay  = info.resource("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_delaunay  = info.resource("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
       const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
       const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
       const auto &e_window    = info.global("window").read_only<gl::Window>();
