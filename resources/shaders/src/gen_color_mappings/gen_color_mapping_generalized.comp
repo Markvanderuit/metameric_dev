@@ -8,25 +8,30 @@
 #include <guard.glsl>
 #include <bary.glsl>
 
+// General layout rule declarations
 layout(local_size_x = 256) in;
 layout(std140)             uniform;
 layout(std430)             buffer;
 
-layout(binding = 0) restrict readonly  buffer b_0 { Bary4 data[]; } b_bary_in;
-layout(binding = 1) restrict readonly  buffer b_1 { vec3  data[]; } b_gamut_in;
-layout(binding = 2) restrict writeonly buffer b_2 { vec3  data[]; } b_colr_out;
-layout(binding = 0) uniform u_0 {
+// Shader storage buffer declarations
+layout(binding = 0) restrict readonly  buffer b_bary { Bary4 data[]; } bary_in;
+layout(binding = 1) restrict readonly  buffer b_vert { vec3  data[]; } vert_in;
+layout(binding = 2) restrict readonly  buffer b_elem { uvec3 data[]; } elem_in; // unused
+layout(binding = 3) restrict writeonly buffer b_colr { vec3  data[]; } colr_out;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_unif {
   uint n;
   uint n_verts;
-} b_unif;
+  uint n_elems;
+} unif;
 
-shared vec3 s_gamut[generalized_weights];
+// Shared memory declarations
+shared vec3 s_verts_in[generalized_weights];
 
-// Load shared gamut data into memory
 void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; i < b_unif.n_verts; i += gl_WorkGroupSize.x)
-    s_gamut[i] = b_gamut_in.data[i];
-  
+  for (uint i = gl_LocalInvocationID.x; i < unif.n_verts; i += gl_WorkGroupSize.x)
+    s_verts_in[i] = vert_in.data[i];
   memoryBarrierShared();
   barrier();
 }
@@ -39,15 +44,15 @@ void main() {
   const uint i = gl_GlobalInvocationID.x / sg_cluster_size; // 000011112222
   const uint j = gl_GlobalInvocationID.x % sg_cluster_size; // 012301230123
 
-  guard(i < b_unif.n);
+  guard(i < unif.n);
 
   // Output color is convex combination of gamut vertices
-  vec4 w = b_bary_in.data[i][j];
+  vec4 w = bary_in.data[i][j];
   vec3 v = vec3(0);
   for (uint k = 0; k < 4; ++k)
-    v += w[k] * s_gamut[j * 4 + k];
+    v += w[k] * s_verts_in[j * 4 + k];
   v = subgroupClusteredAdd(v, sg_cluster_size);
 
   if (j == 0)
-    b_colr_out.data[i] = v;
+    colr_out.data[i] = v;
 }

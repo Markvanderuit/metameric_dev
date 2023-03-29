@@ -40,8 +40,8 @@ namespace met {
 
     // Initialize mesh buffer data and writeable, flushable mappings where necessary
     gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_colr_data)).data()) }};
-    gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
-    gl::Buffer elem_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags}};
+    gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::AlArray3f), .flags = buffer_create_flags}};
+    gl::Buffer elem_buffer = {{ .size = buffer_init_size * sizeof(eig::AlArray3u), .flags = buffer_create_flags}};
     m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
     m_elem_map = elem_buffer.map_as<eig::AlArray3u>(buffer_access_flags);
 

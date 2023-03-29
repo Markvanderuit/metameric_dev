@@ -93,24 +93,15 @@ namespace met {
     scheduler.task("state").init<StateTask>();
 
     // The following tasks define the color->spectrum uplifting pipeline and dependent data
-    switch (e_proj_data.meshing_type) {
-    case ProjectMeshingType::eConvexHull:
-      break;
-    case ProjectMeshingType::ePoints:
-      break;
-    }
-    
-    switch (e_proj_data.weights_type) {
-    case ProjectWeightsType::eGeneralized:
-      break;
-    case ProjectWeightsType::eDelaunay:
-      break;
-    }
-    
     scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
-    scheduler.task("gen_delaunay_weights").init<GenDelaunayWeightsTask>();
-    scheduler.task("gen_generalized_weights").init<GenGeneralizedWeightsTask>();
+    if (e_proj_data.weights_type == ProjectWeightsType::eGeneralized) {
+      scheduler.task("gen_convex_weights").init<GenGeneralizedWeightsTask>();
+    } else {
+      scheduler.task("gen_convex_weights").init<GenDelaunayWeightsTask>();
+    }
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
+    
+    // The following tasks define dependent data for the view components
     scheduler.task("gen_color_system_solid").init<GenColorSystemSolidTask>();
     scheduler.task("gen_mismatch_solid").init<GenMismatchSolidTask>();
 

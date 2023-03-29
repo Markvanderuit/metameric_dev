@@ -40,9 +40,8 @@ namespace met {
       met_trace_full();
 
       // Get external resources
-      const auto &e_delaunay  = info.resource("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
-      const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-      const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
+      const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+      const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
       const auto &e_window    = info.global("window").read_only<gl::Window>();
 
       // Get modified resources
@@ -66,8 +65,15 @@ namespace met {
       ImGui::SetNextWindowSize(overlay_size);
 
       if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
-        ImGui::Value("Vertices", static_cast<uint>(e_delaunay.verts.size()));
-        ImGui::Value("Elements", static_cast<uint>(e_delaunay.elems.size()));
+        // Display mesh data, dependent on what data is available
+        if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
+          const auto &e_delaunay = rsrc.read_only<AlignedDelaunayData>();
+          ImGui::Value("Vertices", static_cast<uint>(e_delaunay.verts.size()));
+          ImGui::Value("Elements", static_cast<uint>(e_delaunay.elems.size()));
+        } else {
+          ImGui::Value("Vertices", static_cast<uint>(e_proj_data.verts.size()));
+          ImGui::Value("Elements", static_cast<uint>(e_proj_data.elems.size()));
+        }
 
         // Describe a button whichs adds a vertex
         if (ImGui::Button("Add vertex")) {

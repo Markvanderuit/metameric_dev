@@ -30,7 +30,7 @@ namespace met {
     // Get shared resources
     const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_vert_buffer = info.resource("gen_delaunay_weights", "vert_buffer").read_only<gl::Buffer>();
+    const auto &e_vert_buffer = info.resource("gen_convex_weights", "vert_buffer").read_only<gl::Buffer>();
 
     // Setup mapped buffer objects
     std::vector<float> size_init(init_vert_support, vert_deslct_size);
@@ -103,8 +103,8 @@ namespace met {
     const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
-    // On relevant delaunay state change, update mesh buffer data
-    if (auto rsrc = info.resource("gen_delaunay_weights", "delaunay"); rsrc.is_mutated()) {
+    // On relevant unay state change, update mesh buffer data
+    if (auto rsrc = info.resource("gen_convex_weights", "delaunay"); rsrc.is_init() && rsrc.is_mutated()) {
       // Get triangulated mesh data from delaunay structure
       auto [verts, elems] = convert_mesh<AlignedMeshData>(rsrc.read_only<AlignedDelaunayData>());
 
@@ -127,6 +127,24 @@ namespace met {
       std::ranges::copy(elems, m_elem_map.begin());
       m_vert_draw.vertex_count = 3 * verts.size();
       m_elem_draw.vertex_count = 3 * elems.size();
+    } else if (e_pipe_state.any_verts || e_pipe_state.any_elems) {
+      if (e_proj_data.verts.size() > m_size_map.size()) {
+        std::vector<float> size_init(2 * e_proj_data.verts.size(), vert_deslct_size);
+        m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
+        m_size_map    = m_size_buffer.map_as<float>(buffer_access_flags);
+      }
+
+      if (e_proj_data.elems.size() > m_elem_map.size()) {
+        m_elem_array.detach_elements();
+        m_elem_buffer = {{ .size = 2 * e_proj_data.elems.size() * sizeof(eig::Array3u), .flags = buffer_create_flags }};
+        m_elem_map    = m_elem_buffer.map_as<eig::Array3u>(buffer_access_flags);
+        m_elem_array.attach_elements(m_elem_buffer);  
+      }
+
+      // Copy data to mapped buffers and adjust draw count
+      std::ranges::copy(e_proj_data.elems, m_elem_map.begin());
+      m_vert_draw.vertex_count = 3 * e_proj_data.verts.size();
+      m_elem_draw.vertex_count = 3 * e_proj_data.elems.size();
     }
 
     // On relevant state change, update selection buffer data
@@ -159,7 +177,7 @@ namespace met {
     gl::dispatch_draw(m_elem_draw);
 
     // Bind resources and dispatch vertex draw
-    m_vert_program.bind("b_posi",   info("gen_delaunay_weights", "vert_buffer").read_only<gl::Buffer>());
+    m_vert_program.bind("b_posi",   info("gen_convex_weights", "vert_buffer").read_only<gl::Buffer>());
     m_vert_program.bind("b_size",   m_size_buffer);
     m_vert_program.bind("b_camera", m_camr_buffer);
     m_vert_program.bind("b_value",  m_unif_buffer);

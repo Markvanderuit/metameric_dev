@@ -15,18 +15,21 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_tex_data    = info.global("app_data").read_only<ApplicationData>().loaded_texture;
+    const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
+    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_colr_data   = e_appl_data.loaded_texture;
 
     // Compute sample position in texture dependent on mouse position in image
-    eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
-                           - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
-                           / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
-    m_tooltip_pixel = (mouse_pos * e_tex_data.size().cast<float>()).cast<int>();
-    const size_t sample_i = e_tex_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
+    eig::Array2f mouse_pos = (static_cast<eig::Array2f>(ImGui::GetMousePos()) 
+                           -  static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
+                           /  static_cast<eig::Array2f>(ImGui::GetItemRectSize());
+    m_tooltip_pixel = (mouse_pos * e_colr_data.size().cast<float>()).cast<int>();
+    const size_t pos = e_colr_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant barycentric data to current available buffer
-    e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], sizeof(eig::Array4f), sizeof(eig::Array4f) * sample_i);
+    size_t bary_size = e_proj_data.weights_type == ProjectWeightsType::eDelaunay ? sizeof(eig::Array4f) : sizeof(Bary); 
+    e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], bary_size, bary_size * pos);
 
     // Submit a fence for current available buffer as it affects mapped memory
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
@@ -39,8 +42,7 @@ namespace met {
     // Get external resources
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
-    const auto &e_vert_spec = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-    const auto &e_delaunay  = info.resource("gen_delaunay_weights", "delaunay").read_only<AlignedDelaunayData>();
+    const auto &e_vert_spec = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
 
     // Spawn tooltip
     ImGui::BeginTooltip();
@@ -54,35 +56,68 @@ namespace met {
       fence.cpu_wait();
 
     // Unpack barycentric weights and get corresponding tetrahedron from delaunay
-    const auto &bary_data = m_tooltip_maps[m_tooltip_cycle_i][0];
-    eig::Array4f bary = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
-    eig::Array4u elem = e_delaunay.elems[*reinterpret_cast<const uint *>(&bary_data.w())].min(e_delaunay.verts.size() - 1);
+    if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
+      const auto &e_delaunay  = rsrc.read_only<AlignedDelaunayData>();
+      const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
-    // Compute output reflectance and color as convex combinations
-    Spec reflectance = 0;
-    for (uint i = 0; i < 4; ++i)
-      reflectance += bary[i] * e_vert_spec[elem[i]];
-    ColrSystem mapp  = e_proj_data.csys(texture_i);
-    Colr color = mapp.apply_color_indirect(reflectance);
-    Spec power = mapp.illuminant * reflectance;
+      eig::Array4f bary = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
+      eig::Array4u elem = e_delaunay.elems[*reinterpret_cast<const uint *>(&bary_data.w())].min(e_delaunay.verts.size() - 1);
 
-    ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
-      nullptr, 0.f, 1.f, { 0.f, 64.f });
-    ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-      nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
+      // Compute output reflectance and color as convex combinations
+      Spec reflectance = 0;
+      for (uint i = 0; i < 4; ++i)
+        reflectance += bary[i] * e_vert_spec[elem[i]];
+      ColrSystem mapp  = e_proj_data.csys(texture_i);
+      Colr color = mapp.apply_color_indirect(reflectance);
+      Spec power = mapp.illuminant * reflectance;
 
-    ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
+      ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
+        nullptr, 0.f, 1.f, { 0.f, 64.f });
+      ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
+        nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
 
-    ImGui::Separator();
+      ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
 
-    ImGui::InputScalarN("Weights", ImGuiDataType_Float, bary.data(), bary.size());
-    ImGui::InputScalarN("Indices", ImGuiDataType_U32, elem.data(), elem.size());
+      ImGui::Separator();
 
-    ImGui::Separator();
+      ImGui::InputScalarN("Weights", ImGuiDataType_Float, bary.data(), bary.size());
+      ImGui::InputScalarN("Indices", ImGuiDataType_U32, elem.data(), elem.size());
+
+      ImGui::Separator();
+      
+      ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
+      ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
+      ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+    } else {
+      const auto &bary_data = std::get<std::span<Bary>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
     
-    ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
-    ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
-    ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+      // Compute output reflectance and color as convex combinations
+      Bary bary = bary_data;
+      Spec reflectance = 0;
+      for (uint i = 0; i < e_vert_spec.size(); ++i)
+        reflectance += bary[i] * e_vert_spec[i];
+      ColrSystem mapp  = e_proj_data.csys(texture_i);
+      Colr color = mapp.apply_color_indirect(reflectance);
+      Spec power = mapp.illuminant * reflectance;
+
+      ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
+        nullptr, 0.f, 1.f, { 0.f, 64.f });
+      ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
+        nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
+
+      ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
+
+      ImGui::Separator();
+
+      ImGui::PlotLines("Weights", bary.data(), bary.size(), 0, 
+        nullptr, 0.f, 1.f, { 0.f, 64.f });
+
+      ImGui::Separator();
+      
+      ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
+      ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
+      ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+    }
 
     ImGui::EndTooltip();
   }
@@ -95,7 +130,7 @@ namespace met {
     if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get external resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
-      const auto &e_colr_buffer = info.resource(color_task_key, "colr_buffer").read_only<gl::Buffer>();
+      const auto &e_colr_buffer = info(color_task_key, "colr_buffer").read_only<gl::Buffer>();
       const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
 
       // Obtain cpu-side texture
@@ -112,9 +147,8 @@ namespace met {
 
     // Get external resources
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
-    uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
-    auto e_texture_size = e_appl_data.loaded_texture.size();
-
+    const auto &e_proj_data = e_appl_data.project_data;
+    
     m_resample_size   = 1;
     m_tooltip_cycle_i = 0;
 
@@ -124,12 +158,18 @@ namespace met {
     for (uint i = 0; i < m_tooltip_buffers.size(); ++i) {
       auto &buffer = m_tooltip_buffers[i];
       auto &map    = m_tooltip_maps[i];
-
-      buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
-      map = cast_span<eig::Array4f>(buffer.map(map_flags));
+      if (e_proj_data.weights_type == ProjectWeightsType::eDelaunay) {
+        buffer = {{ .size = sizeof(eig::Array4f), .flags = create_flags }};
+        map = cast_span<eig::Array4f>(buffer.map(map_flags));
+      } else {
+        buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
+        map = cast_span<Bary>(buffer.map(map_flags));
+      }
     }
 
     // Initialize texture generation subtasks
+    auto e_texture_size = e_appl_data.loaded_texture.size();
+    uint e_mappings_n = e_proj_data.color_systems.size();
     m_texture_subtasks.init(info, e_mappings_n, [](uint i) { return fmt::format("gen_texture_{}", i); },
     [=](auto &, uint i) { return TextureSubTask {{ 
       .input_key = { fmt::format("gen_color_mappings.gen_mapping_{}", i), "colr_buffer" }, 
@@ -154,7 +194,7 @@ namespace met {
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
-      const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+      const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
       const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
       uint e_mappings_n = e_proj_data.color_systems.size();
@@ -180,12 +220,6 @@ namespace met {
         std::string res_name = fmt::format("gen_resample_{}", i);
         
         guard_continue(info.subtask(gen_name).is_init() && info.subtask(res_name).is_init());
-
-        // Notify texture/resample subtasks of input changes
-        /* if (e_pipe_state.csys[i] || e_pipe_state.any_verts) {
-          info.subtask<TextureSubTask>(gen_name).notify();
-          info.subtask<ResampleSubtask>(res_name).notify();
-        } */
         
         // Notify resample subtask of potential resize
         auto task = info.subtask(res_name);
@@ -207,9 +241,8 @@ namespace met {
         // Get externally shared resources; note, resources may not be created yet as tasks are
         // added into the schedule at the end of a loop, not during
         guard_continue(info.task(gen_name).is_init() || info.task(res_name).is_init());
-        const auto &e_texture = info.resource(res_name, "texture").read_only<gl::Texture2d4f>();
+        const auto &e_texture = info(res_name, "texture").read_only<gl::Texture2d4f>();
 
-        // Draw image
         ImGui::BeginGroup();
 
         // Header line

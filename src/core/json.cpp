@@ -73,6 +73,7 @@ namespace met {
     v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
     v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
+    v.weights_type = ProjectWeightsType::eDelaunay; // TODO remove and fix
   }
 
   void to_json(json &js, const ProjectData &v) {

@@ -15,7 +15,7 @@ namespace met {
 
     // Get external resources
     const auto &e_txtr_data    = info.global("app_data").read_only<ApplicationData>().loaded_texture;
-    const auto &e_color_input  = info.resource("gen_delaunay_weights", "colr_buffer").read_only<gl::Buffer>();
+    const auto &e_color_input  = info.resource("gen_convex_weights", "colr_buffer").read_only<gl::Buffer>();
     const auto &e_color_output = info.resource("gen_color_mappings.gen_mapping_0", "colr_buffer").read_only<gl::Buffer>();
 
     // Get modified resources
@@ -71,7 +71,7 @@ namespace met {
     guard(info.resource("state", "pipeline_state").read_only<ProjectState>().any);
 
     // Get external resources
-    const auto &e_color_input  = info("gen_delaunay_weights", "colr_buffer").read_only<gl::Buffer>();
+    const auto &e_color_input  = info("gen_convex_weights", "colr_buffer").read_only<gl::Buffer>();
     const auto &e_color_output = info("gen_color_mappings.gen_mapping_0", "colr_buffer").read_only<gl::Buffer>();
 
     // Get modified resources
