@@ -21,15 +21,16 @@ namespace met {
     const auto &e_rgb_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture;
     const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
+    
+    // Determine compute dispatch size
+    const uint dispatch_n    = e_rgb_texture.size().prod();
+    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
 
-    const uint generate_n    = e_rgb_texture.size().prod();
-    const uint generate_ndiv = ceil_div(generate_n, 256u);
-
-    // Initialize objects for shader call
+    // Initialize objects for compute dispatch
     m_program = {{ .type       = gl::ShaderType::eCompute,
                    .spirv_path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.spv",
                    .cross_path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.json" }};
-    m_dispatch = { .groups_x = generate_ndiv, 
+    m_dispatch = { .groups_x = dispatch_ndiv, 
                    .bindable_program = &m_program }; 
 
     // Initialize uniform buffer and writeable, flushable mapping
@@ -49,7 +50,7 @@ namespace met {
     info("colr_buffer").set(std::move(colr_buffer)); // OpenGL buffer storing texture color positions
     info("vert_buffer").set(std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
     info("elem_buffer").set(std::move(elem_buffer)); // OpenGL buffer storing delaunay tetrahedral elements
-    info("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) }); // Convex weights
+    info("bary_buffer").init<gl::Buffer>({ .size = dispatch_n * sizeof(eig::Array4f) }); // Convex weights
   }
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {

@@ -28,6 +28,7 @@ namespace met {
     bool any_illuminants;
     bool any_cmfs;
     bool any_verts;
+    bool any_elems;
     bool any_csys;
 
     std::vector<CacheVert> verts;

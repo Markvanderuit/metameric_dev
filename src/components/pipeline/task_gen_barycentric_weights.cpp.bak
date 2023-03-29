@@ -59,7 +59,6 @@ namespace met {
   void GenBarycentricWeightsTask::eval(detail::TaskInfo &info) {
     met_trace_full();
 
-
     // Continue only on relevant state change
     auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
     guard(e_pipe_state.any_verts);
