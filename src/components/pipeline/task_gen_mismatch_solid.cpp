@@ -158,15 +158,15 @@ namespace met {
     CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
-    const auto &i_samples = info.resource(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
+    const auto &i_samples = info(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
 
     // Generate points on metamer set boundary; store in aligned format
-    auto data = generate_mismatch_boundary({ .basis     = e_appl_data.loaded_basis, 
-                                             .basis_avg = e_appl_data.loaded_basis_mean, 
-                                             .systems_i = cmfs_i, 
-                                             .signals_i = sign_i, 
-                                             .system_j  = cmfs_j, 
-                                             .samples   = i_samples });
+    auto data = generate_mismatch_boundary({ .basis      = e_appl_data.loaded_basis, 
+                                             .basis_mean = e_appl_data.loaded_basis_mean, 
+                                             .systems_i  = cmfs_i, 
+                                             .signals_i  = sign_i, 
+                                             .system_j   = cmfs_j, 
+                                             .samples    = i_samples });
     
     // Generate cleaned mesh from data
     auto mesh = generate_convex_hull<AlignedMeshData, eig::Array3f>(data);

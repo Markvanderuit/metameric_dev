@@ -254,8 +254,8 @@ namespace met {
         auto &e_app_data = info.global("app_data").writeable<ApplicationData>();
         const bool is_undo = e_app_data.mod_i >= 0;
         const bool is_redo = e_app_data.mod_i < int(e_app_data.mods.size()) - 1;
-        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_app_data.undo(); }
-        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_app_data.redo(); }
+        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_app_data.undo_mod(); }
+        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_app_data.redo_mod(); }
         ImGui::EndMenu();
       }
 

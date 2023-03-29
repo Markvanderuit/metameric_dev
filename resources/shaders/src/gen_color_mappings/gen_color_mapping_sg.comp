@@ -20,7 +20,7 @@ layout(binding = 0) uniform u_0 {
   uint n_verts;
 } b_unif;
 
-shared vec3 s_gamut[mvc_weights];
+shared vec3 s_gamut[generalized_weights];
 
 // Load shared gamut data into memory
 void load_shared() {
@@ -31,7 +31,7 @@ void load_shared() {
   barrier();
 }
 
-const uint sg_cluster_size = mvc_weights / 4; // so 4 then
+const uint sg_cluster_size = generalized_weights / 4; // so 4 then
 
 void main() {
   load_shared();

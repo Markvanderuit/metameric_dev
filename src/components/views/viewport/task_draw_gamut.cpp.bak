@@ -24,8 +24,8 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
-  constexpr uint max_vert_support = mvc_weights;
-  constexpr uint max_elem_support = 2 * mvc_weights;
+  constexpr uint max_vert_support = generalized_weights;
+  constexpr uint max_elem_support = 2 * generalized_weights;
 
   ViewportDrawGamutTask::ViewportDrawGamutTask(const std::string &name)
   : detail::AbstractTask(name, true) { }

@@ -40,10 +40,12 @@ namespace met {
     // Default constructor to fill in standard illuminants/cmfs
     ProjectCreateInfo();
     
+    // Input images with known color systems
+    std::vector<ImageData> images; 
+
     // Input uplifting information
-    std::vector<ImageData> images; // Input images with known color systems
-    uint n_exterior_samples;       // Intended nr. of exterior (convex hull) samples
-    uint n_interior_samples;       // Intended nr. of interior (image data) samples given input fitting
+    uint n_exterior_samples;  // Intended nr. of exterior (convex hull) samples
+    uint n_interior_samples;  // Intended nr. of interior (image data) samples given input fitting
     
     // Input spectral information
     std::vector<std::pair<std::string, Spec>> illuminants;
@@ -65,12 +67,13 @@ namespace met {
       std::vector<uint> csys_j; // Indices of the selected secondary color systems
     };
 
-    // Shorthands used throughout
-    using Vert = VertexData;
-    using Elem = eig::Array3u;
-
     // Set of indices of cmfs/illuminants together describing a stored color system
     struct CSys { uint cmfs, illuminant, n_scatters; };
+
+    // Shorthands used throughout
+    using InfoType = ProjectCreateInfo;
+    using Vert     = VertexData;
+    using Elem     = eig::Array3u;
     
   public: /* public data */
     // Project format information; e.g. convex hull with generalized barycentric coordinates
@@ -109,7 +112,7 @@ namespace met {
     Basis       loaded_basis;       // Basis functions obtained through PCA of measured spectra
     Spec        loaded_basis_mean;  // Mean of basis functions obtained through PCA of measured spectra
 
-  public: /* create/load/save methods */
+  public: /* project management; create/load/save/unload */
     void create(ProjectCreateInfo &&info); // Create project from info object
     void load(const fs::path &path);       // Load project data from path
     void save(const fs::path &path);       // Save project data to path
@@ -128,12 +131,9 @@ namespace met {
     int                     mod_i = -1; // Index of current last modification for undo/redo 
 
     void touch(ProjectMod &&mod); // Submit a modification to project data
-    void redo();                  // Step forward one modification
-    void undo();                  // Step back one modification
-
-  public: /* project solve functions */
-    void gen_convex_hull(uint n_exterior_samples);
-    void gen_constraints(uint n_interior_samples, std::span<const ProjectCreateInfo::ImageData> images);
+    void redo_mod();              // Step forward one modification
+    void undo_mod();              // Step back one modification
+    void clear_mods();            // Clear entire modification state       
 
   public: /* application theming, not exactly important */
     enum class ColorMode { eDark, eLight } color_mode;

@@ -34,8 +34,8 @@ const uint sg_cluster_size = 2; // 2 units per set of barycentric weights
       uint sg_cluster_offs = gl_SubgroupInvocationID.x % sg_cluster_size;
 
 // Shared memory declarations
-shared vec3  s_verts_in[mvc_weights];
-shared uvec3 s_elems_in[mvc_weights * 4];
+shared vec3  s_verts_in[generalized_weights];
+shared uvec3 s_elems_in[generalized_weights * 4];
 shared Bary4 s_bary_out[gl_WorkGroupSize.x / sg_cluster_size];
        uint  s_bary_i = gl_LocalInvocationID.x / sg_cluster_size;
 
@@ -51,14 +51,14 @@ void load_shared_data() {
 
 float norm_weights() {
   vec4 n = vec4(0);
-  for (uint i = sg_cluster_offs; i < mvc_weights_4; i += sg_cluster_size)
+  for (uint i = sg_cluster_offs; i < generalized_weights_4; i += sg_cluster_size)
     n += s_bary_out[s_bary_i][i];
   return hsum(subgroupClusteredAdd(n, sg_cluster_size));
 }
 
 void normalize_weights() {
   float n = 1.f / norm_weights();
-  for (uint i = sg_cluster_offs; i < mvc_weights_4; i += sg_cluster_size)
+  for (uint i = sg_cluster_offs; i < generalized_weights_4; i += sg_cluster_size)
     s_bary_out[s_bary_i][i] *= n;
 
   subgroupMemoryBarrierShared();
@@ -66,7 +66,7 @@ void normalize_weights() {
 }
 
 void clear_weights(float value) {
-  for (uint i = sg_cluster_offs; i < mvc_weights_4; i += sg_cluster_size)
+  for (uint i = sg_cluster_offs; i < generalized_weights_4; i += sg_cluster_size)
     s_bary_out[s_bary_i][i] = vec4(value);
 
   subgroupMemoryBarrierShared();
@@ -186,6 +186,6 @@ void main() {
   mean_value_coords_total(p);
 
   // Share result store across subgroup cluster
-  for (uint k = sg_cluster_offs; k < mvc_weights_4; k += sg_cluster_size)
+  for (uint k = sg_cluster_offs; k < generalized_weights_4; k += sg_cluster_size)
     bary_out.data[i][k] = s_bary_out[s_bary_i][k];
 }

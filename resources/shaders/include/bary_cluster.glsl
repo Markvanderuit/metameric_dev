@@ -14,14 +14,14 @@
 const uint cl_bary_values_n = 4;
 
 // Nr. of invocations for a given barycentric weight
-const uint cl_bary_invoc_n = CEIL_DIV(mvc_weights, cl_bary_values_n);
+const uint cl_bary_invoc_n = CEIL_DIV(generalized_weights, cl_bary_values_n);
 
 // Index of current invocation inside a given barycentric weight
 uint cl_bary_invoc_i = gl_GlobalInvocationID.x % cl_bary_invoc_n;
 
 // Offset and size of values for current invocation
 uint cl_bary_invoc_offs = cl_bary_invoc_i * cl_bary_values_n;
-uint cl_bary_invoc_size = min(cl_bary_invoc_offs + cl_bary_values_n, mvc_weights) - cl_bary_invoc_offs;
+uint cl_bary_invoc_size = min(cl_bary_invoc_offs + cl_bary_values_n, generalized_weights) - cl_bary_invoc_offs;
 
 // Define to perform commonly occuring iteration
 #define cl_bary_iter(__b)           for (uint __b = 0; __b < cl_bary_invoc_size; ++__b)
@@ -35,7 +35,7 @@ uint cl_bary_invoc_size = min(cl_bary_invoc_offs + cl_bary_values_n, mvc_weights
 bool cl_bin_elect() { return cl_bary_invoc_i == 0; }
 
 // Per-invocation barycentric weights are just a vec4 of values
-#define InBary float[mvc_weights]
+#define InBary float[generalized_weights]
 #define ClBary vec4
 #define ClMask bvec4
 

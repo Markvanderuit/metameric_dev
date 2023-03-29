@@ -12,7 +12,7 @@ namespace met {
   constexpr auto plot_flags        = ImPlotFlags_NoFrame | ImPlotFlags_NoMenus;
   constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
   constexpr auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
-  constexpr uint min_exterior_samples = 4, max_exterior_samples = mvc_weights;
+  constexpr uint min_exterior_samples = 4, max_exterior_samples = generalized_weights;
   constexpr uint min_interior_samples = 0, max_interior_samples = 1024;
 
   CreateProjectTask::CreateProjectTask(const std::string &view_title)
@@ -43,7 +43,7 @@ namespace met {
 
       // Miscellaneous settings nested within this header
       if (ImGui::CollapsingHeader("Initialization", ImGuiTreeNodeFlags_DefaultOpen)) {
-        std::array<std::string, 2> meshing_names = { "Convex hull", "Independent points" };
+        std::array<std::string, 2> meshing_names = { "Convex hull", "Convex hull, with interior points" };
         std::array<std::string, 2> weights_names = { "Generalized barycentric weights", "Delaunay triangulation" };
 
         // Selector for meshing structure type

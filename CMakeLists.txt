@@ -1,14 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 
-# Specify vcpkg toolchain path
-set(CMAKE_TOOLCHAIN_FILE 
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake
-  CACHE STRING "Vcpkg toolchain file")
-
-# Specify CMake modules path
-set(CMAKE_MODULE_PATH 
-  ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources"
-  CACHE STRING "CMake module path")
+# Specify VCPKG toolchain path, CMAKE module path
+set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake CACHE STRING "Vcpkg toolchain file")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources" CACHE STRING "CMake module path")
 
 project(Metameric LANGUAGES CXX)
 
@@ -21,7 +15,16 @@ set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
 set(MET_WAVELENGTH_BASES    12) # Nr. of basis functions used in generative functions
-set(MET_MVC_WEIGHTS         16) # Maximum nr. of barycentric weights supported
+set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported
+
+# Print configuration info
+message(STATUS "Metameric : Enabling exceptions = ${met_enable_dbg_exceptions}")
+message(STATUS "Metameric : Enabling Tracy      = ${met_enable_tracy}")
+message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
+message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
+message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
+message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
+message(STATUS "Metameric : Generalized weights = ${MET_GENERALIZED_WEIGHTS}")
 
 # Specify output directories as /bin and /lib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -74,19 +77,10 @@ find_program(glslangValidator NAMES glslangValidator PATHS ${CMAKE_PROGRAM_PATH}
 find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 
-# Include small_gl library directly
+# Include small_gl library directly; forward exceptions/tracy options
 option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
 option(gl_enable_tracy          "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
-
-# Configuration output info
-message(STATUS "Metameric : debug exceptions    = ${met_enable_dbg_exceptions}")
-message(STATUS "Metameric : Tracy support       = ${met_enable_tracy}")
-message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
-message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
-message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
-message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
-message(STATUS "Metameric : Barycentric weights = ${MET_MVC_WEIGHTS}")
 
 # Recursively find all shader files
 file(GLOB_RECURSE glsl_srcs
@@ -100,17 +94,13 @@ file(GLOB_RECURSE glsl_includes
 )
 
 # Add together arguments to pass into glsl parser
-string(CONCAT glsl_parser_arg_string
+string(CONCAT small_gl_parser_args
   "MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN},"
   "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
   "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES},"
   "MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES},"
-  "MET_MVC_WEIGHTS=${MET_MVC_WEIGHTS}"
+  "MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}"
 )
-
-# Add together placeholder args to pass into glsl parser;
-# replaced at runtime with the correct values
-string(CONCAT glsl_parser_placeholder_string "MET_SUBGROUP_SIZE=32")
 
 # Process shaders
 foreach(glsl_src ${glsl_srcs})
@@ -119,7 +109,7 @@ foreach(glsl_src ${glsl_srcs})
              BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src
              OUTPUT_VARIABLE relative_path)
 
-  message(STATUS "Compiling shader : ${relative_path}")
+  message(STATUS "Found shader : ${relative_path}")
   
   set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
   set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.temp")
@@ -131,8 +121,7 @@ foreach(glsl_src ${glsl_srcs})
     OUTPUT  ${spirv_parse_fp}
     COMMAND small_gl_parser_exec ${glsl_src} ${spirv_parse_fp} 
             -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
-            -s "${glsl_parser_arg_string}"
-            -d "${glsl_parser_placeholder_string}"
+            -s "${small_gl_parser_args}"
     DEPENDS small_gl_parser_exec ${glsl_src} ${glsl_includes}
     VERBATIM
   )
@@ -236,7 +225,7 @@ target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX}
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
   MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES}
-  MET_MVC_WEIGHTS=${MET_MVC_WEIGHTS}
+  MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
 

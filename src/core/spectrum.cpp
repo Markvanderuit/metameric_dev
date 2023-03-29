@@ -41,20 +41,19 @@ namespace met {
   } // namespace models 
 
   CMFS ColrSystem::finalize_indirect(const Spec &sd) const {
+    met_trace();
     Spec indirect = sd.pow(n_scatters - 1) * illuminant;
-
     CMFS to_xyz = (cmfs.array().colwise() * indirect   * wavelength_ssize)
                 / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
     CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-
     return to_rgb;
   }
 
   CMFS ColrSystem::finalize_direct() const {
+    met_trace();
     CMFS to_xyz = (cmfs.array().colwise() * illuminant * wavelength_ssize)
                 / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
     CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-
     return to_rgb;
   }
 

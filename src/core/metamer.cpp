@@ -94,7 +94,7 @@ namespace met {
       // Find nearest generalized spectrum that fits within the basis function approach
       Spec s_ = generate_spectrum({
         .basis      = info.basis,
-        .basis_mean = info.basis_avg,
+        .basis_mean = info.basis_mean,
         .systems    = std::vector<CMFS> { info.system },
         .signals    = std::vector<Colr> { (info.system.transpose() * s.matrix()).eval() }
       });
@@ -175,7 +175,7 @@ namespace met {
   std::vector<Spec> generate_gamut(const GenerateGamutInfo &info) {
     // Constant and type shorthands
     using Signal = GenerateGamutInfo::Signal;
-    constexpr uint n_bary = mvc_weights;
+    constexpr uint n_bary = generalized_weights;
     constexpr uint n_spec = wavelength_samples;
     constexpr uint n_base = wavelength_bases;
     constexpr uint n_colr = 3;
@@ -193,7 +193,7 @@ namespace met {
     params.objective = LPObjective::eMinimize;
     
     // Construct basis bounds
-    Spec upper_bounds = Spec(1.0) - info.basis_avg;
+    Spec upper_bounds = Spec(1.0) - info.basis_mean;
     Spec lower_bounds = upper_bounds - Spec(1.0); 
 
     // Clear untouched matrix values to 0
@@ -213,7 +213,7 @@ namespace met {
       const Signal &signal = info.signals[i];
 
       auto signal_csys = (info.systems[signal.syst_i].transpose() * info.basis).eval();
-      Colr signal_avg  = (info.systems[signal.syst_i].transpose() * info.basis_avg.matrix()).transpose().eval();
+      Colr signal_avg  = (info.systems[signal.syst_i].transpose() * info.basis_mean.matrix()).transpose().eval();
 
       for (uint j = 0; j < n_bary; ++j) {
         auto A = (signal_csys * signal.bary_v[j]).cast<double>().eval();
@@ -227,7 +227,7 @@ namespace met {
     // Add roundtrip constraints for gamut vertex positions
     const auto gamut_csys = (info.systems[0].transpose() * info.basis).cast<double>().eval();
     const uint gamut_offs = info.signals.size() * n_colr;
-    const Colr gamut_avg  = (info.systems[0].transpose() * info.basis_avg.matrix()).transpose().eval();
+    const Colr gamut_avg  = (info.systems[0].transpose() * info.basis_mean.matrix()).transpose().eval();
     for (uint i = 0; i < info.gamut.size(); ++i) {
       auto b =( info.gamut[i] - gamut_avg).cast<double>().eval();
       params.A.block(gamut_offs + i * n_colr, i * n_base, rowcol(gamut_csys)) = gamut_csys;
@@ -256,7 +256,7 @@ namespace met {
     // Obtain basis function weights from solution and compute resulting spectra
     std::vector<Spec> out(n_bary);
     for (uint i = 0; i < n_bary; ++i)
-      out[i] = (info.basis_avg 
+      out[i] = (info.basis_mean 
         + (info.basis 
           * eig::Matrix<float, wavelength_bases, 1>(x_min.block<n_base, 1>(n_base * i, 0))
           ).array().eval()
