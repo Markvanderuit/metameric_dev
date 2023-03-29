@@ -78,8 +78,8 @@ namespace met {
     ProjectWeightsType weights_type;
 
     // Convex hull data structure used for rgb->spectral uplifting
-    std::vector<Vert> vertices;      // User-specified mesh vert data 
-    std::vector<Elem> elements;      // User-specified mesh elem data
+    std::vector<Vert> verts;         // User-specified mesh vert data 
+    std::vector<Elem> elems;         // User-specified mesh elem data
     std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
 
     // Named user- or program-provided illuminants and color matching functions

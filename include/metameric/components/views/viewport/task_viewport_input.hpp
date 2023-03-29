@@ -74,12 +74,12 @@ namespace met {
           // Apply data modification to project
           e_appl_data.touch({
             .name = "Add vertex",
-            .redo = [](auto &data) { data.vertices.push_back({ .colr_i = Colr(0.5), .csys_i = 0 }); },
-            .undo = [](auto &data) { data.vertices.pop_back(); }
+            .redo = [](auto &data) { data.verts.push_back({ .colr_i = Colr(0.5), .csys_i = 0 }); },
+            .undo = [](auto &data) { data.verts.pop_back(); }
           });
 
           // Select newly added vertex
-          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>() = { static_cast<uint>(e_proj_data.vertices.size() - 1) };
+          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>() = { static_cast<uint>(e_proj_data.verts.size() - 1) };
           info.resource("viewport.overlay", "constr_selection").writeable<int>() = -1;
         }
 
@@ -97,9 +97,9 @@ namespace met {
             .name = "Remove vertex",
             .redo = [edit = indices](auto &data) { 
               for (uint i : edit)
-                data.vertices.erase(data.vertices.begin() + i);
-            }, .undo = [edit = e_proj_data.vertices](auto &data) { 
-              data.vertices = edit;
+                data.verts.erase(data.verts.begin() + i);
+            }, .undo = [edit = e_proj_data.verts](auto &data) { 
+              data.verts = edit;
             }
           });
 

@@ -43,7 +43,7 @@ namespace met {
 
       // Get modified resources
       auto &e_app_data  = info.global("app_data").writeable<ApplicationData>();
-      auto &e_verts     = e_app_data.project_data.vertices;
+      auto &e_verts     = e_app_data.project_data.verts;
       auto &io          = ImGui::GetIO();
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
@@ -162,10 +162,10 @@ namespace met {
         // Register data edit as drag finishes
         e_app_data.touch({ 
           .name = "Move gamut points", 
-          .redo = [edit = e_verts](auto &data) { data.vertices = edit; }, 
+          .redo = [edit = e_verts](auto &data) { data.verts = edit; }, 
           .undo = [edit = m_colrs_prev](auto &data) { 
             for (uint i = 0; i < edit.size(); ++i)
-              data.vertices[i].colr_i = edit[i];
+              data.verts[i].colr_i = edit[i];
           }
         });
         m_is_gizmo_used = false;

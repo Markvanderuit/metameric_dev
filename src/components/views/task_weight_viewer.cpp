@@ -114,19 +114,19 @@ namespace met {
     auto &i_colr_buffer = info.resource("colr_buffer").writeable<gl::Buffer>();
 
     // Index of selected mapping is used for color queries
-    uint mapping_i = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
+    uint mapping_i = e_cstr_slct >= 0 ? e_proj_data.verts[e_selection[0]].csys_j[e_cstr_slct] : 0;
 
     // Update uniform data for upcoming sum computation
     m_unif_map->n       = e_appl_data.loaded_texture.size().prod();
     m_unif_map->n_verts = e_delaunay.verts.size();
     m_unif_map->n_elems = e_delaunay.elems.size();
-    std::fill(m_unif_map->selection, m_unif_map->selection + e_proj_data.vertices.size(), 0);
+    std::fill(m_unif_map->selection, m_unif_map->selection + e_proj_data.verts.size(), 0);
     std::ranges::for_each(e_selection, [&](uint i) { m_unif_map->selection[i] = 1; });
     m_unif_buffer.flush();
 
     // Update vertex data, given any state change
     ColrSystem csys = e_proj_data.csys(mapping_i);
-    for (uint i = 0; i < e_proj_data.vertices.size(); ++i) {
+    for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
       guard_continue(activate_flag || e_pipe_state.verts[i].any);
       m_vert_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
       m_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));

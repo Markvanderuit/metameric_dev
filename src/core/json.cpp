@@ -69,14 +69,14 @@ namespace met {
   }
 
   void from_json(const json &js, ProjectData &v) {
-    v.vertices      = js.at("vertices").get<std::vector<ProjectData::Vert>>();
+    v.verts      = js.at("vertices").get<std::vector<ProjectData::Vert>>();
     v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
     v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
   }
 
   void to_json(json &js, const ProjectData &v) {
-    js["vertices"]    = v.vertices;
+    js["vertices"]    = v.verts;
     js["mappings"]    = v.color_systems;
     js["cmfs"]        = v.cmfs;
     js["illuminants"] = v.illuminants;

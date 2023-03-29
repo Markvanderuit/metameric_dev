@@ -117,7 +117,7 @@ namespace met {
     // Get external resources
     const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_vert        = e_proj_data.vertices[e_vert_slct[0]];
+    const auto &e_vert        = e_proj_data.verts[e_vert_slct[0]];
     const auto &e_pipe_state  = info.resource("state", "pipeline_state").read_only<ProjectState>();
     const auto &e_view_state  = info.resource("state", "viewport_state").read_only<ViewportState>();
     const auto &e_arcball     = info.resource(m_parent, "arcball").read_only<detail::Arcball>();

@@ -42,14 +42,14 @@ namespace met {
     auto &i_spectra = info("vert_spec").writeable<std::vector<Spec>>();
 
     // Generate spectra at stale gamut vertices in parallel
-    i_spectra.resize(e_proj_data.vertices.size()); // vector-resize is non-destructive on vector growth
+    i_spectra.resize(e_proj_data.verts.size()); // vector-resize is non-destructive on vector growth
     #pragma omp parallel for
     for (int i = 0; i < i_spectra.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
       guard_continue(e_pipe_state.verts[i].any);
 
       // Relevant vertex data
-      auto &vert = e_proj_data.vertices[i];   
+      auto &vert = e_proj_data.verts[i];   
 
       // Obtain color system spectra for this vertex
       std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_spectra[i]) };

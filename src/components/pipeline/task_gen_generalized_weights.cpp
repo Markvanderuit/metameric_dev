@@ -18,12 +18,12 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_rgb_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture;
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
-    const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_colr_data = e_appl_data.loaded_texture;
+    const auto &e_proj_data = e_appl_data.project_data;
     
     // Determine compute dispatch size
-    const uint dispatch_n    = e_rgb_texture.size().prod();
+    const uint dispatch_n    = e_colr_data.size().prod();
     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / 2u); // tldr; subgroup shenanigans
 
     // Initialize objects for compute dispatch
@@ -39,7 +39,7 @@ namespace met {
     m_uniform_map->n = e_appl_data.loaded_texture.size().prod();
 
     // Initialize mesh buffer data and writeable, flushable mappings where necessary
-    gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) }};
+    gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_colr_data)).data()) }};
     gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
     gl::Buffer elem_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags}};
     m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
@@ -78,17 +78,17 @@ namespace met {
     
     // Push stale vertices/elements
     for (uint i : vert_range) {
-      m_vert_map[i] = e_proj_data.vertices[i].colr_i;
+      m_vert_map[i] = e_proj_data.verts[i].colr_i;
       i_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }
     for (uint i : elem_range) {
-      m_elem_map[i] = e_proj_data.elements[i];
+      m_elem_map[i] = e_proj_data.elems[i];
       i_elem_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }
 
     // Update uniform data
-    m_uniform_map->n_verts = e_proj_data.vertices.size();
-    m_uniform_map->n_elems = e_proj_data.elements.size();
+    m_uniform_map->n_verts = e_proj_data.verts.size();
+    m_uniform_map->n_elems = e_proj_data.elems.size();
     m_uniform_buffer.flush();
 
     // Bind required resources

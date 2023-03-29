@@ -102,9 +102,9 @@ namespace met {
       auto &e_proj_data  = e_appl_data.project_data;
       
       #pragma omp parallel for
-      for (int i = 0; i < e_proj_data.vertices.size(); ++i) {
+      for (int i = 0; i < e_proj_data.verts.size(); ++i) {
         guard_continue(e_pipe_state.verts[i].colr_i);
-        auto &vert = e_proj_data.vertices[i];
+        auto &vert = e_proj_data.verts[i];
 
         // Cast a ray through the vertex point towards the mesh centroid;
         Ray ray = { .o = vert.colr_i,

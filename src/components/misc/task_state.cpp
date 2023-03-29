@@ -103,17 +103,17 @@ namespace met {
     auto &i_pipe_state = info("pipeline_state").writeable<ProjectState>();
 
     // Iterate over all project data
-    bool pre_verts_resize = e_proj_data.vertices.size() != m_vertices.size();
-    i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.vertices, m_vertices);
+    bool pre_verts_resize = e_proj_data.verts.size() != m_verts.size();
+    i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.verts, m_verts);
     std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
     std::tie(i_pipe_state.cmfs,        i_pipe_state.any_cmfs)        = detail::compare_state(e_proj_data.cmfs, m_cmfs);
     std::tie(i_pipe_state.csys,        i_pipe_state.any_csys)        = detail::compare_state(e_proj_data.color_systems, m_csys);
-    std::tie(i_pipe_state.elems,       i_pipe_state.any_elems)       = detail::compare_state(e_proj_data.elements, m_elements);
+    std::tie(i_pipe_state.elems,       i_pipe_state.any_elems)       = detail::compare_state(e_proj_data.elems, m_elems);
 
     // Post-process fill in some gaps in project state
     for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
       auto &vert_state = i_pipe_state.verts[i];
-      auto &vert_data  = e_proj_data.vertices[i];
+      auto &vert_data  = e_proj_data.verts[i];
       
       // If mapping state has become stale, this influenced the flag inside of a vertex as well
       vert_state.csys_i |= i_pipe_state.csys[vert_data.csys_i];

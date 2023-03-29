@@ -8,6 +8,7 @@
 #include <metameric/components/misc/task_frame_end.hpp>
 #include <metameric/components/misc/task_state.hpp>
 #include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
+#include <metameric/components/pipeline/task_gen_generalized_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
@@ -108,6 +109,7 @@ namespace met {
     
     scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
     scheduler.task("gen_delaunay_weights").init<GenDelaunayWeightsTask>();
+    scheduler.task("gen_generalized_weights").init<GenGeneralizedWeightsTask>();
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
     scheduler.task("gen_color_system_solid").init<GenColorSystemSolidTask>();
     scheduler.task("gen_mismatch_solid").init<GenMismatchSolidTask>();

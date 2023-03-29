@@ -55,7 +55,7 @@ namespace met {
     // Setup dispatch objects summarizing both draw operations
     m_vert_draw = {
       .type             = gl::PrimitiveType::eTriangles,
-      .vertex_count     = 3 * static_cast<uint>(e_proj_data.vertices.size()),
+      .vertex_count     = 3 * static_cast<uint>(e_proj_data.verts.size()),
       .capabilities     = {{ gl::DrawCapability::eMSAA, false }},
       .draw_op          = gl::DrawOp::eFill,
       .bindable_array   = &m_vert_array,

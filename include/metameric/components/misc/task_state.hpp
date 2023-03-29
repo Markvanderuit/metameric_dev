@@ -6,8 +6,8 @@
 namespace met {
   class StateTask : public detail::TaskNode {
     // Copies of project data to check for and report state changes
-    std::vector<ProjectData::Vert>            m_vertices;
-    std::vector<ProjectData::Elem>            m_elements;
+    std::vector<ProjectData::Vert>            m_verts;
+    std::vector<ProjectData::Elem>            m_elems;
     std::vector<ProjectData::CSys>            m_csys;
     std::vector<std::pair<std::string, CMFS>> m_cmfs;
     std::vector<std::pair<std::string, Spec>> m_illuminants;

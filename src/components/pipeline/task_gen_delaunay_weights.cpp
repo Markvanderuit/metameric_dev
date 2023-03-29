@@ -18,12 +18,12 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_rgb_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture;
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
-    const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_colr_data = e_appl_data.loaded_texture;
+    const auto &e_proj_data = e_appl_data.project_data;
     
     // Determine compute dispatch size
-    const uint dispatch_n    = e_rgb_texture.size().prod();
+    const uint dispatch_n    = e_colr_data.size().prod();
     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
 
     // Initialize objects for compute dispatch
@@ -39,7 +39,7 @@ namespace met {
     m_uniform_map->n = e_appl_data.loaded_texture.size().prod();
 
     // Initialize mesh buffer data and writeable, flushable mappings where necessary
-    gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) }};
+    gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_colr_data)).data()) }};
     gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
     gl::Buffer elem_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags}};
     m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
@@ -71,8 +71,8 @@ namespace met {
     auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
 
     // Generate new delaunay structure
-    std::vector<Colr> delaunay_input(e_proj_data.vertices.size());
-    std::ranges::transform(e_proj_data.vertices, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
+    std::vector<Colr> delaunay_input(e_proj_data.verts.size());
+    std::ranges::transform(e_proj_data.verts, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
     i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
 
     // Push buffer data // TODO optimize?
@@ -91,7 +91,7 @@ namespace met {
     m_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
     m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
-    // Dispatch shader to compute convex weights
+    // Dispatch shader to generate delaunay convex weights
     gl::dispatch_compute(m_dispatch);
   }
 } // namespace met

@@ -225,8 +225,9 @@ namespace met {
   void ApplicationData::gen_convex_hull(uint n_exterior_samples) {
     met_trace_full();
 
-    // Generate temporary OCS for convex hull clipping
     fmt::print("  Generating object color solid boundaries\n");
+
+    // Generate temporary OCS for convex hull clipping
     auto ocs = generate_ocs_boundary({ .basis     = loaded_basis,
                                        .basis_avg = loaded_basis_mean,
                                        .system    = project_data.csys(0).finalize_direct(), 
@@ -234,19 +235,21 @@ namespace met {
     auto ocs_mesh = simplify_edge_length<HalfedgeMeshData>(
       generate_convex_hull<HalfedgeMeshData, eig::Array3f>(ocs), 0.001f);
 
-    // Generate simplified concave hull fitting texture data, then fit convex hull around this
     fmt::print("  Generating simplified convex hull\n");
+
+    // Generate simplified concave hull fitting texture data, then fit convex hull around this
     auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture.data());
     auto chull_mesh = generate_convex_hull<IndexedMeshData, eig::Array3f>(
       simplify_volume<IndexedMeshData>(chull_base, n_exterior_samples, &ocs_mesh).verts
     );
 
-    fmt::print("  Convex hull result: {} vertices\n", chull_mesh.verts.size());
+    fmt::print("  Convex hull result: {} vertices, {} elements\n", 
+      chull_mesh.verts.size(), chull_mesh.elems.size());
 
     // Update project data with new convex hull
-    // project_data.gamut_elems = elems;
-    project_data.vertices.resize(chull_mesh.verts.size());
-    std::ranges::transform(chull_mesh.verts, project_data.vertices.begin(), [](Colr c) {
+    project_data.elems = chull_mesh.elems;
+    project_data.verts.resize(chull_mesh.verts.size());
+    std::ranges::transform(chull_mesh.verts, project_data.verts.begin(), [](Colr c) {
       return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
     });
   }
@@ -320,7 +323,7 @@ namespace met {
       std::iota(range_iter(csys_j_data), 1);
       
       // Add vertices to project data
-      project_data.vertices.reserve(project_data.vertices.size() + n_samples);
+      project_data.verts.reserve(project_data.verts.size() + n_samples);
       for (uint i = 0; i < n_samples; ++i) {
         // Iterate through samples, in case bad samples still exist
         while (i < n_samples) {
@@ -359,7 +362,7 @@ namespace met {
             i++;
             continue;
           } else {
-            project_data.vertices.push_back(vt);
+            project_data.verts.push_back(vt);
             break;
           }
         }

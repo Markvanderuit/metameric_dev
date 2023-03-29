@@ -68,7 +68,7 @@ namespace met {
     const auto &i_cstr_slct  = info.resource("constr_selection").read_only<int>();
     const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
-    const auto &e_verts      = e_proj_data.vertices;
+    const auto &e_verts      = e_proj_data.verts;
 
     // Only spawn any tooltips on non-empty gamut selection; only allow constraint selection
     // on a single vertex
@@ -169,7 +169,7 @@ namespace met {
     // Get modified resources
     auto &e_appl_data = info.global("app_data").writeable<ApplicationData>();
     auto &e_proj_data = e_appl_data.project_data;
-    auto &e_vert      = e_proj_data.vertices[i];
+    auto &e_vert      = e_proj_data.verts[i];
 
     // Local state
     float mapp_width, edit3_width;
@@ -217,8 +217,8 @@ namespace met {
         m_is_vert_edit_used = false;
         e_appl_data.touch({
           .name = "Change vertex color",
-          .redo = [edit = colr_edit, i = i](auto &data) { data.vertices[i].colr_i = edit; },
-          .undo = [edit = m_colr_prev, i = i](auto &data) { data.vertices[i].colr_i = edit; },
+          .redo = [edit = colr_edit, i = i](auto &data) { data.verts[i].colr_i = edit; },
+          .undo = [edit = m_colr_prev, i = i](auto &data) { data.verts[i].colr_i = edit; },
         });
       }
 
@@ -264,8 +264,8 @@ namespace met {
       if (l_csys_i != e_vert.csys_i) {
         e_appl_data.touch({
           .name = "Change color system index",
-          .redo = [edit = l_csys_i,      i = i](auto &data) { data.vertices[i].csys_i = edit; },
-          .undo = [edit = e_vert.csys_i, i = i](auto &data) { data.vertices[i].csys_i = edit; }
+          .redo = [edit = l_csys_i,      i = i](auto &data) { data.verts[i].csys_i = edit; },
+          .undo = [edit = e_vert.csys_i, i = i](auto &data) { data.verts[i].csys_i = edit; }
         });
       }
     }
@@ -306,8 +306,8 @@ namespace met {
         if (l_csys_j != e_vert.csys_j[j]) {
           e_appl_data.touch({
             .name = "Change constraint color system",
-            .redo = [edit = l_csys_j,         i = i, j = j](auto &data) { data.vertices[i].csys_j[j] = edit; },
-            .undo = [edit = e_vert.csys_j[j], i = i, j = j](auto &data) { data.vertices[i].csys_j[j] = edit; }
+            .redo = [edit = l_csys_j,         i = i, j = j](auto &data) { data.verts[i].csys_j[j] = edit; },
+            .undo = [edit = e_vert.csys_j[j], i = i, j = j](auto &data) { data.verts[i].csys_j[j] = edit; }
           });
         }
 
@@ -358,11 +358,11 @@ namespace met {
         if (j == 0) ImGui::BeginDisabled();
         if (ImGui::ArrowButton("up", ImGuiDir_Up)) {
           e_appl_data.touch({ .name = "Swapped constraint color systems", .redo = [i = i, j = j](auto &data) {  
-            std::swap(data.vertices[i].colr_j[j], data.vertices[i].colr_j[j - 1]);
-            std::swap(data.vertices[i].csys_j[j], data.vertices[i].csys_j[j - 1]);
+            std::swap(data.verts[i].colr_j[j], data.verts[i].colr_j[j - 1]);
+            std::swap(data.verts[i].csys_j[j], data.verts[i].csys_j[j - 1]);
           },.undo = [i = i, j = j](auto &data) {  
-            std::swap(data.vertices[i].colr_j[j], data.vertices[i].colr_j[j - 1]);
-            std::swap(data.vertices[i].csys_j[j], data.vertices[i].csys_j[j - 1]);
+            std::swap(data.verts[i].colr_j[j], data.verts[i].colr_j[j - 1]);
+            std::swap(data.verts[i].csys_j[j], data.verts[i].csys_j[j - 1]);
           }});
         }
         if (j == 0) ImGui::EndDisabled();
@@ -372,11 +372,11 @@ namespace met {
         if (j == e_vert.colr_j.size() - 1) ImGui::BeginDisabled();
         if (ImGui::ArrowButton("down", ImGuiDir_Down)) {
           e_appl_data.touch({ .name = "Swapped constraint color systems", .redo = [i = i, j = j](auto &data) {  
-            std::swap(data.vertices[i].colr_j[j], data.vertices[i].colr_j[j + 1]);
-            std::swap(data.vertices[i].csys_j[j], data.vertices[i].csys_j[j + 1]);
+            std::swap(data.verts[i].colr_j[j], data.verts[i].colr_j[j + 1]);
+            std::swap(data.verts[i].csys_j[j], data.verts[i].csys_j[j + 1]);
           },.undo = [i = i, j = j](auto &data) {  
-            std::swap(data.vertices[i].colr_j[j], data.vertices[i].colr_j[j + 1]);
-            std::swap(data.vertices[i].csys_j[j], data.vertices[i].csys_j[j + 1]);
+            std::swap(data.verts[i].colr_j[j], data.verts[i].colr_j[j + 1]);
+            std::swap(data.verts[i].csys_j[j], data.verts[i].csys_j[j + 1]);
           }});
         }
         if (j == e_vert.colr_j.size() - 1) ImGui::EndDisabled();
@@ -392,9 +392,9 @@ namespace met {
 
         if (ImGui::Button("X")) {
           e_appl_data.touch({ .name = "Delete color constraint", .redo = [i = i, j = j](auto &data) { 
-            data.vertices[i].colr_j.erase(data.vertices[i].colr_j.begin() + j); 
-            data.vertices[i].csys_j.erase(data.vertices[i].csys_j.begin() + j); 
-          }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.vertices[i] = edit; }});
+            data.verts[i].colr_j.erase(data.verts[i].colr_j.begin() + j); 
+            data.verts[i].csys_j.erase(data.verts[i].csys_j.begin() + j); 
+          }, .undo = [edit = e_vert,  i = i, j = j](auto &data) { data.verts[i] = edit; }});
 
           // Sanitize selected constraint in case this was deleted
           info.resource("constr_selection").writeable<int>() = std::min(i_cstr_slct, static_cast<int>(e_vert.colr_j.size() - 1));
@@ -408,9 +408,9 @@ namespace met {
     // Spawn button to add an extra constraint, if necessary
     if (ImGui::Button("Add constraint")) {
       e_appl_data.touch({ .name = "Add color constraint", .redo = [i = i](auto &data) { 
-        data.vertices[i].colr_j.push_back(data.vertices[i].colr_i); 
-        data.vertices[i].csys_j.push_back(0); 
-      }, .undo = [edit = e_vert,  i = i](auto &data) { data.vertices[i] = edit; }});
+        data.verts[i].colr_j.push_back(data.verts[i].colr_i); 
+        data.verts[i].csys_j.push_back(0); 
+      }, .undo = [edit = e_vert,  i = i](auto &data) { data.verts[i] = edit; }});
 
       // Set displayed constraint in viewport to this constraint, iff a constraint was selected
       if (i_cstr_slct != -1)
@@ -431,7 +431,7 @@ namespace met {
     // Get mnodified resources
     auto &e_appl_data   = info.global("app_data").writeable<ApplicationData>();
     auto &e_proj_data   = e_appl_data.project_data;
-    auto &e_vert        = e_appl_data.project_data.vertices[e_vert_slct[0]];
+    auto &e_vert        = e_appl_data.project_data.verts[e_vert_slct[0]];
     auto &i_arcball     = info.resource("arcball").writeable<detail::Arcball>();
     auto &i_lrgb_target = info.resource("lrgb_color_solid_target").writeable<gl::Texture2d4f>();
     auto &i_srgb_target = info.resource("srgb_color_solid_target").writeable<gl::Texture2d4f>();
@@ -498,9 +498,9 @@ namespace met {
         e_appl_data.touch({ 
           .name = "Change constraint color", 
           .redo = [edit = e_vert.colr_j[i_cstr_slct], i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
-                  { data.vertices[i].colr_j[j] = edit; }, 
+                  { data.verts[i].colr_j[j] = edit; }, 
           .undo = [edit = m_colr_prev, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
-                  { data.vertices[i].colr_j[j] = edit; }
+                  { data.verts[i].colr_j[j] = edit; }
         });
       }
     }
@@ -522,9 +522,9 @@ namespace met {
       e_appl_data.touch({
         .name = "Change constraint color",
         .redo = [edit = colr_edit, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
-                { data.vertices[i].colr_j[j] = edit; },
+                { data.verts[i].colr_j[j] = edit; },
         .undo = [edit = m_colr_prev, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
-                { data.vertices[i].colr_j[j] = edit; }
+                { data.verts[i].colr_j[j] = edit; }
       });
     }
 
@@ -534,9 +534,9 @@ namespace met {
       e_appl_data.touch({ 
         .name = "Center constraint color", 
         .redo = [edit = e_csol_cntr, i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
-                { data.vertices[i].colr_j[j] = edit; }, 
+                { data.verts[i].colr_j[j] = edit; }, 
         .undo = [edit = e_vert.colr_j[i_cstr_slct], i = e_vert_slct[0], j = i_cstr_slct](auto &data) 
-                { data.vertices[i].colr_j[j] = edit; }
+                { data.verts[i].colr_j[j] = edit; }
       });
     }
   }
@@ -550,7 +550,7 @@ namespace met {
     const auto &e_spec      = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
-    const auto &e_vert      = e_appl_data.project_data.vertices;
+    const auto &e_vert      = e_appl_data.project_data.verts;
 
     const ImVec2 refl_size = { -1.f, overlay_plot_height * e_window.content_scale() };
     const auto   refl_flag = ImPlotFlags_NoInputs | ImPlotFlags_NoFrame;
