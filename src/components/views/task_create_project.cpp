@@ -2,17 +2,19 @@
 #include <metameric/components/views/task_create_project.hpp>
 #include <small_gl/window.hpp>
 #include <implot.h>
+#include <array>
 
 namespace met {
-  constexpr float img_rel_width = 128.f;
+  constexpr float img_rel_width  = 128.f;
   constexpr float img_sec_height = img_rel_width + 80.f;
-  constexpr float plot_height   = 96.f;
-
+  constexpr float plot_height    = 96.f;
   constexpr auto leaf_flags        = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_SpanFullWidth;
   constexpr auto plot_flags        = ImPlotFlags_NoFrame | ImPlotFlags_NoMenus;
   constexpr auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
   constexpr auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
-  
+  constexpr uint min_exterior_samples = 4, max_exterior_samples = mvc_weights;
+  constexpr uint min_interior_samples = 0, max_interior_samples = 1024;
+
   CreateProjectTask::CreateProjectTask(const std::string &view_title)
   : m_view_title(view_title) { }
 
@@ -38,6 +40,39 @@ namespace met {
         eval_images_section(info);
       if (ImGui::CollapsingHeader("Spectral data", ImGuiTreeNodeFlags_DefaultOpen))
         eval_data_section(info);
+
+      // Miscellaneous settings nested within this header
+      if (ImGui::CollapsingHeader("Initialization", ImGuiTreeNodeFlags_DefaultOpen)) {
+        std::array<std::string, 2> meshing_names = { "Convex hull", "Independent points" };
+        std::array<std::string, 2> weights_names = { "Generalized barycentric weights", "Delaunay triangulation" };
+
+        // Selector for meshing structure type
+        uint meshing_type_i = static_cast<uint>(m_proj_data.meshing_type);
+        if (ImGui::BeginCombo("Mesh structure type", meshing_names[meshing_type_i].c_str())) {
+          for (uint i = 0; i < meshing_names.size(); ++i) {
+            if (ImGui::Selectable(meshing_names[i].c_str(), i == meshing_type_i)) {
+              m_proj_data.meshing_type = static_cast<ProjectMeshingType>(i);
+            }
+          }
+          ImGui::EndCombo();
+        }
+
+        // Selector for convex weighting type
+        uint weights_type_i = static_cast<uint>(m_proj_data.weights_type);
+        if (ImGui::BeginCombo("Convex weighting type", weights_names[weights_type_i].c_str())) {
+          for (uint i = 0; i < weights_names.size(); ++i) {
+            if (ImGui::Selectable(weights_names[i].c_str(), i == weights_type_i)) {
+              m_proj_data.weights_type = static_cast<ProjectWeightsType>(i);
+            }
+          }
+          ImGui::EndCombo();
+        }
+
+        ImGui::SliderScalar("Exterior samples", ImGuiDataType_U32, &m_proj_data.n_exterior_samples, &min_exterior_samples, &max_exterior_samples);
+        if (m_imag_data.size() > 1) {
+          ImGui::SliderScalar("Interior samples", ImGuiDataType_U32, &m_proj_data.n_interior_samples, &min_interior_samples, &max_interior_samples);
+        }
+      }
       
       // Define create/cancel buttons to handle results 
       ImGui::Separator();
@@ -53,12 +88,6 @@ namespace met {
         info.task().dstr();
       }
       
-      // Define convex hull vertex slider
-      uint min_chull_v = 4, max_chull_v = mvc_weights;
-      ImGui::SameLine(0.f, -48.f * e_window.content_scale());
-      ImGui::SetNextItemWidth(-48.f * e_window.content_scale());
-      ImGui::SliderScalar("Vertices", ImGuiDataType_U32, 
-        &m_proj_data.n_vertices, &min_chull_v, &max_chull_v);
 
       // Insert modals
       eval_progress_modal(info);

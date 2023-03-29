@@ -85,7 +85,7 @@ namespace met {
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif
 
-    ImGui::Init(window, info.color_mode == AppColorMode::eDark);
+    ImGui::Init(window, info.color_mode == ApplicationData::ColorMode::eDark);
     
     // Initialize major application components on startup
     detail::init_parser(scheduler);

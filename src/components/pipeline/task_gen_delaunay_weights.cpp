@@ -19,7 +19,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_rgb_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_rgb_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture;
     const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
 
@@ -36,11 +36,13 @@ namespace met {
     // Initialize uniform buffer and writeable, flushable mapping
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
-    m_uniform_map->n = e_appl_data.loaded_texture_f32.size().prod();
+    m_uniform_map->n = e_appl_data.loaded_texture.size().prod();
 
     // Initialize buffer holding barycentric weights
+    info("delaunay").set<AlignedDelaunayData>({ });
+    // info("vert_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
+    // info("elem_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
     info("colr_buffer").init<gl::Buffer>({ .data = cast_span<const std::byte>(io::as_aligned((e_rgb_texture)).data()) });
-    info("elem_buffer").init<gl::Buffer>({ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags });
     info("bary_buffer").init<gl::Buffer>({ .size = generate_n * sizeof(eig::Array4f) });
   }
   

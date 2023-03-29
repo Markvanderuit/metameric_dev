@@ -9,9 +9,6 @@
 #include <vector>
 
 namespace met {
-  /* Color states in which application can exist */
-  enum class AppColorMode { eDark, eLight };
-
   /* Save states in which project data can exist */
   enum class ProjectSaveState {
     eUnloaded, // Project is not currently loaded
@@ -45,7 +42,8 @@ namespace met {
     
     // Input uplifting information
     std::vector<ImageData> images; // Input images with known color systems
-    uint n_vertices;               // Intended nr. of vertices for convex hull estimation
+    uint n_exterior_samples;       // Intended nr. of exterior (convex hull) samples
+    uint n_interior_samples;       // Intended nr. of interior (image data) samples given input fitting
     
     // Input spectral information
     std::vector<std::pair<std::string, Spec>> illuminants;
@@ -60,19 +58,28 @@ namespace met {
   struct ProjectData {
   public: /* project data structures */
     // Data structure for a single vertex of the project's convex hull mesh
-    struct Vert {
-      Colr colr_i;              // The expected vertex color under a primary color system
-      uint csys_i;              // Index of the selected primary color system
+    struct VertexData {
+      Colr              colr_i; // The expected vertex color under a primary color system
+      uint              csys_i; // Index of the selected primary color system
       std::vector<Colr> colr_j; // The expected vertex colors under secondary color systems
       std::vector<uint> csys_j; // Indices of the selected secondary color systems
     };
+
+    // Shorthands used throughout
+    using Vert = VertexData;
+    using Elem = eig::Array3u;
 
     // Set of indices of cmfs/illuminants together describing a stored color system
     struct CSys { uint cmfs, illuminant, n_scatters; };
     
   public: /* public data */
+    // Project format information; e.g. convex hull with generalized barycentric coordinates
+    ProjectMeshingType meshing_type;
+    ProjectWeightsType weights_type;
+
     // Convex hull data structure used for rgb->spectral uplifting
-    std::vector<Vert> vertices;      // User-specified vetex data  
+    std::vector<Vert> vertices;      // User-specified mesh vert data 
+    std::vector<Elem> elements;      // User-specified mesh elem data
     std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
 
     // Named user- or program-provided illuminants and color matching functions
@@ -98,10 +105,9 @@ namespace met {
     ProjectSaveState project_save = ProjectSaveState::eUnloaded; 
     
     // Misc application data
-    Texture2d3f   loaded_texture_f32; // F32 RGB image extracted from project data
-    Basis         loaded_basis;       // Basis functions obtained through PCA of measured spectra
-    Spec          loaded_basis_mean;  // Mean of basis functions obtained through PCA of measured spectra
-    AppColorMode  color_mode;         // Application theming
+    Texture2d3f loaded_texture;     // F32 RGB image extracted from project data
+    Basis       loaded_basis;       // Basis functions obtained through PCA of measured spectra
+    Spec        loaded_basis_mean;  // Mean of basis functions obtained through PCA of measured spectra
 
   public: /* create/load/save methods */
     void create(ProjectCreateInfo &&info); // Create project from info object
@@ -126,7 +132,10 @@ namespace met {
     void undo();                  // Step back one modification
 
   public: /* project solve functions */
-    void gen_convex_hull(uint n_vertices);
-    void gen_constraints_from_images(std::span<const ProjectCreateInfo::ImageData> images);
+    void gen_convex_hull(uint n_exterior_samples);
+    void gen_constraints(uint n_interior_samples, std::span<const ProjectCreateInfo::ImageData> images);
+
+  public: /* application theming, not exactly important */
+    enum class ColorMode { eDark, eLight } color_mode;
   };
 } // namespace met

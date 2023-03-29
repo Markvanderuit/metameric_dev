@@ -23,7 +23,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_texture = info.global("app_data").read_only<ApplicationData>().loaded_texture;
 
     // Generate 8-bit packed texture data with identical elements stripped
     std::unordered_set<uint> packed_set;

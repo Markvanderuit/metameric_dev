@@ -83,12 +83,12 @@ namespace met {
                         .spirv_path = "resources/shaders/viewport/draw_delaunay_elem.frag.spv",
                         .cross_path = "resources/shaders/viewport/draw_delaunay_elem.frag.json" }};
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                             ? eig::Array4f { 1, 1, 1, 1 }
                             : eig::Array4f { 0, 0, 0, 1 };
 
     // Set non-changing uniform values
-    m_unif_map->value = e_appl_data.color_mode == AppColorMode::eDark
+    m_unif_map->value = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                         ? eig::Array4f { 1, 1, 1, 1 }
                         : eig::Array4f { 0, 0, 0, 1 };
     m_unif_buffer.flush();

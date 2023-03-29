@@ -3,7 +3,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/core/detail/trace.hpp>
+#include <metameric/core/detail/scheduler_base.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
@@ -16,7 +16,7 @@ namespace met {
 
     // Get external resources
     const auto &e_bary_buffer = info.resource("gen_delaunay_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_tex_data    = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_tex_data    = info.global("app_data").read_only<ApplicationData>().loaded_texture;
 
     // Compute sample position in texture dependent on mouse position in image
     eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
@@ -99,7 +99,7 @@ namespace met {
       const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
 
       // Obtain cpu-side texture
-      Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture_f32.size() }};
+      Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
       e_colr_buffer.get(cast_span<std::byte>(texture_al.data()));
 
       // Remove padding bytes, then save to disk
@@ -113,7 +113,7 @@ namespace met {
     // Get external resources
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
-    auto e_texture_size = e_appl_data.loaded_texture_f32.size();
+    auto e_texture_size = e_appl_data.loaded_texture.size();
 
     m_resample_size   = 1;
     m_tooltip_cycle_i = 0;
@@ -164,8 +164,8 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       eig::Array2f texture_size = viewport_size
-                                 * e_appl_data.loaded_texture_f32.size().cast<float>().y()
-                                 / e_appl_data.loaded_texture_f32.size().cast<float>().x()
+                                 * e_appl_data.loaded_texture.size().cast<float>().y()
+                                 / e_appl_data.loaded_texture.size().cast<float>().x()
                                  * 0.95f / static_cast<float>(n_cols);
 
       // Adjust nr. of subtasks for texture generation

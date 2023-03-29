@@ -20,7 +20,7 @@ namespace met {
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     
     // Determine dispatch group size
-    const uint mapping_n    = e_appl_data.loaded_texture_f32.size().prod();
+    const uint mapping_n    = e_appl_data.loaded_texture.size().prod();
     const uint mapping_ndiv = ceil_div(mapping_n, 256u);
 
     // Initialize objects for convex-combination mapping
@@ -60,7 +60,7 @@ namespace met {
     const auto &e_delaunay   = info("gen_spectral_data", "delaunay").read_only<AlignedDelaunayData>();
 
     // Update uniform data
-    m_uniform_map->n       = e_appl_data.loaded_texture_f32.size().prod();
+    m_uniform_map->n       = e_appl_data.loaded_texture.size().prod();
     m_uniform_map->n_verts = e_delaunay.verts.size();
     m_uniform_map->n_elems = e_delaunay.elems.size();
     m_uniform_buffer.flush();
@@ -92,7 +92,7 @@ namespace met {
     // Get shared resources
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
     uint e_mappings_n   = e_appl_data.project_data.color_systems.size();
-    auto e_texture_size = e_appl_data.loaded_texture_f32.size();
+    auto e_texture_size = e_appl_data.loaded_texture.size();
 
     // Add subtasks to perform mapping
     m_mapping_subtasks.init(info, e_mappings_n, 

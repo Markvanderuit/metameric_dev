@@ -59,24 +59,6 @@ namespace met {
           // Unindent dependent on how much of a subtask something is
           for (uint i = 0; i < count; ++i) ImGui::Unindent(16.f);
         }
-
-        /* if (ImGui::BeginTabBar("#SchedulerTabBar")) {
-          if (ImGui::BeginTabItem("Task nodes", 0)) {
-
-            ImGui::EndTabItem();
-          }
-
-          if (ImGui::BeginTabItem("Resource nodes", 0)) {
-
-            ImGui::EndTabItem();
-          }
-          
-          if (ImGui::BeginTabItem("Schedule", 0)) {
-
-            ImGui::EndTabItem();
-          }
-          ImGui::EndTabBar();
-        } */
       }
       ImGui::End();
     });
@@ -100,12 +82,30 @@ namespace met {
   }
 
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
+    debug::check_expr_rel(scheduler.global("app_data").is_init() && scheduler.global("window").is_init());
+    const auto &e_appl_data = scheduler.global("app_data").read_only<ApplicationData>();
+    const auto &e_proj_data = e_appl_data.project_data;
+    
     scheduler.clear();
 
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("state").init<StateTask>();
 
     // The following tasks define the color->spectrum uplifting pipeline and dependent data
+    switch (e_proj_data.meshing_type) {
+    case ProjectMeshingType::eConvexHull:
+      break;
+    case ProjectMeshingType::ePoints:
+      break;
+    }
+    
+    switch (e_proj_data.weights_type) {
+    case ProjectWeightsType::eGeneralized:
+      break;
+    case ProjectWeightsType::eDelaunay:
+      break;
+    }
+    
     scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
     scheduler.task("gen_delaunay_weights").init<GenDelaunayWeightsTask>();
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
@@ -120,13 +120,14 @@ namespace met {
     scheduler.task("error_viewer").init<ErrorViewerTask>();
     scheduler.task("weight_viewer").init<WeightViewerTask>();
 
-    // Insert temporary unimportant tasks
-    submit_schedule_debug(scheduler);
+    // // Insert temporary unimportant tasks
+    // submit_schedule_debug(scheduler);
 
     scheduler.task("frame_end").init<FrameEndTask>();
   }
   
   void submit_schedule_empty(detail::SchedulerBase &scheduler) {
+    debug::check_expr_rel(scheduler.global("window").is_init());
     scheduler.clear();
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();

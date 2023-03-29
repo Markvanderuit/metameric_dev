@@ -68,7 +68,7 @@ namespace met {
     m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
     m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
     m_unif_map->model_matrix = eig::Matrix4f::Identity();
-    m_unif_map->color_value = e_appl_data.color_mode == AppColorMode::eDark
+    m_unif_map->color_value = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                             ? 1
                             : eig::Vector4f { 0, 0, 0, 1 };
   }

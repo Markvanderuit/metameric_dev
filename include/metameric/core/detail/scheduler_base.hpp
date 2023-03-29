@@ -87,8 +87,13 @@ namespace met {
       virtual void      rem_rsrc_impl(detail::RsrcInfo &&)       = 0;
       
     public: /* Miscellaneous functions */
-      // Handle to other task
+      // Task node handle access
       TaskHandle task(const std::string &task_key);
+
+      // Resource node handle access
+      ResourceHandle global(const std::string &rsrc_key);                                  // Handle to unowned resource
+      ResourceHandle resource(const std::string &task_key, const std::string &rsrc_key);   // Handle to a task's resource
+      ResourceHandle operator()(const std::string &task_key, const std::string &rsrc_key); // Handle to a task's resource
 
       // Clear out tasks and owned resources; preserve_global t/f -> retain non-owned resources
       virtual void clear(bool preserve_global = true) = 0;
@@ -98,13 +103,12 @@ namespace met {
   // Virtual base class for application sscheduler
   struct Scheduler : public detail::SchedulerBase {
     using detail::SchedulerBase::task;
+    using detail::SchedulerBase::global;
+    using detail::SchedulerBase::resource;
+    using detail::SchedulerBase::operator();
     
     // Run the currently built schedule
     virtual void run() = 0;
-
-    // Resource node handle access
-    ResourceHandle global(const std::string &rsrc_key);                                // Handle to unowned resource
-    ResourceHandle resource(const std::string &task_key, const std::string &rsrc_key); // Handle to a task's resource
   };
 
   // Virtual base class for scheduler handle, passed to task nodes
@@ -113,20 +117,20 @@ namespace met {
 
   public:
     using detail::SchedulerBase::task;
+    using detail::SchedulerBase::global;
+    using detail::SchedulerBase::resource;
+    using detail::SchedulerBase::operator();
 
     SchedulerHandle(const std::string &task_key)
     : m_task_key(task_key) { }
     
     // Task node handle access
-    TaskHandle task();                                                                   // Handle to current task
-    TaskHandle subtask(const std::string &task_key);                                     // Handle to other task relative to current task
+    TaskHandle task();                                      // Handle to current task
+    TaskHandle subtask(const std::string &task_key);        // Handle to other task relative to current task
     
     // Resource node handle access
-    ResourceHandle global(const std::string &rsrc_key);                                  // Handle to unowned resource
-    ResourceHandle resource(const std::string &rsrc_key);                                // Handle to current task's resource
-    ResourceHandle resource(const std::string &task_key, const std::string &rsrc_key);   // Handle to other task's resource
-    ResourceHandle operator()(const std::string &rsrc_key);                              // Handle to current task's resource
-    ResourceHandle operator()(const std::string &task_key, const std::string &rsrc_key); // Handle to other task's resource
+    ResourceHandle resource(const std::string &rsrc_key);   // Handle to current task's resource
+    ResourceHandle operator()(const std::string &rsrc_key); // Handle to current task's resource
   };
   
   // Implementing class for masked scheduler handle, passed to containing task nodes

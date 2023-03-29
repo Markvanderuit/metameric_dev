@@ -96,7 +96,7 @@ namespace met {
     m_elem_program = {{ .type = gl::ShaderType::eVertex,   .path = "resources/shaders/viewport/draw_gamut_elem.vert" },
                       { .type = gl::ShaderType::eFragment, .path = "resources/shaders/viewport/draw_gamut_elem.frag" }};
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                             ? eig::Array4f { 1, 1, 1, 1 }
                             : eig::Array4f { 0, 0, 0, 1 };
 

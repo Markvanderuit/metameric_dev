@@ -14,7 +14,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_txtr_data    = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_txtr_data    = info.global("app_data").read_only<ApplicationData>().loaded_texture;
     const auto &e_color_input  = info.resource("gen_delaunay_weights", "colr_buffer").read_only<gl::Buffer>();
     const auto &e_color_output = info.resource("gen_color_mappings.gen_mapping_0", "colr_buffer").read_only<gl::Buffer>();
 
@@ -108,7 +108,7 @@ namespace met {
     m_tooltip_cycle_i = 0;
 
     // Get externally shared resources
-    const auto &e_txtr_data = info.global("app_data").read_only<ApplicationData>().loaded_texture_f32;
+    const auto &e_txtr_data = info.global("app_data").read_only<ApplicationData>().loaded_texture;
 
     // Initialize error computation components
     const uint dispatch_n    = e_txtr_data.size().prod();
@@ -142,7 +142,7 @@ namespace met {
     if (ImGui::Begin("Error viewer")) {
       // Get external resources
       const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
-      const auto &e_txtr_data = e_appl_data.loaded_texture_f32;
+      const auto &e_txtr_data = e_appl_data.loaded_texture;
       const auto &e_proj_data = e_appl_data.project_data;
       const auto &e_mappings  = e_proj_data.color_systems;
 

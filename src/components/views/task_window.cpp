@@ -103,8 +103,8 @@ namespace met {
 
       // Save data to specified filepath
       io::save_spectral_data({
-        .bary_xres = e_app_data.loaded_texture_f32.size()[0],
-        .bary_yres = e_app_data.loaded_texture_f32.size()[1],
+        .bary_xres = e_app_data.loaded_texture.size()[0],
+        .bary_yres = e_app_data.loaded_texture.size()[1],
         .bary_zres = static_cast<uint>(e_delaunay.elems.size()),
         .functions = cnt_span<float>(spec_data),
         .weights   = cnt_span<float>(bary_data)

@@ -89,7 +89,7 @@ namespace met {
     m_cnstr_uniform_buffer = {{ .size = sizeof(CnstrUniformBuffer), .flags = buffer_create_flags }};
     m_cnstr_uniform_map    = m_cnstr_uniform_buffer.map_as<CnstrUniformBuffer>(buffer_access_flags).data();
     m_cnstr_uniform_map->point_size  = quad_vert_size;
-    m_cnstr_uniform_map->point_color = e_appl_data.color_mode == AppColorMode::eDark
+    m_cnstr_uniform_map->point_color = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                                      ? 1
                                      : eig::Vector4f { 0, 0, 0, 1 };
 
@@ -159,7 +159,7 @@ namespace met {
       m_point_dispatch.vertex_count = verts.size();
     }
 
-    eig::Array4f clear_colr = e_appl_data.color_mode == AppColorMode::eDark
+    eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                             ? eig::Array4f { 0, 0, 0, 1 } 
                             : ImGui::GetStyleColorVec4(ImGuiCol_ChildBg);
                             

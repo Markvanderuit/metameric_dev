@@ -17,7 +17,7 @@ namespace met {
     const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
 
     // Determine dispatch group size
-    const uint dispatch_n    = e_appl_data.loaded_texture_f32.size().prod();
+    const uint dispatch_n    = e_appl_data.loaded_texture.size().prod();
     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
 
     // Initialize objects for shader call
@@ -37,7 +37,7 @@ namespace met {
 
     // Create subtask to handle buffer->texture copy
     TextureSubtask texture_subtask = {{ .input_key  = { info.task().key(), "colr_buffer" }, .output_key = "colr_texture",
-                                        .texture_info = { .size = e_appl_data.loaded_texture_f32.size() }}};
+                                        .texture_info = { .size = e_appl_data.loaded_texture.size() }}};
 
     // Create subtask to handle texture->texture resampling and gamma correction
     ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task().key()), "colr_texture" }, .output_key   = "colr_texture",
@@ -54,7 +54,7 @@ namespace met {
     if (ImGui::Begin("Weight viewer")) {
       // Get external resources 
       const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
-      const auto &e_txtr_data = e_appl_data.loaded_texture_f32;
+      const auto &e_txtr_data = e_appl_data.loaded_texture;
 
       // Get subtask names
       auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task().key());
@@ -117,7 +117,7 @@ namespace met {
     uint mapping_i = e_cstr_slct >= 0 ? e_proj_data.vertices[e_selection[0]].csys_j[e_cstr_slct] : 0;
 
     // Update uniform data for upcoming sum computation
-    m_unif_map->n       = e_appl_data.loaded_texture_f32.size().prod();
+    m_unif_map->n       = e_appl_data.loaded_texture.size().prod();
     m_unif_map->n_verts = e_delaunay.verts.size();
     m_unif_map->n_elems = e_delaunay.elems.size();
     std::fill(m_unif_map->selection, m_unif_map->selection + e_proj_data.vertices.size(), 0);

@@ -73,21 +73,26 @@ namespace met {
 
   namespace io {
     ProjectData load_project(const fs::path &path) {
+      met_trace();
       return load_json(path).get<ProjectData>();
     }
 
     void save_project(const fs::path &path, const ProjectData &data) {
+      met_trace();
       save_json(path, data);
     }
   } // namespace io
 
   ProjectCreateInfo::ProjectCreateInfo()
-  : n_vertices(4),
-    illuminants({{ "D65",  models::emitter_cie_d65        },
-                 { "E",    models::emitter_cie_e          },
-                 { "FL2",  models::emitter_cie_fl2        },
-                 { "FL11", models::emitter_cie_fl11       },
-                 { "LED-RGB1", models::emitter_cie_ledrgb1} }),
+  : n_exterior_samples(4),
+    n_interior_samples(128),
+    meshing_type(ProjectMeshingType::ePoints),
+    weights_type(ProjectWeightsType::eDelaunay),
+    illuminants({{ "D65",      models::emitter_cie_d65     },
+                 { "E",        models::emitter_cie_e       },
+                 { "FL2",      models::emitter_cie_fl2     },
+                 { "FL11",     models::emitter_cie_fl11    },
+                 { "LED-RGB1", models::emitter_cie_ledrgb1 }}),
     cmfs({{ "CIE XYZ", models::cmfs_cie_xyz  }}) { }
 
   ColrSystem ProjectData::csys(uint i) const {
@@ -127,14 +132,14 @@ namespace met {
                                              .n_scatters = 1 });
 
     // Move first texture into application - not project - data; later stored in separate file
-    loaded_texture_f32 = std::move(info.images[0].image);
+    loaded_texture = std::move(info.images[0].image);
     info.images.erase(info.images.begin());
 
     // Generate initial geometric data structure; if extra input images are provided,
     // start fitting constraints
-    gen_convex_hull(info.n_vertices);
+    gen_convex_hull(info.n_exterior_samples);
     if (!info.images.empty())
-      gen_constraints_from_images(info.images);
+      gen_constraints(info.n_interior_samples, info.images);
   }
   
   void ApplicationData::save(const fs::path &path) {
@@ -144,7 +149,7 @@ namespace met {
     project_path = io::path_with_ext(path, ".json");
 
     io::save_json(project_path, project_data);
-    io::save_texture2d(io::path_with_ext(project_path, ".exr"), loaded_texture_f32, true);
+    io::save_texture2d(io::path_with_ext(project_path, ".exr"), loaded_texture, true);
   }
 
   void ApplicationData::load(const fs::path &path) {
@@ -153,7 +158,7 @@ namespace met {
     project_save   = ProjectSaveState::eSaved;
     project_path   = io::path_with_ext(path, ".json");
     project_data   = io::load_json(path).get<ProjectData>();
-    loaded_texture_f32 = io::load_texture2d<Colr>(io::path_with_ext(project_path,".exr"), true);
+    loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".exr"), true);
 
     // Reset undo/redo history
     mods  = { };
@@ -211,13 +216,13 @@ namespace met {
     project_path  = "";
     project_data  = { };
 
-    loaded_texture_f32  = { };
+    loaded_texture  = { };
     
     mods  = { };
     mod_i = -1;
   }  
 
-  void ApplicationData::gen_convex_hull(uint n_vertices) {
+  void ApplicationData::gen_convex_hull(uint n_exterior_samples) {
     met_trace_full();
 
     // Generate temporary OCS for convex hull clipping
@@ -231,9 +236,9 @@ namespace met {
 
     // Generate simplified concave hull fitting texture data, then fit convex hull around this
     fmt::print("  Generating simplified convex hull\n");
-    auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture_f32.data());
+    auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(loaded_texture.data());
     auto chull_mesh = generate_convex_hull<IndexedMeshData, eig::Array3f>(
-      simplify_volume<IndexedMeshData>(chull_base, n_vertices, &ocs_mesh).verts
+      simplify_volume<IndexedMeshData>(chull_base, n_exterior_samples, &ocs_mesh).verts
     );
 
     fmt::print("  Convex hull result: {} vertices\n", chull_mesh.verts.size());
@@ -246,13 +251,13 @@ namespace met {
     });
   }
 
-  void ApplicationData::gen_constraints_from_images(std::span<const ProjectCreateInfo::ImageData> images) {
+  void ApplicationData::gen_constraints(uint n_interior_samples, std::span<const ProjectCreateInfo::ImageData> images) {
     met_trace_full();
 
     // Relevant settings for the following section
     // TODO expose parameter to users in input view
-    const uint n_samples    = 164;
-    const uint sample_discr = 256;
+    constexpr uint n_samples    = 164;
+    constexpr uint sample_discr = 256;
 
     // Data store for next steps
     std::vector<uint>              sampleable_indices;
@@ -272,7 +277,7 @@ namespace met {
       > indices_map;
 
       // Insert indices of discretized image colors into the map, if they do not yet exist
-      auto colr_i_span = loaded_texture_f32.data();
+      auto colr_i_span = loaded_texture.data();
       for (uint i = 0; i < colr_i_span.size(); ++i)
         indices_map.insert({ (colr_i_span[i] * sample_discr).cast<uint>(), i });
 
@@ -286,7 +291,7 @@ namespace met {
 
     /* 1. Sample a random subset of texels and obtain their color values from each texture */
     {
-      auto colr_i_span = loaded_texture_f32.data();
+      auto colr_i_span = loaded_texture.data();
         
       // Define random generator
       std::random_device rd;
