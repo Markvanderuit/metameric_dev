@@ -57,11 +57,12 @@ namespace met {
 
     // Unpack barycentric weights and get corresponding tetrahedron from delaunay
     if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-      const auto &e_delaunay  = rsrc.read_only<AlignedDelaunayData>();
+      const auto &e_delaunay = rsrc.read_only<AlignedDelaunayData>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
-      eig::Array4f bary = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
-      eig::Array4u elem = e_delaunay.elems[*reinterpret_cast<const uint *>(&bary_data.w())].min(e_delaunay.verts.size() - 1);
+      eig::Array4f bary   = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
+      uint         bary_i = std::min(*reinterpret_cast<const uint *>(&bary_data.w()), static_cast<uint>(e_delaunay.elems.size()) - 1);
+      eig::Array4u elem   = e_delaunay.elems[bary_i].min(e_delaunay.verts.size() - 1);
 
       // Compute output reflectance and color as convex combinations
       Spec reflectance = 0;

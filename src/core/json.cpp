@@ -69,18 +69,36 @@ namespace met {
   }
 
   void from_json(const json &js, ProjectData &v) {
-    v.verts         = js.at("vertices").get<std::vector<ProjectData::Vert>>();
-    v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
+    // Account for breaking changes in old builds
+    if (js.contains("gamut_verts") || js.contains("gamut_elems")) {
+      v.verts        = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
+      v.elems        = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
+      v.meshing_type = ProjectMeshingType::eConvexHull;
+    } else {
+      v.verts        = js.at("verts").get<std::vector<ProjectData::Vert>>();
+      v.elems        = js.at("elems").get<std::vector<ProjectData::Elem>>();
+      v.meshing_type = js.at("meshing_type").get<ProjectMeshingType>();
+    }
+
+    // Account for breaking changes in "mappings"/"color_systems"
+    if (js.contains("mappings")) {
+      v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
+    } else {
+      v.color_systems = js.at("color_systems").get<std::vector<ProjectData::CSys>>();
+    }
+
+    // Load misc. data
     v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
     v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
-    v.meshing_type  = ProjectMeshingType::eDelaunay; // TODO remove and fix
   }
 
   void to_json(json &js, const ProjectData &v) {
-    js["vertices"]    = v.verts;
-    js["mappings"]    = v.color_systems;
-    js["cmfs"]        = v.cmfs;
-    js["illuminants"] = v.illuminants;
+    js["meshing_type"]  = v.meshing_type;
+    js["verts"]         = v.verts;
+    js["elems"]         = v.elems;
+    js["color_systems"] = v.color_systems;
+    js["illuminants"]   = v.illuminants;
+    js["cmfs"]          = v.cmfs;
   }
 } // namespace met
 

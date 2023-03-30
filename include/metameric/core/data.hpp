@@ -78,11 +78,11 @@ namespace met {
     ProjectMeshingType meshing_type;
 
     // Convex hull data structure used for rgb->spectral uplifting
-    std::vector<Vert> verts;         // User-specified mesh vert data 
-    std::vector<Elem> elems;         // User-specified mesh elem data
-    std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
+    std::vector<Vert> verts; 
+    std::vector<Elem> elems;
 
     // Named user- or program-provided illuminants and color matching functions
+    std::vector<CSys> color_systems; // Stored color system data using the below illuminants/cmfs
     std::vector<std::pair<std::string, Spec>> illuminants;
     std::vector<std::pair<std::string, CMFS>> cmfs;
 
