@@ -3,8 +3,6 @@
 #include <metameric/core/json.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/spectrum.hpp>
-#include <metameric/core/texture.hpp>
 #include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
