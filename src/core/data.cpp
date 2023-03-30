@@ -82,8 +82,7 @@ namespace met {
   ProjectCreateInfo::ProjectCreateInfo()
   : n_exterior_samples(6),
     n_interior_samples(128),
-    meshing_type(ProjectMeshingType::ePoints),
-    weights_type(ProjectWeightsType::eDelaunay),
+    meshing_type(ProjectMeshingType::eDelaunay),
     illuminants({{ "D65",      models::emitter_cie_d65     },
                  { "E",        models::emitter_cie_e       },
                  { "FL2",      models::emitter_cie_fl2     },
@@ -118,7 +117,6 @@ namespace met {
 
     // Copy over newish create info and assign color systems
     project_data.meshing_type = info.meshing_type;
-    project_data.weights_type = info.weights_type;
     project_data.cmfs         = info.cmfs;
     project_data.illuminants  = info.illuminants;
     project_data.color_systems.clear();

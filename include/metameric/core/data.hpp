@@ -19,14 +19,13 @@ namespace met {
 
   /* Mesh structure types for project data */
   enum class ProjectMeshingType {
-    eConvexHull, // Points on a meshed convex hull
-    ePoints      // Generalized points in color space
-  };
-  
-  /* Convex weighting types for mesh interpolation */
-  enum class ProjectWeightsType {
-    eGeneralized, // Generalized barycentric coordinates of hull interior
-    eDelaunay     // Delaunay triangulation of mesh structure
+    // Points on a convex hull, 
+    // with generalized barycentric coordinates to determine interior values
+    eConvexHull, 
+
+    // Points in color space, 
+    // with a delaunay tetrahedralization to determine interior values
+    eDelaunay      
   };
 
   /* Wrapper object to hold information for project instantiation */
@@ -53,7 +52,6 @@ namespace met {
 
     // Input project type information
     ProjectMeshingType meshing_type;
-    ProjectWeightsType weights_type;
   };
 
   /* Wrapper object to hold all saveable project data */
@@ -78,7 +76,6 @@ namespace met {
   public: /* public data */
     // Project format information; e.g. convex hull with generalized barycentric coordinates
     ProjectMeshingType meshing_type;
-    ProjectWeightsType weights_type;
 
     // Convex hull data structure used for rgb->spectral uplifting
     std::vector<Vert> verts;         // User-specified mesh vert data 

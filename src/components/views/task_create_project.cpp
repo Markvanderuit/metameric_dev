@@ -43,12 +43,10 @@ namespace met {
 
       // Miscellaneous settings nested within this header
       if (ImGui::CollapsingHeader("Initialization", ImGuiTreeNodeFlags_DefaultOpen)) {
-        std::array<std::string, 2> meshing_names = { "Convex hull", "Convex hull, with interior points" };
-        std::array<std::string, 2> weights_names = { "Generalized barycentric weights", "Delaunay triangulation" };
-
         // Selector for meshing structure type
+        std::array<std::string, 2> meshing_names = { "Convex hull with barycentrics", "Delaunay triangulation" };
         uint meshing_type_i = static_cast<uint>(m_proj_data.meshing_type);
-        if (ImGui::BeginCombo("Mesh structure type", meshing_names[meshing_type_i].c_str())) {
+        if (ImGui::BeginCombo("Meshing type", meshing_names[meshing_type_i].c_str())) {
           for (uint i = 0; i < meshing_names.size(); ++i) {
             if (ImGui::Selectable(meshing_names[i].c_str(), i == meshing_type_i)) {
               m_proj_data.meshing_type = static_cast<ProjectMeshingType>(i);
@@ -57,17 +55,7 @@ namespace met {
           ImGui::EndCombo();
         }
 
-        // Selector for convex weighting type
-        uint weights_type_i = static_cast<uint>(m_proj_data.weights_type);
-        if (ImGui::BeginCombo("Convex weighting type", weights_names[weights_type_i].c_str())) {
-          for (uint i = 0; i < weights_names.size(); ++i) {
-            if (ImGui::Selectable(weights_names[i].c_str(), i == weights_type_i)) {
-              m_proj_data.weights_type = static_cast<ProjectWeightsType>(i);
-            }
-          }
-          ImGui::EndCombo();
-        }
-
+        // Sliders for nr. of convex hull and sample points
         ImGui::SliderScalar("Exterior samples", ImGuiDataType_U32, &m_proj_data.n_exterior_samples, &min_exterior_samples, &max_exterior_samples);
         if (m_imag_data.size() > 1) {
           ImGui::SliderScalar("Interior samples", ImGuiDataType_U32, &m_proj_data.n_interior_samples, &min_interior_samples, &max_interior_samples);

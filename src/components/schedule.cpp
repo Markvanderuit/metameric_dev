@@ -94,7 +94,7 @@ namespace met {
 
     // The following tasks define the color->spectrum uplifting pipeline and dependent data
     scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
-    if (e_proj_data.weights_type == ProjectWeightsType::eGeneralized) {
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       scheduler.task("gen_convex_weights").init<GenGeneralizedWeightsTask>();
     } else {
       scheduler.task("gen_convex_weights").init<GenDelaunayWeightsTask>();

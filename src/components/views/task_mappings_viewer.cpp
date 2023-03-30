@@ -28,7 +28,7 @@ namespace met {
     const size_t pos = e_colr_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant barycentric data to current available buffer
-    size_t bary_size = e_proj_data.weights_type == ProjectWeightsType::eDelaunay ? sizeof(eig::Array4f) : sizeof(Bary); 
+    size_t bary_size = e_proj_data.meshing_type == ProjectMeshingType::eDelaunay ? sizeof(eig::Array4f) : sizeof(Bary); 
     e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], bary_size, bary_size * pos);
 
     // Submit a fence for current available buffer as it affects mapped memory
@@ -158,7 +158,7 @@ namespace met {
     for (uint i = 0; i < m_tooltip_buffers.size(); ++i) {
       auto &buffer = m_tooltip_buffers[i];
       auto &map    = m_tooltip_maps[i];
-      if (e_proj_data.weights_type == ProjectWeightsType::eDelaunay) {
+      if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
         buffer = {{ .size = sizeof(eig::Array4f), .flags = create_flags }};
         map = cast_span<eig::Array4f>(buffer.map(map_flags));
       } else {
