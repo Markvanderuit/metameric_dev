@@ -47,11 +47,11 @@ if(MSVC)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
 
-# Ensure OpenMP is available
+# Ensure these are available for third parties
 find_package(OpenMP REQUIRED)
+find_package(Threads REQUIRED)
 
 # Include third party libraries provided through vcpkg
-find_package(benchmark CONFIG REQUIRED)
 find_package(CoinUtils CONFIG REQUIRED)
 find_package(Osi       CONFIG REQUIRED)
 find_package(Clp       CONFIG REQUIRED)
@@ -68,7 +68,7 @@ find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
 
-# Include header-only third party libraries provided through vcpkg
+# Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
@@ -84,6 +84,15 @@ option(gl_enable_tracy       "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/small_gl_parser)
 
+# Add together arguments to pass into small_gl_parser when processing shaders
+string(CONCAT small_gl_parser_args
+  "MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN},"
+  "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
+  "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES},"
+  "MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES},"
+  "MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}"
+)
+
 # Recursively find all shader files
 file(GLOB_RECURSE glsl_srcs
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.frag
@@ -93,15 +102,6 @@ file(GLOB_RECURSE glsl_srcs
 )
 file(GLOB_RECURSE glsl_includes 
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include/*
-)
-
-# Add together arguments to pass into glsl parser
-string(CONCAT small_gl_parser_args
-  "MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN},"
-  "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
-  "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES},"
-  "MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES},"
-  "MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}"
 )
 
 # Process shaders

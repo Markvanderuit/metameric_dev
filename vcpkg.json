@@ -2,7 +2,6 @@
   "name" : "spectral-uplifting",
   "version-string" : "0.1.0",
   "dependencies" : [
-    "benchmark",
     "clp",
     "cxxopts",
     "eigen3",
