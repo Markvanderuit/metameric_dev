@@ -16,17 +16,19 @@ namespace met {
 
     /* Data block for spectral texture export format */
     struct SpectralData {
-      // Header data
+      // Resolution of single spectral function
       float spec_min     = wavelength_min;
       float spec_max     = wavelength_max;
       uint  spec_samples = wavelength_samples;
+
+      // Resolution of weights data
       uint  bary_xres;
       uint  bary_yres;
       uint  bary_zres;
 
       // Bulk data
-      std::span<float> functions;
-      std::span<float> weights;
+      std::span<float> functions; // Spectral functions
+      std::span<float> weights;   // Convex weights
     };
 
     void save_spectral_data(const SpectralData &data, const fs::path &path);

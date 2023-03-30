@@ -46,11 +46,11 @@ namespace met {
   bool WindowTask::handle_save(SchedulerHandle &info) {
     met_trace_full();
     
-    auto &e_app_data = info.global("app_data").writeable<ApplicationData>();
-    if (e_app_data.project_save == ProjectSaveState::eNew) {
+    auto &e_appl_data = info.global("app_data").writeable<ApplicationData>();
+    if (e_appl_data.project_save == ProjectSaveState::eNew) {
       return handle_save_as(info);
     } else {
-      e_app_data.save(e_app_data.project_path);
+      e_appl_data.save(e_appl_data.project_path);
       return true;
     }
   }
@@ -70,11 +70,11 @@ namespace met {
 
     if (fs::path path; detail::save_dialog(path, "met")) {
       // Get shared resources
-      const auto &e_app_data    = info.global("app_data").read_only<ApplicationData>();
-      const auto &e_prj_data    = e_app_data.project_data;
-      const auto &e_bary_buffer = info.resource("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
-      const auto &e_spectra     = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
-      const auto &e_delaunay    = info.resource("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+      const auto &e_proj_data   = e_appl_data.project_data;
+      const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
+      const auto &e_spectra     = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+      const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 
@@ -103,8 +103,8 @@ namespace met {
 
       // Save data to specified filepath
       io::save_spectral_data({
-        .bary_xres = e_app_data.loaded_texture.size()[0],
-        .bary_yres = e_app_data.loaded_texture.size()[1],
+        .bary_xres = e_appl_data.loaded_texture.size()[0],
+        .bary_yres = e_appl_data.loaded_texture.size()[1],
         .bary_zres = static_cast<uint>(e_delaunay.elems.size()),
         .functions = cnt_span<float>(spec_data),
         .weights   = cnt_span<float>(bary_data)
@@ -112,8 +112,8 @@ namespace met {
 
 /* 
       // Used sizes
-      const uint func_count  = static_cast<uint>(e_prj_data.vertices.size());
-      const auto weights_res = e_app_data.loaded_texture_f32.size();
+      const uint func_count  = static_cast<uint>(e_proj_data.vertices.size());
+      const auto weights_res = e_appl_data.loaded_texture_f32.size();
 
 
       // Obtain padded weight data from buffers
@@ -153,9 +153,9 @@ namespace met {
   void WindowTask::handle_close_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-    if (e_app_data.project_save == ProjectSaveState::eUnsaved 
-     || e_app_data.project_save == ProjectSaveState::eNew) {
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    if (e_appl_data.project_save == ProjectSaveState::eUnsaved 
+     || e_appl_data.project_save == ProjectSaveState::eNew) {
       m_open_close_modal = true;
     } else {
       handle_close(info);
@@ -179,9 +179,9 @@ namespace met {
   void WindowTask::handle_exit_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-    if (e_app_data.project_save == ProjectSaveState::eUnsaved 
-     || e_app_data.project_save == ProjectSaveState::eNew) {
+    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    if (e_appl_data.project_save == ProjectSaveState::eUnsaved 
+     || e_appl_data.project_save == ProjectSaveState::eNew) {
       m_open_exit_modal = true;
     } else {
       handle_exit(info);
@@ -217,10 +217,10 @@ namespace met {
       /* File menu follows */
       
       if (ImGui::BeginMenu("File")) {
-        const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
-        const bool is_loaded   = e_app_data.project_save != ProjectSaveState::eUnloaded;
-        const bool enable_save = e_app_data.project_save != ProjectSaveState::eSaved 
-          && e_app_data.project_save != ProjectSaveState::eNew && is_loaded;
+        const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+        const bool is_loaded   = e_appl_data.project_save != ProjectSaveState::eUnloaded;
+        const bool enable_save = e_appl_data.project_save != ProjectSaveState::eSaved 
+          && e_appl_data.project_save != ProjectSaveState::eNew && is_loaded;
         
         /* Main section follows */
 
@@ -251,11 +251,11 @@ namespace met {
       /* Edit menu follows */
 
       if (ImGui::BeginMenu("Edit")) {
-        auto &e_app_data = info.global("app_data").writeable<ApplicationData>();
-        const bool is_undo = e_app_data.mod_i >= 0;
-        const bool is_redo = e_app_data.mod_i < int(e_app_data.mods.size()) - 1;
-        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_app_data.undo_mod(); }
-        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_app_data.redo_mod(); }
+        auto &e_appl_data = info.global("app_data").writeable<ApplicationData>();
+        const bool is_undo = e_appl_data.mod_i >= 0;
+        const bool is_redo = e_appl_data.mod_i < int(e_appl_data.mods.size()) - 1;
+        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_appl_data.undo_mod(); }
+        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_appl_data.redo_mod(); }
         ImGui::EndMenu();
       }
 

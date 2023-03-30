@@ -26,22 +26,22 @@ template <typename T> inline std::string to_string(const T& value) {
     std::ostringstream oss;
     oss << value;
     return oss.str();
-}
 
 /* Data block for spectral texture import format */
 struct SpectralData {
-  // Header data
+  // Resolution of single spectral function
   float spec_min;
   float spec_max;
   uint  spec_samples;
+  
+  // Resolution of weights data
   uint  bary_xres;
   uint  bary_yres;
   uint  bary_zres;
 
   // Bulk data
-  std::vector<float> functions;
-  std::vector<float> weights;
-  std::vector<float> indx;
+  std::vector<float> functions; // Spectral functions
+  std::vector<float> weights;   // Convex weights
 };
 
 template <typename Float, typename Spectrum>
@@ -90,10 +90,12 @@ public:
       data.bary_xres, data.bary_yres, data.bary_zres);
 
     // Extract and reinterpret barycentric index data, because dr::reinterpret_array fails on the cuda backend r.n.
-    data.indx.resize(data.bary_xres * data.bary_yres);
+    std::vector<float> indx;
+    indx.resize(data.bary_xres * data.bary_yres);
     #pragma omp parallel for
-    for (int i = 0; i < data.indx.size(); ++i) {
-      data.indx[i] = (float(*reinterpret_cast<const uint32_t *>(&data.weights[i * 4 + 3])) + .5f) / static_cast<float>(data.bary_zres);
+    for (int i = 0; i < indx.size(); ++i) {
+      indx[i] = (float(*reinterpret_cast<const uint32_t *>(&data.weights[i * 4 + 3])) + .5f) 
+              / static_cast<float>(data.bary_zres);
       data.weights[i * 4 + 3] = 1.f - data.weights[i * 4 + 2] - data.weights[i * 4 + 1] - data.weights[i * 4];
     }
 
@@ -140,7 +142,7 @@ public:
 
     // auto indx_tensor = dr::Tensor<mitsuba::DynamicBuffer<UInt32>>(data.indices.data(), 3, indx_shape);
     // m_indx = { indx_tensor, m_accel, m_accel, filter_mode, wrap_mode };
-    m_indx = { TensorXf(data.indx.data(), 3, indx_shape), m_accel, m_accel, filter_mode, wrap_mode };
+    m_indx = { TensorXf(indx.data(), 3, indx_shape), m_accel, m_accel, filter_mode, wrap_mode };
     m_bary = { TensorXf(data.weights.data(), 3, bary_shape), m_accel, m_accel, filter_mode, wrap_mode };
     m_func = { TensorXf(data.functions.data(), 3, func_shape), m_accel, m_accel, dr::FilterMode::Linear, dr::WrapMode::Clamp };
 
