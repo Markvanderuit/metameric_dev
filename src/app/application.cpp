@@ -15,7 +15,6 @@
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
-#include <small_gl_parser/parser.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <execution>
@@ -39,13 +38,6 @@ namespace met {
       data.loaded_basis_mean = loaded_tree.basis_mean;
 
       scheduler.global("app_data").set(std::move(data));
-    }
-
-    void init_parser(LinearScheduler &scheduler) {
-      glp::Parser parser;
-      parser.add_string("MET_SUBGROUP_SIZE", 
-        std::to_string(gl::state::get_variable_int(gl::VariableName::eSubgroupSize)));
-      scheduler.global("glsl_parser").set(std::move(parser));
     }
 
     void init_schedule(LinearScheduler &scheduler) {
@@ -88,7 +80,6 @@ namespace met {
     ImGui::Init(window, info.color_mode == ApplicationData::ColorMode::eDark);
     
     // Initialize major application components on startup
-    detail::init_parser(scheduler);
     detail::init_state(scheduler, info);
     detail::init_schedule(scheduler);
 

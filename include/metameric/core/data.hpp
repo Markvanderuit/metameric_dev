@@ -23,7 +23,7 @@ namespace met {
     // with generalized barycentric coordinates to determine interior values
     eConvexHull, 
 
-    // Points in color space, 
+    // Points throughout color space, 
     // with a delaunay tetrahedralization to determine interior values
     eDelaunay      
   };
