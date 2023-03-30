@@ -29,7 +29,7 @@ namespace met {
     Ty & realize() { 
       static_assert(std::is_base_of_v<detail::TaskNode, Ty>);
       met_trace();
-      debug::check_expr_rel(is_init(), "TaskHandle::realize<>() failed for empty task handle");
+      debug::check_expr(is_init(), "TaskHandle::realize<>() failed for empty task handle");
       return *static_cast<Ty *>(m_task_handle);
     }
 
@@ -82,14 +82,14 @@ namespace met {
     template <typename Ty> 
     const Ty & read_only() const { 
       met_trace();
-      debug::check_expr_rel(is_init(), "ResourceHandle::read_only<>() failed for empty resource handle");
+      debug::check_expr(is_init(), "ResourceHandle::read_only<>() failed for empty resource handle");
       return m_rsrc_handle->read_only<Ty>(); 
     }
 
     template <typename Ty>
     Ty & writeable() { 
       met_trace();
-      debug::check_expr_rel(is_init(), "ResourceHandle::writeable<>() failed for empty resource handle");
+      debug::check_expr(is_init(), "ResourceHandle::writeable<>() failed for empty resource handle");
       return m_rsrc_handle->writeable<Ty>(); 
     }
   

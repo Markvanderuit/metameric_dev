@@ -65,37 +65,22 @@ namespace met {
   namespace debug {
     // Evaluate a boolean expression, throwing a detailed exception pointing
     // to the expression's origin if said expression fails
+    // Note: can be removed on release builds
+  #if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
     constexpr inline
-    void check_expr_rel(bool expr,
-                        const std::string_view &msg = "",
-                        const std::source_location sl = std::source_location::current()) {
+    void check_expr(bool expr,
+                    const std::string_view &msg = "",
+                    const std::source_location sl = std::source_location::current()) {
       guard(!expr);
 
       detail::Exception e;
-      e.put("src", "met::debug::check_expr_rel(...) failed, checked expression evaluated to false");
-      e.put("message", msg);
-      e.put("in file", fmt::format("{}({}:{})", sl.file_name(), sl.line(), sl.column()));
-      throw e;
-    }
-
-    // Evaluate a boolean expression, throwing a detailed exception pointing
-    // to the expression's origin if said expression fails
-    // Note: removed on release builds
-  #if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
-    constexpr inline
-    void check_expr_dbg(bool expr,
-                        const std::string_view &msg = "",
-                        const std::source_location sl = std::source_location::current()) {
-      guard(!expr);
-
-      detail::Exception e;
-      e.put("src", "met::debug::check_expr_dbg(...) failed, checked expression evaluated to false");
+      e.put("src", "met::debug::check_expr(...) failed, checked expression evaluated to false");
       e.put("message", msg);
       e.put("in file", fmt::format("{}({}:{})", sl.file_name(), sl.line(), sl.column()));
       throw e;
     }
   #else
-  #define check_expr_dbg(expr, msg, sl)
+  #define check_expr(expr, msg, sl)
   #endif
   } // namespace debug
 } // namespace met

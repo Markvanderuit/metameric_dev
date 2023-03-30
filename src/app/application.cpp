@@ -66,13 +66,13 @@ namespace met {
              | gl::WindowCreateFlags::eDecorated
              | gl::WindowCreateFlags::eResizable
              | gl::WindowCreateFlags::eMSAA               // Enable support for MSAA framebuffers
-#if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
+#if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
              | gl::WindowCreateFlags::eDebug              // Enable support for OpenGL debug output
 #endif
     }).writeable<gl::Window>();
 
     // Enable OpenGL debug messages, ignoring notification-type messages
-#if defined(NDEBUG) || defined(MET_ENABLE_DBG_EXCEPTIONS)
+#if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
     gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
     gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
 #endif

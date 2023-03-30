@@ -13,12 +13,12 @@ namespace met::io {
     met_trace();
 
     // Check that file path exists
-    debug::check_expr_dbg(fs::exists(path),
+    debug::check_expr(fs::exists(path),
       fmt::format("failed to resolve path \"{}\"", path.string()));
       
     // Attempt to open file stream
     std::ifstream ifs(path, std::ios::ate);
-    debug::check_expr_dbg(ifs.is_open(),
+    debug::check_expr(ifs.is_open(),
       fmt::format("failed to open file \"{}\"", path.string()));
       
     // Read file size and construct string to hold data
@@ -38,7 +38,7 @@ namespace met::io {
     
     // Attempt to open output file stream in text mode
     std::ofstream ofs(path, std::ios::out);
-    debug::check_expr_dbg(ofs.is_open(),
+    debug::check_expr(ofs.is_open(),
       fmt::format("failed to open file \"{}\"", path.string()));
 
     // Write string directly to file in text mode
@@ -102,7 +102,7 @@ namespace met::io {
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
 
       // Throw on incorrect input data 
-      debug::check_expr_rel(split_vect.size() == 4,
+      debug::check_expr(split_vect.size() == 4,
         fmt::format("CMFS data incorrect on line {}\n", line_nr));
 
       wvls.push_back(std::stof(split_vect[0]));
@@ -149,7 +149,7 @@ namespace met::io {
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
 
       // Throw on incorrect input data 
-      debug::check_expr_rel(split_vect.size() >= wavelength_bases + 1,
+      debug::check_expr(split_vect.size() >= wavelength_bases + 1,
         fmt::format("Basis function data too short on line {}\n", line_nr));
 
       std::array<float, wavelength_bases> split_values;

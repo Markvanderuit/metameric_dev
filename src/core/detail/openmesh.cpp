@@ -317,7 +317,7 @@ namespace OpenMesh::Decimater {
       // update heap; new vertex and surrounding supports needs refitting
       heap_vertex(ci.v1);
       for (auto vh : mesh_.vv_range(ci.v1)) {
-        met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
+        met::debug::check_expr(vh.idx() != ci.v0.idx(), "v0 is present!");
         assert(!mesh_.status(vh).deleted());
         if (!_only_selected  || mesh_.status(vh).selected() )
           heap_vertex(vh);
@@ -448,14 +448,14 @@ namespace OpenMesh::Decimater {
         }
       }
       for (auto vh : mesh_.vv_range(ci.v0)) {
-        met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
+        met::debug::check_expr(vh.idx() != ci.v0.idx(), "v0 is present!");
         assert(!mesh_.status(vh).deleted());
         if (!_only_selected  || mesh_.status(vh).selected() ) {
           heap_vertex(vh);
         }
       } */
       for (auto vh : mesh_.vv_range(ci.v1)) {
-        met::debug::check_expr_rel(vh.idx() != ci.v0.idx(), "v0 is present!");
+        met::debug::check_expr(vh.idx() != ci.v0.idx(), "v0 is present!");
         assert(!mesh_.status(vh).deleted());
         if (!_only_selected  || mesh_.status(vh).selected() )
           heap_vertex(vh);

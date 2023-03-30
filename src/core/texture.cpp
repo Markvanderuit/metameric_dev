@@ -31,7 +31,7 @@ namespace met {
     void save_tinyexr(const fs::path &path, std::span<const float> data, uint w, uint h, uint c) {
       met_trace();
 
-      debug::check_expr_dbg(c <= 4, "maximum 4 channels supported");
+      debug::check_expr(c <= 4, "maximum 4 channels supported");
       
       // Scatter data into per-channel blocks
       std::vector<std::vector<float>> blocks(c);
@@ -71,14 +71,14 @@ namespace met {
       const char *pstr = path.string().c_str();
       int ret = SaveEXRImageToFile(&image, &header, pstr, &err_code);
       
-      debug::check_expr_dbg(ret == TINYEXR_SUCCESS,
+      debug::check_expr(ret == TINYEXR_SUCCESS,
         fmt::format("could not save image to \"{}\", code was {}", path.string(), ret));
     }
 
     void save_stb(const fs::path &path, std::span<const float> data, uint w, uint h, uint c) {
       met_trace();
 
-      debug::check_expr_dbg(c <= 4, "maximum 4 channels supported");
+      debug::check_expr(c <= 4, "maximum 4 channels supported");
 
       // Convert data to unsigned bytes
       std::vector<std::byte> byte_data(data.size());
@@ -98,11 +98,11 @@ namespace met {
       } else if (ext == ".bmp") {
         ret = stbi_write_bmp(pstr, w, h, c, byte_data.data());
       } else {
-        debug::check_expr_dbg(false,
+        debug::check_expr(false,
           fmt::format("unsupported image extension for writing \"{}\"", path.string()));
       }
 
-      debug::check_expr_dbg(ret != 0,
+      debug::check_expr(ret != 0,
         fmt::format("could not save image to \"{}\", code was {}", path.string(), ret));
     }
   } // namespace detail
@@ -161,7 +161,7 @@ namespace met {
       met_trace();
 
       // Check that file path exists
-      debug::check_expr_dbg(fs::exists(path),
+      debug::check_expr(fs::exists(path),
         fmt::format("failed to resolve path \"{}\"", path.string()));
 
       // Strip gamma if requested, but not for .EXR input
@@ -183,7 +183,7 @@ namespace met {
         size_t      size = v.prod() * c;
 
         // Test if data was loaded
-        debug::check_expr_rel(ret == TINYEXR_SUCCESS, 
+        debug::check_expr(ret == TINYEXR_SUCCESS, 
           fmt::format("failed to load file \"{}\"", path.string()));
 
         // Copy data over
@@ -197,7 +197,7 @@ namespace met {
         size_t     size = v.prod() * c;
 
         // Test if data was loaded
-        debug::check_expr_rel(ptr, 
+        debug::check_expr(ptr, 
           fmt::format("failed to load file \"{}\"", path.string()));
             
         // Elevate data to floating point

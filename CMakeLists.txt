@@ -7,18 +7,18 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resource
 project(Metameric LANGUAGES CXX)
 
 # Build options
-option(met_enable_dbg_exceptions "Enable debug exceptions on release" ON)
-option(met_enable_tracy          "Enable Tracy support"               ON)
+option(met_enable_exceptions "Enable exceptions on release" ON)
+option(met_enable_tracy      "Enable Tracy support"         ON)
 
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
-set(MET_WAVELENGTH_BASES    12) # Nr. of basis functions used in generative functions
+set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
 set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported
 
 # Print configuration info
-message(STATUS "Metameric : Enabling exceptions = ${met_enable_dbg_exceptions}")
+message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")
 message(STATUS "Metameric : Enabling Tracy      = ${met_enable_tracy}")
 message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
@@ -78,9 +78,9 @@ find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH}
 find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 
 # Include small_gl/small_gl_parser libraries directly; forward exceptions/tracy options
-option(glp_enable_dbg_exceptions "" ${gl_enable_dbg_exceptions})
-option(gl_enable_dbg_exceptions  "" ${met_enable_dbg_exceptions})
-option(gl_enable_tracy           "" ${met_enable_tracy})
+option(glp_enable_exceptions "" ${gl_enable_exceptions})
+option(gl_enable_exceptions  "" ${met_enable_exceptions})
+option(gl_enable_tracy       "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/small_gl_parser)
 
@@ -260,18 +260,18 @@ target_link_libraries(scheduler PRIVATE app)
 
 # Configure OpenMP
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(core       PUBLIC OpenMP::OpenMP_CXX)
-    target_link_libraries(components PUBLIC OpenMP::OpenMP_CXX)
-    target_link_libraries(app        PUBLIC OpenMP::OpenMP_CXX)
-    target_link_libraries(metameric  PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(core       PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(components PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(app        PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(metameric  PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-# Configure debug output options
-if (met_enable_dbg_exceptions)
-  target_compile_definitions(core       PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
-  target_compile_definitions(components PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
-  target_compile_definitions(app        PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
-  target_compile_definitions(metameric  PUBLIC MET_ENABLE_DBG_EXCEPTIONS)
+# Configure exceptions
+if (met_enable_exceptions)
+  target_compile_definitions(core       PUBLIC MET_ENABLE_EXCEPTIONS)
+  target_compile_definitions(components PUBLIC MET_ENABLE_EXCEPTIONS)
+  target_compile_definitions(app        PUBLIC MET_ENABLE_EXCEPTIONS)
+  target_compile_definitions(metameric  PUBLIC MET_ENABLE_EXCEPTIONS)
 endif()
 
 # Configure tracy integration options

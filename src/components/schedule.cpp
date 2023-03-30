@@ -83,7 +83,7 @@ namespace met {
   }
 
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
-    debug::check_expr_rel(scheduler.global("app_data").is_init() && scheduler.global("window").is_init());
+    debug::check_expr(scheduler.global("app_data").is_init() && scheduler.global("window").is_init());
     const auto &e_appl_data = scheduler.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
@@ -120,7 +120,7 @@ namespace met {
   }
   
   void submit_schedule_empty(detail::SchedulerBase &scheduler) {
-    debug::check_expr_rel(scheduler.global("window").is_init());
+    debug::check_expr(scheduler.global("window").is_init());
     scheduler.clear();
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();

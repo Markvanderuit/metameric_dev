@@ -65,7 +65,7 @@ namespace met {
   }
   
   void to_json(json &js, const BasisTreeNode &b) {
-    debug::check_expr_rel(false, "Not imeplemented!");
+    debug::check_expr(false, "Not imeplemented!");
   }
 
   void from_json(const json &js, ProjectData &v) {

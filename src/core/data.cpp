@@ -106,7 +106,7 @@ namespace met {
     met_trace();
 
     fmt::print("Project generation\n");
-    debug::check_expr_rel(!info.images.empty(), "ProjectCreateInfo::images must not be empty");
+    debug::check_expr(!info.images.empty(), "ProjectCreateInfo::images must not be empty");
 
     clear_mods();
 

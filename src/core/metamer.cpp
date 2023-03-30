@@ -12,7 +12,7 @@ namespace met {
 
   Spec generate_spectrum(GenerateSpectrumInfo info) {
     met_trace();
-    debug::check_expr_dbg(info.systems.size() == info.signals.size(),
+    debug::check_expr(info.systems.size() == info.signals.size(),
                           "Color system size not equal to color signal size");
            
     // Out-of-loop state
