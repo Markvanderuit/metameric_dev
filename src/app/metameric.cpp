@@ -9,18 +9,21 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/app/application.hpp>
-#include <small_gl/buffer.hpp>
-#include <small_gl/framebuffer.hpp>
-#include <small_gl/texture.hpp>
-#include <small_gl/utility.hpp>
 #include <small_gl/window.hpp>
 #include <nlohmann/json.hpp>
-#include <algorithm>
-#include <execution>
-#include <ranges>
+#include <fmt/core.h>
+#include <cstdlib>
+#include <exception>
 
 namespace met {
+  struct ApplicationCreateInfo {
+    // In case of a existing project load
+    fs::path project_path = "";
+
+    // Application color theme
+    ApplicationData::ColorMode color_mode = ApplicationData::ColorMode::eDark;
+  };
+
   namespace detail {
     void init_state(LinearScheduler &scheduler, ApplicationCreateInfo info) {
       met_trace();
@@ -48,7 +51,7 @@ namespace met {
         submit_schedule_empty(scheduler);
       }
     }
-  } // namespace detail                          
+  } // namespace detail                 
 
   void create_application(ApplicationCreateInfo info) {
     fmt::print("Metameric format\n  min : {} nm\n  max : {} nm\n  samples: {}\n",
@@ -91,3 +94,13 @@ namespace met {
     ImGui::Destr();
   }
 } // namespace met
+
+int main() {
+  /* try { */
+    met::create_application({ .color_mode    = met::ApplicationData::ColorMode::eDark });
+  /* } catch (const std::exception &e) {
+    fmt::print(stderr, "{}\n", e.what());
+    return EXIT_FAILURE;
+  } */
+  return EXIT_SUCCESS;
+}

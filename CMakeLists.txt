@@ -78,7 +78,7 @@ find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH}
 find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 
 # Include small_gl/small_gl_parser libraries directly; forward exceptions/tracy options
-option(glp_enable_exceptions "" ${gl_enable_exceptions})
+option(glp_enable_exceptions "" ${met_enable_exceptions})
 option(gl_enable_exceptions  "" ${met_enable_exceptions})
 option(gl_enable_tracy       "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
@@ -243,26 +243,14 @@ target_link_libraries(components PUBLIC
 )
 add_dependencies(components shaders misc_copy)
 
-# Set up app library
-add_library_r(app app)
-target_link_libraries(app PUBLIC
-  core
-  components
-  small_gl
-)
-
 # Set up metameric executable
-add_executable_r(metameric src/target/main_metameric.cpp)
-target_link_libraries(metameric PRIVATE app)
-
-add_executable_r(scheduler src/target/main_scheduler.cpp)
-target_link_libraries(scheduler PRIVATE app)
+add_executable_r(metameric src/app/metameric.cpp)
+target_link_libraries(metameric PRIVATE core components)
 
 # Configure OpenMP
 if(OpenMP_CXX_FOUND)
   target_link_libraries(core       PUBLIC OpenMP::OpenMP_CXX)
   target_link_libraries(components PUBLIC OpenMP::OpenMP_CXX)
-  target_link_libraries(app        PUBLIC OpenMP::OpenMP_CXX)
   target_link_libraries(metameric  PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
@@ -270,7 +258,6 @@ endif()
 if (met_enable_exceptions)
   target_compile_definitions(core       PUBLIC MET_ENABLE_EXCEPTIONS)
   target_compile_definitions(components PUBLIC MET_ENABLE_EXCEPTIONS)
-  target_compile_definitions(app        PUBLIC MET_ENABLE_EXCEPTIONS)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_EXCEPTIONS)
 endif()
 
@@ -278,6 +265,5 @@ endif()
 if (met_enable_tracy)
   target_compile_definitions(core       PUBLIC MET_ENABLE_TRACY)
   target_compile_definitions(components PUBLIC MET_ENABLE_TRACY)
-  target_compile_definitions(app        PUBLIC MET_ENABLE_TRACY)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_TRACY)
 endif()
