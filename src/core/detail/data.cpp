@@ -217,9 +217,13 @@ namespace met::detail {
     constexpr uint sample_discretization = 256;
     constexpr uint sample_attemps        = 32;
 
+    // Actual samples per image
+    const uint n_samples = n_interior_samples / (images.size() + 1);
+
     // Data store shared across next steps
+    std::vector<uint> indices;
     std::vector<Bary> bary_weights;
-    std::vector<uint> bary_indices;
+    // std::vector<uint> bary_indices;
     std::mutex solver_mutex;
     float solver_error = std::numeric_limits<float>::max();
     
@@ -228,7 +232,27 @@ namespace met::detail {
     std::ranges::transform(appl_data.project_data.verts, 
       verts.begin(), [](const auto &v) { return v.colr_i; });
 
-    { // 1. Generate generalized weights for the convex hull, w.r.t. the primary loaded image
+    { // 1. Build a distribution of unique color values s.t. identical texels are not sampled twice 
+      // Instantiate an unordered map storing color/uint pairs
+      std::unordered_map<
+        eig::Array3u, 
+        uint, 
+        decltype(eig::detail::matrix_hash<eig::Array3u::value_type>), 
+        decltype(eig::detail::matrix_equal)
+      > indices_map;
+
+      // Insert indices of discretized image colors into the map, if they do not yet exist
+      auto colr_i_span = appl_data.loaded_texture.data();
+      for (uint i = 0; i < colr_i_span.size(); ++i)
+        indices_map.insert({ (colr_i_span[i] * sample_discretization).cast<uint>(), i });
+
+      // Export resulting set of indices
+      indices.resize(indices_map.size());
+      std::transform(std::execution::par_unseq, range_iter(indices_map), indices.begin(),
+        [](const auto &pair) { return pair.second; });
+    } // 1.
+
+    { // 2. Generate generalized weights for the convex hull, w.r.t. the primary loaded image
       //    (we quickly hack-reuse generalized weight shader code for this step)
 
       const uint dispatch_n    = appl_data.loaded_texture.size().prod();
@@ -270,49 +294,40 @@ namespace met::detail {
       // Recover computed barycentric weights
       bary_weights.resize(dispatch_n);
       wght_buffer.get_as(cnt_span<Bary>(bary_weights));
-
-      // Obtain mask over indices of non-negative barycentric weights; in case the convex hull
-      // estimation does not provide a perfect fit, as the decimation implementation needs uhh, work :S
-      bary_indices.clear();
-      std::vector<uint> index_full(dispatch_n);
-      std::iota(range_iter(index_full), 0);
-      std::copy_if(range_iter(index_full), std::back_inserter(bary_indices),
-        [&bary_weights](uint i) { return (bary_weights[i] >= 0).all(); });
-    } // 1.
+    } // 2.
 
     #pragma omp parallel for
     for (int _i = 0; _i < sample_attemps; ++_i) {
       auto colr_i_span = appl_data.loaded_texture.data();
 
       // Data store shared across next steps for current solve attempt
-      std::vector<uint> sample_indices(n_interior_samples);
-      std::vector<Bary> sample_bary(n_interior_samples);
-      std::vector<Colr> sample_colr_i(n_interior_samples);
+      std::vector<uint> sample_indices(n_samples);
+      std::vector<Bary> sample_bary(n_samples);
+      std::vector<Colr> sample_colr_i(n_samples);
       std::vector<std::vector<Colr>> sample_colr_j(images.size());
       std::vector<Spec>              gamut_spec;
       std::vector<ProjectData::Vert> gamut_verts;
       float roundtrip_error = 0.f;
 
-      { // 1. Sample a random subset of texel colors from the texture 
+      { // 1. Sample a random subset of texels and obtain their color values from each texture
         auto colr_i_span = appl_data.loaded_texture.data();
-
-        // Define random distribution to sample non-negative weight indices
+          
+        // Define random generator
         std::random_device rd;
-        std::mt19937 eng(rd());
-        std::uniform_int_distribution<uint> distr(0, bary_indices.size() - 1);
+        std::mt19937 gen(rd());
 
-        // Draw random samples from said distribution
-        std::vector<uint> samples(n_interior_samples);
-        std::ranges::generate(samples, [&]{ return distr(eng); });
+        // Draw random, unique indices from indices
+        std::vector<uint> samples = indices;
+        std::shuffle(range_iter(samples), gen);
+        samples.resize(std::min(static_cast<size_t>(n_samples), samples.size()));
 
-        // Extract sampled data
-        std::ranges::transform(samples, sample_indices.begin(), [&](uint i) { return bary_indices[i]; });
-        std::ranges::transform(sample_indices, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
-        std::ranges::transform(sample_indices, sample_bary.begin(), [&](uint i) { return bary_weights[i]; });
+        // Extract colr_i, colr_j from input images at sampled indices
+        std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
+        std::ranges::transform(samples, sample_bary.begin(), [&](uint i) { return bary_weights[i]; });
         for (uint i = 0; i < images.size(); ++i) {
           auto colr_j_span = images[i].image.data();
-          sample_colr_j[i] = std::vector<Colr>(n_interior_samples);
-          std::ranges::transform(sample_indices, sample_colr_j[i].begin(), [&](uint i) { return colr_j_span[i]; });
+          sample_colr_j[i] = std::vector<Colr>(n_samples);
+          std::ranges::transform(samples, sample_colr_j[i].begin(), [&](uint i) { return colr_j_span[i]; });
         }
       } // 1.
 
@@ -323,7 +338,7 @@ namespace met::detail {
           .basis_mean = appl_data.loaded_basis_mean,
           .gamut      = verts,
           .systems    = std::vector<CMFS>(appl_data.project_data.color_systems.size()),
-          .signals    = std::vector<GenerateGamutInfo::Signal>(n_interior_samples)
+          .signals    = std::vector<GenerateGamutInfo::Signal>(n_samples)
         };
 
         // Transform mappings
@@ -331,7 +346,7 @@ namespace met::detail {
           info.systems[i] = appl_data.project_data.csys(i).finalize_direct();
 
         // Add baseline samples
-        for (uint i = 0; i < n_interior_samples; ++i)
+        for (uint i = 0; i < n_samples; ++i)
           info.signals[i] = { .colr_v = sample_colr_i[i],
                               .bary_v = sample_bary[i],
                               .syst_i = 0 };
@@ -339,7 +354,7 @@ namespace met::detail {
         // Add constraint samples
         for (uint i = 0; i < sample_colr_j.size(); ++i) {
           const auto &values = sample_colr_j[i];
-          for (uint j = 0; j < n_interior_samples; ++j) {
+          for (uint j = 0; j < n_samples; ++j) {
             info.signals.push_back({
               .colr_v = values[j],
               .bary_v = sample_bary[j],
@@ -400,7 +415,7 @@ namespace met::detail {
           roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum(); */
 
         // Add squared error based on sample roundtrip
-        for (uint i = 0; i < n_interior_samples; ++i) {
+        for (uint i = 0; i < n_samples; ++i) {
           // Recover spectrum at sample position
           Bary w = sample_bary[i];
           Spec s = 0.f;
