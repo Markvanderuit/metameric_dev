@@ -77,10 +77,12 @@ find_program(glslangValidator NAMES glslangValidator PATHS ${CMAKE_PROGRAM_PATH}
 find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 
-# Include small_gl library directly; forward exceptions/tracy options
-option(gl_enable_dbg_exceptions "" ${met_enable_dbg_exceptions})
-option(gl_enable_tracy          "" ${met_enable_tracy})
+# Include small_gl/small_gl_parser libraries directly; forward exceptions/tracy options
+option(glp_enable_dbg_exceptions "" ${gl_enable_dbg_exceptions})
+option(gl_enable_dbg_exceptions  "" ${met_enable_dbg_exceptions})
+option(gl_enable_tracy           "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
+add_subdirectory(third_party/small_gl_parser)
 
 # Recursively find all shader files
 file(GLOB_RECURSE glsl_srcs
