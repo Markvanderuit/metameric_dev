@@ -22,7 +22,7 @@ namespace met {
     met_trace_full();
 
     // Submit shared resources 
-    info("vert_spec").set<std::vector<Spec>>({ });               // CPU-side generated reflectance spectra for each vertex
+    info("vert_spec").set<std::vector<Spec>>({ }); // CPU-side generated reflectance spectra for each vertex
   }
 
   bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
@@ -69,26 +69,5 @@ namespace met {
         .reduce_basis_count = false
       });
     }
-
-    // TODO: Remove dead code if irrelevant
-    /* // Describe ranges over stale gamut vertices/elements
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i].any; });
-    auto elem_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.elems.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.elems[i]; });
-
-    // Push stale gamut vertex data to gpu
-    for (uint i : vert_range) {
-      m_vert_map[i] = e_proj_data.vertices[i].colr_i;
-      m_spec_map[i] = i_specs[i];
-      i_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
-      i_spec_buffer.flush(sizeof(Spec), i * sizeof(Spec));
-    }
-    
-    // Push stale gamut element data to gpu
-    for (uint i : elem_range) {
-      m_elem_map[i] = e_proj_data.gamut_elems[i];
-      i_elem_buffer.flush(sizeof(eig::AlArray3u), i * sizeof(eig::AlArray3u));
-    } */
   }
 } // namespace met

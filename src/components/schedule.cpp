@@ -64,22 +64,22 @@ namespace met {
       ImGui::End();
     });
 
-    /* // Temporary window to plot pca components
-    scheduler.emplace_task<LambdaTask>("plot_models", [](auto &info) {
+    // Temporary window to plot pca components
+    scheduler.task("plot_models").init<LambdaTask>([](auto &info) {
       if (ImGui::Begin("PCA plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        auto &pca = info.global("app_data").loaded_basis.writeable<ApplicationData>();
+        const auto &pca = info.global("app_data").read_only<ApplicationData>().loaded_basis;
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
         }
       }
       ImGui::End();
-    }); */
+    });
   }
 
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
@@ -113,7 +113,7 @@ namespace met {
     scheduler.task("error_viewer").init<ErrorViewerTask>();
     scheduler.task("weight_viewer").init<WeightViewerTask>();
 
-    // // Insert temporary unimportant tasks
+    // Insert temporary unimportant tasks
     // submit_schedule_debug(scheduler);
 
     scheduler.task("frame_end").init<FrameEndTask>();

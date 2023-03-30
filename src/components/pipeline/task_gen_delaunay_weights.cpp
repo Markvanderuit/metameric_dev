@@ -62,8 +62,9 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
-    const auto &e_proj_data = e_appl_data.project_data;
+    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
     auto &i_delaunay    = info("delaunay").writeable<AlignedDelaunayData>();
@@ -75,13 +76,25 @@ namespace met {
     std::ranges::transform(e_proj_data.verts, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
     i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
 
-    // Push buffer data // TODO optimize?
+    // Recover triangle element data and store in project
+    auto [_, elems] = convert_mesh<AlignedMeshData>(i_delaunay);
+    info.global("app_data").writeable<ApplicationData>().project_data.elems = elems;
+
+    // Push stale vertices
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
+                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i].any; });
+    for (uint i : vert_range) {
+      m_vert_map[i] = e_proj_data.verts[i].colr_i;
+      i_vert_buffer.flush(sizeof(eig::AlArray3f), i * sizeof(eig::AlArray3f));
+    }
+
+    // Push stale tetrahedral element data // TODO optimize?
+    std::ranges::copy(i_delaunay.elems, m_elem_map.begin());
+    i_elem_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
+    
+    // Push uniform data
     m_uniform_map->n_verts = i_delaunay.verts.size();
     m_uniform_map->n_elems = i_delaunay.elems.size();
-    std::ranges::copy(i_delaunay.verts, m_vert_map.begin());
-    std::ranges::copy(i_delaunay.elems, m_elem_map.begin());
-    i_vert_buffer.flush(i_delaunay.verts.size() * sizeof(eig::AlArray3f));
-    i_elem_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
     m_uniform_buffer.flush();
 
     // Bind required buffers to corresponding targets

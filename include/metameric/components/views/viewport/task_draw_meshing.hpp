@@ -7,7 +7,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class ViewportDrawDelaunayTask : public detail::TaskNode {
+  class ViewportDrawMeshingTask : public detail::TaskNode {
     struct CameraBuffer {
       alignas(64) eig::Matrix4f matrix;
       alignas(16) eig::Vector2f aspect;

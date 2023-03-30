@@ -4,7 +4,7 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/components/views/viewport/task_draw_delaunay.hpp>
+#include <metameric/components/views/viewport/task_draw_meshing.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/framebuffer.hpp>
@@ -24,7 +24,7 @@ namespace met {
   constexpr uint init_vert_support = 1024;
   constexpr uint init_elem_support = 1024;
 
-  void ViewportDrawDelaunayTask::init(SchedulerHandle &info) {
+  void ViewportDrawMeshingTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -71,17 +71,17 @@ namespace met {
 
     // Load shader program objects
     m_vert_program = {{ .type = gl::ShaderType::eVertex,   
-                        .spirv_path = "resources/shaders/viewport/draw_delaunay_vert.vert.spv",
-                        .cross_path = "resources/shaders/viewport/draw_delaunay_vert.vert.json" },
+                        .spirv_path = "resources/shaders/viewport/draw_meshing_vert.vert.spv",
+                        .cross_path = "resources/shaders/viewport/draw_meshing_vert.vert.json" },
                       { .type = gl::ShaderType::eFragment, 
-                        .spirv_path = "resources/shaders/viewport/draw_delaunay_vert.frag.spv",
-                        .cross_path = "resources/shaders/viewport/draw_delaunay_vert.frag.json" }};
+                        .spirv_path = "resources/shaders/viewport/draw_meshing_vert.frag.spv",
+                        .cross_path = "resources/shaders/viewport/draw_meshing_vert.frag.json" }};
     m_elem_program = {{ .type = gl::ShaderType::eVertex,   
-                        .spirv_path = "resources/shaders/viewport/draw_delaunay_elem.vert.spv",
-                        .cross_path = "resources/shaders/viewport/draw_delaunay_elem.vert.json" },
+                        .spirv_path = "resources/shaders/viewport/draw_meshing_elem.vert.spv",
+                        .cross_path = "resources/shaders/viewport/draw_meshing_elem.vert.json" },
                       { .type = gl::ShaderType::eFragment, 
-                        .spirv_path = "resources/shaders/viewport/draw_delaunay_elem.frag.spv",
-                        .cross_path = "resources/shaders/viewport/draw_delaunay_elem.frag.json" }};
+                        .spirv_path = "resources/shaders/viewport/draw_meshing_elem.frag.spv",
+                        .cross_path = "resources/shaders/viewport/draw_meshing_elem.frag.json" }};
 
     eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                             ? eig::Array4f { 1, 1, 1, 1 }
@@ -94,7 +94,7 @@ namespace met {
     m_unif_buffer.flush();
   }
 
-  void ViewportDrawDelaunayTask::eval(SchedulerHandle &info) {
+  void ViewportDrawMeshingTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
@@ -103,31 +103,8 @@ namespace met {
     const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
-    // On relevant unay state change, update mesh buffer data
-    if (auto rsrc = info.resource("gen_convex_weights", "delaunay"); rsrc.is_init() && rsrc.is_mutated()) {
-      // Get triangulated mesh data from delaunay structure
-      auto [verts, elems] = convert_mesh<AlignedMeshData>(rsrc.read_only<AlignedDelaunayData>());
-
-      // Verify fixed-size vertex buffer size limits, or reallocate
-      if (verts.size() > m_size_map.size()) {
-        std::vector<float> size_init(2 * verts.size(), vert_deslct_size);
-        m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
-        m_size_map    = m_size_buffer.map_as<float>(buffer_access_flags);
-      }
-
-      // Verify fixed-size element buffer size limits, or reallocate
-      if (elems.size() > m_elem_map.size()) {
-        m_elem_array.detach_elements();
-        m_elem_buffer = {{ .size = 2 * elems.size() * sizeof(eig::Array3u), .flags = buffer_create_flags }};
-        m_elem_map    = m_elem_buffer.map_as<eig::Array3u>(buffer_access_flags);
-        m_elem_array.attach_elements(m_elem_buffer);  
-      }
-
-      // Copy data to mapped buffers and adjust draw count
-      std::ranges::copy(elems, m_elem_map.begin());
-      m_vert_draw.vertex_count = 3 * verts.size();
-      m_elem_draw.vertex_count = 3 * elems.size();
-    } else if (e_pipe_state.any_verts || e_pipe_state.any_elems) {
+    // On relevant state change, update mesh buffer data
+    if (e_pipe_state.any_verts || e_pipe_state.any_elems) {
       if (e_proj_data.verts.size() > m_size_map.size()) {
         std::vector<float> size_init(2 * e_proj_data.verts.size(), vert_deslct_size);
         m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
@@ -141,8 +118,13 @@ namespace met {
         m_elem_array.attach_elements(m_elem_buffer);  
       }
 
-      // Copy data to mapped buffers and adjust draw count
-      std::ranges::copy(e_proj_data.elems, m_elem_map.begin());
+      // Copy data to mapped element buffer
+      if (e_pipe_state.any_elems) {
+        std::ranges::copy(e_proj_data.elems, m_elem_map.begin());
+        m_elem_buffer.flush();
+      }
+
+      // Adjust draw counts
       m_vert_draw.vertex_count = 3 * e_proj_data.verts.size();
       m_elem_draw.vertex_count = 3 * e_proj_data.elems.size();
     }

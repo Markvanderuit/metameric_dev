@@ -54,8 +54,7 @@ namespace met {
 
   bool GenGeneralizedWeightsTask::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info("state", "pipeline_state").read_only<ProjectState>().any_verts ||
-           info("state", "pipeline_state").read_only<ProjectState>().any_elems;
+    return info("state", "pipeline_state").read_only<ProjectState>().any_verts;
   }
 
   void GenGeneralizedWeightsTask::eval(SchedulerHandle &info) {
