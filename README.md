@@ -1,3 +1,71 @@
-# Metameric
+# Metameric: Spectral Uplifting via Controllable Color Constraints
 
-Work-in-progress repository for rgb-to-spectral texture uplifting project
+## Introduction
+
+This repository contains the implementation of our spectral uplifting toolkit, which can be used to author compact spectral textures from RGB inputs. A single-file plugin is provided for interfacing with [Mitsuba 3](https://github.com/mitsuba-renderer/mitsuba3). For details and renders, check out our recent paper "*Metameric: Spectral Uplifting via Controllable Color Constraints*" (**journal link**, **author link**).
+
+## Compilation
+
+To build the project, you will need a viable C++20 compiler (MSVC **VN**, Clang **VN**, GCC **VN**), CMake 3.22 or later, and a system that supports OpenGL 4.6.
+All other dependencies are bundled through submodules and Vcpkg.  
+To get started, clone the repository:
+
+```bash
+  git clone --recurse-submodules https://github.com/Markvanderuit/spectral_uplifting
+```
+
+Note that some Unix systems may require X11/Wayland development packages to be installed for [GLFW](https://www.glfw.org). Vcpkg tries to provide sufficient information for you to install these, but if you run into any issues, refer to the [GLFW compilation page](https://www.glfw.org/docs/3.3/compile.html).
+
+Next, configure the project using CMake, e.g.
+
+```bash
+  mkdir spectral_uplifting/build
+  cd spectral_uplifting/build
+  cmake ..
+  make
+```
+
+
+
+## Usage
+
+...
+
+## Mitsuba plugin
+
+...
+
+## Citation
+
+Please cite the following paper if you found it useful in your research:
+
+**TODO: add bibtex**
+
+## License and third party software
+
+The source code in this repository is released under the MIT License. 
+However, all third-party software libraries are governed by their respective licenses.
+Without the following libraries, this project would not exist:
+[Coin-or linear programming](https://github.com/coin-or/Clp), 
+[cxxopts](https://github.com/jarro2783/cxxopts),
+[Dear ImGui](https://github.com/ocornut/imgui),
+[Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page), 
+[fmt](https://github.com/fmtlib/fmt), 
+[GLAD](https://glad.dav1d.de/),
+[GLFW](https://www.glfw.org/),
+[GLM](https://glm.g-truc.net/0.9.9/),
+[Glslang](https://github.com/KhronosGroup/glslang), 
+[ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo), 
+[ImPlot](https://github.com/epezent/implot),
+[JSON for Modern C++](https://github.com/nlohmann/json),
+[Native File Dialog](https://github.com/mlabbe/nativefiledialog), 
+[OpenMesh](https://openmesh.org),
+[Qhull](http://www.qhull.org/),
+[SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross), 
+[SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools), 
+[stb](https://github.com/nothings/stb),
+[Tiny OpenEXR image library](https://github.com/syoyo/tinyexr),
+[Tracy Profiler](https://github.com/wolfpld/tracy),
+[vcpkg](https://github.com/microsoft/vcpkg),
+[zlib](https://zlib.net/),
+[zstr](https://github.com/mateidavid/zstr)
