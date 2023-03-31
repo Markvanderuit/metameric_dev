@@ -17,7 +17,7 @@ To build the project, you will need a viable C++20 compiler (MSVC **VN**, Clang 
 > **Note** 
 > Some Unix systems may require X11/Wayland development packages to be installed for [GLFW](https://www.glfw.org). Vcpkg tries to provide sufficient information for you to install these, but if you run into any issues, refer to the [GLFW compilation page](https://www.glfw.org/docs/3.3/compile.html).
 
-Next, configure the project using CMake and your compilation path of choice. E.g.
+Next, configure the project using CMake and your compilation path of choice. E.g., when using Make:
 
 ```bash
   mkdir build
@@ -25,6 +25,8 @@ Next, configure the project using CMake and your compilation path of choice. E.g
   cmake ../spectral_uplifting
   make
 ```
+
+Once this has completed, you should find an executable on the path `build/bin/metameric`.
 
 ## Usage
 
