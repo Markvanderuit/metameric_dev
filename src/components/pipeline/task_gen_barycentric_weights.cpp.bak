@@ -20,7 +20,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "appl_data").loaded_texture_f32;
 
     const uint generate_n    = e_rgb_texture.size().prod();
     const uint generate_ndiv = ceil_div(generate_n, 256u / 2u);
@@ -64,7 +64,7 @@ namespace met {
     guard(e_pipe_state.any_verts);
 
     // Get shared resources
-    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "appl_data");
     auto &e_vert_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "vert_buffer");
     auto &e_elem_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "elem_buffer");
     auto &i_colr_buffer = info.get_resource<gl::Buffer>("colr_buffer");

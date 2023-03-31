@@ -28,7 +28,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_vert_buffer = info.resource("gen_convex_weights", "vert_buffer").read_only<gl::Buffer>();
 
@@ -100,7 +100,7 @@ namespace met {
     // Get external resources
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
-    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // On relevant state change, update mesh buffer data

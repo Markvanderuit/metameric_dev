@@ -42,7 +42,7 @@ namespace met {
       const auto &i_selection_const = info.resource("selection").read_only<std::vector<uint>>();
 
       // Get modified resources
-      auto &e_app_data  = info.global("app_data").writeable<ApplicationData>();
+      auto &e_app_data  = info.global("appl_data").writeable<ApplicationData>();
       auto &e_verts     = e_app_data.project_data.verts;
       auto &io          = ImGui::GetIO();
 

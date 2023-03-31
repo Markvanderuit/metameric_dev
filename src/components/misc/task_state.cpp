@@ -121,7 +121,7 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_arcball    = info("viewport.input", "arcball").read_only<detail::Arcball>();
     const auto &e_vert_selct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
@@ -154,7 +154,7 @@ namespace met {
       vert_state.csys_j.is_any_stale |= std::reduce(range_iter(vert_state.csys_j.is_stale), false, std::logical_or<bool>());
       vert_state.is_any_stale |= vert_state.colr_i || vert_state.csys_i || vert_state.colr_j || vert_state.csys_j;
     }
-    
+
     // Update summary flag across vertices
     pipe_state.verts.is_any_stale |= std::reduce(range_iter(pipe_state.verts.is_stale), false, std::logical_or<bool>());
 

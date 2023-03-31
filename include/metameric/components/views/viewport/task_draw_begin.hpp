@@ -29,7 +29,7 @@ namespace met {
       met_trace_full();
     
       // Get external resources 
-      const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+      const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_lrgb_target = info.resource("viewport.begin", "lrgb_target").read_only<gl::Texture2d4f>();
 
       // Get modified resources 

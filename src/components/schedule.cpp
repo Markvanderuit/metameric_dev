@@ -72,7 +72,7 @@ namespace met {
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        const auto &pca = info.global("app_data").read_only<ApplicationData>().loaded_basis;
+        const auto &pca = info.global("appl_data").read_only<ApplicationData>().loaded_basis;
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
@@ -83,8 +83,8 @@ namespace met {
   }
 
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
-    debug::check_expr(scheduler.global("app_data").is_init() && scheduler.global("window").is_init());
-    const auto &e_appl_data = scheduler.global("app_data").read_only<ApplicationData>();
+    debug::check_expr(scheduler.global("appl_data").is_init() && scheduler.global("window").is_init());
+    const auto &e_appl_data = scheduler.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
     scheduler.clear();

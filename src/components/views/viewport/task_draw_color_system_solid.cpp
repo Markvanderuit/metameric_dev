@@ -98,7 +98,7 @@ namespace met {
       const auto &e_chull_cntr = info.resource("gen_color_system_solid", "chull_cntr").read_only<Colr>();
 
       // Get modified resources
-      auto &e_appl_data  = info.global("app_data").writeable<ApplicationData>();
+      auto &e_appl_data  = info.global("appl_data").writeable<ApplicationData>();
       auto &e_proj_data  = e_appl_data.project_data;
       
       #pragma omp parallel for

@@ -16,7 +16,7 @@ namespace met {
 
     // Get external resources
     const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_colr_data   = e_appl_data.loaded_texture;
 
@@ -40,7 +40,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert_spec = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
 
@@ -132,7 +132,7 @@ namespace met {
       // Get external resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
       const auto &e_colr_buffer = info(color_task_key, "colr_buffer").read_only<gl::Buffer>();
-      const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+      const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
 
       // Obtain cpu-side texture
       Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
@@ -147,7 +147,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
     m_resample_size   = 1;
@@ -196,7 +196,7 @@ namespace met {
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
       const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
-      const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+      const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
       uint e_mappings_n = e_proj_data.color_systems.size();
       

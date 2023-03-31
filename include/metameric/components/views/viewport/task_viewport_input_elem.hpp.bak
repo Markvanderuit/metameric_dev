@@ -49,7 +49,7 @@ namespace met {
       auto &e_selection_vert = info.get_resource<std::vector<uint>>("viewport.input.vert", "selection");
       auto &e_cstr_slct      = info.get_resource<int>("viewport.overlay", "constr_selection");
       auto &i_arcball        = info.get_resource<detail::Arcball>("viewport.input", "arcball");
-      auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "app_data");
+      auto &e_app_data       = info.get_resource<ApplicationData>(global_key, "appl_data");
       auto &e_prj_data       = e_app_data.project_data;
       auto &e_verts          = e_app_data.project_data.gamut_verts;
       auto &e_elems          = e_app_data.project_data.gamut_elems;

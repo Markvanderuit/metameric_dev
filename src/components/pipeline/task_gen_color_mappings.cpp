@@ -17,7 +17,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Determine dispatch group size
@@ -63,7 +63,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     const auto &e_vert_spec  = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
@@ -104,7 +104,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_proj_data = info.global("app_data").read_only<ApplicationData>().project_data;
+    const auto &e_proj_data = info.global("appl_data").read_only<ApplicationData>().project_data;
 
     // Add subtasks to perform mapping
     m_mapping_subtasks.init(info, e_proj_data.color_systems.size(), 
@@ -116,7 +116,7 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    const auto &e_proj_data = info.global("app_data").read_only<ApplicationData>().project_data;
+    const auto &e_proj_data = info.global("appl_data").read_only<ApplicationData>().project_data;
 
     // Adjust nr. of subtasks
     m_mapping_subtasks.eval(info, e_proj_data.color_systems.size());

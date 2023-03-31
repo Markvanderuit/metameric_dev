@@ -38,11 +38,11 @@ namespace met {
       data.loaded_basis = loaded_tree.basis;
       data.loaded_basis_mean = loaded_tree.basis_mean;
 
-      scheduler.global("app_data").set(std::move(data));
+      scheduler.global("appl_data").set(std::move(data));
     }
 
     void init_schedule(LinearScheduler &scheduler) {
-      auto &app_data = scheduler.global("app_data").writeable<ApplicationData>();
+      auto &app_data = scheduler.global("appl_data").writeable<ApplicationData>();
       if (app_data.project_save == ProjectSaveState::eSaved) {
         submit_schedule_main(scheduler);
       } else {

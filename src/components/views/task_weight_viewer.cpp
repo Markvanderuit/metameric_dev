@@ -14,7 +14,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
 
     // Initialize objects for shader call
     const uint dispatch_n = e_appl_data.loaded_texture.size().prod();
@@ -60,7 +60,7 @@ namespace met {
 
     if (ImGui::Begin("Weight viewer")) {
       // Get external resources 
-      const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+      const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_txtr_data = e_appl_data.loaded_texture;
 
       // Get subtask names
@@ -109,7 +109,7 @@ namespace met {
     }
 
     // Get external resources 
-    const auto &e_appl_data   = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_cstr_slct   = info("viewport.overlay", "constr_selection").read_only<int>();
     const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();

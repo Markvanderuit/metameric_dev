@@ -18,7 +18,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "app_data").loaded_texture_f32;
+    auto &e_rgb_texture = info.get_resource<ApplicationData>(global_key, "appl_data").loaded_texture_f32;
 
     const uint generate_n       = e_rgb_texture.size().prod();
     const uint generate_ndiv_cl = ceil_div(generate_n, 256u / ceil_div(wavelength_samples, 4u));
@@ -46,7 +46,7 @@ namespace met {
     guard(e_pipe_state.any);
 
     // Get shared resources
-    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "app_data");
+    auto &e_appl_data  = info.get_resource<ApplicationData>(global_key, "appl_data");
     auto &e_spec_buffer = info.get_resource<gl::Buffer>("gen_spectral_gamut", "spec_buffer");
     auto &e_bary_buffer = info.get_resource<gl::Buffer>("gen_barycentric_weights", "bary_buffer");
     auto &i_spec_buffer = info.get_resource<gl::Buffer>("spec_buffer");

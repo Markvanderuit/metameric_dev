@@ -18,7 +18,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_colr_data = e_appl_data.loaded_texture;
     const auto &e_proj_data = e_appl_data.project_data;
     
@@ -62,7 +62,7 @@ namespace met {
 
     // Get external resources
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources

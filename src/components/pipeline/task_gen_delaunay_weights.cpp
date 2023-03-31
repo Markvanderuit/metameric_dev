@@ -18,7 +18,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_colr_data = e_appl_data.loaded_texture;
     const auto &e_proj_data = e_appl_data.project_data;
     
@@ -63,7 +63,7 @@ namespace met {
 
     // Get external resources
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
@@ -78,7 +78,7 @@ namespace met {
 
     // Recover triangle element data and store in project
     auto [_, elems] = convert_mesh<AlignedMeshData>(i_delaunay);
-    info.global("app_data").writeable<ApplicationData>().project_data.elems = elems;
+    info.global("appl_data").writeable<ApplicationData>().project_data.elems = elems;
 
     // Push stale vertices
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))

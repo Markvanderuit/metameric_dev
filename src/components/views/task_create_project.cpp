@@ -306,7 +306,7 @@ namespace met {
   }
 
   bool CreateProjectTask::create_project_safe(SchedulerHandle &info) {
-    const auto &e_app_data = info.global("app_data").read_only<ApplicationData>();
+    const auto &e_app_data = info.global("appl_data").read_only<ApplicationData>();
     if (e_app_data.project_save == ProjectSaveState::eUnsaved || e_app_data.project_save == ProjectSaveState::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
@@ -320,7 +320,7 @@ namespace met {
 
   bool CreateProjectTask::create_project(SchedulerHandle &info) {
     // Create a new project
-    info.global("app_data").writeable<ApplicationData>().create(std::move(m_proj_data));
+    info.global("appl_data").writeable<ApplicationData>().create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
     submit_schedule_main(info);
