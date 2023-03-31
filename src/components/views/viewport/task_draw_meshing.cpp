@@ -104,7 +104,7 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // On relevant state change, update mesh buffer data
-    if (e_pipe_state.any_verts || e_pipe_state.any_elems) {
+    if (e_pipe_state.verts || e_pipe_state.elems) {
       if (e_proj_data.verts.size() > m_size_map.size()) {
         std::vector<float> size_init(2 * e_proj_data.verts.size(), vert_deslct_size);
         m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
@@ -119,7 +119,7 @@ namespace met {
       }
 
       // Copy data to mapped element buffer
-      if (e_pipe_state.any_elems) {
+      if (e_pipe_state.elems) {
         std::ranges::copy(e_proj_data.elems, m_elem_map.begin());
         m_elem_buffer.flush();
       }

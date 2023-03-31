@@ -103,6 +103,7 @@ namespace met {
 
   bool GenColorSystemSolidTask::is_active(SchedulerHandle &info) {
     met_trace_full();
+    fmt::print("get_is_stale : {}\n", info("state", "pipeline_state").read_only<ProjectState>().csys.is_stale);
     return info("state", "pipeline_state").read_only<ProjectState>().csys[0];
   }
 

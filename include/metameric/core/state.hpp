@@ -1,45 +1,62 @@
 #pragma once
 
+#include <metameric/core/math.hpp>
 #include <vector>
 
 namespace met {
-  /* Wrapper object for tracking changes to project data throughout program pipeline */
-  struct ProjectState {
-    struct CacheVert {
-      bool any;
-      bool any_colr_j;
-      bool any_csys_j;
+  // Helper object for tracking data mutation across a vector structure
+  template <typename CacheObject>
+  struct VectorState {
+    std::vector<CacheObject> is_stale;
 
-      bool colr_i;
-      bool csys_i;
-
-      std::vector<bool> colr_j;
-      std::vector<bool> csys_j;
-    };
-
-    struct CacheMapp {
-      bool any;
-      bool cmfs;
-      bool illuminant;
-    };
+  public:  
+    constexpr
+    const CacheObject& operator[](uint i) const { return is_stale[i]; }
+    constexpr
+          CacheObject& operator[](uint i)       { return is_stale[i]; }
+    constexpr 
+    auto size() const { return is_stale.size(); }
 
   public:
-    bool any;
-    bool any_illuminants;
-    bool any_cmfs;
-    bool any_verts;
-    bool any_elems;
-    bool any_csys;
+    bool is_any_stale;
 
-    std::vector<CacheVert> verts;
-    std::vector<bool>      elems;
-    std::vector<bool>      csys;
-    std::vector<bool>      illuminants;
-    std::vector<bool>      cmfs;
+    constexpr
+    operator bool() const { return is_any_stale; }
   };
 
-  /* Wrapper object for tracking changes to viewport in program pipeline; e.g. vertex selection */
+  // Helper object for tracking data mutation in ProjectData::Vert structure
+  struct ProjectVertState {
+    bool              colr_i;
+    bool              csys_i;
+    VectorState<uint> colr_j;
+    VectorState<uint> csys_j;
+
+  public:  
+    bool is_any_stale;
+
+    constexpr
+    operator bool() const { return is_any_stale; }
+  };
+
+  // Helper object for tracking data mutation in ProjectData object
+  struct ProjectState {
+  public:  
+    VectorState<ProjectVertState> verts;
+    VectorState<uint>             elems;
+    VectorState<uint>             csys;
+    VectorState<uint>             cmfs;
+    VectorState<uint>             illuminants;
+
+  public:  
+    bool is_any_stale;
+
+    constexpr
+    operator bool() const { return is_any_stale; }
+  };
+
+  // Helper object for tracking data mutation throughout viewport pipeline, e.g. vertex selection and camera movement
   struct ViewportState {
+  public:
     // Camera properties
     bool camera_matrix;
     bool camera_aspect;
@@ -50,5 +67,11 @@ namespace met {
 
     // Constraint selection in viewport overlay
     bool cstr_selection;
+  
+  public:  
+    bool is_any_stale;
+
+    constexpr
+    operator bool() const { return is_any_stale; }
   };
 } // namespace met

@@ -92,7 +92,7 @@ namespace met {
     }
 
     // Experimental clamping code for vertex modification
-    if (e_pipe_state.any_verts) {
+    if (e_pipe_state.verts) {
       // Get external resources
       const auto &e_chull_mesh = info.resource("gen_color_system_solid", "chull_mesh").read_only<AlignedMeshData>();
       const auto &e_chull_cntr = info.resource("gen_color_system_solid", "chull_cntr").read_only<Colr>();

@@ -11,7 +11,7 @@
 namespace met {
   /* Save states in which project data can exist */
   enum class ProjectSaveState {
-    eUnloaded, // Project is not currently loaded
+    eUnloaded, // Project is not currently loaded by application
     eNew,      // Project has no previous save, is newly created
     eSaved,    // Project has previous save, and has not been modified
     eUnsaved,  // Project has previous save, and has been modified
@@ -66,7 +66,13 @@ namespace met {
     };
 
     // Set of indices of cmfs/illuminants together describing a stored color system
-    struct CSys { uint cmfs, illuminant, n_scatters; };
+    struct CSys { 
+      uint cmfs;
+      uint illuminant;
+      uint n_scatters; 
+
+      friend auto operator<=>(const CSys &, const CSys &) = default;
+    };
 
     // Shorthands used throughout
     using InfoType = ProjectCreateInfo;

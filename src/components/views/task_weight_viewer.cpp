@@ -97,7 +97,7 @@ namespace met {
     // Continue only on relevant state changes
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
-    bool activate_flag = e_pipe_state.any_verts || e_view_state.vert_selection || e_view_state.cstr_selection;
+    bool activate_flag = e_pipe_state.verts || e_view_state.vert_selection || e_view_state.cstr_selection;
     guard(activate_flag);
 
     // Continue only if vertex selection is non-empty
@@ -139,7 +139,7 @@ namespace met {
     // Update vertex data, given any state change
     ColrSystem csys = e_proj_data.csys(mapping_i);
     for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
-      guard_continue(activate_flag || e_pipe_state.verts[i].any);
+      guard_continue(activate_flag || e_pipe_state.verts[i]);
       m_vert_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
       m_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }

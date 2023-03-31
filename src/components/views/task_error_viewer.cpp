@@ -68,7 +68,7 @@ namespace met {
 
   void ErrorViewerTask::eval_error(SchedulerHandle &info) {
     // Continue only on relevant state changes
-    guard(info.resource("state", "pipeline_state").read_only<ProjectState>().any);
+    guard(info.resource("state", "pipeline_state").read_only<ProjectState>().is_any_stale);
 
     // Get external resources
     const auto &e_color_input  = info("gen_convex_weights", "colr_buffer").read_only<gl::Buffer>();

@@ -27,7 +27,7 @@ namespace met {
 
   bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info("state", "pipeline_state").read_only<ProjectState>().any_verts;
+    return info("state", "pipeline_state").read_only<ProjectState>().verts;
   }
   
   void GenSpectralDataTask::eval(SchedulerHandle &info) {
@@ -46,7 +46,7 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < i_spectra.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
-      guard_continue(e_pipe_state.verts[i].any);
+      guard_continue(e_pipe_state.verts[i]);
 
       // Relevant vertex data
       auto &vert = e_proj_data.verts[i];   

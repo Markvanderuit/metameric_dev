@@ -131,7 +131,7 @@ namespace met {
     const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
     const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
     
-    return e_pipe_state.verts[e_vert_slct[0]].any || e_view_state.vert_selection || e_view_state.cstr_selection;
+    return e_pipe_state.verts[e_vert_slct[0]] || e_view_state.vert_selection || e_view_state.cstr_selection;
   }
   
   void GenMismatchSolidTask::eval(SchedulerHandle &info) {

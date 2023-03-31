@@ -9,75 +9,105 @@
 
 namespace met {
   namespace detail {
-    using CacheVert = ProjectState::CacheVert;
-    using CompareTuple = std::tuple<std::vector<bool>, bool>;
-
     template <typename T>
-    bool compare_func(const T &in, T &out) {
+    bool compare_object(const T &in, T &out) {
       guard(out != in, false);
       out = in;
       return true;
     }
 
     template <typename T, typename T_>
-    bool compare_func(const std::pair<T, T_> &in, std::pair<T, T_> &out) {
-      return compare_func(in.first, out.first) || compare_func(in.second, out.second);
+    bool compare_object(const std::pair<T, T_> &in, std::pair<T, T_> &out) {
+      return compare_object(in.first, out.first) || compare_object(in.second, out.second);
     }
 
     template <>
-    bool compare_func<ProjectData::CSys>(const ProjectData::CSys &in, ProjectData::CSys &out) {
-      guard(in.cmfs != out.cmfs || in.illuminant != out.illuminant || in.n_scatters != out.n_scatters, false);
+    bool compare_object<ProjectData::CSys>(const ProjectData::CSys &in, ProjectData::CSys &out) {
+      guard(out != in, false);
       out = in;
       return true;
     }
 
-    #define decl_compare_func_eig(T)              \
-      template <>                                 \
-      bool compare_func<T>(const T &in, T &out) { \
-        guard (!out.isApprox(in), false);         \
-        out = in;                                 \
-        return true;                              \
+    // Overrides for eigen types
+    #define decl_compare_object_eig(T)              \
+      template <>                                   \
+      bool compare_object<T>(const T &in, T &out) { \
+        guard (!out.isApprox(in), false);           \
+        out = in;                                   \
+        return true;                                \
+      }
+    decl_compare_object_eig(CMFS);
+    decl_compare_object_eig(Spec);
+    decl_compare_object_eig(eig::Array3u);
+    decl_compare_object_eig(eig::Array4u);
+    decl_compare_object_eig(eig::Array3f);
+    decl_compare_object_eig(eig::Matrix4f);
+    decl_compare_object_eig(eig::Vector2f);
+
+    template <typename ReturnObject, typename T>
+    ReturnObject compare_vector(const std::vector<T> &in, std::vector<T> &out) {
+      met_trace();
+      
+      ReturnObject object;
+      object.is_stale.resize(in.size(), true);
+
+      if (in.size() == out.size()) {
+        // Handle simplest (non-resize) case first
+        for (uint i = 0; i < in.size(); ++i)
+          object[i] = compare_object(in[i], out[i]);
+        object.is_any_stale = std::reduce(range_iter(object.is_stale), false, std::logical_or<bool>());
+      } else {
+        // Handle potential resize
+        size_t min_r = std::min(out.size(), in.size()), 
+               max_r = std::max(out.size(), in.size());
+        out.resize(in.size());
+        
+        // Only compare for smaller range of remaining elements
+        for (uint i = 0; i < min_r; ++i)
+          object[i] = compare_object(in[i], out[i]);
+          
+        // Potential added elements always have state as 'true'
+        for (uint i = min_r; i < max_r; ++i)
+          out[i] = in[i];
+        
+        object.is_any_stale = true;
       }
 
-    decl_compare_func_eig(CMFS);
-    decl_compare_func_eig(Spec);
-    decl_compare_func_eig(eig::Array3u);
-    decl_compare_func_eig(eig::Array4u);
-    decl_compare_func_eig(eig::Array3f);
-    decl_compare_func_eig(eig::Matrix4f);
-    decl_compare_func_eig(eig::Vector2f);
-
-    template <typename T>
-    CompareTuple compare_state(const std::vector<T> &in,
-                                     std::vector<T> &out) {
-      std::vector<bool> state(in.size(), true);
-      if (in.size() != out.size()) {
-        out = in;
-        return { state, true };
-      }
-      for (uint i = 0; i < in.size(); ++i)
-        state[i] = compare_func(in[i], out[i]);
-      return { state,  std::reduce(range_iter(state), false, std::logical_or<bool>()) };
+      return object;
     }
 
-    CacheVert compare_and_set_vert(const ProjectData::Vert &in, ProjectData::Vert &out) {
-      CacheVert state;
-      state.colr_i = compare_func(in.colr_i, out.colr_i);
-      state.csys_i = compare_func(in.csys_i, out.csys_i);
-      std::tie(state.colr_j, state.any_colr_j) = compare_state(in.colr_j, out.colr_j);
-      std::tie(state.csys_j, state.any_csys_j) = compare_state(in.csys_j, out.csys_j);
-      state.any = state.colr_i || state.csys_i || state.any_colr_j || state.any_csys_j;
-      return state;
+    ProjectVertState compare_object(const ProjectData::Vert &in, ProjectData::Vert &out) {
+      met_trace();
+      
+      ProjectVertState object;
+
+      object.colr_i = compare_object(in.colr_i, out.colr_i);
+      object.csys_i = compare_object(in.csys_i, out.csys_i);
+      object.colr_j = compare_vector<VectorState<uint>>(in.colr_j, out.colr_j);
+      object.csys_j = compare_vector<VectorState<uint>>(in.csys_j, out.csys_j);
+
+      object.is_any_stale = object.colr_i || object.csys_i || object.colr_j || object.csys_j;
+
+      return object;
     }
 
-    std::vector<CacheVert> compare_and_set_all_vert(const std::vector<ProjectData::Vert> &in,
-                                                          std::vector<ProjectData::Vert> &out) {
-      std::vector<CacheVert> state(in.size());
+    template <>
+    VectorState<ProjectVertState> compare_vector(const std::vector<ProjectData::Vert> &in, std::vector<ProjectData::Vert> &out) {
+      met_trace();
+
+      VectorState<ProjectVertState> object;
+      object.is_stale.resize(in.size());
+
+      // Handle potential resize
       if (in.size() != out.size())
         out.resize(in.size());
+
+      // compare_object(Vert, Vert) handles internal resizes
       for (uint i = 0; i < in.size(); ++i)
-        state[i] = compare_and_set_vert(in[i], out[i]);
-      return state;
+        object[i] = compare_object(in[i], out[i]);
+      object.is_any_stale = std::reduce(range_iter(object.is_stale), false, std::logical_or<bool>());
+
+      return object;
     }
   }
   
@@ -98,51 +128,53 @@ namespace met {
     const auto &e_vert_mover = info("viewport.input.vert", "mouseover").read_only<std::vector<uint>>();
     const auto &e_cstr_selct = info("viewport.overlay", "constr_selection").read_only<int>();
 
-    // Get modified resources
-    auto &i_view_state = info("viewport_state").writeable<ViewportState>();
-    auto &i_pipe_state = info("pipeline_state").writeable<ProjectState>();
+    // Copies of resources
+    ViewportState view_state;
+    ProjectState  pipe_state;
 
-    // Iterate over all project data
-    bool pre_verts_resize = e_proj_data.verts.size() != m_verts.size();
-    i_pipe_state.verts = detail::compare_and_set_all_vert(e_proj_data.verts, m_verts);
-    std::tie(i_pipe_state.illuminants, i_pipe_state.any_illuminants) = detail::compare_state(e_proj_data.illuminants, m_illuminants);
-    std::tie(i_pipe_state.cmfs,        i_pipe_state.any_cmfs)        = detail::compare_state(e_proj_data.cmfs, m_cmfs);
-    std::tie(i_pipe_state.csys,        i_pipe_state.any_csys)        = detail::compare_state(e_proj_data.color_systems, m_csys);
-    std::tie(i_pipe_state.elems,       i_pipe_state.any_elems)       = detail::compare_state(e_proj_data.elems, m_elems);
+    // Iterate over project data
+    pipe_state.elems       = detail::compare_vector<VectorState<uint>>(e_proj_data.elems, m_elems);
+    pipe_state.cmfs        = detail::compare_vector<VectorState<uint>>(e_proj_data.cmfs, m_cmfs);
+    pipe_state.csys        = detail::compare_vector<VectorState<uint>>(e_proj_data.color_systems, m_csys);
+    pipe_state.illuminants = detail::compare_vector<VectorState<uint>>(e_proj_data.illuminants, m_illuminants);
+    pipe_state.verts       = detail::compare_vector<VectorState<ProjectVertState>>(e_proj_data.verts, m_verts);
 
-    // Post-process fill in some gaps in project state
-    for (uint i = 0; i < i_pipe_state.verts.size(); ++i) {
-      auto &vert_state = i_pipe_state.verts[i];
-      auto &vert_data  = e_proj_data.verts[i];
+    // Post-process; propagate state changes in vertex reference data to vertex state
+    for (uint i = 0; i < pipe_state.verts.size(); ++i) {
+      const auto &vert_data  = e_proj_data.verts[i];
+            auto &vert_state = pipe_state.verts[i];
       
       // If mapping state has become stale, this influenced the flag inside of a vertex as well
-      vert_state.csys_i |= i_pipe_state.csys[vert_data.csys_i];
-      for (uint j = 0; j < vert_state.csys_j.size(); ++j)
-        vert_state.csys_j[j] = vert_state.csys_j[j] | i_pipe_state.csys[vert_data.csys_j[j]];
-      
+      vert_state.csys_i = vert_state.csys_i || pipe_state.csys[vert_data.csys_i];
+      for (uint j = 0; j < vert_state.csys_j.size(); ++j) 
+        vert_state.csys_j[j] = vert_state.csys_j[j] || pipe_state.csys[vert_data.csys_j[j]];
+
       // Update summary flags per vertex
-      vert_state.any_colr_j |= std::reduce(range_iter(vert_state.colr_j), false, [](auto a, auto b) { return a | b; });
-      vert_state.any_csys_j |= std::reduce(range_iter(vert_state.csys_j), false, [](auto a, auto b) { return a | b; });
-      vert_state.any        |= vert_state.colr_i || vert_state.csys_i || vert_state.any_colr_j || vert_state.any_csys_j;
+      vert_state.colr_j.is_any_stale |= std::reduce(range_iter(vert_state.colr_j.is_stale), false, std::logical_or<bool>());
+      vert_state.csys_j.is_any_stale |= std::reduce(range_iter(vert_state.csys_j.is_stale), false, std::logical_or<bool>());
+      vert_state.is_any_stale |= vert_state.colr_i || vert_state.csys_i || vert_state.colr_j || vert_state.csys_j;
     }
+    
+    // Update summary flag across vertices
+    pipe_state.verts.is_any_stale |= std::reduce(range_iter(pipe_state.verts.is_stale), false, std::logical_or<bool>());
 
-    // Set summary flags over all vertices in project state
-    i_pipe_state.any_verts = pre_verts_resize | std::reduce(range_iter(i_pipe_state.verts), false, 
-      [](const auto &a, const auto &b) { return a | b.any; });
+    // Iterate over input and selection data
+    view_state.vert_selection = detail::compare_vector<VectorState<uint>>(e_vert_selct, m_vert_selct).is_any_stale;
+    view_state.vert_mouseover = detail::compare_vector<VectorState<uint>>(e_vert_mover, m_vert_mover).is_any_stale;
+    view_state.cstr_selection = detail::compare_object(e_cstr_selct, m_cstr_selct);
+    view_state.camera_matrix  = detail::compare_object(e_arcball.full().matrix(), m_camera_matrix);
+    view_state.camera_aspect  = detail::compare_object(e_arcball.m_aspect,        m_camera_aspect);
 
-    // Set giant summary flag
-    i_pipe_state.any = i_pipe_state.any_csys  | 
-                       i_pipe_state.any_verts |
-                       i_pipe_state.any_cmfs  |
-                       i_pipe_state.any_illuminants;
+    // Set major summary flags
+    pipe_state.is_any_stale = pipe_state.verts || pipe_state.csys || pipe_state.elems 
+      || pipe_state.cmfs || pipe_state.illuminants;
+    view_state.is_any_stale = view_state.vert_selection || view_state.vert_mouseover 
+      || view_state.cstr_selection || view_state.camera_matrix || view_state.camera_aspect;
 
-    // Iterate over all selection data
-    i_view_state.vert_selection = std::get<1>(detail::compare_state(e_vert_selct, m_vert_selct));
-    i_view_state.vert_mouseover = std::get<1>(detail::compare_state(e_vert_mover, m_vert_mover));
-    i_view_state.cstr_selection = detail::compare_func(e_cstr_selct, m_cstr_selct);
-
-    // Set summary flags over arcball camera state
-    i_view_state.camera_matrix = detail::compare_func(e_arcball.full().matrix(), m_camera_matrix);
-    i_view_state.camera_aspect = detail::compare_func(e_arcball.m_aspect,        m_camera_aspect);
+    // Submit state changes to scheduler objects
+    if (auto rsrc = info("viewport_state"); view_state || rsrc.read_only<ViewportState>())
+      rsrc.writeable<ViewportState>() = view_state;
+    if (auto rsrc = info("pipeline_state"); pipe_state || rsrc.read_only<ProjectState>())
+      rsrc.writeable<ProjectState>() = pipe_state;
   }
 } // namespace met

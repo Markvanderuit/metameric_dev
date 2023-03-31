@@ -16,6 +16,8 @@ namespace ImGui {
   static ImVector<ImRect> s_GroupPanelLabelStack;
 
   void Init(const gl::Window &window, bool dark_mode) {
+    met_trace_full();
+
     guard(!appl_imgui_init);
     appl_imgui_init = true;
 
@@ -54,6 +56,8 @@ namespace ImGui {
   }
 
   void Destr() {
+    met_trace_full();
+
     guard(appl_imgui_init);
     appl_imgui_init = false;
     
@@ -64,6 +68,8 @@ namespace ImGui {
   }
 
   void BeginFrame() {
+    met_trace_full();
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -71,22 +77,30 @@ namespace ImGui {
   }
 
   void DrawFrame() {
+    met_trace_full();
+
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   }
 
   void SpacedSeparator() {
+    met_trace_full();
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
   }
 
   void CloseAnyPopupIfOpen() {
+    met_trace_full();
+
     guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
     ImGui::CloseCurrentPopup();
   }
 
   void CloseAllPopupsIfOpen() {
+    met_trace_full();
+    
     while (true) {
       guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
       ImGui::CloseCurrentPopup();

@@ -55,7 +55,7 @@ namespace met {
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info("state", "pipeline_state").read_only<ProjectState>().any_verts;
+    return info("state", "pipeline_state").read_only<ProjectState>().verts;
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
@@ -82,7 +82,7 @@ namespace met {
 
     // Push stale vertices
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i].any; });
+                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i]; });
     for (uint i : vert_range) {
       m_vert_map[i] = e_proj_data.verts[i].colr_i;
       i_vert_buffer.flush(sizeof(eig::AlArray3f), i * sizeof(eig::AlArray3f));
