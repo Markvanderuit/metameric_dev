@@ -30,7 +30,7 @@ namespace met::detail {
 
   template <typename Ty>
   bool TextureResampleTask<Ty>::is_active(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
     return m_is_mutated || info(m_info.input_key.first, m_info.input_key.second).is_mutated();
   }
 

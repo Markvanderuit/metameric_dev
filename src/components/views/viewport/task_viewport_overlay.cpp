@@ -58,11 +58,18 @@ namespace met {
     m_is_cstr_edit_used = false;
   }
 
+  bool ViewportOverlayTask::is_active(SchedulerHandle &info) {
+    met_trace();
+    // Only spawn any tooltips on non-empty gamut selection; only allow constraint selection
+    // on a single vertex
+    return !info("viewport.input.vert", "selection").read_only<std::vector<uint>>().empty();
+  }
+
   void ViewportOverlayTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_view_state = info.resource("state", "view_state").read_only<ViewportState>();
     const auto &e_window     = info.global("window").read_only<gl::Window>();
     const auto &e_vert_slct  = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &i_cstr_slct  = info.resource("constr_selection").read_only<int>();
@@ -70,9 +77,7 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_verts      = e_proj_data.verts;
 
-    // Only spawn any tooltips on non-empty gamut selection; only allow constraint selection
-    // on a single vertex
-    guard(!e_vert_slct.empty());
+    // Disable constraint view on multiple vertex selection
     if (e_vert_slct.size() > 1)
       info.resource("constr_selection").writeable<int>() = -1;
 

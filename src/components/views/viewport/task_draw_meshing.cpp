@@ -98,13 +98,13 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
+    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // On relevant state change, update mesh buffer data
-    if (e_pipe_state.verts || e_pipe_state.elems) {
+    if (e_proj_state.verts || e_proj_state.elems) {
       if (e_proj_data.verts.size() > m_size_map.size()) {
         std::vector<float> size_init(2 * e_proj_data.verts.size(), vert_deslct_size);
         m_size_buffer = {{ .data = cnt_span<const std::byte>(size_init), .flags = buffer_create_flags }};
@@ -119,7 +119,7 @@ namespace met {
       }
 
       // Copy data to mapped element buffer
-      if (e_pipe_state.elems) {
+      if (e_proj_state.elems) {
         std::ranges::copy(e_proj_data.elems, m_elem_map.begin());
         m_elem_buffer.flush();
       }

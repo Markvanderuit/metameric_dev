@@ -54,15 +54,15 @@ namespace met {
   }
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
-    met_trace_full();
-    return info("state", "pipeline_state").read_only<ProjectState>().verts;
+    met_trace();
+    return info("state", "proj_state").read_only<ProjectState>().verts;
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
@@ -81,8 +81,8 @@ namespace met {
     info.global("appl_data").writeable<ApplicationData>().project_data.elems = elems;
 
     // Push stale vertices
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.verts.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i]; });
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.verts.size()))
+                    | std::views::filter([&](uint i) -> bool { return e_proj_state.verts[i]; });
     for (uint i : vert_range) {
       m_vert_map[i] = e_proj_data.verts[i].colr_i;
       i_vert_buffer.flush(sizeof(eig::AlArray3f), i * sizeof(eig::AlArray3f));

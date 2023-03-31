@@ -55,8 +55,8 @@ namespace met {
 
   bool GenColorMappingTask::is_active(SchedulerHandle &info) {
     met_trace();
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
-    return m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.verts;
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
+    return m_init_stale || e_proj_state.csys[m_mapping_i] || e_proj_state.verts;
   }
 
   void GenColorMappingTask::eval(SchedulerHandle &info) {
@@ -65,7 +65,7 @@ namespace met {
     // Get external resources
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
     const auto &e_vert_spec  = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
 
     // Update uniform data
@@ -82,7 +82,7 @@ namespace met {
     // Push gamut data, given any state change
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
     for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
-      guard_continue(m_init_stale || e_pipe_state.csys[m_mapping_i] || e_pipe_state.verts[i]);
+      guard_continue(m_init_stale || e_proj_state.csys[m_mapping_i] || e_proj_state.verts[i]);
       m_gamut_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
       m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }

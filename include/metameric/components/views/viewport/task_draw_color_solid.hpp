@@ -85,5 +85,6 @@ namespace met {
     DrawColorSolidTask(const std::string &parent);
     void init(SchedulerHandle &info) override;
     void eval(SchedulerHandle &info) override;
+    bool is_active(SchedulerHandle &info) override;
   };
 } // namespace met

@@ -26,7 +26,7 @@ namespace met::detail {
 
   template <typename Ty>
   bool TextureFromBufferTask<Ty>::is_active(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
     auto rsrc = info(m_info.input_key.first, m_info.input_key.second);
     return rsrc.is_init() && rsrc.is_mutated();
   }

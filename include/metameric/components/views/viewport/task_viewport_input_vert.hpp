@@ -20,7 +20,7 @@ namespace met {
     
   public:
     void init(SchedulerHandle &info) override {
-      met_trace_full();
+      met_trace();
 
       // Insert shared resources
       info.resource("selection").set<std::vector<uint>>({ });

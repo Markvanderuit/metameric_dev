@@ -113,8 +113,8 @@ namespace met {
   
   void StateTask::init(SchedulerHandle &info) {
     met_trace();
-    info("pipeline_state").set<ProjectState>({ });
-    info("viewport_state").set<ViewportState>({ });
+    info("proj_state").set<ProjectState>({ });
+    info("view_state").set<ViewportState>({ });
   }
 
   void StateTask::eval(SchedulerHandle &info) {
@@ -130,24 +130,24 @@ namespace met {
 
     // Copies of resources
     ViewportState view_state;
-    ProjectState  pipe_state;
+    ProjectState  proj_state;
 
     // Iterate over project data
-    pipe_state.elems       = detail::compare_vector<VectorState<uint>>(e_proj_data.elems, m_elems);
-    pipe_state.cmfs        = detail::compare_vector<VectorState<uint>>(e_proj_data.cmfs, m_cmfs);
-    pipe_state.csys        = detail::compare_vector<VectorState<uint>>(e_proj_data.color_systems, m_csys);
-    pipe_state.illuminants = detail::compare_vector<VectorState<uint>>(e_proj_data.illuminants, m_illuminants);
-    pipe_state.verts       = detail::compare_vector<VectorState<ProjectVertState>>(e_proj_data.verts, m_verts);
+    proj_state.elems       = detail::compare_vector<VectorState<uint>>(e_proj_data.elems, m_elems);
+    proj_state.cmfs        = detail::compare_vector<VectorState<uint>>(e_proj_data.cmfs, m_cmfs);
+    proj_state.csys        = detail::compare_vector<VectorState<uint>>(e_proj_data.color_systems, m_csys);
+    proj_state.illuminants = detail::compare_vector<VectorState<uint>>(e_proj_data.illuminants, m_illuminants);
+    proj_state.verts       = detail::compare_vector<VectorState<ProjectVertState>>(e_proj_data.verts, m_verts);
 
     // Post-process; propagate state changes in vertex reference data to vertex state
-    for (uint i = 0; i < pipe_state.verts.size(); ++i) {
+    for (uint i = 0; i < proj_state.verts.size(); ++i) {
       const auto &vert_data  = e_proj_data.verts[i];
-            auto &vert_state = pipe_state.verts[i];
+            auto &vert_state = proj_state.verts[i];
       
       // If mapping state has become stale, this influenced the flag inside of a vertex as well
-      vert_state.csys_i = vert_state.csys_i || pipe_state.csys[vert_data.csys_i];
+      vert_state.csys_i = vert_state.csys_i || proj_state.csys[vert_data.csys_i];
       for (uint j = 0; j < vert_state.csys_j.size(); ++j) 
-        vert_state.csys_j[j] = vert_state.csys_j[j] || pipe_state.csys[vert_data.csys_j[j]];
+        vert_state.csys_j[j] = vert_state.csys_j[j] || proj_state.csys[vert_data.csys_j[j]];
 
       // Update summary flags per vertex
       vert_state.colr_j.is_any_stale |= std::reduce(range_iter(vert_state.colr_j.is_stale), false, std::logical_or<bool>());
@@ -156,7 +156,7 @@ namespace met {
     }
 
     // Update summary flag across vertices
-    pipe_state.verts.is_any_stale |= std::reduce(range_iter(pipe_state.verts.is_stale), false, std::logical_or<bool>());
+    proj_state.verts.is_any_stale |= std::reduce(range_iter(proj_state.verts.is_stale), false, std::logical_or<bool>());
 
     // Iterate over input and selection data
     view_state.vert_selection = detail::compare_vector<VectorState<uint>>(e_vert_selct, m_vert_selct).is_any_stale;
@@ -166,15 +166,15 @@ namespace met {
     view_state.camera_aspect  = detail::compare_object(e_arcball.m_aspect,        m_camera_aspect);
 
     // Set major summary flags
-    pipe_state.is_any_stale = pipe_state.verts || pipe_state.csys || pipe_state.elems 
-      || pipe_state.cmfs || pipe_state.illuminants;
+    proj_state.is_any_stale = proj_state.verts || proj_state.csys || proj_state.elems 
+      || proj_state.cmfs || proj_state.illuminants;
     view_state.is_any_stale = view_state.vert_selection || view_state.vert_mouseover 
       || view_state.cstr_selection || view_state.camera_matrix || view_state.camera_aspect;
 
     // Submit state changes to scheduler objects
-    if (auto rsrc = info("viewport_state"); view_state || rsrc.read_only<ViewportState>())
+    if (auto rsrc = info("view_state"); view_state || rsrc.read_only<ViewportState>())
       rsrc.writeable<ViewportState>() = view_state;
-    if (auto rsrc = info("pipeline_state"); pipe_state || rsrc.read_only<ProjectState>())
-      rsrc.writeable<ProjectState>() = pipe_state;
+    if (auto rsrc = info("proj_state"); proj_state || rsrc.read_only<ProjectState>())
+      rsrc.writeable<ProjectState>() = proj_state;
   }
 } // namespace met

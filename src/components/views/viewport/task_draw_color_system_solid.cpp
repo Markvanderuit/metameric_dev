@@ -60,8 +60,8 @@ namespace met {
     met_trace_full();
 
     // Get external state resources
-    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
-    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_proj_state = info.resource("state", "proj_state").read_only<ProjectState>();
+    const auto &e_view_state = info.resource("state", "view_state").read_only<ViewportState>();
 
     // Instantiate new vertex array if mesh data has changed; 
     // this change is extremely rare, so we can afford creating new buffers
@@ -92,7 +92,7 @@ namespace met {
     }
 
     // Experimental clamping code for vertex modification
-    if (e_pipe_state.verts) {
+    if (e_proj_state.verts) {
       // Get external resources
       const auto &e_chull_mesh = info.resource("gen_color_system_solid", "chull_mesh").read_only<AlignedMeshData>();
       const auto &e_chull_cntr = info.resource("gen_color_system_solid", "chull_cntr").read_only<Colr>();
@@ -103,7 +103,7 @@ namespace met {
       
       #pragma omp parallel for
       for (int i = 0; i < e_proj_data.verts.size(); ++i) {
-        guard_continue(e_pipe_state.verts[i].colr_i);
+        guard_continue(e_proj_state.verts[i].colr_i);
         auto &vert = e_proj_data.verts[i];
 
         // Cast a ray through the vertex point towards the mesh centroid;

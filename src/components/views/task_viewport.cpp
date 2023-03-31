@@ -12,7 +12,7 @@
 
 namespace met {
   void ViewportTask::init(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
     info.subtask("begin").init<ViewportBeginTask>();
     info.subtask("overlay").init<ViewportOverlayTask>();
     info.subtask("input").init<ViewportInputTask>();

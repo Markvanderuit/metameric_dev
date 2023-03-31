@@ -60,8 +60,8 @@ namespace met {
     met_trace_full();
 
     // Continue only on relevant state change
-    auto &e_pipe_state = info.get_resource<ProjectState>("state", "pipeline_state");
-    guard(e_pipe_state.any_verts);
+    auto &e_proj_state = info.get_resource<ProjectState>("state", "proj_state");
+    guard(e_proj_state.any_verts);
 
     // Get shared resources
     auto &e_appl_data   = info.get_resource<ApplicationData>(global_key, "appl_data");

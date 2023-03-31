@@ -14,6 +14,7 @@ namespace met {
   public:
     void init(SchedulerHandle &info) override;
     void eval(SchedulerHandle &info) override;
+    bool is_active(SchedulerHandle &info) override;
 
     void eval_overlay_vertex(SchedulerHandle &info, uint i);
     void eval_overlay_sample(SchedulerHandle &info, uint i);

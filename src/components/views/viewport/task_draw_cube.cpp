@@ -78,7 +78,7 @@ namespace met {
 
     // Get shared resources 
     const auto &e_arcball    = info("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

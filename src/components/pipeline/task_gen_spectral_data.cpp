@@ -7,34 +7,29 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
-#include <small_gl/buffer.hpp>
 #include <algorithm>
 #include <execution>
 #include <ranges>
 #include <unordered_set>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size    = 1024u;
-
   void GenSpectralDataTask::init(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     // Submit shared resources 
     info("vert_spec").set<std::vector<Spec>>({ }); // CPU-side generated reflectance spectra for each vertex
   }
 
   bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
-    met_trace_full();
-    return info("state", "pipeline_state").read_only<ProjectState>().verts;
+    met_trace();
+    return info("state", "proj_state").read_only<ProjectState>().verts;
   }
   
   void GenSpectralDataTask::eval(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
     
     // Get external resources
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
@@ -46,7 +41,7 @@ namespace met {
     #pragma omp parallel for
     for (int i = 0; i < i_spectra.size(); ++i) {
       // Ensure that we only continue if gamut is in any way stale
-      guard_continue(e_pipe_state.verts[i]);
+      guard_continue(e_proj_state.verts[i]);
 
       // Relevant vertex data
       auto &vert = e_proj_data.verts[i];   

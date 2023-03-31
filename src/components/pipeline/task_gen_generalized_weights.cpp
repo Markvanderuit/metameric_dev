@@ -53,15 +53,15 @@ namespace met {
   }
 
   bool GenGeneralizedWeightsTask::is_active(SchedulerHandle &info) {
-    met_trace_full();
-    return info("state", "pipeline_state").read_only<ProjectState>().verts;
+    met_trace();
+    return info("state", "proj_state").read_only<ProjectState>().verts;
   }
 
   void GenGeneralizedWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
@@ -70,10 +70,10 @@ namespace met {
     auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
 
     // Describe ranges over stale mesh vertices/elements
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.elems.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.verts[i]; });
-    auto elem_range = std::views::iota(0u, static_cast<uint>(e_pipe_state.elems.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_pipe_state.elems[i]; });
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.elems.size()))
+                    | std::views::filter([&](uint i) -> bool { return e_proj_state.verts[i]; });
+    auto elem_range = std::views::iota(0u, static_cast<uint>(e_proj_state.elems.size()))
+                    | std::views::filter([&](uint i) -> bool { return e_proj_state.elems[i]; });
     
     // Push stale vertices/elements
     for (uint i : vert_range) {

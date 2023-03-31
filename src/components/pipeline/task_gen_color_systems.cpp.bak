@@ -28,14 +28,14 @@ namespace met {
   
   bool GenColorSystemsTask::is_active(SchedulerHandle &info) {
     met_trace_full();
-    return info.resource("state", "pipeline_state").read_only<ProjectState>().any_csys;
+    return info.resource("state", "proj_state").read_only<ProjectState>().any_csys;
   }
 
   void GenColorSystemsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_pipe_state = info.resource("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_proj_state = info.resource("state", "proj_state").read_only<ProjectState>();
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
@@ -50,7 +50,7 @@ namespace met {
     
     // Update specific, stale mapping data
     for (uint i = 0; i < e_proj_data.color_systems.size(); ++i) {
-      guard_continue(e_pipe_state.csys[i]);
+      guard_continue(e_proj_state.csys[i]);
       auto data = UnalColrSystem(e_proj_data.csys(i));
       i_buffer.set(obj_span<const std::byte>(data), sizeof(decltype(data)), i * sizeof(decltype(data)));
     }

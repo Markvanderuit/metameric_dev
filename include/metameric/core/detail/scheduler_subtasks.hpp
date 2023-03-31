@@ -16,7 +16,7 @@ namespace met::detail {
     KeyFuncType m_key_func;
 
     void adjust_to(SchedulerHandle &info, uint n_tasks) {
-      met_trace_full();
+      met_trace();
 
       // Adjust nr. of subtasks upwards if necessary
       for (; m_n_tasks < n_tasks; ++m_n_tasks)
@@ -29,7 +29,7 @@ namespace met::detail {
 
   public:
     void init(SchedulerHandle &info, uint n_tasks, KeyFuncType key_func, AddFuncType add_func) {
-      met_trace_full();
+      met_trace();
 
       // Clear out remaining tasks
       adjust_to(info, 0);
@@ -42,12 +42,12 @@ namespace met::detail {
     }
 
     void eval(SchedulerHandle &info, uint n_tasks) {
-      met_trace_full();
+      met_trace();
       adjust_to(info, n_tasks);
     }
 
     void dstr(SchedulerHandle &info) {
-      met_trace_full();
+      met_trace();
       adjust_to(info, 0);
     }
   };

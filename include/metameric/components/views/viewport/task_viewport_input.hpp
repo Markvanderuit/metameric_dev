@@ -29,7 +29,7 @@ namespace met {
   class ViewportInputTask : public detail::TaskNode {
   public:
     void init(SchedulerHandle &info) override {
-      met_trace_full();
+      met_trace();
     
       // Add subtasks, share resources
       info.subtask("vert").init<ViewportInputVertTask>();

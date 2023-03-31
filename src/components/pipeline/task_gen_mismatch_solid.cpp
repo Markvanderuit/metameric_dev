@@ -121,17 +121,17 @@ namespace met {
   }
 
   bool GenMismatchSolidTask::is_active(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
     
     const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
     const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
 
     guard(e_cstr_slct != -1 && !e_vert_slct.empty(), false);
 
-    const auto &e_view_state = info("state", "viewport_state").read_only<ViewportState>();
-    const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
     
-    return e_pipe_state.verts[e_vert_slct[0]] || e_view_state.vert_selection || e_view_state.cstr_selection;
+    return e_proj_state.verts[e_vert_slct[0]] || e_view_state.vert_selection || e_view_state.cstr_selection;
   }
   
   void GenMismatchSolidTask::eval(SchedulerHandle &info) {

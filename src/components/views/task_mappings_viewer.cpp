@@ -195,7 +195,7 @@ namespace met {
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get shared resources
-      const auto &e_pipe_state = info("state", "pipeline_state").read_only<ProjectState>();
+      const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
       const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
       uint e_mappings_n = e_proj_data.color_systems.size();

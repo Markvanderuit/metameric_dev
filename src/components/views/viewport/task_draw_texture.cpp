@@ -61,7 +61,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources 
-    const auto &e_view_state = info.resource("state", "viewport_state").read_only<ViewportState>();
+    const auto &e_view_state = info.resource("state", "view_state").read_only<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,     false),
