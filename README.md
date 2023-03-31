@@ -6,15 +6,16 @@ This repository contains the implementation of our spectral uplifting toolkit, w
 
 ## Compilation
 
-To build the project, you will need a viable C++20 compiler (MSVC **VN**, Clang **VN**, GCC **VN** should work), OpenGL 4.6 and CMake 3.22+.
-All other dependencies are bundled through submodules and Vcpkg.
-To get started, clone the repository:
+To get started, first clone the repository and submodules.
 
 ```bash
   git clone --recurse-submodules https://github.com/markvanderuit/spectral_uplifting
 ```
 
-Note that some Unix systems may require X11/Wayland development packages to be installed for [GLFW](https://www.glfw.org). Vcpkg tries to provide sufficient information for you to install these, but if you run into any issues, refer to the [GLFW compilation page](https://www.glfw.org/docs/3.3/compile.html).
+To build the project, you will need a viable C++20 compiler (MSVC **VN**, Clang **VN**, GCC **VN** should work), OpenGL 4.6 and CMake 3.22+ or later. All other dependencies are bundled through submodules and Vcpkg.
+
+> **Note** 
+> Some Unix systems may require X11/Wayland development packages to be installed for [GLFW](https://www.glfw.org). Vcpkg tries to provide sufficient information for you to install these, but if you run into any issues, refer to the [GLFW compilation page](https://www.glfw.org/docs/3.3/compile.html).
 
 Next, configure the project using CMake and your compilation path of choice. E.g.
 
