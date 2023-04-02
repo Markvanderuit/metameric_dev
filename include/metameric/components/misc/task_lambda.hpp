@@ -11,38 +11,38 @@ namespace met {
     using EvalType = std::function<void(SchedulerHandle &)>;
     using DstrType = std::function<void(SchedulerHandle &)>;
 
-    InitType _init;
-    EvalType _eval;
-    DstrType _dstr;
+    InitType m_init;
+    EvalType m_eval;
+    DstrType m_dstr;
 
   public:
     LambdaTask(EvalType eval)
-    : _eval(eval) { }
+    : m_eval(eval) { }
 
     LambdaTask(InitType init, EvalType eval)
-    : _init(init), _eval(eval) { }
+    : m_init(init), m_eval(eval) { }
 
     LambdaTask(InitType init, EvalType eval, DstrType dstr)
-    : _init(init), _eval(eval), _dstr(dstr) { }
+    : m_init(init), m_eval(eval), m_dstr(dstr) { }
 
     void init(SchedulerHandle &init_info) override {
       met_trace();
 
-      if (_init)
-        _init(init_info);
+      if (m_init)
+        m_init(init_info);
     }
 
     void eval(SchedulerHandle &eval_info) override {
       met_trace();
 
-      _eval(eval_info);
+      m_eval(eval_info);
     }
 
     void dstr(SchedulerHandle &dstr_info) override {
       met_trace();
 
-      if (_dstr)
-        _dstr(dstr_info);
+      if (m_dstr)
+        m_dstr(dstr_info);
     }
   };
 } // namespace met

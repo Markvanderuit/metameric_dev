@@ -27,14 +27,14 @@ namespace met {
     if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
       m_program = {{ .type = gl::ShaderType::eCompute,
-                    .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.spv",
-                    .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.json" }};
+                     .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.spv",
+                     .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.json" }};
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
     } else {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
       m_program = {{ .type = gl::ShaderType::eCompute,
-                    .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.spv",
-                    .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.json" }};
+                     .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.spv",
+                     .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.json" }};
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
     }
 
@@ -66,16 +66,16 @@ namespace met {
     const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_vert_spec  = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_vert_spec  = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
 
     // Update uniform data
-    if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-      const auto e_delaunay = rsrc.read_only<AlignedDelaunayData>();
-      m_uniform_map->n_verts = e_delaunay.verts.size();
-      m_uniform_map->n_elems = e_delaunay.elems.size();
-    } else {
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       m_uniform_map->n_verts = e_proj_data.verts.size();
       m_uniform_map->n_elems = e_proj_data.elems.size();
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      m_uniform_map->n_verts = e_delaunay.verts.size();
+      m_uniform_map->n_elems = e_delaunay.elems.size();
     }
     m_uniform_buffer.flush();
   
@@ -101,7 +101,7 @@ namespace met {
   }
 
   void GenColorMappingsTask::init(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     // Get external resources
     const auto &e_proj_data = info.global("appl_data").read_only<ApplicationData>().project_data;
@@ -113,7 +113,7 @@ namespace met {
   }
 
   void GenColorMappingsTask::eval(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
     
     // Get external resources
     const auto &e_proj_data = info.global("appl_data").read_only<ApplicationData>().project_data;

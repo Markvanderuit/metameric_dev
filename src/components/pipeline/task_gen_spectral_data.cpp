@@ -17,7 +17,7 @@ namespace met {
     met_trace();
 
     // Submit shared resources 
-    info("vert_spec").set<std::vector<Spec>>({ }); // CPU-side generated reflectance spectra for each vertex
+    info("spectra").set<std::vector<Spec>>({ }); // CPU-side generated reflectance spectra for each vertex
   }
 
   bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
@@ -34,16 +34,16 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_spectra = info("vert_spec").writeable<std::vector<Spec>>();
+    auto &i_spectra = info("spectra").writeable<std::vector<Spec>>();
+
+    // vector-resize is non-destructive on vector growth, and otherwise the spectra need deleting anyways
+    i_spectra.resize(e_proj_data.verts.size()); 
 
     // Generate spectra at stale gamut vertices in parallel
-    i_spectra.resize(e_proj_data.verts.size()); // vector-resize is non-destructive on vector growth
     #pragma omp parallel for
     for (int i = 0; i < i_spectra.size(); ++i) {
-      // Ensure that we only continue if gamut is in any way stale
+      // We only generate a spectrum if the specific vertex is stale
       guard_continue(e_proj_state.verts[i]);
-
-      // Relevant vertex data
       auto &vert = e_proj_data.verts[i];   
 
       // Obtain color system spectra for this vertex
@@ -51,9 +51,8 @@ namespace met {
       std::ranges::transform(vert.csys_j, std::back_inserter(systems), [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
 
       // Obtain corresponding color signal for each color system
-      std::vector<Colr> signals(1 + vert.colr_j.size());
-      signals[0] = vert.colr_i;
-      std::ranges::copy(vert.colr_j, signals.begin() + 1);
+      std::vector<Colr> signals = { vert.colr_i };
+      std::ranges::copy(vert.colr_j, std::back_inserter(signals));
 
       // Generate new spectrum given the above systems+signals as solver constraints
       i_spectra[i] = generate_spectrum({ 

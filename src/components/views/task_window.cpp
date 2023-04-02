@@ -73,7 +73,7 @@ namespace met {
       const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_proj_data   = e_appl_data.project_data;
       const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
-      const auto &e_spectra     = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+      const auto &e_spectra     = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
       const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
 
       // Insert barriers for the following operations

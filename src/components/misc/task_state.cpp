@@ -76,10 +76,10 @@ namespace met {
       return object;
     }
 
-    ProjectVertState compare_object(const ProjectData::Vert &in, ProjectData::Vert &out) {
+    ProjectState::VertState compare_object(const ProjectData::Vert &in, ProjectData::Vert &out) {
       met_trace();
       
-      ProjectVertState object;
+      ProjectState::VertState object;
 
       object.colr_i = compare_object(in.colr_i, out.colr_i);
       object.csys_i = compare_object(in.csys_i, out.csys_i);
@@ -92,10 +92,10 @@ namespace met {
     }
 
     template <>
-    VectorState<ProjectVertState> compare_vector(const std::vector<ProjectData::Vert> &in, std::vector<ProjectData::Vert> &out) {
+    VectorState<ProjectState::VertState> compare_vector(const std::vector<ProjectData::Vert> &in, std::vector<ProjectData::Vert> &out) {
       met_trace();
 
-      VectorState<ProjectVertState> object;
+      VectorState<ProjectState::VertState> object;
       object.is_stale.resize(in.size());
 
       // Handle potential resize
@@ -137,7 +137,7 @@ namespace met {
     proj_state.cmfs        = detail::compare_vector<VectorState<uint>>(e_proj_data.cmfs, m_cmfs);
     proj_state.csys        = detail::compare_vector<VectorState<uint>>(e_proj_data.color_systems, m_csys);
     proj_state.illuminants = detail::compare_vector<VectorState<uint>>(e_proj_data.illuminants, m_illuminants);
-    proj_state.verts       = detail::compare_vector<VectorState<ProjectVertState>>(e_proj_data.verts, m_verts);
+    proj_state.verts       = detail::compare_vector<VectorState<ProjectState::VertState>>(e_proj_data.verts, m_verts);
 
     // Post-process; propagate state changes in vertex reference data to vertex state
     for (uint i = 0; i < proj_state.verts.size(); ++i) {

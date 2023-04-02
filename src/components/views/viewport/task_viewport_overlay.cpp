@@ -167,7 +167,7 @@ namespace met {
     ImGui::PushID(fmt::format("overlay_vertex_{}", i).c_str());
 
     // Get external resources
-    const auto &e_spec      = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>()[i];
+    const auto &e_spec      = info.resource("gen_spectral_data", "spectra").read_only<std::vector<Spec>>()[i];
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &i_cstr_slct = info.resource("constr_selection").read_only<int>();
 
@@ -552,7 +552,7 @@ namespace met {
     // Get external resources
     const auto &e_window    = info.global("window").read_only<gl::Window>();
     const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_spec      = info.resource("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_spec      = info.resource("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.verts;

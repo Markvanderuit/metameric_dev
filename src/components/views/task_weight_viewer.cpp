@@ -114,7 +114,7 @@ namespace met {
     const auto &e_cstr_slct   = info("viewport.overlay", "constr_selection").read_only<int>();
     const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
     const auto &e_elem_buffer = info("gen_convex_weights", "elem_buffer").read_only<gl::Buffer>();
-    const auto &e_vert_spec   = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
 
     // Get modified resources 
     auto &i_colr_buffer = info("colr_buffer").writeable<gl::Buffer>();

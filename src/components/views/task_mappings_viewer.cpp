@@ -42,7 +42,7 @@ namespace met {
     // Get external resources
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
-    const auto &e_vert_spec = info("gen_spectral_data", "vert_spec").read_only<std::vector<Spec>>();
+    const auto &e_vert_spec = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
 
     // Spawn tooltip
     ImGui::BeginTooltip();

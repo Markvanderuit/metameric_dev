@@ -24,28 +24,30 @@ namespace met {
     operator bool() const { return is_any_stale; }
   };
 
-  // Helper object for tracking data mutation in ProjectData::Vert structure
-  struct ProjectVertState {
-    bool              colr_i;
-    bool              csys_i;
-    VectorState<uint> colr_j;
-    VectorState<uint> csys_j;
-
-  public:  
-    bool is_any_stale;
-
-    constexpr
-    operator bool() const { return is_any_stale; }
-  };
-
   // Helper object for tracking data mutation in ProjectData object
   struct ProjectState {
+  public:
+    // Helper object for tracking data mutation in ProjectData::Vert structure
+    struct VertState {
+    public:
+      bool              colr_i;
+      bool              csys_i;
+      VectorState<uint> colr_j;
+      VectorState<uint> csys_j;
+
+    public:  
+      bool is_any_stale;
+
+      constexpr
+      operator bool() const { return is_any_stale; }
+    };
+
   public:  
-    VectorState<ProjectVertState> verts;
-    VectorState<uint>             elems;
-    VectorState<uint>             csys;
-    VectorState<uint>             cmfs;
-    VectorState<uint>             illuminants;
+    VectorState<VertState> verts;
+    VectorState<uint>      elems;
+    VectorState<uint>      csys;
+    VectorState<uint>      cmfs;
+    VectorState<uint>      illuminants;
 
   public:  
     bool is_any_stale;
