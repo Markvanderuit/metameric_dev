@@ -28,7 +28,7 @@ namespace met {
     const size_t pos = e_colr_data.size().x() * m_tooltip_pixel.y() + m_tooltip_pixel.x();
 
     // Perform copy of relevant barycentric data to current available buffer
-    size_t bary_size = e_proj_data.meshing_type == ProjectMeshingType::eDelaunay ? sizeof(eig::Array4f) : sizeof(Bary); 
+    size_t bary_size = e_proj_data.meshing_type == ProjectMeshingType::eConvexHull ? sizeof(Bary) : sizeof(eig::Array4f); 
     e_bary_buffer.copy_to(m_tooltip_buffers[m_tooltip_cycle_i], bary_size, bary_size * pos);
 
     // Submit a fence for current available buffer as it affects mapped memory
@@ -55,9 +55,38 @@ namespace met {
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init())
       fence.cpu_wait();
 
-    // Unpack barycentric weights and get corresponding tetrahedron from delaunay
-    if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-      const auto &e_delaunay = rsrc.read_only<AlignedDelaunayData>();
+    // Unpack correct form of barycentric weights and plot stuff
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
+      const auto &bary_data = std::get<std::span<Bary>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
+    
+      // Compute output reflectance and color as convex combinations
+      Bary bary = bary_data;
+      Spec reflectance = 0;
+      for (uint i = 0; i < e_vert_spec.size(); ++i)
+        reflectance += bary[i] * e_vert_spec[i];
+      ColrSystem mapp  = e_proj_data.csys(texture_i);
+      Colr color = mapp.apply_color_indirect(reflectance);
+      Spec power = mapp.illuminant * reflectance;
+
+      ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
+        nullptr, 0.f, 1.f, { 0.f, 64.f });
+      ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
+        nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
+
+      ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
+
+      ImGui::Separator();
+
+      ImGui::PlotLines("Weights", bary.data(), bary.size(), 0, 
+        nullptr, 0.f, 1.f, { 0.f, 64.f });
+
+      ImGui::Separator();
+      
+      ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
+      ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
+      ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
       eig::Array4f bary   = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
@@ -83,35 +112,6 @@ namespace met {
 
       ImGui::InputScalarN("Weights", ImGuiDataType_Float, bary.data(), bary.size());
       ImGui::InputScalarN("Indices", ImGuiDataType_U32, elem.data(), elem.size());
-
-      ImGui::Separator();
-      
-      ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
-      ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
-      ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
-    } else {
-      const auto &bary_data = std::get<std::span<Bary>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
-    
-      // Compute output reflectance and color as convex combinations
-      Bary bary = bary_data;
-      Spec reflectance = 0;
-      for (uint i = 0; i < e_vert_spec.size(); ++i)
-        reflectance += bary[i] * e_vert_spec[i];
-      ColrSystem mapp  = e_proj_data.csys(texture_i);
-      Colr color = mapp.apply_color_indirect(reflectance);
-      Spec power = mapp.illuminant * reflectance;
-
-      ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
-        nullptr, 0.f, 1.f, { 0.f, 64.f });
-      ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-        nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
-
-      ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
-
-      ImGui::Separator();
-
-      ImGui::PlotLines("Weights", bary.data(), bary.size(), 0, 
-        nullptr, 0.f, 1.f, { 0.f, 64.f });
 
       ImGui::Separator();
       
@@ -159,12 +159,12 @@ namespace met {
     for (uint i = 0; i < m_tooltip_buffers.size(); ++i) {
       auto &buffer = m_tooltip_buffers[i];
       auto &map    = m_tooltip_maps[i];
-      if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-        buffer = {{ .size = sizeof(eig::Array4f), .flags = create_flags }};
-        map = cast_span<eig::Array4f>(buffer.map(map_flags));
-      } else {
+      if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
         buffer = {{ .size = sizeof(Bary), .flags = create_flags }};
         map = cast_span<Bary>(buffer.map(map_flags));
+      } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+        buffer = {{ .size = sizeof(eig::Array4f), .flags = create_flags }};
+        map = cast_span<eig::Array4f>(buffer.map(map_flags));
       }
     }
 

@@ -19,7 +19,7 @@ namespace met {
     info.subtask("end").init<ViewportEndTask>();
     info.subtask("draw_begin").init<ViewportDrawBeginTask>();
     info.subtask("draw_color_system_solid").init<ViewportDrawColorSystemSolid>();
-    info.subtask("draw_delaunay").init<ViewportDrawMeshingTask>();
+    info.subtask("draw_meshing").init<ViewportDrawMeshingTask>();
     info.subtask("draw_texture").init<ViewportDrawTextureTask>();
     info.subtask("draw_end").init<ViewportDrawEndTask>();
   }

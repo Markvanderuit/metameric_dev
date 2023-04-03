@@ -47,8 +47,8 @@ namespace met {
 
     // Initialize buffer holding barycentric weights
     info("colr_buffer").set(std::move(colr_buffer)); // OpenGL buffer storing texture color positions
-    info("vert_buffer").set(std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
-    info("elem_buffer").set(std::move(elem_buffer)); // OpenGL buffer storing delaunay tetrahedral elements
+    info("vert_buffer").set(std::move(vert_buffer)); // OpenGL buffer storing mesh vertex positions
+    info("elem_buffer").set(std::move(elem_buffer)); // OpenGL buffer storing mesh element indices
     info("bary_buffer").init<gl::Buffer>({ .size = dispatch_n * sizeof(Bary) }); // Convex weights
   }
 

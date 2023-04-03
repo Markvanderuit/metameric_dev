@@ -24,17 +24,17 @@ namespace met {
     const uint dispatch_n    = e_appl_data.loaded_texture.size().prod();
 
     // Initialize dispatch objects
-    if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
-      m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.spv",
-                     .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.json" }};
-      m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
-    } else {
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
       m_program = {{ .type = gl::ShaderType::eCompute,
                      .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.spv",
                      .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.json" }};
+      m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
+      m_program = {{ .type = gl::ShaderType::eCompute,
+                     .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.spv",
+                     .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.json" }};
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
     }
 

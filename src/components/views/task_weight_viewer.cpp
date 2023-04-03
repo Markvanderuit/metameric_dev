@@ -15,20 +15,21 @@ namespace met {
 
     // Get external resources
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_data = e_appl_data.project_data;
 
     // Initialize objects for shader call
     const uint dispatch_n = e_appl_data.loaded_texture.size().prod();
-    if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
-      m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/viewport/draw_weights_delaunay.comp.spv",
-                     .cross_path = "resources/shaders/viewport/draw_weights_delaunay.comp.json" }};
-      m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
-    } else {
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / generalized_weights);
       m_program = {{ .type = gl::ShaderType::eCompute,
                      .spirv_path = "resources/shaders/viewport/draw_weights_generalized.comp.spv",
                      .cross_path = "resources/shaders/viewport/draw_weights_generalized.comp.json" }};
+      m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
+      m_program = {{ .type = gl::ShaderType::eCompute,
+                     .spirv_path = "resources/shaders/viewport/draw_weights_delaunay.comp.spv",
+                     .cross_path = "resources/shaders/viewport/draw_weights_delaunay.comp.json" }};
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
     }
 
@@ -123,13 +124,13 @@ namespace met {
     uint mapping_i = e_cstr_slct >= 0 ? e_proj_data.verts[e_selection[0]].csys_j[e_cstr_slct] : 0;
 
     // Update uniform data
-    if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-      const auto e_delaunay = rsrc.read_only<AlignedDelaunayData>();
-      m_unif_map->n_verts = e_delaunay.verts.size();
-      m_unif_map->n_elems = e_delaunay.elems.size();
-    } else {
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       m_unif_map->n_verts = e_proj_data.verts.size();
       m_unif_map->n_elems = e_proj_data.elems.size();
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      m_unif_map->n_verts = e_delaunay.verts.size();
+      m_unif_map->n_elems = e_delaunay.elems.size();
     }
     m_unif_map->n = e_appl_data.loaded_texture.size().prod();
     std::fill(m_unif_map->selection, m_unif_map->selection + e_proj_data.verts.size(), 0);

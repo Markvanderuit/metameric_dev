@@ -18,9 +18,9 @@ namespace met {
     
     struct UniformBuffer {
       uint n;                        // Nr. of points to dispatch computation for
-      uint n_verts;                  // Nr. of vertices defining delaunay
-      uint n_elems;                  // Nr. of elements defining delaunay
-      eig::Array4u selection[256u];  // Selection flags for vertices in delaunay (support up to 256)
+      uint n_verts;                  // Nr. of vertices defining meshing structure
+      uint n_elems;                  // Nr. of elements defining meshing structure
+      eig::Array4u selection[256u];  // Selection flags for vertices in mesh (support up to 256)
     };
 
     // Local state
