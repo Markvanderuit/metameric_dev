@@ -17,7 +17,11 @@ namespace met {
   enum class ProjectMeshingType {
     // Points on a convex hull, 
     // with generalized barycentric coordinates to determine interior values
-    eConvexHull    
+    eConvexHull, 
+
+    // Points throughout color space, 
+    // with a delaunay tetrahedralization to determine interior values
+    eDelaunay      
   };
 
   /* Wrapper object to hold information for project instantiation */

@@ -90,6 +90,47 @@ namespace met {
     return convert_mesh<HalfedgeMeshData>(convert_mesh<IndexedMeshData>(mesh));
   }
 
+  template <>
+  IndexedMeshData convert_mesh<IndexedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> IndexedMeshData");
+    
+    std::vector<eig::Array3u> elems(4 * mesh.elems.size());
+
+    #pragma omp parallel for
+    for (int i = 0; i < mesh.elems.size(); ++i) {
+      eig::Array4u in = mesh.elems[i];
+      std::array<eig::Array3u, 4> out = { eig::Array3u { in[2], in[1], in[0] }, eig::Array3u { in[3], in[1], in[2] },
+                                          eig::Array3u { in[3], in[2], in[0] }, eig::Array3u { in[3], in[0], in[1] } };
+      std::ranges::copy(out, elems.begin() + 4 *  i);
+    }
+
+    return { mesh.verts, elems };
+  }
+
+  template <>
+  IndexedDelaunayData convert_mesh<IndexedDelaunayData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
+    met_trace_n("AlignedDelaunayData -> IndexedDelaunayData");
+    return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
+  }
+
+  template <>
+  AlignedDelaunayData convert_mesh<AlignedDelaunayData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> AlignedDelaunayData");
+    return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
+  }
+
+  template <>
+  AlignedMeshData convert_mesh<AlignedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
+    met_trace_n("IndexedDelaunayData -> AlignedMeshData");
+    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  }
+
+  template <>
+  AlignedMeshData convert_mesh<AlignedMeshData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
+    met_trace_n("AlignedDelaunayData -> AlignedMeshData");
+    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedDelaunayData>(mesh));
+  }
+
   template <typename Mesh>
   Mesh generate_octahedron() {
     met_trace();
@@ -172,6 +213,46 @@ namespace met {
 
     return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
   }
+  
+  template <typename Mesh, typename Vector>
+  Mesh generate_delaunay(std::span<const Vector> data) {
+    met_trace();
+
+    // Query qhull for a delaunay tetrahedralization structure
+    std::vector<eig::Array3f> input(range_iter(data));
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt Q3");
+    auto qh_verts = qhull.vertexList().toStdVector();
+    auto qh_elems = qhull.facetList().toStdVector();
+
+    // Assign incremental IDs to qh_verts; Qhull does not seem to manage removed vertices properly?
+    #pragma omp parallel for
+    for (int i = 0; i < qh_verts.size(); ++i) 
+      qh_verts[i].getVertexT()->id = i;
+
+    // Assemble indexed data from qhull format
+    std::vector<eig::Array3f> verts(qh_verts.size());
+    std::vector<eig::Array4u> elems(qh_elems.size());
+    std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
+      [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
+
+    // Undo QHull's unnecessary scatter-because-screw-you-aaaaaargh
+    std::vector<uint> vertex_idx(data.size());
+    for (uint i = 0; i < data.size(); ++i) {
+      auto it = std::ranges::find_if(data, [&](const auto &v) { return v.isApprox(verts[i]); });
+      guard_continue(it != data.end());
+      vertex_idx[i] = std::distance(data.begin(), it);
+    }
+    
+    // Build element data
+    std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [&](const auto &el) {
+      eig::Array4u el_;
+      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 
+        [&](const auto &v) { return vertex_idx[v.id()]; });
+      return el_;
+    });
+
+    return convert_mesh<Mesh>(IndexedDelaunayData { std::vector<eig::Array3f>(range_iter(data)), elems });
+  }
 
   template <typename OutputMesh, typename InputMesh>
   OutputMesh simplify_edge_length(const InputMesh &mesh_, float max_edge_length) {
@@ -232,6 +313,12 @@ namespace met {
 
   /* Explicit template instantiations */
   
+#define declare_function_delaunay_output_only(OutputDelaunay)                                         \
+    template                                                                                          \
+    OutputDelaunay generate_delaunay<OutputDelaunay, eig::Array3f>(std::span<const eig::Array3f>);    \
+    template                                                                                          \
+    OutputDelaunay generate_delaunay<OutputDelaunay, eig::AlArray3f>(std::span<const eig::AlArray3f>);
+
   #define declare_function_mesh_output_only(OutputMesh)                                               \
     template                                                                                          \
     OutputMesh generate_octahedron<OutputMesh>();                                                     \
@@ -254,6 +341,8 @@ namespace met {
     declare_function_output_input(OutputMesh, AlignedMeshData)                                        \
     declare_function_output_input(OutputMesh, HalfedgeMeshData)
   
+  declare_function_delaunay_output_only(IndexedDelaunayData)
+  declare_function_delaunay_output_only(AlignedDelaunayData)
   declare_function_all_inputs(IndexedMeshData)
   declare_function_all_inputs(AlignedMeshData)
   declare_function_all_inputs(HalfedgeMeshData)

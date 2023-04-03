@@ -29,6 +29,8 @@ namespace met {
   };
   using IndexedMeshData     = TemplateMeshData<eig::Array3f,   eig::Array3u>;
   using AlignedMeshData     = TemplateMeshData<eig::AlArray3f, eig::Array3u>;
+  using IndexedDelaunayData = TemplateMeshData<eig::Array3f,   eig::Array4u>;
+  using AlignedDelaunayData = TemplateMeshData<eig::AlArray3f, eig::Array4u>;
 
   // Convert between halfedge/indexed/aligned mesh data structures
   template <typename OutputMesh, typename InputMesh>
@@ -47,6 +49,10 @@ namespace met {
   // Returns a convex hull mesh around a set of points in 3D
   template <typename Mesh, typename Vector>
   Mesh generate_convex_hull(std::span<const Vector> data);
+
+  // Returns a set of simplices representing a delaunay triangulation of a set of points in 3D
+  template <typename Mesh, typename Vector>
+  Mesh generate_delaunay(std::span<const Vector> data);
 
   /* Mesh simplification functions */
 
