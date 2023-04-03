@@ -9,7 +9,7 @@ This repository contains the implementation of our spectral uplifting toolkit, w
 To get started, first clone the repository and submodules.
 
 ```bash
-  git clone --recurse-submodules https://github.com/markvanderuit/spectral_uplifting
+  git clone --recurse-submodules https://github.com/markvanderuit/metameric
 ```
 
 To build the project, you will need a viable C++20 compiler (MSVC **VN**, Clang **VN**, GCC **VN** should work), OpenGL 4.6 and CMake 3.22+ or later. All other dependencies are bundled through submodules and Vcpkg.
@@ -22,7 +22,7 @@ Next, configure the project using CMake and your compilation path of choice. E.g
 ```bash
   mkdir build
   cd build
-  cmake ../spectral_uplifting
+  cmake ../metameric
   make
 ```
 
