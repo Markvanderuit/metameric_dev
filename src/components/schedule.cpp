@@ -7,7 +7,6 @@
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
 #include <metameric/components/misc/task_state.hpp>
-#include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
 #include <metameric/components/pipeline/task_gen_generalized_weights.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
@@ -94,11 +93,7 @@ namespace met {
 
     // The following tasks define the color->spectrum uplifting pipeline and dependent data
     scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
-    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
-      scheduler.task("gen_convex_weights").init<GenGeneralizedWeightsTask>();
-    } else {
-      scheduler.task("gen_convex_weights").init<GenDelaunayWeightsTask>();
-    }
+    scheduler.task("gen_convex_weights").init<GenGeneralizedWeightsTask>();
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
     
     // The following tasks define dependent data for the view components

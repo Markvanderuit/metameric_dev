@@ -452,9 +452,6 @@ namespace met::detail {
     case ProjectMeshingType::eConvexHull:
       init_constraints_convex_hull(appl_data, n_interior_samples, images);
       break;
-    case ProjectMeshingType::eDelaunay:
-      init_constraints_points(appl_data, n_interior_samples, images);
-      break;
     }
   }  
 } // namespace met::detail

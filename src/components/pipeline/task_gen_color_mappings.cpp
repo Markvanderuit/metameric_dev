@@ -24,19 +24,11 @@ namespace met {
     const uint dispatch_n    = e_appl_data.loaded_texture.size().prod();
 
     // Initialize dispatch objects
-    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
-      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
-      m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.spv",
-                     .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.json" }};
-      m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
-    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
-      m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.spv",
-                     .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_delaunay.comp.json" }};
-      m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
-    }
+    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
+    m_program = {{ .type = gl::ShaderType::eCompute,
+                    .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.spv",
+                    .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.json" }};
+    m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
 
     // Set up gamut buffer and establish a flushable mapping
     m_gamut_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
@@ -69,14 +61,8 @@ namespace met {
     const auto &e_vert_spec  = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
 
     // Update uniform data
-    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
-      m_uniform_map->n_verts = e_proj_data.verts.size();
-      m_uniform_map->n_elems = e_proj_data.elems.size();
-    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
-      m_uniform_map->n_verts = e_delaunay.verts.size();
-      m_uniform_map->n_elems = e_delaunay.elems.size();
-    }
+    m_uniform_map->n_verts = e_proj_data.verts.size();
+    m_uniform_map->n_elems = e_proj_data.elems.size();
     m_uniform_buffer.flush();
   
     // Push gamut data, given any state change

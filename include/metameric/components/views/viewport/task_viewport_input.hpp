@@ -65,15 +65,8 @@ namespace met {
       ImGui::SetNextWindowSize(overlay_size);
 
       if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
-        // Display mesh data, dependent on what data is available
-        if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-          const auto &e_delaunay = rsrc.read_only<AlignedDelaunayData>();
-          ImGui::Value("Vertices", static_cast<uint>(e_delaunay.verts.size()));
-          ImGui::Value("Elements", static_cast<uint>(e_delaunay.elems.size()));
-        } else {
-          ImGui::Value("Vertices", static_cast<uint>(e_proj_data.verts.size()));
-          ImGui::Value("Elements", static_cast<uint>(e_proj_data.elems.size()));
-        }
+        ImGui::Value("Vertices", static_cast<uint>(e_proj_data.verts.size()));
+        ImGui::Value("Elements", static_cast<uint>(e_proj_data.elems.size()));
 
         // Describe a button whichs adds a vertex
         if (ImGui::Button("Add vertex")) {
