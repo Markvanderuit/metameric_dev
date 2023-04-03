@@ -28,8 +28,8 @@ namespace met {
 
     // Initialize objects for compute dispatch
     m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.spv",
-                   .cross_path = "resources/shaders/gen_barycentric_weights/gen_delaunay_weights.comp.json" }};
+                   .spirv_path = "resources/shaders/pipeline/gen_delaunay_weights.comp.spv",
+                   .cross_path = "resources/shaders/pipeline/gen_delaunay_weights.comp.json" }};
     m_dispatch = { .groups_x = dispatch_ndiv, 
                    .bindable_program = &m_program }; 
 
