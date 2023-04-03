@@ -71,17 +71,17 @@ namespace met {
 
     // Load shader program objects
     m_vert_program = {{ .type = gl::ShaderType::eVertex,   
-                        .spirv_path = "resources/shaders/viewport/draw_meshing_vert.vert.spv",
-                        .cross_path = "resources/shaders/viewport/draw_meshing_vert.vert.json" },
+                        .spirv_path = "resources/shaders/views/draw_meshing_vert.vert.spv",
+                        .cross_path = "resources/shaders/views/draw_meshing_vert.vert.json" },
                       { .type = gl::ShaderType::eFragment, 
-                        .spirv_path = "resources/shaders/viewport/draw_meshing_vert.frag.spv",
-                        .cross_path = "resources/shaders/viewport/draw_meshing_vert.frag.json" }};
+                        .spirv_path = "resources/shaders/views/draw_meshing_vert.frag.spv",
+                        .cross_path = "resources/shaders/views/draw_meshing_vert.frag.json" }};
     m_elem_program = {{ .type = gl::ShaderType::eVertex,   
-                        .spirv_path = "resources/shaders/viewport/draw_meshing_elem.vert.spv",
-                        .cross_path = "resources/shaders/viewport/draw_meshing_elem.vert.json" },
+                        .spirv_path = "resources/shaders/views/draw_meshing_elem.vert.spv",
+                        .cross_path = "resources/shaders/views/draw_meshing_elem.vert.json" },
                       { .type = gl::ShaderType::eFragment, 
-                        .spirv_path = "resources/shaders/viewport/draw_meshing_elem.frag.spv",
-                        .cross_path = "resources/shaders/viewport/draw_meshing_elem.frag.json" }};
+                        .spirv_path = "resources/shaders/views/draw_meshing_elem.frag.spv",
+                        .cross_path = "resources/shaders/views/draw_meshing_elem.frag.json" }};
 
     eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                             ? eig::Array4f { 1, 1, 1, 1 }

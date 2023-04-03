@@ -56,17 +56,17 @@ namespace met {
 
     // Load shader program objects
     m_cnstr_program = {{ .type       = gl::ShaderType::eVertex,   
-                         .spirv_path = "resources/shaders/viewport/draw_point.vert.spv",
-                         .cross_path = "resources/shaders/viewport/draw_point.vert.json" },
+                         .spirv_path = "resources/shaders/views/draw_point.vert.spv",
+                         .cross_path = "resources/shaders/views/draw_point.vert.json" },
                        { .type       = gl::ShaderType::eFragment, 
-                         .spirv_path = "resources/shaders/viewport/draw_point.frag.spv",
-                         .cross_path = "resources/shaders/viewport/draw_point.frag.json" }};
+                         .spirv_path = "resources/shaders/views/draw_point.frag.spv",
+                         .cross_path = "resources/shaders/views/draw_point.frag.json" }};
     m_draw_program = {{ .type       = gl::ShaderType::eVertex,   
-                        .spirv_path = "resources/shaders/viewport/draw_color_array.vert.spv",
-                        .cross_path = "resources/shaders/viewport/draw_color_array.vert.json" },
+                        .spirv_path = "resources/shaders/views/draw_csys.vert.spv",
+                        .cross_path = "resources/shaders/views/draw_csys.vert.json" },
                       { .type       = gl::ShaderType::eFragment, 
-                        .spirv_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.spv",
-                        .cross_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.json" }};
+                        .spirv_path = "resources/shaders/views/draw_csys.frag.spv",
+                        .cross_path = "resources/shaders/views/draw_csys.frag.json" }};
     m_srgb_program = {{ .type       = gl::ShaderType::eCompute,  
                         .glsl_path  = "resources/shaders/misc/texture_resample.comp",
                         .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};

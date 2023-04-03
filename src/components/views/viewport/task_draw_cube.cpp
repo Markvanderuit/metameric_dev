@@ -43,11 +43,11 @@ namespace met {
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/viewport/draw_color_uniform.vert.spv",
-                   .cross_path = "resources/shaders/viewport/draw_color_uniform.vert.json" },
+                   .spirv_path = "resources/shaders/views/draw_color_uniform.vert.spv",
+                   .cross_path = "resources/shaders/views/draw_color_uniform.vert.json" },
                  { .type = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/viewport/draw_color.frag.spv",
-                   .cross_path = "resources/shaders/viewport/draw_color.frag.json" }};
+                   .spirv_path = "resources/shaders/views/draw_color.frag.spv",
+                   .cross_path = "resources/shaders/views/draw_color.frag.json" }};
 
     // Setup objects for instanced quad draw
     m_vert_buffer = {{ .data = cnt_span<const std::byte>(verts) }};

@@ -21,8 +21,8 @@ namespace met {
     const uint dispatch_n = e_appl_data.loaded_texture.size().prod();
     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / generalized_weights);
     m_program = {{ .type = gl::ShaderType::eCompute,
-                    .spirv_path = "resources/shaders/viewport/draw_weights_generalized.comp.spv",
-                    .cross_path = "resources/shaders/viewport/draw_weights_generalized.comp.json" }};
+                    .spirv_path = "resources/shaders/views/draw_weights_generalized.comp.spv",
+                    .cross_path = "resources/shaders/views/draw_weights_generalized.comp.json" }};
     m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
 
     // Initialize relevant buffers and writeable, flushable mapping

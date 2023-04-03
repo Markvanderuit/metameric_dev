@@ -40,11 +40,11 @@ namespace met {
 
     // Setup program for billboard point draw
     m_program = {{ .type       = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/viewport/draw_texture.vert.spv",
-                   .cross_path = "resources/shaders/viewport/draw_texture.vert.json" },
+                   .spirv_path = "resources/shaders/views/draw_texture.vert.spv",
+                   .cross_path = "resources/shaders/views/draw_texture.vert.json" },
                  { .type       = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/viewport/draw_texture.frag.spv",
-                   .cross_path = "resources/shaders/viewport/draw_texture.frag.json" }};
+                   .spirv_path = "resources/shaders/views/draw_texture.frag.spv",
+                   .cross_path = "resources/shaders/views/draw_texture.frag.json" }};
 
     // Specify array and draw object
     m_array = {{ }};

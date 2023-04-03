@@ -26,8 +26,8 @@ namespace met {
     // Initialize dispatch objects
     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
     m_program = {{ .type = gl::ShaderType::eCompute,
-                    .spirv_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.spv",
-                    .cross_path = "resources/shaders/gen_color_mappings/gen_color_mapping_generalized.comp.json" }};
+                    .spirv_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.spv",
+                    .cross_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.json" }};
     m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
 
     // Set up gamut buffer and establish a flushable mapping

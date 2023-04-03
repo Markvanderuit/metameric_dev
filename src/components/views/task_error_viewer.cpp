@@ -114,8 +114,8 @@ namespace met {
     const uint dispatch_n    = e_txtr_data.size().prod();
     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
     m_error_program = {{ .type = gl::ShaderType::eCompute,
-                         .spirv_path = "resources/shaders/misc/buffer_error.comp.spv",
-                         .cross_path = "resources/shaders/misc/buffer_error.comp.json" }};
+                         .spirv_path = "resources/shaders/views/draw_error.comp.spv",
+                         .cross_path = "resources/shaders/views/draw_error.comp.json" }};
     m_error_dispatch = { .groups_x = dispatch_ndiv, 
                          .bindable_program = &m_error_program };
     m_error_uniform = {{ .data = obj_span<const std::byte>(dispatch_n) }};

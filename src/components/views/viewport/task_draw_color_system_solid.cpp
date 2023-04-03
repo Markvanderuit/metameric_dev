@@ -19,11 +19,11 @@ namespace met {
 
     // Setup program object
     m_program = {{ .type = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/viewport/draw_color_array.vert.spv",
-                   .cross_path = "resources/shaders/viewport/draw_color_array.vert.json" },
+                   .spirv_path = "resources/shaders/views/draw_csys.vert.spv",
+                   .cross_path = "resources/shaders/views/draw_csys.vert.json" },
                  { .type = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.spv",
-                   .cross_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.json" }};
+                   .spirv_path = "resources/shaders/views/draw_csys.frag.spv",
+                   .cross_path = "resources/shaders/views/draw_csys.frag.json" }};
    
     // Setup dispatch object for mesh draw, but do not provide mesh data just yet
     m_draw_line = {
