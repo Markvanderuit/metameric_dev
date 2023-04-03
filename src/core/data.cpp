@@ -154,7 +154,15 @@ namespace met {
     project_save   = ProjectSaveState::eSaved;
     project_path   = io::path_with_ext(path, ".json");
     project_data   = io::load_json(path).get<ProjectData>();
-    loaded_texture = io::load_texture2d<Colr>(io::path_with_ext(project_path,".exr"), true);
+
+    // Attempt different texture loads in order
+    auto exts = { ".exr", ".png", ".jpg", ".bmp" };
+    for (auto ext : exts) {
+      fs::path path = io::path_with_ext(project_path, ext);
+      guard_continue(fs::exists(path));
+      loaded_texture = io::load_texture2d<Colr>(path, true);
+      break;
+    }
   }
 
 
