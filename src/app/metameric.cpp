@@ -94,11 +94,11 @@ namespace met {
 } // namespace met
 
 int main() {
-  try {
+  /* try { */
     met::create_application({ .color_mode    = met::ApplicationData::ColorMode::eDark });
-  } catch (const std::exception &e) {
+  /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  }
+  } */
   return EXIT_SUCCESS;
 }
