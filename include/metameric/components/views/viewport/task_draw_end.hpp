@@ -29,7 +29,7 @@ namespace met {
       // Set up draw components for gamma correction
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
       m_program = {{ .type = gl::ShaderType::eCompute, 
-                     .spirv_path = "resources/shaders/misc/texture_resample.comp.spv", 
+                     .glsl_path  = "resources/shaders/misc/texture_resample.comp", 
                      .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping

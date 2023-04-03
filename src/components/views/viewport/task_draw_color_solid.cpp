@@ -68,7 +68,7 @@ namespace met {
                         .spirv_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.spv",
                         .cross_path = "resources/shaders/viewport/draw_color_uniform_alpha.frag.json" }};
     m_srgb_program = {{ .type       = gl::ShaderType::eCompute,  
-                        .spirv_path = "resources/shaders/misc/texture_resample.comp.spv",
+                        .glsl_path  = "resources/shaders/misc/texture_resample.comp",
                         .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
 
     // Create dispatch objects to summarize draw/compute operations
