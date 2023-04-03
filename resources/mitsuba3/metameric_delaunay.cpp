@@ -21,12 +21,6 @@ NAMESPACE_BEGIN(mitsuba)
 
 using uint = unsigned int;
 
-// Generic string conversion routine
-template <typename T> inline std::string to_string(const T& value) {
-    std::ostringstream oss;
-    oss << value;
-    return oss.str();
-
 /* Data block for spectral texture import format */
 struct SpectralData {
   // Resolution of single spectral function
@@ -45,11 +39,11 @@ struct SpectralData {
 };
 
 template <typename Float, typename Spectrum>
-class MetamericTexture final : public Texture<Float, Spectrum> {
+class MetamericDelaunayTexture final : public Texture<Float, Spectrum> {
 public:
   MI_IMPORT_TYPES(Texture)
 
-  MetamericTexture(const Properties &props) : Texture(props) {
+  MetamericDelaunayTexture(const Properties &props) : Texture(props) {
     // Load transform data
     m_transform = props.get<ScalarTransform4f>("to_uv", ScalarTransform4f()).extract();
     if (m_transform != ScalarTransform3f())
@@ -101,9 +95,7 @@ public:
 
     // Wavelength data
     m_spec_sub = data.spec_min;
-    m_spec_div = data.spec_max - data.spec_min;
-    m_spec_size = m_spec_div / static_cast<float>(data.spec_samples);
-    m_func_div = 1.f / static_cast<float>(data.bary_zres);
+    m_spec_div = 1.f / (data.spec_max - data.spec_min);
 
     // Read filter mode
     std::string filter_mode_str = props.string("filter_type", "bilinear");
@@ -139,9 +131,6 @@ public:
     size_t indx_shape[3] = { data.bary_yres, data.bary_xres,    1 };
     size_t bary_shape[3] = { data.bary_yres, data.bary_xres,    4 };
     size_t func_shape[3] = { data.bary_zres, data.spec_samples, 4 };
-
-    // auto indx_tensor = dr::Tensor<mitsuba::DynamicBuffer<UInt32>>(data.indices.data(), 3, indx_shape);
-    // m_indx = { indx_tensor, m_accel, m_accel, filter_mode, wrap_mode };
     m_indx = { TensorXf(indx.data(), 3, indx_shape), m_accel, m_accel, filter_mode, wrap_mode };
     m_bary = { TensorXf(data.weights.data(), 3, bary_shape), m_accel, m_accel, filter_mode, wrap_mode };
     m_func = { TensorXf(data.functions.data(), 3, func_shape), m_accel, m_accel, dr::FilterMode::Linear, dr::WrapMode::Clamp };
@@ -254,7 +243,7 @@ public:
 
   std::string to_string() const override {
     std::ostringstream oss;
-    oss << "MetamericTexture[" << std::endl
+    oss << "MetamericDelaunayTexture[" << std::endl
         << "  name       = \"" << m_name       << "\"," << std::endl
         << "  resolution = \"" << resolution() << "\"," << std::endl
         << "  mean       = "   << m_mean       << "," << std::endl
@@ -298,17 +287,15 @@ protected:
   bool              m_clamp;
   bool              m_accel;
   Float             m_mean;
-
   std::string       m_name;
-  Float             m_spec_size, m_spec_sub, m_spec_div;
-  Float             m_func_div;
+  Float             m_spec_sub, m_spec_div;
 
   // Optional: distribution for importance sampling
   mutable std::mutex m_mutex;
   std::unique_ptr<DiscreteDistribution2D<Float>> m_distr2d;
 };
 
-MI_IMPLEMENT_CLASS_VARIANT(MetamericTexture, Texture)
-MI_EXPORT_PLUGIN(MetamericTexture, "Metameric texture")
+MI_IMPLEMENT_CLASS_VARIANT(MetamericDelaunayTexture, Texture)
+MI_EXPORT_PLUGIN(MetamericDelaunayTexture, "Metameric texture (delaunay)")
 
 NAMESPACE_END(mitsuba)
