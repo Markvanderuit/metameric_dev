@@ -1,4 +1,4 @@
-# Metameric: Spectral Uplifting via Controllable Color Constraints
+# Metameric
 
 ## Introduction
 
