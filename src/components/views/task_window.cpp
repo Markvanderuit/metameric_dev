@@ -70,79 +70,63 @@ namespace met {
 
     if (fs::path path; detail::save_dialog(path, "met")) {
       // Get shared resources
-      const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
-      const auto &e_proj_data   = e_appl_data.project_data;
-      const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
-      const auto &e_spectra     = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
-      const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_proj_data = e_appl_data.project_data;
+      const auto &e_spectra   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
+      const auto &e_weights   = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
 
       // Insert barriers for the following operations
-      gl::sync::memory_barrier( gl::BarrierFlags::eBufferUpdate        | 
-                                gl::BarrierFlags::eShaderStorageBuffer | 
-                                gl::BarrierFlags::eClientMappedBuffer  );
+      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer | gl::BarrierFlags::eClientMappedBuffer);
 
-      // Obtain packed barycentric data from buffer
-      std::vector<eig::Array4f> bary_data(e_bary_buffer.size() / sizeof(float));
-      e_bary_buffer.get_as<eig::Array4f>(bary_data);
+      if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
+        // Obtain barycentric data from buffer
+        std::vector<Bary> bary_data(e_weights.size() / sizeof(Bary));
+        e_weights.get_as<Bary>(bary_data);
 
-      // Pack interleaved spectral data 
-      std::vector<eig::Array4f> spec_data(wavelength_samples * e_delaunay.elems.size());
-      for (uint i = 0; i < e_delaunay.elems.size(); ++i) {
-        const auto &el = e_delaunay.elems[i];
+        for (uint i = 0; i < e_spectra.size(); ++i)
+          fmt::print("{}\n", e_spectra[i]);
 
-        // Gather the four relevant spectra for this element
-        std::array<Spec, 4> el_spectra;
-        std::ranges::transform(el, el_spectra.begin(), [&](uint i) { return e_spectra[i]; });
+        // Save data to specified filepath
+        io::save_spectral_data({
+          .bary_xres = e_appl_data.loaded_texture.size()[0],
+          .bary_yres = e_appl_data.loaded_texture.size()[1],
+          .bary_zres = static_cast<uint>(e_spectra.size()),
+          .functions = cnt_span<const float>(e_spectra),
+          .weights   = cnt_span<const float>(bary_data)
+        }, io::path_with_ext(path, ".met"));
+      } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+        const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
 
-        // Interleave values and scatter into data so four values are accessed in one query
-        for (uint j = 0; j < wavelength_samples; ++j)
-          spec_data[i * wavelength_samples + j] = eig::Array4f {
-            el_spectra[0][j], el_spectra[1][j], el_spectra[2][j], el_spectra[3][j], 
-          };
+        // Obtain barycentric data from buffer
+        std::vector<eig::Array4f> bary_data(e_weights.size() / sizeof(eig::Array4f));
+        e_weights.get_as<eig::Array4f>(bary_data);
+
+        // Pack interleaved spectral data 
+        std::vector<eig::Array4f> spec_data(wavelength_samples * e_delaunay.elems.size());
+        for (uint i = 0; i < e_delaunay.elems.size(); ++i) {
+          const auto &el = e_delaunay.elems[i];
+
+          // Gather the four relevant spectra for this element
+          std::array<Spec, 4> el_spectra;
+          std::ranges::transform(el, el_spectra.begin(), [&](uint i) { return e_spectra[i]; });
+
+          // Interleave values and scatter into data so four values are accessed in one query
+          for (uint j = 0; j < wavelength_samples; ++j) {
+            spec_data[i * wavelength_samples + j] = eig::Array4f {
+              el_spectra[0][j], el_spectra[1][j], el_spectra[2][j], el_spectra[3][j], 
+            };
+          }
+        }
+        
+        // Save data to specified filepath
+        io::save_spectral_data({
+          .bary_xres = e_appl_data.loaded_texture.size()[0],
+          .bary_yres = e_appl_data.loaded_texture.size()[1],
+          .bary_zres = static_cast<uint>(e_delaunay.elems.size()),
+          .functions = cnt_span<float>(spec_data),
+          .weights   = cnt_span<float>(bary_data)
+        }, io::path_with_ext(path, ".met"));
       }
-
-      // Save data to specified filepath
-      io::save_spectral_data({
-        .bary_xres = e_appl_data.loaded_texture.size()[0],
-        .bary_yres = e_appl_data.loaded_texture.size()[1],
-        .bary_zres = static_cast<uint>(e_delaunay.elems.size()),
-        .functions = cnt_span<float>(spec_data),
-        .weights   = cnt_span<float>(bary_data)
-      }, io::path_with_ext(path, ".met"));
-
-/* 
-      // Used sizes
-      const uint func_count  = static_cast<uint>(e_proj_data.vertices.size());
-      const auto weights_res = e_appl_data.loaded_texture_f32.size();
-
-
-      // Obtain padded weight data from buffers
-      std::vector<AlWeight> bary_data(e_bary_buffer.size() / sizeof(AlWeight));
-      e_bary_buffer.get(cnt_span<std::byte>(bary_data));
-
-      // Copy weights without padding to wght_data_out
-      std::vector<float> wght_data_out(bary_data.size() * func_count);
-      #pragma omp parallel for
-      for (int i = 0; i < bary_data.size(); ++i) {
-        std::span<float> in(bary_data[i].data(), func_count);
-        std::span<float> out(wght_data_out.data() + i * func_count, func_count);
-        std::copy(range_iter(in), out.begin());
-      }
-
-      // Obtain (already unpadded) function data from buffers
-      std::vector<Spec> spec_data_out(e_spec_buffer.size() / sizeof(Spec));
-      e_spec_buffer.get(cnt_span<std::byte>(spec_data_out));
-
-      // Save data to specified filepath
-      io::save_spectral_data({
-        .header = {
-          .func_count = func_count, 
-          .wght_xres = weights_res.x(), 
-          .wght_yres = weights_res.y()
-        },
-        .functions = cnt_span<float>(spec_data_out), 
-        .weights   = cnt_span<float>(wght_data_out)
-      }, io::path_with_ext(path, ".met")); */
 
       return true;
     }

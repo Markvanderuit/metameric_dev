@@ -27,8 +27,8 @@ namespace met {
       uint  bary_zres;
 
       // Bulk data
-      std::span<float> functions; // Spectral functions
-      std::span<float> weights;   // Convex weights
+      std::span<const float> functions; // Spectral functions
+      std::span<const float> weights;   // Convex weights
     };
 
     void save_spectral_data(const SpectralData &data, const fs::path &path);
