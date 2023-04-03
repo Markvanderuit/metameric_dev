@@ -116,7 +116,7 @@ namespace met {
     // Insert temporary unimportant tasks
     // submit_schedule_debug(scheduler);
 
-    scheduler.task("frame_end").init<FrameEndTask>();
+    scheduler.task("frame_end").init<FrameEndTask>(true);
   }
   
   void submit_schedule_empty(detail::SchedulerBase &scheduler) {
@@ -124,6 +124,6 @@ namespace met {
     scheduler.clear();
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
-    scheduler.task("frame_end").init<FrameEndTask>();
+    scheduler.task("frame_end").init<FrameEndTask>(false);
   }
 } // namespace met
