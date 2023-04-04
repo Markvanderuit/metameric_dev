@@ -2,14 +2,10 @@
 
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
-#include <filesystem>
 #include <functional>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 
 namespace met {
-  /* Save states in which project data can exist */
+  /* Save states for project data */
   enum class ProjectSaveState {
     eUnloaded, // Project is not currently loaded by application
     eNew,      // Project has no previous save, is newly created

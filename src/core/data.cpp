@@ -1,72 +1,12 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/json.hpp>
-#include <metameric/core/mesh.hpp>
-#include <metameric/core/metamer.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/data.hpp>
 #include <nlohmann/json.hpp>
-#include <omp.h>
 #include <algorithm>
-#include <chrono>
-#include <execution>
-#include <mutex>
-#include <numbers>
-#include <ranges>
-#include <random>
-#include <unordered_map>
 
 namespace met {
-  namespace detail {
-    // Given a random vector in RN bounded to [-1, 1], return a vector
-    // distributed over a gaussian distribution
-    auto inv_gaussian_cdf(const auto &x) {
-      met_trace();
-      auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
-      auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
-      return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
-    }
-    
-    // Given a random vector in RN bounded to [-1, 1], return a uniformly
-    // distributed point on the unit sphere
-    auto inv_unit_sphere_cdf(const auto &x) {
-      met_trace();
-      return inv_gaussian_cdf(x).matrix().normalized().eval();
-    }
-
-    // Generate a set of random, uniformly distributed unit vectors in RN
-    template <uint N>
-    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_interior_samples) {
-      met_trace();
-      
-      using ArrayNf = eig::Array<float, N, 1>;
-      using SeedTy = std::random_device::result_type;
-
-      // Generate separate seeds for each thread's rng
-      std::random_device rd;
-      std::vector<SeedTy> seeds(omp_get_max_threads());
-      for (auto &s : seeds) s = rd();
-
-      std::vector<ArrayNf> unit_dirs(n_interior_samples);
-      #pragma omp parallel
-      {
-        // Initialize separate random number generator per thread
-        std::mt19937 rng(seeds[omp_get_thread_num()]);
-        std::uniform_real_distribution<float> distr(-1.f, 1.f);
-
-        // Draw samples for this thread's range
-        #pragma omp for
-        for (int i = 0; i < unit_dirs.size(); ++i) {
-          ArrayNf v;
-          for (auto &f : v) f = distr(rng);
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(v);
-        }
-      }
-
-      return unit_dirs;
-    }
-  } // namespace detail
-
   namespace io {
     ProjectData load_project(const fs::path &path) {
       met_trace();
