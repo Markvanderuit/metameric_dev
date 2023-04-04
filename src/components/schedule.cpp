@@ -83,6 +83,7 @@ namespace met {
 
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
     debug::check_expr(scheduler.global("appl_data").is_init() && scheduler.global("window").is_init());
+
     const auto &e_appl_data = scheduler.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
@@ -116,9 +117,26 @@ namespace met {
   
   void submit_schedule_empty(detail::SchedulerBase &scheduler) {
     debug::check_expr(scheduler.global("window").is_init());
+    
     scheduler.clear();
+    
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
     scheduler.task("frame_end").init<FrameEndTask>(false);
+  }
+
+  void submit_schedule(detail::SchedulerBase &scheduler) {
+    debug::check_expr(scheduler.global("window").is_init());
+
+    if (auto rsrc = scheduler.global("appl_data"); rsrc.is_init()) {
+      const auto &e_appl_data = rsrc.read_only<ApplicationData>();
+      if (e_appl_data.project_save != ProjectSaveState::eUnloaded) {
+        submit_schedule_main(scheduler);
+      } else {
+        submit_schedule_empty(scheduler);
+      }
+    } else {
+      submit_schedule_empty(scheduler);
+    }
   }
 } // namespace met

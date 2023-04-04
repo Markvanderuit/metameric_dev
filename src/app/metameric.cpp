@@ -14,91 +14,77 @@
 #include <exception>
 
 namespace met {
-  struct ApplicationCreateInfo {
-    // In case of a existing project load
+  // Application settings object with sensible defaults
+  class ApplicationCreateInfo {
+    using ColorMode = ApplicationData::ColorMode;
+
+  public:
+    // Project settings
     fs::path project_path = "";
 
-    // Application color theme
-    ApplicationData::ColorMode color_mode = ApplicationData::ColorMode::eDark;
+    // Window settings
+    eig::Array2u app_size  = { 1680, 1024 };
+    std::string  app_title = "Metameric";
+    ColorMode    app_cmode = ColorMode::eDark;
+
+    // Misc settings
+    fs::path basis_path = "resources/misc/tree.json";
   };
 
-  namespace detail {
-    void init_state(LinearScheduler &scheduler, ApplicationCreateInfo info) {
-      met_trace();
-      
-      ApplicationData data = { .color_mode = info.color_mode };
-      if (!info.project_path.empty()) {
-        data.load(info.project_path);
-      } else {
-        data.unload();
-      }
-      
-      // TODO: remove
-      auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
-      data.loaded_basis = loaded_tree.basis;
-      data.loaded_basis_mean = loaded_tree.basis_mean;
-
-      scheduler.global("appl_data").set(std::move(data));
-    }
-
-    void init_schedule(LinearScheduler &scheduler) {
-      auto &app_data = scheduler.global("appl_data").writeable<ApplicationData>();
-      if (app_data.project_save == ProjectSaveState::eSaved) {
-        submit_schedule_main(scheduler);
-      } else {
-        submit_schedule_empty(scheduler);
-      }
-    }
-  } // namespace detail                 
-
   void create_application(ApplicationCreateInfo info) {
-    fmt::print("Metameric format\n  min : {} nm\n  max : {} nm\n  samples: {}\n",
-      wavelength_min, wavelength_max, wavelength_samples);
+    fmt::print(
+      "Starting Metameric\n  range   : {}-{} nm\n  samples : {}\n  bases   : {}\n  loading : {}\n",
+      wavelength_min, wavelength_max, wavelength_samples, wavelength_bases, info.project_path.string());
 
-    // Scheduler is responsible for handling application tasks and resources
+    // Scheduler is responsible for handling application tasks, resources, and runtime loop
     LinearScheduler scheduler;
 
-    // Initialize OpenGL context (and primary window) and submit to scheduler
+    // Initialize window (OpenGL context), as a resource owned by the scheduler
     auto &window = scheduler.global("window").init<gl::Window>({ 
-      .size  = { 1680, 1024 }, 
-      .title = "Metameric",
-      .flags = gl::WindowCreateFlags::eVisible
-             | gl::WindowCreateFlags::eFocused   
-             | gl::WindowCreateFlags::eDecorated
-             | gl::WindowCreateFlags::eResizable
-             | gl::WindowCreateFlags::eMSAA               // Enable support for MSAA framebuffers
-#if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
-             | gl::WindowCreateFlags::eDebug              // Enable support for OpenGL debug output
-#endif
+      .size  = info.app_size, 
+      .title = info.app_title, 
+      .flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eFocused 
+             | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
+             | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
     }).writeable<gl::Window>();
 
-    // Enable OpenGL debug messages, ignoring notification-type messages
-#if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
-    gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
-    gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
-#endif
+    // Initialize OpenGL debug messages, if requested
+    if constexpr (met_enable_debug) {
+      gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
+      gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
+    }
 
-    ImGui::Init(window, info.color_mode == ApplicationData::ColorMode::eDark);
-    
-    // Initialize major application components on startup
-    detail::init_state(scheduler, info);
-    detail::init_schedule(scheduler);
+    // Initialize application data component, as a resource owned by the scheduler
+    auto loaded_tree = io::load_json(info.basis_path).get<BasisTreeNode>();
+    auto &appl_data = scheduler.global("appl_data").set<ApplicationData>({
+      .loaded_basis      = loaded_tree.basis,
+      .loaded_basis_mean = loaded_tree.basis_mean,
+      .color_mode        = info.app_cmode
+    }).writeable<ApplicationData>();
 
-    // Main runtime loop
+    // Load project data if a path is provided
+    if (!info.project_path.empty())
+      appl_data.load(info.project_path);
+
+    // Initialize ImGui for UI components
+    ImGui::Init(window, info.app_cmode == ApplicationData::ColorMode::eDark);
+
+    // Create and start runtime loop
+    submit_schedule(scheduler);
     while (!window.should_close())
       scheduler.run();
     
-    // Tear down remaining components
+    // Tear down ImGui
     ImGui::Destr();
   }
 } // namespace met
 
 int main() {
-  /* try { */
-    met::create_application({ .color_mode    = met::ApplicationData::ColorMode::eDark });
-  /* } catch (const std::exception &e) {
+  try {
+    met::create_application({});
+  } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  } */
+  }
   return EXIT_SUCCESS;
 }

@@ -117,7 +117,7 @@ namespace met {
     gl::Program::unbind_all();
 
     // Empty application data as project is closed
-    info.global("appl_data").writeable<ApplicationData>().unload();
+    info.global("appl_data").writeable<ApplicationData>().clear();
     
     // Signal schedule re-creation and submit empty schedule for main view
     submit_schedule_empty(info);
@@ -141,7 +141,7 @@ namespace met {
     ImGui::CloseAnyPopupIfOpen();
 
     // Empty application data as project is closed
-    info.global("appl_data").writeable<ApplicationData>().unload();
+    info.global("appl_data").writeable<ApplicationData>().clear();
 
     // Signal to window that it should close itself
     info.global("window").writeable<gl::Window>().set_should_close();

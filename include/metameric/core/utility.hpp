@@ -33,6 +33,18 @@
   T(T &&o) noexcept { met_trace(); swap(o); }                                 \
   inline T & operator= (T &&o) noexcept { met_trace(); swap(o); return *this; }
 
+// Utility debug shorthands
+#if defined(NDEBUG) || defined(MET_ENABLE_EXCEPTIONS)
+  #define met_debug_is_enabled
+  #define met_debug_insert(x)    x
+  #define met_debug_select(x, y) x
+  #define met_enable_debug       true
+#else
+  #define met_debug_insert(x)
+  #define met_debug_select(x, y) y
+  #define met_enable_debug       false
+#endif
+
 namespace met {
   // Interpret a container type as a span of type T
   template <class T, class C>

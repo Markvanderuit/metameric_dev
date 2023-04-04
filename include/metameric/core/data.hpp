@@ -107,11 +107,11 @@ namespace met {
     Basis       loaded_basis;       // Basis functions obtained through PCA of measured spectra
     Spec        loaded_basis_mean;  // Mean of basis functions obtained through PCA of measured spectra
 
-  public: /* project management; create/load/save/unload */
+  public: /* project management; create/load/save/clear */
     void create(ProjectCreateInfo &&info); // Create project from info object
     void load(const fs::path &path);       // Load project data from path
     void save(const fs::path &path);       // Save project data to path
-    void unload();                         // Unload project data
+    void clear();                         // Unload project data
   
   public: /* project history and data modification */
     struct ProjectMod {

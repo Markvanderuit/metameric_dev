@@ -106,7 +106,7 @@ namespace met {
   }
 
 
-  void ApplicationData::unload() {
+  void ApplicationData::clear() {
     met_trace();
 
     clear_mods();
