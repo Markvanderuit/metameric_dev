@@ -1,11 +1,10 @@
+#include <metameric/core/data.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/data.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/pipeline/task_gen_spectral_data.hpp>
 #include <algorithm>
 #include <execution>
@@ -36,7 +35,7 @@ namespace met {
     // Get modified resources
     auto &i_spectra = info("spectra").writeable<std::vector<Spec>>();
 
-    // vector-resize is non-destructive on vector growth, and otherwise the spectra need deleting anyways
+    // Resize is non-destructive on growth, and otherwise data needs deleting anyways
     i_spectra.resize(e_proj_data.verts.size()); 
 
     // Generate spectra at stale gamut vertices in parallel

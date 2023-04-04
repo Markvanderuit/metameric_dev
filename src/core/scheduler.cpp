@@ -120,7 +120,7 @@ namespace met {
   }
 
   void LinearScheduler::run() {
-    met_trace();
+    met_trace_full();
 
     // Run all current tasks in copy of schedule order
     for (const auto &task_key : std::list<std::string>(m_schedule)) {

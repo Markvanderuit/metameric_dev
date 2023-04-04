@@ -173,7 +173,7 @@ namespace met {
 
     // Compute center of metamer set boundary
     constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
-    auto cntr = std::reduce(std::execution::par_unseq, range_iter(data), Colr(0.f), f_add)
+    Colr cntr = std::reduce(std::execution::par_unseq, range_iter(data), Colr(0.f), f_add)
               / static_cast<float>(data.size());
 
     // Submit mesh data
