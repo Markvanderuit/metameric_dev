@@ -22,24 +22,14 @@ namespace met {
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / generalized_weights);
       m_program = {{ .type = gl::ShaderType::eCompute,
-<<<<<<< HEAD
                      .spirv_path = "resources/shaders/views/draw_weights_generalized.comp.spv",
                      .cross_path = "resources/shaders/views/draw_weights_generalized.comp.json" }};
-=======
-                     .spirv_path = "resources/shaders/viewport/draw_weights_generalized.comp.spv",
-                     .cross_path = "resources/shaders/viewport/draw_weights_generalized.comp.json" }};
->>>>>>> fdfb8c0 (Added full delaunay meshing implementation)
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
       m_program = {{ .type = gl::ShaderType::eCompute,
-<<<<<<< HEAD
                      .spirv_path = "resources/shaders/views/draw_weights_delaunay.comp.spv",
                      .cross_path = "resources/shaders/views/draw_weights_delaunay.comp.json" }};
-=======
-                     .spirv_path = "resources/shaders/viewport/draw_weights_delaunay.comp.spv",
-                     .cross_path = "resources/shaders/viewport/draw_weights_delaunay.comp.json" }};
->>>>>>> fdfb8c0 (Added full delaunay meshing implementation)
       m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program }; 
     }
 
