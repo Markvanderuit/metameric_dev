@@ -107,9 +107,27 @@ namespace met {
                                                        .signals_i  = sign_i, 
                                                        .system_j   = cmfs_j.front(), 
                                                        .samples    = samples_6d });
+    
+      // Compute center of convex hull
+      constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
+      Colr center = std::reduce(std::execution::par_unseq, range_iter(ocs_gen_data), Colr(0.f), f_add)
+                  / static_cast<float>(ocs_gen_data.size());
+      Colr closest = *std::min_element(range_iter(ocs_gen_data), [&](const eig::Vector3f &a, const eig::Vector3f &b) {
+        return (a - center.matrix()).squaredNorm() < (b - center.matrix()).squaredNorm();
+      });
 
-      // Generate a delaunay tesselation of the convex hull
-      auto [del_verts, del_elems] = generate_delaunay<AlignedDelaunayData, eig::Array3f>(ocs_gen_data);
+      // Generate a delaunay tesselation of the convex hull, or collapse to a point
+      std::vector<eig::Array3f> del_verts;
+      std::vector<eig::Array4u> del_elems;
+      if ((closest - center).matrix().norm() > 0.01f) {
+        auto [verts, elems] = generate_delaunay<IndexedDelaunayData, eig::Array3f>(ocs_gen_data);
+        std::tie(del_verts, del_elems) = { verts, elems };
+        del_verts = verts;
+        del_elems = elems;
+      } else {
+        del_verts = { center };
+        del_elems = { };
+      }
 
       // Compute volume of each tetrahedron in delaunay
       std::vector<float> del_volumes(del_elems.size());
@@ -124,20 +142,23 @@ namespace met {
         return nom / 6.f;
       });
 
-      /* // Normalize volume distribution by its sum
-      float del_volume_sum = std::reduce(range_iter(del_volumes));
-      std::for_each(range_iter(del_volumes), [&del_volume_sum](float &f) { f /= del_volume_sum; });
-
-      // Generate cumulative density over normalized volumes
-      std::vector<float> del_cumulative(del_elems.size());
-      std::exclusive_scan(range_iter(del_volumes), del_cumulative.begin(), 0.f); */
-
       // Components for sampling step
       UniformSampler sampler;
       Distribution volume_distr(del_volumes);
 
       // Start drawing samples
       for (uint j = 0; j < n_img_samples; ++j) {
+        if (del_elems.empty()) {
+          i_constraints[j][i] = ProjectData::Vert {
+            .colr_i = vert.colr_i, 
+            .csys_i = 0,           
+            .colr_j = { del_verts[0] },
+            .csys_j = { 1 }
+          };
+
+          continue;
+        }
+
         // First, sample barycentric weights uniformly inside a tetrahedron
         // Src: https://vcg.isti.cnr.it/jgt/tetra.htm
         auto sample_3d = sampler.next_nd<3>();

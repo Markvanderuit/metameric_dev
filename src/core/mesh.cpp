@@ -220,7 +220,7 @@ namespace met {
 
     // Query qhull for a delaunay tetrahedralization structure
     std::vector<eig::Array3f> input(range_iter(data));
-    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt Q3");
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_elems = qhull.facetList().toStdVector();
 

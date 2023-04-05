@@ -11,7 +11,7 @@ namespace met {
   constexpr uint buffer_init_size    = 1024u;
 
   GenRandomColorMappingTask::GenRandomColorMappingTask(uint constraint_i, uint mapping_i)
-  : m_constraint_i(mapping_i),
+  : m_constraint_i(constraint_i),
     m_mapping_i(mapping_i) { }
 
   void GenRandomColorMappingTask::init(SchedulerHandle &info) {
@@ -73,7 +73,6 @@ namespace met {
     const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_proj_state  = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
     const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<
       std::vector<std::vector<ProjectData::Vert>>
     >().at(m_constraint_i);
@@ -94,8 +93,10 @@ namespace met {
     for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
       // guard_continue(m_has_run_once || e_proj_state.csys[m_mapping_i] || e_proj_state.verts[i]);
       m_gamut_map[i] = e_constraints[i].colr_j[0]; // csys.apply_color_indirect(e_vert_spec[i]);
-      m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
+      if (i == 0)
+        fmt::print("{}\n", e_constraints[i].colr_j[0]);
     }
+    m_gamut_buffer.flush();
 
     // Bind required buffers to corresponding targets
     m_program.bind("b_unif", m_uniform_buffer);

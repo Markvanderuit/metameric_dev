@@ -3,12 +3,10 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/core/detail/scheduler_base.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <implot.h>
-#include <small_gl/texture.hpp>
 
 namespace met {
   void MappingsViewerTask::eval_tooltip_copy(SchedulerHandle &info, uint texture_i) {
@@ -183,7 +181,7 @@ namespace met {
     met_trace_full();
     
     if (ImGui::Begin("Mappings viewer")) {
-      // Get shared resources
+      // Get external resources
       const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
       const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
@@ -194,9 +192,9 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
       eig::Array2f texture_size = viewport_size
-                                 * e_appl_data.loaded_texture.size().cast<float>().y()
-                                 / e_appl_data.loaded_texture.size().cast<float>().x()
-                                 * 0.985f / static_cast<float>(n_cols);
+                                * e_appl_data.loaded_texture.size().cast<float>().y()
+                                / e_appl_data.loaded_texture.size().cast<float>().x()
+                                * 0.985f / static_cast<float>(n_cols);
 
       // Adjust nr. of subtasks for texture generation
       m_texture_subtasks.eval(info, e_mappings_n);
