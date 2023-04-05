@@ -3,7 +3,7 @@
 #include <metameric/core/scheduler.hpp>
 
 namespace met {
-  struct GenRandomConstraints : public detail::TaskNode {
+  struct GenRandomConstraintsTask : public detail::TaskNode {
     bool m_has_run_once;
     
     void init(SchedulerHandle &) override;

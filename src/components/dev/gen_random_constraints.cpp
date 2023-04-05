@@ -1,4 +1,5 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
@@ -12,8 +13,8 @@
 #include <ranges>
 
 namespace met {
-  constexpr uint n_attempts   = 16; // Nr. of images to generate
-  constexpr uint n_samples    = 64; // Nr. of samples for color system OCS generation
+  constexpr uint n_img_samples = 16; // Nr. of images to generate
+  constexpr uint n_ocs_samples = 64; // Nr. of samples for color system OCS generation
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -36,7 +37,7 @@ namespace met {
 
     // Generate a set of random, uniformly distributed unit vectors in RN
     inline
-    std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_samples, uint n_dims) {
+    std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_ocs_samples, uint n_dims) {
       met_trace();
 
       // Generate separate seeds for each thread's rng
@@ -45,7 +46,7 @@ namespace met {
       for (auto &s : seeds) 
         s = rd();
 
-      std::vector<eig::ArrayXf> unit_dirs(n_samples);
+      std::vector<eig::ArrayXf> unit_dirs(n_ocs_samples);
 
       #pragma omp parallel
       {
@@ -68,7 +69,7 @@ namespace met {
     // Generate a set of random, uniformly distributed unit vectors in RN
     template <uint N>
     inline
-    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
+    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_ocs_samples) {
       met_trace();
       
       using ArrayNf = eig::Array<float, N, 1>;
@@ -80,7 +81,7 @@ namespace met {
       for (auto &s : seeds) 
         s = rd();
 
-      std::vector<ArrayNf> unit_dirs(n_samples);
+      std::vector<ArrayNf> unit_dirs(n_ocs_samples);
       #pragma omp parallel
       {
         // Initialize separate random number generator per thread
@@ -100,7 +101,7 @@ namespace met {
     }
   } // namespace detail
 
-  void GenRandomConstraints::init(SchedulerHandle &info) {
+  void GenRandomConstraintsTask::init(SchedulerHandle &info) {
     met_trace();
 
     info("constraints").set<std::vector<std::vector<ProjectData::Vert>>>({ });
@@ -108,17 +109,19 @@ namespace met {
     m_has_run_once = false;
   }
 
-  bool GenRandomConstraints::is_active(SchedulerHandle &info) {
+  bool GenRandomConstraintsTask::is_active(SchedulerHandle &info) {
     met_trace();
 
     // Get external resources
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
-    return e_proj_data.color_systems.size() > 1 && !m_has_run_once;
+    return e_proj_data.color_systems.size() > 1 
+      && e_proj_data.color_systems[1].illuminant != 0 
+      && !m_has_run_once;
   }
 
-  void GenRandomConstraints::eval(SchedulerHandle &info) {
+  void GenRandomConstraintsTask::eval(SchedulerHandle &info) {
     met_trace();
     
     // Get external resources
@@ -130,12 +133,12 @@ namespace met {
     auto &i_constraints = info("constraints").writeable<std::vector<std::vector<ProjectData::Vert>>>();
 
     // Resize constraints data to correct format
-    i_constraints.resize(n_attempts);
+    i_constraints.resize(n_img_samples);
     for (auto &constraints : i_constraints)
       constraints.resize(e_verts.size());
 
     // Provide items necessary for fast OCS generation
-    auto samples_6d = detail::gen_unit_dirs_x(n_samples, 6);
+    auto samples_6d = detail::gen_unit_dirs_x(n_ocs_samples, 6);
     std::vector<CMFS> cmfs_i = { e_proj_data.csys(0).finalize_direct() }; // TODO ehhr
     std::vector<CMFS> cmfs_j = { e_proj_data.csys(1).finalize_direct() }; // TODO uhhr
 
@@ -170,20 +173,52 @@ namespace met {
         return nom / 6.f;
       });
 
-      // Normalize volume distribution by its sum
+      /* // Normalize volume distribution by its sum
       float del_volume_sum = std::reduce(range_iter(del_volumes));
       std::for_each(range_iter(del_volumes), [&del_volume_sum](float &f) { f /= del_volume_sum; });
 
       // Generate cumulative density over normalized volumes
       std::vector<float> del_cumulative(del_elems.size());
-      std::exclusive_scan(range_iter(del_volumes), del_cumulative.begin(), 0.f);
+      std::exclusive_scan(range_iter(del_volumes), del_cumulative.begin(), 0.f); */
+
+      // Components for sampling step
+      UniformSampler sampler;
+      Distribution volume_distr(del_volumes);
 
       // Start drawing samples
-      for (uint i = 0; i < n_samples; ++i) {
-        // First, sample a tetrahedron uniformly from the above CDF
+      for (uint j = 0; j < n_img_samples; ++j) {
+        // First, sample barycentric weights uniformly inside a tetrahedron
+        // Src: https://vcg.isti.cnr.it/jgt/tetra.htm
+        auto sample_3d = sampler.next_nd<3>();
+        if (sample_3d.head<2>().sum() > 1.f) {
+          sample_3d.head<2>() = 1.f - sample_3d.head<2>();
+        }
+        if (sample_3d.tail<2>().sum() > 1.f) {
+          float t = sample_3d.z();
+          sample_3d.z() = 1.f - sample_3d.head<2>().sum();
+          sample_3d.y() = 1.f - t;
+        } else if (sample_3d.sum() > 1.f) {
+          float t = sample_3d.z();
+          sample_3d.z() = sample_3d.sum() - 1.f;
+          sample_3d.x() = 1.f - sample_3d.y() - t;
+        }
 
-        // Next, sample a position inside the tetrahedron uniformly
+        // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
+        std::array<eig::Vector3f, 4> p;
+        std::ranges::transform(del_elems[volume_distr.sample(sampler.next_1d())], p.begin(), 
+          [&](uint i) { return del_verts[i]; });
 
+        // Recover sample position using the generated barycentric coordinates
+        eig::Array3f v = p[0] * (1.f - sample_3d.sum())
+                       + p[1] * sample_3d.x() + p[2] * sample_3d.y() + p[3] * sample_3d.z();
+        
+        // Store resulting sample vertex
+        i_constraints[j][i] = ProjectData::Vert {
+          .colr_i = vert.colr_i, 
+          .csys_i = 0,           
+          .colr_j = { v },
+          .csys_j = { 1 }
+        };
       }
     }
 

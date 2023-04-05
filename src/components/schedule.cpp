@@ -20,6 +20,7 @@
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/dev/gen_random_constraints.hpp>
 #include <ranges>
 
 namespace met {
@@ -113,6 +114,9 @@ namespace met {
     scheduler.task("mappings_viewer").init<MappingsViewerTask>();
     scheduler.task("error_viewer").init<ErrorViewerTask>();
     scheduler.task("weight_viewer").init<WeightViewerTask>();
+
+    // The following tasks are in development
+    scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
 
     // Insert temporary unimportant tasks
     // submit_schedule_debug(scheduler);
