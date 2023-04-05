@@ -8,11 +8,8 @@
 #include <metameric/core/state.hpp>
 #include <metameric/components/pipeline/task_gen_mismatch_solid.hpp>
 #include <omp.h>
-#include <algorithm>
 #include <execution>
 #include <numbers>
-#include <random>
-#include <ranges>
 
 namespace met {
   constexpr uint n_samples     = 64;   // Nr. of samples for metamer mismatch volume OCS generation

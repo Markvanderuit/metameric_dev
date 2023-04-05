@@ -6,11 +6,8 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/components/dev/gen_random_constraints.hpp>
 #include <omp.h>
-#include <algorithm>
 #include <execution>
 #include <numbers>
-#include <random>
-#include <ranges>
 
 namespace met {
   constexpr uint n_img_samples = 16; // Nr. of images to generate
@@ -49,27 +46,6 @@ namespace met {
         #pragma omp for
         for (int i = 0; i < unit_dirs.size(); ++i)
           unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd(n_dims));
-      }
-
-      return unit_dirs;
-    }
-
-    // Generate a set of random, uniformly distributed unit vectors in RN
-    template <uint N>
-    inline
-    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
-      met_trace();
-      
-      std::vector<eig::Array<float, N, 1>> unit_dirs(n_samples);
-
-      #pragma omp parallel
-      {
-        // Draw samples for this thread's range with separate sampler per thread
-        // UniformSampler sampler(-1.f, 1.f, seeds[omp_get_thread_num()]);
-        UniformSampler sampler(-1.f, 1.f, static_cast<uint>(omp_get_thread_num()));
-        #pragma omp for
-        for (int i = 0; i < unit_dirs.size(); ++i)
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd<N>());
       }
 
       return unit_dirs;

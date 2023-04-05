@@ -7,10 +7,8 @@
 #include <metameric/core/state.hpp>
 #include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
 #include <omp.h>
-#include <algorithm>
 #include <execution>
 #include <numbers>
-#include <ranges>
 
 namespace met {
   constexpr uint n_samples = 1024; // Nr. of samples for color system OCS generation
@@ -32,25 +30,6 @@ namespace met {
     auto inv_unit_sphere_cdf(const auto &x) {
       met_trace();
       return inv_gaussian_cdf(x).matrix().normalized().eval();
-    }
-
-    // Generate a set of random, uniformly distributed unit vectors in RN
-    inline
-    std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_samples, uint n_dims) {
-      met_trace();
-
-      std::vector<eig::ArrayXf> unit_dirs(n_samples);
-      
-      #pragma omp parallel
-      {
-        // Draw samples for this thread's range with separate sampler per thread
-        UniformSampler sampler(-1.f, 1.f, static_cast<uint>(omp_get_thread_num()));
-        #pragma omp for
-        for (int i = 0; i < unit_dirs.size(); ++i)
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd(n_dims));
-      }
-
-      return unit_dirs;
     }
 
     // Generate a set of random, uniformly distributed unit vectors in RN
