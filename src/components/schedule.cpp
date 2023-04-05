@@ -21,6 +21,7 @@
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/dev/gen_random_constraints.hpp>
+#include <metameric/components/dev/gen_random_color_mappings.hpp>
 #include <ranges>
 
 namespace met {
@@ -117,9 +118,10 @@ namespace met {
 
     // The following tasks are in development
     scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
+    scheduler.task("gen_random_color_mappings").init<GenRandomColorMappingsTask>();
 
     // Insert temporary unimportant tasks
-    // submit_schedule_debug(scheduler);
+    submit_schedule_debug(scheduler);
 
     scheduler.task("frame_end").init<FrameEndTask>(true);
   }
