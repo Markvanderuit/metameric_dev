@@ -1,15 +1,25 @@
 #version 460 core
 
 #include <guard.glsl>
+#include <color.glsl>
 
+// General layout rule declarations
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(binding = 0, std430)  restrict readonly buffer           b_buffer { vec3 data[]; };
+// Image/buffer declarations
+layout(binding = 0, std430)  restrict readonly buffer b_buffer { vec3 data[]; };
 layout(binding = 0, rgba32f) restrict writeonly uniform image2D i_image;
-layout(binding = 0, std140)  uniform b_uniform { uvec2 size; };
+layout(binding = 0, std140)  uniform b_uniform {
+  uvec2 size;
+  bool  lrgb_to_srgb; 
+} unif;
 
 void main() {
-  const uvec2 v = gl_GlobalInvocationID.xy;
-  guard(min(v, size - 1) == v);
-  imageStore(i_image, ivec2(v), vec4(data[size.x * v.y + v.x], 1));
+  const uvec2 i = gl_GlobalInvocationID.xy;
+  guard(min(i, unif.size - 1) == i);
+
+  const uint p = unif.size.x * i.y + i.x;  
+  vec4 v = vec4(data[p], 1);
+
+  imageStore(i_image, ivec2(i), unif.lrgb_to_srgb ? lrgb_to_srgb(v) : v);
 }

@@ -14,6 +14,15 @@ namespace met::detail {
     eig::Array2u dispatch_n    = m_info.texture_info.size;
     eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
 
+    // Instantiate uniform buffer block with provided settings
+    struct UniformBuffer {
+      alignas(8) eig::Array2u size;
+      alignas(4) uint lrgb_to_srgb;
+    } uniform_data { 
+      .size         = dispatch_n, 
+      .lrgb_to_srgb = m_info.lrgb_to_srgb 
+    };
+
     // Initialize objects for texture-to-texture resampling
     m_program = {{ .type       = gl::ShaderType::eCompute,
                     .spirv_path = "resources/shaders/misc/buffer_to_texture_rgba32f.comp.spv",
@@ -21,7 +30,7 @@ namespace met::detail {
     m_dispatch = { .groups_x = dispatch_ndiv.x(),
                    .groups_y = dispatch_ndiv.y(),
                    .bindable_program = &m_program };
-    m_uniform = {{ .data = cnt_span<const std::byte>(dispatch_n) }};
+    m_uniform = {{ .data = obj_span<const std::byte>(uniform_data) }};
   }
 
   template <typename Ty>

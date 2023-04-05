@@ -14,6 +14,7 @@ namespace met::detail {
     StringPair  input_key;             // Key to input resource
     std::string output_key;            // Key to output resource
     TextureInfo texture_info = {};     // Info about output gl texture object
+    bool        lrgb_to_srgb  = false; // Perform gamma correction during conversion
   };
 
   template <class TextureType>

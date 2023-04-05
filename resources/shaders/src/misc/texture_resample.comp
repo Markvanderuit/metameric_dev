@@ -25,9 +25,4 @@ void main() {
   const vec4 v = texture(s_image_r, p);
   
   imageStore(i_image_w, ivec2(i), unif.lrgb_to_srgb ? lrgb_to_srgb(v) : v);
-  
-  // imageStore(i_image_w, ivec2(i), v); 
-  
-  //lrgb_to_srgb(v));
-  // imageStore(i_image_w, ivec2(i), lrgb_to_srgb(v));
 }
