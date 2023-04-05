@@ -14,30 +14,21 @@
 
 namespace met {
   class MappingsViewerTask : public detail::TaskNode {
-    using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
     using TextureSubTask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
-    using BaryVariant     = std::variant<std::span<Bary>, 
-                                         std::span<eig::Array4f>>;
+    using BaryVariant     = std::variant<std::span<Bary>, std::span<eig::Array4f>>;
 
-    // Resample subtask state
     // Texture generation subtasks
-    eig::Array2u                           m_resample_size;
-    detail::Subtasks<TextureSubTask>       m_texture_subtasks;
-    detail::Subtasks<ResampleSubtask>      m_resample_subtasks;
+    detail::Subtasks<TextureSubTask> m_texture_subtasks;
 
     // Set of rolling buffers for continuous data copy, so wait time is minimized
-    std::array<gl::Buffer,              6> m_tooltip_buffers;
-    std::array<gl::sync::Fence,         6> m_tooltip_fences;
-    std::array<BaryVariant, 6>             m_tooltip_maps;
-    uint                                   m_tooltip_cycle_i;
+    std::array<gl::Buffer,      6>   m_tooltip_buffers;
+    std::array<gl::sync::Fence, 6>   m_tooltip_fences;
+    std::array<BaryVariant, 6>       m_tooltip_maps;
+    uint                             m_tooltip_cycle_i;
 
     // Information about what is currently visible in the tooltip
-    eig::Array2i                           m_tooltip_pixel;
-    int                                    m_tooltip_mapping_i;
-
-    // Misc
-    bool                                   m_init_stale;
-
+    eig::Array2i                     m_tooltip_pixel;
+    int                              m_tooltip_mapping_i;
 
     // Delegating functions
     void eval_tooltip_copy(SchedulerHandle &info, uint texture_i);
