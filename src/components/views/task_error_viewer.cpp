@@ -4,7 +4,6 @@
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 
 namespace met {
@@ -124,16 +123,11 @@ namespace met {
     info.resource("colr_buffer").init<gl::Buffer>({ .size = dispatch_n * sizeof(AlColr) });
 
     // Create subtask to handle buffer->texture copy
-    TextureSubtask texture_subtask = {{ .input_key    = { info.task().key(), "colr_buffer" }, .output_key   = "colr_texture",
-                                        .texture_info = { .size = e_txtr_data.size() }}};
-                                
-    // Create subtask to handle texture->texture resampling and gamma correction
-    ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task().key()), "colr_texture" }, .output_key   = "colr_texture",
-                                          .texture_info = { .size = 1u }, .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }}};
-    
-    // Submit subtasks to scheduler
+    TextureSubtask texture_subtask = {{ .input_key    = { info.task().key(), "colr_buffer" }, 
+                                        .output_key   = "colr_texture",
+                                        .texture_info = { .size = e_txtr_data.size() },
+                                        .lrgb_to_srgb = true }};
     info.subtask("gen_texture").set(std::move(texture_subtask));
-    info.subtask("gen_resample").set(std::move(resample_subtask));
   }
 
   void ErrorViewerTask::eval(SchedulerHandle &info) {
@@ -146,10 +140,6 @@ namespace met {
       const auto &e_proj_data = e_appl_data.project_data;
       const auto &e_mappings  = e_proj_data.color_systems;
 
-      // Get subtask names
-      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task().key());
-      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task().key());
-
       // Local state
       bool handle_toolip = false;
 
@@ -159,19 +149,13 @@ namespace met {
       // 2. Handle texture resampling subtask
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
-      float texture_aspect = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
-      auto texture_size    = (viewport_size * texture_aspect).max(1.f).cast<uint>().eval();
-
-      // Ensure the resample subtask can readjust for a resized output texture
-      {
-        auto task = info.subtask("gen_resample");
-        auto mask = task.mask(info);
-        task.realize<ResampleSubtask>().set_texture_info(mask, { .size = texture_size });
-      }
+      float texture_aspect       = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
+      eig::Array2f texture_size  = (viewport_size * texture_aspect).max(1.f).eval();
 
       // 3. Display ImGui components to show error and select mapping
-      if (auto rsrc = info.resource(resample_subtask_name, "colr_texture"); rsrc.is_init()) {
-        ImGui::Image(ImGui::to_ptr(rsrc.read_only<gl::Texture2d4f>().object()), texture_size.cast<float>().eval());
+      auto subtask_name  = fmt::format("{}.gen_texture", info.task().key());
+      if (auto rsrc = info.resource(subtask_name, "colr_texture"); rsrc.is_init()) {
+        ImGui::Image(ImGui::to_ptr(rsrc.read_only<gl::Texture2d4f>().object()), texture_size);
 
         // 4. Signal tooltip and start data copy
         if (ImGui::IsItemHovered()) {

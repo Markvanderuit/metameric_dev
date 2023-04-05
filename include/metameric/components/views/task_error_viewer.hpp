@@ -5,7 +5,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <metameric/components/views/detail/task_texture_from_buffer.hpp>
-#include <metameric/components/views/detail/task_texture_resample.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
@@ -16,7 +15,6 @@
 namespace met {
   class ErrorViewerTask : public detail::TaskNode {
     using TextureSubtask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
-    using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
 
     // Wrapper objects to hold three buffers and attached maps 
     struct TooltipBuffer { gl::Buffer in_a, in_b, out; };
@@ -31,7 +29,6 @@ namespace met {
     // Local state
     uint         m_mapping_i;     // Current selected mapping
     eig::Array2i m_tooltip_pixel; // Selected pixel in tooltip
-    eig::Array2u m_texture_size; // Current output size of texture
 
     // Components for error computation
     gl::Buffer      m_error_uniform;
