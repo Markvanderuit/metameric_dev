@@ -5,7 +5,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <metameric/components/views/detail/task_texture_from_buffer.hpp>
-#include <metameric/components/views/detail/task_texture_resample.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
@@ -14,7 +13,6 @@
 namespace met {
   class WeightViewerTask : public detail::TaskNode {
     using TextureSubtask  = detail::TextureFromBufferTask<gl::Texture2d4f>;
-    using ResampleSubtask = detail::TextureResampleTask<gl::Texture2d4f>;
     
     struct UniformBuffer {
       uint n;                        // Nr. of points to dispatch computation for
@@ -22,9 +20,6 @@ namespace met {
       uint n_elems;                  // Nr. of elements defining meshing structure
       eig::Array4u selection[256u];  // Selection flags for vertices in mesh (support up to 256)
     };
-
-    // Local state
-    eig::Array2u m_texture_size; // Current output size of texture
 
     // Weight sum computation components
     gl::ComputeInfo   m_dispatch;

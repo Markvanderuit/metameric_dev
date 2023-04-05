@@ -35,17 +35,12 @@ namespace met {
     // Initialize buffer object for storing intermediate results
     info("colr_buffer").init<gl::Buffer>({ .size = sizeof(AlColr) * dispatch_n });
 
-    // Create subtask to handle buffer->texture copy
-    TextureSubtask texture_subtask = {{ .input_key  = { info.task().key(), "colr_buffer" }, .output_key = "colr_texture",
-                                        .texture_info = { .size = e_appl_data.loaded_texture.size() }}};
-
-    // Create subtask to handle texture->texture resampling and gamma correction
-    ResampleSubtask resample_subtask = {{ .input_key    = { fmt::format("{}.gen_texture", info.task().key()), "colr_texture" }, .output_key   = "colr_texture",
-                                          .texture_info = { .size = 1u }, .sampler_info = { .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear },
-                                          .lrgb_to_srgb = true}};
-
+    // Create subtask to handle buffer->texture copy and lrgb->srgb conversion
+    TextureSubtask texture_subtask = {{ .input_key    = { info.task().key(), "colr_buffer" }, 
+                                        .output_key   = "colr_texture",
+                                        .texture_info = { .size = e_appl_data.loaded_texture.size() },
+                                        .lrgb_to_srgb = true }};
     info.subtask("gen_texture").set(std::move(texture_subtask));
-    info.subtask("gen_resample").set(std::move(resample_subtask));
   }
 
   void WeightViewerTask::eval(SchedulerHandle &info) {
@@ -56,29 +51,19 @@ namespace met {
       const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_txtr_data = e_appl_data.loaded_texture;
 
-      // Get subtask names
-      auto texture_subtask_name  = fmt::format("{}.gen_texture", info.task().key());
-      auto resample_subtask_name = fmt::format("{}.gen_resample", info.task().key());
-
-      // Weight data is drawn to texture in this function
+      // Weight data is drawn to buffer in this function
       eval_draw(info);
 
-      // Determine texture size
+      // Determine texture size in view
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax().x)
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin().x);
-      float texture_aspect = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
-      m_texture_size       = (viewport_size * texture_aspect).max(1.f).cast<uint>().eval();
-
-      // Ensure the resample subtask can readjust for a resized output texture
-      {
-        auto task = info.subtask("gen_resample");
-        auto mask = task.mask(info);
-        task.realize<ResampleSubtask>().set_texture_info(mask, { .size = m_texture_size });
-      }
+      float texture_aspect       = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
+      eig::Array2f texture_size  = (viewport_size * texture_aspect).max(1.f).eval();
 
       // Display ImGui components
-      if (auto rsrc = info(resample_subtask_name, "colr_texture"); rsrc.is_init()) {
-        ImGui::Image(ImGui::to_ptr(rsrc.read_only<gl::Texture2d4f>().object()), m_texture_size.cast<float>().eval());
+      auto subtask_name = fmt::format("{}.gen_texture", info.task().key());
+      if (auto rsrc = info(subtask_name, "colr_texture"); rsrc.is_init()) {
+        ImGui::Image(ImGui::to_ptr(rsrc.read_only<gl::Texture2d4f>().object()), texture_size);
       }
     }
     ImGui::End();
