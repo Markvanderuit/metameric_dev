@@ -40,6 +40,12 @@ namespace met {
       std::ranges::generate(v, std::bind(&UniformSampler::next_1d, this));
       return v;
     }
+
+    eig::Array<float, -1, 1> next_nd(uint n) {
+      eig::Array<float, -1, 1> v(n);
+      std::ranges::generate(v, std::bind(&UniformSampler::next_1d, this));
+      return v;
+    }
   };
 
   class Distribution {

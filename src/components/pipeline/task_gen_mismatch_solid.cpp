@@ -1,4 +1,5 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/mesh.hpp>
@@ -41,28 +42,15 @@ namespace met {
     std::vector<eig::ArrayXf> gen_unit_dirs_x(uint n_samples, uint n_dims) {
       met_trace();
 
-      using SeedTy = std::random_device::result_type;
-
-      // Generate separate seeds for each thread's rng
-      std::random_device rd;
-      std::vector<SeedTy> seeds(omp_get_max_threads());
-      for (auto &s : seeds) s = rd();
-
       std::vector<eig::ArrayXf> unit_dirs(n_samples);
-
+      
       #pragma omp parallel
       {
-        // Initialize separate random number generator per thread
-        std::mt19937 rng(seeds[omp_get_thread_num()]);
-        std::uniform_real_distribution<float> distr(-1.f, 1.f);
-
-        // Draw samples for this thread's range
+        // Draw samples for this thread's range with separate sampler per thread
+        UniformSampler sampler(-1.f, 1.f, static_cast<uint>(omp_get_thread_num()));
         #pragma omp for
-        for (int i = 0; i < unit_dirs.size(); ++i) {
-          eig::ArrayXf v(n_dims);
-          for (auto &f : v) f = distr(rng);
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(v);
-        }
+        for (int i = 0; i < unit_dirs.size(); ++i)
+          unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd(n_dims));
       }
 
       return unit_dirs;
@@ -74,28 +62,16 @@ namespace met {
     std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
       met_trace();
       
-      using ArrayNf = eig::Array<float, N, 1>;
-      using SeedTy = std::random_device::result_type;
+      std::vector<eig::Array<float, N, 1>> unit_dirs(n_samples);
 
-      // Generate separate seeds for each thread's rng
-      std::random_device rd;
-      std::vector<SeedTy> seeds(omp_get_max_threads());
-      for (auto &s : seeds) s = rd();
-
-      std::vector<ArrayNf> unit_dirs(n_samples);
       #pragma omp parallel
       {
-        // Initialize separate random number generator per thread
-        std::mt19937 rng(seeds[omp_get_thread_num()]);
-        std::uniform_real_distribution<float> distr(-1.f, 1.f);
-
-        // Draw samples for this thread's range
+        // Draw samples for this thread's range with separate sampler per thread
+        // UniformSampler sampler(-1.f, 1.f, seeds[omp_get_thread_num()]);
+        UniformSampler sampler(-1.f, 1.f, static_cast<uint>(omp_get_thread_num()));
         #pragma omp for
-        for (int i = 0; i < unit_dirs.size(); ++i) {
-          ArrayNf v;
-          for (auto &f : v) f = distr(rng);
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(v);
-        }
+        for (int i = 0; i < unit_dirs.size(); ++i)
+          unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd<N>());
       }
 
       return unit_dirs;
