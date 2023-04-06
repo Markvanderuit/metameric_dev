@@ -8,7 +8,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class GenRandomColorMappingTask : public detail::TaskNode {
+  class GenRandomMappingTask : public detail::TaskNode {
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining meshing structure
@@ -27,15 +27,15 @@ namespace met {
     std::span<AlColr> m_gamut_map;
 
   public:
-    GenRandomColorMappingTask(uint constraint_i, uint mapping_i);
+    GenRandomMappingTask(uint constraint_i, uint mapping_i);
 
     void init(SchedulerHandle &) override;
     bool is_active(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
   };
 
-  class GenRandomColorMappingsTask : public detail::TaskNode {
-    detail::Subtasks<GenRandomColorMappingTask> m_mapping_subtasks;
+  class GenRandomMappingsTask : public detail::TaskNode {
+    detail::Subtasks<GenRandomMappingTask> m_mapping_subtasks;
 
   public:
     void init(SchedulerHandle &) override;

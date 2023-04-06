@@ -2,7 +2,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/components/dev/gen_random_color_mappings.hpp>
+#include <metameric/components/dev/task_gen_random_mappings.hpp>
 #include <small_gl/utility.hpp>
 
 namespace met {
@@ -10,11 +10,11 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   constexpr uint buffer_init_size    = 1024u;
 
-  GenRandomColorMappingTask::GenRandomColorMappingTask(uint constraint_i, uint mapping_i)
+  GenRandomMappingTask::GenRandomMappingTask(uint constraint_i, uint mapping_i)
   : m_constraint_i(constraint_i),
     m_mapping_i(mapping_i) { }
 
-  void GenRandomColorMappingTask::init(SchedulerHandle &info) {
+  void GenRandomMappingTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
@@ -54,7 +54,7 @@ namespace met {
     m_has_run_once = false;
   }
 
-  bool GenRandomColorMappingTask::is_active(SchedulerHandle &info) {
+  bool GenRandomMappingTask::is_active(SchedulerHandle &info) {
     met_trace();
 
     // Get external resources
@@ -111,7 +111,7 @@ namespace met {
     m_has_run_once = true;
   }
 
-  void GenRandomColorMappingsTask::init(SchedulerHandle &info) {
+  void GenRandomMappingsTask::init(SchedulerHandle &info) {
     met_trace();
 
     // Get external resources
@@ -120,10 +120,10 @@ namespace met {
     // Add subtasks to perform mapping
     m_mapping_subtasks.init(info, e_constraints.size(), 
       [](uint i)         { return fmt::format("gen_mapping_{}", i); },
-      [](auto &, uint i) { return GenRandomColorMappingTask(i, 1); });
+      [](auto &, uint i) { return GenRandomMappingTask(i, 1); });
   }
 
-  void GenRandomColorMappingsTask::eval(SchedulerHandle &info) {
+  void GenRandomMappingsTask::eval(SchedulerHandle &info) {
     met_trace();
     
     // Get external resources

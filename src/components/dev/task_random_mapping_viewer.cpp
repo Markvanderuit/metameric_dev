@@ -1,7 +1,7 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
-#include <metameric/components/dev/random_mapping_viewer.hpp>
+#include <metameric/components/dev/task_random_mapping_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
