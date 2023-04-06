@@ -1,6 +1,5 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
@@ -43,7 +42,7 @@ namespace met {
     for (int i = 0; i < i_spectra.size(); ++i) {
       // We only generate a spectrum if the specific vertex is stale
       guard_continue(e_proj_state.verts[i]);
-      auto &vert = e_proj_data.verts[i];   
+      const auto &vert = e_proj_data.verts[i];   
 
       // Obtain color system spectra for this vertex
       std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_spectra[i]) };
@@ -59,7 +58,7 @@ namespace met {
         .basis_mean = e_appl_data.loaded_basis_mean,
         .systems    = std::span<CMFS> { systems }, 
         .signals    = std::span<Colr> { signals },
-        .reduce_basis_count = false
+        .solve_dual = true
       });
     }
   }

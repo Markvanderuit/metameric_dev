@@ -11,8 +11,11 @@ namespace met {
     const Spec           &basis_mean;    // Mean of spectral basis functions
     std::span<const CMFS> systems;       // Color systems in which signals are available
     std::span<const Colr> signals;       // Signal samples in their respective color systems
-    bool impose_boundedness = true;      // Impose boundedness cosntraints
+
+    bool impose_boundedness = true;      // Impose [0, 1] boundedness cosntraints duringg solve
+    bool solve_dual         = false;     // Define as a dual problem during solve
     bool reduce_basis_count = false;     // After solve, re-attempt solve with reduced nr. of bases
+
     uint basis_count = wavelength_bases; // Starting nr. of bases
   };
   

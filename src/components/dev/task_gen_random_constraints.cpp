@@ -4,6 +4,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/state.hpp>
 #include <metameric/components/dev/task_gen_random_constraints.hpp>
 #include <omp.h>
 #include <execution>
@@ -64,37 +65,50 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-    const auto &e_proj_data = e_appl_data.project_data;
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_data  = e_appl_data.project_data;
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
 
-    return e_proj_data.color_systems.size() > 1 
-      && e_proj_data.color_systems[1].illuminant != 0 
-      && !m_has_run_once;
+    // Test state validity
+    guard(e_proj_data.color_systems.size() > 1                      &&
+          e_proj_data.color_systems[1] != e_proj_data.color_systems[0], false);
+    guard(e_proj_state.csys[0] || e_proj_state.csys[1] || !m_has_run_once, false);
+
+    return true;
   }
 
   void GenRandomConstraintsTask::eval(SchedulerHandle &info) {
     met_trace();
     
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-    const auto &e_proj_data = e_appl_data.project_data;
-    const auto &e_verts     = e_proj_data.verts;
+    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_verts       = e_proj_data.verts;
+    const auto &e_vert_select = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
 
     // Get modified resources
-    auto &i_constraints = info("constraints").writeable<std::vector<std::vector<ProjectData::Vert>>>();
+    auto &i_constraints = info("constraints").writeable<
+      std::vector<std::vector<ProjectData::Vert>>
+    >();
 
-    // Resize constraints data to correct format
+    // Resize constraints data to correct format, and insert copies of current vertices
     i_constraints.resize(n_img_samples);
-    for (auto &constraints : i_constraints)
-      constraints.resize(e_verts.size());
+    std::ranges::fill(i_constraints, e_verts);
 
     // Provide items necessary for fast OCS generation
     auto samples_6d = detail::gen_unit_dirs_x(n_ocs_samples, 6);
     std::vector<CMFS> cmfs_i = { e_proj_data.csys(0).finalize_direct() }; // TODO ehhr
     std::vector<CMFS> cmfs_j = { e_proj_data.csys(1).finalize_direct() }; // TODO uhhr
 
-    // Iterate through base vertex data step-by-step
-    for (uint i = 0; i < e_verts.size(); ++i) {
+    // We either operate on selected vertices, or, if none are selected, all vertices
+    std::vector<uint> vert_select = e_vert_select;
+    if (vert_select.empty()) {
+      vert_select.resize(e_verts.size());
+      std::iota(range_iter(vert_select), 0);
+    }
+
+    // Iterate through selected vertex data step-by-step
+    for (uint i : e_vert_select) {
       const auto &vert = e_verts[i];
 
       // Provide items necessary for OCS generation
@@ -116,17 +130,13 @@ namespace met {
         return (a - center.matrix()).squaredNorm() < (b - center.matrix()).squaredNorm();
       });
 
-      // Generate a delaunay tesselation of the convex hull, or collapse to a point
-      std::vector<eig::Array3f> del_verts;
+      // Generate a delaunay tesselation of the convex hull,
+      // or collapse to a point if the volume is too small/degenerate for qhull to function
+      std::vector<eig::Array3f> del_verts = { center };
       std::vector<eig::Array4u> del_elems;
       if ((closest - center).matrix().norm() > 0.025f) {
         auto [verts, elems] = generate_delaunay<IndexedDelaunayData, eig::Array3f>(ocs_gen_data);
         std::tie(del_verts, del_elems) = { verts, elems };
-        del_verts = verts;
-        del_elems = elems;
-      } else {
-        del_verts = { center };
-        del_elems = { };
       }
 
       // Compute volume of each tetrahedron in delaunay
@@ -138,15 +148,14 @@ namespace met {
         std::ranges::transform(el, p.begin(), [&](uint i) { return del_verts[i]; });
 
         // Compute tetrahedral volume
-        float nom = std::abs((p[0] - p[3]).dot((p[1] - p[3]).cross(p[2] - p[3])));
-        return nom / 6.f;
+        return std::abs((p[0] - p[3]).dot((p[1] - p[3]).cross(p[2] - p[3]))) / 6.f;
       });
 
       // Components for sampling step
       UniformSampler sampler;
       Distribution volume_distr(del_volumes);
 
-      // Start drawing samples
+      // Start drawing a sample per image
       for (uint j = 0; j < n_img_samples; ++j) {
         if (del_elems.empty()) {
           i_constraints[j][i] = ProjectData::Vert {
@@ -155,24 +164,23 @@ namespace met {
             .colr_j = { del_verts[0] },
             .csys_j = { 1 }
           };
-
           continue;
         }
 
-        // First, sample barycentric weights uniformly inside a tetrahedron
-        // Src: https://vcg.isti.cnr.it/jgt/tetra.htm
+        // First, sample barycentric weights uniformly inside a tetrahedron 
+        // (https://vcg.isti.cnr.it/jgt/tetra.htm)
         auto sample_3d = sampler.next_nd<3>();
         if (sample_3d.head<2>().sum() > 1.f) {
           sample_3d.head<2>() = 1.f - sample_3d.head<2>();
         }
         if (sample_3d.tail<2>().sum() > 1.f) {
-          float t = sample_3d.z();
-          sample_3d.z() = 1.f - sample_3d.head<2>().sum();
-          sample_3d.y() = 1.f - t;
+          float t = sample_3d[2];
+          sample_3d[2] = 1.f - sample_3d.head<2>().sum();
+          sample_3d[1] = 1.f - t;
         } else if (sample_3d.sum() > 1.f) {
-          float t = sample_3d.z();
-          sample_3d.z() = sample_3d.sum() - 1.f;
-          sample_3d.x() = 1.f - sample_3d.y() - t;
+          float t = sample_3d[2];
+          sample_3d[2] = sample_3d.sum() - 1.f;
+          sample_3d[0] = 1.f - sample_3d[1] - t;
         }
 
         // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
@@ -180,11 +188,11 @@ namespace met {
         std::ranges::transform(del_elems[volume_distr.sample(sampler.next_1d())], p.begin(), 
           [&](uint i) { return del_verts[i]; });
 
-        // Recover sample position using the generated barycentric coordinates
+        // Then, recover sample position using the generated barycentric coordinates
         eig::Array3f v = p[0] * (1.f - sample_3d.sum())
                        + p[1] * sample_3d.x() + p[2] * sample_3d.y() + p[3] * sample_3d.z();
         
-        // Store resulting sample vertex
+        // Finally, store resulting sampled vertex
         i_constraints[j][i] = ProjectData::Vert {
           .colr_i = vert.colr_i, 
           .csys_i = 0,           

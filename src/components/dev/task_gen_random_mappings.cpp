@@ -1,7 +1,9 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/metamer.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/dev/task_gen_random_mappings.hpp>
 #include <small_gl/utility.hpp>
 
@@ -21,10 +23,8 @@ namespace met {
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
-    // Determine dispatch group size
-    const uint dispatch_n    = e_appl_data.loaded_texture.size().prod();
-
     // Initialize dispatch objects
+    const uint dispatch_n = e_appl_data.loaded_texture.size().prod();
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
       m_program = {{ .type = gl::ShaderType::eCompute,
@@ -56,14 +56,8 @@ namespace met {
 
   bool GenRandomMappingTask::is_active(SchedulerHandle &info) {
     met_trace();
-
-    // Get external resources
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
-    const auto &e_proj_data   = e_appl_data.project_data;
-
-    return e_proj_data.color_systems.size() > 1 
-      && e_proj_data.color_systems[m_mapping_i].illuminant != 0 
-      && !m_has_run_once;
+    auto rsrc = info("gen_random_constraints", "constraints");
+    return rsrc.is_init() && (rsrc.is_mutated() || !m_has_run_once);
   }
 
   void GenRandomMappingTask::eval(SchedulerHandle &info) {
@@ -73,7 +67,7 @@ namespace met {
     const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_proj_state  = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<
+    const auto &e_verts = info("gen_random_constraints", "constraints").read_only<
       std::vector<std::vector<ProjectData::Vert>>
     >().at(m_constraint_i);
 
@@ -89,12 +83,28 @@ namespace met {
     m_uniform_buffer.flush();
   
     // Push gamut data, given any state change
-    // ColrSystem csys = e_proj_data.csys(m_mapping_i);
-    for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
-      // guard_continue(m_has_run_once || e_proj_state.csys[m_mapping_i] || e_proj_state.verts[i]);
-      m_gamut_map[i] = e_constraints[i].colr_j[0]; // csys.apply_color_indirect(e_vert_spec[i]);
-      if (i == 0)
-        fmt::print("{}\n", e_constraints[i].colr_j[0]);
+    ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
+    #pragma omp parallel for
+    for (int i = 0; i < e_verts.size(); ++i) {
+      const auto &vert = e_verts[i];
+
+      // Obtain color system spectra and corresponding color signals for this vertex
+      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_direct() };
+      std::vector<Colr> signals = { vert.colr_i };
+      std::ranges::transform(vert.csys_j, std::back_inserter(systems), [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
+      std::ranges::copy(vert.colr_j, std::back_inserter(signals));
+
+      // Generate a new spectrum given the above configuration
+      Spec vert_spec = generate_spectrum({ 
+        .basis      = e_appl_data.loaded_basis,
+        .basis_mean = e_appl_data.loaded_basis_mean,
+        .systems    = std::span<CMFS> { systems }, 
+        .signals    = std::span<Colr> { signals },
+        .solve_dual = true
+      });
+
+      // Finally, recover the resultant color (in case constraints are not preciously known) and store in buffer
+      m_gamut_map[i] = mapping_csys.apply_color_indirect(vert_spec);
     }
     m_gamut_buffer.flush();
 

@@ -20,10 +20,8 @@ namespace met {
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
-    // Determine dispatch group size
-    const uint dispatch_n    = e_appl_data.loaded_texture.size().prod();
-
     // Initialize dispatch objects
+    const uint dispatch_n = e_appl_data.loaded_texture.size().prod();
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / (generalized_weights / 4));
       m_program = {{ .type = gl::ShaderType::eCompute,
@@ -73,7 +71,7 @@ namespace met {
       m_uniform_map->n_verts = e_proj_data.verts.size();
       m_uniform_map->n_elems = e_proj_data.elems.size();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
       m_uniform_map->n_verts = e_delaunay.verts.size();
       m_uniform_map->n_elems = e_delaunay.elems.size();
     }
