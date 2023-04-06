@@ -66,7 +66,7 @@ namespace met {
       && !m_has_run_once;
   }
 
-  void GenRandomColorMappingTask::eval(SchedulerHandle &info) {
+  void GenRandomMappingTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources

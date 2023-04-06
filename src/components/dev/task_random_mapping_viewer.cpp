@@ -16,7 +16,7 @@ namespace met {
     auto e_texture_size = e_appl_data.loaded_texture.size();
     m_texture_subtasks.init(info, 0, [](uint i) { return fmt::format("gen_texture_{}", i); },
     [=](auto &, uint i) { return TextureSubTask {{ 
-      .input_key = { fmt::format("gen_random_color_mappings.gen_mapping_{}", i), "colr_buffer" }, 
+      .input_key = { fmt::format("gen_random_mappings.gen_mapping_{}", i), "colr_buffer" }, 
       .output_key    = "texture",
       .texture_info  = { .size = e_texture_size },
       .lrgb_to_srgb  = true
