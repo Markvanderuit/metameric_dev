@@ -156,7 +156,7 @@ namespace met {
       eig::Array2f texture_size = viewport_size
                                  * e_appl_data.loaded_texture.size().cast<float>().y()
                                  / e_appl_data.loaded_texture.size().cast<float>().x()
-                                 * 0.95f / static_cast<float>(n_cols);
+                                 * 0.985f / static_cast<float>(n_cols);
 
       // Adjust nr. of subtasks for texture generation
       m_texture_subtasks.eval(info, e_mappings_n);
