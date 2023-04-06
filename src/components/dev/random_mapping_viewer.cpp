@@ -47,7 +47,7 @@ namespace met {
       eig::Array2f texture_size = viewport_size
                                 * e_appl_data.loaded_texture.size().cast<float>().y()
                                 / e_appl_data.loaded_texture.size().cast<float>().x()
-                                * 0.95f / static_cast<float>(n_cols);
+                                * 0.985f / static_cast<float>(n_cols);
 
       // Adjust nr. of subtasks for texture generation
       m_texture_subtasks.eval(info, e_images_n);
@@ -64,8 +64,24 @@ namespace met {
 
         // Bulk of content
         ImGui::BeginGroup();
-        ImGui::Text(fmt::format("Random \#{}", i).c_str());
+        
+        // Header line
+        ImGui::SetNextItemWidth(texture_size.x() * 0.6);
+        ImGui::Text(fmt::format("Random #{}", i).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Apply")) {
+          auto &e_proj_data = info.global("appl_data").writeable<ApplicationData>().project_data;
+          for (uint j = 0; j < e_proj_data.verts.size(); ++j) {
+            const auto &constr = e_constraints[i][j];
+            e_proj_data.verts[j].csys_j = constr.csys_j;
+            e_proj_data.verts[j].colr_j = constr.colr_j;
+          }
+        }
+        // if (ImGui::SmallButton("Export")) eval_save(info, i);
+        
+        // Main image
         ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
+
         ImGui::EndGroup();
         
         // Increment column count; insert same-line if on same row and not last item

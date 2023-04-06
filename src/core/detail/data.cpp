@@ -102,10 +102,12 @@ namespace met::detail {
       return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
     });
   }
-  
+
   void init_constraints_points(ApplicationData &appl_data, uint n_interior_samples,
                                std::span<const ProjectCreateInfo::ImageData> images) {
     met_trace();
+
+    guard(/* !images.empty() && */ n_interior_samples > 0);
 
     // Hardcoded settings shared across next steps
     constexpr uint sample_discretization = 256;
@@ -149,10 +151,12 @@ namespace met::detail {
 
       // Extract colr_i, colr_j from input images at sampled indices
       std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
-      for (uint i = 0; i < n_interior_samples; ++i) {
-        sample_colr_j[i] = std::vector<Colr>(images.size());
-        std::ranges::transform(images, sample_colr_j[i].begin(), 
-          [&](const auto &info) { return info.image.data()[samples[i]]; });
+      if (!images.empty()) {
+        for (uint i = 0; i < n_interior_samples; ++i) {
+          sample_colr_j[i] = std::vector<Colr>(images.size());
+          std::ranges::transform(images, sample_colr_j[i].begin(), 
+            [&](const auto &info) { return info.image.data()[samples[i]]; });
+        }
       }
     } // 2.
     
@@ -166,12 +170,11 @@ namespace met::detail {
       for (uint i = 0; i < n_interior_samples; ++i) {
         // Iterate through samples, in case bad samples still exist
         while (i < n_interior_samples) {
-          ProjectData::Vert vt = {
-            .colr_i = sample_colr_i[i],
-            .csys_i = 0,
-            .colr_j = sample_colr_j[i],
-            .csys_j = csys_j_data
-          };
+          ProjectData::Vert vt = { .colr_i = sample_colr_i[i], .csys_i = 0 };
+          if (!images.empty()) {
+            vt.colr_j = sample_colr_j[i];
+            vt.csys_j = csys_j_data;
+          }
 
           // Obtain color system spectra for this vertex
           std::vector<CMFS> systems = { appl_data.project_data.csys(vt.csys_i).finalize_direct() };
@@ -212,6 +215,8 @@ namespace met::detail {
   void init_constraints_convex_hull(ApplicationData &appl_data, uint n_interior_samples,
                                     std::span<const ProjectCreateInfo::ImageData> images) {
     met_trace();
+
+    guard(!images.empty() && n_interior_samples > 0);
 
     // Hardcoded settings shared across next steps
     constexpr uint sample_discretization = 256;

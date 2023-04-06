@@ -20,8 +20,8 @@ namespace met {
   } // namespace io
   
   ProjectCreateInfo::ProjectCreateInfo()
-  : n_exterior_samples(6),
-    n_interior_samples(128),
+  : n_exterior_samples(8),
+    n_interior_samples(16),
     meshing_type(ProjectMeshingType::eDelaunay),
     illuminants({{ "D65",      models::emitter_cie_d65     },
                  { "E",        models::emitter_cie_e       },
@@ -72,8 +72,9 @@ namespace met {
     // Generate initial geometric data structure; if extra input images are provided,
     // start fitting constraints
     detail::init_convex_hull(*this, info.n_exterior_samples);
-    if (!info.images.empty())
-      detail::init_constraints(*this, info.n_interior_samples, info.images);
+    detail::init_constraints(*this, info.n_interior_samples, info.images);
+
+    // if (!info.images.empty())
   }
   
   void ApplicationData::save(const fs::path &path) {

@@ -57,7 +57,7 @@ namespace met {
 
         // Sliders for nr. of convex hull and sample points
         ImGui::SliderScalar("Exterior samples", ImGuiDataType_U32, &m_proj_data.n_exterior_samples, &min_exterior_samples, &max_exterior_samples);
-        if (m_imag_data.size() > 1) {
+        if (m_imag_data.size() > 1 || m_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
           ImGui::SliderScalar("Interior samples", ImGuiDataType_U32, &m_proj_data.n_interior_samples, &min_interior_samples, &max_interior_samples);
         }
       }
@@ -295,7 +295,7 @@ namespace met {
   }
   
   void CreateProjectTask::eval_progress_modal(SchedulerHandle &info) {
-    if (ImGui::BeginPopupModal("Warning: unsaved progress")) {
+    if (ImGui::BeginPopupModal("Warning: unsaved progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       ImGui::Text("If you continue, you may lose unsaved progress.");
       ImGui::Separator();
       if (ImGui::Button("Continue")) {

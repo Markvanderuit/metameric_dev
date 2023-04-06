@@ -10,8 +10,8 @@
 #include <numbers>
 
 namespace met {
-  constexpr uint n_img_samples = 16; // Nr. of images to generate
-  constexpr uint n_ocs_samples = 64; // Nr. of samples for color system OCS generation
+  constexpr uint n_img_samples = 64; // Nr. of images to generate
+  constexpr uint n_ocs_samples = 256; // Nr. of samples for color system OCS generation
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -119,7 +119,7 @@ namespace met {
       // Generate a delaunay tesselation of the convex hull, or collapse to a point
       std::vector<eig::Array3f> del_verts;
       std::vector<eig::Array4u> del_elems;
-      if ((closest - center).matrix().norm() > 0.01f) {
+      if ((closest - center).matrix().norm() > 0.025f) {
         auto [verts, elems] = generate_delaunay<IndexedDelaunayData, eig::Array3f>(ocs_gen_data);
         std::tie(del_verts, del_elems) = { verts, elems };
         del_verts = verts;
