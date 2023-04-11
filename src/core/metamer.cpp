@@ -51,19 +51,15 @@ namespace met {
     }
 
     // Average min/max objectives for a nice smooth result
-    // params.objective = LPObjective::eMaximize;
-    // auto [opt_max, res_max] = lp_solve_res(params);
+    params.objective = LPObjective::eMaximize;
+    auto [opt_max, res_max] = lp_solve_res(params);
     params.objective = LPObjective::eMinimize;
-    params.method = info.solve_dual ? LPMethod::eDual : LPMethod::ePrimal;
     auto [opt_min, res_min] = lp_solve_res(params);
 
+    // Obtain spectral reflectance
+    Spec s_max = info.basis_mean + Spec(basis * res_max.cast<float>().matrix());
     Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
-    return s_min;
-
-    // // Obtain spectral reflectance
-    // Spec s_max = info.basis_mean + Spec(basis * res_max.cast<float>().matrix());
-    // Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
-    // return (0.5 * (s_min + s_max)).eval();
+    return (0.5 * (s_min + s_max)).eval();
   }
 
   /* Spec generate_spectrum_recursive(GenerateSpectrumInfo info) {

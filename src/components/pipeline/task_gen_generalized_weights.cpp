@@ -70,7 +70,7 @@ namespace met {
     auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
 
     // Describe ranges over stale mesh vertices/elements
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.elems.size()))
+    auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.verts.size()))
                     | std::views::filter([&](uint i) -> bool { return e_proj_state.verts[i]; });
     auto elem_range = std::views::iota(0u, static_cast<uint>(e_proj_state.elems.size()))
                     | std::views::filter([&](uint i) -> bool { return e_proj_state.elems[i]; });
