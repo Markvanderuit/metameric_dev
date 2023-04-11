@@ -67,8 +67,9 @@ namespace met {
           object[i] = compare_object(in[i], out[i]);
           
         // Potential added elements always have state as 'true'
-        for (uint i = min_r; i < max_r; ++i)
-          out[i] = in[i];
+        if (in.size() == max_r)
+          for (uint i = min_r; i < max_r; ++i)
+            out[i] = in[i];
         
         object.is_any_stale = true;
       }

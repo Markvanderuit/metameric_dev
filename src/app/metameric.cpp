@@ -66,16 +66,10 @@ namespace met {
     if (!info.project_path.empty())
       appl_data.load(info.project_path);
 
-    // Initialize ImGui for UI components
-    ImGui::Init(window, info.app_cmode == ApplicationData::ColorMode::eDark);
-
     // Create and start runtime loop
     submit_schedule(scheduler);
     while (!window.should_close())
       scheduler.run();
-    
-    // Tear down ImGui
-    ImGui::Destr();
   }
 } // namespace met
 

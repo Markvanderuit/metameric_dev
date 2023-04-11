@@ -64,12 +64,14 @@ namespace met {
       
       // Define create/cancel buttons to handle results 
       ImGui::Separator();
-      if (m_proj_data.images.empty()) ImGui::BeginDisabled();
+
+      bool is_create_disabled = m_proj_data.images.empty();
+      if (is_create_disabled) ImGui::BeginDisabled();
       if (ImGui::Button("Create") && create_project_safe(info)) { 
         ImGui::CloseAnyPopupIfOpen();
         info.task().dstr();
       }
-      if (m_proj_data.images.empty()) ImGui::EndDisabled();
+      if (is_create_disabled) ImGui::EndDisabled();
       ImGui::SameLine();      
       if (ImGui::Button("Cancel")) { 
         ImGui::CloseCurrentPopup();

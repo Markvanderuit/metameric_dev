@@ -1,10 +1,8 @@
 #include <metameric/core/linprog.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <ClpSimplex.hpp>
 #include <ClpLinearObjective.hpp>
 #include <limits>
 #include <ranges>
-
 
 namespace met {
   LPParameters::LPParameters(uint M, uint N)

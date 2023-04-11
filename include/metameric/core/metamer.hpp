@@ -36,6 +36,7 @@ namespace met {
 
   // Corresponding functions to above generate objects
   Spec generate_spectrum(GenerateSpectrumInfo info);
+  /* Spec generate_spectrum_recursive(GenerateSpectrumInfo info); */
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info);
   std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info);
 

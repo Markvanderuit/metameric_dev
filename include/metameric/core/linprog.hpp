@@ -2,8 +2,6 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <limits>
-#include <vector>
 
 namespace met {
   enum class LPMethod {

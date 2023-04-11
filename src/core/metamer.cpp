@@ -1,8 +1,6 @@
 #include <metameric/core/linprog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
-#include <omp.h>
 #include <algorithm>
 #include <execution>
 #include <unordered_set>
@@ -11,6 +9,64 @@ namespace met {
   constexpr uint min_wavelength_bases = 4;
 
   Spec generate_spectrum(GenerateSpectrumInfo info) {
+    met_trace();
+    debug::check_expr(info.systems.size() == info.signals.size(),
+                          "Color system size not equal to color signal size");
+           
+    // Out-of-loop state
+    bool is_first_run = true;
+    Spec s = 0;
+
+    const uint N = info.basis_count;
+    const uint M = 3 * info.systems.size() 
+                + (info.impose_boundedness ? 2 * wavelength_samples : 0);
+
+    // Initialize parameter object for LP solver with expected matrix sizes M, N
+    LPParameters params(M, N);
+
+    // Obtain appropriate nr. of basis functions from data
+    eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
+
+    // Construct basis bounds
+    Spec upper_bounds = Spec(1.0) - info.basis_mean;
+    Spec lower_bounds = upper_bounds - Spec(1.0); 
+
+    // Add constraints to ensure resulting spectra produce the given color signals
+    for (uint i = 0; i < info.systems.size(); ++i) {
+      Colr signal_offs = (info.systems[i].transpose() * info.basis_mean.matrix()).transpose().eval();
+      params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
+      params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
+    }
+
+    // Add constraints to ensure resulting spectra are bounded to [0, 1]
+    if (info.impose_boundedness) {
+      const uint offs_l = 3 * info.systems.size();
+      const uint offs_u = offs_l + wavelength_samples;
+      params.A.block(offs_l, 0, wavelength_samples, N) = basis.cast<double>().eval();
+      params.A.block(offs_u, 0, wavelength_samples, N) = basis.cast<double>().eval();
+      params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
+      params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
+      params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
+      params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
+    }
+
+    // Average min/max objectives for a nice smooth result
+    // params.objective = LPObjective::eMaximize;
+    // auto [opt_max, res_max] = lp_solve_res(params);
+    params.objective = LPObjective::eMinimize;
+    params.method = info.solve_dual ? LPMethod::eDual : LPMethod::ePrimal;
+    auto [opt_min, res_min] = lp_solve_res(params);
+
+    Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
+    return s_min;
+
+    // // Obtain spectral reflectance
+    // Spec s_max = info.basis_mean + Spec(basis * res_max.cast<float>().matrix());
+    // Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
+    // return (0.5 * (s_min + s_max)).eval();
+  }
+
+  /* Spec generate_spectrum_recursive(GenerateSpectrumInfo info) {
     met_trace();
     debug::check_expr(info.systems.size() == info.signals.size(),
                           "Color system size not equal to color signal size");
@@ -79,7 +135,7 @@ namespace met {
     }               
     
     return s;
-  }
+  } */
 
   std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {
     met_trace();
