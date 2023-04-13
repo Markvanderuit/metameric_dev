@@ -6,6 +6,8 @@
 #include <metameric/core/state.hpp>
 #include <metameric/components/dev/task_gen_random_mappings.hpp>
 #include <small_gl/utility.hpp>
+#include <algorithm>
+#include <ranges>
 
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
@@ -67,9 +69,11 @@ namespace met {
     const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_proj_state  = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_verts = info("gen_random_constraints", "constraints").read_only<
+    const auto &e_verts       = info("gen_random_constraints", "constraints").read_only<
       std::vector<std::vector<ProjectData::Vert>>
     >().at(m_constraint_i);
+    const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
 
     // Update uniform data
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
@@ -81,31 +85,17 @@ namespace met {
       m_uniform_map->n_elems = e_delaunay.elems.size();
     }
     m_uniform_buffer.flush();
-  
-    // Push gamut data, given any state change
+
+    // Obtain differense of all vertex indices and selected vertex indices
+    auto vert_diff = std::views::iota(0u, static_cast<uint>(e_verts.size()))
+                   | std::views::filter([&](uint i) { return std::ranges::find(e_vert_slct, i) == e_vert_slct.end(); });
+
+    // Push unselected/selected gamut data separately
     ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
-    #pragma omp parallel for
-    for (int i = 0; i < e_verts.size(); ++i) {
-      const auto &vert = e_verts[i];
-
-      // Obtain color system spectra and corresponding color signals for this vertex
-      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_direct() };
-      std::vector<Colr> signals = { vert.colr_i };
-      std::ranges::transform(vert.csys_j, std::back_inserter(systems), [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
-      std::ranges::copy(vert.colr_j, std::back_inserter(signals));
-
-      // Generate a new spectrum given the above configuration
-      Spec vert_spec = generate_spectrum({ 
-        .basis      = e_appl_data.loaded_basis,
-        .basis_mean = e_appl_data.loaded_basis_mean,
-        .systems    = std::span<CMFS> { systems }, 
-        .signals    = std::span<Colr> { signals },
-        .solve_dual = true
-      });
-
-      // Finally, recover the resultant color (in case constraints are not preciously known) and store in buffer
-      m_gamut_map[i] = mapping_csys.apply_color_indirect(vert_spec);
-    }
+    for (uint i : vert_diff)
+      m_gamut_map[i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
+    for (uint i : e_vert_slct)
+      m_gamut_map[i] = e_verts[i].colr_j[0];
     m_gamut_buffer.flush();
 
     // Bind required buffers to corresponding targets
