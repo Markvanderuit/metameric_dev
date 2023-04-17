@@ -9,6 +9,7 @@
 #include <metameric/components/views/viewport/task_draw_texture.hpp>
 #include <metameric/components/views/viewport/task_draw_color_system_solid.hpp>
 #include <metameric/components/views/viewport/task_draw_end.hpp>
+#include <metameric/components/views/dev/task_draw_bvh.hpp>
 
 namespace met {
   void ViewportTask::init(SchedulerHandle &info) {
@@ -21,6 +22,7 @@ namespace met {
     info.subtask("draw_color_system_solid").init<ViewportDrawColorSystemSolid>();
     info.subtask("draw_meshing").init<ViewportDrawMeshingTask>();
     info.subtask("draw_texture").init<ViewportDrawTextureTask>();
+    info.subtask("draw_bvh").init<ViewportDrawBVHTask>();
     info.subtask("draw_end").init<ViewportDrawEndTask>();
   }
 } // namespace met

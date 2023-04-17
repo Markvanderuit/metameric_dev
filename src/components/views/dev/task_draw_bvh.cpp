@@ -1,18 +1,22 @@
 #include <metameric/core/data.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/core/spectrum.hpp>
-#include <metameric/core/texture.hpp>
-#include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
+#include <metameric/core/utility.hpp>
+#include <metameric/core/detail/trace.hpp>
+#include <metameric/components/views/dev/task_draw_bvh.hpp>
+#include <metameric/components/views/detail/arcball.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <algorithm>
 #include <execution>
-#include <ranges>
+#include <vector>
 
 namespace met {
+  // Buffer flags for flushable, persistent, write-only mapping
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size    = 512u;
 
   namespace detail {
     namespace radix {
@@ -47,8 +51,8 @@ namespace met {
     template <uint Degr> constexpr uint tree_lvl_begin(int lvl);
     // template <> constexpr uint tree_lvl_begin<2>(int lvl) { return 0xFFFFFFFF >> (32 - (lvl - 1)); }
     // template <> constexpr uint tree_lvl_begin<4>(int lvl) { return 0x55555555 >> (31 - ((tree_degr_log<4>() * lvl)) + 1); }
-    template <> constexpr uint tree_lvl_begin<8>(int lvl) { return (0x92492492 >> (31 - tree_degr_log<8>() * lvl)) >> 2; }
-    
+    template <> constexpr uint tree_lvl_begin<8>(int lvl) { return (0x92492492 >> (31 - tree_degr_log<8>() * lvl)) >> 3; }
+
     // Extent of indices on current tree level
     template <uint Degr> constexpr uint tree_lvl_extent(uint lvl) {
       return tree_lvl_begin<Degr>(lvl + 1) - tree_lvl_begin<Degr>(lvl);
@@ -93,6 +97,7 @@ namespace met {
       std::vector<Node> nodes;
         
       // Node/leaf accessors/iterators
+      size_t node_size_i(uint lvl)  const { return tree_lvl_extent<Degr>(lvl);                             }
       size_t node_begin_i(uint lvl) const { return tree_lvl_begin<Degr>(lvl);                              }
       size_t node_end_i(uint lvl)   const { return tree_lvl_begin<Degr>(lvl) + tree_lvl_extent<Degr>(lvl); }
       auto   node_begin(uint lvl)   const { return nodes.begin() + node_begin_i(lvl);                      }
@@ -104,7 +109,7 @@ namespace met {
     };
 
     template <typename Mesh = IndexedDelaunayData, uint Degr>
-    std::pair<Mesh, ImplicitTree<Degr>> generate_search_tree(Mesh delaunay) {
+    std::pair<Mesh, ImplicitTree<Degr>> generate_search_tree_mod(Mesh delaunay) {
       met_trace();
 
       using Tree = ImplicitTree<Degr>;
@@ -129,10 +134,10 @@ namespace met {
       std::transform(std::execution::par_unseq, range_iter(order), delaunay.elems.begin(), [&](uint i) { return _elems[i]; });
 
       Tree tree(order.size());
-      /* fmt::print("n_children : {}\n", Tree::Degree);
-      fmt::print("levels     : {}\n", tree.n_levels);
-      fmt::print("n_objects  : {}\n", tree.n_objects);
-      fmt::print("n_nodes    : {}\n", tree.nodes.size()); */
+      // fmt::print("n_children : {}\n", Tree::Degree);
+      // fmt::print("levels     : {}\n", tree.n_levels);
+      // fmt::print("n_objects  : {}\n", tree.n_objects);
+      // fmt::print("n_nodes    : {}\n", tree.nodes.size());
 
       // Build bottom-most level
       #pragma omp parallel for
@@ -143,16 +148,18 @@ namespace met {
         const eig::Array4u &el = delaunay.elems[i_underlying];
         std::array<eig::Array3f, 4> vt;
         std::ranges::transform(el, vt.begin(), [&](uint i) { return delaunay.verts[i]; });
-        
+
         // Build node data, wrapping bbox around element
         tree.nodes[i] = Node { .b_min    = vt[0].min(vt[1].min(vt[2].min(vt[3]))).eval(),
                                .e_begin  = i_underlying,
                                .b_max    = vt[0].max(vt[1].max(vt[2].max(vt[3]))).eval(),
                                .e_extent = 1 };
-      } // end for i
 
+        // fmt::print("{}\t{}\n", vt, tree.nodes[i].b_min);
+      } // end for i
+      
       // Build upper levels
-      for (int lvl = tree.n_levels - 1; lvl >= 0; lvl--) {
+      for (int lvl = tree.n_levels - 2; lvl >= 0; lvl--) {
         #pragma omp parallel for
         for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
           // Start with new empty node as reduction target
@@ -185,110 +192,95 @@ namespace met {
     }
   } // namespace detail
 
-  void GenDelaunayWeightsTask::init(SchedulerHandle &info) {
+  void ViewportDrawBVHTask::init(SchedulerHandle &info) {
     met_trace_full();
-
-    // Get shared resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-    const auto &e_colr_data = e_appl_data.loaded_texture;
-    const auto &e_proj_data = e_appl_data.project_data;
     
-    // Determine compute dispatch size
-    const uint dispatch_n    = e_colr_data.size().prod();
-    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
+    // Setup mapped buffer objects
+    m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_camr_buffer = {{ .size = sizeof(CameraBuffer), .flags = buffer_create_flags }};
+    m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
+    m_camr_map    = m_camr_buffer.map_as<CameraBuffer>(buffer_access_flags).data();
+    
+    // Load shader object
+    m_program = {{ .type = gl::ShaderType::eVertex,   
+                   .spirv_path = "resources/shaders/views/dev/draw_bvh.vert.spv",
+                   .cross_path = "resources/shaders/views/dev/draw_bvh.vert.json" },
+                 { .type = gl::ShaderType::eFragment, 
+                   .spirv_path = "resources/shaders/views/dev/draw_bvh.frag.spv",
+                   .cross_path = "resources/shaders/views/dev/draw_bvh.frag.json" }};
 
-    // Initialize objects for compute dispatch
-    m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/pipeline/gen_delaunay_weights.comp.spv",
-                   .cross_path = "resources/shaders/pipeline/gen_delaunay_weights.comp.json" }};
-    m_dispatch = { .groups_x = dispatch_ndiv, 
-                   .bindable_program = &m_program }; 
 
-    // Initialize uniform buffer and writeable, flushable mapping
-    m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
-    m_uniform_map->n = e_appl_data.loaded_texture.size().prod();
+    // Specify array and draw object
+    m_array = {{ }};
+    m_draw  = {
+      .type             = gl::PrimitiveType::eTriangles,
+      .vertex_count     = 0,
+      .draw_op          = gl::DrawOp::eLine,
+      .bindable_array   = &m_array,
+      .bindable_program = &m_program
+    };
 
-    // Initialize buffer data
-    gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_colr_data)).data()) }};
-    gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
-    gl::Buffer elem_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags}};
-
-    // Initialize writeable, flushable mappings over relevant buffers
-    m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
-    m_elem_map = elem_buffer.map_as<eig::Array4u>(buffer_access_flags);
-
-    // Initialize buffer holding barycentric weights
-    info("delaunay").set<AlignedDelaunayData>({ });  // Generated delaunay tetrahedralization over input vertices
-    info("colr_buffer").set(std::move(colr_buffer)); // OpenGL buffer storing texture color positions
-    info("vert_buffer").set(std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
-    info("elem_buffer").set(std::move(elem_buffer)); // OpenGL buffer storing delaunay tetrahedral elements
-    info("bary_buffer").init<gl::Buffer>({ .size = dispatch_n * sizeof(eig::Array4f) }); // Convex weights
+    // Let's start at the top for now
+    m_tree_level = 0;
   }
   
-  bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
-    met_trace();
-    return info("state", "proj_state").read_only<ProjectState>().verts;
-  }
-
-  /* 
-    generate weights for full texture
-    generate mipmaps from weights
-    - either downsample through reduction
-    - or compute per level
-    - or, given delaunay, represent as sampleable textures, and sample the damned things
-    - meanwhile, given generalized, represent as sampleable array textures 
-   */
-
-  void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
+  void ViewportDrawBVHTask::eval(SchedulerHandle &info) {
     met_trace_full();
-
+    
     // Get external resources
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
-    const auto &e_proj_data  = e_appl_data.project_data;
+    const auto &e_delaunay   = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
 
-    // Get modified resources
-    auto &i_delaunay    = info("delaunay").writeable<AlignedDelaunayData>();
-    auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
-    auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
+    // Build search tree and push results
+    auto [_, tree] = detail::generate_search_tree_mod<AlignedDelaunayData, 8>(e_delaunay);
+    m_tree_buffer  = {{ .data = cnt_span<std::byte>(tree.nodes) }};
 
-    // Generate new delaunay structure
-    std::vector<Colr> delaunay_input(e_proj_data.verts.size());
-    std::ranges::transform(e_proj_data.verts, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
-    i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
-    detail::ImplicitTree<8> tree;
-    std::tie(i_delaunay, tree) = detail::generate_search_tree<AlignedDelaunayData, 8>(i_delaunay);
+    // Determine draw count
+    uint draw_begin     = tree.node_begin_i(m_tree_level);
+    uint draw_extent    = tree.node_size_i(m_tree_level);
+    m_draw.vertex_count = 36 * draw_extent;
 
-    // Recover triangle element data and store in project
-    auto [_, elems] = convert_mesh<AlignedMeshData>(i_delaunay);
-    info.global("appl_data").writeable<ApplicationData>().project_data.elems = elems;
+    fmt::print("{} - {}\n", draw_begin, draw_extent);
 
-    // Push stale vertices
-    auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.verts.size()))
-                    | std::views::filter([&](uint i) -> bool { return e_proj_state.verts[i]; });
-    for (uint i : vert_range) {
-      m_vert_map[i] = e_proj_data.verts[i].colr_i;
-      i_vert_buffer.flush(sizeof(eig::AlArray3f), i * sizeof(eig::AlArray3f));
+    // Push uniform data
+    m_unif_map->node_begin  = draw_begin;
+    m_unif_map->node_extent = draw_extent;
+    m_unif_buffer.flush();
+
+    static bool is_first_run = false;
+    if (!is_first_run) {
+      fmt::print("{} - {}\n", tree.nodes[0].b_min, tree.nodes[0].b_max);
+      
+      is_first_run = true;
+      // std::exit(0);
     }
 
-    // Push stale tetrahedral element data // TODO optimize?
-    std::ranges::copy(i_delaunay.elems, m_elem_map.begin());
-    i_elem_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
-    
-    // Push uniform data
-    m_uniform_map->n_verts = i_delaunay.verts.size();
-    m_uniform_map->n_elems = i_delaunay.elems.size();
-    m_uniform_buffer.flush();
+    // On relevant state change, update uniform buffer data
+    if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
+      const auto &e_arcball = info("viewport.input", "arcball").read_only<detail::Arcball>();
+      m_camr_map->matrix = e_arcball.full().matrix();
+      m_camr_map->aspect = { 1.f, e_arcball.m_aspect };
+      m_camr_buffer.flush();
+    }
 
-    // Bind required buffers to corresponding targets
-    m_program.bind("b_unif", m_uniform_buffer);
-    m_program.bind("b_vert", i_vert_buffer);
-    m_program.bind("b_elem", i_elem_buffer);
-    m_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+    // Set OpenGL state shared for the coming draw operations
+    auto shared_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
+                                 gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   false),
+                                 gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
+                                 gl::state::ScopedSet(gl::DrawCapability::eMSAA,      false) };
 
-    // Dispatch shader to generate delaunay convex weights
-    gl::dispatch_compute(m_dispatch);
+    // Bind resources and dispatch draw
+    m_program.bind("b_tree", m_tree_buffer);
+    m_program.bind("b_unif", m_unif_buffer);
+    m_program.bind("b_camr", m_camr_buffer);
+
+    gl::dispatch_draw(m_draw);
+
+    // Spawn ImGui debug window
+    if (ImGui::Begin("BVH debug window")) {
+      uint pmin = 0, pmax = tree.n_levels - 1;
+      ImGui::SliderScalar("Level", ImGuiDataType_U32, &m_tree_level, &pmin, &pmax);
+    }
+    ImGui::End();
   }
 } // namespace met
