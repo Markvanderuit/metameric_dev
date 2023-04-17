@@ -12,7 +12,57 @@
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size    = 1024u;
+  constexpr uint buffer_init_size    = 512u;
+
+  namespace detail {
+    // FWD
+    struct TreeNode;
+    struct TreeObject;
+    
+    // Delaunay search tree; node data structure
+    struct TreeNode {
+      eig::Array3f b_min;    // Bounding volume minimum
+      uint         e_begin;  // Begin index of underlying element 
+      eig::Array3f b_center; // Bounding volume center; volume max
+      uint         e_extent; // Extent of underlying element range
+    };
+
+    // Delaunay search tree; implict tree object
+    struct TreeObject {
+      uint n_levels;   // Tree depth
+      uint n_children; // Max degree for non-leaf nodes
+
+      std::vector<TreeNode> nodes;
+    };
+
+    template <typename Mesh = IndexedDelaunayData>
+    TreeObject generate_search_tree(Mesh delaunay) {
+      TreeObject object;
+
+      std::vector<TreeNode> leaves(delaunay.elems.size());
+
+      // Build leaf nodes
+      #pragma omp parallel for
+      for (int i = 0; i < leaves.size(); ++i) {
+        const eig::Array4u &el = delaunay.elems[i];
+
+        // Gather vertex data
+        std::array<eig::Array3f, 4> vt;
+        std::ranges::transform(el, vt.begin(), [](uint i) { return delaunay.verts[i]; });
+
+        // Build node data 
+        TreeNode node = { .b_min    = vt[0].min(vt[1].min(vt[2].min(vt[3]))).eval()
+                          .e_begin  = i, 
+                          .e_extent = 1 };
+        node.b_center = (vt[0].max(vt[1].max(vt[2].max(vt[3]))).eval() - node.b_min) * 0.5;        
+        return node;
+      }
+
+      
+
+      return object;
+    }
+  } // namespace detail
 
   void GenDelaunayWeightsTask::init(SchedulerHandle &info) {
     met_trace_full();
@@ -38,10 +88,12 @@ namespace met {
     m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
     m_uniform_map->n = e_appl_data.loaded_texture.size().prod();
 
-    // Initialize mesh buffer data and writeable, flushable mappings where necessary
+    // Initialize buffer data
     gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned((e_colr_data)).data()) }};
     gl::Buffer vert_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4f), .flags = buffer_create_flags}};
     gl::Buffer elem_buffer = {{ .size = buffer_init_size * sizeof(eig::Array4u), .flags = buffer_create_flags}};
+
+    // Initialize writeable, flushable mappings over relevant buffers
     m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
     m_elem_map = elem_buffer.map_as<eig::Array4u>(buffer_access_flags);
 
@@ -57,6 +109,15 @@ namespace met {
     met_trace();
     return info("state", "proj_state").read_only<ProjectState>().verts;
   }
+
+  /* 
+    generate weights for full texture
+    generate mipmaps from weights
+    - either downsample through reduction
+    - or compute per level
+    - or, given delaunay, represent as sampleable textures, and sample the damned things
+    - meanwhile, given generalized, represent as sampleable array textures 
+   */
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
