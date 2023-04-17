@@ -11,8 +11,8 @@
 #include <numbers>
 
 namespace met {
-  constexpr uint n_img_samples = 64; // Nr. of images to generate
-  constexpr uint n_ocs_samples = 256; // Nr. of samples for color system OCS generation
+  constexpr uint n_img_samples = 16; // Nr. of images to generate
+  constexpr uint n_ocs_samples = 16; // Nr. of samples for color system OCS generation
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -56,9 +56,8 @@ namespace met {
   void GenRandomConstraintsTask::init(SchedulerHandle &info) {
     met_trace();
 
+    info("samples").set<std::vector<eig::ArrayXf>>(detail::gen_unit_dirs_x(n_ocs_samples, 6));
     info("constraints").set<std::vector<std::vector<ProjectData::Vert>>>({ });
-
-    m_has_run_once = false;
   }
 
   bool GenRandomConstraintsTask::is_active(SchedulerHandle &info) {
@@ -70,9 +69,9 @@ namespace met {
     const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
 
     // Test state validity
-    guard(e_proj_data.color_systems.size() > 1                      &&
+    guard(e_proj_data.color_systems.size() > 1 &&
           e_proj_data.color_systems[1] != e_proj_data.color_systems[0], false);
-    guard(e_proj_state.csys[0] || e_proj_state.csys[1] || !m_has_run_once, false);
+    guard(e_proj_state.csys[0] || e_proj_state.csys[1], false);
 
     return true;
   }
@@ -85,6 +84,7 @@ namespace met {
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_verts       = e_proj_data.verts;
     const auto &e_vert_select = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &i_samples_6d  = info("samples").read_only<std::vector<eig::ArrayXf>>();
 
     // Get modified resources
     auto &i_constraints = info("constraints").writeable<
@@ -96,7 +96,6 @@ namespace met {
     std::ranges::fill(i_constraints, e_verts);
 
     // Provide items necessary for fast OCS generation
-    auto samples_6d = detail::gen_unit_dirs_x(n_ocs_samples, 6);
     std::vector<CMFS> cmfs_i = { e_proj_data.csys(0).finalize_direct() }; // TODO ehhr
     std::vector<CMFS> cmfs_j = { e_proj_data.csys(1).finalize_direct() }; // TODO uhhr
 
@@ -120,7 +119,7 @@ namespace met {
                                                        .systems_i  = cmfs_i, 
                                                        .signals_i  = sign_i, 
                                                        .system_j   = cmfs_j.front(), 
-                                                       .samples    = samples_6d });
+                                                       .samples    = i_samples_6d });
     
       // Compute center of convex hull
       constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
@@ -201,7 +200,5 @@ namespace met {
         };
       }
     }
-
-    m_has_run_once = true;
   }
 } // namespace met
