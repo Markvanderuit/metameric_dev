@@ -134,6 +134,22 @@ namespace met {
       std::transform(std::execution::par_unseq, range_iter(order), delaunay.elems.begin(), [&](uint i) { return _elems[i]; });
 
       Tree tree(order.size());
+
+      // Build subdivision; push downwards
+      tree.nodes[0] = Node { .e_begin = 0, .e_extent = tree.n_objects };
+      for (int lvl = 1; lvl < tree.n_levels; lvl++) {
+        // const Node &parent = tree.node_begin_i(lvl) >> tree_degr_log
+        
+        for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
+          
+        }
+
+      }
+
+      // Build bounding volumes; pull upwards
+
+
+
       // fmt::print("n_children : {}\n", Tree::Degree);
       // fmt::print("levels     : {}\n", tree.n_levels);
       // fmt::print("n_objects  : {}\n", tree.n_objects);
@@ -240,7 +256,7 @@ namespace met {
     uint draw_extent    = tree.node_size_i(m_tree_level);
     m_draw.vertex_count = 36 * draw_extent;
 
-    fmt::print("{} - {}\n", draw_begin, draw_extent);
+    // fmt::print("{} - {}\n", draw_begin, draw_extent);
 
     // Push uniform data
     m_unif_map->node_begin  = draw_begin;
@@ -252,7 +268,10 @@ namespace met {
       fmt::print("{} - {}\n", tree.nodes[0].b_min, tree.nodes[0].b_max);
       
       is_first_run = true;
-      // std::exit(0);
+    }
+
+    for (int i = tree.node_begin_i(1); i < tree.node_end_i(1); ++i) {
+      fmt::print("{} - {}\n", i, tree.nodes[i].e_extent);
     }
 
     // On relevant state change, update uniform buffer data

@@ -15,6 +15,7 @@ namespace met {
 
     gl::ComputeInfo           m_dispatch;
     gl::Program               m_program;
+    gl::Buffer                m_tree_buffer;
     gl::Buffer                m_uniform_buffer;
     UniformBuffer            *m_uniform_map;
     std::span<eig::AlArray3f> m_vert_map;
