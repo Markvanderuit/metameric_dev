@@ -47,8 +47,8 @@ namespace met {
     template <uint Degr> constexpr uint tree_lvl_begin(int lvl);
     // template <> constexpr uint tree_lvl_begin<2>(int lvl) { return 0xFFFFFFFF >> (32 - (lvl - 1)); }
     // template <> constexpr uint tree_lvl_begin<4>(int lvl) { return 0x55555555 >> (31 - ((tree_degr_log<4>() * lvl)) + 1); }
-    template <> constexpr uint tree_lvl_begin<8>(int lvl) { return (0x92492492 >> (31 - tree_degr_log<8>() * lvl)) >> 2; }
-    
+    template <> constexpr uint tree_lvl_begin<8>(int lvl) { return (0x92492492 >> (31 - tree_degr_log<8>() * lvl)) >> 3; }
+
     // Extent of indices on current tree level
     template <uint Degr> constexpr uint tree_lvl_extent(uint lvl) {
       return tree_lvl_begin<Degr>(lvl + 1) - tree_lvl_begin<Degr>(lvl);
@@ -93,6 +93,7 @@ namespace met {
       std::vector<Node> nodes;
         
       // Node/leaf accessors/iterators
+      size_t node_size_i(uint lvl)  const { return tree_lvl_extent<Degr>(lvl);                             }
       size_t node_begin_i(uint lvl) const { return tree_lvl_begin<Degr>(lvl);                              }
       size_t node_end_i(uint lvl)   const { return tree_lvl_begin<Degr>(lvl) + tree_lvl_extent<Degr>(lvl); }
       auto   node_begin(uint lvl)   const { return nodes.begin() + node_begin_i(lvl);                      }
@@ -129,10 +130,10 @@ namespace met {
       std::transform(std::execution::par_unseq, range_iter(order), delaunay.elems.begin(), [&](uint i) { return _elems[i]; });
 
       Tree tree(order.size());
-      /* fmt::print("n_children : {}\n", Tree::Degree);
-      fmt::print("levels     : {}\n", tree.n_levels);
-      fmt::print("n_objects  : {}\n", tree.n_objects);
-      fmt::print("n_nodes    : {}\n", tree.nodes.size()); */
+      // fmt::print("n_children : {}\n", Tree::Degree);
+      // fmt::print("levels     : {}\n", tree.n_levels);
+      // fmt::print("n_objects  : {}\n", tree.n_objects);
+      // fmt::print("n_nodes    : {}\n", tree.nodes.size());
 
       // Build bottom-most level
       #pragma omp parallel for
@@ -143,16 +144,18 @@ namespace met {
         const eig::Array4u &el = delaunay.elems[i_underlying];
         std::array<eig::Array3f, 4> vt;
         std::ranges::transform(el, vt.begin(), [&](uint i) { return delaunay.verts[i]; });
-        
+
         // Build node data, wrapping bbox around element
         tree.nodes[i] = Node { .b_min    = vt[0].min(vt[1].min(vt[2].min(vt[3]))).eval(),
                                .e_begin  = i_underlying,
                                .b_max    = vt[0].max(vt[1].max(vt[2].max(vt[3]))).eval(),
                                .e_extent = 1 };
-      } // end for i
 
+        // fmt::print("{}\t{}\n", vt, tree.nodes[i].b_min);
+      } // end for i
+      
       // Build upper levels
-      for (int lvl = tree.n_levels - 1; lvl >= 0; lvl--) {
+      for (int lvl = tree.n_levels - 2; lvl >= 0; lvl--) {
         #pragma omp parallel for
         for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
           // Start with new empty node as reduction target
