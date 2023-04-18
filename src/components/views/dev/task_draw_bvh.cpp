@@ -10,6 +10,8 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/utility.hpp>
 #include <algorithm>
+#include <bit>
+#include <bitset>
 #include <execution>
 #include <vector>
 
@@ -36,6 +38,38 @@ namespace met {
         uint y = expand_bits_10(uint(v[1]));
         uint z = expand_bits_10(uint(v[2]));
         return x * 4u + y * 2u + z;
+      }
+
+      inline
+      int find_msb(uint i) {
+        return 31 - std::countl_zero(i);
+      }
+
+      // Find split position within a range [first, last] of morton codes
+      inline
+      uint find_split(std::span<const uint> codes, uint first, uint last) {
+        // Initial guess for split position
+        uint split = first;
+
+        // Get data for initial guess 
+        uint code = codes[first];
+        uint pref = find_msb(code ^ codes[last]);
+
+        // Perform a binary search to find the split position
+        uint step = last - first;
+        do {
+          step = (step + 1) >> 1;        // Decrease step size
+          uint new_split = split + step; // Possible new split position
+
+          guard_continue(new_split < last);
+          guard_continue(find_msb(code ^ codes[new_split]) < pref);
+
+          split = new_split; // Accept newly proposed split for this iteration
+        } while (step > 1);
+
+        /* split = first + (last - first) / 2; // blunt halfway split for testing */
+
+        return split;
       }
     } // namespace radix
 
@@ -135,16 +169,60 @@ namespace met {
 
       Tree tree(order.size());
 
-      // Build subdivision; push downwards
-      tree.nodes[0] = Node { .e_begin = 0, .e_extent = tree.n_objects };
-      for (int lvl = 1; lvl < tree.n_levels; lvl++) {
-        // const Node &parent = tree.node_begin_i(lvl) >> tree_degr_log
-        
-        for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
-          
-        }
+      // uint a = 0xFFFF0100;
+      // uint b = 0xFFFF0000;
+      // // fmt::print("{} - {} - {}\n", std::bitset<32>(a).to_string(), std::bitset<32>(b).to_string(), std::countl_zero(a ^ b));
+      // std::exit(0);
 
-      }
+      // Build subdivision based on morton order; push downwards
+      tree.nodes[0] = Node { .e_begin = 0, .e_extent = tree.n_objects }; // Root node encompasses objects
+      for (int lvl = 0; lvl < tree.n_levels - 1; lvl++) {
+        for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
+          // Load current node for subdivision
+          const Node &node = tree.nodes[i];
+
+          // Perform subdivision log2(Degree) times, starting at the current node
+          std::vector<Node> children = { node };
+          for (int j = Tree::Degree; j > 1; j /= 2) {
+            std::vector<Node> _children;
+            for (auto &node : children) {
+              if (node.e_extent <= 1) {
+                _children.push_back({ .e_extent = 0 });
+                _children.push_back({ .e_extent = 0 });
+                continue;
+              }
+
+              uint begin = node.e_begin;
+              uint end   = begin + node.e_extent - 1;
+              uint split = radix::find_split(codes, begin, end);
+              fmt::print("{} - {}, split at {}\n", begin, end, split);
+
+              _children.push_back({ .e_begin = begin,     .e_extent = 1 + split - begin });
+              _children.push_back({ .e_begin = split + 1, .e_extent = 1 + end - split });
+            }
+            children = _children;  
+          } // for j
+
+          // Store subdivided result in tree
+          uint j_begin = i * Tree::Degree + 1;
+          std::ranges::copy(children, tree.nodes.begin() + j_begin);
+        } // for i
+      } // for lvl
+
+      /* for (int lvl = 0; lvl < tree.n_levels - 1; lvl++) {
+        fmt::print("{}\n\t", lvl);
+        for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
+          const Node &node = tree.nodes[i];
+
+          if (node.e_extent > 0)
+            fmt::print("[{}, {}] ", node.e_begin, node.e_begin + node.e_extent - 1);
+          else
+            fmt::print("[] ");
+        } // for i
+        fmt::print("\n\n");
+      } // for lvl */
+
+      std::exit(0);
 
       // Build bounding volumes; pull upwards
 
@@ -224,7 +302,6 @@ namespace met {
                  { .type = gl::ShaderType::eFragment, 
                    .spirv_path = "resources/shaders/views/dev/draw_bvh.frag.spv",
                    .cross_path = "resources/shaders/views/dev/draw_bvh.frag.json" }};
-
 
     // Specify array and draw object
     m_array = {{ }};
