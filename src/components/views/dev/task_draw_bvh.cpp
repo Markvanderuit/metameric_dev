@@ -13,6 +13,7 @@
 #include <bit>
 #include <bitset>
 #include <execution>
+#include <ranges>
 #include <vector>
 
 namespace met {
@@ -67,13 +68,17 @@ namespace met {
           split = new_split; // Accept newly proposed split for this iteration
         } while (step > 1);
 
-        /* split = first + (last - first) / 2; // blunt halfway split for testing */
-
         return split;
+        /* return first + (last - first) / 2; // blunt halfway split for testing */
       }
     } // namespace radix
 
     /* Implicit tree helper code */
+
+    // Generate a transforming view that performs unsigned integer index access over a range
+    constexpr auto indexed_view(const auto &v) {
+      return std::views::transform([&v](uint i) { return v[i]; });
+    };
 
     // Hardcoded log2 of tree's degree
     template <uint Degr> consteval uint tree_degr_log();
@@ -105,13 +110,14 @@ namespace met {
     // Delaunay search tree; implict bvh structure
     template <uint Degr>
     struct ImplicitTree {
-      constexpr static uint Degree = Degr; // Maximum degree for non-leaf nodes
-      
+      constexpr static uint Degr  = Degr; // Maximum degree for non-leaf nodes
+      constexpr static uint LDegr = tree_degr_log<Degr>(); // Useful constant
+
       struct Node {
-        eig::Array3f b_min;    // Bounding volume minimum
-        uint         e_begin;  // Begin index of underlying element 
-        eig::Array3f b_max;    // Bounding volume center; volume max
-        uint         e_extent; // Extent of underlying element range
+        eig::Array3f b_min    = std::numeric_limits<float>::max(); // Bounding volume minimum
+        uint         e_begin  = 0;                                 // Begin index of underlying element 
+        eig::Array3f b_max    = std::numeric_limits<float>::min(); // Bounding volume center; volume max
+        uint         e_extent = 0;                                 // Extent of underlying element range
       };
     
     public:
@@ -122,7 +128,7 @@ namespace met {
       ImplicitTree(uint n_objects)
       : n_objects(n_objects),
         n_levels(tree_n_lvls<Degr>(n_objects)),
-        nodes(tree_n_nodes<Degr>(n_levels), Node { .e_extent = 0 })
+        nodes(tree_n_nodes<Degr>(n_levels), Node { })
       { }
 
       // Public members
@@ -152,8 +158,7 @@ namespace met {
       // Establish object centers as targets for morton order
       std::vector<eig::Vector3f> centers(delaunay.elems.size());
       std::transform(std::execution::par_unseq, range_iter(delaunay.elems), centers.begin(), [&](const eig::Array4u &el) {
-        return ((delaunay.verts[el[0]] + delaunay.verts[el[1]] + 
-                 delaunay.verts[el[2]] + delaunay.verts[el[3]]) / 4.f).eval();
+        return ((delaunay.verts[el[0]] + delaunay.verts[el[1]] + delaunay.verts[el[2]] + delaunay.verts[el[3]]) / 4.f).eval();
       });
 
       // Build quick and dirty morton order
@@ -167,121 +172,72 @@ namespace met {
       auto _elems = delaunay.elems;
       std::transform(std::execution::par_unseq, range_iter(order), delaunay.elems.begin(), [&](uint i) { return _elems[i]; });
 
+      // Initialize tree holder object; root node encompasses entire data range
       Tree tree(order.size());
-
-      // uint a = 0xFFFF0100;
-      // uint b = 0xFFFF0000;
-      // // fmt::print("{} - {} - {}\n", std::bitset<32>(a).to_string(), std::bitset<32>(b).to_string(), std::countl_zero(a ^ b));
-      // std::exit(0);
+      tree.nodes[0] = Node { .e_begin = 0, .e_extent = tree.n_objects };
 
       // Build subdivision based on morton order; push downwards
-      tree.nodes[0] = Node { .e_begin = 0, .e_extent = tree.n_objects }; // Root node encompasses objects
       for (int lvl = 0; lvl < tree.n_levels - 1; lvl++) {
+        #pragma omp parallel for
         for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
           // Load current node for subdivision
           const Node &node = tree.nodes[i];
 
-          // Perform subdivision log2(Degree) times, starting at the current node
+          // Perform subdivision log2(Degr) times, starting at the current node; 
+          // this adapts to binary/quad/octree configurations
           std::vector<Node> children = { node };
-          for (int j = Tree::Degree; j > 1; j /= 2) {
+          for (int j = Tree::LDegr; j > 0; --j) { // 3, 2, 1
             std::vector<Node> _children;
             for (auto &node : children) {
+              // Propagate leaf/empty nodes to bottom of tree
               if (node.e_extent <= 1) {
-                _children.push_back({ .e_extent = 0 });
-                _children.push_back({ .e_extent = 0 });
+                _children.push_back(node);
                 continue;
               }
 
-              uint begin = node.e_begin;
-              uint end   = begin + node.e_extent - 1;
+              // Determine ranges of left/right nodes
+              uint begin = node.e_begin, end = begin + node.e_extent - 1;
               uint split = radix::find_split(codes, begin, end);
-              fmt::print("{} - {}, split at {}\n", begin, end, split);
-
-              _children.push_back({ .e_begin = begin,     .e_extent = 1 + split - begin });
-              _children.push_back({ .e_begin = split + 1, .e_extent = 1 + end - split });
+              
+              // Push subdivided nodes
+              _children.push_back({ .e_begin = begin,     .e_extent = split - begin + 1 });
+              _children.push_back({ .e_begin = split + 1, .e_extent = end - split });
             }
             children = _children;  
           } // for j
 
           // Store subdivided result in tree
-          uint j_begin = i * Tree::Degree + 1;
-          std::ranges::copy(children, tree.nodes.begin() + j_begin);
+          std::ranges::copy(children, tree.nodes.begin() + i * Tree::Degr + 1);
         } // for i
       } // for lvl
 
-      /* for (int lvl = 0; lvl < tree.n_levels - 1; lvl++) {
-        fmt::print("{}\n\t", lvl);
-        for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
-          const Node &node = tree.nodes[i];
-
-          if (node.e_extent > 0)
-            fmt::print("[{}, {}] ", node.e_begin, node.e_begin + node.e_extent - 1);
-          else
-            fmt::print("[] ");
-        } // for i
-        fmt::print("\n\n");
-      } // for lvl */
-
-      std::exit(0);
-
       // Build bounding volumes; pull upwards
-
-
-
-      // fmt::print("n_children : {}\n", Tree::Degree);
-      // fmt::print("levels     : {}\n", tree.n_levels);
-      // fmt::print("n_objects  : {}\n", tree.n_objects);
-      // fmt::print("n_nodes    : {}\n", tree.nodes.size());
-
-      // Build bottom-most level
-      #pragma omp parallel for
-      for (int i = tree.leaf_begin_i(); i < tree.leaf_end_i(); ++i) { // extent of nr. of leaf objects, not nr. of leaf nodes
-        uint i_underlying = i - static_cast<uint>(tree.leaf_begin_i());
-      
-        // Gather vertex data for the current element
-        const eig::Array4u &el = delaunay.elems[i_underlying];
-        std::array<eig::Array3f, 4> vt;
-        std::ranges::transform(el, vt.begin(), [&](uint i) { return delaunay.verts[i]; });
-
-        // Build node data, wrapping bbox around element
-        tree.nodes[i] = Node { .b_min    = vt[0].min(vt[1].min(vt[2].min(vt[3]))).eval(),
-                               .e_begin  = i_underlying,
-                               .b_max    = vt[0].max(vt[1].max(vt[2].max(vt[3]))).eval(),
-                               .e_extent = 1 };
-
-        // fmt::print("{}\t{}\n", vt, tree.nodes[i].b_min);
-      } // end for i
-      
-      // Build upper levels
-      for (int lvl = tree.n_levels - 2; lvl >= 0; lvl--) {
+      for (int lvl = tree.n_levels - 1; lvl >= 0; --lvl) {
         #pragma omp parallel for
         for (int i = tree.node_begin_i(lvl); i < tree.node_end_i(lvl); ++i) {
-          // Start with new empty node as reduction target
-          Node node = { .e_extent = 0 };
+          // Load current node, skip padding nodes
+          Node &node = tree.nodes[i];
+          guard_continue(node.e_extent > 0);
 
-          uint j_begin = i * Tree::Degree + 1;
-          for (uint j = j_begin; j < j_begin + Tree::Degree; ++j) {
-            const Node &child = tree.nodes[j];
-
-            // Test if either node contains data
-            if (child.e_extent == 0) {
-              continue;
-            } else if (node.e_extent == 0) {
-              node = child;
-              continue;
+          // Build data; separate into leaf/non-leaf cases 
+          if (node.e_extent == 1 || lvl == tree.n_levels - 1) {  // Leaf node; 
+            // Fit bounding volume around contained mesh vertices
+            for (const auto &vt : std::views::iota(node.e_begin, node.e_begin + node.e_extent)
+                                | indexed_view(delaunay.elems) | std::views::join | indexed_view(delaunay.verts)) {
+              node.b_min = node.b_min.cwiseMin(vt);
+              node.b_max = node.b_max.cwiseMax(vt);
             }
-            
-            // Reduce result into new node if both contain data
-            node.e_begin  = std::min(node.e_begin, child.e_begin);
-            node.e_extent = node.e_extent + child.e_extent; 
-            node.b_min    = node.b_min.cwiseMin(child.b_min);
-            node.b_max    = node.b_max.cwiseMax(child.b_max);
-          } // end for j
-
-          tree.nodes[i] = node;
+          } else {  // Non-leaf node; 
+            // Generate bounding volume over non-empty children
+            for (const auto &child : std::views::iota(1 + i * Tree::Degr, 1 + (i + 1) * Tree::Degr)
+                                   | indexed_view(tree.nodes)) {
+              node.b_min = node.b_min.cwiseMin(child.b_min);
+              node.b_max = node.b_max.cwiseMax(child.b_max);
+            }
+          }
         } // end for i
       } // end for lvl
-      
+
       return { delaunay, tree };
     }
   } // namespace detail
@@ -333,23 +289,10 @@ namespace met {
     uint draw_extent    = tree.node_size_i(m_tree_level);
     m_draw.vertex_count = 36 * draw_extent;
 
-    // fmt::print("{} - {}\n", draw_begin, draw_extent);
-
     // Push uniform data
     m_unif_map->node_begin  = draw_begin;
     m_unif_map->node_extent = draw_extent;
     m_unif_buffer.flush();
-
-    static bool is_first_run = false;
-    if (!is_first_run) {
-      fmt::print("{} - {}\n", tree.nodes[0].b_min, tree.nodes[0].b_max);
-      
-      is_first_run = true;
-    }
-
-    for (int i = tree.node_begin_i(1); i < tree.node_end_i(1); ++i) {
-      fmt::print("{} - {}\n", i, tree.nodes[i].e_extent);
-    }
 
     // On relevant state change, update uniform buffer data
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {

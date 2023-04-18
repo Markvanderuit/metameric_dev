@@ -67,7 +67,7 @@ namespace met {
     // Delaunay search tree; implict bvh structure
     template <uint Degr>
     struct ImplicitTree {
-      constexpr static uint Degree = Degr; // Maximum degree for non-leaf nodes
+      constexpr static uint Degr = Degr; // Maximum degree for non-leaf nodes
       
       struct Node {
         eig::Array3f b_min;    // Bounding volume minimum
@@ -130,7 +130,7 @@ namespace met {
       std::transform(std::execution::par_unseq, range_iter(order), delaunay.elems.begin(), [&](uint i) { return _elems[i]; });
 
       Tree tree(order.size());
-      // fmt::print("n_children : {}\n", Tree::Degree);
+      // fmt::print("n_children : {}\n", Tree::Degr);
       // fmt::print("levels     : {}\n", tree.n_levels);
       // fmt::print("n_objects  : {}\n", tree.n_objects);
       // fmt::print("n_nodes    : {}\n", tree.nodes.size());
@@ -161,8 +161,8 @@ namespace met {
           // Start with new empty node as reduction target
           Node node = { .e_extent = 0 };
 
-          uint j_begin = i * Tree::Degree + 1;
-          for (uint j = j_begin; j < j_begin + Tree::Degree; ++j) {
+          uint j_begin = i * Tree::Degr + 1;
+          for (uint j = j_begin; j < j_begin + Tree::Degr; ++j) {
             const Node &child = tree.nodes[j];
 
             // Test if either node contains data
