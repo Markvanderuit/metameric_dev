@@ -115,21 +115,23 @@ namespace met::detail {
     m_n_levels(bvh_n_lvls<Degr>(el.size())) {
     met_trace();
     
-    // Used objects for coming operations
+    // Prepare node storage
     m_nodes.resize(bvh_n_nodes<Degr>(m_n_levels), Node { });
-    std::vector<eig::Array3f> centers(m_n_primitives);
-    std::vector<uint>         codes(m_n_primitives);
-    std::vector<uint>         order(m_n_primitives);
-
-    // Generate object centers for primitives, as morton order targets
-    std::transform(std::execution::par_unseq, range_iter(el), centers.begin(), 
-      [&](const eig::Array4u &elem) { return ((vt[elem[0]] + vt[elem[1]] + vt[elem[2]] + vt[elem[3]]) / 4.f).eval(); });
-
+    m_nodes[0] = { .i = 0, .n = m_n_primitives }; // Root node encompass all primitives
+    
     // Build quick and dirty morton order
-    // TODO; get a radix sort in here, dammit
-    std::transform(std::execution::par_unseq, range_iter(centers), codes.begin(), radix::morton_code);
-    std::iota(range_iter(order), 0u);
-    std::sort(std::execution::par_unseq, range_iter(order), [&](uint i, uint j) { return codes[i] < codes[j]; });
+    std::vector<uint> codes(m_n_primitives), order(m_n_primitives);
+    {
+      // Generate object centers for primitives, output morton codes
+      std::transform(std::execution::par_unseq, range_iter(el), codes.begin(), [&](const eig::Array4u &elem) { 
+        return radix::morton_code((vt[elem[0]] + vt[elem[1]] + vt[elem[2]] + vt[elem[3]]) / 4.f); 
+      });
+
+      // Generate morton morton order
+      // TODO; get a radix sort in here, dammit
+      std::iota(range_iter(order), 0u);
+      std::sort(std::execution::par_unseq, range_iter(order), [&](uint i, uint j) { return codes[i] < codes[j]; });
+    }
 
     // Adjust input data to adhere to order
     // TODO; instead of doing hidden stuff, provide a copy of the data
