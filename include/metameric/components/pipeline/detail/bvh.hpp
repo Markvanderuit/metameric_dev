@@ -3,8 +3,15 @@
 #include <metameric/core/math.hpp>
 #include <limits>
 #include <span>
+#include <vector>
 
 namespace met::detail {
+  // Hardcoded log2 of 8/4/2
+  template <uint Degr> consteval uint bvh_degr_log();
+  template <> consteval uint bvh_degr_log<2>() { return 1; }
+  template <> consteval uint bvh_degr_log<4>() { return 2; }
+  template <> consteval uint bvh_degr_log<8>() { return 3; }
+
   enum class BVHPrimitive {
     ePoint,
     eTriangle,
@@ -24,8 +31,8 @@ namespace met::detail {
   struct BVH {
     using Node = BVHNode;
     
-    constexpr static uint Degr  = Degree;                // Maximum degree for non-leaf nodes
-    constexpr static uint LDegr = tree_degr_log<Degr>(); // Useful constant for build/traverse
+    constexpr static uint Degr  = Degree;               // Maximum degree for non-leaf nodes
+    constexpr static uint LDegr = bvh_degr_log<Degr>(); // Useful constant for build/traverse
 
   private:
     std::vector<Node> m_nodes;
@@ -35,19 +42,19 @@ namespace met::detail {
   public:
     BVH() = default;
 
-    BVH(std::span<const eig::Array3f> vt)
+    BVH(std::span<eig::Array3f> vt)
     requires(Ty == BVHPrimitive::ePoint);
 
-    BVH(std::span<const eig::Array3f> vt, std::span<const eig::Array3u> el)
+    BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)
     requires(Ty == BVHPrimitive::eTriangle);
 
-    BVH(std::span<const eig::Array3f> vt, std::span<const eig::Array4u> el)
+    BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
     requires(Ty == BVHPrimitive::eTetrahedron);
 
   public:
-    uint n_levels()     const { m_n_levels;     };
-    uint n_nodes()      const { m_nodes.size(); };
-    uint n_primitives() const { m_n_primitives; };
+    uint n_levels()     const { return m_n_levels;     };
+    uint n_nodes()      const { return m_nodes.size(); };
+    uint n_primitives() const { return m_n_primitives; };
 
   public:
     std::span<const Node> nodes() const { return m_nodes; }
