@@ -93,41 +93,62 @@ namespace met::detail {
   }
 
   template <uint D, BVHPrimitive Ty>
-  BVH<D, Ty>::BVH(uint max_n_primitives) {
+  BVH<D, Ty>::BVH(uint max_primitives) {
     met_trace();
-    m_nodes.resize(bvh_n_nodes<Degr>(bvh_n_lvls<Degr>(max_n_primitives)));
+    reserve(max_primitives);
   }
 
   template <uint D, BVHPrimitive Ty>
   BVH<D, Ty>::BVH(std::span<eig::Array3f> vt)
-  requires(Ty == BVHPrimitive::ePoint)
-  : m_n_primitives(vt.size()),
-    m_n_levels(bvh_n_lvls<Degr>(m_n_primitives)),
-    m_nodes(bvh_n_nodes<Degr>(m_n_levels), Node { }) {
+  requires(Ty == BVHPrimitive::ePoint) {
     met_trace();
-    debug::check_expr(false, "Not implemented!");
+    build(vt);
   }
 
   template <uint D, BVHPrimitive Ty>
   BVH<D, Ty>::BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)
-  requires(Ty == BVHPrimitive::eTriangle)
-  : m_n_primitives(el.size()),
-    m_n_levels(bvh_n_lvls<Degr>(m_n_primitives)),
-    m_nodes(bvh_n_nodes<Degr>(m_n_levels), Node { }) {
+  requires(Ty == BVHPrimitive::eTriangle) {
+    met_trace();
+    build(vt, el);
+  }
+
+  template <uint D, BVHPrimitive Ty>
+  BVH<D, Ty>::BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
+  requires(Ty == BVHPrimitive::eTetrahedron) {
+    met_trace();
+    build(vt, el);
+  }
+
+  template <uint D, BVHPrimitive Ty>
+  void BVH<D, Ty>::reserve(uint max_primitives) {
+    m_nodes.resize(bvh_n_nodes<Degr>(bvh_n_lvls<Degr>(max_primitives)));
+  }
+
+  template <uint D, BVHPrimitive Ty>
+  void BVH<D, Ty>::build(std::span<eig::Array3f> vt)
+  requires(Ty == BVHPrimitive::ePoint) {
     met_trace();
     debug::check_expr(false, "Not implemented!");
   }
 
   template <uint D, BVHPrimitive Ty>
-  BVH<D, Ty>::BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
-  requires(Ty == BVHPrimitive::eTetrahedron)
-  : BVH(el.size()) {
+  void BVH<D, Ty>::build(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)
+  requires(Ty == BVHPrimitive::eTriangle) {
     met_trace();
-    
+    debug::check_expr(false, "Not implemented!");
+  }
+
+  template <uint D, BVHPrimitive Ty>
+  void BVH<D, Ty>::build(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
+  requires(Ty == BVHPrimitive::eTetrahedron) {
+    met_trace();
+
     m_n_primitives = el.size();
-    m_n_levels = bvh_n_lvls<Degr>(el.size());
+    m_n_levels = bvh_n_lvls<Degr>(m_n_primitives);
+    if (m_nodes.size() < bvh_n_nodes<Degr>(m_n_levels))
+      reserve(m_n_primitives);
     m_nodes[0] = { .i = 0, .n = m_n_primitives };
-    
+
     // Build quick and dirty morton order
     std::vector<uint> codes(m_n_primitives);
     std::vector<uint> order(m_n_primitives);
@@ -149,15 +170,12 @@ namespace met::detail {
       // Adjust code data to adhere to order
       std::vector<uint> codes_(codes);
       std::transform(std::execution::par_unseq, range_iter(order), codes.begin(), [&](uint i) { return codes_[i]; });
-    } // order_generation
 
-    // Adjust input data to adhere to order
-    // TODO; instead of doing hidden stuff, provide a copy of the data
-    std::vector<eig::Array4u> el_(range_iter(el));
-    std::transform(std::execution::par_unseq, range_iter(order), el.begin(), [&](uint i) { return el_[i]; });
-    
-    // Initialize root node; encompass all primitives
-    m_nodes[0] = { .i = 0, .n = m_n_primitives };
+      // Adjust input data to adhere to order
+      // TODO; instead of doing hidden stuff, provide a copy of the data
+      std::vector<eig::Array4u> el_(range_iter(el));
+      std::transform(std::execution::par_unseq, range_iter(order), el.begin(), [&](uint i) { return el_[i]; });
+    } // order_generation
 
     // Build subdivision based on morton order; push down from root
     { met_trace_n("subdivision");
@@ -229,7 +247,17 @@ namespace met::detail {
   }
 
   template <uint D, BVHPrimitive Ty>
-  std::span<typename BVH<D, Ty>::Node> BVH<D, Ty>::nodes(uint level) {
+  std::span<const typename BVH<D, Ty>::Node> BVH<D, Ty>::data() const {
+    return { m_nodes.begin(), bvh_n_nodes<Degr>(m_n_levels) };
+  }
+
+  template <uint D, BVHPrimitive Ty>
+  std::span<typename BVH<D, Ty>::Node> BVH<D, Ty>::data() {
+    return { m_nodes.begin(), bvh_n_nodes<Degr>(m_n_levels) };
+  }
+
+  template <uint D, BVHPrimitive Ty>
+  std::span<typename BVH<D, Ty>::Node> BVH<D, Ty>::data(uint level) {
     return { m_nodes.begin() + bvh_lvl_begin<Degr>(level), bvh_lvl_size<Degr>(level) };
   }
 

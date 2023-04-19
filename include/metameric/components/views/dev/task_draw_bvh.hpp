@@ -1,7 +1,8 @@
 #pragma once
 
 
-#include <metameric/core/scheduler.hpp>
+#include <metameric/core/scheduler.hpp>     
+#include <metameric/components/pipeline/detail/bvh.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
@@ -19,6 +20,9 @@ namespace met {
       alignas(4) uint node_extent;
     };
 
+    detail::BVH<
+      8, detail::BVHPrimitive::eTetrahedron
+    >                       m_tree;
     uint                    m_tree_level;
     uint                    m_tree_index;
 

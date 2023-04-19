@@ -40,20 +40,24 @@ namespace met::detail {
     uint              m_n_primitives;
 
   public:
+    // Default constructor
     BVH() = default;
 
-    // Allocating constructor; simply reserves space for maximum nr. of primitives
-    BVH(uint max_n_primitives);
+    // Reserving constructor; simply reserves space for maximum nr. of primitives
+    BVH(uint max_primitives);
 
     // Building constructors for different primitive types
-    BVH(std::span<eig::Array3f> vt)                                    requires(Ty == BVHPrimitive::ePoint);
-    BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)        requires(Ty == BVHPrimitive::eTriangle);
-    BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)        requires(Ty == BVHPrimitive::eTetrahedron);
+    BVH(std::span<eig::Array3f> vt)                             requires(Ty == BVHPrimitive::ePoint);
+    BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
+    BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron);
+
+    // Reserve space without rebuild
+    void reserve(uint max_primitives);
 
     // Build functions for different primitive types
-    /* void build(std::span<eig::Array3f> vt)                             requires(Ty == BVHPrimitive::ePoint);
+    void build(std::span<eig::Array3f> vt)                             requires(Ty == BVHPrimitive::ePoint);
     void build(std::span<eig::Array3f> vt, std::span<eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
-    void build(std::span<eig::Array3f> vt, std::span<eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron); */
+    void build(std::span<eig::Array3f> vt, std::span<eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron);
 
   public:
     uint n_levels()     const { return m_n_levels;     };
@@ -61,8 +65,10 @@ namespace met::detail {
     uint n_primitives() const { return m_n_primitives; };
 
   public:
-    std::span<const Node> nodes() const { return m_nodes; }
-    std::span<Node> nodes() { return m_nodes; }
-    std::span<Node> nodes(uint level);
+    size_t size_bytes()           const { return data().size_bytes();           }
+    size_t size_bytes_reserved()  const { return m_nodes.size() * sizeof(Node); }
+    std::span<const Node> data() const;
+    std::span<Node> data();
+    std::span<Node> data(uint level);
   };
 } // namespace met::detail
