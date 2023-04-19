@@ -1,12 +1,15 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <metameric/components/pipeline/detail/bvh.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/program.hpp>
 
 namespace met {
   class GenDelaunayWeightsTask : public detail::TaskNode {
+    using BVH = detail::BVH<8, detail::BVHPrimitive::eTetrahedron>;
+    
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for
       uint n_verts; // Nr. of vertices defining surrounding hull
