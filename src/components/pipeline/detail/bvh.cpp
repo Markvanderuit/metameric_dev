@@ -92,54 +92,54 @@ namespace met::detail {
     return bvh_lvl_begin<Degr>(lvls + 1); 
   }
 
-  template <uint D, BVHPrimitive Ty>
-  BVH<D, Ty>::BVH(uint max_primitives) {
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  BVH<Vt, D, Ty>::BVH(uint max_primitives) {
     met_trace();
     reserve(max_primitives);
   }
 
-  template <uint D, BVHPrimitive Ty>
-  BVH<D, Ty>::BVH(std::span<eig::Array3f> vt)
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  BVH<Vt, D, Ty>::BVH(std::span<Vt> vt)
   requires(Ty == BVHPrimitive::ePoint) {
     met_trace();
     build(vt);
   }
 
-  template <uint D, BVHPrimitive Ty>
-  BVH<D, Ty>::BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  BVH<Vt, D, Ty>::BVH(std::span<Vt> vt, std::span<eig::Array3u> el)
   requires(Ty == BVHPrimitive::eTriangle) {
     met_trace();
     build(vt, el);
   }
 
-  template <uint D, BVHPrimitive Ty>
-  BVH<D, Ty>::BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  BVH<Vt, D, Ty>::BVH(std::span<Vt> vt, std::span<eig::Array4u> el)
   requires(Ty == BVHPrimitive::eTetrahedron) {
     met_trace();
     build(vt, el);
   }
 
-  template <uint D, BVHPrimitive Ty>
-  void BVH<D, Ty>::reserve(uint max_primitives) {
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  void BVH<Vt, D, Ty>::reserve(uint max_primitives) {
     m_nodes.resize(bvh_n_nodes<Degr>(bvh_n_lvls<Degr>(max_primitives)));
   }
 
-  template <uint D, BVHPrimitive Ty>
-  void BVH<D, Ty>::build(std::span<eig::Array3f> vt)
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  void BVH<Vt, D, Ty>::build(std::span<Vt> vt)
   requires(Ty == BVHPrimitive::ePoint) {
     met_trace();
     debug::check_expr(false, "Not implemented!");
   }
 
-  template <uint D, BVHPrimitive Ty>
-  void BVH<D, Ty>::build(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  void BVH<Vt, D, Ty>::build(std::span<Vt> vt, std::span<eig::Array3u> el)
   requires(Ty == BVHPrimitive::eTriangle) {
     met_trace();
     debug::check_expr(false, "Not implemented!");
   }
 
-  template <uint D, BVHPrimitive Ty>
-  void BVH<D, Ty>::build(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  void BVH<Vt, D, Ty>::build(std::span<Vt> vt, std::span<eig::Array4u> el)
   requires(Ty == BVHPrimitive::eTetrahedron) {
     met_trace();
 
@@ -147,6 +147,9 @@ namespace met::detail {
     m_n_levels = bvh_n_lvls<Degr>(m_n_primitives);
     if (m_nodes.size() < bvh_n_nodes<Degr>(m_n_levels))
       reserve(m_n_primitives);
+    
+    // Initialize or clear data
+    std::fill(std::execution::par_unseq, range_iter(m_nodes), Node { });
     m_nodes[0] = { .i = 0, .n = m_n_primitives };
 
     // Build quick and dirty morton order
@@ -245,32 +248,49 @@ namespace met::detail {
     } // bounding_volume_generation
   }
 
-  template <uint D, BVHPrimitive Ty>
-  std::span<const typename BVH<D, Ty>::Node> BVH<D, Ty>::data() const {
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  std::span<typename BVH<Vt, D, Ty>::Node> BVH<Vt, D, Ty>::data() {
     return { m_nodes.begin(), bvh_n_nodes<Degr>(m_n_levels) };
   }
 
-  template <uint D, BVHPrimitive Ty>
-  std::span<typename BVH<D, Ty>::Node> BVH<D, Ty>::data() {
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  std::span<const typename BVH<Vt, D, Ty>::Node> BVH<Vt, D, Ty>::data() const {
     return { m_nodes.begin(), bvh_n_nodes<Degr>(m_n_levels) };
   }
 
-  template <uint D, BVHPrimitive Ty>
-  std::span<typename BVH<D, Ty>::Node> BVH<D, Ty>::data(uint level) {
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  std::span<typename BVH<Vt, D, Ty>::Node> BVH<Vt, D, Ty>::data(uint level) {
+    return { m_nodes.begin() + bvh_lvl_begin<Degr>(level), bvh_lvl_size<Degr>(level) };
+  }
+
+  template <typename Vt, uint D, BVHPrimitive Ty>
+  std::span<const typename BVH<Vt, D, Ty>::Node> BVH<Vt, D, Ty>::data(uint level) const {
     return { m_nodes.begin() + bvh_lvl_begin<Degr>(level), bvh_lvl_size<Degr>(level) };
   }
 
   /* Explicit template declarations */
 
-  template class BVH<2, BVHPrimitive::ePoint>;
-  template class BVH<4, BVHPrimitive::ePoint>;
-  template class BVH<8, BVHPrimitive::ePoint>;
+  template class BVH<eig::Array3f, 2, BVHPrimitive::ePoint>;
+  template class BVH<eig::Array3f, 4, BVHPrimitive::ePoint>;
+  template class BVH<eig::Array3f, 8, BVHPrimitive::ePoint>;
   
-  template class BVH<2, BVHPrimitive::eTriangle>;
-  template class BVH<4, BVHPrimitive::eTriangle>;
-  template class BVH<8, BVHPrimitive::eTriangle>;
+  template class BVH<eig::Array3f, 2, BVHPrimitive::eTriangle>;
+  template class BVH<eig::Array3f, 4, BVHPrimitive::eTriangle>;
+  template class BVH<eig::Array3f, 8, BVHPrimitive::eTriangle>;
 
-  template class BVH<2, BVHPrimitive::eTetrahedron>;
-  template class BVH<4, BVHPrimitive::eTetrahedron>;
-  template class BVH<8, BVHPrimitive::eTetrahedron>;
+  template class BVH<eig::Array3f, 2, BVHPrimitive::eTetrahedron>;
+  template class BVH<eig::Array3f, 4, BVHPrimitive::eTetrahedron>;
+  template class BVH<eig::Array3f, 8, BVHPrimitive::eTetrahedron>;
+
+  template class BVH<eig::AlArray3f, 2, BVHPrimitive::ePoint>;
+  template class BVH<eig::AlArray3f, 4, BVHPrimitive::ePoint>;
+  template class BVH<eig::AlArray3f, 8, BVHPrimitive::ePoint>;
+  
+  template class BVH<eig::AlArray3f, 2, BVHPrimitive::eTriangle>;
+  template class BVH<eig::AlArray3f, 4, BVHPrimitive::eTriangle>;
+  template class BVH<eig::AlArray3f, 8, BVHPrimitive::eTriangle>;
+
+  template class BVH<eig::AlArray3f, 2, BVHPrimitive::eTetrahedron>;
+  template class BVH<eig::AlArray3f, 4, BVHPrimitive::eTetrahedron>;
+  template class BVH<eig::AlArray3f, 8, BVHPrimitive::eTetrahedron>;
 } // namespace met::detail

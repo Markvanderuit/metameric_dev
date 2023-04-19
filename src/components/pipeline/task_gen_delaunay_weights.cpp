@@ -47,11 +47,11 @@ namespace met {
     m_vert_map = vert_buffer.map_as<eig::AlArray3f>(buffer_access_flags);
     m_elem_map = elem_buffer.map_as<eig::Array4u>(buffer_access_flags);
 
-    // Initialize search tree
+    // Initialize search tree and tesselation structure
+    info("delaunay").set<AlignedDelaunayData>({ });
     const auto &tree = info("search_tree").set<BVH>(BVH(buffer_init_size)).read_only<BVH>();
 
     // Initialize buffer holding barycentric weights
-    info("delaunay").set<AlignedDelaunayData>({ });  // Generated delaunay tetrahedralization over input vertices
     info("colr_buffer").set(std::move(colr_buffer)); // OpenGL buffer storing texture color positions
     info("vert_buffer").set(std::move(vert_buffer)); // OpenGL buffer storing delaunay vertex positions
     info("elem_buffer").set(std::move(elem_buffer)); // OpenGL buffer storing delaunay tetrahedral elements
@@ -83,16 +83,16 @@ namespace met {
 
     // Get modified resources
     auto &i_delaunay    = info("delaunay").writeable<AlignedDelaunayData>();
+    auto &i_search_tree = info("search_tree").writeable<BVH>();
     auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
     auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
+    auto &i_tree_buffer = info("tree_buffer").writeable<gl::Buffer>();
 
-    // Generate new delaunay structure
+    // Generate new delaunay structure and search tree
     std::vector<Colr> delaunay_input(e_proj_data.verts.size());
     std::ranges::transform(e_proj_data.verts, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
     i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
-
-    // Push tree to buffer
-    // m_tree_buffer = {{ .data = obj_span<const std::byte>(tree.nodes) }};
+    i_search_tree.build(i_delaunay.verts, i_delaunay.elems);
 
     // Recover triangle element data and store in project
     auto [_, elems] = convert_mesh<AlignedMeshData>(i_delaunay);
@@ -110,6 +110,10 @@ namespace met {
     std::ranges::copy(i_delaunay.elems, m_elem_map.begin());
     i_elem_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
     
+    // Push stale element data // TODO optimize?
+    auto tree_data = cast_span<const std::byte>(i_search_tree.data());
+    i_tree_buffer.set(tree_data, tree_data.size()); // Specify size as buffer over-reserves data size
+
     // Push uniform data
     m_uniform_map->n_verts = i_delaunay.verts.size();
     m_uniform_map->n_elems = i_delaunay.elems.size();
@@ -125,5 +129,5 @@ namespace met {
     
     // Dispatch shader to generate delaunay convex weights
     gl::dispatch_compute(m_dispatch);
-  }
+  } 
 } // namespace met
