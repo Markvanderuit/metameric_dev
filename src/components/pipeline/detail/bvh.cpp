@@ -179,7 +179,6 @@ namespace met::detail {
 
     // Build subdivision based on morton order; push down from root
     { met_trace_n("subdivision");
-
       for (int lvl = 0; lvl < m_n_levels - 1; ++lvl) {
         // Iterate over nodes on level
         #pragma omp parallel for
