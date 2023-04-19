@@ -20,6 +20,7 @@ namespace met {
     };
 
     uint                    m_tree_level;
+    uint                    m_tree_index;
 
     gl::Buffer              m_tree_buffer;
     gl::Buffer              m_unif_buffer;

@@ -296,9 +296,9 @@ namespace met {
     // auto [_, tree] = detail::generate_search_tree_mod<AlignedDelaunayData, 8>(e_delaunay);
 
     // Determine draw count
-    auto node_level = bvh.nodes(m_tree_level);
-    uint draw_begin     = std::distance(bvh.nodes().begin(), node_level.begin()); //  tree.node_begin_i(m_tree_level);
-    uint draw_extent    = node_level.size();
+    auto node_level     = bvh.nodes(m_tree_level);
+    uint draw_begin     = std::distance(bvh.nodes().begin(), node_level.begin() + m_tree_index); //  tree.node_begin_i(m_tree_level);
+    uint draw_extent    = 1; // node_level.size();
     m_draw.vertex_count = 36 * draw_extent;
 
     // Push uniform data
@@ -329,8 +329,17 @@ namespace met {
 
     // Spawn ImGui debug window
     if (ImGui::Begin("BVH debug window")) {
-      uint pmin = 0, pmax = bvh.n_levels() - 1;
-      ImGui::SliderScalar("Level", ImGuiDataType_U32, &m_tree_level, &pmin, &pmax);
+      uint tree_level_min = 0, tree_level_max = bvh.n_levels() - 1;
+      ImGui::SliderScalar("Level", ImGuiDataType_U32, &m_tree_level, &tree_level_min, &tree_level_max);
+
+      uint tree_index_min = 0, tree_index_max = bvh.nodes(m_tree_level).size() - 1;
+      ImGui::SliderScalar("Index", ImGuiDataType_U32, &m_tree_index, &tree_index_min, &tree_index_max);
+
+      const auto &node = bvh.nodes()[draw_begin];
+      ImGui::Value("Node index", draw_begin);
+      ImGui::Value("Node begin", node.i);
+      ImGui::Value("Node end",   node.i + node.n - 1);
+      ImGui::Value("Node size",  node.n);
     }
     ImGui::End();
   }

@@ -42,14 +42,18 @@ namespace met::detail {
   public:
     BVH() = default;
 
-    BVH(std::span<eig::Array3f> vt)
-    requires(Ty == BVHPrimitive::ePoint);
+    // Allocating constructor; simply reserves space for maximum nr. of primitives
+    BVH(uint max_n_primitives);
 
-    BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)
-    requires(Ty == BVHPrimitive::eTriangle);
+    // Building constructors for different primitive types
+    BVH(std::span<eig::Array3f> vt)                                    requires(Ty == BVHPrimitive::ePoint);
+    BVH(std::span<eig::Array3f> vt, std::span<eig::Array3u> el)        requires(Ty == BVHPrimitive::eTriangle);
+    BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)        requires(Ty == BVHPrimitive::eTetrahedron);
 
-    BVH(std::span<eig::Array3f> vt, std::span<eig::Array4u> el)
-    requires(Ty == BVHPrimitive::eTetrahedron);
+    // Build functions for different primitive types
+    /* void build(std::span<eig::Array3f> vt)                             requires(Ty == BVHPrimitive::ePoint);
+    void build(std::span<eig::Array3f> vt, std::span<eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
+    void build(std::span<eig::Array3f> vt, std::span<eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron); */
 
   public:
     uint n_levels()     const { return m_n_levels;     };
