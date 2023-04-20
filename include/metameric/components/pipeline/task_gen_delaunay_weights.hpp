@@ -8,7 +8,7 @@
 
 namespace met {
   class GenDelaunayWeightsTask : public detail::TaskNode {
-    using BVH = detail::BVH<eig::AlArray3f, 8, detail::BVHPrimitive::eTetrahedron>;
+    using BVH = detail::BVH<eig::AlArray3f, detail::BVHNode, 8, detail::BVHPrimitive::eTetrahedron>;
     
     struct UniformBuffer {
       uint n;       // Nr. of points to dispatch computation for

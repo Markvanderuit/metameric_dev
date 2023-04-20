@@ -12,13 +12,22 @@ namespace met::detail {
   template <> consteval uint bvh_degr_log<4>() { return 2; }
   template <> consteval uint bvh_degr_log<8>() { return 3; }
 
+  // Type of data primitive over which the hierarchy is constructed
   enum class BVHPrimitive {
     ePoint,
     eTriangle,
     eTetrahedron
   };
 
-  // Packed BVH node structure; 2x4b on GL side
+  // Packed ball-tree node structure; 2x4b on GL side
+  struct BTNode {
+    eig::Array3f p = 0; // Sphere center
+    float        r = 0; // Sphere radius
+    uint         i = 0; // Underlying range begin
+    uint         n = 0; // Underlying range extent
+  };
+
+  // Packed bounding-volume-hierarchy node structure; 2x4b on GL side
   struct BVHNode {
     eig::Array3f minb = std::numeric_limits<float>::max(); // Bounding volume minimum
     uint         i    = 0;                                 // Underlying range begin
@@ -27,9 +36,14 @@ namespace met::detail {
   };
 
   // Simple implicit BVH with padding, supports oc-/quad-/binary structure
-  template <typename Vert, uint Degree, BVHPrimitive Ty>
-  struct BVH {
-    using Node = BVHNode;
+  template <
+    typename VertTy,
+    typename NodeTy,
+    uint Degree, 
+    BVHPrimitive Ty
+  > struct BVH {
+    using Node = NodeTy;
+    using Vert = VertTy;
     
     constexpr static uint Degr  = Degree;               // Maximum degree for non-leaf nodes
     constexpr static uint LDegr = bvh_degr_log<Degr>(); // Useful constant for build/traverse
@@ -61,15 +75,18 @@ namespace met::detail {
 
   public:
     uint n_levels()     const { return m_n_levels;     };
-    uint n_nodes()      const { return m_nodes.size(); };
     uint n_primitives() const { return m_n_primitives; };
 
   public:
-    size_t size_bytes()           const { return data().size_bytes();           }
-    size_t size_bytes_reserved()  const { return m_nodes.size() * sizeof(Node); }
+    size_t size()                const { return data().size();   };
+    size_t size_reserved()       const { return m_nodes.size();  };
+    size_t size_bytes()          const { return data().size_bytes();           }
+    size_t size_bytes_reserved() const { return m_nodes.size() * sizeof(Node); }
+
+  public:
+    std::span<Node>       data();
     std::span<const Node> data() const;
-    std::span<Node> data();
-    std::span<Node> data(uint level);
+    std::span<Node>       data(uint level);
     std::span<const Node> data(uint level) const;
   };
 } // namespace met::detail

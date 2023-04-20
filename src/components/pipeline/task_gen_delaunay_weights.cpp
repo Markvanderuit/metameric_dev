@@ -123,7 +123,7 @@ namespace met {
     m_program.bind("b_unif", m_uniform_buffer);
     m_program.bind("b_vert", i_vert_buffer);
     m_program.bind("b_elem", i_elem_buffer);
-    // m_program.bind("b_tree", m_tree_buffer);
+    // m_program.bind("b_tree", i_tree_buffer);
     m_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
     m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
     
