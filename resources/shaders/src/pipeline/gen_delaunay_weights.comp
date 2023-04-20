@@ -6,10 +6,10 @@
 
 // Delaunay search tree; node data structure
 struct Node { 
-  vec3 b_min;    // Bounding volume minimum
-  uint e_begin;  // Begin index of underlying range
-  vec3 b_max;    // Bounding volume maximum
-  uint e_extent; // Extent of underlying range
+  vec3 maxb; // Bounding volume minimum
+  uint i;    // Begin index of underlying range
+  vec3 minb; // Bounding volume maximum
+  uint n;    // Extent of underlying range
 };
 
 // General layout rule declarations
@@ -40,7 +40,7 @@ const uint max_nodes_support = 512;
 // Shared memory declarations
 shared vec3  s_verts_in[max_verts_support]; // Shared load of vert_in buffer
 shared uvec4 s_elems_in[max_elems_support]; // Shared load of elem_in buffer
-// shared Node  s_nodes_in[max_nodes_support]; // Shared load of node_in buffer
+shared Node  s_nodes_in[max_nodes_support]; // Shared load of node_in buffer
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < unif_in.n_verts; i += gl_WorkGroupSize.x)

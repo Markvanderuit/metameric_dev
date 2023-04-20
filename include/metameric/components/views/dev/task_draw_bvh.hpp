@@ -10,7 +10,8 @@
 
 namespace met {
   class ViewportDrawBVHTask : public detail::TaskNode {
-    using BVH = detail::BVH<eig::AlArray3f, 8, detail::BVHPrimitive::eTetrahedron>;
+    using BVH = detail::BVH<eig::AlArray3f, detail::BVHNode, 8, detail::BVHPrimitive::eTetrahedron>;
+    using BVHPoint = detail::BVH<eig::Array3f, detail::BVHNode, 8, detail::BVHPrimitive::ePoint>;
 
     struct CameraBuffer {
       alignas(64) eig::Matrix4f matrix;
@@ -22,6 +23,8 @@ namespace met {
       alignas(4) uint node_extent;
     };
 
+    BVHPoint                m_tree_points;
+    gl::Buffer              m_tree_buffer;
     uint                    m_tree_level;
     uint                    m_tree_index;
 

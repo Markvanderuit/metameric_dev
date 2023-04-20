@@ -37,14 +37,13 @@ const uint bmin_data [8]= uint[8](
   4  // 100 - 011 ; 3    ... 7
 );
 
-const uint elem_data[36] = uint[36](
-// face 0,   face 1
-   2, 0, 1,  2, 3, 0,
-   4, 5, 6,  4, 6, 7,
-   1, 2, 6,  1, 6, 5,
-   2, 3, 7,  2, 7, 6,
-   3, 0, 4,  3, 4, 7,
-   0, 1, 5,  0, 5, 4
+const uint elem_data[48] = uint[48](
+  0, 1, 1, 2, 2, 3, 3, 0,
+  1, 5, 5, 6, 6, 2, 2, 1,
+  0, 3, 3, 7, 7, 4, 4, 0,
+  0, 4, 4, 5, 5, 1, 1, 0,
+  3, 2, 2, 6, 6, 7, 7, 3,
+  5, 4, 4, 7, 7, 6, 6, 5
 );
 
 // Buffer declarations
@@ -58,12 +57,8 @@ layout(binding = 1) uniform b_camr {
   vec2 aspect;
 } camera;
 
-// Vertex stage declarations
-// layout(location = 0) out vec3 out_value_vert;
-// layout(location = 0) out bool out_value_discard;
-
 void main() {
-  uint i = unif.node_begin + gl_VertexID / 36, j = gl_VertexID % 36;
+  uint i = unif.node_begin + gl_VertexID / 48, j = gl_VertexID % 48;
 
   uint mult_bmin_i = bmin_data[elem_data[j]];
   uint mult_bmax_i = 7 - mult_bmin_i;
@@ -76,8 +71,5 @@ void main() {
 
   vec3 v = node.b_min * mult_data[mult_bmin_i] +
            node.b_max * mult_data[mult_bmax_i];
-
-  // Set per vertex position property
-  // out_value_vert = v;
   gl_Position = camera.matrix * vec4(v, 1);
 }
