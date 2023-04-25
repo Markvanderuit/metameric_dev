@@ -1,0 +1,14 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <math.glsl>
+
+layout(local_size_x = 1) in;
+layout(std430)           buffer;
+layout(binding = 0) restrict readonly  buffer b_data { uint value;  } data_in;
+layout(binding = 1) restrict writeonly buffer b_disp { uvec3 value; } data_out;
+
+void main() {
+  guard(gl_LocalInvocationID.x == 0);
+  data_out.value = uvec3(ceil_div(data_in.value, 256u), 1, 1);
+}

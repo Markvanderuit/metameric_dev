@@ -89,4 +89,7 @@ namespace met::detail {
     std::span<Node>       data(uint level);
     std::span<const Node> data(uint level) const;
   };
+
+  template <uint DegreeA, uint DegreeB>
+  std::vector<eig::Array2u> init_pair_data(uint level_a, uint level_b);
 } // namespace met::detail

@@ -68,12 +68,16 @@ namespace met {
     // Get external resources
     const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
     const auto &e_view_state  = info("state", "view_state").read_only<ViewportState>();
-    // const auto &e_tree_data   = info("gen_convex_weights", "search_tree").read_only<BVH>();
-    // const auto &e_tree_buffer = info("gen_convex_weights", "tree_buffer").read_only<gl::Buffer>();
+
+    // Select tree
+    // const auto &tree_data   = info("gen_convex_weights", "elem_tree").read_only<BVH>();
+    // const auto &tree_buffer = info("gen_convex_weights", "tree_buffer").read_only<gl::Buffer>();
+    const auto &tree_data   = m_tree_points;
+    const auto &tree_buffer = m_tree_buffer;
 
     // Determine draw count
-    auto node_level     = m_tree_points.data(m_tree_level);
-    uint draw_begin     = std::distance(m_tree_points.data().begin(), node_level.begin() /* + m_tree_index */); 
+    auto node_level     = tree_data.data(m_tree_level);
+    uint draw_begin     = std::distance(tree_data.data().begin(), node_level.begin() /* + m_tree_index */); 
     uint draw_extent    = node_level.size(); // 1
     m_draw.vertex_count = 48 * draw_extent;
 
@@ -97,8 +101,7 @@ namespace met {
                                  gl::state::ScopedSet(gl::DrawCapability::eMSAA,      false) };
 
     // Bind resources and dispatch draw
-    m_program.bind("b_tree", m_tree_buffer);
-    // m_program.bind("b_tree", e_tree_buffer);
+    m_program.bind("b_tree", tree_buffer);
     m_program.bind("b_unif", m_unif_buffer);
     m_program.bind("b_camr", m_camr_buffer);
 
@@ -106,13 +109,13 @@ namespace met {
 
     // Spawn ImGui debug window
     if (ImGui::Begin("BVH debug window")) {
-      uint tree_level_min = 0, tree_level_max = m_tree_points.n_levels() - 1;
+      uint tree_level_min = 0, tree_level_max = tree_data.n_levels() - 1;
       ImGui::SliderScalar("Level", ImGuiDataType_U32, &m_tree_level, &tree_level_min, &tree_level_max);
 
-      // uint tree_index_min = 0, tree_index_max = m_tree_points.data(m_tree_level).size() - 1;
+      // uint tree_index_min = 0, tree_index_max = tree_data.data(m_tree_level).size() - 1;
       // ImGui::SliderScalar("Index", ImGuiDataType_U32, &m_tree_index, &tree_index_min, &tree_index_max);
 
-      const auto &node = m_tree_points.data()[draw_begin];
+      const auto &node = tree_data.data()[draw_begin];
       // ImGui::Value("Node index", draw_begin);
       ImGui::Value("Node begin", node.i);
       ImGui::Value("Node end",   node.i + node.n - 1);

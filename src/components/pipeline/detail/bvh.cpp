@@ -188,15 +188,17 @@ namespace met::detail {
         #pragma omp parallel for
         for (int i = bvh_lvl_begin<Degr>(lvl); i < bvh_lvl_end<Degr>(lvl); ++i) {
           const Node &node = m_nodes[i];
-          guard_continue(node.n > 1);
 
+          // Generate subdivided nodes, or propagate current node
           std::vector<Node> children = { node };
           for (int j = LDegr; j > 0; --j) { // 3, 2, 1
-            std::vector<Node> _children;
+            guard_break(children.size() > 1 || children[0].n > 1);
+
+            std::vector<Node> children_;
             for (auto &child : children) {
               // Propagate leaf/empty nodes to bottom of tree
               if (child.n <= 1) {
-                _children.push_back(child);
+                children_.push_back(child);
                 continue;
               }
 
@@ -205,10 +207,10 @@ namespace met::detail {
               uint split = radix::find_split(codes, begin, end);
               
               // Push new child nodes
-              _children.push_back({ .i = begin,     .n = split - begin + 1 });
-              _children.push_back({ .i = split + 1, .n = end - split });
+              children_.push_back({ .i = begin,     .n = split - begin + 1 });
+              children_.push_back({ .i = split + 1, .n = end - split });
             } // for node
-            children = _children;  
+            children = children_;  
           } // for j
           
           // Store subdivided result in tree
@@ -299,15 +301,17 @@ namespace met::detail {
         #pragma omp parallel for
         for (int i = bvh_lvl_begin<Degr>(lvl); i < bvh_lvl_end<Degr>(lvl); ++i) {
           const Node &node = m_nodes[i];
-          guard_continue(node.n > 1);
 
+          // Generate subdivided nodes, or propagate current node
           std::vector<Node> children = { node };
           for (int j = LDegr; j > 0; --j) { // 3, 2, 1
-            std::vector<Node> _children;
-            for (auto &child : children) {
+            guard_break(children.size() > 1 || children[0].n > 1);
+            
+            std::vector<Node> children_;
+            for (const auto &child : children) {
               // Propagate leaf/empty nodes to bottom of tree
               if (child.n <= 1) {
-                _children.push_back(child);
+                children_.push_back(child);
                 continue;
               }
 
@@ -316,10 +320,10 @@ namespace met::detail {
               uint split = radix::find_split(codes, begin, end);
               
               // Push new child nodes
-              _children.push_back({ .i = begin,     .n = split - begin + 1 });
-              _children.push_back({ .i = split + 1, .n = end - split });
+              children_.push_back({ .i = begin,     .n = split - begin + 1 });
+              children_.push_back({ .i = split + 1, .n = end - split });
             } // for node
-            children = _children;  
+            children = children_;  
           } // for j
           
           // Store subdivided result in tree
@@ -350,7 +354,7 @@ namespace met::detail {
           } else {  // Non-leaf node; 
             // Generate bounding volume over non-empty children
             for (const auto &child : std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr)
-                                  | indexed_view(m_nodes)) {
+                                   | indexed_view(m_nodes)) {
               node.minb = node.minb.cwiseMin(child.minb);
               node.maxb = node.maxb.cwiseMax(child.maxb);
             }
@@ -384,6 +388,23 @@ namespace met::detail {
     return std::span<const Node> { m_nodes.begin() + bvh_lvl_begin<Degr>(level), bvh_lvl_size<Degr>(level) };
   }
 
+  
+  template <uint DegrA, uint DegrB>
+  std::vector<eig::Array2u> init_pair_data(uint level_a, uint level_b) {
+    uint begin_a = bvh_lvl_begin<DegrA>(level_a);
+    uint begin_b = bvh_lvl_begin<DegrB>(level_b);
+    uint size_a = bvh_lvl_size<DegrA>(level_a);
+    uint size_b = bvh_lvl_size<DegrB>(level_b);
+
+    std::vector<eig::Array2u> data(size_a * size_b);
+    for (uint i = 0; i < size_a; ++i) {
+      for (uint j = 0; j < size_b; ++j) {
+        data[i * size_b + j] = { begin_a + i, begin_b + j };
+      }
+    }
+    return data;
+  }
+
   /* Explicit template declarations */
 
   template class BVH<eig::Array3f, BVHNode, 2, BVHPrimitive::ePoint>;
@@ -409,4 +430,6 @@ namespace met::detail {
   template class BVH<eig::AlArray3f, BVHNode, 2, BVHPrimitive::eTetrahedron>;
   template class BVH<eig::AlArray3f, BVHNode, 4, BVHPrimitive::eTetrahedron>;
   template class BVH<eig::AlArray3f, BVHNode, 8, BVHPrimitive::eTetrahedron>;
+
+  template std::vector<eig::Array2u> init_pair_data<8, 8>(uint, uint);
 } // namespace met::detail

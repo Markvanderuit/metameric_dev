@@ -1,0 +1,105 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <math.glsl>
+
+// Delaunay search tree; node data structure
+struct Node { 
+  vec3 minb; // Bounding volume maximum
+  uint i;    // Begin index of underlying range
+  vec3 maxb; // Bounding volume minimum
+  uint n;    // Extent of underlying range
+};
+
+// Unit of work data assigned by the shader for the next task
+struct WorkUnit {
+  uint elem_i; // Index of the mesh tree node to be compared
+  uint colr_i; // Index of the color tree node to be compared
+};
+
+// Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
+struct Elem {
+  mat3 inv; // Inverse of 3x3 matrix [x - w, y - w, z - w]
+  vec3 sub; // Subtractive component w
+};
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
+
+// Shader storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_posi { vec3 data[]; } posi_in;
+layout(binding = 1) restrict readonly buffer b_pack { Elem data[]; } pack_in;
+layout(binding = 2) restrict readonly buffer b_elem { Node data[]; } elem_in;
+layout(binding = 3) restrict readonly buffer b_colr { Node data[]; } colr_in;
+layout(binding = 4) restrict readonly buffer b_curr {
+  uint     head;   // Atomic head count
+  uint    _pad[3]; // 3x4by padding
+  WorkUnit data[]; // Actual work data
+} curr_work;
+layout(binding = 5) restrict coherent  buffer b_comp { int  data[]; } comp_inout;
+layout(binding = 6) restrict writeonly buffer b_bary { vec4 data[]; } bary_out;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_unif {
+  uint n_colr_nodes;
+  uint n_elem_nodes;
+  uint n_elems;
+} unif_in;
+
+// Shared memory declarations
+shared Elem s_pack_in[512];
+
+void load_shared() {
+  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
+    s_pack_in[i] = pack_in.data[i];
+  memoryBarrierShared();
+  barrier();
+}
+
+void main() {
+  load_shared();
+  
+  const uint i = gl_GlobalInvocationID.x;
+  guard(i < curr_work.head);
+
+  // Load current work and relevant hierarchy nodes
+  WorkUnit curr_unit = curr_work.data[i];
+  Node elem_node = elem_in.data[curr_unit.elem_i];
+  Node colr_node = colr_in.data[curr_unit.colr_i];
+
+  // Iterate relevant color signals
+  for (uint colr_i = colr_node.i; colr_i < colr_node.i + colr_node.n; ++colr_i) {
+    vec3 p = posi_in.data[colr_i];
+
+    vec4 bary_i;
+    int bary_i_err = 1024;
+
+    // Iterate relevant delaunay elements
+    for (uint elem_i = elem_node.i; elem_i < elem_node.i + elem_node.n; ++elem_i) {
+      // Compute barycentric weights using packed element data
+      vec3 xyz = s_pack_in[elem_i].inv * (p - s_pack_in[elem_i].sub);
+      vec4 bary_j = vec4(xyz, 1.f - hsum(xyz));
+      
+      // Compute squared error of potentially negative barycentric weights,
+      // and get an integer representation in here
+      float err = sdot(bary_j - clamp(bary_j, 0, 1));
+      int bary_j_err = err == 0.f ? -1 : int(ceil(err * 255.f));
+
+      // Best result so far
+      if (bary_j_err < bary_i_err) {
+        bary_i_err = bary_j_err;
+        bary_i = vec4(xyz, uintBitsToFloat(elem_i));
+      }
+    } // for elem_i
+
+    // Attempt to establish a global minimum
+    // TODO; this is not actually safe. It will, at best, decrease
+
+    // There should be exactly one correct solution, so no need for atomics
+    // if (bary_i_err == -1)
+    if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err))
+      bary_out.data[colr_i] = bary_i;
+  } // for colr_i
+}

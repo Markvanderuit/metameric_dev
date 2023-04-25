@@ -12,17 +12,22 @@ struct Node {
   uint n;    // Extent of underlying range
 };
 
+// Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
+struct Elem {
+  mat3 inv; // Inverse of 3x3 matrix [x - w, y - w, z - w]
+  vec3 sub; // Subtractive component w
+};
+
 // General layout rule declarations
 layout(local_size_x = 256) in;
 layout(std430)             buffer;
 layout(std140)             uniform;
 
 // Shader storage buffer declarations
-layout(binding = 0) restrict readonly  buffer b_vert { vec3  data[]; } vert_in;
-layout(binding = 1) restrict readonly  buffer b_elem { uvec4 data[]; } elem_in;
-layout(binding = 2) restrict readonly  buffer b_posi { vec3  data[]; } posi_in;
-layout(binding = 3) restrict readonly  buffer b_tree { Node  data[]; } node_in;
-layout(binding = 4) restrict writeonly buffer b_bary { vec4  data[]; } bary_out;
+// layout(binding = 3) restrict readonly  buffer b_tree { Node  data[]; } node_in;
+layout(binding = 0) restrict readonly  buffer b_posi { vec3 data[]; } posi_in;
+layout(binding = 1) restrict readonly  buffer b_pack { Elem data[]; } pack_in;
+layout(binding = 2) restrict writeonly buffer b_bary { vec4 data[]; } bary_out;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_unif {
@@ -32,23 +37,15 @@ layout(binding = 0) uniform b_unif {
   uint n_nodes;
 } unif_in;
 
-// Constants
-const uint max_verts_support = 512;
-const uint max_elems_support = 512;
-const uint max_nodes_support = 512;
-
 // Shared memory declarations
-shared vec3  s_verts_in[max_verts_support]; // Shared load of vert_in buffer
-shared uvec4 s_elems_in[max_elems_support]; // Shared load of elem_in buffer
-shared Node  s_nodes_in[max_nodes_support]; // Shared load of node_in buffer
+shared Elem s_pack_in[512];
+// shared Node  s_nodes_in[max_node_support]; // Shared load of node_in buffer
 
 void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_verts; i += gl_WorkGroupSize.x)
-    s_verts_in[i] = vert_in.data[i];
-  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
-    s_elems_in[i] = elem_in.data[i];
   // for (uint i = gl_LocalInvocationID.x; i < unif_in.n_nodes; i += gl_WorkGroupSize.x)
   //   s_nodes_in[i] = node_in.data[i];
+  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
+    s_pack_in[i] = pack_in.data[i];
   memoryBarrierShared();
   barrier();
 }
@@ -65,29 +62,21 @@ void main() {
   vec4 result_bary;
   uint result_indx;
 
-  // TreeStack stack = tree_root();
-
-
   for (uint j = 0; j < unif_in.n_elems; ++j) {
-    uvec4 elem = s_elems_in[j];
-
-    // Compute barycentric weights for this tetrahedron
-    vec3 sub = s_verts_in[elem.w];
-    mat3 t = inverse(mat3(s_verts_in[elem.x] - sub, s_verts_in[elem.y] - sub, s_verts_in[elem.z] - sub));
-    vec3 xyz = t * (p - sub);
+    // Compute barycentric weights using packed element data
+    vec3 xyz = s_pack_in[j].inv * (p - s_pack_in[j].sub);
     vec4 bary = vec4(xyz, 1.f - hsum(xyz));
 
     // Compute squared error of potentially negative barycentric weights
-    float err = dot(bary, clamp(bary, 0, 1));
+    // float err = dot(bary, clamp(bary, 0, 1));
+    vec4 err4 = bary - clamp(bary, 0, 1); //  abs(dot(bary, clamp(bary, 0, 1)));
+    float err = sdot(err4);
 
     // Store best result if error is improved
     guard_continue(err < result_err);
     result_err  = err;
     result_bary = bary;
     result_indx = j;
-
-    // Exit early if error is zero
-    // guard_break(err != 0); // like that helps thread divergence
   }
 
   // Store result, packing 3/4th of weights, together with the tetrahedron's index

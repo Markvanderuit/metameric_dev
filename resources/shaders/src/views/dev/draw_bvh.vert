@@ -4,10 +4,10 @@
 
 // Tree node data structure
 struct Node {
-  vec3 b_min;
-  uint e_begin;
-  vec3 b_max;
-  uint e_extent;
+  vec3 minb;
+  uint i;
+  vec3 maxb;
+  uint n;
 };
 
 // Layout declarations
@@ -25,7 +25,7 @@ const vec3 mult_data[8] = vec3[8](
   vec3(1, 1, 1)  // 7
 );
 
-const uint bmin_data [8]= uint[8](
+const uint minb_data [8]= uint[8](
   7, // 111 - 000 ; 0    ... 0
   3, // 011 - 100 ; 4    ... 1
   1, // 001 - 110 ; 6    ... 2
@@ -49,8 +49,8 @@ const uint elem_data[48] = uint[48](
 // Buffer declarations
 layout(binding = 0) restrict readonly buffer b_tree { Node data[]; } tree_in;
 layout(binding = 0) uniform b_unif {
-  uint node_begin;
-  uint node_extent;
+  uint nodi;
+  uint nodn;
 } unif;
 layout(binding = 1) uniform b_camr {
   mat4 matrix;
@@ -58,18 +58,21 @@ layout(binding = 1) uniform b_camr {
 } camera;
 
 void main() {
-  uint i = unif.node_begin + gl_VertexID / 48, j = gl_VertexID % 48;
+  uint i = unif.nodi + gl_VertexID / 48, j = gl_VertexID % 48;
 
-  uint mult_bmin_i = bmin_data[elem_data[j]];
-  uint mult_bmax_i = 7 - mult_bmin_i;
+  uint mult_minb_i = minb_data[elem_data[j]];
+  uint mult_maxb_i = 7 - mult_minb_i;
   
   Node node = tree_in.data[i];
-  if (node.e_extent == 0) {
+  if (node.n == 0) {
     gl_Position = vec4(0);
-    return;
+  } else if (node.n == 1) {
+    vec3 v = (node.minb - vec3(0.0025)) * mult_data[mult_minb_i] +
+             (node.maxb + vec3(0.0025)) * mult_data[mult_maxb_i];
+    gl_Position = camera.matrix * vec4(v, 1);
+  } else {
+    vec3 v = node.minb * mult_data[mult_minb_i] +
+             node.maxb * mult_data[mult_maxb_i];
+    gl_Position = camera.matrix * vec4(v, 1);
   }
-
-  vec3 v = node.b_min * mult_data[mult_bmin_i] +
-           node.b_max * mult_data[mult_bmax_i];
-  gl_Position = camera.matrix * vec4(v, 1);
 }
