@@ -24,7 +24,6 @@ layout(std430)             buffer;
 layout(std140)             uniform;
 
 // Shader storage buffer declarations
-// layout(binding = 3) restrict readonly  buffer b_tree { Node  data[]; } node_in;
 layout(binding = 0) restrict readonly  buffer b_posi { vec3 data[]; } posi_in;
 layout(binding = 1) restrict readonly  buffer b_pack { Elem data[]; } pack_in;
 layout(binding = 2) restrict writeonly buffer b_bary { vec4 data[]; } bary_out;

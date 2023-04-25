@@ -68,6 +68,7 @@ namespace met {
     gl::Buffer              m_bvh_init_head; // This is continuously copied over
     gl::Buffer              m_bvh_curr_work; // This is continuously swapped
     gl::Buffer              m_bvh_next_work; // This is continuously swapped
+    gl::Buffer              m_bvh_leaf_work;
 
   public:
     void init(SchedulerHandle &) override;

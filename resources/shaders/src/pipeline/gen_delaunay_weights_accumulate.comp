@@ -99,12 +99,12 @@ void main() {
 
     // Default values for coming operation
     vec4 bary_i;
-    int bary_i_err = 1024;
+    int bary_i_err = 4096;
 
     // Iterate relevant delaunay elements
     for (uint elem_i = elem.i; 
               elem_i < elem.i + elem.n; 
-              ++elem_i) {
+            ++elem_i) {
       // Compute barycentric weights using packed element data
       vec3 xyz = s_pack_in[elem_i].inv * (p - s_pack_in[elem_i].sub);
       vec4 bary_j = vec4(xyz, 1.f - hsum(xyz));
