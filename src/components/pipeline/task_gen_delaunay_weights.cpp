@@ -231,10 +231,12 @@ namespace met {
                                  gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_desc_dispatch);
 
-        /* uint curr_head = 0, next_head = 0;
+        gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate| gl::BarrierFlags::eShaderStorageBuffer);
+        uint curr_head = 0, next_head = 0, leaf_head = 0;
         m_bvh_curr_work.get_as<uint>(std::span<uint> { &curr_head, 1 }, 1);
         m_bvh_next_work.get_as<uint>(std::span<uint> { &next_head, 1 }, 1);
-        fmt::print("{}: curr={} -> exp={}, next={}\n", i, curr_head, 8 * curr_head, next_head); */
+        m_bvh_leaf_work.get_as<uint>(std::span<uint> { &leaf_head, 1 }, 1);
+        fmt::print("{}: curr={}, next={}, leaf={}\n", i, curr_head, next_head, leaf_head);
 
         // Swap current/next work buffers
         std::swap(m_bvh_curr_work, m_bvh_next_work);
@@ -264,7 +266,7 @@ namespace met {
 
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate       | 
-                                gl::BarrierFlags::eShaderStorageBuffer);
+                                 gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
       }
 
@@ -288,7 +290,7 @@ namespace met {
 
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate       | 
-                                gl::BarrierFlags::eShaderStorageBuffer);
+                                 gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
       }
 
