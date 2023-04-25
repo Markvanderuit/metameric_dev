@@ -1,5 +1,9 @@
 #version 460 core
 
+#extension GL_KHR_shader_subgroup_ballot    : require
+#extension GL_KHR_shader_subgroup_clustered : require
+#extension GL_KHR_shader_subgroup_shuffle   : require
+
 #include <guard.glsl>
 #include <math.glsl>
 
@@ -50,34 +54,57 @@ layout(binding = 0) uniform b_unif {
 
 // Shared memory declarations
 shared Elem s_pack_in[512];
+shared uint s_work_head_in;
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
     s_pack_in[i] = pack_in.data[i];
+  if (gl_LocalInvocationID.x == 0)
+    s_work_head_in = curr_work.head;
   memoryBarrierShared();
   barrier();
 }
 
 void main() {
   load_shared();
-  
-  const uint i = gl_GlobalInvocationID.x;
-  guard(i < curr_work.head);
+
+  const uint i = (gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x) / gl_SubgroupSize;
+  guard(i < s_work_head_in);
 
   // Load current work and relevant hierarchy nodes
   WorkUnit curr_unit = curr_work.data[i];
-  Node elem_node = elem_in.data[curr_unit.elem_i];
-  Node colr_node = colr_in.data[curr_unit.colr_i];
+  if (subgroupElect()) {
+    curr_unit = curr_work.data[i];  
+  }
+  curr_unit.elem_i = subgroupBroadcastFirst(curr_unit.elem_i);
+  curr_unit.colr_i = subgroupBroadcastFirst(curr_unit.colr_i);
 
-  // Iterate relevant color signals
-  for (uint colr_i = colr_node.i; colr_i < colr_node.i + colr_node.n; ++colr_i) {
+  // A current element is shared among a subgroup cluster, which is the degree of the tree (8)
+  Node elem, colr;
+  if (subgroupElect()) {
+    colr = colr_in.data[curr_unit.colr_i];
+    elem = elem_in.data[curr_unit.elem_i];
+  }
+  elem.i = subgroupBroadcastFirst(elem.i);
+  elem.n = subgroupBroadcastFirst(elem.n);
+  colr.i = subgroupBroadcastFirst(colr.i);
+  colr.n = subgroupBroadcastFirst(colr.n);
+
+  // Iterate relevant color signals; grid-stride loop across subgroup cluster
+  for (uint colr_i = colr.i + gl_SubgroupInvocationID;
+            colr_i < colr.i + colr.n;
+            colr_i += gl_SubgroupSize) {
+    // Load color signal
     vec3 p = posi_in.data[colr_i];
 
+    // Default values for coming operation
     vec4 bary_i;
     int bary_i_err = 1024;
 
     // Iterate relevant delaunay elements
-    for (uint elem_i = elem_node.i; elem_i < elem_node.i + elem_node.n; ++elem_i) {
+    for (uint elem_i = elem.i; 
+              elem_i < elem.i + elem.n; 
+              ++elem_i) {
       // Compute barycentric weights using packed element data
       vec3 xyz = s_pack_in[elem_i].inv * (p - s_pack_in[elem_i].sub);
       vec4 bary_j = vec4(xyz, 1.f - hsum(xyz));
@@ -94,12 +121,9 @@ void main() {
       }
     } // for elem_i
 
-    // Attempt to establish a global minimum
-    // TODO; this is not actually safe. It will, at best, decrease
-
-    // There should be exactly one correct solution, so no need for atomics
-    // if (bary_i_err == -1)
-    if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err))
+    // Attempt to establish a minimum
+    if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err)) {
       bary_out.data[colr_i] = bary_i;
+    }
   } // for colr_i
 }

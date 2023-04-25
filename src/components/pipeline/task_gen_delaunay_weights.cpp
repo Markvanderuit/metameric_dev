@@ -88,8 +88,8 @@ namespace met {
     constexpr size_t work_size = sizeof(eig::Array4u) + 64 * 1024 * 1024 * sizeof(eig::Array2u);
     m_bvh_colr_buffer = {{ .data = cast_span<const std::byte>(colr_tree.data()) }};
     m_bvh_elem_buffer = {{ .size = elem_tree.size_bytes_reserved(), .flags = gl::BufferCreateFlags::eStorageDynamic }};
-    m_bvh_curr_work.data = {{ .size = work_size/* , .flags = gl::BufferCreateFlags::eStorageDynamic */ }};
-    m_bvh_next_work.data = {{ .size = work_size/* , .flags = gl::BufferCreateFlags::eStorageDynamic */ }};
+    m_bvh_curr_work = {{ .size = work_size/* , .flags = gl::BufferCreateFlags::eStorageDynamic */ }};
+    m_bvh_next_work = {{ .size = work_size/* , .flags = gl::BufferCreateFlags::eStorageDynamic */ }};
     m_bvh_unif_buffer = {{ .size = sizeof(BVHUniformBuffer), .flags = gl::BufferCreateFlags::eMapWritePersistent }};
     m_bvh_unif_map    = m_bvh_unif_buffer.map_as<BVHUniformBuffer>(gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush).data();
     m_bvh_comp_buffer = {{ .size = e_colr_data.data().size() * sizeof(uint), .flags = gl::BufferCreateFlags::eStorageDynamic }};
@@ -97,24 +97,24 @@ namespace met {
     m_bvh_desc_program = {{ .type       = gl::ShaderType::eCompute,
                        .spirv_path = "resources/shaders/pipeline/gen_delaunay_weights_traverse.comp.spv",
                        .cross_path = "resources/shaders/pipeline/gen_delaunay_weights_traverse.comp.json" }};
-    m_bvh_desc_dispatch = { .buffer = &m_bvh_div32__buffer, .bindable_program = &m_bvh_desc_program };
-    
-    m_bvh_div256_program = {{ .type       = gl::ShaderType::eCompute,
-                              .spirv_path = "resources/shaders/misc/dispatch_divide_256.comp.spv",
-                              .cross_path = "resources/shaders/misc/dispatch_divide_256.comp.json" }};
-    m_bvh_div256_buffer  = {{ .size = sizeof(eig::Array4u) }};
-    m_bvh_div256_dispatch = { .bindable_program = &m_bvh_div256_program };
+    m_bvh_desc_dispatch = { .buffer = &m_bvh_div_32_buffer, .bindable_program = &m_bvh_desc_program };
 
-    m_bvh_div32__program = {{ .type       = gl::ShaderType::eCompute,
+    m_bvh_div_sg_program = {{ .type       = gl::ShaderType::eCompute,
+                              .spirv_path = "resources/shaders/misc/dispatch_divide_8.comp.spv",
+                              .cross_path = "resources/shaders/misc/dispatch_divide_8.comp.json" }};
+    m_bvh_div_sg_buffer   = {{ .size = sizeof(eig::Array4u) }};
+    m_bvh_div_sg_dispatch = { .bindable_program = &m_bvh_div_sg_program };
+
+    m_bvh_div_32_program = {{ .type       = gl::ShaderType::eCompute,
                               .spirv_path = "resources/shaders/misc/dispatch_divide_32.comp.spv",
                               .cross_path = "resources/shaders/misc/dispatch_divide_32.comp.json" }};
-    m_bvh_div32__buffer  = {{ .size = sizeof(eig::Array4u) }};
-    m_bvh_div32__dispatch = { .bindable_program = &m_bvh_div32__program };
+    m_bvh_div_32_buffer   = {{ .size = sizeof(eig::Array4u) }};
+    m_bvh_div_32_dispatch = { .bindable_program = &m_bvh_div_32_program };
     
     m_bvh_bary_program = {{ .type       = gl::ShaderType::eCompute,
                             .spirv_path = "resources/shaders/pipeline/gen_delaunay_weights_accumulate.comp.spv",
                             .cross_path = "resources/shaders/pipeline/gen_delaunay_weights_accumulate.comp.json" }};
-    m_bvh_bary_dispatch = { .buffer = &m_bvh_div256_buffer, .bindable_program = &m_bvh_bary_program };
+    m_bvh_bary_dispatch = { .buffer = &m_bvh_div_sg_buffer, .bindable_program = &m_bvh_bary_program };
 
     auto init_work_data = detail::init_pair_data<8, 8>(3, bvh_level_begin);
     auto init_head = eig::Array4u(0);
@@ -122,8 +122,11 @@ namespace met {
     std::ranges::copy(init_work_data, std::back_inserter(init_work));
     m_bvh_init_work = {{ .data = cnt_span<const std::byte>(init_work) }};
     m_bvh_init_head = {{ .data = obj_span<const std::byte>(init_head) }};
+
     fmt::print("init {}\n", init_work.front().x());
-    fmt::print("init size = {}, work size = {}\n", m_bvh_init_work.size(), m_bvh_curr_work.data.size());
+    fmt::print("init size = {}, work size = {}\n", m_bvh_init_work.size(), m_bvh_curr_work.size());
+
+    // TODO; filter out empty texture nodes from the initial workload
   }
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
@@ -204,17 +207,19 @@ namespace met {
     { met_trace_n("bvh_testing");
       // Copy starting work to buffer
       fmt::print("Copy coming up: {} bytes\n", m_bvh_init_work.size());
-      m_bvh_init_work.copy_to(m_bvh_curr_work.data, m_bvh_init_work.size());
+      m_bvh_init_work.copy_to(m_bvh_curr_work, m_bvh_init_work.size());
 
       // Iterate through levels of hierarchy, finding an optimal dual-hierarchy cut for computation
-      for (uint i = bvh_level_begin; i < i_colr_tree.n_levels() - 1; ++i) {
+      for (uint i = bvh_level_begin; i < i_colr_tree.n_levels() - 3; ++i) {
+        fmt::print("level {}, max {} nodes\n", i, i_colr_tree.data(i).size());
+        
         // Reset next work head
-        m_bvh_init_head.copy_to(m_bvh_next_work.data, sizeof(uint));
+        m_bvh_init_head.copy_to(m_bvh_next_work, sizeof(uint));
 
         // Copy divided data to indirect dispatch buffer (divide by (256/8))
-        m_bvh_div32__program.bind("b_data", m_bvh_curr_work.data);
-        m_bvh_div32__program.bind("b_disp", m_bvh_div32__buffer);
-        gl::dispatch_compute(m_bvh_div32__dispatch);
+        m_bvh_div_32_program.bind("b_data", m_bvh_curr_work);
+        m_bvh_div_32_program.bind("b_disp", m_bvh_div_32_buffer);
+        gl::dispatch_compute(m_bvh_div_32_dispatch);
         
         // Push uniform data
         m_bvh_unif_map->n_colr_nodes = i_colr_tree.data(i).size();
@@ -225,47 +230,62 @@ namespace met {
         m_bvh_desc_program.bind("b_unif", m_bvh_unif_buffer);
         m_bvh_desc_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_desc_program.bind("b_colr", m_bvh_colr_buffer);
-        m_bvh_desc_program.bind("b_curr", m_bvh_curr_work.data);
-        m_bvh_desc_program.bind("b_next", m_bvh_next_work.data);
+        m_bvh_desc_program.bind("b_curr", m_bvh_curr_work);
+        m_bvh_desc_program.bind("b_next", m_bvh_next_work);
 
         // Dispatch work using indirect buffer, based on previous work data
-        gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate       | 
+                                 gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_desc_dispatch);
 
         /* uint prev_head = 0, next_head = 0;
-        m_bvh_curr_work.data.get_as<uint>(std::span<uint> { &prev_head, 1 }, 1);
-        m_bvh_next_work.data.get_as<uint>(std::span<uint> { &next_head, 1 }, 1);
+        m_bvh_curr_work.get_as<uint>(std::span<uint> { &prev_head, 1 }, 1);
+        m_bvh_next_work.get_as<uint>(std::span<uint> { &next_head, 1 }, 1);
         fmt::print("{}: previous={} -> exp={}, next={}\n", i, prev_head, 8 * prev_head, next_head); */
 
         // Swap current/next work buffers
         std::swap(m_bvh_curr_work, m_bvh_next_work);
       } // for i
 
-      { // Do some debugging
+      /* { // Forcibly subdivide large nodes into smaller work
+
+      } */
+
+      /* { // Do some debugging
         struct WorkNode { uint elem_i, node_i; };
-        std::vector<WorkNode> curr_work(m_bvh_curr_work.data.size() / sizeof(WorkNode));
-        m_bvh_curr_work.data.get_as<WorkNode>(curr_work);
+        std::vector<WorkNode> curr_work(m_bvh_curr_work.size() / sizeof(WorkNode) - 2 * sizeof(WorkNode));
+        m_bvh_curr_work.get_as<WorkNode>(curr_work, curr_work.size(), 2);
 
         std::for_each(std::execution::par_unseq, range_iter(curr_work), [&](auto &work) {
           work.elem_i = i_elem_tree.data()[work.elem_i].n;
           work.node_i = i_colr_tree.data()[work.node_i].n;
         });
 
-        fmt::print("Nodes (elem, colr) : {}, {}\n", i_elem_tree.data().size(), i_colr_tree.data().size());
-        fmt::print("Curr work: {}\n", cast_span<const eig::Array2u>(std::span { curr_work.begin(), 32 }));
+        auto large_work_view = curr_work | std::views::filter([](const WorkNode &w) { return w.node_i > 1024; });
+        std::vector<WorkNode> large_work(range_iter(large_work_view));
+
+        size_t large_work_n = large_work.size();
+        size_t small_work_n = curr_work.size() - large_work_n;
+
+        fmt::print("Large: {}, small: {}, sum: {}\n",
+          large_work_n, small_work_n, large_work_n + small_work_n);
+
+
+        // fmt::print("Nodes (elem, colr) : {}, {}\n", i_elem_tree.data().size(), i_colr_tree.data().size());
+        fmt::print("Large work: {}\n", cast_span<const eig::Array2u>(std::span { large_work.begin(), 256 }));
 
         std::exit(0);
-      } // Do some debugging
+      } // Do some debugging */
 
       // Clear comparative buffer to some large integer value
       int comp_max = 1024;
       m_bvh_comp_buffer.clear(cast_span<const std::byte>(std::span<int> { &comp_max, 1 }));
 
-      // Copy divided data to indirect dispatch buffer (divide by 256)
-      m_bvh_div256_program.bind("b_data", m_bvh_curr_work.data);
-      m_bvh_div256_program.bind("b_disp", m_bvh_div256_buffer);
+      // Copy divided data to indirect dispatch buffer (divide by (256/32))
+      m_bvh_div_sg_program.bind("b_data", m_bvh_curr_work);
+      m_bvh_div_sg_program.bind("b_disp", m_bvh_div_sg_buffer);
       gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-      gl::dispatch_compute(m_bvh_div256_dispatch);
+      gl::dispatch_compute(m_bvh_div_sg_dispatch);
 
       // Push uniform data
       m_bvh_unif_map->n_elems = i_delaunay.elems.size();
@@ -276,25 +296,27 @@ namespace met {
       m_bvh_bary_program.bind("b_elem", m_bvh_elem_buffer);
       m_bvh_bary_program.bind("b_colr", m_bvh_colr_buffer);
       m_bvh_bary_program.bind("b_comp", m_bvh_comp_buffer);
-      m_bvh_bary_program.bind("b_curr", m_bvh_curr_work.data);
+      m_bvh_bary_program.bind("b_curr", m_bvh_curr_work);
       m_bvh_bary_program.bind("b_pack", m_pack_buffer);
       m_bvh_bary_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
       m_bvh_bary_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
-      // uint curr_head = 0, disp_head = 0;
-      // m_bvh_curr_work.data.get_as<uint>(std::span<uint> { &curr_head, 1 }, 1);
-      // m_bvh_div256_buffer.get_as<uint>(std::span<uint> { &disp_head, 1 }, 1);
-      // fmt::print("Dispatching {} / 256 = {}\n", curr_head, disp_head);
-
       // Dispatch work using indirect buffer, based on previous work data
-      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
+      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate       | 
+                               gl::BarrierFlags::eShaderStorageBuffer);
       gl::dispatch_compute(m_bvh_bary_dispatch);
 
+      // uint curr_head = 0, disp_head = 0;
+      // m_bvh_curr_work.get_as<uint>(std::span<uint> { &curr_head, 1 }, 1);
+      // m_bvh_div_sg_buffer.get_as<uint>(std::span<uint> { &disp_head, 1 }, 1);
+      // fmt::print("Dispatching {} / (256 / 32) = {}\n", curr_head, disp_head);
+
       // std::vector<int> comp_data(32);
-      // /* m_bvh_comp_buffer.get_as<int>(comp_data, comp_data.size(), 2048 * 1024 * sizeof(uint));
-      // fmt::print("comp pre : {}\n", comp_data); */
+      // // /* m_bvh_comp_buffer.get_as<int>(comp_data, comp_data.size(), 2048 * 1024 * sizeof(uint));
+      // // fmt::print("comp pre : {}\n", comp_data); */
       // m_bvh_comp_buffer.get_as<int>(comp_data, comp_data.size(), 1024 * 2048);
       // fmt::print("comp post: {}\n", comp_data);
+      // std::exit(0);
     } // bvh_testing
 
     /* { met_trace_n("work_testing");

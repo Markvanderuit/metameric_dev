@@ -1,7 +1,7 @@
 #version 460 core
 
-#extension GL_KHR_shader_subgroup_shuffle   : require
 #extension GL_KHR_shader_subgroup_clustered : require
+#extension GL_KHR_shader_subgroup_shuffle   : require
 
 #include <guard.glsl>
 #include <math.glsl>
@@ -46,19 +46,11 @@ layout(binding = 0) uniform b_unif {
   uint n_elems;
 } unif_in;
 
-// Tree helper declarations
-const uint bvh_degr     = 8;
-const uint bvh_degr_log = 3;
-uint bvh_n_lvls(uint n_nodes) { return 1 + uint(ceil(log2(n_nodes) / bvh_degr_log)); }
-uint colr_lvls = bvh_n_lvls(unif_in.n_colr_nodes);
-uint elem_lvls = bvh_n_lvls(unif_in.n_elem_nodes);
-
 // Subgroup helper declarations
-const uint sg_invocs = bvh_degr; // 8
-uint sg_invoc  = gl_SubgroupInvocationID % sg_invocs;
-uint sg_base   = gl_SubgroupInvocationID - sg_invoc;
-uint wg_subgrs = gl_WorkGroupSize.x / sg_invocs; // 32
-uint wg_subgr  = gl_SubgroupID * sg_invocs + sg_invoc;
+const uint bvh_degr = 8;
+const uint sg_invocs = bvh_degr;
+uint sg_invoc = gl_SubgroupInvocationID % sg_invocs;
+uint sg_base  = gl_SubgroupInvocationID - sg_invoc;
 
 // Test bbox intersection
 bool intersect(in Node a, in Node b) {
@@ -69,27 +61,7 @@ bool intersect(in Node a, in Node b) {
   return intersect_(a, b) || intersect_(b, a);
 } */
 
-// Shared memory declarations
-/* shared WorkUnit s_work_in[sg_invocs]; // 32 */
-/* shared vec3  s_vert_in[512];
-shared uvec4 s_elem_in[512]; */
-
-void load_shared() {
-  /* for (uint i = gl_LocalInvocationID.x; i < unif_in.n_verts; i += gl_WorkGroupSize.x)
-    s_vert_in[i] = vert_in.data[i];
-  for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
-    s_elem_in[i] = elem_in.data[i]; */
-  
-  memoryBarrierShared();
-  barrier();
-}
-
 void main() {
- /*  load_shared();
-  
-  const uint i = gl_GlobalInvocationID.x;
-  guard(i < work_curr.head); */
-
   const uint i = (gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x) / sg_invocs;
   guard(i < work_curr.head);
   
@@ -99,9 +71,6 @@ void main() {
     unit_curr = work_curr.data[i];  
   unit_curr.elem_i = subgroupShuffle(unit_curr.elem_i, sg_base);
   unit_curr.colr_i = subgroupShuffle(unit_curr.colr_i, sg_base);
-
-  // This invocation is only active if tree depth is not exceeded on subsequent subdivision
-  guard(bvh_n_lvls(unit_curr.colr_i) <= colr_lvls);
 
   // A current element is shared among a subgroup cluster, which is the degree of the tree (8)
   Node elem;
@@ -118,31 +87,9 @@ void main() {
   // Load node data at descended position
   Node colr = colr_in.data[colr_i];
 
-  // This invocation remains active only for a non-empty, intersecting node pair
-  guard(colr.n > 0 && intersect(elem, colr));
+  // This invocation remains active only for a non-empty, intersecting pair
+  guard(colr.n > 0 && elem.n > 0 && intersect(elem, colr));
 
   // Push new, subdivided workunit to output queue
   work_next.data[atomicAdd(work_next.head, 1)] = WorkUnit(unit_curr.elem_i, colr_i);
-
-  // END
-
-  /* WorkUnit unit_curr = work_curr.data[i];
-  guard(bvh_n_lvls(unit_curr.colr_i) <= colr_lvls);
-
-  // Descend node hierarchy, subdividing on the right side
-  uint colr_i_begin = unit_curr.colr_i * bvh_degr + 1;
-  
-  // TODO: best place for subgroup handling
-  // Compare elem and node boxes, and allocate work
-  Node elem = elem_in.data[unit_curr.elem_i];
-  for (uint j = 0; j < bvh_degr; ++j) {
-    uint colr_i = colr_i_begin + j;
-    Node colr = colr_in.data[colr_i];
-
-    // Cull partially empty or non-intersecting node pairs
-    guard_continue(colr.n > 0 && intersect(elem, colr));
-
-    // Push work data for next iteration 
-    work_next.data[atomicAdd(work_next.head, 1)] = WorkUnit(unit_curr.elem_i, colr_i);
-  } */
 }

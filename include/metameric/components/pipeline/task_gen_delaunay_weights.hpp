@@ -47,12 +47,12 @@ namespace met {
       }
     };
 
-    gl::Buffer              m_bvh_div32__buffer;
-    gl::ComputeInfo         m_bvh_div32__dispatch;
-    gl::Program             m_bvh_div32__program;
-    gl::Buffer              m_bvh_div256_buffer;
-    gl::ComputeInfo         m_bvh_div256_dispatch;
-    gl::Program             m_bvh_div256_program;
+    gl::Buffer              m_bvh_div_sg_buffer;
+    gl::ComputeInfo         m_bvh_div_sg_dispatch;
+    gl::Program             m_bvh_div_sg_program;
+    gl::Buffer              m_bvh_div_32_buffer;
+    gl::ComputeInfo         m_bvh_div_32_dispatch;
+    gl::Program             m_bvh_div_32_program;
 
     gl::ComputeIndirectInfo m_bvh_desc_dispatch;
     gl::Program             m_bvh_desc_program;
@@ -66,8 +66,8 @@ namespace met {
     BVHUniformBuffer       *m_bvh_unif_map;
     gl::Buffer              m_bvh_init_work; // This is continuously copied over
     gl::Buffer              m_bvh_init_head; // This is continuously copied over
-    BVHWorkBuffer           m_bvh_curr_work; // This is continuously swapped
-    BVHWorkBuffer           m_bvh_next_work; // This is continuously swapped
+    gl::Buffer              m_bvh_curr_work; // This is continuously swapped
+    gl::Buffer              m_bvh_next_work; // This is continuously swapped
 
   public:
     void init(SchedulerHandle &) override;
