@@ -63,7 +63,7 @@ bool intersect(in Node a, in Node b) {
 }
 
 void main() {
-  const uint i = (gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x) / sg_invocs;
+  const uint i = gl_GlobalInvocationID.x / sg_invocs;
   guard(i < work_curr.head);
   
   // A prior work-unit is shared among a 8-wide subgroup cluster
@@ -89,10 +89,11 @@ void main() {
   Node colr = colr_in.data[colr_i];
 
   // This invocation remains active only for a non-empty, intersecting pair
-  guard(colr.n > 0 && elem.n > 0 && intersect(elem, colr));
+  guard(elem.n != 0 && colr.n != 0);
+  guard(intersect(elem, colr));
   
   // Push new, subdivided workunit to the appropriate output queue
-  WorkUnit unit_next = WorkUnit(unit_curr.elem_i, colr_i);
+  WorkUnit unit_next = WorkUnit(unit_curr.elem_i, colr_i); 
   if (colr.n <= gl_SubgroupSize) {
     work_leaf.data[atomicAdd(work_leaf.head, 1)] = unit_next;
   } else {

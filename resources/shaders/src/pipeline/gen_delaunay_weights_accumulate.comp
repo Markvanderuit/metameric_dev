@@ -59,8 +59,10 @@ shared uint s_work_head_in;
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
     s_pack_in[i] = pack_in.data[i];
+
   if (gl_LocalInvocationID.x == 0)
     s_work_head_in = curr_work.head;
+  
   memoryBarrierShared();
   barrier();
 }
@@ -68,7 +70,7 @@ void load_shared() {
 void main() {
   load_shared();
 
-  const uint i = (gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x) / gl_SubgroupSize;
+  const uint i = gl_GlobalInvocationID.x / gl_SubgroupSize;
   guard(i < s_work_head_in);
 
   // Load current work and relevant hierarchy nodes
@@ -111,8 +113,8 @@ void main() {
       
       // Compute squared error of potentially negative barycentric weights,
       // and get an integer representation in here
-      float err = sdot(bary_j - clamp(bary_j, 0, 1));
-      int bary_j_err = err == 0.f ? -1 : int(ceil(err * 255.f));
+      float err = hsum(abs(bary_j - clamp(bary_j, 0, 1)));
+      int bary_j_err = err == 0.f ? -1 : int(clamp(err, 0, 1) * 1024.f);
 
       // Best result so far
       if (bary_j_err < bary_i_err) {
@@ -122,8 +124,8 @@ void main() {
     } // for elem_i
 
     // Attempt to establish a minimum
-    if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err)) {
+    if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err))
+    // if (bary_i_err == -1)
       bary_out.data[colr_i] = bary_i;
-    }
   } // for colr_i
 }

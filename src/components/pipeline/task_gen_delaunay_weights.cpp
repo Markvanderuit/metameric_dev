@@ -4,6 +4,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/utility.hpp>
 #include <algorithm>
 #include <execution>
@@ -71,7 +72,7 @@ namespace met {
     info("tree_buffer").init<gl::Buffer>({ .size = elem_tree.size_bytes_reserved(), .flags = gl::BufferCreateFlags::eStorageDynamic });
 
     // Initialize tree and work components
-    constexpr size_t work_size = sizeof(eig::Array4u) + 128 * 1024 * 1024 * sizeof(eig::Array2u);
+    constexpr size_t work_size = sizeof(eig::Array4u) + 64 * 1024 * 1024 * sizeof(eig::Array2u);
     m_bvh_comp_buffer = {{ .size = e_colr_data.data().size() * sizeof(uint), .flags = gl::BufferCreateFlags::eStorageDynamic }};
     m_bvh_colr_buffer = {{ .data = cast_span<const std::byte>(colr_tree.data()) }};
     m_bvh_elem_buffer = {{ .size = elem_tree.size_bytes_reserved(), .flags = gl::BufferCreateFlags::eStorageDynamic }};
@@ -116,7 +117,8 @@ namespace met {
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info("state", "proj_state").read_only<ProjectState>().verts;
+    // return info("state", "proj_state").read_only<ProjectState>().verts;
+    return true;
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
@@ -199,8 +201,8 @@ namespace met {
       m_bvh_unif_buffer.flush();
 
       // Iterate through levels of hierarchy, finding an optimal dual-hierarchy cut for computation
-      for (uint i = bvh_level_begin; i < 6; ++i) {
-        fmt::print("level {}, max {} nodes\n", i, i_colr_tree.data(i).size());
+      for (uint i = bvh_level_begin; i < 8; ++i) {
+        // fmt::print("level {}, max {} nodes\n", i, i_colr_tree.data(i).size());
         
         // Reset next work head to starting work head
         m_bvh_init_head.copy_to(m_bvh_next_work, sizeof(uint));
@@ -208,6 +210,7 @@ namespace met {
         // Copy divided data to indirect dispatch buffer (divide by (256/8))
         m_bvh_div_32_program.bind("b_data", m_bvh_curr_work);
         m_bvh_div_32_program.bind("b_disp", m_bvh_div_32_buffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_div_32_dispatch);
 
         // Bind relevant buffers
@@ -222,6 +225,12 @@ namespace met {
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_desc_dispatch);
 
+        /* uint curr, next, leaf;
+        m_bvh_curr_work.get_as<uint>(std::span<uint> { &curr, 1 }, 1, 0);
+        m_bvh_next_work.get_as<uint>(std::span<uint> { &next, 1 }, 1, 0);
+        m_bvh_leaf_work.get_as<uint>(std::span<uint> { &leaf, 1 }, 1, 0);
+        fmt::print("{} : curr {}, next {}, leaf {}\n", i, curr, next, leaf); */
+
         // Swap current/next work buffers
         std::swap(m_bvh_curr_work, m_bvh_next_work);
       } // for i
@@ -230,8 +239,18 @@ namespace met {
       int comp_max = 1024;
       m_bvh_comp_buffer.clear(cast_span<const std::byte>(std::span<int> { &comp_max, 1 }));
 
+      static bool process_bottom = true;
+      static bool process_leaf = true;
+      if (ImGui::Begin("Delaunay Debug")) {
+        ImGui::Checkbox("Bottom", &process_bottom);
+        ImGui::Checkbox("Leaf", &process_leaf);
+      }
+      ImGui::End();
+
       // Process bottom part of cut
-      {
+      if (process_bottom) {
+        // fmt::print("Processing bottom\n");
+
         // Copy divided data to indirect dispatch buffer (divide by (256/32))
         m_bvh_div_08_program.bind("b_data", m_bvh_curr_work);
         m_bvh_div_08_program.bind("b_disp", m_bvh_div_08_buffer);
@@ -254,7 +273,9 @@ namespace met {
       }
 
       // Process leaf part of cut
-      {
+      if (process_leaf) {
+        // fmt::print("Processing leaf\n");
+
         // Copy divided data to indirect dispatch buffer (divide by (256/32))
         m_bvh_div_08_program.bind("b_data", m_bvh_leaf_work);
         m_bvh_div_08_program.bind("b_disp", m_bvh_div_08_buffer);
@@ -279,8 +300,12 @@ namespace met {
       /* { // Do some debugging
         struct BVHNode  { uint indx, i, n; };
         struct WorkNode { uint elem_i, colr_i; };
-        std::vector<WorkNode> curr_work(m_bvh_curr_work.size() / sizeof(WorkNode) - 2 * sizeof(WorkNode));
-        m_bvh_curr_work.get_as<WorkNode>(curr_work, curr_work.size(), 2);
+        
+        uint curr_work_head;
+        m_bvh_curr_work.get_as<uint>(std::span<uint> { & curr_work_head, 1 }, 1, 0);
+        fmt::print("queried work head: {}\n", curr_work_head);
+        std::vector<WorkNode> curr_work(curr_work_head);
+        m_bvh_curr_work.get_as<WorkNode>(curr_work, curr_work_head, 2);
 
         auto colr_span = i_colr_tree.data();
         auto elem_span = i_elem_tree.data();
@@ -306,10 +331,10 @@ namespace met {
         });
 
         fmt::print("Colr:\n\t{}\n",
-          cast_span<const eig::Array3u>(std::span { colr_nodes.begin() + 4096, 16 }));
+          cast_span<const eig::Array3u>(std::span { colr_nodes.begin() + 0, 16 }));
 
         fmt::print("Elem:\n\t{}\n",
-          cast_span<const eig::Array3u>(std::span { elem_nodes.begin() + 4096, 16 }));
+          cast_span<const eig::Array3u>(std::span { elem_nodes.begin() + 0, 16 }));
           
         std::exit(0);
       } // Do some debugging */
