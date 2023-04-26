@@ -102,7 +102,7 @@ void main() {
     int bary_i_err = 4096;
 
     // Iterate relevant delaunay elements
-    for (uint elem_i = elem.i; 
+    for (uint elem_i = elem.i;
               elem_i < elem.i + elem.n; 
             ++elem_i) {
       // Compute barycentric weights using packed element data

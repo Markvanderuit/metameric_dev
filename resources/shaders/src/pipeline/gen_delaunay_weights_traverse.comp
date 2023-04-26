@@ -38,7 +38,7 @@ layout(binding = 3) restrict coherent buffer b_next {
   uint    _pad[3]; // 3x4by padding
   WorkUnit data[]; // Actual work data
 } work_next;
-layout(binding = 3) restrict coherent buffer b_leaf {
+layout(binding = 4) restrict coherent buffer b_leaf {
   uint     head;   // Atomic head count
   uint    _pad[3]; // 3x4by padding
   WorkUnit data[]; // Actual work data
@@ -59,46 +59,43 @@ uint sg_base  = gl_SubgroupInvocationID - sg_invoc;
 
 // Test bbox intersection
 bool intersect(in Node a, in Node b) {
-  return all(greaterThanEqual(a.maxb, b.minb)) && all(lessThan(a.minb, b.maxb));
+  return all(greaterThan(a.maxb, b.minb)) && all(lessThan(a.minb, b.maxb));
 }
-
-/* bool intersect(in Node a, in Node b) {
-  return intersect_(a, b) || intersect_(b, a);
-} */
 
 void main() {
   const uint i = (gl_WorkGroupID.x * gl_WorkGroupSize.x + gl_LocalInvocationID.x) / sg_invocs;
   guard(i < work_curr.head);
   
-  // A prior work-unit is shared among a subgroup cluster, which is the degree of the tree (8)
+  // A prior work-unit is shared among a 8-wide subgroup cluster
   WorkUnit unit_curr;
-  if (sg_invoc == 0)
+  if (sg_invoc == 0) {
     unit_curr = work_curr.data[i];  
+  }
   unit_curr.elem_i = subgroupShuffle(unit_curr.elem_i, sg_base);
   unit_curr.colr_i = subgroupShuffle(unit_curr.colr_i, sg_base);
 
-  // A current element is shared among a subgroup cluster, which is the degree of the tree (8)
+  // A current element is shared among a 8-wide subgroup cluster
   Node elem;
-  if (sg_invoc == 0)
+  if (sg_invoc == 0) {
     elem = elem_in.data[unit_curr.elem_i];
+  }
   elem.minb = subgroupShuffle(elem.minb, sg_base);
   elem.i    = subgroupShuffle(elem.i,    sg_base);
   elem.maxb = subgroupShuffle(elem.maxb, sg_base);
   elem.n    = subgroupShuffle(elem.n,    sg_base);
 
-  // Descend along tree, doing subdivision using a subgroup cluster of 8 invocations
+  // Descend along tree; 8-wide subdivision is split among a subgroup cluster
   uint colr_i = unit_curr.colr_i * bvh_degr + 1 + sg_invoc;
-
-  // Load node data at descended position
   Node colr = colr_in.data[colr_i];
 
   // This invocation remains active only for a non-empty, intersecting pair
   guard(colr.n > 0 && elem.n > 0 && intersect(elem, colr));
-
-  // Push new, subdivided workunit to some output queue
+  
+  // Push new, subdivided workunit to the appropriate output queue
+  WorkUnit unit_next = WorkUnit(unit_curr.elem_i, colr_i);
   if (colr.n <= gl_SubgroupSize) {
-    work_leaf.data[atomicAdd(work_leaf.head, 1)] = WorkUnit(unit_curr.elem_i, colr_i);
+    work_leaf.data[atomicAdd(work_leaf.head, 1)] = unit_next;
   } else {
-    work_next.data[atomicAdd(work_next.head, 1)] = WorkUnit(unit_curr.elem_i, colr_i);
+    work_next.data[atomicAdd(work_next.head, 1)] = unit_next;
   }
 }

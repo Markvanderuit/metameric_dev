@@ -47,9 +47,9 @@ namespace met {
       }
     };
 
-    gl::Buffer              m_bvh_div_sg_buffer;
-    gl::ComputeInfo         m_bvh_div_sg_dispatch;
-    gl::Program             m_bvh_div_sg_program;
+    gl::Buffer              m_bvh_div_08_buffer;
+    gl::ComputeInfo         m_bvh_div_08_dispatch;
+    gl::Program             m_bvh_div_08_program;
     gl::Buffer              m_bvh_div_32_buffer;
     gl::ComputeInfo         m_bvh_div_32_dispatch;
     gl::Program             m_bvh_div_32_program;
