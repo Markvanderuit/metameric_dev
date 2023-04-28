@@ -124,8 +124,8 @@ void main() {
     } // for elem_i
 
     // Attempt to establish a minimum
-    if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err))
-    // if (bary_i_err == -1)
+    // if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err))
+    if (bary_i_err == -1)
       bary_out.data[colr_i] = bary_i;
   } // for colr_i
 }

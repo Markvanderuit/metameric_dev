@@ -297,6 +297,26 @@ namespace met {
         gl::dispatch_compute(m_bvh_bary_dispatch);
       }
 
+      { // Do some more debugging
+        using BVHNode = detail::BVHNode;
+        
+        auto colr_nodes = i_colr_tree.data(i_colr_tree.n_levels() - 4);
+        auto elem_nodes = i_elem_tree.data(i_elem_tree.n_levels() - 4);
+
+        int colr_count = 0, elem_count = 0;
+        for (const auto &node : colr_nodes) {
+          colr_count += node.n;
+        }
+        for (const auto &node : elem_nodes) {
+          elem_count += node.n;
+        }
+
+        fmt::print("colr_count {} of {}\n", colr_count, e_appl_data.loaded_texture.data().size());
+        fmt::print("elem_count {} of {}\n", elem_count, i_delaunay.elems.size());
+
+        std::exit(0);
+      } // End debugging
+
       /* { // Do some debugging
         struct BVHNode  { uint indx, i, n; };
         struct WorkNode { uint elem_i, colr_i; };

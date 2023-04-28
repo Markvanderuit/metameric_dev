@@ -70,10 +70,10 @@ namespace met {
     const auto &e_view_state  = info("state", "view_state").read_only<ViewportState>();
 
     // Select tree
-    // const auto &tree_data   = info("gen_convex_weights", "elem_tree").read_only<BVH>();
-    // const auto &tree_buffer = info("gen_convex_weights", "tree_buffer").read_only<gl::Buffer>();
-    const auto &tree_data   = m_tree_points;
-    const auto &tree_buffer = m_tree_buffer;
+    const auto &tree_data   = info("gen_convex_weights", "elem_tree").read_only<BVH>();
+    const auto &tree_buffer = info("gen_convex_weights", "tree_buffer").read_only<gl::Buffer>();
+    // const auto &tree_data   = m_tree_points;
+    // const auto &tree_buffer = m_tree_buffer;
 
     // Determine draw count
     auto node_level     = tree_data.data(m_tree_level);
