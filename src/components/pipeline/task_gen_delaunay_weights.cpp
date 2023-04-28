@@ -71,8 +71,8 @@ namespace met {
     info("bary_buffer").init<gl::Buffer>({ .size = dispatch_n * sizeof(eig::Array4f) }); // Convex weights
     info("tree_buffer").init<gl::Buffer>({ .size = elem_tree.size_bytes_reserved(), .flags = gl::BufferCreateFlags::eStorageDynamic });
 
-    // Initialize tree and work components
-    constexpr size_t work_size = sizeof(eig::Array4u) + 64 * 1024 * 1024 * sizeof(eig::Array2u);
+    /* // Initialize tree and work components
+    constexpr size_t work_size = sizeof(eig::Array4u) + 256 * 1024 * 1024 * sizeof(eig::Array2u);
     m_bvh_comp_buffer = {{ .size = e_colr_data.data().size() * sizeof(uint), .flags = gl::BufferCreateFlags::eStorageDynamic }};
     m_bvh_colr_buffer = {{ .data = cast_span<const std::byte>(colr_tree.data()) }};
     m_bvh_elem_buffer = {{ .size = elem_tree.size_bytes_reserved(), .flags = gl::BufferCreateFlags::eStorageDynamic }};
@@ -102,17 +102,13 @@ namespace met {
     m_bvh_desc_dispatch = { .buffer = &m_bvh_div_32_buffer, .bindable_program = &m_bvh_desc_program };
     m_bvh_bary_dispatch = { .buffer = &m_bvh_div_08_buffer, .bindable_program = &m_bvh_bary_program };
 
+    // TODO; filter out empty texture nodes from the initial workload
     auto init_work_data = detail::init_pair_data<8, 8>(3, bvh_level_begin);
     auto init_head = eig::Array4u(0);
     std::vector<eig::Array2u> init_work = { eig::Array2u { init_work_data.size(), 0 }, 0 };
     std::ranges::copy(init_work_data, std::back_inserter(init_work));
     m_bvh_init_work = {{ .data = cnt_span<const std::byte>(init_work) }};
-    m_bvh_init_head = {{ .data = obj_span<const std::byte>(init_head) }};
-
-    fmt::print("init {}\n", init_work.front().x());
-    fmt::print("init size = {}, work size = {}\n", m_bvh_init_work.size(), m_bvh_curr_work.size());
-
-    // TODO; filter out empty texture nodes from the initial workload
+    m_bvh_init_head = {{ .data = obj_span<const std::byte>(init_head) }}; */
   }
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
@@ -175,9 +171,9 @@ namespace met {
     // Push stale mesh tree data // TODO optimize?
     auto tree_data = cast_span<const std::byte>(i_elem_tree.data());
     i_tree_buffer.set(tree_data, tree_data.size()); // Specify size as buffer over-reserves data size
-    m_bvh_elem_buffer.set(tree_data, tree_data.size());
+    /* m_bvh_elem_buffer.set(tree_data, tree_data.size()); */
 
-    /* // Push uniform data
+    // Push uniform data
     m_uniform_map->n_verts = i_delaunay.verts.size();
     m_uniform_map->n_elems = i_delaunay.elems.size();
     m_uniform_buffer.flush();
@@ -189,21 +185,19 @@ namespace met {
     m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
     
     // Dispatch shader to generate delaunay convex weights
-    gl::dispatch_compute(m_dispatch); */
+    gl::dispatch_compute(m_dispatch);
 
-    { met_trace_n("bvh_testing");
-      // Reset some buffers
+    { met_trace_full_n("bvh_testing");
+     /*  // Reset some buffers
       m_bvh_init_work.copy_to(m_bvh_curr_work, m_bvh_init_work.size());
-      m_bvh_init_head.copy_to(m_bvh_leaf_work, sizeof(uint));
+      // m_bvh_init_head.copy_to(m_bvh_leaf_work, sizeof(uint));
 
       // Push uniform data
       m_bvh_unif_map->n_elems = i_delaunay.elems.size();
-      m_bvh_unif_buffer.flush();
+      m_bvh_unif_buffer.flush(); */
 
       // Iterate through levels of hierarchy, finding an optimal dual-hierarchy cut for computation
-      for (uint i = bvh_level_begin; i < 8; ++i) {
-        // fmt::print("level {}, max {} nodes\n", i, i_colr_tree.data(i).size());
-        
+      /* for (uint i = bvh_level_begin; i < i_colr_tree.n_levels() - 2; ++i) {
         // Reset next work head to starting work head
         m_bvh_init_head.copy_to(m_bvh_next_work, sizeof(uint));
 
@@ -225,32 +219,16 @@ namespace met {
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_desc_dispatch);
 
-        /* uint curr, next, leaf;
-        m_bvh_curr_work.get_as<uint>(std::span<uint> { &curr, 1 }, 1, 0);
-        m_bvh_next_work.get_as<uint>(std::span<uint> { &next, 1 }, 1, 0);
-        m_bvh_leaf_work.get_as<uint>(std::span<uint> { &leaf, 1 }, 1, 0);
-        fmt::print("{} : curr {}, next {}, leaf {}\n", i, curr, next, leaf); */
-
         // Swap current/next work buffers
         std::swap(m_bvh_curr_work, m_bvh_next_work);
-      } // for i
+      } // for i */
 
-      // Clear comparative buffer to some large integer value
+      /* // Clear comparative helper buffer to some reasonably large integer value
       int comp_max = 1024;
-      m_bvh_comp_buffer.clear(cast_span<const std::byte>(std::span<int> { &comp_max, 1 }));
-
-      static bool process_bottom = true;
-      static bool process_leaf = true;
-      if (ImGui::Begin("Delaunay Debug")) {
-        ImGui::Checkbox("Bottom", &process_bottom);
-        ImGui::Checkbox("Leaf", &process_leaf);
-      }
-      ImGui::End();
+      m_bvh_comp_buffer.clear(cast_span<const std::byte>(std::span<int> { &comp_max, 1 })); */
 
       // Process bottom part of cut
-      if (process_bottom) {
-        // fmt::print("Processing bottom\n");
-
+      /* { met_trace_full_n("bottom_cut");
         // Copy divided data to indirect dispatch buffer (divide by (256/32))
         m_bvh_div_08_program.bind("b_data", m_bvh_curr_work);
         m_bvh_div_08_program.bind("b_disp", m_bvh_div_08_buffer);
@@ -262,7 +240,7 @@ namespace met {
         m_bvh_bary_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_bary_program.bind("b_colr", m_bvh_colr_buffer);
         m_bvh_bary_program.bind("b_comp", m_bvh_comp_buffer);
-        m_bvh_bary_program.bind("b_curr", m_bvh_curr_work);
+        m_bvh_bary_program.bind("b_work", m_bvh_curr_work);
         m_bvh_bary_program.bind("b_pack", m_pack_buffer);
         m_bvh_bary_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
         m_bvh_bary_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
@@ -270,12 +248,10 @@ namespace met {
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
-      }
+      } */
 
-      // Process leaf part of cut
-      if (process_leaf) {
-        // fmt::print("Processing leaf\n");
-
+      /* // Process leaf part of cut
+      { met_trace_full_n("leaf_cut");
         // Copy divided data to indirect dispatch buffer (divide by (256/32))
         m_bvh_div_08_program.bind("b_data", m_bvh_leaf_work);
         m_bvh_div_08_program.bind("b_disp", m_bvh_div_08_buffer);
@@ -287,7 +263,7 @@ namespace met {
         m_bvh_bary_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_bary_program.bind("b_colr", m_bvh_colr_buffer);
         m_bvh_bary_program.bind("b_comp", m_bvh_comp_buffer);
-        m_bvh_bary_program.bind("b_curr", m_bvh_leaf_work);
+        m_bvh_bary_program.bind("b_work", m_bvh_leaf_work);
         m_bvh_bary_program.bind("b_pack", m_pack_buffer);
         m_bvh_bary_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
         m_bvh_bary_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
@@ -295,27 +271,65 @@ namespace met {
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
-      }
+      } */
 
-      { // Do some more debugging
-        using BVHNode = detail::BVHNode;
+      // { // Do some more debugging
+      //   using BVHNode = detail::BVHNode;
+      //   struct WorkUnit { uint elem_i, colr_i; };
+
+      //   // Get tree nodes 
+      //   auto colr_nodes = i_colr_tree.data();
+      //   auto elem_nodes = i_elem_tree.data();
+
+      //   // Get work queue and leaf queue
+      //   uint leaf_head, curr_head;
+      //   m_bvh_leaf_work.get_as<uint>(std::span<uint> { &leaf_head, 1}, 1, 0);
+      //   // m_bvh_curr_work.get_as<uint>(std::span<uint> { &curr_head, 1}, 1, 0);
         
-        auto colr_nodes = i_colr_tree.data(i_colr_tree.n_levels() - 4);
-        auto elem_nodes = i_elem_tree.data(i_elem_tree.n_levels() - 4);
+      //   std::vector<WorkUnit> leaf_work(leaf_head);
+      //   // std::vector<WorkUnit> curr_work(curr_head);
+      //   m_bvh_leaf_work.get_as<WorkUnit>(leaf_work, leaf_work.size(), 2);
+      //   // m_bvh_curr_work.get_as<WorkUnit>(curr_work, curr_work.size(), 2);
 
-        int colr_count = 0, elem_count = 0;
-        for (const auto &node : colr_nodes) {
-          colr_count += node.n;
-        }
-        for (const auto &node : elem_nodes) {
-          elem_count += node.n;
-        }
+      //   fmt::print("leaf\n\t{}\n", cast_span<eig::Array2u>(std::span { leaf_work.begin(), 64 }));
+      //   // fmt::print("curr\n\t{}\n", cast_span<eig::Array2u>(std::span { curr_work.begin(), 64 }));
 
-        fmt::print("colr_count {} of {}\n", colr_count, e_appl_data.loaded_texture.data().size());
-        fmt::print("elem_count {} of {}\n", elem_count, i_delaunay.elems.size());
+      //   std::vector<uint> point_count(e_appl_data.loaded_texture.data().size(), 0);
+      //   /* for (const auto &work : curr_work) {
+      //     const auto &colr = colr_nodes[work.colr_i];
+      //     const auto &elem = elem_nodes[work.colr_i];
+      //     for (uint i = colr.i; i < colr.i + colr.n; ++i)
+      //       point_count[i]++;
+      //     // fmt::print("{} - {}\n", colr.i, colr.n);
+      //   } */
 
-        std::exit(0);
-      } // End debugging
+      //   for (const auto &work : leaf_work) {
+      //     const auto &colr = colr_nodes[work.colr_i];
+      //     const auto &elem = elem_nodes[work.elem_i];
+      //     for (uint i = colr.i; i < colr.i + colr.n; ++i)
+      //       point_count[i] += elem.n;
+      //     // fmt::print("{} - {}\n", colr.i, colr.n);
+      //   }
+
+      //   // fmt::print("count\n\t{}\n", std::span { point_count.begin(), 64 });
+      //   fmt::print("elems = {}\n", i_delaunay.elems.size());
+      //   for (uint i = 0; i < 128; ++i)
+      //     fmt::print("{} - {}\n", i, point_count[i]);
+
+
+      //   /* int colr_count = 0, elem_count = 0;
+      //   for (const auto &node : colr_nodes) {
+      //     colr_count += node.n;
+      //   }
+      //   for (const auto &node : elem_nodes) {
+      //     elem_count += node.n;
+      //   }
+
+      //   fmt::print("colr_count {} of {}\n", colr_count, e_appl_data.loaded_texture.data().size());
+      //   fmt::print("elem_count {} of {}\n", elem_count, i_delaunay.elems.size()); */
+
+      //   std::exit(0);
+      // } // End debugging
 
       /* { // Do some debugging
         struct BVHNode  { uint indx, i, n; };

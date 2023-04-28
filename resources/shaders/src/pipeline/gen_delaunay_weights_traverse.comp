@@ -53,8 +53,7 @@ layout(binding = 0) uniform b_unif {
 
 // Subgroup helper declarations
 const uint bvh_degr = 8;
-const uint sg_invocs = bvh_degr;
-uint sg_invoc = gl_SubgroupInvocationID % sg_invocs;
+uint sg_invoc = gl_SubgroupInvocationID % bvh_degr;
 uint sg_base  = gl_SubgroupInvocationID - sg_invoc;
 
 // Test bbox intersection
@@ -63,7 +62,7 @@ bool intersect(in Node a, in Node b) {
 }
 
 void main() {
-  const uint i = gl_GlobalInvocationID.x / sg_invocs;
+  const uint i = gl_GlobalInvocationID.x / bvh_degr;
   guard(i < work_curr.head);
   
   // A prior work-unit is shared among a 8-wide subgroup cluster
@@ -83,20 +82,21 @@ void main() {
   elem.i    = subgroupShuffle(elem.i,    sg_base);
   elem.maxb = subgroupShuffle(elem.maxb, sg_base);
   elem.n    = subgroupShuffle(elem.n,    sg_base);
+  guard(elem.n != 0);
 
   // Descend along tree; 8-wide subdivision is split among a subgroup cluster
   uint colr_i = unit_curr.colr_i * bvh_degr + 1 + sg_invoc;
   Node colr = colr_in.data[colr_i];
+  guard(colr.n != 0);
 
-  // This invocation remains active only for a non-empty, intersecting pair
-  guard(elem.n != 0 && colr.n != 0);
+  // This invocation remains active only for intersecting bounding boxes
   guard(intersect(elem, colr));
   
   // Push new, subdivided workunit to the appropriate output queue
   WorkUnit unit_next = WorkUnit(unit_curr.elem_i, colr_i); 
-  if (colr.n <= gl_SubgroupSize) {
-    work_leaf.data[atomicAdd(work_leaf.head, 1)] = unit_next;
-  } else {
+  if (colr.n > gl_SubgroupSize) {
     work_next.data[atomicAdd(work_next.head, 1)] = unit_next;
+  } else {
+    work_leaf.data[atomicAdd(work_leaf.head, 1)] = unit_next;
   }
 }

@@ -37,11 +37,11 @@ layout(binding = 0) restrict readonly buffer b_posi { vec3 data[]; } posi_in;
 layout(binding = 1) restrict readonly buffer b_pack { Elem data[]; } pack_in;
 layout(binding = 2) restrict readonly buffer b_elem { Node data[]; } elem_in;
 layout(binding = 3) restrict readonly buffer b_colr { Node data[]; } colr_in;
-layout(binding = 4) restrict readonly buffer b_curr {
+layout(binding = 4) restrict readonly buffer b_work {
   uint     head;   // Atomic head count
   uint    _pad[3]; // 3x4by padding
   WorkUnit data[]; // Actual work data
-} curr_work;
+} work_in;
 layout(binding = 5) restrict coherent  buffer b_comp { int  data[]; } comp_inout;
 layout(binding = 6) restrict writeonly buffer b_bary { vec4 data[]; } bary_out;
 
@@ -61,7 +61,7 @@ void load_shared() {
     s_pack_in[i] = pack_in.data[i];
 
   if (gl_LocalInvocationID.x == 0)
-    s_work_head_in = curr_work.head;
+    s_work_head_in = work_in.head;
   
   memoryBarrierShared();
   barrier();
@@ -74,39 +74,42 @@ void main() {
   guard(i < s_work_head_in);
 
   // Load current work and relevant hierarchy nodes
-  WorkUnit curr_unit = curr_work.data[i];
+  WorkUnit work = work_in.data[i];
   if (subgroupElect()) {
-    curr_unit = curr_work.data[i];  
+    work = work_in.data[i];  
   }
-  curr_unit.elem_i = subgroupBroadcastFirst(curr_unit.elem_i);
-  curr_unit.colr_i = subgroupBroadcastFirst(curr_unit.colr_i);
+  work.elem_i = subgroupBroadcastFirst(work.elem_i);
+  work.colr_i = subgroupBroadcastFirst(work.colr_i);
 
   // A current element is shared among a subgroup cluster, which is the degree of the tree (8)
   Node elem, colr;
   if (subgroupElect()) {
-    colr = colr_in.data[curr_unit.colr_i];
-    elem = elem_in.data[curr_unit.elem_i];
+    colr = colr_in.data[work.colr_i];
+    elem = elem_in.data[work.elem_i];
   }
   elem.i = subgroupBroadcastFirst(elem.i);
   elem.n = subgroupBroadcastFirst(elem.n);
   colr.i = subgroupBroadcastFirst(colr.i);
   colr.n = subgroupBroadcastFirst(colr.n);
 
-  // Iterate relevant color signals; grid-stride loop across subgroup cluster
+  guard(elem.n != 0 && colr.n != 0);
+
+  // Iterate relevant color signals; grid-stride loop per subgroup cluster
   for (uint colr_i = colr.i + gl_SubgroupInvocationID;
             colr_i < colr.i + colr.n;
             colr_i += gl_SubgroupSize) {
-    // Load color signal
-    vec3 p = posi_in.data[colr_i];
+    vec3 p = posi_in.data[colr_i]; // Color signal in texture
+    
+    guard_continue(atomicCompSwap(comp_inout.data[colr_i], -1, -1) != -1);
 
-    // Default values for coming operation
-    vec4 bary_i;
+    // Initial values for coming operation
+    vec4 bary_i = vec4(0);
     int bary_i_err = 4096;
 
-    // Iterate relevant delaunay elements
+    // Iterate relevant delaunay elements; single loop per invocation; break on success
     for (uint elem_i = elem.i;
-              elem_i < elem.i + elem.n; 
-            ++elem_i) {
+              elem_i < elem.i + elem.n && bary_i_err != -1; 
+              elem_i += 1) {
       // Compute barycentric weights using packed element data
       vec3 xyz = s_pack_in[elem_i].inv * (p - s_pack_in[elem_i].sub);
       vec4 bary_j = vec4(xyz, 1.f - hsum(xyz));
@@ -114,7 +117,9 @@ void main() {
       // Compute squared error of potentially negative barycentric weights,
       // and get an integer representation in here
       float err = hsum(abs(bary_j - clamp(bary_j, 0, 1)));
-      int bary_j_err = err == 0.f ? -1 : int(clamp(err, 0, 1) * 1024.f);
+      int bary_j_err = (err < 0.00001f) 
+                     ? -1 
+                     : int(clamp(err, 0, 1) * 1024.f);
 
       // Best result so far
       if (bary_j_err < bary_i_err) {
@@ -123,7 +128,7 @@ void main() {
       }
     } // for elem_i
 
-    // Attempt to establish a minimum
+    // Attempt to establish a minimum or error-free result
     // if (bary_i_err == atomicMin(comp_inout.data[colr_i], bary_i_err))
     if (bary_i_err == -1)
       bary_out.data[colr_i] = bary_i;

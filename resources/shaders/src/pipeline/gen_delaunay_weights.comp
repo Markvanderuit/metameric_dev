@@ -4,14 +4,6 @@
 #include <math.glsl>
 #include <tree.glsl>
 
-// Delaunay search tree; node data structure
-struct Node { 
-  vec3 maxb; // Bounding volume minimum
-  uint i;    // Begin index of underlying range
-  vec3 minb; // Bounding volume maximum
-  uint n;    // Extent of underlying range
-};
-
 // Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
 struct Elem {
   mat3 inv; // Inverse of 3x3 matrix [x - w, y - w, z - w]
@@ -38,11 +30,8 @@ layout(binding = 0) uniform b_unif {
 
 // Shared memory declarations
 shared Elem s_pack_in[512];
-// shared Node  s_nodes_in[max_node_support]; // Shared load of node_in buffer
 
 void load_shared() {
-  // for (uint i = gl_LocalInvocationID.x; i < unif_in.n_nodes; i += gl_WorkGroupSize.x)
-  //   s_nodes_in[i] = node_in.data[i];
   for (uint i = gl_LocalInvocationID.x; i < unif_in.n_elems; i += gl_WorkGroupSize.x)
     s_pack_in[i] = pack_in.data[i];
   memoryBarrierShared();
