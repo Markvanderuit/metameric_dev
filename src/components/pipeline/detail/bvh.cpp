@@ -10,6 +10,11 @@
 #include <ranges>
 
 namespace met::detail {
+  // Generate a transforming view that performs unsigned integer index access over a range
+  constexpr auto indexed_view(const auto &v) {
+    return std::views::transform([&v](uint i) { return v[i]; });
+  };
+
   namespace radix {
     inline
     uint expand_bits_10(uint i)  {
@@ -62,26 +67,89 @@ namespace met::detail {
   } // namespace radix
 
   template <typename NodeTy, typename VertTy> 
-  void reduce_leaf(NodeTy &node, const VertTy &vt);
-  template <typename NodeTy> 
-  void reduce_node(NodeTy &node, const NodeTy &child);
+  void reduce_leaf(NodeTy &node, std::span<const VertTy> vts);
+  template <typename NodeTy, typename VertTy> 
+  void reduce_node(NodeTy &node, const NodeTy &child, std::span<const VertTy> underlying_vts);
 
   template <>
-  void reduce_leaf<BVHNode, eig::Array3f>(BVHNode &node, const eig::Array3f &vt) {
-    node.minb = node.minb.cwiseMin(vt);
-    node.maxb = node.maxb.cwiseMax(vt);
+  void reduce_leaf<BTNode, eig::Array3f>(BTNode &node, std::span<const eig::Array3f> vts) {
+    guard(node.n > 0);
+
+    // Single point, return point
+    // >= 2 points, we use Jack Ritter's bounding sphere approximation
+    if (node.n == 1) {
+      node.p = vts[node.i];
+      node.r = 0.f;
+      return;
+    }
+    
+    // Get contiguous range over contained points
+    auto view_range = std::views::iota(node.i, node.i + node.n) | indexed_view(vts);
+    std::vector<eig::Array3f> view(range_iter(view_range));
+
+    // Select starting point from point set, and find a farthest point
+    auto p_begin = view.front();
+    auto p_begin_farthest = *std::max_element(view.begin() + 1, view.end(), [&p_begin](const auto &vt_a, const auto &vt_b) {
+      return (vt_a - p_begin).matrix().squaredNorm() < (vt_b - p_begin).matrix().squaredNorm();
+    });
+
+    // Next, find the farthest point from that farthest point
+    auto p_next_farthest = *std::max_element(view.begin() + 1, view.end(), [&p_begin_farthest](const auto &vt_a, const auto &vt_b) {
+      return (vt_a - p_begin_farthest).matrix().squaredNorm() < (vt_b - p_begin_farthest).matrix().squaredNorm();
+    });
+
+    // Assign initial bounding sphere between these farthest points
+    node.p = 0.5f * (p_begin_farthest + p_next_farthest);
+    node.r = 0.5f * (p_begin_farthest - p_next_farthest).matrix().norm();
+    
+    // Next, for any other points that lie outside the bounding sphere, grow the sphere to encompass those points.
+    for (const auto &vt : view)
+      node.r = std::max(node.r, (vt - node.p).matrix().norm());
   }
 
   template <>
-  void reduce_node<BVHNode>(BVHNode &node, const BVHNode &child) {
+  void reduce_leaf<BTNode, eig::AlArray3f>(BTNode &node, std::span<const eig::AlArray3f> vts) {
+    eig::Array3f minv = std::numeric_limits<float>::max(), 
+                 maxv = std::numeric_limits<float>::min(),
+                 posv = 0;
+
+    for (const auto &vt : std::views::iota(node.i, node.i + node.n) | indexed_view(vts)) {
+      minv = minv.cwiseMin(vt);
+      maxv = maxv.cwiseMin(vt);
+      posv += vt;
+    }
+    
+    node.p = posv / static_cast<float>(node.n);
+    node.r = 0.5f * (maxv - minv).matrix().norm();
+  }
+
+  template <>
+  void reduce_leaf<BVHNode, eig::Array3f>(BVHNode &node, std::span<const eig::Array3f> vts) {
+    for (const auto &vt : std::views::iota(node.i, node.i + node.n) | indexed_view(vts)) {
+      node.minb = node.minb.cwiseMin(vt);
+      node.maxb = node.maxb.cwiseMax(vt);
+    }
+  }
+
+  template <>
+  void reduce_leaf<BVHNode, eig::AlArray3f>(BVHNode &node, std::span<const eig::AlArray3f> vts) {
+    for (const auto &vt : std::views::iota(node.i, node.i + node.n) | indexed_view(vts)) {
+      node.minb = node.minb.cwiseMin(vt);
+      node.maxb = node.maxb.cwiseMax(vt);
+    }
+  }
+
+  template <>
+  void reduce_node<BVHNode, eig::Array3f>(BVHNode &node, const BVHNode &child, std::span<const eig::Array3f> _vts) {
     node.minb = node.minb.cwiseMin(child.minb);
     node.maxb = node.maxb.cwiseMax(child.maxb);
   }
 
-  // Generate a transforming view that performs unsigned integer index access over a range
-  constexpr auto indexed_view(const auto &v) {
-    return std::views::transform([&v](uint i) { return v[i]; });
-  };
+  template <>
+  void reduce_node<BVHNode, eig::AlArray3f>(BVHNode &node, const BVHNode &child, std::span<const eig::AlArray3f> _vts) {
+    node.minb = node.minb.cwiseMin(child.minb);
+    node.maxb = node.maxb.cwiseMax(child.maxb);
+  }
 
   // Padded begin index on current tree level
   template <uint Degr> constexpr uint bvh_lvl_begin(int lvl);
@@ -157,7 +225,7 @@ namespace met::detail {
     m_nodes[0] = { .i = 0, .n = m_n_primitives };
 
     // Temporary sorted vertex order
-    std::vector<eig::Array3f> vt(range_iter(vt_));
+    std::vector<Vert> vt(range_iter(vt_));
 
     // Build quick and dirty morton order
     std::vector<uint> codes(m_n_primitives);
@@ -194,11 +262,11 @@ namespace met::detail {
           for (int j = LDegr; j > 0; --j) { // 3, 2, 1
             guard_break(children.size() > 1 || children[0].n > 1);
 
-            std::vector<Node> children_;
+            std::vector<Node> children_subdivided;
             for (auto &child : children) {
               // Propagate leaf/empty nodes to bottom of tree
               if (child.n <= 1) {
-                children_.push_back(child);
+                children_subdivided.push_back(child);
                 continue;
               }
 
@@ -207,10 +275,10 @@ namespace met::detail {
               uint split = radix::find_split(codes, begin, end);
               
               // Push new child nodes
-              children_.push_back({ .i = begin,     .n = split - begin + 1 });
-              children_.push_back({ .i = split + 1, .n = end - split });
+              children_subdivided.push_back({ .i = begin,     .n = split - begin + 1 });
+              children_subdivided.push_back({ .i = split + 1, .n = end - split });
             } // for node
-            children = children_;  
+            children = children_subdivided;  
           } // for j
           
           // Store subdivided result in tree
@@ -230,15 +298,13 @@ namespace met::detail {
 
           // Build data; separate into leaf/non-leaf cases 
           if (node.n == 1 || lvl == m_n_levels - 1) {  // Leaf node; 
-            // Fit bounding volume around contained mesh vertices
-            auto verts = std::views::iota(node.i, node.i + node.n) | indexed_view(vt);
-            for (const auto &vert : verts)
-              reduce_leaf(node, vert);
+            // Fit initial bounding volume
+            reduce_leaf(node, std::span<const Vert> { vt });
           } else {  // Non-leaf node; 
-            // Generate bounding volume over non-empty children
+            // Generate folded bounding volume (over non-empty children)
             auto children = std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr) | indexed_view(m_nodes);
             for (const auto &child : children)
-              reduce_node(node, child);
+              reduce_node(node, child, std::span<const Vert> { vt });
           }
         } // for i
       } // for lvl
@@ -307,11 +373,11 @@ namespace met::detail {
           for (int j = LDegr; j > 0; --j) { // 3, 2, 1
             guard_break(children.size() > 1 || children[0].n > 1);
             
-            std::vector<Node> children_;
+            std::vector<Node> children_subdivided;
             for (const auto &child : children) {
               // Propagate leaf/empty nodes to bottom of tree
               if (child.n <= 1) {
-                children_.push_back(child);
+                children_subdivided.push_back(child);
                 continue;
               }
 
@@ -320,10 +386,10 @@ namespace met::detail {
               uint split = radix::find_split(codes, begin, end);
               
               // Push new child nodes
-              children_.push_back({ .i = begin,     .n = split - begin + 1 });
-              children_.push_back({ .i = split + 1, .n = end - split });
+              children_subdivided.push_back({ .i = begin,     .n = split - begin + 1 });
+              children_subdivided.push_back({ .i = split + 1, .n = end - split });
             } // for node
-            children = children_;  
+            children = children_subdivided;  
           } // for j
           
           // Store subdivided result in tree

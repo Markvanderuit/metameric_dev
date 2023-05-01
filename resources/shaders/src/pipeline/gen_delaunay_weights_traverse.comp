@@ -46,15 +46,24 @@ layout(binding = 4) restrict coherent buffer b_leaf {
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_unif {
+  uint elem_begin_lvl;
+  uint colr_begin_lvl;
+  uint n_elems;
   uint n_colr_nodes;
   uint n_elem_nodes;
-  uint n_elems;
 } unif_in;
 
 // Subgroup helper declarations
-const uint bvh_degr = 8;
+const uint bvh_degr     = 8;
+const uint bvh_degr_log = 3;
 uint sg_invoc = gl_SubgroupInvocationID % bvh_degr;
 uint sg_base  = gl_SubgroupInvocationID - sg_invoc;
+
+// BVH traversal helper functions
+const float bvh_degr_ln_div = 1.f / log(bvh_degr);
+uint lvl_from_index(uint i) {
+  return uint(log(float(i) * 7.f + 6.f) * bvh_degr_ln_div);
+}
 
 // Test bbox intersection
 bool intersect(in Node a, in Node b) {
@@ -82,6 +91,9 @@ void main() {
   elem.i    = subgroupShuffle(elem.i,    sg_base);
   elem.maxb = subgroupShuffle(elem.maxb, sg_base);
   elem.n    = subgroupShuffle(elem.n,    sg_base);
+
+  // Determine current level
+  // uint curr_colr_lvl = lvl_from_index(unit_curr.colr_i);
   guard(elem.n != 0);
 
   // Descend along tree; 8-wide subdivision is split among a subgroup cluster

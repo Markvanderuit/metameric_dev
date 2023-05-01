@@ -19,7 +19,7 @@ namespace met::detail {
     eTetrahedron
   };
 
-  // Packed ball-tree node structure; 2x4b on GL side
+  // Packed ball-tree node structure; packed 6b on GL side
   struct BTNode {
     eig::Array3f p = 0; // Sphere center
     float        r = 0; // Sphere radius
@@ -27,7 +27,7 @@ namespace met::detail {
     uint         n = 0; // Underlying range extent
   };
 
-  // Packed bounding-volume-hierarchy node structure; 2x4b on GL side
+  // Packed bounding-volume-hierarchy node structure; packed 8b on GL side
   struct BVHNode {
     eig::Array3f minb = std::numeric_limits<float>::max(); // Bounding volume minimum
     uint         i    = 0;                                 // Underlying range begin
