@@ -34,19 +34,9 @@ namespace met {
     std::span<eig::Array4u>   m_elem_map;
 
     struct BVHUniformBuffer {
-      uint elem_begin_lvl;
-      uint colr_begin_lvl;
+      uint n_elem_lvls;
+      uint n_colr_lvls;
       uint n_elems;
-      uint n_colr_nodes;
-      uint n_elem_nodes;
-    };
-
-    struct BVHWorkBuffer {
-      gl::Buffer data;
-
-      void clear_head() {
-        data.clear({ }, 1u, sizeof(eig::Array4u));
-      }
     };
 
     gl::Buffer              m_bvh_div_sg_buffer;
@@ -63,10 +53,13 @@ namespace met {
 
     gl::ComputeInfo         m_bvh_finl_dispatch;
     gl::Program             m_bvh_finl_program;
-
+    
     gl::Buffer              m_bvh_flag_buffer;
     gl::Buffer              m_bvh_colr_buffer;
+    gl::Buffer              m_bvh_colr_refr_buffer;
+    gl::Buffer              m_bvh_colr_ordr_buffer;
     gl::Buffer              m_bvh_elem_buffer;
+    gl::Buffer              m_bvh_elem_ordr_buffer;
     gl::Buffer              m_bvh_unif_buffer;
     BVHUniformBuffer       *m_bvh_unif_map;
     gl::Buffer              m_bvh_init_work; // This is continuously copied over

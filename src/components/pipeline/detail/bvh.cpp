@@ -10,9 +10,14 @@
 #include <ranges>
 
 namespace met::detail {
-  // Generate a transforming view that performs unsigned integer index access over a range
+  // Generate a transforming closure that performs unsigned integer index access in some object
+  constexpr auto indexed_closure(const auto &v) {
+    return [&v](uint i) { return v[i]; };
+  };
+
+  // Generate a transforming view that performs unsigned integer index access in some object
   constexpr auto indexed_view(const auto &v) {
-    return std::views::transform([&v](uint i) { return v[i]; });
+    return std::views::transform(indexed_closure(v));
   };
 
   namespace radix {
@@ -67,12 +72,12 @@ namespace met::detail {
   } // namespace radix
 
   template <typename NodeTy, typename VertTy> 
-  void reduce_leaf(NodeTy &node, std::span<const VertTy> vts);
+  void reduce_leaf_point(NodeTy &node, std::span<const VertTy> vts);
   template <typename NodeTy, typename VertTy> 
-  void reduce_node(NodeTy &node, const NodeTy &child, std::span<const VertTy> underlying_vts);
+  void reduce_node_point(NodeTy &node, const NodeTy &child, std::span<const VertTy> underlying_vts);
 
   template <>
-  void reduce_leaf<BTNode, eig::Array3f>(BTNode &node, std::span<const eig::Array3f> vts) {
+  void reduce_leaf_point<BTNode, eig::Array3f>(BTNode &node, std::span<const eig::Array3f> vts) {
     guard(node.n > 0);
 
     // Single point, return point
@@ -108,7 +113,7 @@ namespace met::detail {
   }
 
   template <>
-  void reduce_leaf<BTNode, eig::AlArray3f>(BTNode &node, std::span<const eig::AlArray3f> vts) {
+  void reduce_leaf_point<BTNode, eig::AlArray3f>(BTNode &node, std::span<const eig::AlArray3f> vts) {
     eig::Array3f minv = std::numeric_limits<float>::max(), 
                  maxv = std::numeric_limits<float>::min(),
                  posv = 0;
@@ -124,7 +129,7 @@ namespace met::detail {
   }
 
   template <>
-  void reduce_leaf<BVHNode, eig::Array3f>(BVHNode &node, std::span<const eig::Array3f> vts) {
+  void reduce_leaf_point<BVHNode, eig::Array3f>(BVHNode &node, std::span<const eig::Array3f> vts) {
     for (const auto &vt : std::views::iota(node.i, node.i + node.n) | indexed_view(vts)) {
       node.minb = node.minb.cwiseMin(vt);
       node.maxb = node.maxb.cwiseMax(vt);
@@ -132,7 +137,7 @@ namespace met::detail {
   }
 
   template <>
-  void reduce_leaf<BVHNode, eig::AlArray3f>(BVHNode &node, std::span<const eig::AlArray3f> vts) {
+  void reduce_leaf_point<BVHNode, eig::AlArray3f>(BVHNode &node, std::span<const eig::AlArray3f> vts) {
     for (const auto &vt : std::views::iota(node.i, node.i + node.n) | indexed_view(vts)) {
       node.minb = node.minb.cwiseMin(vt);
       node.maxb = node.maxb.cwiseMax(vt);
@@ -140,13 +145,13 @@ namespace met::detail {
   }
 
   template <>
-  void reduce_node<BVHNode, eig::Array3f>(BVHNode &node, const BVHNode &child, std::span<const eig::Array3f> _vts) {
+  void reduce_node_point<BVHNode, eig::Array3f>(BVHNode &node, const BVHNode &child, std::span<const eig::Array3f> _vts) {
     node.minb = node.minb.cwiseMin(child.minb);
     node.maxb = node.maxb.cwiseMax(child.maxb);
   }
 
   template <>
-  void reduce_node<BVHNode, eig::AlArray3f>(BVHNode &node, const BVHNode &child, std::span<const eig::AlArray3f> _vts) {
+  void reduce_node_point<BVHNode, eig::AlArray3f>(BVHNode &node, const BVHNode &child, std::span<const eig::AlArray3f> _vts) {
     node.minb = node.minb.cwiseMin(child.minb);
     node.maxb = node.maxb.cwiseMax(child.maxb);
   }
@@ -184,21 +189,21 @@ namespace met::detail {
   }
 
   template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
-  BVH<Vt, Node, D, Ty>::BVH(std::span<Vt> vt)
+  BVH<Vt, Node, D, Ty>::BVH(std::span<const Vt> vt)
   requires(Ty == BVHPrimitive::ePoint) {
     met_trace();
     build(vt);
   }
 
   template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
-  BVH<Vt, Node, D, Ty>::BVH(std::span<Vt> vt, std::span<eig::Array3u> el)
+  BVH<Vt, Node, D, Ty>::BVH(std::span<const Vt> vt, std::span<const eig::Array3u> el)
   requires(Ty == BVHPrimitive::eTriangle) {
     met_trace();
     build(vt, el);
   }
 
   template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
-  BVH<Vt, Node, D, Ty>::BVH(std::span<Vt> vt, std::span<eig::Array4u> el)
+  BVH<Vt, Node, D, Ty>::BVH(std::span<const Vt> vt, std::span<const eig::Array4u> el)
   requires(Ty == BVHPrimitive::eTetrahedron) {
     met_trace();
     build(vt, el);
@@ -211,12 +216,13 @@ namespace met::detail {
   }
 
   template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
-  void BVH<Vt, Node, D, Ty>::build(std::span<Vt> vt_)
+  void BVH<Vt, Node, D, Ty>::build(std::span<const Vt> vt_)
   requires(Ty == BVHPrimitive::ePoint) {
     met_trace();
     
     m_n_primitives = vt_.size();
     m_n_levels = bvh_n_lvls<Degr>(m_n_primitives);
+    m_order.resize(m_n_primitives);
     if (m_nodes.size() < bvh_n_nodes<Degr>(m_n_levels))
       reserve(m_n_primitives);
 
@@ -224,30 +230,25 @@ namespace met::detail {
     std::fill(std::execution::par_unseq, range_iter(m_nodes), Node { });
     m_nodes[0] = { .i = 0, .n = m_n_primitives };
 
-    // Temporary sorted vertex order
-    std::vector<Vert> vt(range_iter(vt_));
-
     // Build quick and dirty morton order
     std::vector<uint> codes(m_n_primitives);
-    std::vector<uint> order(m_n_primitives);
     { met_trace_n("order_generation");
       // Generate object centers for primitives, output morton codes
-      std::transform(std::execution::par_unseq, range_iter(vt), codes.begin(),
+      std::transform(std::execution::par_unseq, range_iter(vt_), codes.begin(),
         [](const auto &v) { return radix::morton_code(v); });
 
-      // Generate morton order
-      // TODO; get a radix sort in here, dammit
-      std::iota(range_iter(order), 0u);
-      std::sort(std::execution::par_unseq, range_iter(order), [&](uint i, uint j) { return codes[i] < codes[j]; });
+      // Generate morton order // TODO; get a radix sort in here, dammit
+      std::iota(range_iter(m_order), 0u);
+      std::sort(std::execution::par_unseq, range_iter(m_order), [&](uint i, uint j) { return codes[i] < codes[j]; });
 
       // Adjust code data to adhere to order
       std::vector<uint> codes_(codes);
-      std::transform(std::execution::par_unseq, range_iter(order), codes.begin(), [&](uint i) { return codes_[i]; });
-
-      // Adjust input data to adhere to order
-      // TODO; instead of doing hidden stuff, provide a underlying representation of the data for buffers
-      std::transform(std::execution::par_unseq, range_iter(order), vt.begin(), [&](uint i) { return vt_[i]; });
+      std::transform(std::execution::par_unseq, range_iter(m_order), codes.begin(), indexed_closure(codes_));
     } // order_generation
+
+    // Temporary sorted vertex order
+    std::vector<Vert> vt(m_n_primitives);
+    std::transform(std::execution::par_unseq, range_iter(m_order), vt.begin(), indexed_closure(vt_));
 
     // Build subdivision based on morton order; push down from root
     { met_trace_n("subdivision");
@@ -299,32 +300,47 @@ namespace met::detail {
           // Build data; separate into leaf/non-leaf cases 
           if (node.n == 1 || lvl == m_n_levels - 1) {  // Leaf node; 
             // Fit initial bounding volume
-            reduce_leaf(node, std::span<const Vert> { vt });
+            for (const auto &vert : std::views::iota(node.i, node.i + node.n) 
+                                | indexed_view(vt)) {
+              node.minb = node.minb.cwiseMin(vert);
+              node.maxb = node.maxb.cwiseMax(vert);
+            }
+            // reduce_leaf_point(node, std::span<const Vert> { vt });
           } else {  // Non-leaf node; 
             // Generate folded bounding volume (over non-empty children)
-            auto children = std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr) | indexed_view(m_nodes);
-            for (const auto &child : children)
-              reduce_node(node, child, std::span<const Vert> { vt });
+            for (const auto &child : std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr)
+                                   | indexed_view(m_nodes)) {
+              node.minb = node.minb.cwiseMin(child.minb);
+              node.maxb = node.maxb.cwiseMax(child.maxb);
+            }
+
+            /* auto children = std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr) | indexed_view(m_nodes);
+            // reduce_node_point(node, child, std::span<const Vert> { vt });
+            for (const auto &child : children) {
+              node.minb = node.minb.cwiseMin(child.minb);
+              node.maxb = node.maxb.cwiseMax(child.maxb);
+            } */
           }
         } // for i
       } // for lvl
     } // bounding_volume_generation
   }
-
+  
   template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
-  void BVH<Vt, Node, D, Ty>::build(std::span<Vt> vt, std::span<eig::Array3u> el)
+  void BVH<Vt, Node, D, Ty>::build(std::span<const Vt> vt, std::span<const eig::Array3u> el)
   requires(Ty == BVHPrimitive::eTriangle) {
     met_trace();
     debug::check_expr(false, "Not implemented!");
   }
 
   template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
-  void BVH<Vt, Node, D, Ty>::build(std::span<Vt> vt, std::span<eig::Array4u> el)
+  void BVH<Vt, Node, D, Ty>::build(std::span<const Vt> vt, std::span<const eig::Array4u> el_)
   requires(Ty == BVHPrimitive::eTetrahedron) {
     met_trace();
 
-    m_n_primitives = el.size();
+    m_n_primitives = el_.size();
     m_n_levels = bvh_n_lvls<Degr>(m_n_primitives);
+    m_order.resize(m_n_primitives);
     if (m_nodes.size() < bvh_n_nodes<Degr>(m_n_levels))
       reserve(m_n_primitives);
     
@@ -334,32 +350,28 @@ namespace met::detail {
 
     // Build quick and dirty morton order
     std::vector<uint> codes(m_n_primitives);
-    std::vector<uint> order(m_n_primitives);
     { met_trace_n("order_generation");
       // Generate object centers for primitives, output morton codes
-      std::transform(std::execution::par_unseq, range_iter(el), codes.begin(), [&](const eig::Array4u &elem) { 
+      std::transform(std::execution::par_unseq, range_iter(el_), codes.begin(), [&](const eig::Array4u &elem) { 
         auto verts = elem | indexed_view(vt);
         eig::Array3f maxb = std::reduce(range_iter(verts), m_nodes[0].maxb, [](auto a, auto b) { return a.max(b); });
         eig::Array3f minb = std::reduce(range_iter(verts), m_nodes[0].minb, [](auto a, auto b) { return a.min(b); });
         return radix::morton_code((minb + maxb) * 0.5);
-        // return radix::morton_code((vt[elem[0]] + vt[elem[1]] + vt[elem[2]] + vt[elem[3]]) / 4.f); 
       });
 
-      // Generate morton order
-      // TODO; get a radix sort in here, dammit
-      std::iota(range_iter(order), 0u);
-      std::sort(std::execution::par_unseq, range_iter(order), [&](uint i, uint j) { return codes[i] < codes[j]; });
+      // Generate morton order // TODO; get a radix sort in here, dammit
+      std::iota(range_iter(m_order), 0u);
+      std::sort(std::execution::par_unseq, range_iter(m_order), [&](uint i, uint j) { return codes[i] < codes[j]; });
 
       // Adjust code data to adhere to order
       std::vector<uint> codes_(codes);
-      std::transform(std::execution::par_unseq, range_iter(order), codes.begin(), [&](uint i) { return codes_[i]; });
-
-      // Adjust input data to adhere to order
-      // TODO; instead of doing hidden stuff, provide a copy of the data
-      std::vector<eig::Array4u> el_(range_iter(el));
-      std::transform(std::execution::par_unseq, range_iter(order), el.begin(), [&](uint i) { return el_[i]; });
+      std::transform(std::execution::par_unseq, range_iter(m_order), codes.begin(), indexed_closure(codes_));
     } // order_generation
 
+    // Temporary sorted element order
+    std::vector<eig::Array4u> el(m_n_primitives);
+    std::transform(std::execution::par_unseq, range_iter(m_order), el.begin(), indexed_closure(el_));
+    
     // Build subdivision based on morton order; push down from root
     { met_trace_n("subdivision");
       for (int lvl = 0; lvl < m_n_levels - 1; ++lvl) {
@@ -419,6 +431,8 @@ namespace met::detail {
             }
           } else {  // Non-leaf node; 
             // Generate bounding volume over non-empty children
+            auto children = std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr) | indexed_view(m_nodes);
+            
             for (const auto &child : std::views::iota(1 + i * Degr, 1 + (i + 1) * Degr)
                                    | indexed_view(m_nodes)) {
               node.minb = node.minb.cwiseMin(child.minb);
@@ -454,6 +468,11 @@ namespace met::detail {
     return std::span<const Node> { m_nodes.begin() + bvh_lvl_begin<Degr>(level), bvh_lvl_size<Degr>(level) };
   }
 
+  template <typename Vt, typename Node, uint D, BVHPrimitive Ty>
+  std::span<const uint> BVH<Vt, Node, D, Ty>::order() const {
+    met_trace();
+    return std::span<const uint> { m_order };
+  }
   
   template <uint DegrA, uint DegrB>
   std::vector<eig::Array2u> init_pair_data(uint level_a, uint level_b) {

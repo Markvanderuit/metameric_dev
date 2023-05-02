@@ -73,12 +73,30 @@ namespace met {
   }
 } // namespace met
 
+using uint = unsigned;
+
+uint bvh_degr     = 8;
+uint bvh_degr_log = 3;
+
+float bvh_degr_ln_div = 1.f / std::log(bvh_degr);
+uint lvl_from_index(uint i) {
+  return uint(log(float(i) * 7.f + 6.f) * bvh_degr_ln_div);
+}
+uint begin_from_lvl(uint lvl) {
+  return (0x92492492 >> (31 - bvh_degr_log * lvl)) >> 3; 
+}
+
 int main() {
-  /* try { */
+  /* for (uint i = 0; i < 1024; ++i)
+    fmt::print("{}, {}, {}\n", i, lvl_from_index(i), begin_from_lvl(lvl_from_index(i)));
+  std::exit(0);
+ */
+
+  try {
     met::create_application({});
-  /* } catch (const std::exception &e) {
+  } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  } */
+  }
   return EXIT_SUCCESS;
 }

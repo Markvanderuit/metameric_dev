@@ -7,6 +7,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/utility.hpp>
 #include <algorithm>
+#include <bitset>
 #include <execution>
 #include <ranges>
 
@@ -74,9 +75,39 @@ namespace met {
 
     // Initialize tree and work components
     constexpr size_t work_size = sizeof(eig::Array4u) + 64 * 1024 * 1024 * sizeof(eig::Array2u);
-    m_bvh_flag_buffer = {{ .size = e_colr_data.data().size() * sizeof(eig::Array2u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
     m_bvh_colr_buffer = {{ .data = cast_span<const std::byte>(i_colr_tree.data()) }};
+    m_bvh_colr_ordr_buffer = {{ .data = cast_span<const std::byte>(i_colr_tree.order()) }};
     m_bvh_elem_buffer = {{ .size = elem_tree.size_bytes_reserved(), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    m_bvh_elem_ordr_buffer = {{ .size = buffer_init_size * sizeof(uint), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+
+    // Build a referral buffer; for a given color value, find its containing leaf node
+    {
+      std::vector<uint> buffer(i_colr_tree.n_primitives());
+      auto leaves = i_colr_tree.data(i_colr_tree.n_levels() - 1);
+      auto order = i_colr_tree.order();
+
+      #pragma omp parallel for
+      for (int i = 0; i < leaves.size(); ++i) {
+        const auto &leaf = leaves[i];
+        guard_continue(leaf.n > 0);
+
+        for (uint colr_i = leaf.i; colr_i < leaf.i + leaf.n; ++colr_i) {
+          buffer[order[colr_i]] = i;
+        } // for colr_i
+      } // for i
+
+      /* for (uint i = 0; i < i_colr_tree.n_primitives(); ++i) {
+        uint refr = buffer[i];
+        const auto &leaf = leaves[refr];
+        fmt::print("{} -> {}, in [{}, {}]\n", i, refr, leaf.i, leaf.i + leaf.n);
+      } */
+
+     /*  fmt::print("{}\n", buffer); */
+
+      m_bvh_colr_refr_buffer = {{ .data = cnt_span<const std::byte>(buffer) }};
+      m_bvh_flag_buffer = {{ .size = leaves.size() * sizeof(eig::Array2u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    }
+
     m_bvh_curr_work   = {{ .size = work_size, .flags = gl::BufferCreateFlags::eStorageDynamic }};
     m_bvh_next_work   = {{ .size = work_size, .flags = gl::BufferCreateFlags::eStorageDynamic }};
     m_bvh_leaf_work   = {{ .size = work_size, .flags = gl::BufferCreateFlags::eStorageDynamic }};
@@ -131,8 +162,8 @@ namespace met {
     m_bvh_init_work = {{ .data = cnt_span<const std::byte>(init_work_data) }};
     m_bvh_init_head = {{ .data = obj_span<const std::byte>(init_head_data) }};
 
-    m_bvh_unif_map->elem_begin_lvl = elem_level_begin;
-    m_bvh_unif_map->colr_begin_lvl = colr_level_begin;
+    m_bvh_unif_map->n_colr_lvls = i_colr_tree.n_levels();
+    m_bvh_unif_map->n_elem_lvls = 0;
     m_bvh_unif_buffer.flush();
   }
   
@@ -199,7 +230,9 @@ namespace met {
 
     // Push single level of stale mesh tree data
     auto elem_tree_data = cast_span<const std::byte>(i_elem_tree.data(elem_level_begin));
+    auto elem_tree_order = cast_span<const std::byte>(i_elem_tree.order());
     m_bvh_elem_buffer.set(elem_tree_data, elem_tree_data.size());
+    m_bvh_elem_ordr_buffer.set(elem_tree_order, elem_tree_order.size());
 
     // Push uniform data
     m_uniform_map->n_verts = i_delaunay.verts.size();
@@ -216,14 +249,15 @@ namespace met {
     /* gl::dispatch_compute(m_dispatch); */
 
     { met_trace_full_n("bvh_testing");
-      // Reset work queues; initial node pairs are precomputed at lower levels
-      m_bvh_init_work.copy_to(m_bvh_curr_work, m_bvh_init_work.size());
-      m_bvh_init_head.copy_to(m_bvh_leaf_work, sizeof(uint));
-
       // Clear flag buffer; no work is yet flagged for computation
       m_bvh_flag_buffer.clear();
 
-      // Push relevant uniform data
+      // Reset work queues; initial node pairs start at lower levels
+      m_bvh_init_work.copy_to(m_bvh_curr_work, m_bvh_init_work.size());
+      m_bvh_init_head.copy_to(m_bvh_leaf_work, sizeof(uint));
+
+      // Update relevant uniform data for new meshing
+      m_bvh_unif_map->n_elem_lvls = i_elem_tree.n_levels();
       m_bvh_unif_map->n_elems = i_delaunay.elems.size();
       m_bvh_unif_buffer.flush();
 
@@ -242,9 +276,9 @@ namespace met {
         m_bvh_desc_program.bind("b_unif", m_bvh_unif_buffer);
         m_bvh_desc_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_desc_program.bind("b_colr", m_bvh_colr_buffer);
+        m_bvh_desc_program.bind("b_flag", m_bvh_flag_buffer);
         m_bvh_desc_program.bind("b_curr", m_bvh_curr_work);
         m_bvh_desc_program.bind("b_next", m_bvh_next_work);
-        m_bvh_desc_program.bind("b_leaf", m_bvh_leaf_work);
 
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
@@ -252,10 +286,51 @@ namespace met {
 
         // Swap current/next work buffers
         std::swap(m_bvh_curr_work, m_bvh_next_work);
+        
+        /* {
+          uint head_curr = 0, head_next = 0;
+          m_bvh_curr_work.get_as<uint>(std::span { &head_curr, 1 }, 1, 0);
+          m_bvh_next_work.get_as<uint>(std::span { &head_next, 1 }, 1, 0);
+          fmt::print("{} : {} -> {}\n", i, head_curr, head_next);
+        } */
       } // for i
 
+      // Process finalized results, recovering barycentric weights
+      { met_trace_full_n("finalize");
+        // Bind relevant buffers
+        m_bvh_finl_program.bind("b_unif", m_uniform_buffer);
+        m_bvh_finl_program.bind("b_flag", m_bvh_flag_buffer);
+        m_bvh_finl_program.bind("b_pack", m_pack_buffer);
+        m_bvh_finl_program.bind("b_elem", m_bvh_elem_buffer);
+        m_bvh_finl_program.bind("b_ordr", m_bvh_elem_ordr_buffer);
+        m_bvh_finl_program.bind("b_refr", m_bvh_colr_refr_buffer);
+        m_bvh_finl_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
+        m_bvh_finl_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+
+        // Dispatch shader to finalize delaunay convex weights
+        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::dispatch_compute(m_bvh_finl_dispatch);
+      }
+
+     /*  { // Debugging, again
+        auto leaves = i_colr_tree.data(i_colr_tree.n_levels() - 1);
+        std::vector<eig::Array2u> flags(leaves.size());
+        m_bvh_flag_buffer.get_as<eig::Array2u>(flags, flags.size());
+        
+        for (uint i = 0; i < leaves.size(); ++i) {
+          const auto &node = leaves[i];
+          guard_continue(node.n > 0);
+          fmt::print("{} - [{}, {}]",
+            i,
+            std::bitset<32>(flags[i][0]).to_string(),
+            std::bitset<32>(flags[i][1]).to_string()
+          );
+        }
+        std::exit(0);
+      } */
+
       // Process bottom part of cut
-      { met_trace_full_n("bottom_cut");
+      /* { met_trace_full_n("bottom_cut");
         // Copy divided data to indirect dispatch buffer (divide by (256/sg) for subgroup-wide clusters)
         m_bvh_div_sg_program.bind("b_data", m_bvh_curr_work);
         m_bvh_div_sg_program.bind("b_disp", m_bvh_div_sg_buffer);
@@ -266,16 +341,17 @@ namespace met {
         m_bvh_bary_program.bind("b_unif", m_bvh_unif_buffer);
         m_bvh_bary_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_bary_program.bind("b_colr", m_bvh_colr_buffer);
+        m_bvh_bary_program.bind("b_ordr", m_bvh_colr_ordr_buffer);
         m_bvh_bary_program.bind("b_flag", m_bvh_flag_buffer);
         m_bvh_bary_program.bind("b_work", m_bvh_curr_work);
 
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
-      }
+      } */
 
       // Process leaf part of cut
-      { met_trace_full_n("leaf_cut");
+      /* { met_trace_full_n("leaf_cut");
         // Copy divided data to indirect dispatch buffer (divide by (256/sg) for subgroup-wide clusters)
         m_bvh_div_sg_program.bind("b_data", m_bvh_leaf_work);
         m_bvh_div_sg_program.bind("b_disp", m_bvh_div_sg_buffer);
@@ -286,28 +362,14 @@ namespace met {
         m_bvh_bary_program.bind("b_unif", m_bvh_unif_buffer);
         m_bvh_bary_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_bary_program.bind("b_colr", m_bvh_colr_buffer);
+        m_bvh_bary_program.bind("b_ordr", m_bvh_colr_ordr_buffer);
         m_bvh_bary_program.bind("b_flag", m_bvh_flag_buffer);
         m_bvh_bary_program.bind("b_work", m_bvh_leaf_work);
 
         // Dispatch work using indirect buffer, based on previous work data
         gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
-      }
-
-      // Process finalized results, recovering barycentric weights
-      { met_trace_full_n("finalize");
-        // Bind relevant buffers
-        m_bvh_finl_program.bind("b_unif", m_uniform_buffer);
-        m_bvh_finl_program.bind("b_flag", m_bvh_flag_buffer);
-        m_bvh_finl_program.bind("b_pack", m_pack_buffer);
-        m_bvh_finl_program.bind("b_elem", m_bvh_elem_buffer);
-        m_bvh_finl_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
-        m_bvh_finl_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
-
-        // Dispatch shader to finalize delaunay convex weights
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
-        gl::dispatch_compute(m_bvh_finl_dispatch);
-      }
+      } */
     } // bvh_testing
   } 
 } // namespace met

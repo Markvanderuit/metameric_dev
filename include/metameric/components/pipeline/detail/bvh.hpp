@@ -50,6 +50,7 @@ namespace met::detail {
 
   private:
     std::vector<Node> m_nodes;
+    std::vector<uint> m_order;
     uint              m_n_levels;
     uint              m_n_primitives;
 
@@ -61,17 +62,17 @@ namespace met::detail {
     BVH(uint max_primitives);
 
     // Building constructors for different primitive types
-    BVH(std::span<Vert> vt)                             requires(Ty == BVHPrimitive::ePoint);
-    BVH(std::span<Vert> vt, std::span<eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
-    BVH(std::span<Vert> vt, std::span<eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron);
+    BVH(std::span<const Vert> vt)                                   requires(Ty == BVHPrimitive::ePoint);
+    BVH(std::span<const Vert> vt, std::span<const eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
+    BVH(std::span<const Vert> vt, std::span<const eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron);
 
     // Reserve space without rebuild
     void reserve(uint max_primitives);
 
     // Build functions for different primitive types
-    void build(std::span<Vert> vt)                             requires(Ty == BVHPrimitive::ePoint);
-    void build(std::span<Vert> vt, std::span<eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
-    void build(std::span<Vert> vt, std::span<eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron);
+    void build(std::span<const Vert> vt)                                   requires(Ty == BVHPrimitive::ePoint);
+    void build(std::span<const Vert> vt, std::span<const eig::Array3u> el) requires(Ty == BVHPrimitive::eTriangle);
+    void build(std::span<const Vert> vt, std::span<const eig::Array4u> el) requires(Ty == BVHPrimitive::eTetrahedron);
 
   public:
     uint n_levels()     const { return m_n_levels;     };
@@ -84,10 +85,16 @@ namespace met::detail {
     size_t size_bytes_reserved() const { return m_nodes.size() * sizeof(Node); }
 
   public:
+    // Access the full set of nodes
     std::span<Node>       data();
     std::span<const Node> data() const;
+
+    // Access a level-restricted set of nodes
     std::span<Node>       data(uint level);
     std::span<const Node> data(uint level) const;
+
+    // Access the represented data's underlying sort order
+    std::span<const uint> order() const;
   };
 
   template <uint DegreeA, uint DegreeB>
