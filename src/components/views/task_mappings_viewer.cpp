@@ -208,12 +208,14 @@ namespace met {
 
         // Get externally shared resources; note, resources may not be created yet as tasks are
         // added into the schedule at the end of a loop, not during
-        std::string gen_name = fmt::format("{}.gen_texture_{}", info.task().key(), i); // subtask name
+        std::string gen_name = fmt::format("gen_color_mappings_resampled.gen_mapping_{}", i);
+        // std::string gen_name = fmt::format("{}.gen_texture_{}", info.task().key(), i); // subtask name
         if (!info.task(gen_name).is_init()) {
           ImGui::PopID();
           continue;
         }
-        const auto &e_texture = info(gen_name, "texture").read_only<gl::Texture2d4f>();
+        const auto &e_texture = info(gen_name, "colr_texture").read_only<gl::Texture2d4f>();
+        // const auto &e_texture = info(gen_name, "texture").read_only<gl::Texture2d4f>();
 
         ImGui::BeginGroup();
 

@@ -115,8 +115,8 @@ namespace met {
                      .cross_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.json" }};
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
       m_program = {{ .type = gl::ShaderType::eCompute,
-                     .spirv_path = "resources/shaders/pipeline/gen_color_mapping_delaunay.comp.spv",
-                     .cross_path = "resources/shaders/pipeline/gen_color_mapping_delaunay.comp.json" }};
+                     .spirv_path = "resources/shaders/pipeline/gen_color_mapping_resampled_delaunay.comp.spv",
+                     .cross_path = "resources/shaders/pipeline/gen_color_mapping_resampled_delaunay.comp.json" }};
     }
 
     // Set up gamut buffer and establish a flushable mapping
@@ -129,7 +129,7 @@ namespace met {
     m_uniform_map->in_size = e_appl_data.loaded_texture.size();
 
     // Lazy init texture-related components
-    set_texture_info(info, { .size = 1 });
+    set_texture_info(info, { .size = e_appl_data.loaded_texture.size() });
   }
 
   bool GenColorMappingResampledTask::is_active(SchedulerHandle &info) {
@@ -171,7 +171,8 @@ namespace met {
     m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>());
     m_program.bind("b_vert", m_gamut_buffer);
     m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
+    // m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
+    m_program.bind("i_image", info("colr_texture").writeable<TextureType>());
 
     // Dispatch shader to generate color-mapped buffer
     gl::dispatch_compute(m_dispatch);
@@ -190,12 +191,10 @@ namespace met {
     m_uniform_buffer.flush();
     
     // Rebuild dispatch object
-    const auto dispatch_n = texture_info.size;
-    const auto dispatch_ndiv = ceil_div(dispatch_n, 256u);
-    m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                   .groups_y = dispatch_ndiv.y(), 
-                   .bindable_program = &m_program };
-
+    const uint dispatch_n = texture_info.size.prod();
+    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
+    m_dispatch = { .groups_x = dispatch_ndiv, .bindable_program = &m_program };
+    
     m_is_mutated = true;
   }
 
@@ -212,6 +211,28 @@ namespace met {
   }
 
   void GenColorMappingsTask::eval(SchedulerHandle &info) {
+    met_trace();
+    
+    // Get external resources
+    const auto &e_proj_data = info.global("appl_data").read_only<ApplicationData>().project_data;
+
+    // Adjust nr. of subtasks
+    m_mapping_subtasks.eval(info, e_proj_data.color_systems.size());
+  }
+
+  void GenColorMappingsResampledTask::init(SchedulerHandle &info) {
+    met_trace();
+
+    // Get external resources
+    const auto &e_proj_data = info.global("appl_data").read_only<ApplicationData>().project_data;
+
+    // Add subtasks to perform mapping
+    m_mapping_subtasks.init(info, e_proj_data.color_systems.size(), 
+      [](uint i)         { return fmt::format("gen_mapping_{}", i); },
+      [](auto &, uint i) { return GenColorMappingResampledTask(i); });
+  }
+
+  void GenColorMappingsResampledTask::eval(SchedulerHandle &info) {
     met_trace();
     
     // Get external resources

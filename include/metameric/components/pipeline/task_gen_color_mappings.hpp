@@ -66,6 +66,14 @@ namespace met {
     void set_texture_info(SchedulerHandle &info, TextureType::InfoType texture_info);
   };
 
+  class GenColorMappingsResampledTask : public detail::TaskNode {
+    detail::Subtasks<GenColorMappingResampledTask> m_mapping_subtasks;
+
+  public:
+    void init(SchedulerHandle &) override;
+    void eval(SchedulerHandle &) override;
+  };
+
   class GenColorMappingsTask : public detail::TaskNode {
     detail::Subtasks<GenColorMappingTask> m_mapping_subtasks;
 

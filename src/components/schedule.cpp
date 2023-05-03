@@ -104,6 +104,7 @@ namespace met {
       scheduler.task("gen_convex_weights").init<GenDelaunayWeightsTask>();
     }
     scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
+    scheduler.task("gen_color_mappings_resampled").init<GenColorMappingsResampledTask>();
     
     // The following tasks define dependent data for the view components
     scheduler.task("gen_color_system_solid").init<GenColorSystemSolidTask>();
