@@ -53,19 +53,18 @@ layout(binding = 0) uniform b_unif {
 } unif_in;
 
 // Subgroup helper declarations
-const uint bvh_degr     = 8;
-const uint bvh_degr_log = 3;
+const uint bvh_degr = 8;
+const uint bvh_degr_log2 = 3;
+const float div_bvh_degr_log = 1.f / log(bvh_degr);
 uint sg_invoc = gl_SubgroupInvocationID % bvh_degr;
 uint sg_base  = gl_SubgroupInvocationID - sg_invoc;
 
-// BVH traversal helper functions
-const float bvh_degr_ln_div = 1.f / log(bvh_degr);
 uint lvl_from_index(uint i) {
-  return uint(log(float(i) * 7.f + 6.f) * bvh_degr_ln_div);
+  return uint(log(float(i) * 7.f + 6.f) * div_bvh_degr_log);
 }
 
 uint begin_from_lvl(uint lvl) {
-  return (0x92492492 >> (31 - bvh_degr_log * lvl)) >> 3; 
+  return (0x92492492 >> (31 - bvh_degr_log2 * lvl)) >> 3; 
 }
 
 // Test bbox intersection
@@ -105,13 +104,15 @@ void main() {
   guard(intersect(elem, colr));
   
   // Determine current level, and test if a bottom node was reached
-  uint next_lvl = lvl_from_index(unit_next.colr_i);
-  if (next_lvl == unif_in.n_colr_lvls - 1) {
+  if (lvl_from_index(unit_next.colr_i) == unif_in.n_colr_lvls - 1) {
     // If a leaf was reached; flag elem nodes for comparison on this leaf
-    uint next_lvl_offs = unit_next.colr_i - begin_from_lvl(next_lvl);
-    uint flag_i = 2 * next_lvl_offs + unit_next.elem_i / 32;
-    uint flag_v = 1u << (unit_next.elem_i % 32);
-    atomicOr(flag_inout.data[flag_i], flag_v);
+    uint floffs = unit_next.colr_i - begin_from_lvl(unif_in.n_colr_lvls - 1);
+    uint flag_i = 2 * floffs + unit_next.elem_i / 32;
+    
+    atomicOr(flag_inout.data[flag_i], 1u << (unit_next.elem_i % 32));
+    
+    // atomicExchange(flag_inout.data[flag_i], floffs);
+    // atomicOr(flag_inout.data[flag_i], flag_i);
   } else {
     // Else, push newly subdivided workunit to the appropriate output queue
     work_next.data[atomicAdd(work_next.head, 1)] = unit_next;

@@ -54,7 +54,7 @@ namespace met {
     gl::ComputeInfo         m_bvh_finl_dispatch;
     gl::Program             m_bvh_finl_program;
     
-    gl::Buffer              m_bvh_flag_buffer;
+    gl::Buffer              m_bvh_colr_flag_buffer;
     gl::Buffer              m_bvh_colr_buffer;
     gl::Buffer              m_bvh_colr_refr_buffer;
     gl::Buffer              m_bvh_colr_ordr_buffer;
