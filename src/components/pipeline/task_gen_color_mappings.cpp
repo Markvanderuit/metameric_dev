@@ -98,6 +98,107 @@ namespace met {
     m_init_stale = false;
   }
 
+  GenColorMappingResampledTask::GenColorMappingResampledTask(uint mapping_i)
+  : m_mapping_i(mapping_i) { }
+
+  void GenColorMappingResampledTask::init(SchedulerHandle &info) {
+    met_trace_full();
+
+    // Get shared resources
+    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_data = e_appl_data.project_data;
+
+    // Initialize program object
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
+      m_program = {{ .type = gl::ShaderType::eCompute,
+                     .spirv_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.spv",
+                     .cross_path = "resources/shaders/pipeline/gen_color_mapping_generalized.comp.json" }};
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      m_program = {{ .type = gl::ShaderType::eCompute,
+                     .spirv_path = "resources/shaders/pipeline/gen_color_mapping_delaunay.comp.spv",
+                     .cross_path = "resources/shaders/pipeline/gen_color_mapping_delaunay.comp.json" }};
+    }
+
+    // Set up gamut buffer and establish a flushable mapping
+    m_gamut_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
+    m_gamut_map    = m_gamut_buffer.map_as<AlColr>(buffer_access_flags);
+
+    // Set up uniform buffer and establish a flushable mapping
+    m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
+    m_uniform_map->in_size = e_appl_data.loaded_texture.size();
+
+    // Lazy init texture-related components
+    set_texture_info(info, { .size = 1 });
+  }
+
+  bool GenColorMappingResampledTask::is_active(SchedulerHandle &info) {
+    met_trace();
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
+    return m_is_mutated || e_proj_state.csys[m_mapping_i] || e_proj_state.verts;
+  }
+
+  void GenColorMappingResampledTask::eval(SchedulerHandle &info) {
+    met_trace_full();
+
+    // Get external resources
+    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_data  = e_appl_data.project_data;
+    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
+    const auto &e_vert_spec  = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
+
+    // Update uniform data
+    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
+      m_uniform_map->n_verts = e_proj_data.verts.size();
+      m_uniform_map->n_elems = e_proj_data.elems.size();
+    } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
+      const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      m_uniform_map->n_verts = e_delaunay.verts.size();
+      m_uniform_map->n_elems = e_delaunay.elems.size();
+    }
+    m_uniform_buffer.flush();
+
+    // Push gamut data, given any state change
+    ColrSystem csys = e_proj_data.csys(m_mapping_i);
+    for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
+      guard_continue(m_is_mutated || e_proj_state.csys[m_mapping_i] || e_proj_state.verts[i]);
+      m_gamut_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
+      m_gamut_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
+    }
+
+    // Bind required buffers to corresponding targets
+    m_program.bind("b_unif", m_uniform_buffer);
+    m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_vert", m_gamut_buffer);
+    m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
+
+    // Dispatch shader to generate color-mapped buffer
+    gl::dispatch_compute(m_dispatch);
+
+    m_is_mutated = false;
+  }
+
+  void GenColorMappingResampledTask::set_texture_info(SchedulerHandle &info, TextureType::InfoType texture_info) {
+    met_trace_full();
+
+    // Create texture output for this task
+    info("colr_texture").init<TextureType, TextureType::InfoType>(texture_info);
+
+    // Update texture info in uniform buffer
+    m_uniform_map->out_size = texture_info.size;
+    m_uniform_buffer.flush();
+    
+    // Rebuild dispatch object
+    const auto dispatch_n = texture_info.size;
+    const auto dispatch_ndiv = ceil_div(dispatch_n, 256u);
+    m_dispatch = { .groups_x = dispatch_ndiv.x(),
+                   .groups_y = dispatch_ndiv.y(), 
+                   .bindable_program = &m_program };
+
+    m_is_mutated = true;
+  }
+
   void GenColorMappingsTask::init(SchedulerHandle &info) {
     met_trace();
 

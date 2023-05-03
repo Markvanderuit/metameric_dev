@@ -172,8 +172,7 @@ namespace met {
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
     met_trace();
-    // return info("state", "proj_state").read_only<ProjectState>().verts;
-    return true;
+    return info("state", "proj_state").read_only<ProjectState>().verts;
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
@@ -190,13 +189,13 @@ namespace met {
     auto &i_colr_tree   = info("colr_tree").read_only<BVHColr>();
     auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
     auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
-    auto &i_tree_buffer = info("tree_buffer").writeable<gl::Buffer>();
+    /* auto &i_tree_buffer = info("tree_buffer").writeable<gl::Buffer>(); */
 
     // Generate new delaunay structure and search tree
     std::vector<Colr> delaunay_input(e_proj_data.verts.size());
     std::ranges::transform(e_proj_data.verts, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
     i_delaunay = generate_delaunay<AlignedDelaunayData, Colr>(delaunay_input);
-    i_elem_tree.build(i_delaunay.verts, i_delaunay.elems);
+    /* i_elem_tree.build(i_delaunay.verts, i_delaunay.elems); */
 
     // Recover triangle element data and store in project
     auto [_, elems] = convert_mesh<AlignedMeshData>(i_delaunay);
@@ -227,15 +226,15 @@ namespace met {
     std::ranges::copy(i_delaunay.elems, m_elem_map.begin());
     i_elem_buffer.flush(i_delaunay.elems.size() * sizeof(eig::Array4u));
     
-    // Push stale mesh tree data // TODO optimize?
+    /* // Push stale mesh tree data // TODO optimize?
     auto tree_data = cast_span<const std::byte>(i_elem_tree.data());
-    i_tree_buffer.set(tree_data, tree_data.size()); // Specify size as buffer over-reserves data size
+    i_tree_buffer.set(tree_data, tree_data.size()); // Specify size as buffer over-reserves data size */
 
-    // Push single level of stale mesh tree data
+    /* // Push single level of stale mesh tree data
     auto elem_tree_data = cast_span<const std::byte>(i_elem_tree.data(elem_level_begin));
     auto elem_tree_order = cast_span<const std::byte>(i_elem_tree.order());
     m_bvh_elem_buffer.set(elem_tree_data, elem_tree_data.size());
-    m_bvh_elem_ordr_buffer.set(elem_tree_order, elem_tree_order.size());
+    m_bvh_elem_ordr_buffer.set(elem_tree_order, elem_tree_order.size()); */
 
     // Push uniform data
     m_uniform_map->n_verts = i_delaunay.verts.size();
