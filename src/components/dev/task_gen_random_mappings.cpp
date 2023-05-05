@@ -42,13 +42,13 @@ namespace met {
     }
 
     // Set up gamut buffer and establish a flushable mapping
-    m_gamut_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
-    m_gamut_map    = m_gamut_buffer.map_as<AlColr>(buffer_access_flags);
+    m_vert_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
+    m_vert_map    = m_vert_buffer.map_as<AlColr>(buffer_access_flags);
 
     // Set up uniform buffer and establish a flushable mapping
-    m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-    m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
-    m_uniform_map->n = e_appl_data.loaded_texture.size().prod();
+    m_unif_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+    m_unif_map    = m_unif_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
+    m_unif_map->n = e_appl_data.loaded_texture.size().prod();
 
     // Create color buffer output for this task
     info("colr_buffer").init<gl::Buffer>({ .size  = (size_t) dispatch_n * sizeof(AlColr)  });
@@ -77,14 +77,14 @@ namespace met {
 
     // Update uniform data
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
-      m_uniform_map->n_verts = e_proj_data.verts.size();
-      m_uniform_map->n_elems = e_proj_data.elems.size();
+      m_unif_map->n_verts = e_proj_data.verts.size();
+      m_unif_map->n_elems = e_proj_data.elems.size();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
       const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
-      m_uniform_map->n_verts = e_delaunay.verts.size();
-      m_uniform_map->n_elems = e_delaunay.elems.size();
+      m_unif_map->n_verts = e_delaunay.verts.size();
+      m_unif_map->n_elems = e_delaunay.elems.size();
     }
-    m_uniform_buffer.flush();
+    m_unif_buffer.flush();
 
     // Obtain differense of all vertex indices and selected vertex indices
     auto vert_diff = std::views::iota(0u, static_cast<uint>(e_verts.size()))
@@ -93,15 +93,15 @@ namespace met {
     // Push unselected/selected gamut data separately
     ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
     for (uint i : vert_diff)
-      m_gamut_map[i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
+      m_vert_map[i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
     for (uint i : e_vert_slct)
-      m_gamut_map[i] = e_verts[i].colr_j[0];
-    m_gamut_buffer.flush();
+      m_vert_map[i] = e_verts[i].colr_j[0];
+    m_vert_buffer.flush();
 
     // Bind required buffers to corresponding targets
-    m_program.bind("b_unif", m_uniform_buffer);
+    m_program.bind("b_unif", m_unif_buffer);
     m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_vert", m_gamut_buffer);
+    m_program.bind("b_vert", m_vert_buffer);
     m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").read_only<gl::Buffer>());
     m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
 

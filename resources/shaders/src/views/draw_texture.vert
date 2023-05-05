@@ -15,7 +15,7 @@ layout(std430) buffer;
 
 // Buffer declarations
 layout(binding = 0) restrict readonly buffer b_data_buffer { uint data[]; } data_buffer; // (r8 g8 b8 ...)
-layout(binding = 1) restrict readonly buffer b_erro_buffer { vec4 data[]; } erro_buffer; // (r, g, b, sum)
+// layout(binding = 1) restrict readonly buffer b_erro_buffer { vec4 data[]; } erro_buffer; // (r, g, b, sum)
 layout(binding = 0) uniform b_unif_buffer {
   mat4 camera_matrix;
   vec2 camera_aspect;
@@ -34,7 +34,7 @@ void main() {
   vec3 pos = unpackUnorm4x8(data_buffer.data[i]).xyz;
 
   out_value_vert = elem_data[j];
-  out_value_colr = mix(pos, vec3(1, 0, 0), min(erro_buffer.data[i].w, 1.f));
+  out_value_colr = pos; // mix(pos, vec3(1, 0, 0), min(erro_buffer.data[i].w, 1.f));
 
   // Set per vertex position property
   gl_Position = unif.camera_matrix * vec4(pos, 1) 

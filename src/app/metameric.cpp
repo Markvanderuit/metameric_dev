@@ -92,11 +92,11 @@ int main() {
   std::exit(0);
  */
 
-  try {
+ /*  try { */
     met::create_application({});
-  } catch (const std::exception &e) {
+  /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  }
+  } */
   return EXIT_SUCCESS;
 }

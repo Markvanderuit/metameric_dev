@@ -1,9 +1,8 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/state.hpp>
-#include <metameric/core/texture.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <metameric/components/views/task_error_viewer.hpp>
+#include <metameric/components/views/task_bary_viewer.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -11,7 +10,7 @@
 namespace met {
   constexpr float tooltip_width = 256.f;
 
-  void ErrorViewerTask::eval_tooltip_copy(SchedulerHandle &info) {
+  void BaryViewerTask::eval_tooltip_copy(SchedulerHandle &info) {
     met_trace_full();
 
     auto subtask_name  = fmt::format("{}.gen_mapping", info.task().key());
@@ -38,7 +37,7 @@ namespace met {
     m_tooltip_fences[m_tooltip_cycle_i] = gl::sync::Fence(gl::sync::time_s(1));
   } 
 
-  void ErrorViewerTask::eval_tooltip(SchedulerHandle &info) {
+  void BaryViewerTask::eval_tooltip(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
@@ -105,7 +104,7 @@ namespace met {
     ImGui::EndTooltip();
   }
 
-  void ErrorViewerTask::init(SchedulerHandle &info) {
+  void BaryViewerTask::init(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
@@ -128,20 +127,21 @@ namespace met {
     }
 
     // Initialize error texture generation subtask
-    info.subtask("gen_error").init<GenErrorMappingTask>(0);
+    info.subtask("gen_bary").init<GenBaryMappingTask>(0);
 
     m_tooltip_cycle_i = 0;
   }
 
-  void ErrorViewerTask::eval(SchedulerHandle &info) {
+  void BaryViewerTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    if (ImGui::Begin("Error viewer")) {
+    if (ImGui::Begin("Weight viewer")) {
       // Get external resources
-      const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-      const auto &e_txtr_data = e_appl_data.loaded_texture;
-      const auto &e_proj_data = e_appl_data.project_data;
-      const auto &e_mappings  = e_proj_data.color_systems;
+      const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_txtr_data  = e_appl_data.loaded_texture;
+      const auto &e_proj_data  = e_appl_data.project_data;
+      const auto &e_mappings   = e_proj_data.color_systems;
+      const auto &e_cstr_selct = info("viewport.overlay", "constr_selection").read_only<int>();
 
       // Local state
       bool handle_toolip = false;
@@ -152,13 +152,14 @@ namespace met {
       float texture_aspect       = static_cast<float>(e_txtr_data.size()[1]) / static_cast<float>(e_txtr_data.size()[0]);
       eig::Array2f texture_size  = (viewport_size * texture_aspect).max(1.f).eval();
 
-      auto subtask_name = fmt::format("{}.gen_error", info.task().key());
+      auto subtask_name = fmt::format("{}.gen_bary", info.task().key());
 
       // 2. Handle error texture generation subtask resize
       if (auto handle = info.task(subtask_name); handle.is_init()) {
-        auto &subtask = handle.realize<GenErrorMappingTask>();
+        auto &subtask = handle.realize<GenBaryMappingTask>();
         auto mask = handle.mask(info);
         subtask.set_texture_info(mask, { .size = texture_size.cast<uint>() });
+        subtask.set_cstr_slct(mask, e_cstr_selct);
       }
 
       // 3. Display ImGui components to show error and select mapping

@@ -3,15 +3,14 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/detail/scheduler_subtasks.hpp>
-#include <metameric/components/pipeline/task_gen_error_mapping.hpp>
+#include <metameric/components/pipeline/task_gen_bary_mapping.hpp>
 #include <small_gl/buffer.hpp>
-#include <small_gl/utility.hpp>
+#include <small_gl/dispatch.hpp>
 #include <array>
 #include <variant>
 
 namespace met {
-  class ErrorViewerTask : public detail::TaskNode {
+  class BaryViewerTask : public detail::TaskNode {
     using BaryVariant    = std::variant<std::span<Bary>, std::span<eig::Array4f>>;
 
     // Wrapper objects to hold three buffers and attached maps 
@@ -35,5 +34,4 @@ namespace met {
     void init(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
   };
-
 } // namespace met

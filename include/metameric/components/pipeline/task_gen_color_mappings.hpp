@@ -16,15 +16,16 @@ namespace met {
       uint n_elems; // Nr. of elements defining meshing structure
     };
 
-    bool              m_init_stale;
+    bool              m_is_mutated;
     uint              m_mapping_i;
-    gl::Buffer        m_uniform_buffer;
-    gl::Buffer        m_gamut_buffer;
+
+    gl::Buffer        m_unif_buffer;
+    gl::Buffer        m_vert_buffer;
     gl::Program       m_program;
     gl::ComputeInfo   m_dispatch;
 
-    UniformBuffer    *m_uniform_map;
-    std::span<AlColr> m_gamut_map;
+    UniformBuffer    *m_unif_map;
+    std::span<AlColr> m_vert_map;
 
   public:
     GenColorMappingTask(uint mapping_i);
@@ -36,25 +37,28 @@ namespace met {
 
   class GenColorMappingResampledTask : public detail::TaskNode {
   public:
-    using TextureType = gl::Texture2d3f;
+    using TextureType = gl::Texture2d4f;
+    using TextureInfo = TextureType::InfoType;
 
   private:
     struct UniformBuffer {
-      alignas(8) eig::Array2u in_size;  // Nr. of texels to sample from
-      alignas(8) eig::Array2u out_size; // Nr. of texels to dispatch shader for
+      alignas(8) eig::Array2u size_in;  // Nr. of texels to sample from
+      alignas(8) eig::Array2u size_out; // Nr. of texels to dispatch shader for
       alignas(4) uint         n_verts;  // Nr. of vertices defining meshing structure
       alignas(4) uint         n_elems;  // Nr. of elements defining meshing structure
     };
 
     bool              m_is_mutated;
     uint              m_mapping_i;
-    gl::Buffer        m_uniform_buffer;
-    gl::Buffer        m_gamut_buffer;
+    TextureInfo       m_texture_info;
+
+    gl::Buffer        m_unif_buffer;
+    gl::Buffer        m_vert_buffer;
     gl::Program       m_program;
     gl::ComputeInfo   m_dispatch;
 
-    UniformBuffer    *m_uniform_map;
-    std::span<AlColr> m_gamut_map;
+    UniformBuffer    *m_unif_map;
+    std::span<AlColr> m_vert_map;
 
   public:
     GenColorMappingResampledTask(uint mapping_i);
@@ -63,19 +67,19 @@ namespace met {
     bool is_active(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
 
-    void set_texture_info(SchedulerHandle &info, TextureType::InfoType texture_info);
+    void set_texture_info(SchedulerHandle &info, TextureInfo texture_info);
   };
 
-  class GenColorMappingsResampledTask : public detail::TaskNode {
-    detail::Subtasks<GenColorMappingResampledTask> m_mapping_subtasks;
+  class GenColorMappingsTask : public detail::TaskNode {
+    detail::Subtasks<GenColorMappingTask> m_mapping_subtasks;
 
   public:
     void init(SchedulerHandle &) override;
     void eval(SchedulerHandle &) override;
   };
 
-  class GenColorMappingsTask : public detail::TaskNode {
-    detail::Subtasks<GenColorMappingTask> m_mapping_subtasks;
+  class GenColorMappingsResampledTask : public detail::TaskNode {
+    detail::Subtasks<GenColorMappingResampledTask> m_mapping_subtasks;
 
   public:
     void init(SchedulerHandle &) override;

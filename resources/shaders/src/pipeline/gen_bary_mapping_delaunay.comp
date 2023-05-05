@@ -13,7 +13,12 @@ layout(std430)             buffer;
 layout(binding = 0) restrict readonly buffer b_bary { vec4  data[]; } bary_in;
 layout(binding = 1) restrict readonly buffer b_vert { vec3  data[]; } vert_in;
 layout(binding = 2) restrict readonly buffer b_elem { uvec4 data[]; } elem_in;
+layout(binding = 3) restrict readonly buffer b_colr { vec3 data[];  } colr_in;
 layout(binding = 0, rgba32f) restrict writeonly uniform image2D i_colr;
+
+// Constants
+const uint max_verts_support = 1024;
+const uint max_elems_support = 1024;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_unif {
@@ -21,11 +26,8 @@ layout(binding = 0) uniform b_unif {
   uvec2 size_out;
   uint  n_verts;
   uint  n_elems;
+  uint  selection[max_verts_support];
 } unif_in;
-
-// Constants
-const uint max_verts_support = 1024;
-const uint max_elems_support = 1024;
 
 // Shared memory declarations
 shared vec3  s_verts_in[max_verts_support]; // Shared load of vert_in buffer
@@ -58,10 +60,10 @@ void main() {
   vec3 xyz  = bary_in.data[i_in].xyz;
   vec4 bary = vec4(xyz, 1.f - hsum(xyz));
 
-  // Compute convex combination of vertex colors
+  // Compute convex combination of vertex colors, negating unselected vertices
   vec3 v = vec3(0);
   for (uint j = 0; j < 4; ++j)
-    v += bary[j] * s_verts_in[idx[j]];
+    v += float(unif_in.selection[idx[j]]) * bary[j] * s_verts_in[idx[j]];
 
   // Store results to image/buffer
   imageStore(i_colr, ivec2(ij_out), vec4(lrgb_to_srgb(v), 1));

@@ -14,7 +14,7 @@
 #include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
 #include <metameric/components/pipeline/task_gen_mismatch_solid.hpp>
 #include <metameric/components/views/task_error_viewer.hpp>
-#include <metameric/components/views/task_weight_viewer.hpp>
+#include <metameric/components/views/task_bary_viewer.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_viewport.hpp>
@@ -103,7 +103,6 @@ namespace met {
     } else {
       scheduler.task("gen_convex_weights").init<GenDelaunayWeightsTask>();
     }
-    scheduler.task("gen_color_mappings").init<GenColorMappingsTask>();
     scheduler.task("gen_color_mappings_resampled").init<GenColorMappingsResampledTask>();
     
     // The following tasks define dependent data for the view components
@@ -116,7 +115,7 @@ namespace met {
     scheduler.task("spectra_editor").init<SpectraEditorTask>();
     scheduler.task("mappings_viewer").init<MappingsViewerTask>();
     scheduler.task("error_viewer").init<ErrorViewerTask>();
-    scheduler.task("weight_viewer").init<WeightViewerTask>();
+    scheduler.task("bary_viewer").init<BaryViewerTask>();
 
     // The following tasks are in development
     scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();

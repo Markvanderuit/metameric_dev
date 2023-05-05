@@ -4,6 +4,7 @@
 #include <metameric/core/state.hpp>
 #include <metameric/core/texture.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
+#include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <implot.h>
@@ -53,36 +54,21 @@ namespace met {
     if (auto &fence = m_tooltip_fences[m_tooltip_cycle_i]; fence.is_init())
       fence.cpu_wait();
 
-    // Unpack correct form of barycentric weights and plot stuff
+    // Unpack correct form of barycentric weights and compute reflectance
+    Spec reflectance = 0;
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       const auto &bary_data = std::get<std::span<Bary>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
     
-      // Compute output reflectance and color as convex combinations
+      // Compute output reflectance as convex combinations
       Bary bary = bary_data;
-      Spec reflectance = 0;
       for (uint i = 0; i < e_vert_spec.size(); ++i)
         reflectance += bary[i] * e_vert_spec[i];
-      ColrSystem mapp  = e_proj_data.csys(texture_i);
-      Colr color = mapp.apply_color_indirect(reflectance);
-      Spec power = mapp.illuminant * reflectance;
 
-      ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
-        nullptr, 0.f, 1.f, { 0.f, 64.f });
-      ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-        nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
-
-      ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
-
-      ImGui::Separator();
-
+      // Plot barycentric weights
       ImGui::PlotLines("Weights", bary.data(), bary.size(), 0, 
         nullptr, 0.f, 1.f, { 0.f, 64.f });
-
+        
       ImGui::Separator();
-      
-      ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
-      ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
-      ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
       const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
@@ -91,33 +77,38 @@ namespace met {
       uint         bary_i = std::min(*reinterpret_cast<const uint *>(&bary_data.w()), static_cast<uint>(e_delaunay.elems.size()) - 1);
       eig::Array4u elem   = e_delaunay.elems[bary_i].min(e_delaunay.verts.size() - 1);
 
-      // Compute output reflectance and color as convex combinations
-      Spec reflectance = 0;
+      // Compute output reflectance as convex combination
       for (uint i = 0; i < 4; ++i)
         reflectance += bary[i] * e_vert_spec[elem[i]];
-      ColrSystem mapp  = e_proj_data.csys(texture_i);
-      Colr color = mapp.apply_color_indirect(reflectance);
-      Spec power = mapp.illuminant * reflectance;
 
-      ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0,
-        nullptr, 0.f, 1.f, { 0.f, 64.f });
-      ImGui::PlotLines("Power", power.data(), wavelength_samples, 0,
-        nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
-
-      ImGui::ColorEdit3("Color (sRGB)", lrgb_to_srgb(color).data(), ImGuiColorEditFlags_Float);
-
-      ImGui::Separator();
-
+      // Plot barycentric weights
       ImGui::InputScalarN("Weights", ImGuiDataType_Float, bary.data(), bary.size());
       ImGui::InputScalarN("Indices", ImGuiDataType_U32, elem.data(), elem.size());
 
       ImGui::Separator();
-      
-      ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
-      ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
-      ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
     }
 
+    // Get reflectance-related data
+    ColrSystem mapp  = e_proj_data.csys(texture_i);
+    Spec power = mapp.illuminant * reflectance;
+
+    // Plot spectra
+    ImGui::PlotLines("Reflectance", reflectance.data(), wavelength_samples, 0, nullptr, 0.f, 1.f, { 0.f, 64.f });
+    ImGui::PlotLines("Power", power.data(), wavelength_samples, 0, nullptr, 0.f, power.maxCoeff(), { 0.f, 64.f });
+
+    ImGui::Separator();
+
+    // Plot output color information
+    Colr color_out = mapp.apply_color_indirect(reflectance);
+    ImGui::ColorEdit3("Rtrip (sRGB)", lrgb_to_srgb(color_out).data(), ImGuiColorEditFlags_Float);
+
+    ImGui::Separator();
+    
+    // Plot boundary information
+    ImGui::Value("Minimum", reflectance.minCoeff(), "%.6f");
+    ImGui::Value("Maximum", reflectance.maxCoeff(), "%.6f");
+    ImGui::Value("Bounded", reflectance.minCoeff() >= 0.f && reflectance.maxCoeff() <= 1.f);
+    
     ImGui::EndTooltip();
   }
 
@@ -148,7 +139,7 @@ namespace met {
     const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
-    // Initialize a set of rolling buffers of size Spec, and map these for reading
+    // Initialize a set of rolling buffers, and map these for reading
     constexpr auto create_flags = gl::BufferCreateFlags::eMapPersistent | gl::BufferCreateFlags::eMapRead;
     constexpr auto map_flags    = gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapRead;
     for (uint i = 0; i < m_tooltip_buffers.size(); ++i) {
@@ -208,15 +199,20 @@ namespace met {
 
         // Get externally shared resources; note, resources may not be created yet as tasks are
         // added into the schedule at the end of a loop, not during
-        std::string gen_name = fmt::format("gen_color_mappings_resampled.gen_mapping_{}", i);
-        // std::string gen_name = fmt::format("{}.gen_texture_{}", info.task().key(), i); // subtask name
-        if (!info.task(gen_name).is_init()) {
+
+        // Get handle to external color mapping task; note, task may not be created yet as it
+        // is added into the schedule at the end of a loop, not during
+        auto gen_task_handle = info.task(fmt::format("gen_color_mappings_resampled.gen_mapping_{}", i));
+        if (!gen_task_handle.is_init()) {
           ImGui::PopID();
           continue;
         }
-        const auto &e_texture = info(gen_name, "colr_texture").read_only<gl::Texture2d4f>();
-        // const auto &e_texture = info(gen_name, "texture").read_only<gl::Texture2d4f>();
 
+        // Realize external task/texture objects
+        auto mask = gen_task_handle.mask(info);
+        auto       &e_colr_task = gen_task_handle.realize<GenColorMappingResampledTask>();
+        const auto &e_colr_texture = mask("colr_texture").read_only<gl::Texture2d4f>();
+        
         ImGui::BeginGroup();
 
         // Header line
@@ -225,8 +221,9 @@ namespace met {
         ImGui::SameLine();
         if (ImGui::SmallButton("Export")) eval_save(info, i);
         
-        // Main image
-        ImGui::Image(ImGui::to_ptr(e_texture.object()), texture_size);
+        // Main image; signal to external task the correct render size
+        e_colr_task.set_texture_info(mask, { .size = texture_size.cast<uint>() });
+        ImGui::Image(ImGui::to_ptr(e_colr_texture.object()), texture_size);
         
         // Set id for tooltip after loop is over, and start data copy
         if (ImGui::IsItemHovered()) {

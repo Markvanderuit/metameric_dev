@@ -79,7 +79,7 @@ namespace met {
     // Bind resources and submit draw
     m_program.bind("b_unif_buffer", m_uniform_buffer);
     m_program.bind("b_data_buffer", m_data_buffer);
-    m_program.bind("b_erro_buffer", info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>());
+    // m_program.bind("b_erro_buffer", info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>());
     gl::dispatch_draw(m_draw);
   }
 } // namespace met

@@ -22,7 +22,7 @@ namespace met {
     // Set of rolling buffers for continuous data copy, so wait time is minimized
     std::array<gl::Buffer,      6>   m_tooltip_buffers;
     std::array<gl::sync::Fence, 6>   m_tooltip_fences;
-    std::array<BaryVariant, 6>       m_tooltip_maps;
+    std::array<BaryVariant,     6>   m_tooltip_maps;
     uint                             m_tooltip_cycle_i;
 
     // Information about what is currently visible in the tooltip

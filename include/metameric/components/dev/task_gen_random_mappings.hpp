@@ -18,13 +18,13 @@ namespace met {
     bool              m_has_run_once;
     uint              m_constraint_i;
     uint              m_mapping_i;
-    gl::Buffer        m_uniform_buffer;
-    gl::Buffer        m_gamut_buffer;
+    gl::Buffer        m_unif_buffer;
+    gl::Buffer        m_vert_buffer;
     gl::Program       m_program;
     gl::ComputeInfo   m_dispatch;
 
-    UniformBuffer    *m_uniform_map;
-    std::span<AlColr> m_gamut_map;
+    UniformBuffer    *m_unif_map;
+    std::span<AlColr> m_vert_map;
 
   public:
     GenRandomMappingTask(uint constraint_i, uint mapping_i);
