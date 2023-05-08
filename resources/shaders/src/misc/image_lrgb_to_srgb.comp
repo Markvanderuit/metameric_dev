@@ -8,21 +8,16 @@ layout(local_size_x = 16, local_size_y = 16) in;
 layout(std140) uniform;
 
 // Sampler/image binding declarations
-layout(binding = 0)          uniform                    sampler2D s_image_r;
-layout(binding = 0, rgba32f) uniform restrict writeonly image2D   i_image_w;
+layout(binding = 0, rgba32f) uniform restrict readonly  image2D i_image_r;
+layout(binding = 1, rgba32f) uniform restrict writeonly image2D i_image_w;
 
 // Uniform buffer declaration
 layout(binding = 0, std140) uniform b_uniform {
   uvec2 size;
-  bool  lrgb_to_srgb; 
 } unif;
 
 void main() {
   const uvec2 i = gl_GlobalInvocationID.xy;
   guard(all(lessThan(i, unif.size)));
-
-  const vec2 p = (vec2(i) + vec2(0.5)) / vec2(unif.size);
-  const vec4 v = texture(s_image_r, p);
-  
-  imageStore(i_image_w, ivec2(i), unif.lrgb_to_srgb ? lrgb_to_srgb(v) : v);
+  imageStore(i_image_w, ivec2(i), lrgb_to_srgb(imageLoad(i_image_r, ivec2(i))));
 }
