@@ -14,7 +14,6 @@ namespace met {
   struct ViewportDrawEndTask : public detail::TaskNode {
     struct UniformBuffer {
       alignas(8) eig::Array2u size;
-      // alignas(4) uint lrgb_to_srgb;
     };
 
     gl::ComputeInfo m_dispatch;
@@ -35,7 +34,6 @@ namespace met {
       // Initialize uniform buffer and writeable, flushable mapping
       m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = gl::BufferCreateFlags::eMapWritePersistent }};
       m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush)[0];
-      // m_uniform_map->lrgb_to_srgb = true;
     }
 
     void eval(SchedulerHandle &info) override {
