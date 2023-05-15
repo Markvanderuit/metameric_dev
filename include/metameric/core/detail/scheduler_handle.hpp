@@ -3,7 +3,7 @@
 #include <metameric/core/detail/scheduler_base.hpp>
 
 namespace met {
-  // Implementation base for resource handles, returned by scheduler/handle::task(...)/subtask(...)
+  // Implementation base for resource handles, returned by scheduler/handle::task(...)/child_task(...)
   class TaskHandle {
     detail::TaskInfo       m_task_key;
     detail::SchedulerBase *m_schd_handle;

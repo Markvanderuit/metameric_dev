@@ -50,7 +50,7 @@ namespace met {
     info.resource("arcball").init<detail::Arcball>({ .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
-    info.subtask("draw_color_solid").init<DrawColorSolidTask>(info.task().key());
+    info.child_task("draw_color_solid").init<DrawColorSolidTask>(info.task().key());
 
     // Start with gizmo inactive
     m_is_gizmo_used = false;

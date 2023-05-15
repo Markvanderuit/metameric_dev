@@ -41,7 +41,7 @@ namespace met {
     return TaskHandle(this, { .task_key = m_task_key });
   }
 
-  TaskHandle SchedulerHandle::subtask(const std::string &task_key) {
+  TaskHandle SchedulerHandle::child_task(const std::string &task_key) {
     met_trace();
     return TaskHandle(this, { .prnt_key = m_task_key, .task_key = task_key });
   }
@@ -64,5 +64,20 @@ namespace met {
     } else {
       return TaskHandle(this, { .task_key = task_key });
     }
+  }
+
+  MaskedSchedulerHandle SchedulerHandle::parent() {
+    met_trace();
+    return parent_task().mask(*this);
+  }
+
+  MaskedSchedulerHandle SchedulerHandle::child(const std::string &task_key) {
+    met_trace();
+    return child_task(task_key).mask(*this);
+  }
+
+  MaskedSchedulerHandle SchedulerHandle::relative(const std::string &task_key) {
+    met_trace();
+    return relative_task(task_key).mask(*this);
   }
 } // namespace met

@@ -127,7 +127,7 @@ namespace met {
     }
 
     // Initialize error texture generation subtask
-    info.subtask("gen_bary").init<GenBaryMappingTask>(0);
+    info.child_task("gen_bary").init<GenBaryMappingTask>(0);
 
     m_tooltip_cycle_i = 0;
   }

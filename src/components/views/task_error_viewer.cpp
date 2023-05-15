@@ -128,7 +128,7 @@ namespace met {
     }
 
     // Initialize error texture generation subtask
-    info.subtask("gen_error").init<GenErrorMappingTask>(0);
+    info.child_task("gen_error").init<GenErrorMappingTask>(0);
 
     m_tooltip_cycle_i = 0;
   }

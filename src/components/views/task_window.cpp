@@ -248,13 +248,13 @@ namespace met {
 
     // Spawn create modal
     if (m_open_create_modal) { 
-      info.subtask(create_modal_name).init<CreateProjectTask>(create_modal_title);
+      info.child_task(create_modal_name).init<CreateProjectTask>(create_modal_title);
       ImGui::OpenPopup(create_modal_title.c_str()); 
     }
 
     // Spawn close modal
     if (m_open_close_modal)  { 
-      info.subtask(close_modal_name).init<LambdaTask>([&](auto &info) {
+      info.child_task(close_modal_name).init<LambdaTask>([&](auto &info) {
         if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
           ImGui::SpacedSeparator();
@@ -274,7 +274,7 @@ namespace met {
 
     // Spawm exit modal
     if (m_open_exit_modal)   { 
-      info.subtask(exit_modal_name).init<LambdaTask>([&](auto &info) {
+      info.child_task(exit_modal_name).init<LambdaTask>([&](auto &info) {
         if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
           ImGui::SpacedSeparator();

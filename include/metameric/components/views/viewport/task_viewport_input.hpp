@@ -32,7 +32,7 @@ namespace met {
       met_trace();
     
       // Add subtasks, share resources
-      info.subtask("vert").init<ViewportInputVertTask>();
+      info.child_task("vert").init<ViewportInputVertTask>();
       info.resource("arcball").init<detail::Arcball>({ .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
