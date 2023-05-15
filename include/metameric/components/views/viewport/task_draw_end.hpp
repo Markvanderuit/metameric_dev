@@ -14,7 +14,6 @@ namespace met {
   struct ViewportDrawEndTask : public detail::TaskNode {
     struct UniformBuffer {
       alignas(8) eig::Array2u size;
-      alignas(4) uint lrgb_to_srgb;
     };
 
     gl::ComputeInfo m_dispatch;
@@ -29,13 +28,12 @@ namespace met {
       // Set up draw components for gamma correction
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
       m_program = {{ .type = gl::ShaderType::eCompute, 
-                     .glsl_path  = "resources/shaders/misc/texture_resample.comp", 
-                     .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
+                     .glsl_path  = "resources/shaders/misc/image_lrgb_to_srgb.comp", 
+                     .cross_path = "resources/shaders/misc/image_lrgb_to_srgb.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping
       m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = gl::BufferCreateFlags::eMapWritePersistent }};
       m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush)[0];
-      m_uniform_map->lrgb_to_srgb = true;
     }
 
     void eval(SchedulerHandle &info) override {
@@ -68,8 +66,7 @@ namespace met {
 
       // Bind image/sampler resources, then dispatch shader to perform resample/srgb conversion
       m_program.bind("b_uniform", m_uniform_buffer);
-      m_program.bind("s_image_r", m_sampler);
-      m_program.bind("s_image_r", e_lrgb_target);
+      m_program.bind("i_image_r", e_lrgb_target);
       m_program.bind("i_image_w", info("viewport.begin", "srgb_target").writeable<gl::Texture2d4f>());
       gl::dispatch_compute(m_dispatch);
     }
