@@ -126,8 +126,10 @@ namespace met {
     
     // Task node handle access
     TaskHandle task();                                      // Handle to current task
-    TaskHandle subtask(const std::string &task_key);        // Handle to other task relative to current task
-    
+    TaskHandle subtask(const std::string &task_key);        // Handle to child task relative to current task
+    TaskHandle parent_task();                               // Handle to parent task, relative to current task
+    TaskHandle relative_task(const std::string &task_key);  // Handle to relative task, on same level as current task
+
     // Resource node handle access
     ResourceHandle resource(const std::string &rsrc_key);   // Handle to current task's resource
     ResourceHandle operator()(const std::string &rsrc_key); // Handle to current task's resource

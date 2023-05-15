@@ -1,12 +1,7 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/views/task_viewport.hpp>
-#include <metameric/components/views/viewport/task_viewport_overlay.hpp>
-#include <metameric/components/views/viewport/task_viewport_input.hpp>
-#include <metameric/components/views/viewport/task_draw_meshing.hpp>
-#include <metameric/components/views/viewport/task_draw_texture.hpp>
-#include <metameric/components/views/viewport/task_draw_color_system_solid.hpp>
+#include <metameric/components/views/task_embedding_viewport.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/framebuffer.hpp>
@@ -17,7 +12,7 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  struct ViewportViewBeginTask : public detail::TaskNode {
+  struct EmbeddingViewportViewBeginTask : public detail::TaskNode {
     void init(SchedulerHandle &info) override {
       met_trace_full();
 
@@ -38,7 +33,7 @@ namespace met {
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       
       // Begin main viewport window
-      ImGui::Begin("Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
+      ImGui::Begin("Embedding viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
       // Compute viewport size minus ImGui's tab bars etc
       // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
@@ -53,11 +48,11 @@ namespace met {
       // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
       ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
 
-      // Note: window end is post-pended in ViewportViewEndTask
+      // Note: window end is post-pended in EmbeddingViewportViewEndTask
     }
   };
   
-  struct ViewportViewEndTask : public detail::TaskNode {
+  struct EmbeddingViewportViewEndTask : public detail::TaskNode {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
@@ -66,12 +61,12 @@ namespace met {
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
 
-      // Note: window end is post-pended here, but window begin is in ViewportViewBeginTask
+      // Note: window end is post-pended here, but window begin is in EmbeddingViewportViewBeginTask
       ImGui::End();
     }
   };
 
-  class ViewportDrawBeginTask : public detail::TaskNode {
+  class EmbeddingViewportDrawBeginTask : public detail::TaskNode {
     using Colorbuffer = gl::Renderbuffer<float, 4, gl::RenderbufferType::eMultisample>;
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1, gl::RenderbufferType::eMultisample>;
 
@@ -131,7 +126,7 @@ namespace met {
     }
   };
 
-  struct ViewportDrawEndTask : public detail::TaskNode {
+  struct EmbeddingViewportDrawEndTask : public detail::TaskNode {
     struct UniformBuffer {
       alignas(8) eig::Array2u size;
       alignas(4) uint lrgb_to_srgb;
@@ -196,22 +191,22 @@ namespace met {
     }
   };
 
-  void ViewportTask::init(SchedulerHandle &info) {
+  void EmbeddingViewportTask::init(SchedulerHandle &info) {
     met_trace();
 
-    info.subtask("view_begin").init<ViewportViewBeginTask>();
-    info.subtask("overlay").init<ViewportOverlayTask>();
-    info.subtask("input").init<ViewportInputTask>();
-    info.subtask("view_end").init<ViewportViewEndTask>();
-    info.subtask("draw_begin").init<ViewportDrawBeginTask>();
-    info.subtask("draw_color_system_solid").init<ViewportDrawColorSystemSolid>();
-    info.subtask("draw_meshing").init<ViewportDrawMeshingTask>();
-    info.subtask("draw_texture").init<ViewportDrawTextureTask>();
-    info.subtask("draw_end").init<ViewportDrawEndTask>();
+    info.subtask("view_begin").init<EmbeddingViewportViewBeginTask>();
+    info.subtask("view_end").init<EmbeddingViewportViewEndTask>();
+    info.subtask("draw_begin").init<EmbeddingViewportDrawBeginTask>();
+    info.subtask("draw_end").init<EmbeddingViewportDrawEndTask>();
 
-    // info.subtask("begin").init<ViewportBeginTask>();
-    // info.subtask("end").init<ViewportEndTask>();
-    // info.subtask("draw_begin").init<ViewportDrawBeginTask>();
-    // info.subtask("draw_end").init<ViewportDrawEndTask>();
+    // Insert intermediate tasks that operate on ImGui view state
+    // info.subtask("overlay").init<ViewportOverlayTask>();
+    // info.subtask("input").init<ViewportInputTask>();
+    // info.subtask("draw_begin").init<EmbeddingViewportDrawBeginTask>();
+    // info.subtask("draw_color_system_solid").init<ViewportDrawColorSystemSolid>();
+    // info.subtask("draw_meshing").init<ViewportDrawMeshingTask>();
+    // info.subtask("draw_texture").init<ViewportDrawTextureTask>();
+    // info.subtask("draw_bvh").init<ViewportDrawBVHTask>();
+    // info.subtask("draw_end").init<EmbeddingViewportDrawEndTask>();
   }
 } // namespace met
