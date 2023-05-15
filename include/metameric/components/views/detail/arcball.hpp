@@ -26,8 +26,7 @@ namespace met::detail {
     Arcball camera with zoom support.
     src: https://asliceofrendering.com/camera/2019/11/30/ArcballCamera/
   */
-  struct Arcball {
-  private:
+  class Arcball {
     eig::Affine3f     m_view;
     eig::Projective3f m_proj;
     eig::Projective3f m_full;
@@ -75,9 +74,9 @@ namespace met::detail {
 
     /* public vector accessors */
 
-    eig::Array3f & eye()    { return m_eye;    }
-    eig::Array3f & up()     { return m_up;     }
-    eig::Array3f & center() { return m_center; }
+    eig::Array3f       & eye()          { return m_eye;    }
+    eig::Array3f       & up()           { return m_up;     }
+    eig::Array3f       & center()       { return m_center; }
     const eig::Array3f & eye()    const { return m_eye;    }
     const eig::Array3f & up()     const { return m_up;     }
     const eig::Array3f & center() const { return m_center; }

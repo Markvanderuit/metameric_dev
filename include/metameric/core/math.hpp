@@ -18,6 +18,8 @@ namespace Eigen {
                      const Vector3f &cen,
                      const Vector3f &up);
 
+  Projective3f ortho(float left, float right, float bottom, float top, float near, float far);
+
   Projective3f perspective_rh_no(float fovy, float aspect, float near, float far);
   
   // Convert a screen-space vector in [0, 1] to world space

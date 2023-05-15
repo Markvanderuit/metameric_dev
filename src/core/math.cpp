@@ -34,6 +34,22 @@ namespace Eigen {
     return trf;
   }
 
+  Projective3f ortho(float left, float right, float bottom, float top, float near, float far) {
+    const float _00 = 2.f / (right - left);
+    const float _11 = 2.f / (top - bottom);
+    const float _22 = 2.f / (far - near);
+    const float _30 = (right + left) / (right - left);
+    const float _31 = (top + bottom) / (top - bottom);
+    const float _32 = (far + near) / (far - near);
+
+    Projective3f trf;
+    trf.matrix() << _00, 0, 0, 0,
+                    0, _11, 0, 0,
+                    0, 0, _22, 0,
+                    _30,_31,_32,0;
+    return trf;
+  }
+
   Projective3f perspective_rh_no(float fovy, float aspect, float near, float far) {
     const float tan_half_fovy = std::tan(fovy / 2.f);
     const float _00 = 1.f / (aspect * tan_half_fovy);
