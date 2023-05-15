@@ -206,10 +206,5 @@ namespace met {
     info.child_task("draw_meshing").init<ViewportDrawMeshingTask>();
     info.child_task("draw_texture").init<ViewportDrawTextureTask>();
     info.child_task("draw_end").init<ViewportDrawEndTask>();
-
-    // info.subtask("begin").init<ViewportBeginTask>();
-    // info.subtask("end").init<ViewportEndTask>();
-    // info.subtask("draw_begin").init<ViewportDrawBeginTask>();
-    // info.subtask("draw_end").init<ViewportDrawEndTask>();
   }
 } // namespace met

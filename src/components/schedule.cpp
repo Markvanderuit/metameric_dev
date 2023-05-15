@@ -121,8 +121,8 @@ namespace met {
 
     // The following tasks are in development
     scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
-    scheduler.task("gen_random_mappings").init<GenRandomMappingsTask>();
-    scheduler.task("random_mappings_viewer").init<RandomMappingsViewerTask>();
+    // scheduler.task("gen_random_mappings").init<GenRandomMappingsTask>();
+    // scheduler.task("random_mappings_viewer").init<RandomMappingsViewerTask>();
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);

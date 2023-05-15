@@ -72,7 +72,7 @@ namespace met {
     const auto &e_verts       = info("gen_random_constraints", "constraints").read_only<
       std::vector<std::vector<ProjectData::Vert>>
     >().at(m_constraint_i);
-    const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_vert_slct   = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
 
     // Update uniform data
@@ -80,7 +80,7 @@ namespace met {
       m_unif_map->n_verts = e_proj_data.verts.size();
       m_unif_map->n_elems = e_proj_data.elems.size();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
       m_unif_map->n_verts = e_delaunay.verts.size();
       m_unif_map->n_elems = e_delaunay.elems.size();
     }

@@ -2,6 +2,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/task_embedding_viewport.hpp>
+#include <metameric/components/views/embedding_viewport/task_draw_embedding.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/framebuffer.hpp>
@@ -195,6 +196,7 @@ namespace met {
     info.child_task("view_begin").init<EmbeddingViewportViewBeginTask>();
     info.child_task("view_end").init<EmbeddingViewportViewEndTask>();
     info.child_task("draw_begin").init<EmbeddingViewportDrawBeginTask>();
+    info.child_task("draw_embedding").init<ViewportDrawEmbeddingTask>();
     info.child_task("draw_end").init<EmbeddingViewportDrawEndTask>();
 
     // Insert intermediate tasks that operate on ImGui view state
