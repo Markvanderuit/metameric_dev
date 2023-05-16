@@ -35,18 +35,18 @@ namespace Eigen {
   }
 
   Projective3f ortho(float left, float right, float bottom, float top, float near, float far) {
-    const float _00 = 2.f / (right - left);
-    const float _11 = 2.f / (top - bottom);
-    const float _22 = 2.f / (far - near);
-    const float _30 = (right + left) / (right - left);
-    const float _31 = (top + bottom) / (top - bottom);
-    const float _32 = (far + near) / (far - near);
+    const float _00 =   2.f / (right - left);
+    const float _11 =   2.f / (top - bottom);
+    const float _22 =   2.f / (far - near);
+    const float _30 = - (right + left) / (right - left);
+    const float _31 = - (top + bottom) / (top - bottom);
+    const float _32 = - (far + near)   / (far - near);
 
     Projective3f trf;
-    trf.matrix() << _00, 0, 0, 0,
-                    0, _11, 0, 0,
-                    0, 0, _22, 0,
-                    _30,_31,_32,0;
+    trf.matrix() << _00,   0,   0, _30,
+                      0, _11,   0, _31,
+                      0,   0, _22, _32,
+                      0,   0,   0,   1;
     return trf;
   }
 
@@ -59,10 +59,10 @@ namespace Eigen {
     const float _23 = -1;
 
     Projective3f trf;
-    trf.matrix() << _00, 0, 0, 0,
-                    0, _11, 0, 0,
-                    0, 0,_22,_32,
-                    0, 0,_23,  0;
+    trf.matrix() << _00,   0,   0,   0,
+                      0, _11,   0,   0,
+                      0,   0, _22, _32,
+                      0,   0, _23,   0;
     return trf;
   }
 } // namespace Eigen

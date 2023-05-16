@@ -33,11 +33,11 @@ namespace met {
     
       // Add subtasks, share resources
       info.child_task("vert").init<ViewportInputVertTask>();
-      info.resource("arcball").init<detail::Arcball>({ .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
+    info.resource("arcball").init<detail::Arcball>({ .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
     void eval(SchedulerHandle &info) override {
-      met_trace_full();
+      met_trace();
 
       // Get external resources
       const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
@@ -215,7 +215,7 @@ namespace met {
       guard(ImGui::IsItemHovered());
 
       // Get modified resources
-      auto &i_arcball   = info.resource("arcball").writeable<detail::Arcball>();
+      auto &i_arcball = info.resource("arcball").writeable<detail::Arcball>();
 
       // Handle camera update: aspect ratio, scroll delta, move delta dependent on ImGui i/o
       i_arcball.m_aspect = viewport_size.x() / viewport_size.y();

@@ -41,6 +41,7 @@ namespace met::detail {
     using InfoType = ArcballCreateInfo;
 
     /* constr */
+    
     Arcball(ArcballCreateInfo info = { })
     : m_fov_y(info.fov_y),
       m_near_z(info.near_z),

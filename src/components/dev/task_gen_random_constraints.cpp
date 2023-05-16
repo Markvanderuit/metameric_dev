@@ -11,7 +11,7 @@
 #include <numbers>
 
 namespace met {
-  constexpr uint n_img_samples = 1024; // Nr. of images to generate
+  constexpr uint n_img_samples = 65536; // Nr. of images to generate
   constexpr uint n_ocs_samples = 16; // Nr. of samples for color system OCS generation
 
   namespace detail {

@@ -14,6 +14,7 @@ layout(binding = 1) restrict readonly buffer b_bary { vec4 data[];  } bary_in;
 layout(binding = 2) restrict readonly buffer b_vert { vec3 data[];  } vert_in;
 layout(binding = 3) restrict readonly buffer b_elem { uvec4 data[]; } elem_in;
 layout(binding = 0) uniform b_unif {
+  mat4  camera_matrix;
   uvec2 size_in;
   vec2  viewport_aspect;
   uint  n_verts;
@@ -22,7 +23,6 @@ layout(binding = 0) uniform b_unif {
 
 void main() {
   if (clamp(in_value_vert, 0, 1) != in_value_vert)
-    // out_value_colr = vec4(1, 0, 1, 1);
     discard;
   else {
     // Nearest-neighbor find corresponding 2d/1d coordinates in input size
@@ -40,6 +40,6 @@ void main() {
     for (uint j = 0; j < 4; ++j)
       v += bary[j] * vert_in.data[elems_offs + elems_idx[j]];
 
-    out_value_colr = vec4(v, 1); // vec4(in_value_vert, 0, 1);
+    out_value_colr = vec4(v, 1);
   }
 }

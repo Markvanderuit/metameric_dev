@@ -2,25 +2,51 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <numbers>
 
 namespace met::detail {
   struct PanscanCreateInfo {
+    float near_z =-1000.f;
+    float far_z  = 1000.f;
+    float scale  = 1.f;
 
+    eig::Vector3f e_eye    = { 0, 0,-1 };
+    eig::Vector3f e_center = { 0, 0, 0 };
+    eig::Vector3f e_up     = { 0, 1, 0 };
+
+    // Multipliers to scrolling/movement deltas
+    float        scale_delta_mult = 1.f; 
+    eig::Array2f pos_delta_mult   = 1.f; 
   };
 
   class Panscan {
     eig::Affine3f     m_view;
     eig::Projective3f m_orth;
     eig::Projective3f m_full;
-    eig::Array3f      m_eye;
-    eig::Array3f      m_center;
-    eig::Array3f      m_up;
+    eig::Vector3f     m_eye;
+    eig::Vector3f     m_center;
+    eig::Vector3f     m_up;
     float             m_scale;
     float             m_scale_delta_mult;
     eig::Array2f      m_pos_delta_mult;
 
   public:
     using InfoType = PanscanCreateInfo;
+
+    /* constr */
+
+    Panscan(PanscanCreateInfo info = { })
+    : m_scale(info.scale),
+      m_near_z(info.near_z),
+      m_far_z(info.far_z),
+      m_eye(info.e_eye.matrix().normalized()), 
+      m_center(info.e_center), 
+      m_up(info.e_up),
+      m_pos_delta_mult(info.pos_delta_mult),
+      m_scale_delta_mult(info.scale_delta_mult) 
+    {
+      update_matrices();
+    }
 
     /* public data members; call update_matrices() after changing */
 
@@ -38,26 +64,46 @@ namespace met::detail {
     const eig::Projective3f & orth() const { return m_orth; };
 
     void update_matrices() {
+      met_trace();
+
       m_view = eig::lookat_rh(m_eye, m_center, m_up);
-      m_orth = eig::ortho(-1, 1, -1, 1, m_near_z, m_far_z);
-      m_full = m_orth * m_view;  
+      m_orth = eig::ortho(-m_scale, m_scale, -m_scale, m_scale, m_near_z, m_far_z);
+      m_full = m_orth * m_view;
     }
 
     // Before next update_matrices() call, set scaling delta
     void set_scale_delta(float scale_delta) {
-      m_scale = std::max(m_scale + scale_delta * m_scale_delta_mult, 0.01f);
+      met_trace();
+
+      float diff = scale_delta * m_scale_delta_mult;
+      float next;
+      if (diff > 0.f) {
+        next = std::powf(1.f + m_scale, 1.15f) * diff;
+      } else {
+        next = std::powf(1.f + (m_scale - std::powf(1.f + m_scale, 1.15f) * diff), 1.15f) * diff;
+      }
+      m_scale = std::clamp(m_scale + next, 0.005f, 1000.f);
     }
 
     // Before next update_matrices() call, set positional delta
     void set_pos_delta(eig::Array2f pos_delta) {
+      met_trace();
+      
       guard(!pos_delta.isZero());
 
-      // Describe 2-dimensional translation
-      eig::Array2f delta = pos_delta * m_pos_delta_mult;
-      eig::Affine3f tnsl(eig::Translation2f(delta));
+      // Describe u/v vectors on camera plane
+      eig::Vector3f f = (m_center - m_eye).normalized();
+      eig::Vector3f s = f.cross(m_up).normalized();
+      eig::Vector3f u = s.cross(f);
 
-      
+      // Describe 2-dimensional translation on camera plane
+      eig::Array2f delta = pos_delta * m_scale * m_pos_delta_mult;
+      eig::Affine3f transl(eig::Translation3f(s *-delta.x()) 
+                         * eig::Translation3f(u * delta.y()));
+
+      // Apply translation
+      m_center = transl * m_center;
+      m_eye    = transl * m_eye;
     }
-
   };
 } // namespace met::detail

@@ -9,10 +9,11 @@
 namespace met {
   class ViewportDrawEmbeddingTask : public detail::TaskNode {
     struct UniformBuffer {
-      alignas(8) eig::Array2u size_in;  // Nr. of texels to sample from
-      alignas(8) eig::Array2f viewport_aspect;
-      alignas(4) uint         n_verts;
-      alignas(4) uint         n_quads;
+      alignas(64) eig::Matrix4f camera_matrix;
+      alignas(8)  eig::Array2u  size_in;  // Nr. of texels to sample from
+      alignas(8)  eig::Array2f  viewport_aspect;
+      alignas(4)  uint          n_verts;
+      alignas(4)  uint          n_quads;
     };
     
     uint m_mapping_i = 1;

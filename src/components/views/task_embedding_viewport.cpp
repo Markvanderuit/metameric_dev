@@ -2,6 +2,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/task_embedding_viewport.hpp>
+#include <metameric/components/views/embedding_viewport/task_input.hpp>
 #include <metameric/components/views/embedding_viewport/task_draw_embedding.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
@@ -194,6 +195,7 @@ namespace met {
     met_trace();
 
     info.child_task("view_begin").init<EmbeddingViewportViewBeginTask>();
+    info.child_task("view_input").init<EmbeddingViewportInputTask>();
     info.child_task("view_end").init<EmbeddingViewportViewEndTask>();
     info.child_task("draw_begin").init<EmbeddingViewportDrawBeginTask>();
     info.child_task("draw_embedding").init<ViewportDrawEmbeddingTask>();
