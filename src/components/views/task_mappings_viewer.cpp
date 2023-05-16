@@ -222,7 +222,7 @@ namespace met {
         if (ImGui::SmallButton("Export")) eval_save(info, i);
         
         // Main image; signal to external task the correct render size
-        e_colr_task.set_texture_info(mask, { .size = texture_size.cast<uint>() });
+        e_colr_task.set_texture_info(mask, { .size = texture_size.max(1.f).cast<uint>() });
         ImGui::Image(ImGui::to_ptr(e_colr_texture.object()), texture_size);
         
         // Set id for tooltip after loop is over, and start data copy

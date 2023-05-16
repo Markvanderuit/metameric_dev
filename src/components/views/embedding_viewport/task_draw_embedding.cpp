@@ -9,6 +9,7 @@
 #include <small_gl/texture.hpp>
 #include <small_gl/utility.hpp>
 #include <algorithm>
+#include <execution>
 #include <ranges>
 
 namespace met {
@@ -96,6 +97,9 @@ namespace met {
 
       ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
 
+      // Temporary fake positional data based on a single color constraint
+      std::vector<eig::Array2f> buffer_data(e_constraints.size());
+
       #pragma omp parallel for
       for (int j = 0; j < e_constraints.size(); ++j) {
         const auto &e_verts = e_constraints[j];
@@ -103,8 +107,16 @@ namespace met {
           m_vert_map[j * e_delaunay.verts.size() + i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
         for (uint i : e_vert_slct)
           m_vert_map[j * e_delaunay.verts.size() + i] = e_verts[i].colr_j[0];
+        buffer_data[j] = 512.f * m_vert_map[j * e_delaunay.verts.size() + e_vert_slct[0]].head<2>();
       } // for j
+      
+      eig::Array2f mean = std::reduce(std::execution::par_unseq, range_iter(buffer_data), eig::Array2f(0.f),
+        [](const auto &a, const auto &b) { return (a + b).eval(); })
+        / static_cast<float>(buffer_data.size());
+      std::for_each(std::execution::par_unseq, range_iter(buffer_data), 
+        [&mean](eig::Array2f &v) { v = (v - mean).eval(); });
 
+      m_data_buffer = {{ .data = cnt_span<const std::byte>(buffer_data) }};
       m_vert_buffer.flush(sizeof(AlColr) * e_constraints.size() * e_delaunay.verts.size(), 0);
     }
 
