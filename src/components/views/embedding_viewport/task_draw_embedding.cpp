@@ -80,10 +80,9 @@ namespace met {
 
     // Update uniform data
     eig::Array2f viewport_size = e_lrgb_target.size().cast<float>();
-    m_unif_map->camera_matrix = e_panscan.full().matrix();
-    m_unif_map->viewport_aspect = { 1.f, viewport_size.x() / viewport_size.y() };
-    m_unif_map->n_verts = e_delaunay.verts.size();
-    m_unif_map->n_quads = e_constraints.size();
+    m_unif_map->camera_matrix  = e_panscan.full().matrix();
+    m_unif_map->n_verts        = e_delaunay.verts.size();
+    m_unif_map->n_quads        = e_constraints.size();
     m_unif_buffer.flush();
 
     // Update draw data

@@ -14,8 +14,8 @@ namespace met {
     void init(SchedulerHandle &info) override {
       met_trace();
       info.resource("panscan").init<detail::Panscan>({ 
-        .scale            = 0.25f,
-        .scale_delta_mult = 0.01f, 
+        .scale            = 0.01f,
+        .scale_delta_mult = 0.0001f, 
         .pos_delta_mult   = 2.f
       });
     }
@@ -37,10 +37,11 @@ namespace met {
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());    
 
       // Handle mouse panning data
+      i_panscan.m_aspect = viewport_size;
       if (io.MouseWheel != 0.f)
         i_panscan.set_scale_delta(-io.MouseWheel);
       if (io.MouseDown[0])
-        i_panscan.set_pos_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
+        i_panscan.set_pos_delta(eig::Array2f(io.MouseDelta));
       i_panscan.update_matrices();
     }
   };

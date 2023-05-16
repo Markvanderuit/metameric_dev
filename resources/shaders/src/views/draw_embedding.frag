@@ -16,7 +16,6 @@ layout(binding = 3) restrict readonly buffer b_elem { uvec4 data[]; } elem_in;
 layout(binding = 0) uniform b_unif {
   mat4  camera_matrix;
   uvec2 size_in;
-  vec2  viewport_aspect;
   uint  n_verts;
   uint  n_quads;
 } unif_in;

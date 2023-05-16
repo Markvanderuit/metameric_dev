@@ -6,9 +6,10 @@
 
 namespace met::detail {
   struct PanscanCreateInfo {
-    float near_z =-1000.f;
-    float far_z  = 1000.f;
-    float scale  = 1.f;
+    float near_z        =-1000.f;
+    float far_z         = 1000.f;
+    float scale         = 1.f;
+    eig::Array2f aspect = 1.f;
 
     eig::Vector3f e_eye    = { 0, 0,-1 };
     eig::Vector3f e_center = { 0, 0, 0 };
@@ -39,6 +40,7 @@ namespace met::detail {
     : m_scale(info.scale),
       m_near_z(info.near_z),
       m_far_z(info.far_z),
+      m_aspect(info.aspect),
       m_eye(info.e_eye.matrix().normalized()), 
       m_center(info.e_center), 
       m_up(info.e_up),
@@ -52,7 +54,7 @@ namespace met::detail {
 
     float m_near_z;
     float m_far_z;
-    float m_aspect;
+    eig::Array2f m_aspect;
 
     /* public matrix accessors; call after update_matrices() */
      
@@ -67,7 +69,9 @@ namespace met::detail {
       met_trace();
 
       m_view = eig::lookat_rh(m_eye, m_center, m_up);
-      m_orth = eig::ortho(-m_scale, m_scale, -m_scale, m_scale, m_near_z, m_far_z);
+      m_orth = eig::ortho(-m_scale * m_aspect.x(), m_scale * m_aspect.x(), 
+                          -m_scale * m_aspect.y(), m_scale * m_aspect.y(), 
+                           m_near_z, m_far_z);
       m_full = m_orth * m_view;
     }
 
@@ -78,17 +82,17 @@ namespace met::detail {
       float diff = scale_delta * m_scale_delta_mult;
       float next;
       if (diff > 0.f) {
-        next = std::powf(1.f + m_scale, 1.15f) * diff;
+        next = std::powf(1.f + m_scale, 4.f) * diff;
       } else {
-        next = std::powf(1.f + (m_scale - std::powf(1.f + m_scale, 1.15f) * diff), 1.15f) * diff;
+        next = std::powf(1.f + (m_scale - std::powf(1.f + m_scale, 4.f) * diff), 4.f) * diff;
       }
-      m_scale = std::clamp(m_scale + next, 0.005f, 1000.f);
+      m_scale = std::clamp(m_scale + next, 0.0001f, 100.f);
     }
 
     // Before next update_matrices() call, set positional delta
     void set_pos_delta(eig::Array2f pos_delta) {
       met_trace();
-      
+
       guard(!pos_delta.isZero());
 
       // Describe u/v vectors on camera plane

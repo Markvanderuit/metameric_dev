@@ -21,7 +21,6 @@ layout(binding = 3) restrict readonly buffer b_elem { uvec4 data[]; } elem_in;
 layout(binding = 0) uniform b_unif {
   mat4  camera_matrix;
   uvec2 size_in;
-  vec2  viewport_aspect;
   uint  n_verts;
   uint  n_quads;
 } unif_in;
@@ -37,11 +36,6 @@ void main() {
 
   out_value_vert = elem_data[j];
 
-  // Set per vertex position property, currently based on fake input position
-  gl_Position 
-              = unif_in.camera_matrix * (vec4(data_in.data[i], 0, 1) 
-              + vec4(quad_scale * unif_in.viewport_aspect * (out_value_vert - .5f), 0, 0));
-
-              // = unif_in.camera_matrix * vec4(data_in.data[i] * 2.f - 1.f, 0, 1)
-              // = vec4(data_in.data[i] * 2.f - 1.f, 0, 1) 
+  gl_Position = unif_in.camera_matrix * (vec4(data_in.data[i], 0, 1) 
+              + vec4(quad_scale * (out_value_vert - .5f), 0, 0));
 }
