@@ -22,7 +22,6 @@ namespace met {
     // Get shared resources
     const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    // const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<std::vector<std::vector<ProjectData::Vert>>>();
 
     // Set up gamut buffer and establish a flushable mapping
     m_vert_buffer = {{ .size = buffer_init_size * sizeof(AlColr), .flags = buffer_create_flags }};
@@ -45,11 +44,7 @@ namespace met {
     std::vector<eig::Array2f> buffer_data;
     for (uint j = 0; j < 256; ++j) {
       for (uint i = 0; i < 256; ++i) {
-        eig::Vector2f v = { i, j };
-        // v = v * 2;
-        // eig::Array2f v = { (static_cast<float>(i) + .5f) / 256.f, 
-        //                    (static_cast<float>(j) + .5f) / 256.f };
-        buffer_data.push_back(v);
+        buffer_data.push_back({ i, j });
       }
     }
     m_data_buffer = {{ .data = cnt_span<const std::byte>(buffer_data) }};
@@ -90,19 +85,6 @@ namespace met {
     m_unif_map->n_verts = e_delaunay.verts.size();
     m_unif_map->n_quads = e_constraints.size();
     m_unif_buffer.flush();
-
-    // { // Debug transform
-    //   auto trf = e_panscan.full();
-    //   eig::Vector2f v = { 0.5f, 0.5f };
-    //   eig::Vector4f h = { v.x() /* * 2.f - 1.f */,
-    //                       v.y() /* * 2.f - 1.f */,
-    //                       0,
-    //                       1 };
-    //   eig::Vector4f p = trf * h;
-      
-    //   // fmt::print("{} -> {}\n", v, h);
-    //   fmt::print("v: {}\nh: {}\np: {}\n", v, h, p);
-    // }
 
     // Update draw data
     m_draw.vertex_count = 3 * static_cast<uint>(e_constraints.size());
