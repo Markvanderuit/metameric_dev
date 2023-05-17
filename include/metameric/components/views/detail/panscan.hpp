@@ -16,8 +16,9 @@ namespace met::detail {
     eig::Vector3f e_up     = { 0, 1, 0 };
 
     // Multipliers to scrolling/movement deltas
-    float        scale_delta_mult = 1.f; 
     eig::Array2f pos_delta_mult   = 1.f; 
+    float        scale_delta_mult = 1.f; 
+    float        scale_delta_curv = 1.f;
   };
 
   class Panscan {
@@ -28,8 +29,9 @@ namespace met::detail {
     eig::Vector3f     m_center;
     eig::Vector3f     m_up;
     float             m_scale;
-    float             m_scale_delta_mult;
     eig::Array2f      m_pos_delta_mult;
+    float             m_scale_delta_mult;
+    float             m_scale_delta_curv;
 
   public:
     using InfoType = PanscanCreateInfo;
@@ -44,8 +46,9 @@ namespace met::detail {
       m_eye(info.e_eye.matrix().normalized()), 
       m_center(info.e_center), 
       m_up(info.e_up),
-      m_pos_delta_mult(info.pos_delta_mult),
-      m_scale_delta_mult(info.scale_delta_mult) 
+      m_scale_delta_mult(info.scale_delta_mult),
+      m_scale_delta_curv(info.scale_delta_curv),
+      m_pos_delta_mult(info.pos_delta_mult)
     {
       update_matrices();
     }
@@ -79,14 +82,18 @@ namespace met::detail {
     void set_scale_delta(float scale_delta) {
       met_trace();
 
-      float diff = scale_delta * m_scale_delta_mult;
-      float next;
-      if (diff > 0.f) {
-        next = std::powf(1.f + m_scale, 4.f) * diff;
+      float delta = scale_delta * m_scale_delta_mult;
+      float curv = std::expf(1.f + m_scale * m_scale_delta_curv) * delta;
+
+      float diff;
+      if (delta > 0.f) {
+        diff = curv;
       } else {
-        next = std::powf(1.f + (m_scale - std::powf(1.f + m_scale, 4.f) * diff), 4.f) * diff;
+        float prev_scale = std::max(m_scale + curv, 0.0001f);
+        diff = std::expf(1.f + prev_scale * m_scale_delta_curv) * delta;
       }
-      m_scale = std::clamp(m_scale + next, 0.0001f, 100.f);
+
+      m_scale = std::clamp(m_scale + diff, 0.0001f, 100.f);
     }
 
     // Before next update_matrices() call, set positional delta

@@ -15,8 +15,9 @@ namespace met {
       met_trace();
       info.resource("panscan").init<detail::Panscan>({ 
         .scale            = 0.01f,
-        .scale_delta_mult = 0.0001f, 
-        .pos_delta_mult   = 2.f
+        .pos_delta_mult   = 2.f,
+        .scale_delta_mult = 0.0001f,
+        .scale_delta_curv = 4.f
       });
     }
 
