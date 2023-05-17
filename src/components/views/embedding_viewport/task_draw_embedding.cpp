@@ -41,15 +41,6 @@ namespace met {
                    .spirv_path = "resources/shaders/views/draw_embedding.frag.spv",
                    .cross_path = "resources/shaders/views/draw_embedding.frag.json" }};
 
-    // Generate 128x128 hardcoded positions
-    std::vector<eig::Array2f> buffer_data;
-    for (uint j = 0; j < 256; ++j) {
-      for (uint i = 0; i < 256; ++i) {
-        buffer_data.push_back({ i, j });
-      }
-    }
-    m_data_buffer = {{ .data = cnt_span<const std::byte>(buffer_data) }};
-
     // Initialize dispatch object
     m_array = {{ }};
     m_draw = { .type             = gl::PrimitiveType::eTriangles,
@@ -60,8 +51,13 @@ namespace met {
 
   bool ViewportDrawEmbeddingTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info("gen_random_constraints", "constraints").is_init() &&
-           info.global("appl_data").read_only<ApplicationData>().project_data.color_systems.size() > 1; 
+
+    auto rsrc = info("gen_random_constraints", "constraints");
+
+    guard(rsrc.is_init() && !rsrc.read_only<std::vector<std::vector<ProjectData::Vert>>>().empty(), false);
+    guard(info.global("appl_data").read_only<ApplicationData>().project_data.color_systems.size() > 1, false);
+
+    return true;
   }
 
   void ViewportDrawEmbeddingTask::eval(SchedulerHandle &info) {
@@ -97,7 +93,7 @@ namespace met {
 
       ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
 
-      // Temporary fake positional data based on a single color constraint
+      // Buffer for fake positional data
       std::vector<eig::Array2f> buffer_data(e_constraints.size());
 
       #pragma omp parallel for
@@ -107,9 +103,12 @@ namespace met {
           m_vert_map[j * e_delaunay.verts.size() + i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
         for (uint i : e_vert_slct)
           m_vert_map[j * e_delaunay.verts.size() + i] = e_verts[i].colr_j[0];
+
+        // Generate fake positional data based on a single color constraint
         buffer_data[j] = 512.f * m_vert_map[j * e_delaunay.verts.size() + e_vert_slct[0]].head<2>();
       } // for j
       
+      // Center fake positional data around color mean
       eig::Array2f mean = std::reduce(std::execution::par_unseq, range_iter(buffer_data), eig::Array2f(0.f),
         [](const auto &a, const auto &b) { return (a + b).eval(); })
         / static_cast<float>(buffer_data.size());
