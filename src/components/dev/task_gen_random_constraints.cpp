@@ -107,7 +107,7 @@ namespace met {
     }
 
     // Iterate through selected vertex data step-by-step
-    for (uint i : e_vert_select) {
+    for (uint i : vert_select) {
       const auto &vert = e_verts[i];
 
       // Provide items necessary for OCS generation

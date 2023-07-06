@@ -76,7 +76,7 @@ namespace met {
       const auto &e_weights   = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
 
       // Insert barriers for the following operations
-      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer | gl::BarrierFlags::eClientMappedBuffer);
+      gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eStorageBuffer | gl::BarrierFlags::eClientMappedBuffer);
 
       if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
         // Obtain barycentric data from buffer

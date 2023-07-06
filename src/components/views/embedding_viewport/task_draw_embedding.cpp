@@ -51,7 +51,7 @@ namespace met {
 
   bool ViewportDrawEmbeddingTask::is_active(SchedulerHandle &info) {
     met_trace();
-
+    
     auto rsrc = info("gen_random_constraints", "constraints");
 
     guard(rsrc.is_init() && !rsrc.read_only<std::vector<std::vector<ProjectData::Vert>>>().empty(), false);
@@ -66,10 +66,11 @@ namespace met {
     // Get external resources
     const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
+    const auto &e_verts       = e_proj_data.verts;
     const auto &e_panscan     = info.relative("view_input")("panscan").read_only<detail::Panscan>();
     const auto &e_lrgb_target = info.relative("view_begin")("lrgb_target").read_only<gl::Texture2d4f>();
     const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
-    const auto &e_vert_slct   = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_vert_select = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
     const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
     const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<
       std::vector<std::vector<ProjectData::Vert>>
@@ -85,11 +86,18 @@ namespace met {
     // Update draw data
     m_draw.vertex_count = 3 * static_cast<uint>(e_constraints.size());
 
+    // We either operate on selected vertices, or, if none are selected, all vertices
+    std::vector<uint> vert_select = e_vert_select;
+    if (vert_select.empty()) {
+      vert_select.resize(e_verts.size());
+      std::iota(range_iter(vert_select), 0);
+    }
+
     // Update per-constraint vertex data on constraint update
     if (info("gen_random_constraints", "constraints").is_mutated()) {
       // Obtain differense of all vertex indices and selected vertex indices
       auto vert_diff = std::views::iota(0u, static_cast<uint>(e_delaunay.verts.size()))
-                     | std::views::filter([&](uint i) { return std::ranges::find(e_vert_slct, i) == e_vert_slct.end(); });
+                     | std::views::filter([&](uint i) { return std::ranges::find(vert_select, i) == vert_select.end(); });
 
       ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
 
@@ -101,11 +109,11 @@ namespace met {
         const auto &e_verts = e_constraints[j];
         for (uint i : vert_diff)
           m_vert_map[j * e_delaunay.verts.size() + i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
-        for (uint i : e_vert_slct)
+        for (uint i : vert_select)
           m_vert_map[j * e_delaunay.verts.size() + i] = e_verts[i].colr_j[0];
 
         // Generate fake positional data based on a single color constraint
-        buffer_data[j] = 512.f * m_vert_map[j * e_delaunay.verts.size() + e_vert_slct[0]].head<2>();
+        buffer_data[j] = 512.f * m_vert_map[j * e_delaunay.verts.size() + vert_select[0]].head<2>();
       } // for j
       
       // Center fake positional data around color mean
@@ -118,6 +126,9 @@ namespace met {
       m_data_buffer = {{ .data = cnt_span<const std::byte>(buffer_data) }};
       m_vert_buffer.flush(sizeof(AlColr) * e_constraints.size() * e_delaunay.verts.size(), 0);
     }
+
+    // Only perform consecutive draw if the view is active
+    guard(info.relative("view_begin")("is_active").read_only<bool>());
 
     // Set local state
     gl::state::ScopedSet(gl::DrawCapability::eCullOp,     false);

@@ -271,7 +271,7 @@ namespace met {
         // Copy divided data to indirect dispatch buffer (divide by (256/8) for 8-wide subgroup clusters)
         m_bvh_div_32_program.bind("b_data", m_bvh_curr_work);
         m_bvh_div_32_program.bind("b_disp", m_bvh_div_32_buffer);
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_div_32_dispatch);
 
         // Bind relevant buffers
@@ -283,7 +283,7 @@ namespace met {
         m_bvh_desc_program.bind("b_next", m_bvh_next_work);
 
         // Dispatch work using indirect buffer, based on previous work data
-        gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_desc_dispatch);
         
         {
@@ -354,7 +354,7 @@ namespace met {
         m_bvh_finl_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
         // Dispatch shader to finalize delaunay convex weights
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_finl_dispatch);
       } */
 
@@ -363,7 +363,7 @@ namespace met {
         // Copy divided data to indirect dispatch buffer (divide by (256/sg) for subgroup-wide clusters)
         m_bvh_div_sg_program.bind("b_data", m_bvh_curr_work);
         m_bvh_div_sg_program.bind("b_disp", m_bvh_div_sg_buffer);
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_div_sg_dispatch);
 
         // Bind relevant buffers
@@ -375,7 +375,7 @@ namespace met {
         m_bvh_bary_program.bind("b_work", m_bvh_curr_work);
 
         // Dispatch work using indirect buffer, based on previous work data
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
       } */
 
@@ -384,7 +384,7 @@ namespace met {
         // Copy divided data to indirect dispatch buffer (divide by (256/sg) for subgroup-wide clusters)
         m_bvh_div_sg_program.bind("b_data", m_bvh_leaf_work);
         m_bvh_div_sg_program.bind("b_disp", m_bvh_div_sg_buffer);
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_div_sg_dispatch);
 
         // Bind relevant buffers
@@ -396,7 +396,7 @@ namespace met {
         m_bvh_bary_program.bind("b_work", m_bvh_leaf_work);
 
         // Dispatch work using indirect buffer, based on previous work data
-        gl::sync::memory_barrier(gl::BarrierFlags::eShaderStorageBuffer);
+        gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
         gl::dispatch_compute(m_bvh_bary_dispatch);
       } */
     // } // bvh_testing

@@ -19,6 +19,7 @@ namespace met {
       met_trace_full();
       info("lrgb_target").init<gl::Texture2d4f>({ .size = 1 });
       info("srgb_target").init<gl::Texture2d4f>({ .size = 1 });
+      info("is_active").init<bool>(false);
     }
     
     void eval(SchedulerHandle &info) override {
@@ -34,7 +35,8 @@ namespace met {
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       
       // Begin main viewport window
-      ImGui::Begin("Embedding Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
+      info("is_active").writeable<bool>()
+        = ImGui::Begin("Embedding Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
       // Compute viewport size minus ImGui's tab bars etc
       // (Re-)create viewport texture if necessary; attached framebuffers are resized separately
@@ -79,6 +81,10 @@ namespace met {
     void init(SchedulerHandle &info) override {
       met_trace_full();
       info.resource("frame_buffer_ms").set<gl::Framebuffer>({ });
+    }
+    
+    bool is_active(SchedulerHandle &info) override {
+      return info.relative("view_begin")("is_active").read_only<bool>();
     }
 
     void eval(SchedulerHandle &info) override {
@@ -147,6 +153,10 @@ namespace met {
       m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush)[0];
       m_uniform_map->lrgb_to_srgb = true;
     }
+    
+    bool is_active(SchedulerHandle &info) override {
+      return info.relative("view_begin")("is_active").read_only<bool>();
+    }
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
@@ -200,15 +210,5 @@ namespace met {
     info.child_task("draw_begin").init<EmbeddingViewportDrawBeginTask>();
     info.child_task("draw_embedding").init<ViewportDrawEmbeddingTask>();
     info.child_task("draw_end").init<EmbeddingViewportDrawEndTask>();
-
-    // Insert intermediate tasks that operate on ImGui view state
-    // info.subtask("overlay").init<ViewportOverlayTask>();
-    // info.subtask("input").init<ViewportInputTask>();
-    // info.subtask("draw_begin").init<EmbeddingViewportDrawBeginTask>();
-    // info.subtask("draw_color_system_solid").init<ViewportDrawColorSystemSolid>();
-    // info.subtask("draw_meshing").init<ViewportDrawMeshingTask>();
-    // info.subtask("draw_texture").init<ViewportDrawTextureTask>();
-    // info.subtask("draw_bvh").init<ViewportDrawBVHTask>();
-    // info.subtask("draw_end").init<EmbeddingViewportDrawEndTask>();
   }
 } // namespace met

@@ -57,8 +57,10 @@ namespace met::io {
     std::string line;
     while (std::getline(line__ss, line)) {
       std::ranges::replace(line, '\t', ' ');
-      auto split_line = line | std::views::split(' ');
-      auto split_vect = std::vector<std::string>(range_iter(split_line));
+      auto split_vect = line 
+                      | std::views::split(' ') 
+                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
+                      | std::ranges::to<std::vector>();
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -95,8 +97,10 @@ namespace met::io {
     std::string line;
     uint line_nr = 0;
     while (std::getline(line__ss, line)) {
-      auto split_line = line | std::views::split(' ');
-      auto split_vect = std::vector<std::string>(range_iter(split_line));
+      auto split_vect = line 
+                      | std::views::split(' ') 
+                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
+                      | std::ranges::to<std::vector>();
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
@@ -142,8 +146,10 @@ namespace met::io {
     std::string line;
     uint line_nr = 0;
     while (std::getline(line__ss, line)) {
-      auto split_line = line | std::views::split(' ');
-      auto split_vect = std::vector<std::string>(range_iter(split_line));
+      auto split_vect = line 
+                      | std::views::split(' ') 
+                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
+                      | std::ranges::to<std::vector>();
 
       // Skip empty and commented lines
       guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
