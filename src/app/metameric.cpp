@@ -32,6 +32,8 @@ namespace met {
   };
 
   void create_application(ApplicationCreateInfo info) {
+    met_trace();
+    
     fmt::print(
       "Starting Metameric\n  range   : {}-{} nm\n  samples : {}\n  bases   : {}\n  loading : {}\n",
       wavelength_min, wavelength_max, wavelength_samples, wavelength_bases, info.project_path.string());
