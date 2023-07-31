@@ -20,9 +20,9 @@ namespace met {
   } // namespace io
   
   ProjectCreateInfo::ProjectCreateInfo()
-  : n_exterior_samples(8),
+  : n_exterior_samples(12),
     n_interior_samples(16),
-    meshing_type(ProjectMeshingType::eDelaunay),
+    meshing_type(ProjectMeshingType::eConvexHull),
     illuminants({{ "D65",      models::emitter_cie_d65     },
                  { "E",        models::emitter_cie_e       },
                  { "FL2",      models::emitter_cie_fl2     },

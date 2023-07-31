@@ -88,7 +88,7 @@ namespace met {
     // Track these positions/sizes so overtays are evenly spaced
     eig::Array2f view_posi = viewport_offs + overlay_padding * e_window.content_scale(), 
                  view_size = { overlay_width * e_window.content_scale(), 0.f },
-                 view_minv = { overlay_width * e_window.content_scale(), 0.f },
+                 view_minv = { 0, 0.f },
                  view_maxv = { overlay_width * e_window.content_scale(), overlay_vert_height * e_window.content_scale() };
 
     // Spawn window with vertex info if one or more vertices are selected
@@ -96,7 +96,7 @@ namespace met {
       // Dictate hard size bounds
       ImGui::SetNextWindowPos(view_posi);
       ImGui::SetNextWindowSize(view_size);
-      ImGui::SetNextWindowSizeConstraints(view_minv, view_maxv);
+      // ImGui::SetNextWindowSizeConstraints(view_minv, view_maxv);
       view_size.y() = 0.f;
 
       if (ImGui::Begin("Vertex settings", nullptr, window_vertices_flags)) {

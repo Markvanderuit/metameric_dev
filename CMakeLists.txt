@@ -8,7 +8,7 @@ project(Metameric LANGUAGES CXX)
 
 # Build options
 option(met_enable_exceptions "Enable exceptions on release" ON)
-option(met_enable_tracy      "Enable Tracy support"         ON)
+option(met_enable_tracy      "Enable Tracy support"        OFF)
 
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
