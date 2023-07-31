@@ -28,7 +28,7 @@
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
-    scheduler.task("schedule_view").init<LambdaTask>([&](SchedulerHandle &info) {
+    /* scheduler.task("schedule_view").init<LambdaTask>([&](SchedulerHandle &info) {
       // Check if the scheduler handle implements a MapBasedSchedule
       auto *info_data = dynamic_cast<MapBasedSchedule *>(&info);
       guard(info_data);
@@ -66,9 +66,9 @@ namespace met {
         }
       }
       ImGui::End();
-    });
+    }); */
 
-    // Temporary window to plot pca components
+    /* // Temporary window to plot pca components
     scheduler.task("plot_models").init<LambdaTask>([](auto &info) {
       if (ImGui::Begin("PCA plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -83,7 +83,7 @@ namespace met {
         }
       }
       ImGui::End();
-    });
+    }); */
   }
 
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
