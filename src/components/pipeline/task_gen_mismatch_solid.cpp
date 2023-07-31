@@ -130,6 +130,15 @@ namespace met {
     // The selected constraint is the varying component, for which we generate a metamer boundary
     CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
 
+    // Last-second safety check; cmfs_i != cmfs_j for all i, j
+    // or qhull, bless its naive heart, will happily tear down the application 
+    const bool is_overlap = std::ranges::any_of(cmfs_i, [&cmfs_j](const CMFS &cmfs_i) { return cmfs_i.isApprox(cmfs_j); });
+    if (is_overlap) {
+      info("chull_mesh").set<AlignedMeshData>({ });
+      info("chull_cntr").writeable<Colr>() = e_vert.colr_i;
+      return;
+    }
+
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
     const auto &i_samples = info(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
 

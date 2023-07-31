@@ -156,13 +156,16 @@ namespace met {
     // we copy to existing buffers
     if (auto rsrc = info.resource("gen_mismatch_solid", "chull_mesh"); rsrc.is_mutated()) {
       const auto &[verts, elems] = rsrc.read_only<AlignedMeshData>();
-      guard(!verts.empty());
-
-      // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
-      m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
-      m_chull_elems.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
-      m_chull_dispatch.vertex_count = elems.size() * 3;
-      m_point_dispatch.vertex_count = verts.size();
+      if (verts.empty()) {
+        m_chull_dispatch.vertex_count = 0;
+        m_point_dispatch.vertex_count = 0;
+      } else {
+        // Copy data to buffers and adjust dispatch settings as the mesh may be smaller
+        m_chull_verts.set(cnt_span<const std::byte>(verts), verts.size() * sizeof(decltype(verts)::value_type));
+        m_chull_elems.set(cnt_span<const std::byte>(elems), elems.size() * sizeof(decltype(elems)::value_type));
+        m_chull_dispatch.vertex_count = elems.size() * 3;
+        m_point_dispatch.vertex_count = verts.size();
+      }
     }
 
     eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
