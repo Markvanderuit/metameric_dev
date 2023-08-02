@@ -52,7 +52,7 @@ namespace met {
     // Instantiate unchanging uniform data
     m_unif_map_line->alpha = 0.25f;
     m_unif_map_line->model_matrix = eig::Matrix4f::Identity();
-    m_unif_map_fill->alpha = 0.01f;
+    m_unif_map_fill->alpha = 0.025f;
     m_unif_map_fill->model_matrix = eig::Matrix4f::Identity();
   }
 
@@ -132,8 +132,8 @@ namespace met {
                                gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
 
     // Submit line draw information 
-    m_program.bind("b_uniform", m_unif_buffer_line);
-    gl::dispatch_draw(m_draw_line);
+    // m_program.bind("b_uniform", m_unif_buffer_line);
+    // gl::dispatch_draw(m_draw_line);
     
     // Submit fill draw information 
     m_program.bind("b_uniform", m_unif_buffer_fill);

@@ -65,8 +65,9 @@ namespace met {
         reflectance += bary[i] * e_vert_spec[i];
 
       // Plot barycentric weights
-      ImGui::PlotLines("Weights", bary.data(), bary.size(), 0, 
-        nullptr, 0.f, 1.f, { 0.f, 64.f });
+      // TODO re-enable after recording
+      // ImGui::PlotLines("Weights", bary.data(), bary.size(), 0, 
+        // nullptr, 0.f, 1.f, { 0.f, 64.f });
         
       ImGui::Separator();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {

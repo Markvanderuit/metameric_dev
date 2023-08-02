@@ -410,6 +410,9 @@ namespace met {
       ImGui::EndGroup();
     }
 
+    if (!e_vert.colr_j.empty())
+      ImGui::Separator();
+
     // Spawn button to add an extra constraint, if necessary
     if (ImGui::Button("Add constraint")) {
       e_appl_data.touch({ .name = "Add color constraint", .redo = [i = i](auto &data) { 
