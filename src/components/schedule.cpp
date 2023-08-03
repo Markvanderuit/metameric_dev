@@ -117,10 +117,10 @@ namespace met {
     scheduler.task("mappings_viewer").init<MappingsViewerTask>();
     scheduler.task("error_viewer").init<ErrorViewerTask>();
     scheduler.task("bary_viewer").init<BaryViewerTask>();
-    scheduler.task("embedding_viewport").init<EmbeddingViewportTask>();
 
     // The following tasks are in development
-    scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
+    // scheduler.task("embedding_viewport").init<EmbeddingViewportTask>();
+    // scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
     // scheduler.task("gen_random_mappings").init<GenRandomMappingsTask>();
     // scheduler.task("random_mappings_viewer").init<RandomMappingsViewerTask>();
 

@@ -22,16 +22,18 @@ namespace met {
     const auto &e_colr_data = e_appl_data.loaded_texture;
     const auto &e_proj_data = e_appl_data.project_data;
     
-    // Determine compute dispatch size
-    const uint dispatch_n    = e_colr_data.size().prod();
-    const uint dispatch_ndiv = ceil_div(dispatch_n, 256u / 2u); // tldr; subgroup shenanigans
-
     // Initialize objects for compute dispatch
-    m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/pipeline/gen_generalized_weights.comp.spv",
-                   .cross_path = "resources/shaders/pipeline/gen_generalized_weights.comp.json" }};
-    m_dispatch = { .groups_x = dispatch_ndiv, 
-                   .bindable_program = &m_program }; 
+    const uint dispatch_n = e_colr_data.size().prod();
+    m_program_bary = {{ .type       = gl::ShaderType::eCompute,
+                        .spirv_path = "resources/shaders/pipeline/gen_generalized_weights_simple.comp.spv",
+                        .cross_path = "resources/shaders/pipeline/gen_generalized_weights_simple.comp.json" }};
+    m_program_norm = {{ .type       = gl::ShaderType::eCompute,
+                        .spirv_path = "resources/shaders/pipeline/gen_generalized_weights_normalize.comp.spv",
+                        .cross_path = "resources/shaders/pipeline/gen_generalized_weights_normalize.comp.json" }};
+    m_dispatch_bary = { .groups_x         = ceil_div(dispatch_n, 256u), 
+                        .bindable_program = &m_program_bary }; 
+    m_dispatch_norm = { .groups_x         = ceil_div(dispatch_n, 256u /* / (generalized_weights / 4) */ ), 
+                        .bindable_program = &m_program_norm }; 
 
     // Initialize uniform buffer and writeable, flushable mapping
     m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
@@ -91,13 +93,22 @@ namespace met {
     m_uniform_buffer.flush();
 
     // Bind required resources
-    m_program.bind("b_unif", m_uniform_buffer);
-    m_program.bind("b_vert", i_vert_buffer);
-    m_program.bind("b_elem", i_elem_buffer);
-    m_program.bind("b_colr", info("colr_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+    m_program_bary.bind("b_unif", m_uniform_buffer);
+    m_program_bary.bind("b_vert", i_vert_buffer);
+    m_program_bary.bind("b_elem", i_elem_buffer);
+    m_program_bary.bind("b_colr", info("colr_buffer").read_only<gl::Buffer>());
+    m_program_bary.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
     // Dispatch shader to generate generalized barycentric weights
-    gl::dispatch_compute(m_dispatch);
+    gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
+    gl::dispatch_compute(m_dispatch_bary);
+
+    // Bind required resources
+    m_program_norm.bind("b_unif", m_uniform_buffer);
+    m_program_norm.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+
+    // Dispatch shader to normalize generalized barycentric weights
+    gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
+    gl::dispatch_compute(m_dispatch_norm);
   }
 } // namespace met

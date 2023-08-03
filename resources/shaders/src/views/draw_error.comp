@@ -18,6 +18,6 @@ void main() {
   const uint i = gl_GlobalInvocationID.x;
   guard(i < unif.n);
 
-  vec3 err = 128.f * abs(in_a.data[i] - in_b.data[i]);
+  vec3 err = /* 128.f *  */abs(in_a.data[i] - in_b.data[i]);
   out_err.data[i] = vec4(err, hsum(err));
 }

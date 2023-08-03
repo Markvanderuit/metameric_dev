@@ -13,8 +13,10 @@ namespace met {
       uint n_elems; // Nr. of elements defining surrounding hull
     };
 
-    gl::ComputeInfo           m_dispatch;
-    gl::Program               m_program;
+    gl::ComputeInfo           m_dispatch_bary;
+    gl::ComputeInfo           m_dispatch_norm;
+    gl::Program               m_program_bary;
+    gl::Program               m_program_norm;
     gl::Buffer                m_uniform_buffer;
     UniformBuffer            *m_uniform_map;
     std::span<eig::AlArray3f> m_vert_map;

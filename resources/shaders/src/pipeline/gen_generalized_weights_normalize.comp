@@ -1,0 +1,48 @@
+#version 460 core
+
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_clustered  : require
+
+#include <guard.glsl>
+#include <math.glsl>
+#include <bary.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std430)             buffer;
+layout(std140)             uniform;
+
+// Shader storage buffer declarations
+layout(binding = 0) restrict buffer b_bary { Bary4 data[]; } bary_buffer;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_unif {
+  uint n;
+  uint n_verts;
+  uint n_elems;
+} unif_buffer;
+
+void main() {
+  for (uint i = gl_GlobalInvocationID.x;
+            i < (unif_buffer.n * generalized_weights_4);
+            i += gl_WorkGroupSize.x * gl_NumWorkGroups.x) {
+    const uint i_ = i / generalized_weights_4;
+    const uint j_ = i % generalized_weights_4;
+
+    vec4 w = subgroupClusteredAdd(bary_buffer.data[i_][j_], generalized_weights_4);
+    subgroupBarrier();
+    bary_buffer.data[i_][j_] /= hsum(w);
+  } // for (uint i)
+
+  /* const uint i = gl_GlobalInvocationID.x / generalized_weights_4;
+  const uint j = gl_GlobalInvocationID.x % generalized_weights_4;
+  const bool mask = i < unif_buffer.n;
+
+  vec4 w = mask ? bary_buffer.data[i][j] : vec4(0);
+       w = subgroupClusteredAdd(w, generalized_weights_4);
+  subgroupBarrier();
+
+  const float s = hsum(w);
+  if (mask && s != 0.f)
+    bary_buffer.data[i][j] /= s; */
+}
