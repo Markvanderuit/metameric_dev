@@ -134,6 +134,21 @@ namespace met::io {
     return save_string(path, ss.str());
   }
 
+  template <typename Mesh>
+  Mesh load_mesh(const fs::path &path) {
+    met_trace();
+
+    Mesh m;
+    return;
+  }
+
+  template<typename Mesh>
+  void save_mesh(const fs::path &path, const Mesh &mesh) {
+    met_trace();
+
+    return;
+  }
+
   Basis load_basis(const fs::path &path) {
     met_trace();
 
@@ -172,6 +187,8 @@ namespace met::io {
 
     return basis_from_data(wvls, values);
   }
+
+
 
   void save_spectral_data(const SpectralData &data, const fs::path &path) {
     met_trace();

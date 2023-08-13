@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <filesystem>
 #include <string>
@@ -48,6 +49,13 @@ namespace met {
     // optional comments marked with '#'. This is similar to the spectrum format described above.
     CMFS load_cmfs(const fs::path &path);
     void save_cmfs(const fs::path &path, const CMFS &s);
+
+    // Simple mesh load/save to/from file
+    // Passes through to ASSIMP under the hood
+    template <typename Mesh>
+    Mesh load_mesh(const fs::path &path);
+    template<typename Mesh>
+    void save_mesh(const fs::path &path, const Mesh &mesh);
 
     // Simple basis function load from file
     // Input should be a text file, containing a single wavelength and 'm' values per line, and

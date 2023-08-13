@@ -8,7 +8,7 @@ project(Metameric LANGUAGES CXX)
 
 # Build options
 option(met_enable_exceptions "Enable exceptions on release" ON)
-option(met_enable_tracy      "Enable Tracy support"        OFF)
+option(met_enable_tracy      "Enable Tracy support"         ON)
 
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
@@ -52,6 +52,7 @@ find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 
 # Include third party libraries provided through vcpkg
+find_package(assimp    CONFIG REQUIRED)
 find_package(CoinUtils CONFIG REQUIRED)
 find_package(Osi       CONFIG REQUIRED)
 find_package(Clp       CONFIG REQUIRED)
@@ -204,6 +205,7 @@ endfunction()
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC
+  assimp::assimp
   small_gl
   small_gl_parser_lib
   Eigen3::Eigen
