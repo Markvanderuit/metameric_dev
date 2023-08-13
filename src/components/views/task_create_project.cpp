@@ -44,7 +44,7 @@ namespace met {
       // Miscellaneous settings nested within this header
       if (ImGui::CollapsingHeader("Initialization", ImGuiTreeNodeFlags_DefaultOpen)) {
         // Selector for meshing structure type
-        std::array<std::string, 1> meshing_names = { "Convex hull with barycentrics"/* , "Delaunay triangulation" */ };
+        std::array<std::string, 2> meshing_names = { "Convex hull with barycentrics", "Delaunay triangulation" };
         uint meshing_type_i = static_cast<uint>(m_proj_data.meshing_type);
         if (ImGui::BeginCombo("Meshing type", meshing_names[meshing_type_i].c_str())) {
           for (uint i = 0; i < meshing_names.size(); ++i) {
