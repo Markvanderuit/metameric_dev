@@ -198,7 +198,7 @@ namespace met {
     /* i_elem_tree.build(i_delaunay.verts, i_delaunay.elems); */
 
     // Recover triangle element data and store in project
-    auto [_, elems] = convert_mesh<AlignedMeshData>(i_delaunay);
+    auto [_verts, elems, _norms, _uvs] = convert_mesh<AlignedMeshData>(i_delaunay);
     info.global("appl_data").writeable<ApplicationData>().project_data.elems = elems;
 
     // Push stale vertices

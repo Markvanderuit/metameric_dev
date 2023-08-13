@@ -155,7 +155,7 @@ namespace met {
     // Stream data to vertex array if mesh data has changed; this change is on-line, so
     // we copy to existing buffers
     if (auto rsrc = info.resource("gen_mismatch_solid", "chull_mesh"); rsrc.is_mutated()) {
-      const auto &[verts, elems] = rsrc.read_only<AlignedMeshData>();
+      const auto &[verts, elems, _norms, _uvs] = rsrc.read_only<AlignedMeshData>();
       if (verts.empty()) {
         m_chull_dispatch.vertex_count = 0;
         m_point_dispatch.vertex_count = 0;

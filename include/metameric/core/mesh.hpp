@@ -22,10 +22,20 @@ namespace met {
   // Triangle mesh shorthand for the openmesh halfedge implementation 
   using HalfedgeMeshData = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
 
-  template <typename Vertex, typename Element>
+  template <typename Vert, 
+            typename Elem>
   struct TemplateMeshData {
-    std::vector<Vertex>  verts;
-    std::vector<Element> elems;
+    // Primary mesh data; must be available
+    std::vector<Vert> verts;
+    std::vector<Elem> elems;
+    
+    // Secondary mesh data; query availability
+    std::vector<Vert>         norms;
+    std::vector<eig::Array2u> uvs;
+
+    // Data queries
+    bool has_norms() const { return !norms.empty(); }
+    bool has_uvs() const   { return !uvs.empty(); }
   };
   using IndexedMeshData     = TemplateMeshData<eig::Array3f,   eig::Array3u>;
   using AlignedMeshData     = TemplateMeshData<eig::AlArray3f, eig::Array3u>;

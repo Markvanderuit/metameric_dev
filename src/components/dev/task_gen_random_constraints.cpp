@@ -134,7 +134,7 @@ namespace met {
       std::vector<eig::Array3f> del_verts = { center };
       std::vector<eig::Array4u> del_elems;
       if ((closest - center).matrix().norm() > 0.025f) {
-        auto [verts, elems] = generate_delaunay<IndexedDelaunayData, eig::Array3f>(ocs_gen_data);
+        auto [verts, elems, _norms, _uvs] = generate_delaunay<IndexedDelaunayData, eig::Array3f>(ocs_gen_data);
         std::tie(del_verts, del_elems) = { verts, elems };
       }
 

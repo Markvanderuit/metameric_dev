@@ -26,7 +26,8 @@ namespace met {
   HalfedgeMeshData convert_mesh<HalfedgeMeshData, IndexedMeshData>(const IndexedMeshData &mesh_) {
     met_trace_n("IndexedMeshData -> HalfedgeMeshData");
 
-    const auto &[verts, elems] = mesh_;
+    // UV and normal data is lost during conversion
+    const auto &[verts, elems, _norms, _uvs] = mesh_;
 
     // Prepare mesh structure
     HalfedgeMeshData mesh;
@@ -51,7 +52,7 @@ namespace met {
   template <>
   IndexedMeshData convert_mesh<IndexedMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
     met_trace_n("HalfedgeMeshData -> IndexedMeshData");
-
+    
     std::vector<eig::Array3f> verts(mesh.n_vertices());
     std::vector<eig::Array3u> faces(mesh.n_faces());
 
@@ -69,13 +70,23 @@ namespace met {
   template <>
   IndexedMeshData convert_mesh<IndexedMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
     met_trace_n("AlignedMeshData -> IndexedMeshData");
-    return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
+    return { 
+      std::vector<eig::Array3f>(range_iter(mesh.verts)), 
+      mesh.elems,
+      std::vector<eig::Array3f>(range_iter(mesh.norms)),
+      mesh.uvs 
+    };
   }
 
   template <>
   AlignedMeshData convert_mesh<AlignedMeshData, IndexedMeshData>(const IndexedMeshData &mesh) {
     met_trace_n("IndexedMeshData -> AlignedMeshData");
-    return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
+    return { 
+      std::vector<eig::AlArray3f>(range_iter(mesh.verts)), 
+      mesh.elems,
+      std::vector<eig::AlArray3f>(range_iter(mesh.norms)),
+      mesh.uvs 
+    };
   }
 
   template <>

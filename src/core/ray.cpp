@@ -7,7 +7,7 @@ namespace met {
   RayQuery raytrace_vert(const Ray &ray, const Mesh &mesh, float min_distance) {
     met_trace();
 
-    const auto &[verts, elems] = mesh;
+    const auto &[verts, elems, _norms, _uvs] = mesh;
     
     RayQuery query;
     float min_distance_2 = min_distance * min_distance;
@@ -52,7 +52,7 @@ namespace met {
   RayQuery raytrace_elem(const Ray &ray, const Mesh &mesh, bool cull_backface) {
     met_trace();
 
-    const auto &[verts, elems] = mesh;
+    const auto &[verts, elems, _norms, _uvs] = mesh;
 
     RayQuery query;
 
