@@ -1,7 +1,11 @@
+#include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
 #include <zstr.hpp>
 #include <algorithm>
@@ -138,14 +142,56 @@ namespace met::io {
   Mesh load_mesh(const fs::path &path) {
     met_trace();
 
-    Mesh m;
-    return;
+    Assimp::Importer imp;
+    const auto *scene = imp.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+  	
+    // debug::check_expr(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE,
+    //   fmt::format("Could not load mesh data from {}\n", path.string()));
+
+    // For now, just load the base mesh
+    // TODO; actually handle scenes, not individual meshes
+    const auto *mesh = scene->mMeshes[0];
+
+    ApplicationData::Mesh m;
+    
+    if (mesh->HasPositions()) {
+      std::span verts = { mesh->mVertices, mesh->mNumVertices };
+      m.verts.resize(verts.size());
+      std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
+        [](const auto &v) { return ApplicationData::Mesh::VertTy { v.x, v.y, v.z }; });
+    }
+
+    if (mesh->HasFaces()) {
+      std::span elems = { mesh->mFaces, mesh->mNumFaces };
+      m.elems.resize(elems.size());
+      std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
+        [](const aiFace &v) { return ApplicationData::Mesh::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
+    }
+    
+    if (mesh->HasNormals()) {
+      std::span norms = { mesh->mNormals, mesh->mNumVertices };
+      m.norms.resize(norms.size());
+      std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
+        [](const auto &v) { return ApplicationData::Mesh::NormTy { v.x, v.y, v.z }; });
+    }
+
+    constexpr size_t default_texture_coord = 0;
+    if (mesh->HasTextureCoords(default_texture_coord)) {
+      std::span uvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
+      m.uvs.resize(uvs.size());
+      std::transform(std::execution::par_unseq, range_iter(uvs), m.uvs.begin(),
+        [](const auto &v) { return ApplicationData::Mesh::UVTy { v.x, v.y }; });
+    }
+
+    return convert_mesh<Mesh>(m);
   }
 
   template<typename Mesh>
   void save_mesh(const fs::path &path, const Mesh &mesh) {
     met_trace();
 
+    // TODO implement export
+    
     return;
   }
 
@@ -348,4 +394,15 @@ namespace met::io {
     
     return { wvls, values_x, values_y, values_z };
   }
+
+  /* Explicit template instantiations */
+
+  #define declare_function_mesh(Mesh)                                                              \
+    template                                                                                       \
+    Mesh load_mesh<Mesh>(const fs::path &);                                                        \
+    template                                                                                       \
+    void save_mesh<Mesh>(const fs::path &, const Mesh &);
+  
+  declare_function_mesh(IndexedMeshData);
+  declare_function_mesh(AlignedMeshData);
 } // namespace met::io

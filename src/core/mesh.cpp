@@ -326,11 +326,15 @@ namespace met {
   
 #define declare_function_delaunay_output_only(OutputDelaunay)                                         \
     template                                                                                          \
+    OutputDelaunay convert_mesh<OutputDelaunay>(const OutputDelaunay &);                              \
+    template                                                                                          \
     OutputDelaunay generate_delaunay<OutputDelaunay, eig::Array3f>(std::span<const eig::Array3f>);    \
     template                                                                                          \
     OutputDelaunay generate_delaunay<OutputDelaunay, eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
   #define declare_function_mesh_output_only(OutputMesh)                                               \
+    template                                                                                          \
+    OutputMesh convert_mesh<OutputMesh>(const OutputMesh &);                                          \
     template                                                                                          \
     OutputMesh generate_octahedron<OutputMesh>();                                                     \
     template                                                                                          \

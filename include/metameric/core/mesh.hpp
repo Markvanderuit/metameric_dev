@@ -25,18 +25,25 @@ namespace met {
   template <typename Vert, 
             typename Elem>
   struct TemplateMeshData {
+    using VertTy = Vert;
+    using ElemTy = Elem;
+    using NormTy = Vert;
+    using UVTy   = eig::Array2f;
+
+  public:
     // Primary mesh data; must be available
-    std::vector<Vert> verts;
-    std::vector<Elem> elems;
+    std::vector<VertTy> verts;
+    std::vector<ElemTy> elems;
     
     // Secondary mesh data; might be available, should query
-    std::vector<Vert>         norms;
-    std::vector<eig::Array2u> uvs;
+    std::vector<VertTy> norms;
+    std::vector<UVTy>   uvs;
 
     // Data queries for secondary mesh data
     bool has_norms() const { return norms.size() == verts.size(); }
     bool has_uvs()   const { return uvs.size()   == verts.size(); }
   };
+  
   using IndexedMeshData     = TemplateMeshData<eig::Array3f,   eig::Array3u>;
   using AlignedMeshData     = TemplateMeshData<eig::AlArray3f, eig::Array3u>;
   using IndexedDelaunayData = TemplateMeshData<eig::Array3f,   eig::Array4u>;
