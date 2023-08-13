@@ -29,13 +29,13 @@ namespace met {
     std::vector<Vert> verts;
     std::vector<Elem> elems;
     
-    // Secondary mesh data; query availability
+    // Secondary mesh data; might be available, should query
     std::vector<Vert>         norms;
     std::vector<eig::Array2u> uvs;
 
-    // Data queries
-    bool has_norms() const { return !norms.empty(); }
-    bool has_uvs() const   { return !uvs.empty(); }
+    // Data queries for secondary mesh data
+    bool has_norms() const { return norms.size() == verts.size(); }
+    bool has_uvs()   const { return uvs.size()   == verts.size(); }
   };
   using IndexedMeshData     = TemplateMeshData<eig::Array3f,   eig::Array3u>;
   using AlignedMeshData     = TemplateMeshData<eig::AlArray3f, eig::Array3u>;

@@ -100,6 +100,8 @@ namespace met {
 
   /* Wrapper to hold all major application data */
   struct ApplicationData {
+    using Mesh = AlignedMeshData;
+    
   public: /* public data */
     // Saved project data
     ProjectData      project_data;
@@ -108,6 +110,7 @@ namespace met {
     
     // Misc application data
     Texture2d3f loaded_texture;     // F32 RGB image extracted from project data
+    Mesh        loaded_mesh;        // Indexed mesh data supplied by user at runtime for viewing
     Basis       loaded_basis;       // Basis functions obtained through PCA of measured spectra
     Spec        loaded_basis_mean;  // Mean of basis functions obtained through PCA of measured spectra
 
