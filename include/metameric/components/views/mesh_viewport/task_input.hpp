@@ -13,9 +13,10 @@ namespace met {
       met_trace();
       
       info.resource("arcball").init<detail::Arcball>({ 
-        .dist     = 10.f,
-        .e_eye    = 1.f,
-        .e_center = 0.f
+        .dist            = 1.f,
+        .e_eye           = 1.f,
+        .e_center        = 0.f,
+        .dist_delta_mult = 0.1f
       });
     }
 

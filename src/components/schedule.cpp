@@ -18,6 +18,7 @@
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_embedding_viewport.hpp>
+#include <metameric/components/views/task_mesh_viewport.hpp>
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -119,6 +120,7 @@ namespace met {
     scheduler.task("bary_viewer").init<BaryViewerTask>();
 
     // The following tasks are in development
+    scheduler.task("mesh_viewport").init<MeshViewportTask>();
     // scheduler.task("embedding_viewport").init<EmbeddingViewportTask>();
     // scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
     // scheduler.task("gen_random_mappings").init<GenRandomMappingsTask>();
