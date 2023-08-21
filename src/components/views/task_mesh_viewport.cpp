@@ -120,7 +120,7 @@ namespace met {
 
       // Specify shared state for next tasks
       gl::state::set_depth_range(0.f, 1.f);
-      gl::state::set_op(gl::DepthOp::eLess);
+      gl::state::set_op(gl::DepthOp::eLessOrEqual);
       gl::state::set_op(gl::CullOp::eBack);
       gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     }
@@ -208,7 +208,7 @@ namespace met {
     info.child_task("view_input").init<MeshViewportInputTask>();
     info.child_task("view_end").init<MeshViewportViewEndTask>();
     info.child_task("draw_begin").init<MeshViewportDrawBeginTask>();
-    info.child_task("draw_embedding").init<MeshViewportDrawTask>();
+    info.child_task("draw_mesh").init<MeshViewportDrawTask>();
     info.child_task("draw_end").init<MeshViewportDrawEndTask>();
   }
 } // namespace met
