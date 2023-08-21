@@ -97,15 +97,23 @@ namespace met {
     project_data   = io::load_json(path).get<ProjectData>();
 
     // Attempt different texture loads in order
-    auto exts = { ".exr", ".png", ".jpg", ".bmp" };
-    for (auto ext : exts) {
+    auto txtr_exts = { ".exr", ".png", ".jpg", ".bmp" };
+    for (auto ext : txtr_exts) {
       fs::path path = io::path_with_ext(project_path, ext);
       guard_continue(fs::exists(path));
       loaded_texture = io::load_texture2d<Colr>(path, true);
       break;
     }
-  }
 
+    // Attempt different mesh loads in order
+    auto mesh_exts = { ".ply", ".obj" };
+    for (auto ext : mesh_exts) {
+      fs::path path = io::path_with_ext(project_path, ext);
+      guard_continue(fs::exists(path));
+      loaded_mesh = io::load_mesh<ApplicationData::Mesh>(path);
+      break;
+    }
+  }
 
   void ApplicationData::clear() {
     met_trace();

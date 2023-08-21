@@ -143,8 +143,9 @@ namespace met::io {
     met_trace();
 
     Assimp::Importer imp;
-    const auto *scene = imp.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
-  	
+    const auto *scene = imp.ReadFile(path.string(), 
+      aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals);
+    
     // debug::check_expr(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE,
     //   fmt::format("Could not load mesh data from {}\n", path.string()));
 
@@ -157,15 +158,9 @@ namespace met::io {
     if (mesh->HasPositions()) {
       std::span verts = { mesh->mVertices, mesh->mNumVertices };
       m.verts.resize(verts.size());
+      fmt::print("verts: {}\n", verts.size());
       std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
         [](const auto &v) { return ApplicationData::Mesh::VertTy { v.x, v.y, v.z }; });
-    }
-
-    if (mesh->HasFaces()) {
-      std::span elems = { mesh->mFaces, mesh->mNumFaces };
-      m.elems.resize(elems.size());
-      std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
-        [](const aiFace &v) { return ApplicationData::Mesh::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
     }
     
     if (mesh->HasNormals()) {
@@ -181,6 +176,14 @@ namespace met::io {
       m.uvs.resize(uvs.size());
       std::transform(std::execution::par_unseq, range_iter(uvs), m.uvs.begin(),
         [](const auto &v) { return ApplicationData::Mesh::UVTy { v.x, v.y }; });
+    }
+
+    if (mesh->HasFaces()) {
+      std::span elems = { mesh->mFaces, mesh->mNumFaces };
+      m.elems.resize(elems.size());
+      fmt::print("elems: {}\n", elems.size());
+      std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
+        [](const aiFace &v) { return ApplicationData::Mesh::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
     }
 
     return convert_mesh<Mesh>(m);

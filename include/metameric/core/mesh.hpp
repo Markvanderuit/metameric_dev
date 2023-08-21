@@ -22,12 +22,11 @@ namespace met {
   // Triangle mesh shorthand for the openmesh halfedge implementation 
   using HalfedgeMeshData = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
 
-  template <typename Vert, 
-            typename Elem>
+  template <typename Vt, typename El>
   struct TemplateMeshData {
-    using VertTy = Vert;
-    using ElemTy = Elem;
-    using NormTy = Vert;
+    using VertTy = Vt;
+    using ElemTy = El;
+    using NormTy = Vt;
     using UVTy   = eig::Array2f;
 
   public:
@@ -39,7 +38,7 @@ namespace met {
     std::vector<VertTy> norms;
     std::vector<UVTy>   uvs;
 
-    // Data queries for secondary mesh data
+    // Data queries for secondary mesh data, available per-vertex
     bool has_norms() const { return norms.size() == verts.size(); }
     bool has_uvs()   const { return uvs.size()   == verts.size(); }
   };
