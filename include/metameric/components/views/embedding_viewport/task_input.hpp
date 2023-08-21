@@ -8,9 +8,7 @@
 #include <small_gl/window.hpp>
 
 namespace met {
-  class EmbeddingViewportInputTask : public detail::TaskNode {
-
-  public:
+  struct EmbeddingViewportInputTask : public detail::TaskNode {
     void init(SchedulerHandle &info) override {
       met_trace();
       info.resource("panscan").init<detail::Panscan>({ 

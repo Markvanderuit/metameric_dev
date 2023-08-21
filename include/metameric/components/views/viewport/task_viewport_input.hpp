@@ -33,7 +33,7 @@ namespace met {
     
       // Add subtasks, share resources
       info.child_task("vert").init<ViewportInputVertTask>();
-    info.resource("arcball").init<detail::Arcball>({ .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
+      info.resource("arcball").init<detail::Arcball>({ .dist = 10.f, .e_eye = 1.5f, .e_center = 0.5f });
     }
 
     void eval(SchedulerHandle &info) override {
