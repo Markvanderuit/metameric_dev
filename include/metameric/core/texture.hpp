@@ -10,6 +10,7 @@ namespace met {
   // FWD
   template <typename T, uint D> struct TextureBlock;
   template <typename T>         struct Texture2d;
+  using Texture2d1f    = Texture2d<float>;
   using Texture2d3f    = Texture2d<eig::Array3f>;
   using Texture2d4f    = Texture2d<eig::Array4f>;
   using Texture2d3f_al = Texture2d<eig::AlArray3f>;

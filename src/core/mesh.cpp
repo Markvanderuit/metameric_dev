@@ -71,10 +71,10 @@ namespace met {
   IndexedMeshData convert_mesh<IndexedMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
     met_trace_n("AlignedMeshData -> IndexedMeshData");
     return { 
-      std::vector<eig::Array3f>(range_iter(mesh.verts)), 
-      mesh.elems,
-      std::vector<eig::Array3f>(range_iter(mesh.norms)),
-      mesh.uvs 
+      .verts = std::vector<eig::Array3f>(range_iter(mesh.verts)), 
+      .elems = mesh.elems,
+      .norms = std::vector<eig::Array3f>(range_iter(mesh.norms)),
+      .uvs   = mesh.uvs 
     };
   }
 
@@ -82,10 +82,10 @@ namespace met {
   AlignedMeshData convert_mesh<AlignedMeshData, IndexedMeshData>(const IndexedMeshData &mesh) {
     met_trace_n("IndexedMeshData -> AlignedMeshData");
     return { 
-      std::vector<eig::AlArray3f>(range_iter(mesh.verts)), 
-      mesh.elems,
-      std::vector<eig::AlArray3f>(range_iter(mesh.norms)),
-      mesh.uvs 
+      .verts = std::vector<eig::AlArray3f>(range_iter(mesh.verts)), 
+      .elems = mesh.elems,
+      .norms = std::vector<eig::AlArray3f>(range_iter(mesh.norms)),
+      .uvs   = mesh.uvs 
     };
   }
 
