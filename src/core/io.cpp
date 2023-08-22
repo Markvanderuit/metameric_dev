@@ -146,19 +146,54 @@ namespace met::io {
     const auto *scene = imp.ReadFile(path.string(), 
       aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals);
     
-    // debug::check_expr(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE,
-    //   fmt::format("Could not load mesh data from {}\n", path.string()));
+    debug::check_expr(scene/*  || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE */,
+      fmt::format("Could not load scnene data from {}. {}\n", 
+                  path.string(),
+                  std::string(imp.GetErrorString())));
 
     // For now, just load the base mesh
     // TODO; actually handle scenes, not individual meshes
     const auto *mesh = scene->mMeshes[0];
+
+    fmt::print("Meshes : {}\nMaterials : {}\nTextures : {}\n",
+      scene->mNumMeshes, scene->mNumMaterials, scene->mNumTextures);
+    
+    
+    std::span materials = { scene->mMaterials, scene->mNumMaterials };
+    for (auto *mat : materials) {
+      std::string mat_name = mat->GetName().C_Str();
+      fmt::print("{}\n", mat_name);
+
+      std::span properties = { mat->mProperties, mat->mNumProperties };
+      for (auto *prop : properties) {
+        std::string prop_name = prop->mKey.C_Str();
+        std::string buffer(prop->mData, size_t(prop->mDataLength));
+
+        switch (prop->mType) {
+          case aiPTI_Float:
+            fmt::print("\t{} - F32 - {}\n", prop_name, "" /* mat->Get(prop->mKey, aiPTI_Float, ) */);
+            break;
+          case aiPTI_Double:
+            fmt::print("\t{} - F64 - {}\n", prop_name, "");
+            break;
+          case aiPTI_Integer:
+            fmt::print("\t{} - I32 - {}\n", prop_name, "");
+            break;
+          case aiPTI_String:
+            fmt::print("\t{} - Str - {}\n", prop_name, buffer);
+            break;
+          case aiPTI_Buffer:
+            fmt::print("\t{} - Buf - {}\n", prop_name, "");
+            break;
+        }
+      }
+    }
 
     ApplicationData::Mesh m;
     
     if (mesh->HasPositions()) {
       std::span verts = { mesh->mVertices, mesh->mNumVertices };
       m.verts.resize(verts.size());
-      fmt::print("verts: {}\n", verts.size());
       std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
         [](const auto &v) { return ApplicationData::Mesh::VertTy { v.x, v.y, v.z }; });
     }
@@ -170,6 +205,7 @@ namespace met::io {
         [](const auto &v) { return ApplicationData::Mesh::NormTy { v.x, v.y, v.z }; });
     }
 
+    // Assume first set of coords only
     constexpr size_t default_texture_coord = 0;
     if (mesh->HasTextureCoords(default_texture_coord)) {
       std::span uvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
@@ -181,21 +217,11 @@ namespace met::io {
     if (mesh->HasFaces()) {
       std::span elems = { mesh->mFaces, mesh->mNumFaces };
       m.elems.resize(elems.size());
-      fmt::print("elems: {}\n", elems.size());
       std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
         [](const aiFace &v) { return ApplicationData::Mesh::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
     }
 
     return convert_mesh<Mesh>(m);
-  }
-
-  template<typename Mesh>
-  void save_mesh(const fs::path &path, const Mesh &mesh) {
-    met_trace();
-
-    // TODO implement export
-    
-    return;
   }
 
   Basis load_basis(const fs::path &path) {
@@ -400,12 +426,8 @@ namespace met::io {
 
   /* Explicit template instantiations */
 
-  #define declare_function_mesh(Mesh)                                                              \
-    template                                                                                       \
-    Mesh load_mesh<Mesh>(const fs::path &);                                                        \
-    template                                                                                       \
-    void save_mesh<Mesh>(const fs::path &, const Mesh &);
-  
-  declare_function_mesh(IndexedMeshData);
-  declare_function_mesh(AlignedMeshData);
+  template
+  IndexedMeshData load_mesh<IndexedMeshData>(const fs::path &);
+  template
+  AlignedMeshData load_mesh<AlignedMeshData>(const fs::path &);
 } // namespace met::io

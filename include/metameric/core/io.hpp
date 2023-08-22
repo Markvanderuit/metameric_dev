@@ -54,8 +54,6 @@ namespace met {
     // Passes through to ASSIMP under the hood
     template <typename Mesh>
     Mesh load_mesh(const fs::path &path);
-    template<typename Mesh>
-    void save_mesh(const fs::path &path, const Mesh &mesh);
 
     // Simple basis function load from file
     // Input should be a text file, containing a single wavelength and 'm' values per line, and
