@@ -1,24 +1,12 @@
 #pragma once
 
+#include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/texture.hpp>
 #include <functional>
 #include <variant>
 
-namespace met {
-  /* Save states for project data */
-  enum class ProjectSaveState {
-    eUnloaded, // Project is not currently loaded by application
-    eNew,      // Project is newly created
-    eSaved,    // Project has previous save, and has not been modified
-    eUnsaved,  // Project has previous save, and has been modified
-  };
-  
-  // FWD
-  struct Scene;
-  struct Uplifting;
-  struct Project;
-
+namespace met {  
   /* Tesselated spectral uplifting representation and data layout;
      kept separate from Scene object, given its importance to the codebase */
   struct Uplifting {
@@ -71,42 +59,51 @@ namespace met {
       friend auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
     };
 
+  public: /* object data stores */
     using CSys = ColorSystem;
     using Vert = Constraint;
     using Elem = eig::Array3u;
 
-  public: /* object data stores */
-    MeshingType meshing_type;
-    
+    MeshingType       meshing_type;
+    uint              basis_i = 0;
     std::vector<Vert> verts; 
     std::vector<Elem> elems;
     std::vector<CSys> color_systems;
     
   public: /* Helper methods */
+    // ...
   };
 
   /* Simple indexed scene; no graph, just a library of objects and their dependencies;
      responsible for most program data */
   struct Scene {
-    using Texture3f = Texture2d3f;
-    using Texture1f = Texture2d1f;
-    using Mesh      = AlignedMeshData;
-    
     // Generic wrapper for an arbitrary named scene component
     template <typename Ty>
     struct SceneComponent {
       std::string name;
       Ty          data;
+
+      friend auto operator<=>(const SceneComponent &, 
+                              const SceneComponent &) = default;
+    };
+
+    // Generic wrapper for an arbitrary named on-disk component
+    template <typename Ty>
+    struct FileComponent {
+      fs::path path;
+      Ty       data;
+
+      friend auto operator<=>(const FileComponent &, 
+                              const FileComponent &) = default;
     };
     
   public: /* scene data layout */
     // Object representation; couldn't be simpler
     struct Object {
-      // Objects hold indices to an underlying mesh, an underlying material, 
-      // and a applied spectral uplifting
+      // Indices to an underlying mesh+material, and an applied spectral uplifting
       uint mesh_i, material_i, uplifting_i;
 
-      // Object position/rotation/scale captured in affine transform
+      // Object position/rotation/scale are captured in an affine transform
       eig::Affine3f trf;
     };
     
@@ -127,13 +124,23 @@ namespace met {
       uint         illuminant_i = 0;   // index to spectral illuminant
     };
 
+    struct Basis {
+      Spec mean;
+      eig::Matrix<float, wavelength_samples, wavelength_bases> functions;
+    };
+
   public: /* scene component stores */
+    using Texture3f = Texture2d3f;
+    using Texture1f = Texture2d1f;
+    using Mesh      = AlignedMeshData;
+
     uint observer_i = 0; // Primary observer index; simple enough for now
 
     // Spectral objects, primarily for uplifting
     std::vector<SceneComponent<Uplifting>> upliftings;
     std::vector<SceneComponent<Spec>>      illuminants;
     std::vector<SceneComponent<CMFS>>      observers;
+    std::vector<SceneComponent<Basis>>     bases;
 
     // Scene objects, visible or referred in scene
     std::vector<SceneComponent<Object>>    objects;
@@ -141,8 +148,16 @@ namespace met {
     std::vector<SceneComponent<Material>>  materials;
 
     // Data objects, primarily referred in scene
-    std::vector<SceneComponent<Mesh>>      meshes;
-    std::vector<SceneComponent<Texture3f>> textures_3f;
-    std::vector<SceneComponent<Texture1f>> textures_1f;
+    std::vector<SceneComponent<Mesh>>       meshes;
+    std::vector<SceneComponent<Texture3f>>  textures_3f;
+    std::vector<SceneComponent<Texture1f>>  textures_1f;
+
+  public: /* scene helper functions */
+    // ...
   };
+
+  namespace io {
+    Scene load_scene(const fs::path &path);
+    void  save_scene(const fs::path &path, const Scene &scene);
+  } // namespace io
 } // namespace met
