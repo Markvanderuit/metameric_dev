@@ -106,7 +106,7 @@ namespace met {
     }
 
     // Attempt different mesh loads in order
-    auto mesh_exts = { ".ply", ".obj" };
+    auto mesh_exts = { ".obj" };
     for (auto ext : mesh_exts) {
       fs::path path = io::path_with_ext(project_path, ext);
       guard_continue(fs::exists(path));
