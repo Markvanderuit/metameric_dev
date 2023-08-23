@@ -269,7 +269,7 @@ namespace met::io {
     met_trace();
     
     // Attempt to open output file stream in binary mode using zlib stream wrapper
-    zstr::ofstream ofs(path.string(), std::ios::out | std::ios::trunc | std::ios::binary, -1);
+    zstr::ofstream ofs(path.string(), std::ios::out | std::ios::trunc | std::ios::binary,  -1);
 
     // Output header data
     std::array<float, 2> header_f = { data.spec_min, data.spec_max };

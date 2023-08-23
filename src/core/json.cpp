@@ -160,6 +160,15 @@ namespace Eigen {
   void to_json(met::json &js, const met::Chro &v) {
     js = std::vector<met::Chro::value_type>(v.begin(), v.end());
   }
+  
+  void from_json(const met::json &js, Affine3f &t) {
+    std::ranges::copy(js, t.matrix().reshaped().begin());
+  }
+
+  void to_json(met::json &js, const Affine3f &t) {
+    auto r = t.matrix().reshaped();
+    js = std::vector<Affine3f::Scalar>(r.begin(), r.end());
+  }
 
   void from_json(const met::json &js, Array<float, 31, 1> &m) {
     std::ranges::copy(js, m.begin());
