@@ -129,9 +129,6 @@ namespace met {
     };
 
   public: /* Scene data stores */
-    // Resource shorthands
-    using Mesh = AlignedMeshData;
-
     // Miscellaneous
     Component<uint> observer_i; // Primary observer index; simple enough for now
 
@@ -144,7 +141,7 @@ namespace met {
     std::vector<Component<ColrSystem>> colr_systems;
 
     // Scene resources, primarily referred to by components in the scene
-    std::vector<Resource<Mesh>>        meshes;
+    std::vector<Resource<AlMeshData>>  meshes;
     std::vector<Resource<Texture2d3f>> textures_3f;
     std::vector<Resource<Texture2d1f>> textures_1f;
     std::vector<Resource<Spec>>        illuminants;

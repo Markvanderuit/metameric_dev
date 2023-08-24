@@ -263,16 +263,16 @@ namespace met {
       }
     }
     
-    Texture2d3f as_unaligned(const Texture2d3f_al &in) {
+    Texture2d3f as_unaligned(const AlTexture2d3f &in) {
       met_trace();
       Texture2d3f out = {{ .size = in.size() }};
       std::copy(std::execution::par_unseq, in.data().begin(), in.data().end(), out.data().begin());
       return out;
     }
 
-    Texture2d3f_al as_aligned(const Texture2d3f &in) {
+    AlTexture2d3f as_aligned(const Texture2d3f &in) {
       met_trace();
-      Texture2d3f_al out = {{ .size = in.size() }};
+      AlTexture2d3f out = {{ .size = in.size() }};
       std::copy(std::execution::par_unseq, in.data().begin(), in.data().end(), out.data().begin());
       return out;
     }

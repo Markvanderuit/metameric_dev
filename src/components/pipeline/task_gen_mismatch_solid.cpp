@@ -89,7 +89,7 @@ namespace met {
     }
 
     // Register resources to hold convex hull data
-    info("chull_mesh").set<AlignedMeshData>({ });
+    info("chull_mesh").set<AlMeshData>({ });
     info("chull_cntr").set(Colr(0.f));
   }
 
@@ -134,7 +134,7 @@ namespace met {
     // or qhull, bless its naive heart, will happily tear down the application 
     const bool is_overlap = std::ranges::any_of(cmfs_i, [&cmfs_j](const CMFS &cmfs_i) { return cmfs_i.isApprox(cmfs_j); });
     if (is_overlap) {
-      info("chull_mesh").set<AlignedMeshData>({ });
+      info("chull_mesh").set<AlMeshData>({ });
       info("chull_cntr").writeable<Colr>() = e_vert.colr_i;
       return;
     }
@@ -151,7 +151,7 @@ namespace met {
                                              .samples    = i_samples });
     
     // Generate cleaned mesh from data
-    auto mesh = generate_convex_hull<AlignedMeshData, eig::Array3f>(data);
+    auto mesh = generate_convex_hull<AlMeshData, eig::Array3f>(data);
 
     // Compute center of metamer set boundary
     constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
@@ -159,7 +159,7 @@ namespace met {
               / static_cast<float>(data.size());
 
     // Submit mesh data
-    info("chull_mesh").writeable<AlignedMeshData>() = std::move(mesh);
+    info("chull_mesh").writeable<AlMeshData>() = std::move(mesh);
     info("chull_cntr").writeable<Colr>() = cntr;
   }
 } // namespace met

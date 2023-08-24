@@ -10,10 +10,10 @@ namespace met {
   // FWD
   template <typename T, uint D> struct TextureBlock;
   template <typename T>         struct Texture2d;
-  using Texture2d1f    = Texture2d<float>;
-  using Texture2d3f    = Texture2d<eig::Array3f>;
-  using Texture2d4f    = Texture2d<eig::Array4f>;
-  using Texture2d3f_al = Texture2d<eig::AlArray3f>;
+  using Texture2d1f   = Texture2d<float>;
+  using Texture2d3f   = Texture2d<eig::Array3f>;
+  using Texture2d4f   = Texture2d<eig::Array4f>;
+  using AlTexture2d3f = Texture2d<eig::AlArray3f>;
 
   namespace detail {
     template <typename T>
@@ -38,8 +38,8 @@ namespace met {
     void save_texture2d(const fs::path &path, const Texture2d<T> &texture, bool lrgb_to_srgb = false);
 
     // Convert to aligned/unaligned backed types
-    Texture2d3f    as_unaligned(const Texture2d3f_al &aligned);
-    Texture2d3f_al as_aligned(const Texture2d3f &unaligned);
+    Texture2d3f    as_unaligned(const AlTexture2d3f &aligned);
+    AlTexture2d3f as_aligned(const Texture2d3f &unaligned);
 
     // Linearize/delinearize texture data
     template <typename T>

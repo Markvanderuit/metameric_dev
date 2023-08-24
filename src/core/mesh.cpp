@@ -23,8 +23,8 @@ namespace met {
   }
 
   template <>
-  HalfedgeMeshData convert_mesh<HalfedgeMeshData, IndexedMeshData>(const IndexedMeshData &mesh_) {
-    met_trace_n("IndexedMeshData -> HalfedgeMeshData");
+  HalfedgeMeshData convert_mesh<HalfedgeMeshData, MeshData>(const MeshData &mesh_) {
+    met_trace_n("MeshData -> HalfedgeMeshData");
 
     // UV and normal data is lost during conversion
     const auto &[verts, elems, _norms, _uvs] = mesh_;
@@ -50,8 +50,8 @@ namespace met {
   }
   
   template <>
-  IndexedMeshData convert_mesh<IndexedMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-    met_trace_n("HalfedgeMeshData -> IndexedMeshData");
+  MeshData convert_mesh<MeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+    met_trace_n("HalfedgeMeshData -> MeshData");
     
     std::vector<eig::Array3f> verts(mesh.n_vertices());
     std::vector<eig::Array3u> faces(mesh.n_faces());
@@ -68,8 +68,8 @@ namespace met {
   }
 
   template <>
-  IndexedMeshData convert_mesh<IndexedMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
-    met_trace_n("AlignedMeshData -> IndexedMeshData");
+  MeshData convert_mesh<MeshData, AlMeshData>(const AlMeshData &mesh) {
+    met_trace_n("AlMeshData -> MeshData");
     return { 
       .verts = std::vector<eig::Array3f>(range_iter(mesh.verts)), 
       .elems = mesh.elems,
@@ -79,8 +79,8 @@ namespace met {
   }
 
   template <>
-  AlignedMeshData convert_mesh<AlignedMeshData, IndexedMeshData>(const IndexedMeshData &mesh) {
-    met_trace_n("IndexedMeshData -> AlignedMeshData");
+  AlMeshData convert_mesh<AlMeshData, MeshData>(const MeshData &mesh) {
+    met_trace_n("MeshData -> AlMeshData");
     return { 
       .verts = std::vector<eig::AlArray3f>(range_iter(mesh.verts)), 
       .elems = mesh.elems,
@@ -90,20 +90,20 @@ namespace met {
   }
 
   template <>
-  AlignedMeshData convert_mesh<AlignedMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-    met_trace_n("HalfedgeMeshData -> AlignedMeshData");
-    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  AlMeshData convert_mesh<AlMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+    met_trace_n("HalfedgeMeshData -> AlMeshData");
+    return convert_mesh<AlMeshData>(convert_mesh<MeshData>(mesh));
   }
 
   template <>
-  HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlignedMeshData>(const AlignedMeshData &mesh) {
-    met_trace_n("AlignedMeshData -> HalfedgeMeshData");
-    return convert_mesh<HalfedgeMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlMeshData>(const AlMeshData &mesh) {
+    met_trace_n("AlMeshData -> HalfedgeMeshData");
+    return convert_mesh<HalfedgeMeshData>(convert_mesh<MeshData>(mesh));
   }
 
   template <>
-  IndexedMeshData convert_mesh<IndexedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
-    met_trace_n("IndexedDelaunayData -> IndexedMeshData");
+  MeshData convert_mesh<MeshData, DelaunayData>(const DelaunayData &mesh) {
+    met_trace_n("DelaunayData -> MeshData");
     
     std::vector<eig::Array3u> elems(4 * mesh.elems.size());
 
@@ -119,27 +119,27 @@ namespace met {
   }
 
   template <>
-  IndexedDelaunayData convert_mesh<IndexedDelaunayData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
-    met_trace_n("AlignedDelaunayData -> IndexedDelaunayData");
+  DelaunayData convert_mesh<DelaunayData, AlDelaunayData>(const AlDelaunayData &mesh) {
+    met_trace_n("AlDelaunayData -> DelaunayData");
     return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
-  AlignedDelaunayData convert_mesh<AlignedDelaunayData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
-    met_trace_n("IndexedDelaunayData -> AlignedDelaunayData");
+  AlDelaunayData convert_mesh<AlDelaunayData, DelaunayData>(const DelaunayData &mesh) {
+    met_trace_n("DelaunayData -> AlDelaunayData");
     return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
-  AlignedMeshData convert_mesh<AlignedMeshData, IndexedDelaunayData>(const IndexedDelaunayData &mesh) {
-    met_trace_n("IndexedDelaunayData -> AlignedMeshData");
-    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedMeshData>(mesh));
+  AlMeshData convert_mesh<AlMeshData, DelaunayData>(const DelaunayData &mesh) {
+    met_trace_n("DelaunayData -> AlMeshData");
+    return convert_mesh<AlMeshData>(convert_mesh<MeshData>(mesh));
   }
 
   template <>
-  AlignedMeshData convert_mesh<AlignedMeshData, AlignedDelaunayData>(const AlignedDelaunayData &mesh) {
-    met_trace_n("AlignedDelaunayData -> AlignedMeshData");
-    return convert_mesh<AlignedMeshData>(convert_mesh<IndexedDelaunayData>(mesh));
+  AlMeshData convert_mesh<AlMeshData, AlDelaunayData>(const AlDelaunayData &mesh) {
+    met_trace_n("AlDelaunayData -> AlMeshData");
+    return convert_mesh<AlMeshData>(convert_mesh<DelaunayData>(mesh));
   }
 
   template <typename Mesh>
@@ -154,7 +154,7 @@ namespace met {
     std::vector<E> elems = { E(0, 2, 1), E(3, 1, 2), E(0, 1, 5), E(3, 5, 1),
                              E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
 
-    return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
+    return convert_mesh<Mesh>(MeshData { verts, elems });
   }
   
   template <typename Mesh>
@@ -222,7 +222,7 @@ namespace met {
         el = eig::Array3u { el[2], el[1], el[0] };
     }); 
 
-    return convert_mesh<Mesh>(IndexedMeshData { verts, elems });
+    return convert_mesh<Mesh>(MeshData { verts, elems });
   }
   
   template <typename Mesh, typename Vector>
@@ -262,7 +262,7 @@ namespace met {
       return el_;
     });
 
-    return convert_mesh<Mesh>(IndexedDelaunayData { std::vector<eig::Array3f>(range_iter(data)), elems });
+    return convert_mesh<Mesh>(DelaunayData { std::vector<eig::Array3f>(range_iter(data)), elems });
   }
 
   template <typename OutputMesh, typename InputMesh>
@@ -352,13 +352,13 @@ namespace met {
 
   #define declare_function_all_inputs(OutputMesh)                                                     \
     declare_function_mesh_output_only(OutputMesh)                                                     \
-    declare_function_output_input(OutputMesh, IndexedMeshData)                                        \
-    declare_function_output_input(OutputMesh, AlignedMeshData)                                        \
+    declare_function_output_input(OutputMesh, MeshData)                                               \
+    declare_function_output_input(OutputMesh, AlMeshData)                                             \
     declare_function_output_input(OutputMesh, HalfedgeMeshData)
   
-  declare_function_delaunay_output_only(IndexedDelaunayData)
-  declare_function_delaunay_output_only(AlignedDelaunayData)
-  declare_function_all_inputs(IndexedMeshData)
-  declare_function_all_inputs(AlignedMeshData)
+  declare_function_delaunay_output_only(DelaunayData)
+  declare_function_delaunay_output_only(AlDelaunayData)
+  declare_function_all_inputs(MeshData)
+  declare_function_all_inputs(AlMeshData)
   declare_function_all_inputs(HalfedgeMeshData)
 } // namespace met

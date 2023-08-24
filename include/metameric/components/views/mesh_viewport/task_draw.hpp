@@ -73,9 +73,9 @@ namespace met {
       m_vuvs_buffer = {{ .data = cnt_span<const std::byte>(e_mesh.uvs)   }};
       m_elem_buffer = {{ .data = cnt_span<const std::byte>(e_mesh.elems) }};
       m_array = {{
-        .buffers  = {{ .buffer = &m_vpos_buffer, .index = 0, .stride = sizeof(AlignedMeshData::VertTy) },
-                     { .buffer = &m_vnor_buffer, .index = 1, .stride = sizeof(AlignedMeshData::VertTy) },
-                     { .buffer = &m_vuvs_buffer, .index = 2, .stride = sizeof(AlignedMeshData::UVTy)   }},
+        .buffers  = {{ .buffer = &m_vpos_buffer, .index = 0, .stride = sizeof(AlMeshData::VertTy) },
+                     { .buffer = &m_vnor_buffer, .index = 1, .stride = sizeof(AlMeshData::VertTy) },
+                     { .buffer = &m_vuvs_buffer, .index = 2, .stride = sizeof(AlMeshData::UVTy)   }},
         .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 },
                      { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e3 },
                      { .attrib_index = 2, .buffer_index = 2, .size = gl::VertexAttribSize::e2 }},

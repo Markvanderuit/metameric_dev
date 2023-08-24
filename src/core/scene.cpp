@@ -68,7 +68,7 @@ namespace met {
   }
 
   template <typename Vt, typename El>
-  void to_stream(std::ostream &os, const TemplateMeshData<Vt, El> &mesh) {
+  void to_stream(std::ostream &os, const MeshDataBase<Vt, El> &mesh) {
     met_trace();
     to_stream(os, mesh.verts);
     to_stream(os, mesh.elems);
@@ -77,7 +77,7 @@ namespace met {
   }
 
   template <typename Vt, typename El>
-  void from_stream(std::istream &is, TemplateMeshData<Vt, El> &mesh) {
+  void from_stream(std::istream &is, MeshDataBase<Vt, El> &mesh) {
     met_trace();
     from_stream(is, mesh.verts);
     from_stream(is, mesh.elems);

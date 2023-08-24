@@ -66,7 +66,7 @@ namespace met {
     // Instantiate new vertex array if mesh data has changed; 
     // this change is extremely rare, so we can afford creating new buffers
     if (auto rsrc = info.resource("gen_color_system_solid", "chull_mesh"); rsrc.is_mutated()) {
-      const auto &[e_verts, e_elems, _norms, _uvs] = rsrc.read_only<AlignedMeshData>();
+      const auto &[e_verts, e_elems, _norms, _uvs] = rsrc.read_only<AlMeshData>();
 
       m_vert_buffer = {{ .data = cnt_span<const std::byte>(e_verts) }};
       m_elem_buffer = {{ .data = cnt_span<const std::byte>(e_elems) }};
@@ -94,7 +94,7 @@ namespace met {
     // Experimental clamping code for vertex modification
     if (e_proj_state.verts) {
       // Get external resources
-      const auto &e_chull_mesh = info.resource("gen_color_system_solid", "chull_mesh").read_only<AlignedMeshData>();
+      const auto &e_chull_mesh = info.resource("gen_color_system_solid", "chull_mesh").read_only<AlMeshData>();
       const auto &e_chull_cntr = info.resource("gen_color_system_solid", "chull_cntr").read_only<Colr>();
 
       // Get modified resources

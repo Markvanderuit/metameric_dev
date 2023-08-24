@@ -71,7 +71,7 @@ namespace met {
         
       ImGui::Separator();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunayData>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
       eig::Array4f bary   = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
@@ -125,7 +125,7 @@ namespace met {
       const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
 
       // Obtain cpu-side texture
-      Texture2d3f_al texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
+      AlTexture2d3f texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
       e_colr_buffer.get(cast_span<std::byte>(texture_al.data()));
 
       // Remove padding bytes, then save to disk

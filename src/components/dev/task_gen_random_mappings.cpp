@@ -80,7 +80,7 @@ namespace met {
       m_unif_map->n_verts = e_proj_data.verts.size();
       m_unif_map->n_elems = e_proj_data.elems.size();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+      const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunayData>();
       m_unif_map->n_verts = e_delaunay.verts.size();
       m_unif_map->n_elems = e_delaunay.elems.size();
     }

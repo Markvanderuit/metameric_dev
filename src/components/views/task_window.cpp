@@ -92,7 +92,7 @@ namespace met {
           .weights   = cnt_span<const float>(bary_data)
         }, io::path_with_ext(path, ".met"));
       } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-        const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlignedDelaunayData>();
+        const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunayData>();
 
         // Obtain barycentric data from buffer
         std::vector<eig::Array4f> bary_data(e_weights.size() / sizeof(eig::Array4f));

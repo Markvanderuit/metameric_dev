@@ -22,8 +22,9 @@ namespace met {
   // Triangle mesh shorthand for the openmesh halfedge implementation 
   using HalfedgeMeshData = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
 
+  /* Simple indexed mesh representation with optional normal/texcoord data */
   template <typename Vt, typename El>
-  struct TemplateMeshData {
+  struct MeshDataBase {
     using VertTy = Vt;
     using ElemTy = El;
     using NormTy = Vt;
@@ -43,10 +44,10 @@ namespace met {
     bool has_uvs()   const { return uvs.size()   == verts.size(); }
   };
   
-  using IndexedMeshData     = TemplateMeshData<eig::Array3f,   eig::Array3u>;
-  using AlignedMeshData     = TemplateMeshData<eig::AlArray3f, eig::Array3u>;
-  using IndexedDelaunayData = TemplateMeshData<eig::Array3f,   eig::Array4u>;
-  using AlignedDelaunayData = TemplateMeshData<eig::AlArray3f, eig::Array4u>;
+  using MeshData       = MeshDataBase<eig::Array3f,   eig::Array3u>;
+  using AlMeshData     = MeshDataBase<eig::AlArray3f, eig::Array3u>;
+  using DelaunayData   = MeshDataBase<eig::Array3f,   eig::Array4u>;
+  using AlDelaunayData = MeshDataBase<eig::AlArray3f, eig::Array4u>;
 
   // Convert between halfedge/indexed/aligned mesh data structures
   template <typename OutputMesh, typename InputMesh>

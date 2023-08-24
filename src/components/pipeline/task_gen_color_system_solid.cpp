@@ -73,7 +73,7 @@ namespace met {
                                         .samples    = detail::gen_unit_dirs<3>(n_samples) });
 
     // Generate cleaned mesh from data
-    auto mesh = simplify_edge_length<AlignedMeshData>(
+    auto mesh = simplify_edge_length<AlMeshData>(
       generate_convex_hull<HalfedgeMeshData, eig::Array3f>(data), 0.001f);
 
     // Compute center of convex hull
@@ -82,7 +82,7 @@ namespace met {
               / static_cast<float>(mesh.verts.size());
 
     // Submit mesh and center as resources; used by viewport draw tasks
-    info("chull_mesh").set<AlignedMeshData>(std::move(mesh));
+    info("chull_mesh").set<AlMeshData>(std::move(mesh));
     info("chull_cntr").set<eig::Array3f>(cntr);
   }
 } // namespace met

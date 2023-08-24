@@ -427,7 +427,7 @@ namespace met::io {
   /* Explicit template instantiations */
 
   template
-  IndexedMeshData load_mesh<IndexedMeshData>(const fs::path &);
+  MeshData load_mesh<MeshData>(const fs::path &);
   template
-  AlignedMeshData load_mesh<AlignedMeshData>(const fs::path &);
+  AlMeshData load_mesh<AlMeshData>(const fs::path &);
 } // namespace met::io
