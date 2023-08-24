@@ -189,20 +189,20 @@ namespace met::io {
       }
     }
 
-    ApplicationData::Mesh m;
+    AlMeshData m;
     
     if (mesh->HasPositions()) {
       std::span verts = { mesh->mVertices, mesh->mNumVertices };
       m.verts.resize(verts.size());
       std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
-        [](const auto &v) { return ApplicationData::Mesh::VertTy { v.x, v.y, v.z }; });
+        [](const auto &v) { return AlMeshData::VertTy { v.x, v.y, v.z }; });
     }
     
     if (mesh->HasNormals()) {
       std::span norms = { mesh->mNormals, mesh->mNumVertices };
       m.norms.resize(norms.size());
       std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
-        [](const auto &v) { return ApplicationData::Mesh::NormTy { v.x, v.y, v.z }; });
+        [](const auto &v) { return AlMeshData::NormTy { v.x, v.y, v.z }; });
     }
 
     // Assume first set of coords only
@@ -211,14 +211,14 @@ namespace met::io {
       std::span uvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
       m.uvs.resize(uvs.size());
       std::transform(std::execution::par_unseq, range_iter(uvs), m.uvs.begin(),
-        [](const auto &v) { return ApplicationData::Mesh::UVTy { v.x, v.y }; });
+        [](const auto &v) { return AlMeshData::UVTy { v.x, v.y }; });
     }
 
     if (mesh->HasFaces()) {
       std::span elems = { mesh->mFaces, mesh->mNumFaces };
       m.elems.resize(elems.size());
       std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
-        [](const aiFace &v) { return ApplicationData::Mesh::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
+        [](const aiFace &v) { return AlMeshData::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
     }
 
     return convert_mesh<Mesh>(m);

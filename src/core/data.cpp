@@ -92,9 +92,9 @@ namespace met {
 
     clear_mods();
     
-    project_save   = ProjectSaveState::eSaved;
-    project_path   = io::path_with_ext(path, ".json");
-    project_data   = io::load_json(path).get<ProjectData>();
+    project_save = ProjectSaveState::eSaved;
+    project_path = io::path_with_ext(path, ".json");
+    project_data = io::load_json(path).get<ProjectData>();
 
     // Attempt different texture loads in order
     auto txtr_exts = { ".exr", ".png", ".jpg", ".bmp" };
@@ -110,7 +110,7 @@ namespace met {
     for (auto ext : mesh_exts) {
       fs::path path = io::path_with_ext(project_path, ext);
       guard_continue(fs::exists(path));
-      loaded_mesh = io::load_mesh<ApplicationData::Mesh>(path);
+      loaded_mesh = io::load_mesh<AlMeshData>(path);
       break;
     }
   }

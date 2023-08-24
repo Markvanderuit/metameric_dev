@@ -10,8 +10,9 @@
 #include <variant>
 
 namespace met {  
-  /* Simple indexed scene; no graph, just a library of objects and their dependencies;
-     responsible for most program data */
+  /* Simple indexed scene; no graph, just a library of objects and 
+     their dependencies; responsible for most program data, as well
+     as state tracking of dependency modifications */
   struct Scene {
     /* Scene component.
        Wrapper for scene components. Stores an active flag, name,
@@ -114,7 +115,7 @@ namespace met {
     struct ColrSystem {
       uint observer_i   = 0;
       uint illuminant_i = 0;
-      uint n_scatters   = 0; 
+      uint n_scatters   = 0;
 
       inline
       bool operator==(const ColrSystem &o) const {
