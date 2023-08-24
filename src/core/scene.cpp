@@ -107,12 +107,15 @@ namespace met {
 
   void to_json(json &js, const Uplifting::Constraint &cstr) {
     met_trace();
-    js = {{ "type",   cstr.type   },
-          { "colr_i", cstr.colr_i },
-          { "csys_i", cstr.csys_i },
-          { "colr_j", cstr.colr_j },
-          { "csys_j", cstr.csys_j },
-          { "spec",   cstr.spec   }};
+    js = {{ "type",             cstr.type             },
+          { "colr_i",           cstr.colr_i           },
+          { "csys_i",           cstr.csys_i           },
+          { "colr_j",           cstr.colr_j           },
+          { "csys_j",           cstr.csys_j           },
+          { "object_i",         cstr.object_i         },
+          { "object_elem_i",    cstr.object_elem_i    },
+          { "object_elem_bary", cstr.object_elem_bary },
+          { "measurement",      cstr.measurement      }};
   }
 
   void from_json(const json &js, Uplifting::Constraint &cstr) {
@@ -122,7 +125,10 @@ namespace met {
     js.at("csys_i").get_to(cstr.csys_i);
     js.at("colr_j").get_to(cstr.colr_j);
     js.at("csys_j").get_to(cstr.csys_j);
-    js.at("spec").get_to(cstr.spec);
+    js.at("object_i").get_to(cstr.object_i);
+    js.at("object_elem_i").get_to(cstr.object_elem_i);
+    js.at("object_elem_bary").get_to(cstr.object_elem_bary);
+    js.at("measurement").get_to(cstr.measurement);
   }
 
   void to_json(json &js, const Uplifting &uplifting) {
