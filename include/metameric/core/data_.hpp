@@ -129,7 +129,7 @@ namespace met {
     std::vector<Component<Uplifting>>  upliftings;
     std::vector<Component<ColrSystem>> colr_systems;
 
-    // Scene data, primarily referred to by components in the scene
+    // Scene resources, primarily referred to by components in the scene
     std::vector<Resource<Mesh>>        meshes;
     std::vector<Resource<Texture3f>>   textures_3f;
     std::vector<Resource<Texture1f>>   textures_1f;
