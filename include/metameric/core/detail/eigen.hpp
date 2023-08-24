@@ -10,6 +10,12 @@
 
 namespace met {
   namespace eig = Eigen; // namespace shorthand
+
+  // Concept for detecting Eigen's isApprox(...) member function
+  template <typename T>
+  concept is_approx_comparable = requires(const T &a, const T &b) {
+    { a.isApprox(b) } -> std::convertible_to<bool>;
+  };
 } // namespace met
 
 namespace Eigen {

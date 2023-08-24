@@ -1,73 +1,56 @@
-  #pragma once
+#pragma once
 
 #include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/math.hpp>
 #include <metameric/core/texture.hpp>
-#include <functional>
+#include <metameric/core/uplifting.hpp>
+#include <metameric/core/utility.hpp>
+#include <metameric/core/detail/scene.hpp>
 #include <variant>
 
 namespace met {  
-  /* Tesselated spectral uplifting representation and data layout;
-     kept separate from Scene object, given its importance to the codebase */
-  struct Uplifting {
-    // A mesh structure defines how constraints are connected; e.g. as points
-    // on a convex hull with generalized barycentrics for the interior, or points 
-    // throughout color space with a delaunay tesselation connecting the interior
-    enum class Type {
-      eConvexHull, eDelaunay      
-    } meshing_type;
-
-    // The mesh structure connects a set of user-configured constraints;
-    // these can be either spectral measurements, or color values across color systems
-    struct Constraint {
-      enum class Type {
-        eColorSystem, eMeasurement
-      } type = Type::eColorSystem;
-
-      // If type == Type::eColorSystem, these are the color constraints,
-      // else, these are generated from the measurement where necessary
-      Colr              colr_i; // Expected color under a primary color system 
-      uint              csys_i; // Index referring to the primary color system
-      std::vector<Colr> colr_j; // Expected colors under secondary color systems
-      std::vector<uint> csys_j; // Indices of the secondary color systems
-      
-      // If type == Type::eMeasurement, this holds the spectral constraint
-      // else, this is generated from color constraint values where necessary
-      Spec spec;
-    };
-
-  public: /* Object data stores */
-    // Shorthands
-    using Vert = Constraint;
-    using Elem = eig::Array3u;
-
-    uint              basis_i = 0; // Index of used underlying basis
-    std::vector<Vert> verts;       // Vertices of uplifting mesh
-    std::vector<Elem> elems;       // Elements of uplifting mesh
-    
-  public: /* Helper methods */
-    // ...
-  };
-
   /* Simple indexed scene; no graph, just a library of objects and their dependencies;
      responsible for most program data */
   struct Scene {
-    // Generic wrapper for an arbitrary named component active in the scene
-    template <typename Ty>
+    /* Scene component.
+       Wrapper for scene components. Stores an active flag, name,
+       the component's data, and a specializable state tracker
+       to detect internal changes to the component's data. */
+    template <typename Ty, 
+              typename State = detail::ComponentState<Ty>> 
+    requires (std::derived_from<State, detail::ComponentStateBase<Ty>>)
     struct Component {
       bool        is_active = true;
       std::string name;
       Ty          data;
+      State       state;
 
       friend auto operator<=>(const Component &, const Component &) = default;
     };
 
-    // Generic wrapper for an arbitrary named "loaded" resource used in the scene
+    /* Scene resource.
+       Wrapper for scene resources. Has a much coarser state
+       tracking built in by encapsulating resource access in data() function,
+       to prevent caching duplicates of large resources. */
     template <typename Ty>
-    struct Resource {
+    class Resource {
+      bool m_stale = true; // Cache flag for tracking write-accesses to resource data
+      Ty   m_data  = { };  // Hidden resource data
+
+    public:
       std::string name;
       fs::path    path;
-      Ty          data;
+
+    public:
+      void set_stale(bool b) { m_stale = b; }
+      bool is_stale() const { return m_stale; }
+
+      constexpr
+      const Ty &data() const { return m_data; }
+
+      constexpr
+      Ty &data() { set_stale(true); return m_data; }
 
       friend auto operator<=>(const Resource &, const Resource &) = default;
     };
@@ -80,6 +63,12 @@ namespace met {
 
       // Object position/rotation/scale are captured in an affine transform
       eig::Affine3f trf;
+
+      inline bool operator==(const Object &o) const {
+        return trf.isApprox(o.trf)
+            && std::tie(mesh_i, material_i, uplifting_i) 
+            == std::tie(o.mesh_i, o.material_i, o.uplifting_i);
+      }
     };
     
     // Material representation; generic PBR layout; components either hold a direct
@@ -89,6 +78,19 @@ namespace met {
       std::variant<float, uint> roughness;
       std::variant<float, uint> metallic;
       std::variant<float, uint> opacity;
+
+      inline bool operator==(const Material &o) const {
+        // Comparison can be a little unwieldy due to the different variant permutations
+        // and Eigen's lack of a single-component operator==(); we can abuse memory instead
+        bool r = std::tie(roughness, metallic, opacity)
+              == std::tie(o.roughness, o.metallic, o.opacity);
+        guard(r && diffuse.index() == o.diffuse.index(), false);
+        switch (diffuse.index()) {
+          case 0: return r && std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse));
+          case 1: return r && std::get<uint>(diffuse) == std::get<uint>(o.diffuse);
+          default: return r;
+        }
+      }
     };
     
     // Point-light representation
@@ -96,6 +98,12 @@ namespace met {
       eig::Array3f p            = 1.f; // point light position
       float        multiplier   = 1.f; // power multiplier
       uint         illuminant_i = 0;   // index to spectral illuminant
+
+      inline bool operator==(const Emitter &o) const {
+        return p.isApprox(o.p)
+            && std::tie(multiplier, illuminant_i) 
+            == std::tie(o.multiplier, o.illuminant_i);
+      }
     };
 
     // A simplistic color system, described by indices to corresponding CMFS/illuminant data
@@ -104,35 +112,41 @@ namespace met {
       uint illuminant_i = 0;
       uint n_scatters   = 0; 
 
-      friend auto operator<=>(const ColrSystem &, const ColrSystem &) = default;
+      inline bool operator==(const ColrSystem &o) const {
+        return std::tie(observer_i, illuminant_i, n_scatters) 
+            == std::tie(o.observer_i, o.illuminant_i, o.n_scatters);
+      }
     };
 
     // Spectral basis functions, offset by the basis mean
     struct Basis {
       Spec mean;
       eig::Matrix<float, wavelength_samples, wavelength_bases> functions;
+
+      inline bool operator==(const Basis &o) const {
+        return mean.isApprox(o.mean) && functions.isApprox(o.functions);
+      }
     };
 
   public: /* Scene data stores */
     // Resource shorthands
-    using Texture3f = Texture2d3f;
-    using Texture1f = Texture2d1f;
-    using Mesh      = AlignedMeshData;
+    using Mesh = AlignedMeshData;
 
     // Miscellaneous
-    uint observer_i = 0; // Primary observer index; simple enough for now
+    Component<uint> observer_i; // Primary observer index; simple enough for now
 
-    // Scene objects, directly visible or referred to in the scene
+    // Scene objects, directly visible or edited in the scene
     std::vector<Component<Object>>     objects;
     std::vector<Component<Emitter>>    emitters;
     std::vector<Component<Material>>   materials;
-    std::vector<Component<Uplifting>>  upliftings;
+    std::vector<Component<Uplifting,
+              detail::UpliftingState>> upliftings;
     std::vector<Component<ColrSystem>> colr_systems;
 
     // Scene resources, primarily referred to by components in the scene
     std::vector<Resource<Mesh>>        meshes;
-    std::vector<Resource<Texture3f>>   textures_3f;
-    std::vector<Resource<Texture1f>>   textures_1f;
+    std::vector<Resource<Texture2d3f>> textures_3f;
+    std::vector<Resource<Texture2d1f>> textures_1f;
     std::vector<Resource<Spec>>        illuminants;
     std::vector<Resource<CMFS>>        observers;
     std::vector<Resource<Basis>>       bases;
@@ -150,7 +164,7 @@ namespace met {
     std::string get_csys_name(uint i)       const;
     std::string get_csys_name(ColrSystem c) const;
   };
-
+  
   namespace io {
     Scene load_scene(const fs::path &path);
     void  save_scene(const fs::path &path, const Scene &scene);

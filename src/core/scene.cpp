@@ -1,4 +1,4 @@
-#include <metameric/core/data_.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
@@ -6,7 +6,7 @@
 #include <iostream>
 
 /* 
-  std::variant serialization helper
+  std::variant serialization helper for json
   src: https://github.com/nlohmann/json/issues/1261#issuecomment-426200060
 */
 namespace nlohmann {
@@ -127,15 +127,15 @@ namespace met {
 
   void to_json(json &js, const Uplifting &uplifting) {
     met_trace();
-    js = {{ "meshing_type",  uplifting.meshing_type  },
-          { "basis_i",       uplifting.basis_i       },
-          { "verts",         uplifting.verts         },
-          { "elems",         uplifting.elems         }};
+    js = {{ "type",    uplifting.type    },
+          { "basis_i", uplifting.basis_i },
+          { "verts",   uplifting.verts   },
+          { "elems",   uplifting.elems   }};
   }
 
   void from_json(const json &js, Uplifting &uplifting) {
     met_trace();
-    js.at("meshing_type").get_to(uplifting.meshing_type);
+    js.at("type").get_to(uplifting.type);
     js.at("basis_i").get_to(uplifting.basis_i);
     js.at("verts").get_to(uplifting.verts);
     js.at("elems").get_to(uplifting.elems);
@@ -217,16 +217,16 @@ namespace met {
     js.at("n_scatters").get_to(csys.n_scatters);
   }
 
-  template <typename Ty>
-  void to_json(json &js, const Scene::Component<Ty> &component) {
+  template <typename Ty, typename State>
+  void to_json(json &js, const Scene::Component<Ty, State> &component) {
     met_trace();
     js = {{ "is_active", component.is_active },
           { "name",      component.name      },
           { "data",      component.data      }};
   }
 
-  template <typename Ty>
-  void from_json(const json &js, Scene::Component<Ty> &component) {
+  template <typename Ty, typename State>
+  void from_json(const json &js, Scene::Component<Ty, State> &component) {
     met_trace();
     js.at("is_active").get_to(component.is_active);
     js.at("name").get_to(component.name);
@@ -236,9 +236,9 @@ namespace met {
   template <typename Ty>
   void to_json(json &js, const Scene::Resource<Ty> &resource) {
     met_trace();
-    js = {{ "name", resource.name },
-          { "path", resource.path },
-          { "data", resource.data }};
+    js = {{ "name", resource.name   },
+          { "path", resource.path   },
+          { "data", resource.data() }};
   }
 
   template <typename Ty>
@@ -246,7 +246,7 @@ namespace met {
     met_trace();
     js.at("name").get_to(resource.name);
     js.at("path").get_to(resource.path);
-    js.at("data").get_to(resource.data);
+    js.at("data").get_to(resource.data());
   }
 
   void to_json(json &js, const Scene &scene) {
@@ -276,8 +276,8 @@ namespace met {
 
   met::ColrSystem Scene::get_csys(ColrSystem c) const {
     met_trace();
-    return { .cmfs       = observers[c.observer_i].data,
-             .illuminant = illuminants[c.illuminant_i].data,
+    return { .cmfs       = observers[c.observer_i].data(),
+             .illuminant = illuminants[c.illuminant_i].data(),
              .n_scatters = c.n_scatters };
   }
 
@@ -288,7 +288,7 @@ namespace met {
 
   met::Spec Scene::get_emitter_spd(Emitter e) const {
     met_trace();
-    return (illuminants[e.illuminant_i].data * e.multiplier).eval();
+    return (illuminants[e.illuminant_i].data() * e.multiplier).eval();
   }
 
   std::string Scene::get_csys_name(uint i) const {

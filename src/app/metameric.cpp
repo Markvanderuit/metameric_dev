@@ -77,7 +77,9 @@ namespace met {
 
 int main() {
   try {
-    met::create_application({});
+    met::create_application({
+      .project_path = "C:/Users/mark/Desktop/cart/CoffeeCart_01_4k.json"
+    });
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;

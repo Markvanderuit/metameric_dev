@@ -4,6 +4,7 @@
 #include <metameric/core/detail/utility.hpp>
 #include <span>
 #include <source_location>
+#include <ranges>
 
 // Simple guard statement syntactic sugar
 #define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
@@ -46,6 +47,10 @@
 #endif
 
 namespace met {
+  // Namespace shorthands
+  namespace rng = std::ranges;
+  namespace vws = std::views;
+
   // Interpret a container type as a span of type T
   template <class T, class C>
   constexpr

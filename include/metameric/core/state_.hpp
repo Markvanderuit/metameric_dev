@@ -2,12 +2,13 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/data_.hpp>
+#include <metameric/core/utility.hpp>
 #include <ranges>
 #include <vector>
 
 namespace met {
   namespace detail {
-    class StateObjectBase {
+    struct StateObjectBase {
       constexpr
       virtual bool is_dirty() const = 0;
 
@@ -17,7 +18,7 @@ namespace met {
 
     /* Helper object to track potential changes to an object. This requires
        storing a copy of the object's previously compared version. */
-    template <typename Ty, typename Comparator = std::ranges::equal_to>
+    template <typename Ty, typename Comparator = rng::equal_to>
     class StateObject : public StateObjectBase {
       bool m_dirty = true;
       Ty   m_ty    = { };
@@ -40,10 +41,12 @@ namespace met {
       }
     };
 
-    template <typename Ty, typename Comparator = std::ranges::equal_to>
+    template <typename Ty, 
+              typename Comparator = rng::equal_to, 
+              typename STy        = StateObject<Ty, Comparator>>
     class StateVector : public StateObjectBase {
-      bool                                     m_dirty = true;
-      std::vector<StateObject<Ty, Comparator>> m_v  	 = { };
+      bool             m_dirty = true;
+      std::vector<STy> m_v  	 = { };
 
     public:
       constexpr
@@ -55,7 +58,7 @@ namespace met {
           // Handle simplest (non-resize) case first
           for (uint i = 0; i < m_v.size(); ++i)
             m_v[i].compare(other[i]);
-          m_dirty = std::ranges::fold_left(m_v, false, std::logical_or<bool>());
+          m_dirty = rng::fold_left(m_v, false, std::logical_or<bool>{}, [](const auto &v) { return v.is_dirty(); });
         } else {
           // Handle potential resize
           size_t min_r = std::min(m_v.size(), other.size()), 
@@ -80,73 +83,76 @@ namespace met {
         return compare(other);
       }
     };
-
-    // Helper object for tracking data mutation across a vector structure
-    template <typename Ty>
-    struct VectorState : BaseState {
-      std::vector<Ty> is_stale;
-
-      constexpr
-      const Ty& operator[](uint i) const { return is_stale[i]; }
-
-      constexpr
-            Ty& operator[](uint i)       { return is_stale[i]; }
-            
-      constexpr 
-      auto size() const { return is_stale.size(); }
-    };
   } // namespace detail
 
-  struct UpliftingState : detail::StateObjectBase {
-    struct ConstraintState : detail::StateObjectBase {
-      detail::StateObject<Uplifting::Constraint::Type> type;                      type;
-      detail::StateObject<Colr> csys_i;
-      detail::StateObject<uint> csys_i;
-      detail::StateVector<Colr> colr_j;
-      detail::StateVector<uint> csys_j;
-      detail::StateObject<Spec> spec;
+  class UpliftingState : detail::StateObjectBase {
+    bool m_dirty = true;
+
+  public:
+    // It is useful to have refined queries of constraint property states available for gl uniform
+    // handling, so constraints are specialized
+    class ConstraintState : detail::StateObjectBase {
+      bool m_dirty = true;
+
+    public:
+      detail::StateObject<Uplifting::Constraint::Type> type;
+      detail::StateObject<Colr>                        colr_i;
+      detail::StateObject<uint>                        csys_i;
+      detail::StateVector<Colr>                        colr_j;
+      detail::StateVector<uint>                        csys_j;
+      detail::StateObject<Spec>                        spec;
+
+    public:
+      constexpr
+      virtual bool is_dirty() const override { return m_dirty; };
+
+      constexpr
+      bool compare(const Scene::Component<Uplifting::Constraint> &other) {
+        m_dirty = type.compare(other.data.type)     ||
+                  colr_i.compare(other.data.colr_i) ||
+                  csys_i.compare(other.data.csys_i) ||
+                  colr_j.compare(other.data.colr_j) ||
+                  csys_j.compare(other.data.csys_j) ||
+                  spec.compare(other.data.spec);
+        return m_dirty;
+      }
     };
 
   public:
     detail::StateObject<Uplifting::Type> meshing_type;
-    detail::StateObject<uint> basis_i;
-    detail::StateVector<Uplifting::Vert> verts;
-    detail::StateVector<Uplifting::Elem> verts;
-  };
-
-  struct SceneState : detail::BaseState {
-    struct ObjectState : detail::BaseState {
-      bool mesh_i, material_i, uplifting_i, trf;
-    };
-
-    struct MaterialState : detail::BaseState {
-      bool diffuse, roughness, metallic, opacity;
-    };
-
-    struct EmitterState : detail::BaseState {
-      bool p, multiplier, illuminant_i;
-    };
-
-    struct ColrSystemState : detail::BaseState {
-      bool observer_i, illuminant_i, n_scatters;
-    };
-
-    struct BasisState : detail::BaseState {
-      bool mean, functions;
-    };
+    detail::StateObject<uint>            basis_i;
+    detail::StateVector<Uplifting::Vert, 
+      rng::equal_to, ConstraintState>    verts;
+    detail::StateVector<Uplifting::Elem> elems;
 
   public:
-    bool                      observer_i;
-    detail::VectorState<uint> objects;
-    detail::VectorState<uint> emitters;
-    detail::VectorState<uint> materials;
-    detail::VectorState<uint> upliftings;
-    detail::VectorState<uint> colr_systems;
-    detail::VectorState<uint> meshes;
-    detail::VectorState<uint> textures_3f;
-    detail::VectorState<uint> textures_1f;
-    detail::VectorState<uint> illuminants;
-    detail::VectorState<uint> observers;
-    detail::VectorState<uint> bases;
+    constexpr
+    virtual bool is_dirty() const override { return m_dirty; };
+
+    constexpr
+    bool compare(const Uplifting &other) {
+      m_dirty 
+         = meshing_type.compare(other.meshing_type) 
+        || basis_i.compare(other.basis_i)
+        || verts.compare(other.verts)
+        || elems.compare(other.elems);
+      return m_dirty;
+    }
+  };
+
+  class SceneState : detail::StateObjectBase {
+    bool m_dirty = true;
+
+  public:
+    
+
+  public:
+    detail::StateVector<Scene::Component<Scene::Object>>     objects;
+    detail::StateVector<Scene::Component<Scene::Emitter>>    emitters;
+    detail::StateVector<Scene::Component<Scene::Material>>   materials;
+    detail::StateVector<Scene::Component<Uplifting>, 
+                      rng::equal_to, UpliftingState>         upliftings;
+    detail::StateVector<Scene::Component<Scene::ColrSystem>> colr_systems;
+
   };
 } // namespace met

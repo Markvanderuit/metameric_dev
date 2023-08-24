@@ -53,7 +53,6 @@ namespace met {
     std::vector<std::string> schedule() const override { return std::vector<std::string>(range_iter(m_schedule)); }
   };
 
-
   // Implementing scheduler handle, passed to task nodes during scheduler run
   class LinearSchedulerHandle : public SchedulerHandle,
                                 public MapBasedSchedule {
