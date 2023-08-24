@@ -19,14 +19,15 @@ namespace met {
        to detect internal changes to the component's data. */
     template <typename Ty, 
               typename State = detail::ComponentState<Ty>> 
-    requires (std::derived_from<State, detail::ComponentStateBase<Ty>>)
+              requires (std::derived_from<State, detail::ComponentStateBase<Ty>>)
     struct Component {
       bool        is_active = true;
       std::string name;
-      Ty          data;
+      Ty          value;
       State       state;
 
-      friend auto operator<=>(const Component &, const Component &) = default;
+      friend 
+      auto operator<=>(const Component &, const Component &) = default;
     };
 
     /* Scene resource.
@@ -36,7 +37,7 @@ namespace met {
     template <typename Ty>
     class Resource {
       bool m_stale = true; // Cache flag for tracking write-accesses to resource data
-      Ty   m_data  = { };  // Hidden resource data
+      Ty   m_value = { };  // Hidden resource data
 
     public:
       std::string name;
@@ -47,12 +48,12 @@ namespace met {
       bool is_stale() const { return m_stale; }
 
       constexpr
-      const Ty &data() const { return m_data; }
-
+      const Ty &get() const { return m_value; }
       constexpr
-      Ty &data() { set_stale(true); return m_data; }
+      Ty &get() { set_stale(true); return m_value; }
 
-      friend auto operator<=>(const Resource &, const Resource &) = default;
+      friend 
+      auto operator<=>(const Resource &, const Resource &) = default;
     };
     
   public: /* Scene data layout */
@@ -64,7 +65,8 @@ namespace met {
       // Object position/rotation/scale are captured in an affine transform
       eig::Affine3f trf;
 
-      inline bool operator==(const Object &o) const {
+      inline 
+      bool operator==(const Object &o) const {
         return trf.isApprox(o.trf)
             && std::tie(mesh_i, material_i, uplifting_i) 
             == std::tie(o.mesh_i, o.material_i, o.uplifting_i);
@@ -79,7 +81,8 @@ namespace met {
       std::variant<float, uint> metallic;
       std::variant<float, uint> opacity;
 
-      inline bool operator==(const Material &o) const {
+      inline 
+      bool operator==(const Material &o) const {
         // Comparison can be a little unwieldy due to the different variant permutations
         // and Eigen's lack of a single-component operator==(); we can abuse memory instead
         bool r = std::tie(roughness, metallic, opacity)
@@ -99,7 +102,8 @@ namespace met {
       float        multiplier   = 1.f; // power multiplier
       uint         illuminant_i = 0;   // index to spectral illuminant
 
-      inline bool operator==(const Emitter &o) const {
+      inline 
+      bool operator==(const Emitter &o) const {
         return p.isApprox(o.p)
             && std::tie(multiplier, illuminant_i) 
             == std::tie(o.multiplier, o.illuminant_i);
@@ -112,7 +116,8 @@ namespace met {
       uint illuminant_i = 0;
       uint n_scatters   = 0; 
 
-      inline bool operator==(const ColrSystem &o) const {
+      inline
+      bool operator==(const ColrSystem &o) const {
         return std::tie(observer_i, illuminant_i, n_scatters) 
             == std::tie(o.observer_i, o.illuminant_i, o.n_scatters);
       }
@@ -123,7 +128,8 @@ namespace met {
       Spec mean;
       eig::Matrix<float, wavelength_samples, wavelength_bases> functions;
 
-      inline bool operator==(const Basis &o) const {
+      inline
+      bool operator==(const Basis &o) const {
         return mean.isApprox(o.mean) && functions.isApprox(o.functions);
       }
     };

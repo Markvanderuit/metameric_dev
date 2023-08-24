@@ -222,7 +222,7 @@ namespace met {
     met_trace();
     js = {{ "is_active", component.is_active },
           { "name",      component.name      },
-          { "data",      component.data      }};
+          { "data",      component.value     }};
   }
 
   template <typename Ty, typename State>
@@ -230,15 +230,15 @@ namespace met {
     met_trace();
     js.at("is_active").get_to(component.is_active);
     js.at("name").get_to(component.name);
-    js.at("data").get_to(component.data);
+    js.at("data").get_to(component.value);
   }
 
   template <typename Ty>
   void to_json(json &js, const Scene::Resource<Ty> &resource) {
     met_trace();
-    js = {{ "name", resource.name   },
-          { "path", resource.path   },
-          { "data", resource.data() }};
+    js = {{ "name", resource.name  },
+          { "path", resource.path  },
+          { "data", resource.get() }};
   }
 
   template <typename Ty>
@@ -246,17 +246,17 @@ namespace met {
     met_trace();
     js.at("name").get_to(resource.name);
     js.at("path").get_to(resource.path);
-    js.at("data").get_to(resource.data());
+    js.at("data").get_to(resource.get());
   }
 
   void to_json(json &js, const Scene &scene) {
     met_trace();
-    js = {{ "observer_i",    scene.observer_i },
-          { "objects",       scene.objects    },
-          { "emitters",      scene.emitters   },
-          { "materials",     scene.materials  },
-          { "upliftings",    scene.upliftings },
-          { "colr_systems", scene.colr_systems }};
+    js = {{ "observer_i",    scene.observer_i   },
+          { "objects",       scene.objects      },
+          { "emitters",      scene.emitters     },
+          { "materials",     scene.materials    },
+          { "upliftings",    scene.upliftings   },
+          { "colr_systems",  scene.colr_systems }};
   }
 
   void from_json(const json &js, Scene &scene) {
@@ -271,29 +271,29 @@ namespace met {
 
   met::ColrSystem Scene::get_csys(uint i) const {
     met_trace();
-    return get_csys(colr_systems[i].data);
+    return get_csys(colr_systems[i].value);
   }
 
   met::ColrSystem Scene::get_csys(ColrSystem c) const {
     met_trace();
-    return { .cmfs       = observers[c.observer_i].data(),
-             .illuminant = illuminants[c.illuminant_i].data(),
+    return { .cmfs       = observers[c.observer_i].get(),
+             .illuminant = illuminants[c.illuminant_i].get(),
              .n_scatters = c.n_scatters };
   }
 
   met::Spec Scene::get_emitter_spd(uint i) const {
     met_trace();
-    return get_emitter_spd(emitters[i].data);
+    return get_emitter_spd(emitters[i].value);
   }
 
   met::Spec Scene::get_emitter_spd(Emitter e) const {
     met_trace();
-    return (illuminants[e.illuminant_i].data() * e.multiplier).eval();
+    return (illuminants[e.illuminant_i].get() * e.multiplier).eval();
   }
 
   std::string Scene::get_csys_name(uint i) const {
     met_trace();
-    return get_csys_name(colr_systems[i].data);
+    return get_csys_name(colr_systems[i].value);
   }
 
   std::string Scene::get_csys_name(ColrSystem c) const {
