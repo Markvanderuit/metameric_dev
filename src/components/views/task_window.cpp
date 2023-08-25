@@ -13,11 +13,25 @@
 
 namespace met {
   /* Titles and ImGui IDs used to spawn modals */
-  const static std::string create_modal_title = "Create new project";
+  const static std::string create_modal_title = "New project";
   const static std::string close_modal_title  = "Close project";
   const static std::string exit_modal_title   = "Exit Metameric";
   
   namespace detail {
+    // TODO handle new safe 
+    void handle_new(SchedulerHandle &info) {
+      met_trace_full();
+      
+      // Initialize new project
+      info.global("scene_handler").writeable<SceneHandler>().create();
+
+      // Clear OpenGL state
+      gl::Program::unbind_all();
+      
+      // Signal schedule re-creation and submit new schedule for main view
+      submit_metameric_editor_schedule_loaded(info);
+    }
+
     bool handle_open(SchedulerHandle &info) {
       met_trace_full();
       
@@ -216,7 +230,8 @@ namespace met {
         
         /* Main section follows */
 
-        if (ImGui::MenuItem("New..."))                             { m_open_create_modal = true; }
+        if (ImGui::MenuItem("New..."))                             { detail::handle_new(info); }
+        // if (ImGui::MenuItem("New..."))                             { m_open_create_modal = true; }
         if (ImGui::MenuItem("Open..."))                            { detail::handle_open(info);  }
         if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded)) { handle_close_safe(info);    }
 

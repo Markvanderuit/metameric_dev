@@ -26,6 +26,8 @@
 #include <metameric/components/dev/task_gen_random_constraints.hpp>
 #include <metameric/components/dev/task_gen_random_mappings.hpp>
 #include <metameric/components/dev/task_random_mapping_viewer.hpp>
+#include <metameric/components/views/task_scene_resources_editor.hpp>
+#include <metameric/components/views/task_scene_components_editor.hpp>
 #include <ranges>
 
 namespace met {
@@ -180,7 +182,11 @@ namespace met {
     scheduler.clear();
     
     scheduler.task("frame_begin").init<FrameBeginTask>();
-    // scheduler.task("window").init<WindowTask>();
+    scheduler.task("window").init<WindowTask>();
+
+    scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
+    scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
+
     scheduler.task("frame_end").init<FrameEndTask>(false);
   }
   
