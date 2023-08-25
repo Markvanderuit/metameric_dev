@@ -155,10 +155,10 @@ namespace met {
   namespace io {
     template <typename T>
     Texture2d<T> load_texture2d(const fs::path &path, bool _srgb_to_lrgb) {
-      constexpr uint C_ = T::RowsAtCompileTime; 
-      using          T_ = eig::Array<float, C_, 1>;
-
       met_trace();
+
+      constexpr uint C_ = T::RowsAtCompileTime;
+      using          T_ = eig::Array<float, C_, 1>;
 
       // Check that file path exists
       debug::check_expr(fs::exists(path),
@@ -173,8 +173,7 @@ namespace met {
 
       // Load image from disk
       if (path.extension() == ".exr") {
-        //  TODO Stop assuming RGBA input format
-        c = 4;
+        c = 4; //  TODO Stop assuming RGBA input format
 
         // Load hdr .exr file
         const char *err = nullptr;
@@ -184,7 +183,7 @@ namespace met {
 
         // Test if data was loaded
         debug::check_expr(ret == TINYEXR_SUCCESS, 
-          fmt::format("failed to load file \"{}\"", path.string()));
+          fmt::format("failed to load file \"{}\", TinyEXR returned {}", path.string(), ret));
 
         // Copy data over
         data_float = std::vector<float>(ptr, ptr + size);
@@ -211,32 +210,35 @@ namespace met {
       }
 
       // Initialize temporary texture object with correct dims, requested channel layout, and float data
-      Texture2d<T_> texture_float = {{ .size = v.cast<uint>() }};
-      std::span<T_> texture_span  = texture_float.data();
+      Texture2d<T_> texture      = {{ .size = v.cast<uint>() }};
+      std::span<T_> texture_span = texture.data();
 
       // Perform channel-correct copy/transform into texture data
-      if (c == 3) {
-        auto arr_span = cnt_span<const eig::Array3f>(data_float);
-        if constexpr (C_ == 4) {
-          std::transform(std::execution::par_unseq, range_iter(arr_span), texture_span.begin(), detail::v3_to_v4);
-        } else {
-          std::copy(std::execution::par_unseq, range_iter(arr_span), texture_span.begin());
+      if (C_ < c) {
+        #pragma omp parallel for
+        for (int i = 0; i < texture_span.size(); ++i) {
+          for (int j = 0; j < C_; ++j)
+            texture_span[i][j] = data_float[i * c + j];
         }
-      } else if (c == 4) {
-        auto arr_span = cnt_span<const eig::Array4f>(data_float);
-        if constexpr (C_ == 4) {
-          std::copy(std::execution::par_unseq, range_iter(arr_span), texture_span.begin());
-        } else {
-          std::transform(std::execution::par_unseq, range_iter(arr_span), texture_span.begin(), detail::v4_to_v3);
+      } else if (C_ > c) {
+        std::ranges::fill(cast_span<float>(texture_span), 1.f);
+        #pragma omp parallel for
+        for (int i = 0; i < texture_span.size(); ++i) {
+          for (int j = 0; j < c; ++j)
+            texture_span[i][j] = data_float[i * c + j];
         }
+      } else {
+        auto texture_float = cast_span<float>(texture_span);
+        std::copy(std::execution::par_unseq, range_iter(data_float), texture_float.begin());
       }
 
       // Strip linear sRGB gamma if requested
-      if (srgb_to_lrgb)
-        to_lrgb(texture_float);
+      if constexpr (C_ > 2)
+        if (srgb_to_lrgb)
+          to_lrgb(texture);
       
       // Return result, converting to requested sized internal format
-      return texture_float.convert<T>();
+      return texture.convert<T>();
     }
 
     template <typename T>
@@ -246,8 +248,9 @@ namespace met {
       // Operate on a copy as gamma may need to be applied;
       // apply linear sRGB gamma if requested
       Texture2d<T> texture({ .size = texture_.size(), .data = texture_.data() });
-      if (lrgb_to_srgb && path.extension().string() != ".exr")
-        to_srgb(texture);
+      if constexpr (T::RowsAtCompileTime > 2)
+        if (lrgb_to_srgb && path.extension().string() != ".exr")
+          to_srgb(texture);
 
       const char *pstr = path.string().c_str();
       auto size = texture.size();
@@ -358,6 +361,8 @@ namespace met {
 
   /* Explicit template instantiations for common types */
 
+  template class Texture2d<eig::Array1f>;
+  template class Texture2d<eig::Array2f>;
   template class Texture2d<eig::Array3f>;
   template class Texture2d<eig::Array4f>;
   template class Texture2d<eig::AlArray3f>;

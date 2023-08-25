@@ -6,7 +6,6 @@
 #include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
-#include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/window.hpp>
 #include <nlohmann/json.hpp>
 #include <fmt/core.h>
@@ -76,13 +75,13 @@ namespace met {
 } // namespace met
 
 int main() {
-  try {
+ /*  try { */
     met::create_application({
-      .project_path = "C:/Users/mark/Desktop/cart/CoffeeCart_01_4k.json"
+      // .project_path = "C:/Users/mark/Desktop/cart/CoffeeCart_01_4k.json"
     });
-  } catch (const std::exception &e) {
+  /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  }
+  } */
   return EXIT_SUCCESS;
 }

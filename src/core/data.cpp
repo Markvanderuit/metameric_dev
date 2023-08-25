@@ -1,6 +1,7 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/json.hpp>
+#include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/data.hpp>
 #include <nlohmann/json.hpp>

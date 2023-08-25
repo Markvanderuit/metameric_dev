@@ -10,55 +10,15 @@
 #include <variant>
 
 namespace met {  
-  /* Simple indexed scene; no graph, just a library of objects and 
+  /* Scene data.
+     Simple indexed scene; no graph, just a library of objects and 
      their dependencies; responsible for most program data, as well
      as state tracking of dependency modifications */
   struct Scene {
-    /* Scene component.
-       Wrapper for scene components. Stores an active flag, name,
-       the component's data, and a specializable state tracker
-       to detect internal changes to the component's data. */
-    template <typename Ty, 
-              typename State = detail::ComponentState<Ty>> 
-              requires (std::derived_from<State, detail::ComponentStateBase<Ty>>)
-    struct Component {
-      bool        is_active = true;
-      std::string name;
-      Ty          value;
-      State       state;
-
-      friend 
-      auto operator<=>(const Component &, const Component &) = default;
-    };
-
-    /* Scene resource.
-       Wrapper for scene resources. Has a much coarser state
-       tracking built in by encapsulating resource access in data() function,
-       to prevent caching duplicates of large resources. */
-    template <typename Ty>
-    class Resource {
-      bool m_stale = true; // Cache flag for tracking write-accesses to resource data
-      Ty   m_value = { };  // Hidden resource data
-
-    public:
-      std::string name;
-      fs::path    path;
-
-    public:
-      void set_stale(bool b) { m_stale = b; }
-      bool is_stale() const { return m_stale; }
-
-      constexpr
-      const Ty &get() const { return m_value; }
-      constexpr
-      Ty &get() { set_stale(true); return m_value; }
-
-      friend 
-      auto operator<=>(const Resource &, const Resource &) = default;
-    };
-    
-  public: /* Scene data layout */
-    // Object representation; couldn't be simpler
+  public: // Scene object classes
+    /* Object representation; 
+       couldn't be simpler. A shape represented by a surface mesh, a surface
+       material, and an accompanying uplifting to handle spectral data. */
     struct Object {
       // Indices to an underlying mesh+material, and an applied spectral uplifting
       uint mesh_i, material_i, uplifting_i;
@@ -74,8 +34,9 @@ namespace met {
       }
     };
     
-    // Material representation; generic PBR layout; components either hold a direct
-    // value, or indices to corresponding textures
+    /* Material representation; 
+       generic PBR layout; components either hold a direct value, or indices referring
+       to corresponding texture resources */
     struct Material {
       std::variant<Colr,  uint> diffuse;
       std::variant<float, uint> roughness;
@@ -97,7 +58,8 @@ namespace met {
       }
     };
     
-    // Point-light representation
+    /* Emitter representation; 
+       just a simple point light for now */
     struct Emitter {
       eig::Array3f p            = 1.f; // point light position
       float        multiplier   = 1.f; // power multiplier
@@ -111,7 +73,8 @@ namespace met {
       }
     };
 
-    // A simplistic color system, described by indices to corresponding CMFS/illuminant data
+    /* Color system representation; 
+       a simple description referring to CMFS and illuminant data */
     struct ColrSystem {
       uint observer_i   = 0;
       uint illuminant_i = 0;
@@ -124,7 +87,8 @@ namespace met {
       }
     };
 
-    // Spectral basis functions, offset by the basis mean
+    /* Spectral basis function representation;
+       The basis is offset around its mean */
     struct Basis {
       Spec mean;
       eig::Matrix<float, wavelength_samples, wavelength_bases> functions;
@@ -135,27 +99,27 @@ namespace met {
       }
     };
 
-  public: /* Scene data stores */
+  public: // Scene data
     // Miscellaneous
-    Component<uint> observer_i; // Primary observer index; simple enough for now
+    detail::Component<uint> observer_i; // Primary observer index; simple enough for now
 
     // Scene objects, directly visible or edited in the scene
-    std::vector<Component<Object>>     objects;
-    std::vector<Component<Emitter>>    emitters;
-    std::vector<Component<Material>>   materials;
-    std::vector<Component<Uplifting,
-              detail::UpliftingState>> upliftings;
-    std::vector<Component<ColrSystem>> colr_systems;
+    detail::ComponentVector<Object>     objects;
+    detail::ComponentVector<Emitter>    emitters;
+    detail::ComponentVector<Material>   materials;
+    detail::ComponentVector<Uplifting,
+                detail::UpliftingState> upliftings;
+    detail::ComponentVector<ColrSystem> colr_systems;
 
     // Scene resources, primarily referred to by components in the scene
-    std::vector<Resource<AlMeshData>>  meshes;
-    std::vector<Resource<Texture2d3f>> textures_3f;
-    std::vector<Resource<Texture2d1f>> textures_1f;
-    std::vector<Resource<Spec>>        illuminants;
-    std::vector<Resource<CMFS>>        observers;
-    std::vector<Resource<Basis>>       bases;
+    detail::ResourceVector<AlMeshData>  meshes;
+    detail::ResourceVector<Texture2d3f> textures_3f;
+    detail::ResourceVector<Texture2d1f> textures_1f;
+    detail::ResourceVector<Spec>        illuminants;
+    detail::ResourceVector<CMFS>        observers;
+    detail::ResourceVector<Basis>       bases;
 
-  public: /* Scene helper functions */
+  public: // Scene helper functions
     // Obtain the spectral data of a certain color system
     met::ColrSystem get_csys(uint i)       const;
     met::ColrSystem get_csys(ColrSystem c) const;

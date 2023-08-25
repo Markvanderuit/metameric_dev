@@ -5,17 +5,13 @@
 #include <vector>
 
 namespace met {  
-  /* Tesselated spectral uplifting representation and data layout;
-     kept separate from Scene object, given its importance to the codebase */
+  /* Spectral uplifting data layout;
+     Mostly a tesselation of a color space, with constraints on the tesselation's
+     vertices describing spectral behavior. Kept separate from Scene object,
+     given its centrality to the codebase. */
   struct Uplifting {
-    // A mesh structure defines how constraints are connected; e.g. as points
-    // on a convex hull with generalized barycentrics for the interior, or points 
-    // throughout color space with a delaunay tesselation connecting the interior
-    enum class Type {
-      eConvexHull, eDelaunay      
-    } type = Type::eDelaunay;
-
-    // The mesh structure connects a set of user-configured constraints; There are three types:
+    // The mesh structure connects a set of user-configured constraints; 
+    // there are three types and they can be used intermittently:
     // - Color values across different systems, primary color sampled from a color space position
     // - Color values across different systems; primary color sampled from an object surface position
     // - Spectral measurements, based on artist-provided data
@@ -44,57 +40,71 @@ namespace met {
     using Vert = Constraint;
     using Elem = eig::Array3u;
 
+    // The mesh structure defines how constraints are connected; e.g. as points
+    // on a convex hull with generalized barycentrics for the interior, or points 
+    // throughout color space with a delaunay tesselation connecting the interior
+    enum class Type {
+      eConvexHull, eDelaunay      
+    } type = Type::eDelaunay;
+
     uint              basis_i = 0; // Index of used underlying basis
     std::vector<Vert> verts;       // Vertices of uplifting mesh
     std::vector<Elem> elems;       // Elements of uplifting mesh
   };
   
   namespace detail {
+    // Fine-grained state tracker helper, so the pipeline can push parts of
+    // data where necessary
     struct UpliftingState : public ComponentStateBase<Uplifting> {
       struct ConstraintState : public ComponentStateBase<Uplifting::Constraint> {
         using Base = Uplifting::Constraint;
-        using ComponentStateBase<Base>::m_stale;
+        using ComponentStateBase<Base>::m_mutated;
         
         ComponentState<Base::Type>   type;
+
         ComponentState<Colr>         colr_i;
         ComponentState<uint>         csys_i;
-        VectorState<Colr>            colr_j;
-        VectorState<uint>            csys_j;
+        ComponentStateVector<Colr>   colr_j;
+        ComponentStateVector<uint>   csys_j;
+
         ComponentState<uint>         object_i;
         ComponentState<uint>         object_elem_i;
         ComponentState<eig::Array3f> object_elem_bary;
+        
         ComponentState<Spec>         measurement;
 
         virtual 
         bool update_state(const Base &o) override {
-          return m_stale = (type.update_state(o.type)
-                        || colr_i.update_state(o.colr_i)
-                        || csys_i.update_state(o.csys_i)
-                        || colr_j.update_state(o.colr_j)
-                        || csys_j.update_state(o.csys_j)
-                        || object_i.update_state(o.object_i)
-                        || object_elem_i.update_state(o.object_elem_i)
-                        || object_elem_bary.update_state(o.object_elem_bary)
-                        || measurement.update_state(o.measurement));
+          return m_mutated = (type.update_state(o.type)
+                           || colr_i.update_state(o.colr_i)
+                           || csys_i.update_state(o.csys_i)
+                           || colr_j.update_state(o.colr_j)
+                           || csys_j.update_state(o.csys_j)
+                           || object_i.update_state(o.object_i)
+                           || object_elem_i.update_state(o.object_elem_i)
+                           || object_elem_bary.update_state(o.object_elem_bary)
+                           || measurement.update_state(o.measurement));
         }
       };
 
       using Base = Uplifting;
-      using ComponentStateBase<Base>::m_stale;
+      using ComponentStateBase<Base>::m_mutated;
 
-      ComponentState<Base::Type>    type;
-      ComponentState<uint>          basis_i;
-      VectorState<Base::Constraint, 
-                  ConstraintState>  verts;
-      VectorState<Base::Elem>       elems;
+      ComponentState<Base::Type> type;
+      ComponentState<uint>       basis_i;
+      ComponentStateVector<
+        Base::Constraint, 
+        ConstraintState>         verts;
+      ComponentStateVector<
+        Base::Elem>              elems;
 
     public:
       virtual 
       bool update_state(const Base &o) override {
-        return m_stale = (type.update_state(o.type)
-                       || basis_i.update_state(o.basis_i)
-                       || verts.update_state(o.verts)
-                       || elems.update_state(o.elems));
+        return m_mutated = (type.update_state(o.type)
+                         || basis_i.update_state(o.basis_i)
+                         || verts.update_state(o.verts)
+                         || elems.update_state(o.elems));
       }
     };
   } // namespace detail

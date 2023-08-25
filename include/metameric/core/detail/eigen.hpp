@@ -96,6 +96,11 @@ namespace Eigen {
     }
   };
 
+  /* Define (sometimes) useful 1-component types */
+
+  using Array1u = Array<unsigned int, 1, 1>;
+  using Array1f = Array<float, 1, 1>;
+
   /* Define useful unsigned types */
   
   using Array2u = Array<unsigned int, 2, 1>;

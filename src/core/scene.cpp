@@ -21,89 +21,119 @@ namespace nlohmann {
 }
 
 namespace met {
-  template <typename Ty>
-  void to_stream(std::ostream &os, const Ty &ty) {
-    met_trace();
-    os.write((const char *) &ty, sizeof(Ty));
-  }
+  namespace detail {
+    template <typename Ty>
+    void to_stream(std::ostream &os, const Ty &ty) {
+      met_trace();
+      os.write((const char *) &ty, sizeof(Ty));
+    }
 
-  template <typename Ty>
-  void from_stream(std::istream &is, Ty &ty) {
-    met_trace();
-    is.read((char *) &ty, sizeof(Ty));
-  }
+    template <typename Ty>
+    void to_stream(std::ostream &os, const std::vector<Ty> &v) {
+      met_trace();
+      size_t size = v.size();
+      to_stream(os, size);
+      os.write((const char *) v.data(), size * sizeof(Ty));
+    }
 
-  template <typename Ty>
-  void to_stream(std::ostream &os, const std::vector<Ty> &v) {
-    met_trace();
-    size_t size = v.size();
-    to_stream(os, size);
-    os.write((const char *) v.data(), size * sizeof(Ty));
-  }
+    template <typename Ty>
+    void to_stream(std::ostream &os, const detail::ResourceVector<Ty> &v) {
+      met_trace();
+      to_stream(os, v.data());
+    }
 
-  template <typename Ty>
-  void from_stream(std::istream &is, std::vector<Ty> &v) {
-    met_trace();
-    size_t size;
-    from_stream(is, size);
-    v.resize(size);
-    is.read((char *) v.data(), size * sizeof(Ty));
-  }
+    template <typename Ty, uint D>
+    void to_stream(std::ostream &os, const TextureBlock<Ty, D> &texture) {
+      met_trace();
+      auto size = texture.size();
+      to_stream(os, size);
+      os.write((const char *) texture.data(), size.prod() * sizeof(Ty));
+    }
 
-  template <typename Ty, uint D>
-  void to_stream(std::ostream &os, const TextureBlock<Ty, D> &texture) {
-    met_trace();
-    auto size = texture.size();
-    to_stream(os, size);
-    os.write((const char *) texture.data(), size.prod() * sizeof(Ty));
-  }
+    template <typename Ty>
+    void from_stream(std::istream &is, Ty &ty) {
+      met_trace();
+      is.read((char *) &ty, sizeof(Ty));
+    }
 
-  template <typename Ty, uint D>
-  void from_stream(std::istream &is, TextureBlock<Ty, D> &texture) {
-    met_trace();
-    auto size = texture.size();
-    from_stream(is, size);
-    texture = {{ .size = size }};
-    is.read((char *) texture.data(), size.prod() * sizeof(Ty));
-  }
+    template <typename Ty>
+    void from_stream(std::istream &is, std::vector<Ty> &v) {
+      met_trace();
+      size_t size;
+      from_stream(is, size);
+      v.resize(size);
+      is.read((char *) v.data(), size * sizeof(Ty));
+    }
 
-  template <typename Vt, typename El>
-  void to_stream(std::ostream &os, const MeshDataBase<Vt, El> &mesh) {
-    met_trace();
-    to_stream(os, mesh.verts);
-    to_stream(os, mesh.elems);
-    to_stream(os, mesh.norms);
-    to_stream(os, mesh.uvs);
-  }
+    template <typename Ty>
+    void from_stream(std::istream &is, detail::ResourceVector<Ty> &v) {
+      met_trace();
+      from_stream(is, v.data());
+    }
 
-  template <typename Vt, typename El>
-  void from_stream(std::istream &is, MeshDataBase<Vt, El> &mesh) {
-    met_trace();
-    from_stream(is, mesh.verts);
-    from_stream(is, mesh.elems);
-    from_stream(is, mesh.norms);
-    from_stream(is, mesh.uvs);
-  }
+    template <typename Ty, uint D>
+    void from_stream(std::istream &is, TextureBlock<Ty, D> &texture) {
+      met_trace();
+      auto size = texture.size();
+      from_stream(is, size);
+      texture = {{ .size = size }};
+      is.read((char *) texture.data(), size.prod() * sizeof(Ty));
+    }
 
-  void to_stream(std::ostream &os, const Scene &scene) {
-    met_trace();
-    to_stream(os, scene.meshes);
-    to_stream(os, scene.textures_3f);
-    to_stream(os, scene.textures_1f);
-    to_stream(os, scene.illuminants);
-    to_stream(os, scene.observers);
-    to_stream(os, scene.bases);
-  }
+    template <typename Vt, typename El>
+    void to_stream(std::ostream &os, const MeshDataBase<Vt, El> &mesh) {
+      met_trace();
+      to_stream(os, mesh.verts);
+      to_stream(os, mesh.elems);
+      to_stream(os, mesh.norms);
+      to_stream(os, mesh.uvs);
+    }
 
-  void from_stream(std::istream &is, Scene &scene) {
-    met_trace();
-    from_stream(is, scene.meshes);
-    from_stream(is, scene.textures_3f);
-    from_stream(is, scene.textures_1f);
-    from_stream(is, scene.illuminants);
-    from_stream(is, scene.observers);
-    from_stream(is, scene.bases);
-  }
+    template <typename Vt, typename El>
+    void from_stream(std::istream &is, MeshDataBase<Vt, El> &mesh) {
+      met_trace();
+      from_stream(is, mesh.verts);
+      from_stream(is, mesh.elems);
+      from_stream(is, mesh.norms);
+      from_stream(is, mesh.uvs);
+    }
+
+    void to_stream(std::ostream &os, const Scene &scene) {
+      met_trace();
+      to_stream(os, scene.meshes);
+      to_stream(os, scene.textures_3f);
+      to_stream(os, scene.textures_1f);
+      to_stream(os, scene.illuminants);
+      to_stream(os, scene.observers);
+      to_stream(os, scene.bases);
+    }
+
+    void from_stream(std::istream &is, Scene &scene) {
+      met_trace();
+      from_stream(is, scene.meshes);
+      from_stream(is, scene.textures_3f);
+      from_stream(is, scene.textures_1f);
+      from_stream(is, scene.illuminants);
+      from_stream(is, scene.observers);
+      from_stream(is, scene.bases);
+    }
+
+    template <typename Ty, typename State>
+    void to_json(json &js, const detail::Component<Ty, State> &component) {
+      met_trace();
+      js = {{ "is_active", component.is_active },
+            { "name",      component.name      },
+            { "value",     component.value     }};
+    }
+
+    template <typename Ty, typename State>
+    void from_json(const json &js, detail::Component<Ty, State> &component) {
+      met_trace();
+      js.at("is_active").get_to(component.is_active);
+      js.at("name").get_to(component.name);
+      js.at("value").get_to(component.value);
+    }
+  } // namespace detail
 
   void to_json(json &js, const Uplifting::Constraint &cstr) {
     met_trace();
@@ -223,56 +253,24 @@ namespace met {
     js.at("n_scatters").get_to(csys.n_scatters);
   }
 
-  template <typename Ty, typename State>
-  void to_json(json &js, const Scene::Component<Ty, State> &component) {
-    met_trace();
-    js = {{ "is_active", component.is_active },
-          { "name",      component.name      },
-          { "data",      component.value     }};
-  }
-
-  template <typename Ty, typename State>
-  void from_json(const json &js, Scene::Component<Ty, State> &component) {
-    met_trace();
-    js.at("is_active").get_to(component.is_active);
-    js.at("name").get_to(component.name);
-    js.at("data").get_to(component.value);
-  }
-
-  template <typename Ty>
-  void to_json(json &js, const Scene::Resource<Ty> &resource) {
-    met_trace();
-    js = {{ "name", resource.name  },
-          { "path", resource.path  },
-          { "data", resource.get() }};
-  }
-
-  template <typename Ty>
-  void from_json(const json &js, Scene::Resource<Ty> &resource) {
-    met_trace();
-    js.at("name").get_to(resource.name);
-    js.at("path").get_to(resource.path);
-    js.at("data").get_to(resource.get());
-  }
-
   void to_json(json &js, const Scene &scene) {
     met_trace();
-    js = {{ "observer_i",    scene.observer_i   },
-          { "objects",       scene.objects      },
-          { "emitters",      scene.emitters     },
-          { "materials",     scene.materials    },
-          { "upliftings",    scene.upliftings   },
-          { "colr_systems",  scene.colr_systems }};
+    js = {{ "observer_i",    scene.observer_i          },
+          { "objects",       scene.objects.data()      },
+          { "emitters",      scene.emitters.data()     },
+          { "materials",     scene.materials.data()    },
+          { "upliftings",    scene.upliftings.data()   },
+          { "colr_systems",  scene.colr_systems.data() }};
   }
 
   void from_json(const json &js, Scene &scene) {
     met_trace();
     js.at("observer_i").get_to(scene.observer_i);
-    js.at("objects").get_to(scene.objects);
-    js.at("emitters").get_to(scene.emitters);
-    js.at("materials").get_to(scene.materials);
-    js.at("upliftings").get_to(scene.upliftings);
-    js.at("colr_systems").get_to(scene.colr_systems);
+    js.at("objects").get_to(scene.objects.data());
+    js.at("emitters").get_to(scene.emitters.data());
+    js.at("materials").get_to(scene.materials.data());
+    js.at("upliftings").get_to(scene.upliftings.data());
+    js.at("colr_systems").get_to(scene.colr_systems.data());
   }
 
   met::ColrSystem Scene::get_csys(uint i) const {
@@ -282,8 +280,8 @@ namespace met {
 
   met::ColrSystem Scene::get_csys(ColrSystem c) const {
     met_trace();
-    return { .cmfs       = observers[c.observer_i].get(),
-             .illuminant = illuminants[c.illuminant_i].get(),
+    return { .cmfs       = observers[c.observer_i].value(),
+             .illuminant = illuminants[c.illuminant_i].value(),
              .n_scatters = c.n_scatters };
   }
 
@@ -294,7 +292,7 @@ namespace met {
 
   met::Spec Scene::get_emitter_spd(Emitter e) const {
     met_trace();
-    return (illuminants[e.illuminant_i].get() * e.multiplier).eval();
+    return (illuminants[e.illuminant_i].value() * e.multiplier).eval();
   }
 
   std::string Scene::get_csys_name(uint i) const {
@@ -328,7 +326,7 @@ namespace met {
 
       // Next, attempt opening zlib compressed stream, and deserialize to scene object
       auto ifs = zstr::ifstream(data_path.string(), scene_i_flags);
-      from_stream(ifs, scene);
+      detail::from_stream(ifs, scene);
       
       return scene;
     }
@@ -342,7 +340,7 @@ namespace met {
       
       // Attempt opening zlib compressed stream, and serialize scene object
       auto ofs = zstr::ofstream(data_path.string(), scene_o_flags, -1);
-      to_stream(ofs, scene);
+      detail::to_stream(ofs, scene);
 
       // Attempt serialize and save of scene object to .json file
       json js = scene;

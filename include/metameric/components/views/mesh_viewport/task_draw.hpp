@@ -50,6 +50,9 @@ namespace met {
       const auto &e_mesh      = e_appl_data.loaded_mesh;
       const auto &e_texture   = e_appl_data.loaded_texture;
 
+      // TODO: more robust data push system in eval()
+      guard(!e_mesh.verts.empty());
+
       // Initialize program object
       m_program = {{ .type       = gl::ShaderType::eVertex,
                      .spirv_path = "resources/shaders/views/draw_mesh.vert.spv",

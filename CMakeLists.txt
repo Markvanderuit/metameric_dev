@@ -249,11 +249,16 @@ add_dependencies(components shaders misc_copy)
 add_executable_r(metameric src/app/metameric.cpp)
 target_link_libraries(metameric PRIVATE core components)
 
+# Set up metameric executable
+add_executable_r(metameric_editor src/app/metameric_editor.cpp)
+target_link_libraries(metameric_editor PRIVATE core components)
+
 # Configure OpenMP
 if(OpenMP_CXX_FOUND)
   target_link_libraries(core       PUBLIC OpenMP::OpenMP_CXX)
   target_link_libraries(components PUBLIC OpenMP::OpenMP_CXX)
   target_link_libraries(metameric  PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(metameric_editor  PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
 # Configure exceptions
@@ -261,6 +266,7 @@ if (met_enable_exceptions)
   target_compile_definitions(core       PUBLIC MET_ENABLE_EXCEPTIONS)
   target_compile_definitions(components PUBLIC MET_ENABLE_EXCEPTIONS)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_EXCEPTIONS)
+  target_compile_definitions(metameric_editor  PUBLIC MET_ENABLE_EXCEPTIONS)
 endif()
 
 # Configure tracy integration options
@@ -268,4 +274,5 @@ if (met_enable_tracy)
   target_compile_definitions(core       PUBLIC MET_ENABLE_TRACY)
   target_compile_definitions(components PUBLIC MET_ENABLE_TRACY)
   target_compile_definitions(metameric  PUBLIC MET_ENABLE_TRACY)
+  target_compile_definitions(metameric_editor  PUBLIC MET_ENABLE_TRACY)
 endif()
