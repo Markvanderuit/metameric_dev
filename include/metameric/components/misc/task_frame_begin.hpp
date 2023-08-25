@@ -1,9 +1,7 @@
 #pragma once
 
-#include <metameric/core/data.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/window.hpp>
 
@@ -13,11 +11,10 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_window    = info.global("window").read_only<gl::Window>();
-      const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_window = info.global("window").read_only<gl::Window>();
 
       // Initialize ImGui for all following tasks
-      ImGui::Init(e_window, e_appl_data.color_mode == ApplicationData::ColorMode::eDark);
+      ImGui::Init(e_window);
     }
 
     void dstr(SchedulerHandle &info) override {

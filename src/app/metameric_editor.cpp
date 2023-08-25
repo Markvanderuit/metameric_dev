@@ -6,6 +6,7 @@
 #include <exception>
 
 namespace met {
+  // Application create settings
   struct MetamericEditorCreateInfo {
     // Direct load scene
     fs::path scene_path = "";
@@ -15,6 +16,7 @@ namespace met {
     std::string  app_title = "Metameric Editor";
   };
 
+  // Application create function
   void create_metameric_editor(MetamericEditorCreateInfo info) {
     met_trace();
     
@@ -52,12 +54,13 @@ namespace met {
       scene_handler.load(info.scene_path);
 
     // Create and start runtime loop
-    submit_schedule(scheduler);
+    submit_metameric_editor_schedule(scheduler);
     while (!window.should_close())
       scheduler.run();
   }
 } // namespace met
 
+// Application entry point
 int main() {
   /* try { */
     met::create_metameric_editor({ /* ... */ });

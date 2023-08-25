@@ -1,7 +1,5 @@
-#include <metameric/core/io.hpp>
-#include <metameric/core/mesh.hpp>
+#include <metameric/core/scene_handler.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/views/task_window.hpp>
@@ -11,61 +9,88 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/window.hpp>
-#include <ranges>
+#include <string>
 
 namespace met {
   /* Titles and ImGui IDs used to spawn modals */
   const static std::string create_modal_title = "Create new project";
   const static std::string close_modal_title  = "Close project";
   const static std::string exit_modal_title   = "Exit Metameric";
-
-  /* Task IDs used to spawn modals' tasks */
-  const static std::string create_modal_name = "create_modal";
-  const static std::string close_modal_name  = "close_modal";
-  const static std::string exit_modal_name   = "exit_modal";
   
-  bool WindowTask::handle_open(SchedulerHandle &info) {
-    met_trace_full();
-    
-    // Open a file picker
-    if (fs::path path; detail::load_dialog(path, "json")) {
-      // Initialize existing project
-      info.global("appl_data").writeable<ApplicationData>().load(path);
+  namespace detail {
+    bool handle_open(SchedulerHandle &info) {
+      met_trace_full();
+      
+      // Open a file picker
+      if (fs::path path; detail::load_dialog(path, "json")) {
+        // Initialize existing project
+        info.global("scene_handler").writeable<SceneHandler>().load(path);
 
+        // Clear OpenGL state
+        gl::Program::unbind_all();
+
+        // Signal schedule re-creation and submit new schedule for main view
+        submit_metameric_editor_schedule_loaded(info);
+        
+        return true;
+      }
+      return false;
+    }
+
+    bool handle_save_as(SchedulerHandle &info) {
+      met_trace_full();
+      if (fs::path path; detail::save_dialog(path, "json")) {
+        info.global("scene_handler").writeable<SceneHandler>().save(path);
+        return true;
+      }
+      return false;
+    }
+
+    bool handle_save(SchedulerHandle &info) {
+      met_trace_full();
+      auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
+      if (e_handler.save_state == SceneHandler::SaveState::eNew) {
+        return handle_save_as(info);
+      } else {
+        e_handler.save(e_handler.save_path);
+        return true;
+      }
+    }
+
+    bool handle_export(SchedulerHandle &info) {
+      met_trace_full();
+      
+      // TODO implement
+
+      return true;
+    }
+
+    void handle_close(SchedulerHandle &info) {
+      met_trace_full();
+      
       // Clear OpenGL state
+      ImGui::CloseAnyPopupIfOpen();
       gl::Program::unbind_all();
 
-      // Signal schedule re-creation and submit new schedule for main view
-      submit_schedule_main(info);
+      // Empty application data as project is closed
+      info.global("scene_handler").writeable<SceneHandler>().unload();
       
-      return true;
+      // Signal schedule re-creation and submit empty schedule for main view
+      submit_metameric_editor_schedule_unloaded(info);
     }
-    return false;
-  }
 
-  bool WindowTask::handle_save(SchedulerHandle &info) {
-    met_trace_full();
-    
-    auto &e_appl_data = info.global("appl_data").writeable<ApplicationData>();
-    if (e_appl_data.project_save == ProjectSaveState::eNew) {
-      return handle_save_as(info);
-    } else {
-      e_appl_data.save(e_appl_data.project_path);
-      return true;
+    void handle_exit(SchedulerHandle &info) {
+      met_trace_full();
+      
+      ImGui::CloseAnyPopupIfOpen();
+
+      info.global("scene_handler").writeable<SceneHandler>().unload();        // Empty application data as project is closed
+      info.global("window").writeable<gl::Window>().set_should_close(); // Signal to window that it should close itself
+      info.clear();                                                     // Signal to scheduler that it should empty out
     }
-  }
+  } // namespace detail
 
-  bool WindowTask::handle_save_as(SchedulerHandle &info) {
-    met_trace_full();
-    
-    if (fs::path path; detail::save_dialog(path, "json")) {
-      info.global("appl_data").writeable<ApplicationData>().save(io::path_with_ext(path, ".json"));
-      return true;
-    }
-    return false;
-  }
-
-  bool WindowTask::handle_export(SchedulerHandle &info) {
+  /* bool WindowTask::handle_export(SchedulerHandle &info) {
     met_trace_full();
 
     if (fs::path path; detail::save_dialog(path, "met")) {
@@ -129,64 +154,51 @@ namespace met {
     }
 
     return false;
-  }
+  } */
   
+  /* void WindowTask::handle_new_safe(SchedulerHandle &info) {
+    met_trace_full();
+
+
+  } */
+
+
   void WindowTask::handle_close_safe(SchedulerHandle &info) {
     met_trace_full();
     
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-    if (e_appl_data.project_save == ProjectSaveState::eUnsaved 
-     || e_appl_data.project_save == ProjectSaveState::eNew) {
+    // Get external resources
+    const auto &e_handler = info.global("scene_handler").read_only<SceneHandler>();
+
+    // Continue to close function if scene state is ok; otherwise, present modal on next frame
+    if (e_handler.save_state == SceneHandler::SaveState::eUnsaved 
+     || e_handler.save_state == SceneHandler::SaveState::eNew) {
       m_open_close_modal = true;
     } else {
       handle_close(info);
     }
   }
-
-  void WindowTask::handle_close(SchedulerHandle &info) {
-    met_trace_full();
-    
-    // Clear OpenGL state
-    ImGui::CloseAnyPopupIfOpen();
-    gl::Program::unbind_all();
-
-    // Empty application data as project is closed
-    info.global("appl_data").writeable<ApplicationData>().clear();
-    
-    // Signal schedule re-creation and submit empty schedule for main view
-    submit_schedule_empty(info);
-  }
   
   void WindowTask::handle_exit_safe(SchedulerHandle &info) {
     met_trace_full();
-    
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-    if (e_appl_data.project_save == ProjectSaveState::eUnsaved 
-     || e_appl_data.project_save == ProjectSaveState::eNew) {
+
+    // Get external resources
+    const auto &e_handler = info.global("scene_handler").read_only<SceneHandler>();
+
+    // Continue to exit function if scene state is ok; otherwise, present modal on next frame
+    if (e_handler.save_state == SceneHandler::SaveState::eUnsaved 
+     || e_handler.save_state == SceneHandler::SaveState::eNew) {
       m_open_exit_modal = true;
     } else {
       handle_exit(info);
     }
   }
 
-  void WindowTask::handle_exit(SchedulerHandle &info) {
-    met_trace_full();
-    
-    ImGui::CloseAnyPopupIfOpen();
-
-    // Empty application data as project is closed
-    info.global("appl_data").writeable<ApplicationData>().clear();
-
-    // Signal to window that it should close itself
-    info.global("window").writeable<gl::Window>().set_should_close();
-    
-    // Signal scheduler end
-    info.clear();
-  }
-
   void WindowTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
+    // Get external resources
+    const auto &e_handler = info.global("scene_handler").read_only<SceneHandler>();
+
     // Modals/popups have to be on the same level of stack as OpenPopup(), so track this state
     // and call OpenPopup() at the end if true
     m_open_close_modal  = false;
@@ -198,27 +210,26 @@ namespace met {
       /* File menu follows */
       
       if (ImGui::BeginMenu("File")) {
-        const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
-        const bool is_loaded   = e_appl_data.project_save != ProjectSaveState::eUnloaded;
-        const bool enable_save = e_appl_data.project_save != ProjectSaveState::eSaved 
-          && e_appl_data.project_save != ProjectSaveState::eNew && is_loaded;
+        const bool is_loaded  = e_handler.save_state != SceneHandler::SaveState::eUnloaded;
+        const bool is_savable = e_handler.save_state != SceneHandler::SaveState::eSaved 
+                             && e_handler.save_state != SceneHandler::SaveState::eNew && is_loaded;
         
         /* Main section follows */
 
         if (ImGui::MenuItem("New..."))                             { m_open_create_modal = true; }
-        if (ImGui::MenuItem("Open..."))                            { handle_open(info);               }
-        if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded)) { handle_close_safe(info);         }
+        if (ImGui::MenuItem("Open..."))                            { detail::handle_open(info);  }
+        if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded)) { handle_close_safe(info);    }
 
         ImGui::Separator(); 
 
         /* Save section follows */
 
-        if (ImGui::MenuItem("Save", nullptr, nullptr, enable_save))     { handle_save(info);    }
-        if (ImGui::MenuItem("Save as...", nullptr, nullptr, is_loaded)) { handle_save_as(info); }
+        if (ImGui::MenuItem("Save", nullptr, nullptr, is_savable))      { detail::handle_save(info);    }
+        if (ImGui::MenuItem("Save as...", nullptr, nullptr, is_loaded)) { detail::handle_save_as(info); }
 
         ImGui::Separator(); 
 
-        if (ImGui::MenuItem("Export", nullptr, nullptr, is_loaded)) { handle_export(info); }
+        if (ImGui::MenuItem("Export", nullptr, nullptr, is_loaded)) { detail::handle_export(info); }
 
         ImGui::Separator(); 
 
@@ -232,11 +243,11 @@ namespace met {
       /* Edit menu follows */
 
       if (ImGui::BeginMenu("Edit")) {
-        auto &e_appl_data = info.global("appl_data").writeable<ApplicationData>();
-        const bool is_undo = e_appl_data.mod_i >= 0;
-        const bool is_redo = e_appl_data.mod_i < int(e_appl_data.mods.size()) - 1;
-        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_appl_data.undo_mod(); }
-        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_appl_data.redo_mod(); }
+        auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
+        const bool is_undo = e_handler.mod_i >= 0;
+        const bool is_redo = e_handler.mod_i < int(e_handler.mods.size()) - 1;
+        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_handler.undo_mod(); }
+        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_handler.redo_mod(); }
         ImGui::EndMenu();
       }
 
@@ -248,13 +259,13 @@ namespace met {
 
     // Spawn create modal
     if (m_open_create_modal) { 
-      info.child_task(create_modal_name).init<CreateProjectTask>(create_modal_title);
+      info.child_task("create_modal").init<CreateProjectTask>(create_modal_title);
       ImGui::OpenPopup(create_modal_title.c_str()); 
     }
 
     // Spawn close modal
     if (m_open_close_modal)  { 
-      info.child_task(close_modal_name).init<LambdaTask>([&](auto &info) {
+      info.child_task("close_modal").init<LambdaTask>([&](auto &info) {
         if (ImGui::BeginPopupModal(close_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to close the project? You may lose unsaved progress.");
           ImGui::SpacedSeparator();
@@ -274,7 +285,7 @@ namespace met {
 
     // Spawm exit modal
     if (m_open_exit_modal)   { 
-      info.child_task(exit_modal_name).init<LambdaTask>([&](auto &info) {
+      info.child_task("exit_modal").init<LambdaTask>([&](auto &info) {
         if (ImGui::BeginPopupModal(exit_modal_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           ImGui::Text("Do you wish to exit the program? You may lose unsaved progress.");
           ImGui::SpacedSeparator();
