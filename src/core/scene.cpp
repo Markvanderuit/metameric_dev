@@ -29,31 +29,47 @@ namespace met {
     }
 
     template <typename Ty>
+    void from_stream(std::istream &is, Ty &ty) {
+      met_trace();
+      is.read((char *) &ty, sizeof(Ty));
+    }
+
+    void to_stream(std::ostream &os, const std::string &ty) {
+      met_trace();
+      size_t size = ty.size();
+      to_stream(os, size);
+      os.write(ty.data(), size);
+    }
+
+    void from_stream(std::istream &is, std::string &ty) {
+      met_trace();
+      size_t size;
+      from_stream(is, size);
+      ty.resize(size);
+      is.read(ty.data(), size);
+    }
+
+    template <typename Ty>
+    void to_stream(std::ostream &os, const detail::Resource<Ty> &ty) {
+      met_trace();
+      to_stream(os, ty.name);
+      to_stream(os, ty.value());
+    }
+
+    template <typename Ty>
+    void from_stream(std::istream &is, detail::Resource<Ty> &ty) {
+      met_trace();
+      from_stream(is, ty.name);
+      from_stream(is, ty.value());
+    }
+
+    template <typename Ty>
     void to_stream(std::ostream &os, const std::vector<Ty> &v) {
       met_trace();
       size_t size = v.size();
       to_stream(os, size);
-      os.write((const char *) v.data(), size * sizeof(Ty));
-    }
-
-    template <typename Ty>
-    void to_stream(std::ostream &os, const detail::ResourceVector<Ty> &v) {
-      met_trace();
-      to_stream(os, v.data());
-    }
-
-    template <typename Ty, uint D>
-    void to_stream(std::ostream &os, const TextureBlock<Ty, D> &texture) {
-      met_trace();
-      auto size = texture.size();
-      to_stream(os, size);
-      os.write((const char *) texture.data(), size.prod() * sizeof(Ty));
-    }
-
-    template <typename Ty>
-    void from_stream(std::istream &is, Ty &ty) {
-      met_trace();
-      is.read((char *) &ty, sizeof(Ty));
+      for (const auto &obj : v)
+        to_stream(os, obj);
     }
 
     template <typename Ty>
@@ -62,13 +78,28 @@ namespace met {
       size_t size;
       from_stream(is, size);
       v.resize(size);
-      is.read((char *) v.data(), size * sizeof(Ty));
+      for (auto &obj : v)
+        from_stream(is, obj);
+    }
+
+    template <typename Ty>
+    void to_stream(std::ostream &os, const detail::ResourceVector<Ty> &v) {
+      met_trace();
+      to_stream(os, v.data());
     }
 
     template <typename Ty>
     void from_stream(std::istream &is, detail::ResourceVector<Ty> &v) {
       met_trace();
       from_stream(is, v.data());
+    }
+
+    template <typename Ty, uint D>
+    void to_stream(std::ostream &os, const TextureBlock<Ty, D> &texture) {
+      met_trace();
+      auto size = texture.size();
+      to_stream(os, size);
+      os.write((const char *) texture.data(), size.prod() * sizeof(Ty));
     }
 
     template <typename Ty, uint D>

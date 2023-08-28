@@ -57,8 +57,21 @@ namespace met {
 
         if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.meshes.size()).c_str())) {
           for (const auto &mesh : e_scene.meshes) {
-            if (ImGui::CollapsingHeader(mesh.name.c_str())) {
-              // ...
+            if (ImGui::TreeNodeEx(mesh.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+              if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Value("Vertices", static_cast<uint>(mesh.value().verts.size()));
+                ImGui::Value("Elements", static_cast<uint>(mesh.value().elems.size()));
+                ImGui::EndTooltip();
+              }
+
+              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+
+              if (ImGui::SmallButton("X")) {
+                debug::check_expr(false, "Not implemented");
+              } 
+              
+              ImGui::TreePop();
             }
           }
         }
@@ -66,13 +79,39 @@ namespace met {
         if (ImGui::CollapsingHeader(std::format("Textures ({})", e_scene.textures_3f.size() + 
                                                                  e_scene.textures_1f.size()).c_str())) {
           for (const auto &txtr : e_scene.textures_3f) {
-            if (ImGui::CollapsingHeader(txtr.name.c_str())) {
-              // ...
+            if (ImGui::TreeNodeEx(txtr.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+              if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Dimensions: %i x %i", txtr.value().size()[0], txtr.value().size()[1]);
+                ImGui::Value("Channels", 3);
+                ImGui::EndTooltip();
+              }
+
+              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+
+              if (ImGui::SmallButton("X")) {
+                debug::check_expr(false, "Not implemented");
+              } 
+              
+              ImGui::TreePop();
             }
           }
           for (const auto &txtr : e_scene.textures_1f) {
-            if (ImGui::CollapsingHeader(txtr.name.c_str())) {
-              // ...
+            if (ImGui::TreeNodeEx(txtr.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+              if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Dimensions: %i x %i", txtr.value().size()[0], txtr.value().size()[1]);
+                ImGui::Value("Channels", 1);
+                ImGui::EndTooltip();
+              }
+
+              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+
+              if (ImGui::SmallButton("X")) {
+                debug::check_expr(false, "Not implemented");
+              } 
+              
+              ImGui::TreePop();
             }
           }
         }
