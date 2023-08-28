@@ -38,7 +38,15 @@ namespace met {
     void undo_mod();            // Step back one modification
     void clear_mods();          // Clear entire modification state       
 
-  public: // Miscellaneous
+  public: // I/O
+    // Export a specific uplifting model from the loaded scene to a texture file
     void export_uplifting(const fs::path &path, uint uplifting_i) const;
+
+    // Import a wavefront .obj file, adding its components into the loaded scene
+    void import_wavefront_obj(const fs::path &path);
+
+    // Import an existing scene, adding its components into the loaded scene
+    void import_scene(const fs::path &path);
+    void import_scene(Scene &&other);
   };
 } // namespace met

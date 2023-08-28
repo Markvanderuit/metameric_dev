@@ -11,6 +11,9 @@
 #include <algorithm>
 #include <execution>
 #include <fstream>
+#include <unordered_map>
+#include <unordered_set>
+#include <deque>
 
 namespace met::io {
   std::string load_string(const fs::path &path) {
@@ -151,6 +154,37 @@ namespace met::io {
                   path.string(),
                   std::string(imp.GetErrorString())));
 
+    {
+      struct QueueObject {
+        eig::Matrix4f trf;
+        aiNode       *node;
+      } root = { eig::Matrix4f::Identity(), scene->mRootNode };
+
+      std::unordered_set<uint> meshes, textures;
+
+      std::deque<QueueObject> queue = { root };
+      while (!queue.empty()) {
+        // Pop current node from work queue
+        auto [parent_trf, node] = queue.front();
+        queue.pop_front();
+
+        // Assemble recursive transformation to pass to children
+        eig::Matrix4f trf;
+        std::memcpy(trf.data(), (const void *) &(node->mTransformation), sizeof(aiMatrix4x4));
+        trf = parent_trf * trf;
+
+        // If current node has meshes attached, register object(s)
+        for (uint i : std::span { node->mMeshes, node->mNumMeshes }) {
+          
+        }
+        
+        // Push child nodes on work queue
+        for (auto child : std::span { node->mChildren, node->mNumChildren })
+          queue.push_back({ trf, child });
+      }
+    }
+
+
     // For now, just load the base mesh
     // TODO; actually handle scenes, not individual meshes
     const auto *mesh = scene->mMeshes[0];
@@ -158,15 +192,44 @@ namespace met::io {
     fmt::print("Meshes : {}\nMaterials : {}\nTextures : {}\n",
       scene->mNumMeshes, scene->mNumMaterials, scene->mNumTextures);
     
-    
     std::span materials = { scene->mMaterials, scene->mNumMaterials };
     for (auto *mat : materials) {
       std::string mat_name = mat->GetName().C_Str();
       fmt::print("{}\n", mat_name);
 
+      fmt::print("Texture keys >\n", mat_name);
+      {
+        aiString baseColorTexture, metallicTexture, roughnessTexture, opacityTexture, normalTexture;
+
+        // Search for a corresponding texture value for diffuse
+        for (auto tag : { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE }) {
+          mat->GetTexture(tag, 0, &baseColorTexture);
+          guard_break(baseColorTexture.length == 0);
+        }
+        
+        // Search for a corresponding texture value for normal maps
+        for (auto tag : { aiTextureType_NORMALS, aiTextureType_HEIGHT, aiTextureType_NORMAL_CAMERA }) {
+          mat->GetTexture(tag, 0, &normalTexture);
+          guard_break(normalTexture.length == 0);
+        }
+
+        // Gather texture paths for miscellaneous values
+        mat->GetTexture(aiTextureType_METALNESS,         0, &metallicTexture);
+        mat->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTexture);
+        mat->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture);
+
+        fmt::print("Base color {}\n", baseColorTexture.C_Str());
+        fmt::print("Metallic   {}\n", metallicTexture.C_Str());
+        fmt::print("Roughness  {}\n", roughnessTexture.C_Str());
+        fmt::print("Opacity    {}\n", opacityTexture.C_Str());
+        fmt::print("Normals    {}\n", normalTexture.C_Str());
+      }
+
+      fmt::print("Properties >\n", mat_name);
       std::span properties = { mat->mProperties, mat->mNumProperties };
       for (auto *prop : properties) {
         std::string prop_name = prop->mKey.C_Str();
+        uint prop_semantic = prop->mSemantic;
         std::string buffer(prop->mData, size_t(prop->mDataLength));
 
         switch (prop->mType) {
@@ -180,7 +243,7 @@ namespace met::io {
             fmt::print("\t{} - I32 - {}\n", prop_name, "");
             break;
           case aiPTI_String:
-            fmt::print("\t{} - Str - {}\n", prop_name, buffer);
+            fmt::print("\t{} - Str - {} - {}\n", prop_name, buffer, prop_semantic);
             break;
           case aiPTI_Buffer:
             fmt::print("\t{} - Buf - {}\n", prop_name, "");

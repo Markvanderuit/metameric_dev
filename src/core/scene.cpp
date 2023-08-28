@@ -199,6 +199,7 @@ namespace met {
     js["roughness"] = {{ "index", material.roughness.index() }, { "variant", material.roughness }};
     js["metallic"]  = {{ "index", material.metallic.index() },  { "variant", material.metallic }};
     js["opacity"]   = {{ "index", material.opacity.index() },   { "variant", material.opacity }};
+    js["normals"]   = {{ "index", material.normals.index() },   { "variant", material.normals }};
   }
 
   void from_json(const json &js, Scene::Material &material) {
@@ -221,6 +222,11 @@ namespace met {
     switch (js.at("opacity").at("index").get<size_t>()) {
       case 0: material.opacity = js.at("opacity").at("variant").get<float>(); break;
       case 1: material.opacity = js.at("opacity").at("variant").get<uint>(); break;
+      default: debug::check_expr(false, "Error parsing json material data");
+    }
+    switch (js.at("normals").at("index").get<size_t>()) {
+      case 0: material.normals = js.at("normals").at("variant").get<Colr>(); break;
+      case 1: material.normals = js.at("normals").at("variant").get<uint>(); break;
       default: debug::check_expr(false, "Error parsing json material data");
     }
   }

@@ -121,7 +121,7 @@ namespace met::detail {
     Resource(std::string_view name, const Ty &value) 
     : name(name), m_value(value) { }
     Resource(std::string_view name, Ty &&value) 
-    : name(name), m_value(value) { }
+    : name(name), m_value(std::move(value)) { }
 
   public:
     constexpr void set_mutated(bool b) { m_mutated = b; }

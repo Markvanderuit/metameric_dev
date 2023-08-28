@@ -42,19 +42,23 @@ namespace met {
       std::variant<float, uint> roughness;
       std::variant<float, uint> metallic;
       std::variant<float, uint> opacity;
+      std::variant<Colr, uint>  normals;
 
       inline 
       bool operator==(const Material &o) const {
         // Comparison can be a little unwieldy due to the different variant permutations
         // and Eigen's lack of a single-component operator==(); we can abuse memory instead
-        bool r = std::tie(roughness, metallic, opacity)
-              == std::tie(o.roughness, o.metallic, o.opacity);
-        guard(r && diffuse.index() == o.diffuse.index(), false);
+        bool r = std::tie(roughness, metallic, opacity) == std::tie(o.roughness, o.metallic, o.opacity);
+        guard(r && diffuse.index() == o.diffuse.index() && normals.index() == o.normals.index(), false);
         switch (diffuse.index()) {
-          case 0: return r && std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse));
-          case 1: return r && std::get<uint>(diffuse) == std::get<uint>(o.diffuse);
-          default: return r;
+          case 0: r &= std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse));
+          case 1: r &= std::get<uint>(diffuse) == std::get<uint>(o.diffuse);
         }
+        switch (normals.index()) {
+          case 0: r &= std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals));
+          case 1: r &= std::get<uint>(normals) == std::get<uint>(o.normals);
+        }
+        return r;
       }
     };
     
