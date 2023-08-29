@@ -255,8 +255,9 @@ namespace met {
       js.get_to(scene);
 
       // Next, attempt opening zlib compressed stream, and deserialize to scene object
-      auto ifs = zstr::ifstream(data_path.string(), scene_i_flags);
-      scene.fr_stream(ifs);
+      auto str = zstr::ifstream(data_path.string(), scene_i_flags);
+      debug::check_expr(str.good());
+      scene.fr_stream(str);
       
       return scene;
     }
@@ -269,8 +270,9 @@ namespace met {
       fs::path data_path = path_with_ext(path, ".data");
       
       // Attempt opening zlib compressed stream, and serialize scene resources
-      auto ofs = zstr::ofstream(data_path.string(), scene_o_flags, Z_BEST_SPEED);
-      scene.to_stream(ofs);
+      auto str = zstr::ofstream(data_path.string(), scene_o_flags, Z_BEST_SPEED);
+      debug::check_expr(str.good());
+      scene.to_stream(str);
 
       // Attempt serialize and save of scene object to .json file
       json js = scene;

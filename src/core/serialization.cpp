@@ -3,7 +3,8 @@
 
 namespace met::io {
   /* Specialized serialization for vectors of generic objects */
-
+  
+  // Currently unused
   /* template <>
   void to_stream(const std::vector<size_t> &v, std::ostream &str) {
     met_trace();
@@ -11,6 +12,7 @@ namespace met::io {
               sizeof(std::decay_t<decltype(v)>::value_type) * v.size());
   } */
 
+  // Currently unused
   /* template <>
   void fr_stream(std::vector<size_t> &v, std::istream &str) {
     met_trace();
