@@ -1,9 +1,9 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/json.hpp>
+#include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlohmann/json.hpp>
 #include <zstr.hpp>
-#include <iostream>
 
 /* 
   std::variant serialization helper for json
@@ -22,133 +22,6 @@ namespace nlohmann {
 
 namespace met {
   namespace detail {
-    template <typename Ty>
-    void to_stream(std::ostream &os, const Ty &ty) {
-      met_trace();
-      os.write((const char *) &ty, sizeof(Ty));
-    }
-
-    template <typename Ty>
-    void from_stream(std::istream &is, Ty &ty) {
-      met_trace();
-      is.read((char *) &ty, sizeof(Ty));
-    }
-
-    void to_stream(std::ostream &os, const std::string &ty) {
-      met_trace();
-      size_t size = ty.size();
-      to_stream(os, size);
-      os.write(ty.data(), size);
-    }
-
-    void from_stream(std::istream &is, std::string &ty) {
-      met_trace();
-      size_t size;
-      from_stream(is, size);
-      ty.resize(size);
-      is.read(ty.data(), size);
-    }
-
-    template <typename Ty>
-    void to_stream(std::ostream &os, const detail::Resource<Ty> &ty) {
-      met_trace();
-      to_stream(os, ty.name);
-      to_stream(os, ty.value());
-    }
-
-    template <typename Ty>
-    void from_stream(std::istream &is, detail::Resource<Ty> &ty) {
-      met_trace();
-      from_stream(is, ty.name);
-      from_stream(is, ty.value());
-    }
-
-    template <typename Ty>
-    void to_stream(std::ostream &os, const std::vector<Ty> &v) {
-      met_trace();
-      size_t size = v.size();
-      to_stream(os, size);
-      for (const auto &obj : v)
-        to_stream(os, obj);
-    }
-
-    template <typename Ty>
-    void from_stream(std::istream &is, std::vector<Ty> &v) {
-      met_trace();
-      size_t size;
-      from_stream(is, size);
-      v.resize(size);
-      for (auto &obj : v)
-        from_stream(is, obj);
-    }
-
-    template <typename Ty>
-    void to_stream(std::ostream &os, const detail::ResourceVector<Ty> &v) {
-      met_trace();
-      to_stream(os, v.data());
-    }
-
-    template <typename Ty>
-    void from_stream(std::istream &is, detail::ResourceVector<Ty> &v) {
-      met_trace();
-      from_stream(is, v.data());
-    }
-
-    template <typename Ty, uint D>
-    void to_stream(std::ostream &os, const TextureBlock<Ty, D> &texture) {
-      met_trace();
-      auto size = texture.size();
-      to_stream(os, size);
-      os.write((const char *) texture.data(), size.prod() * sizeof(Ty));
-    }
-
-    template <typename Ty, uint D>
-    void from_stream(std::istream &is, TextureBlock<Ty, D> &texture) {
-      met_trace();
-      auto size = texture.size();
-      from_stream(is, size);
-      texture = {{ .size = size }};
-      is.read((char *) texture.data(), size.prod() * sizeof(Ty));
-    }
-
-    template <typename Vt, typename El>
-    void to_stream(std::ostream &os, const MeshDataBase<Vt, El> &mesh) {
-      met_trace();
-      to_stream(os, mesh.verts);
-      to_stream(os, mesh.elems);
-      to_stream(os, mesh.norms);
-      to_stream(os, mesh.uvs);
-    }
-
-    template <typename Vt, typename El>
-    void from_stream(std::istream &is, MeshDataBase<Vt, El> &mesh) {
-      met_trace();
-      from_stream(is, mesh.verts);
-      from_stream(is, mesh.elems);
-      from_stream(is, mesh.norms);
-      from_stream(is, mesh.uvs);
-    }
-
-    void to_stream(std::ostream &os, const Scene &scene) {
-      met_trace();
-      to_stream(os, scene.meshes);
-      to_stream(os, scene.textures_3f);
-      to_stream(os, scene.textures_1f);
-      to_stream(os, scene.illuminants);
-      to_stream(os, scene.observers);
-      to_stream(os, scene.bases);
-    }
-
-    void from_stream(std::istream &is, Scene &scene) {
-      met_trace();
-      from_stream(is, scene.meshes);
-      from_stream(is, scene.textures_3f);
-      from_stream(is, scene.textures_1f);
-      from_stream(is, scene.illuminants);
-      from_stream(is, scene.observers);
-      from_stream(is, scene.bases);
-    }
-
     template <typename Ty, typename State>
     void to_json(json &js, const detail::Component<Ty, State> &component) {
       met_trace();
@@ -344,6 +217,26 @@ namespace met {
                        illuminants[c.illuminant_i].name);
   }
 
+  void Scene::to_stream(std::ostream &str) const {
+    met_trace();
+    io::to_stream(meshes,      str);
+    io::to_stream(textures_3f, str);
+    io::to_stream(textures_1f, str);
+    io::to_stream(illuminants, str);
+    io::to_stream(observers,   str);
+    io::to_stream(bases,       str);
+  }
+
+  void Scene::fr_stream(std::istream &str) {
+    met_trace();
+    io::fr_stream(meshes,      str);
+    io::fr_stream(textures_3f, str);
+    io::fr_stream(textures_1f, str);
+    io::fr_stream(illuminants, str);
+    io::fr_stream(observers,   str);
+    io::fr_stream(bases,       str);
+  }
+
   namespace io {
     constexpr auto scene_i_flags = std::ios::in  | std::ios::binary;
     constexpr auto scene_o_flags = std::ios::out | std::ios::binary | std::ios::trunc;
@@ -363,7 +256,7 @@ namespace met {
 
       // Next, attempt opening zlib compressed stream, and deserialize to scene object
       auto ifs = zstr::ifstream(data_path.string(), scene_i_flags);
-      detail::from_stream(ifs, scene);
+      scene.fr_stream(ifs);
       
       return scene;
     }
@@ -375,9 +268,9 @@ namespace met {
       fs::path json_path = path_with_ext(path, ".json");
       fs::path data_path = path_with_ext(path, ".data");
       
-      // Attempt opening zlib compressed stream, and serialize scene object
-      auto ofs = zstr::ofstream(data_path.string(), scene_o_flags, -1);
-      detail::to_stream(ofs, scene);
+      // Attempt opening zlib compressed stream, and serialize scene resources
+      auto ofs = zstr::ofstream(data_path.string(), scene_o_flags, Z_BEST_SPEED);
+      scene.to_stream(ofs);
 
       // Attempt serialize and save of scene object to .json file
       json js = scene;

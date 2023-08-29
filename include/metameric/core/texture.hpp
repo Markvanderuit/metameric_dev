@@ -2,6 +2,7 @@
 
 #include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/serialization.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <filesystem>
 #include <vector>
@@ -39,7 +40,7 @@ namespace met {
     void save_texture2d(const fs::path &path, const Texture2d<T> &texture, bool lrgb_to_srgb = false);
 
     // Convert to aligned/unaligned backed types
-    Texture2d3f    as_unaligned(const AlTexture2d3f &aligned);
+    Texture2d3f   as_unaligned(const AlTexture2d3f &aligned);
     AlTexture2d3f as_aligned(const Texture2d3f &unaligned);
 
     // Linearize/delinearize texture data
@@ -119,6 +120,19 @@ namespace met {
                         range_iter(o.m_data),
                         [](const auto &a, const auto &b) { return a.isApprox(b); })
               && (m_size == o.m_size).all();
+    }
+
+  public: // Serialization
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(m_size, str);
+      io::to_stream(m_data, str);
+    }
+
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(m_size, str);
+      io::fr_stream(m_data, str);
     }
 
     met_declare_noncopyable(TextureBlock);

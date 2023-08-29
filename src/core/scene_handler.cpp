@@ -79,6 +79,7 @@ namespace met {
 
     // Apply change
     mod.redo(scene);
+    fmt::print("Touch!\n");
 
     // Ensure mod list doesn't exceed fixed length
     // and set the current mod to its end
@@ -337,11 +338,13 @@ namespace met {
     std::transform(range_iter(other.objects), std::back_inserter(scene.objects.data()), [&](auto component) {
       component.value.mesh_i      += scene.meshes.size();
       component.value.material_i  += scene.materials.size();
-      component.value.uplifting_i += scene.upliftings.size();
+      if (!other.upliftings.empty())
+        component.value.uplifting_i += scene.upliftings.size();
       return component;
     });
     std::transform(range_iter(other.emitters), std::back_inserter(scene.emitters.data()), [&](auto component) {
-      component.value.illuminant_i      += scene.illuminants.size();
+      if (!other.illuminants.empty())
+        component.value.illuminant_i += scene.illuminants.size();
       return component;
     });
     std::transform(range_iter(other.materials), std::back_inserter(scene.materials.data()), [&](auto component) {
@@ -358,8 +361,10 @@ namespace met {
       return component;
     });
     std::transform(range_iter(other.colr_systems), std::back_inserter(scene.colr_systems.data()), [&](auto component) {
-      component.value.observer_i   += scene.observers.size();
-      component.value.illuminant_i += scene.illuminants.size();
+      if (!other.observers.empty())
+        component.value.observer_i   += scene.observers.size();
+      if (!other.illuminants.empty())
+        component.value.illuminant_i += scene.illuminants.size();
       return component;
     });
 

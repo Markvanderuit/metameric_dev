@@ -101,6 +101,19 @@ namespace met {
       bool operator==(const Basis &o) const {
         return mean.isApprox(o.mean) && functions.isApprox(o.functions);
       }
+
+    public: // Serialization
+      void to_stream(std::ostream &str) const {
+        met_trace();
+        io::to_stream(mean,      str);
+        io::to_stream(functions, str);
+      }
+
+      void fr_stream(std::istream &str) {
+        met_trace();
+        io::fr_stream(mean,      str);
+        io::fr_stream(functions, str);
+      }
     };
 
   public: // Scene data
@@ -135,6 +148,10 @@ namespace met {
     // Obtain a pretty-printed name of a certain color system
     std::string get_csys_name(uint i)       const;
     std::string get_csys_name(ColrSystem c) const;
+    
+  public: // Serialization
+    void to_stream(std::ostream &str) const;
+    void fr_stream(std::istream &str);
   };
   
   namespace io {

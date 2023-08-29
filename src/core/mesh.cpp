@@ -64,7 +64,7 @@ namespace met {
       return el;
     });
     
-    return { verts, faces };
+    return { .verts = verts, .elems = faces };
   }
 
   template <>

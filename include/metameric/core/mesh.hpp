@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/openmesh.hpp>
 #include <array>
@@ -42,6 +43,23 @@ namespace met {
     // Data queries for secondary mesh data, available per-vertex
     bool has_norms() const { return norms.size() == verts.size(); }
     bool has_uvs()   const { return uvs.size()   == verts.size(); }
+
+  public: // Serialization
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(verts, str);
+      io::to_stream(elems, str);
+      io::to_stream(norms, str);
+      io::to_stream(uvs,   str);
+    }
+
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(verts, str);
+      io::fr_stream(elems, str);
+      io::fr_stream(norms, str);
+      io::fr_stream(uvs,   str);
+    }
   };
   
   using MeshData       = MeshDataBase<eig::Array3f,   eig::Array3u>;

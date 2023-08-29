@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
 #include <functional>
 #include <type_traits>
@@ -104,6 +105,19 @@ namespace met::detail {
 
     constexpr friend 
     auto operator<=>(const Component &, const Component &) = default;
+
+  public: // Serialization
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(name,  str);
+      io::to_stream(value, str);
+    }
+
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(name,  str);
+      io::fr_stream(value, str);
+    }
   };
 
   /* Scene resource.
@@ -132,6 +146,19 @@ namespace met::detail {
 
     constexpr friend 
     auto operator<=>(const Resource &, const Resource &) = default;
+    
+  public: // Serialization
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(name,    str);
+      io::to_stream(m_value, str);
+    }
+
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(name,    str);
+      io::fr_stream(m_value, str);
+    }
   };
 
   /* Scene component vector.
@@ -180,13 +207,25 @@ namespace met::detail {
 
     // Bookkeeping; expose miscellaneous std::vector member functions
     constexpr void resize(size_t i) { m_data.resize(i);      }
-    constexpr void erase(uint i)    { m_data.erase(i);       }
+    constexpr void erase(uint i)    { m_data.erase(m_data.begin() + i); }
     constexpr void clear()          { m_data.clear();        }
+    constexpr auto empty()    const { return m_data.empty(); }
     constexpr auto size()     const { return m_data.size();  }
     constexpr auto begin()    const { return m_data.begin(); }
     constexpr auto end()      const { return m_data.end();   }
     constexpr auto begin()          { return m_data.begin(); }
     constexpr auto end()            { return m_data.end();   }
+    
+  public: // Serialization
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(m_data, str);
+    }
+
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(m_data, str);
+    }
   };
 
   /* Scene resource vector.
@@ -236,10 +275,22 @@ namespace met::detail {
     constexpr void resize(size_t i) { m_data.resize(i);      }
     constexpr void erase(uint i)    { m_data.erase(i);       }
     constexpr void clear()          { m_data.clear();        }
+    constexpr auto empty()    const { return m_data.empty(); }
     constexpr auto size()     const { return m_data.size();  }
     constexpr auto begin()    const { return m_data.begin(); }
     constexpr auto end()      const { return m_data.end();   }
     constexpr auto begin()          { return m_data.begin(); }
     constexpr auto end()            { return m_data.end();   }
+    
+  public: // Serialization
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(m_data, str);
+    }
+
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(m_data, str);
+    }
   };
 } // namespace met::detail
