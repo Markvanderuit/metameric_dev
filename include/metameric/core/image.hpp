@@ -118,10 +118,6 @@ namespace met {
   using Image3f = Image<eig::Array3f>;
   using Image4f = Image<eig::Array4f>;
 
-  using Image1i = Image<eig::Array1i>;
-  using Image3i = Image<eig::Array3i>;
-  using Image4i = Image<eig::Array4i>;
-
   using Image1u = Image<eig::Array1u>;
   using Image3u = Image<eig::Array3u>;
   using Image4u = Image<eig::Array4u>;
@@ -135,7 +131,6 @@ namespace met {
   using Image4us = Image<eig::Array4us>;
   
   using AlImage3f  = Image<eig::AlArray3f>;
-  using AlImage3i  = Image<eig::AlArray3i>;
   using AlImage3u  = Image<eig::AlArray3u>;
   using AlImage3s  = Image<eig::AlArray3s>;
   using AlImage3us = Image<eig::AlArray3us>;

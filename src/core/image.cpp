@@ -6,41 +6,37 @@
 
 namespace met {
   namespace detail {
-    template <typename OutTy, typename InTy>
-    OutTy convert_image_value(const InTy &v) {
-      return v.cast<OutTy::Scalar>().eval();
-    }
-
-    /* template <typename OutTy, typename InTy> 
-    requires (std::is_same_v<InTy::Scalar, OutTy::Scalar>) 
+    // Convert image values; pass-through if value types are the same
+    template <typename OutTy, typename InTy> 
+    requires (std::is_same_v<InTy, OutTy>) 
     OutTy convert_image_value(InTy v) {
       return v;
     }
 
-    template <typename OutTy, typename InTy>
-    requires (!std::is_same_v<InTy::Scalar, OutTy::Scalar> && 
-              !std::is_same_v<InTy::Scalar, float>         && 
-              !std::is_same_v<OutTy::Scalar, float>)
-    OutTy convert_image_value(InTy v) {
-      return v
-        .max(std::numeric_limits<OutTy::Scalar>::min())
-        .min(std::numeric_limits<OutTy::Scalar>::max())
-        .cast<OutTy::Scalar>().eval();
+    // Convert image values; handle clipped integer type conversion
+    template <typename OArr, typename IArr, typename OTy = OArr::Scalar, typename ITy = IArr::Scalar> 
+    requires (!std::is_same_v<IArr, OArr> && std::is_integral_v<ITy> && std::is_integral_v<OTy>)
+    OArr convert_image_value(IArr v) {
+      return v.max(std::numeric_limits<OTy>::min())
+              .min(std::numeric_limits<OTy>::max())
+              .cast<OTy>().eval();
     }
 
-    template <typename OutTy, typename InTy> 
-    requires (!std::is_same_v<InTy::Scalar, float> && 
-               std::is_same_v<OutTy::Scalar, float>) 
-    OutTy convert_image_value(InTy v) {
-      return v.cast<OutTy::Scalar>() / static_cast<OutTy::Scalar>(std::numeric_limits<InTy::Scalar>::max());
+    // Convert image values; handle integer type to float type converison
+    template <typename OArr, typename IArr, typename OTy = OArr::Scalar, typename ITy = IArr::Scalar> 
+    requires (std::is_integral_v<ITy> && std::is_floating_point_v<OTy>) 
+    OArr convert_image_value(IArr v) {
+      constexpr auto f_div = static_cast<OTy>(std::numeric_limits<ITy>::max());
+      return (v.cast<OTy>() / f_div).eval();
     }
 
-    template <typename OutTy, typename InTy> 
-    requires (std::is_same_v<InTy::Scalar, float> && 
-             !std::is_same_v<OutTy::Scalar, float>) 
-    OutTy convert_image_value(InTy v) {
-      return (v * static_cast<InTy::Scalar>(std::numeric_limits<OutTy::Scalar>::max())).cast<OutTy::Scalar>().eval();
-    } */
+    // Convert image values; handle float type to integer type converison
+    template <typename OArr, typename IArr, typename OTy = OArr::Scalar, typename ITy = IArr::Scalar> 
+    requires (std::is_floating_point_v<ITy> && std::is_integral_v<OTy>) 
+    OArr convert_image_value(IArr v) {
+      constexpr auto f_mul = static_cast<ITy>(std::numeric_limits<OTy>::max());
+      return (v * f_mul).cast<OTy>().eval();
+    }
   } // namespace detail
 
   template <typename Ty> requires (is_approx_comparable<Ty>)
@@ -73,7 +69,11 @@ namespace met {
   OutputImage convert_image(const InputImage &input, ImageConvertInfo<typename OutputImage::Type> info) {
     met_trace();
 
-    constexpr auto overlap_channels = std::min<uint>(InputImage::channels(), OutputImage::channels());
+    constexpr auto C  = std::min<uint>(InputImage::channels(), OutputImage::channels());
+    using InputType   = typename InputImage::Type;
+    using OutputType  = typename OutputImage::Type;
+    using Scalar      = typename OutputImage::Scalar;
+    using OverlayType = eig::Array<Scalar, C, 1>;
 
     OutputImage output = {{ .size = input.size() }};
 
@@ -85,15 +85,11 @@ namespace met {
       std::transform(std::execution::par_unseq, 
                     range_iter(input.data()), 
                     output.data().begin(), 
-                    [&](const typename InputImage::Type &v) {
-        typename OutputImage::Type v_(info.fill_value);
-        auto v_reduced = v.head<overlap_channels>().eval();
-        v_.head<overlap_channels>() = v_reduced.cast<decltype(v_)::Scalar>();
-        // v_.head<overlap_channels>() = detail::convert_image_value<decltype(v_)>(v_reduced);
-
-        // v_.head<overlap_channels>() 
-        //   = detail::convert_image_value<decltype(v_), decltype(v_reduced)>(v_reduced);
-        return v_;
+                    [&](const InputType &input_v) {
+        
+        OutputType output_v = info.fill_value;
+        output_v.head<C>() = detail::convert_image_value<OverlayType>(input_v.head<C>().eval());
+        return output_v;
       });
     }
 
@@ -145,27 +141,25 @@ namespace met {
   OutputImage convert_image<InputImage, OutputImage>(const InputImage &, ImageConvertInfo<typename OutputImage::Type>);
 
 #define declare_output_functions(InputImage, OutputDenom)                                           \
-  declare_output_function(InputImage, Image<eig::Array1   ## OutputDenom>);                 \
-  declare_output_function(InputImage, Image<eig::Array3   ## OutputDenom>);                 \
-  declare_output_function(InputImage, Image<eig::Array4   ## OutputDenom>);                 \
+  declare_output_function(InputImage, Image<eig::Array1   ## OutputDenom>);                         \
+  declare_output_function(InputImage, Image<eig::Array3   ## OutputDenom>);                         \
+  declare_output_function(InputImage, Image<eig::Array4   ## OutputDenom>);                         \
   declare_output_function(InputImage, Image<eig::AlArray3 ## OutputDenom>);
 
 #define declare_output_functions_all(InputImage)                                                    \
   declare_output_functions(InputImage, f );                                                         \
-  declare_output_functions(InputImage, i );                                                         \
   declare_output_functions(InputImage, u );                                                         \
   declare_output_functions(InputImage, s );                                                         \
   declare_output_functions(InputImage, us);
 
 #define declare_input_functions(OutputDenom)                                                        \
-  declare_output_functions_all(Image<eig::Array1   ## OutputDenom>);                        \
-  declare_output_functions_all(Image<eig::Array3   ## OutputDenom>);                        \
-  declare_output_functions_all(Image<eig::Array4   ## OutputDenom>);                        \
+  declare_output_functions_all(Image<eig::Array1   ## OutputDenom>);                                \
+  declare_output_functions_all(Image<eig::Array3   ## OutputDenom>);                                \
+  declare_output_functions_all(Image<eig::Array4   ## OutputDenom>);                                \
   declare_output_functions_all(Image<eig::AlArray3 ## OutputDenom>);
 
 #define declare_input_functions_all()                                                               \
   declare_input_functions(f );                                                                      \
-  declare_input_functions(i );                                                                      \
   declare_input_functions(u );                                                                      \
   declare_input_functions(s );                                                                      \
   declare_input_functions(us);
