@@ -96,32 +96,43 @@ namespace Eigen {
     }
   };
 
-  /* Define (sometimes) useful 1-component types */
+  /* Define useful integer types */
+
+  using Array1us = Array<unsigned short, 1, 1>;
+  using Array2us = Array<unsigned short, 2, 1>;
+  using Array3us = Array<unsigned short, 3, 1>;
+  using Array4us = Array<unsigned short, 4, 1>;
+  
+  using Array1s = Array<short, 1, 1>;
+  using Array2s = Array<short, 2, 1>;
+  using Array3s = Array<short, 3, 1>;
+  using Array4s = Array<short, 4, 1>;
 
   using Array1u = Array<unsigned int, 1, 1>;
-  using Array1f = Array<float, 1, 1>;
-
-  /* Define useful unsigned types */
-  
   using Array2u = Array<unsigned int, 2, 1>;
   using Array3u = Array<unsigned int, 3, 1>;
   using Array4u = Array<unsigned int, 4, 1>;
 
+  using Vector1u = Matrix<unsigned int, 1, 1>;
   using Vector2u = Matrix<unsigned int, 2, 1>;
   using Vector3u = Matrix<unsigned int, 3, 1>;
   using Vector4u = Matrix<unsigned int, 4, 1>;
 
   /* Define common aligned vector types */
   
-  using AlVector2f = AlVector<float, 2>;
+  using AlArray3s  = AlArray<short, 3>;
+  using AlArray3us = AlArray<unsigned short, 3>;
+  using AlArray3u  = AlArray<unsigned int, 3>;
+  using AlArray3i  = AlArray<int, 3>;
+  using AlArray3f  = AlArray<float, 3>;
   using AlVector3f = AlVector<float, 3>;
-  using AlVector4f = AlVector<float, 4>;
+  
+  /* Define (sometimes) useful 1-component types */
 
-  using AlArray2f = AlArray<float, 2>;
-  using AlArray3f = AlArray<float, 3>;
-  using AlArray4f = AlArray<float, 4>;
-
-  using AlArray2u = AlArray<unsigned int, 2>;
-  using AlArray3u = AlArray<unsigned int, 3>;
-  using AlArray4u = AlArray<unsigned int, 4>;
+  using Array1i  = Array<int, 1, 1>;
+  using Array1u  = Array<unsigned int, 1, 1>;
+  using Array1s  = Array<short, 1, 1>;
+  using Array1us = Array<unsigned short, 1, 1>;
+  using Array1f  = Array<float, 1, 1>;
+  
 } // namespace Eigen

@@ -4,7 +4,6 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <filesystem>
 #include <vector>
 
 namespace met {
