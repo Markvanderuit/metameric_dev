@@ -78,7 +78,7 @@ namespace met {
           auto &data()       { return m_data; }
 
   public:
-    constexpr static auto channels()  { return Ty::RowsAtCompileTime; }
+    constexpr static auto channels() { return Ty::RowsAtCompileTime; }
 
     bool operator==(const auto &o) const {
       met_trace();
@@ -115,27 +115,22 @@ namespace met {
   /* Declare common types */
 
   using Image1f = Image<eig::Array1f>;
-  using Image2f = Image<eig::Array2f>;
   using Image3f = Image<eig::Array3f>;
   using Image4f = Image<eig::Array4f>;
 
   using Image1i = Image<eig::Array1i>;
-  using Image2i = Image<eig::Array2i>;
   using Image3i = Image<eig::Array3i>;
   using Image4i = Image<eig::Array4i>;
 
   using Image1u = Image<eig::Array1u>;
-  using Image2u = Image<eig::Array2u>;
   using Image3u = Image<eig::Array3u>;
   using Image4u = Image<eig::Array4u>;
 
   using Image1s = Image<eig::Array1s>;
-  using Image2s = Image<eig::Array2s>;
   using Image3s = Image<eig::Array3s>;
   using Image4s = Image<eig::Array4s>;
 
   using Image1us = Image<eig::Array1us>;
-  using Image2us = Image<eig::Array2us>;
   using Image3us = Image<eig::Array3us>;
   using Image4us = Image<eig::Array4us>;
   

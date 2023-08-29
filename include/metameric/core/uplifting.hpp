@@ -2,6 +2,7 @@
 
 #include <metameric/core/detail/scene.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <vector>
 
 namespace met {  
