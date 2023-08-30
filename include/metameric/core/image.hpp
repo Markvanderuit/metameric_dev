@@ -31,6 +31,10 @@ namespace met {
     RGBConvertType rgb_convert = RGBConvertType::eNone;
   };
 
+  // FWD
+  template <typename Ty> requires (is_approx_comparable<Ty>)
+  struct Image;
+
   namespace detail {
     struct ImageBase {
     protected:
@@ -52,13 +56,18 @@ namespace met {
         std::swap(m_size, o.m_size);
       }
 
+      template <typename Ty> requires (is_approx_comparable<Ty>)
+      Image<Ty> convert() const {
+        return convert_image<Image<Ty>>(*this, { });
+      }
+
     public: // Serialization
       virtual void to_stream(std::ostream &str) const = 0;
       virtual void fr_stream(std::istream &str)       = 0;
     };
   } // namespace detail
 
-  /* Simple 2D image representation with channel/type conversion support */
+  /* Simple 2D image representation with erased channel/type conversion support */
   template <typename Ty> requires (is_approx_comparable<Ty>)
   struct Image : public detail::ImageBase {
   protected:
@@ -70,12 +79,17 @@ namespace met {
 
     Image()  = default;
     ~Image() = default;
+
     Image(ImageLoadInfo       info);
     Image(ImageCreateInfo<Ty> info);
-
     
-    const auto &data() const { return m_data; }
-          auto &data()       { return m_data; }
+  public: // Data accessors
+    constexpr const auto &data() const { return m_data; }
+                    auto &data()       { return m_data; }
+    constexpr       auto begin() const { return m_data.begin(); }
+    constexpr       auto end()   const { return m_data.end();   }
+    constexpr       auto begin()       { return m_data.begin(); }
+    constexpr       auto end()         { return m_data.end();   }
 
   public:
     constexpr static auto channels() { return Ty::RowsAtCompileTime; }
@@ -83,8 +97,7 @@ namespace met {
     bool operator==(const auto &o) const {
       met_trace();
       return ImageBase::operator==(o) 
-          && std::equal(range_iter(m_data), 
-                        range_iter(o.m_data),
+          && std::equal(range_iter(m_data), range_iter(o.m_data),
                         [](const auto &a, const auto &b) { return a.isApprox(b); });
     }
 
