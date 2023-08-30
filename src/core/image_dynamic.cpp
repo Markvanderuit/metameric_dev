@@ -190,12 +190,10 @@ namespace met {
       m_pixel_frmt = detail::format_from_size(c);
       m_size       = { w, h };
 
-      // Allocate image memory
-      m_data.resize(m_size.prod() * detail::size_from_format(m_pixel_frmt) 
-                                  * detail::size_from_type(m_pixel_type));
-
-      // Copy over data
-      std::memcpy(m_data.data(), ptr, m_data.size());
+      // Allocate image memory and copy image data over
+      size_t data_len = m_size.prod() * detail::size_from_format(m_pixel_frmt) 
+                                      * detail::size_from_type(m_pixel_type);
+      m_data = std::vector<std::byte>(ptr, ptr + data_len);
 
       // Cleanup
       stbi_image_free(ptr);

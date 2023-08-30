@@ -61,7 +61,7 @@ namespace met {
   };
 
   /* DynamicImage.
-     Dynamic image class which can be converted to static image classes
+     Dynamic image class which can be converted to static texture classes
      when necessary. Is the primary class for loading textures from disk, for 
      (de)serialinzing textures in the internal scene format, and for handling 
      conversion between different texture types. */
