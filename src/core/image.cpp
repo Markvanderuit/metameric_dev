@@ -27,6 +27,5 @@ namespace met {
 
   declare_image(f );
   declare_image(u );
-  declare_image(s );
   declare_image(us);
 } // namespace met

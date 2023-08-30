@@ -23,9 +23,6 @@
 
 namespace met {
   namespace detail {
-    auto v3_to_v4 = [](auto v) { return (eig::Array<decltype(v)::Scalar, 4, 1>() << v, 1).finished(); };
-    auto v4_to_v3 = [](auto v) { return v.head<3>(); };
-
     std::array<std::string, 4> exr_channel_flags = { "B\0", "G\0", "R\0", "A\0" };
 
     void save_tinyexr(const fs::path &path, std::span<const float> data, uint w, uint h, uint c) {

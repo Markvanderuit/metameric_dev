@@ -96,13 +96,23 @@ namespace met {
     return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
   }
 
+  inline constexpr
+  float srgb_to_lrgb_f(float f) {
+    return f <= 0.04045f ? f / 12.92f : std::pow<float>((f + 0.055f) / 1.055f, 2.4f);
+  }
+
+  inline constexpr
+  float lrgb_to_srgb_f(float f) {
+    return f <= 0.003130f ? f * 12.92f : std::pow<float>(f, 1.0f / 2.4f) * 1.055f - 0.055f;
+  }
+
   // Convert a gamma-corrected sRGB value to linear sRGB
   inline
   Colr srgb_to_lrgb(Colr c) {
     met_trace();
-    constexpr auto srgb_to_lrgb_f = [](float f) {
+    /* constexpr auto srgb_to_lrgb_f = [](float f) {
       return f <= 0.04045f ? f / 12.92f : std::pow<float>((f + 0.055f) / 1.055f, 2.4f);
-    };
+    }; */
     std::ranges::transform(c, c.begin(), srgb_to_lrgb_f);
     return c;
   }
@@ -111,9 +121,9 @@ namespace met {
   inline
   Colr lrgb_to_srgb(Colr c) {
     met_trace();
-    constexpr auto lrgb_to_srgb_f = [](float f) {
+    /* constexpr auto lrgb_to_srgb_f = [](float f) {
       return f <= 0.003130f ? f * 12.92f : std::pow<float>(f, 1.0f / 2.4f) * 1.055f - 0.055f;
-    };
+    }; */
     std::ranges::transform(c, c.begin(), lrgb_to_srgb_f);
     return c;
   }

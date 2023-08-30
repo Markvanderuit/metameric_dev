@@ -59,7 +59,7 @@ namespace met {
     }
   } // namespace detail
 
-  template <typename InputImage, typename OutputImage>
+  template <typename OutputImage, typename InputImage>
   OutputImage convert_image(const InputImage &input, ImageConvertInfo<typename OutputImage::Type> info) {
     met_trace();
 
@@ -99,7 +99,7 @@ namespace met {
 
 #define declare_output_function(InputImage, OutputImage)                                            \
   template                                                                                          \
-  OutputImage convert_image<InputImage, OutputImage>(const InputImage &, ImageConvertInfo<typename OutputImage::Type>);
+  OutputImage convert_image<OutputImage, InputImage>(const InputImage &, ImageConvertInfo<typename OutputImage::Type>);
 
 #define declare_output_functions(InputImage, OutputDenom)                                           \
   declare_output_function(InputImage, Image<eig::Array1   ## OutputDenom>)                          \
@@ -110,7 +110,6 @@ namespace met {
 #define declare_output_functions_all(InputImage)                                                    \
   declare_output_functions(InputImage, f )                                                          \
   declare_output_functions(InputImage, u )                                                          \
-  declare_output_functions(InputImage, s )                                                          \
   declare_output_functions(InputImage, us) 
 
 #define declare_input_functions(OutputDenom)                                                        \
@@ -121,6 +120,5 @@ namespace met {
 
   declare_input_functions(f )
   declare_input_functions(u )
-  declare_input_functions(s )
   declare_input_functions(us)
 } // namespace met
