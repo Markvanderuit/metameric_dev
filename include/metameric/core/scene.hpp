@@ -42,7 +42,7 @@ namespace met {
       std::variant<float, uint> roughness;
       std::variant<float, uint> metallic;
       std::variant<float, uint> opacity;
-      std::variant<Colr, uint>  normals;
+      std::variant<Colr,  uint> normals;
 
       inline 
       bool operator==(const Material &o) const {

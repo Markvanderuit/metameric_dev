@@ -173,12 +173,12 @@ namespace met::detail {
   public: // State handling
     constexpr void set_mutated(bool b) {
       met_trace();
-      rng::for_each(m_data, [b](auto &rsrc) { rsrc.set_mutated(b); });
+      rng::for_each(m_data, [b](auto &rsrc) { rsrc.state.set_mutated(b); });
     }
 
     constexpr bool is_mutated() const {
       met_trace();
-      return rng::any_of(m_data, [](const auto &rsrc) { return rsrc.is_mutated(); });
+      return rng::any_of(m_data, [](const auto &rsrc) { return rsrc.state.is_mutated(); });
     }
 
   public: // Vector overloads

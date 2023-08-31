@@ -31,7 +31,6 @@ namespace met {
     gl::Sampler     m_sampler;
     gl::Texture2d3f m_texture;
     
-    
   public:
     bool is_active(SchedulerHandle &info) override {
       met_trace();
