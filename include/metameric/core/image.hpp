@@ -73,7 +73,7 @@ namespace met {
       PixelFormat                pixel_frmt;
       PixelType                  pixel_type;
       eig::Array2u               size;
-      std::span<const std::byte> data = { };
+      std::span<const std::byte> data        = { };
       RGBConvertType             rgb_convert = RGBConvertType::eNone;
     };
 
@@ -85,7 +85,6 @@ namespace met {
     struct ConvertInfo {
       std::optional<PixelFormat> pixel_frmt = { };
       std::optional<PixelType>   pixel_type = { };
-
       RGBConvertType             rgb_convert = RGBConvertType::eNone;
     };
 
@@ -130,6 +129,9 @@ namespace met {
     auto type() const { return m_pixel_type; }
     auto size() const { return m_size;       }
 
+    // Helper, though channel count isn't stored
+    uint channels() const;
+
     template <typename Ty = std::byte>
     std::span<const Ty> data() const {
       return cnt_span<const Ty>(m_data);
@@ -142,19 +144,40 @@ namespace met {
   
   public: // Conversion to static formats
     
+  private: // Serialization
+    void to_stream(const PixelFormat &ty, std::ostream &str) const {
+      met_trace();
+      str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
+    }
+
+    void fr_stream(PixelFormat &ty, std::istream &str) {
+      met_trace();
+      str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
+    }
+
+    void to_stream(const PixelType &ty, std::ostream &str) const {
+      met_trace();
+      str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
+    }
+
+    void fr_stream(PixelType &ty, std::istream &str) {
+      met_trace();
+      str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
+    }
+
   public: // Serialization
     void to_stream(std::ostream &str) const {
       met_trace();
-      io::to_stream(m_pixel_type, str);
-      io::to_stream(m_pixel_frmt, str);
+      this->to_stream(m_pixel_type, str);
+      this->to_stream(m_pixel_frmt, str);
       io::to_stream(m_size, str);
       io::to_stream(m_data, str);
     }
 
     void fr_stream(std::istream &str) {
       met_trace();
-      io::fr_stream(m_pixel_type, str);
-      io::fr_stream(m_pixel_frmt, str);
+      this->fr_stream(m_pixel_type, str);
+      this->fr_stream(m_pixel_frmt, str);
       io::fr_stream(m_size, str);
       io::fr_stream(m_data, str);
     }

@@ -3,7 +3,8 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/texture.hpp>
+#include <metameric/core/mesh.hpp>
+#include <metameric/core/image.hpp>
 #include <metameric/core/uplifting.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/scene.hpp>
@@ -130,8 +131,7 @@ namespace met {
 
     // Scene resources, primarily referred to by components in the scene
     detail::ResourceVector<AlMeshData>  meshes;
-    detail::ResourceVector<Texture2d3f> textures_3f;
-    detail::ResourceVector<Texture2d1f> textures_1f;
+    detail::ResourceVector<DynamicImage>images;
     detail::ResourceVector<Spec>        illuminants;
     detail::ResourceVector<CMFS>        observers;
     detail::ResourceVector<Basis>       bases;

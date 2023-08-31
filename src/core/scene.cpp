@@ -220,8 +220,7 @@ namespace met {
   void Scene::to_stream(std::ostream &str) const {
     met_trace();
     io::to_stream(meshes,      str);
-    io::to_stream(textures_3f, str);
-    io::to_stream(textures_1f, str);
+    io::to_stream(images,      str);
     io::to_stream(illuminants, str);
     io::to_stream(observers,   str);
     io::to_stream(bases,       str);
@@ -230,8 +229,7 @@ namespace met {
   void Scene::fr_stream(std::istream &str) {
     met_trace();
     io::fr_stream(meshes,      str);
-    io::fr_stream(textures_3f, str);
-    io::fr_stream(textures_1f, str);
+    io::fr_stream(images,      str);
     io::fr_stream(illuminants, str);
     io::fr_stream(observers,   str);
     io::fr_stream(bases,       str);

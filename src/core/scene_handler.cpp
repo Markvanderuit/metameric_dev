@@ -151,9 +151,9 @@ namespace met {
     // Temporary scene to which we add all imported objects
     Scene scene;
 
-    // Loading caches; prevent unnecessary texture and material loads
+    // Loading caches; prevent unnecessary image and material loads
     std::unordered_map<uint, uint>     material_uuid;
-    std::unordered_map<fs::path, uint> texture_uuid;
+    std::unordered_map<fs::path, uint> image_uuid;
 
     // First, build a list of used mesh objects by traversing assimp tree;
     // not all materials in an OBJ file are used, and we don't want to clutter
@@ -273,40 +273,27 @@ namespace met {
       material->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTexture);
       material->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture);
 
-      // Texture load helpers
-      auto texture_load_3f = [&](auto &variant, std::string_view texture_str, auto texture_value) {
-        if (auto texture_path = path.parent_path() / texture_str; !texture_str.empty() && fs::exists(texture_path)) {
-          if (auto it = texture_uuid.find(texture_path); it != texture_uuid.end()) {
-            variant = it->second;
+      // Texture image load helper
+      auto image_load = [&](auto &target, std::string_view image_str, auto image_value) {
+        if (auto image_path = path.parent_path() / image_str; !image_str.empty() && fs::exists(image_path)) {
+          if (auto it = image_uuid.find(image_path); it != image_uuid.end()) {
+            target = it->second;
           } else {
-            auto texture_data = io::load_texture2d<Colr>(texture_path, true);
-            scene.textures_3f.emplace(baseColorTexture.C_Str(), std::move(texture_data));
-            variant = static_cast<uint>(scene.textures_3f.size() - 1);
+            DynamicImage image_data = {{ .path = image_path }};
+            scene.images.emplace(image_str, std::move(image_data));
+            target = static_cast<uint>(scene.images.size() - 1);
           }
         } else {
-          variant = texture_value;
-        }
-      };
-      auto texture_load_1f = [&](auto &variant, std::string_view texture_str, auto texture_value) {
-        if (auto texture_path = path.parent_path() / texture_str; !texture_str.empty() && fs::exists(texture_path)) {
-          if (auto it = texture_uuid.find(texture_path); it != texture_uuid.end()) {
-            variant = it->second;
-          } else {
-            auto texture_data = io::load_texture2d<eig::Array1f>(texture_path, true);
-            scene.textures_1f.emplace(baseColorTexture.C_Str(), std::move(texture_data));
-            variant = static_cast<uint>(scene.textures_1f.size() - 1);
-          }
-        } else {
-          variant = texture_value;
+          target = image_value;
         }
       };
       
-      // Attempt to load all referred textures
-      texture_load_3f(m.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
-      texture_load_1f(m.metallic,  metallicTexture.C_Str(), metallicValue);
-      texture_load_1f(m.roughness, roughnessTexture.C_Str(), roughnessValue);
-      texture_load_1f(m.opacity,   opacityTexture.C_Str(), opacityValue);
-      texture_load_3f(m.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 });
+      // Attempt to load all referred texture images
+      image_load(m.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
+      image_load(m.metallic,  metallicTexture.C_Str(), metallicValue);
+      image_load(m.roughness, roughnessTexture.C_Str(), roughnessValue);
+      image_load(m.opacity,   opacityTexture.C_Str(), opacityValue);
+      image_load(m.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 });
       
       // Register material
       scene.materials.data().at(material_i_new) = { .name  = material->GetName().C_Str(), 
@@ -349,15 +336,15 @@ namespace met {
     });
     std::transform(range_iter(other.materials), std::back_inserter(scene.materials.data()), [&](auto component) {
       if (component.value.diffuse.index() == 1)
-        component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + scene.textures_3f.size());
+        component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + scene.images.size());
       if (component.value.roughness.index() == 1)
-        component.value.roughness = static_cast<uint>(std::get<1>(component.value.roughness) + scene.textures_1f.size());
+        component.value.roughness = static_cast<uint>(std::get<1>(component.value.roughness) + scene.images.size());
       if (component.value.metallic.index() == 1)
-        component.value.metallic = static_cast<uint>(std::get<1>(component.value.metallic) + scene.textures_1f.size());
+        component.value.metallic = static_cast<uint>(std::get<1>(component.value.metallic) + scene.images.size());
       if (component.value.opacity.index() == 1)
-        component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + scene.textures_1f.size());
+        component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + scene.images.size());
       if (component.value.normals.index() == 1)
-        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + scene.textures_3f.size());
+        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + scene.images.size());
       return component;
     });
     std::transform(range_iter(other.colr_systems), std::back_inserter(scene.colr_systems.data()), [&](auto component) {
@@ -371,10 +358,8 @@ namespace met {
     // Append scene resources from other scene behind current scene's components
     scene.meshes.data().insert(scene.meshes.end(),           std::make_move_iterator(other.meshes.begin()),
                                                              std::make_move_iterator(other.meshes.end()));
-    scene.textures_3f.data().insert(scene.textures_3f.end(), std::make_move_iterator(other.textures_3f.begin()),
-                                                             std::make_move_iterator(other.textures_3f.end()));
-    scene.textures_1f.data().insert(scene.textures_1f.end(), std::make_move_iterator(other.textures_1f.begin()),
-                                                             std::make_move_iterator(other.textures_1f.end()));
+    scene.images.data().insert(scene.images.end(),           std::make_move_iterator(other.images.begin()),
+                                                             std::make_move_iterator(other.images.end()));
     scene.illuminants.data().insert(scene.illuminants.end(), std::make_move_iterator(other.illuminants.begin()),
                                                              std::make_move_iterator(other.illuminants.end()));
     scene.observers.data().insert(scene.observers.end(),     std::make_move_iterator(other.observers.begin()),

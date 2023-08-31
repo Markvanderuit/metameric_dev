@@ -297,4 +297,8 @@ namespace met {
 
     return output;
   }
+
+  uint DynamicImage::channels() const {
+    return detail::size_from_format(m_pixel_frmt);
+  }
 } // namespace met

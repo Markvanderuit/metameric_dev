@@ -29,11 +29,7 @@ namespace met {
               }
             }
 
-            if (ImGui::MenuItem("Texture (RGB) (.exr, .png, .jpg, ...)")) {
-              
-            }
-
-            if (ImGui::MenuItem("Texture (A) (.exr, .png, .jpg, ...)")) {
+            if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
               
             }
 
@@ -76,14 +72,13 @@ namespace met {
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Textures ({})", e_scene.textures_3f.size() + 
-                                                                 e_scene.textures_1f.size()).c_str())) {
-          for (const auto &txtr : e_scene.textures_3f) {
-            if (ImGui::TreeNodeEx(txtr.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
+        if (ImGui::CollapsingHeader(std::format("Images ({})", e_scene.images.size()).c_str())) {
+          for (const auto &image : e_scene.images) {
+            if (ImGui::TreeNodeEx(image.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
-                ImGui::Text("Dimensions: %i x %i", txtr.value().size()[0], txtr.value().size()[1]);
-                ImGui::Value("Channels", 3);
+                ImGui::Text("Dimensions: %i x %i", image.value().size()[0], image.value().size()[1]);
+                ImGui::Value("Channels", image.value().channels());
                 ImGui::EndTooltip();
               }
 
@@ -94,27 +89,9 @@ namespace met {
               } 
               
               ImGui::TreePop();
-            }
-          }
-          for (const auto &txtr : e_scene.textures_1f) {
-            if (ImGui::TreeNodeEx(txtr.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-              if (ImGui::IsItemHovered()) {
-                ImGui::BeginTooltip();
-                ImGui::Text("Dimensions: %i x %i", txtr.value().size()[0], txtr.value().size()[1]);
-                ImGui::Value("Channels", 1);
-                ImGui::EndTooltip();
-              }
-
-              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-
-              if (ImGui::SmallButton("X")) {
-                debug::check_expr(false, "Not implemented");
-              } 
-              
-              ImGui::TreePop();
-            }
-          }
-        }
+            } // if (treenode)
+          } // for (image)
+        } // if (header)
 
         if (ImGui::CollapsingHeader(std::format("Illuminant functions ({})", e_scene.illuminants.size()).c_str())) {
           for (const auto &func : e_scene.illuminants) {

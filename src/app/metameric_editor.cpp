@@ -67,11 +67,6 @@ namespace met {
 // Application entry point
 int main() {
   try {
-    met::DynamicImage img = {{
-      .path = "C:/Users/markv/Desktop/Meshes/concrete_cat_statue_4k.blend/textures/concrete_cat_statue_nor_gl_4k.exr"
-    }};
-    fmt::print("Succes!\n");
-
     met::create_metameric_editor({ /* ... */ });
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
