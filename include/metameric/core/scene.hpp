@@ -120,20 +120,26 @@ namespace met {
     // Miscellaneous
     detail::Component<uint> observer_i; // Primary observer index; simple enough for now
 
-    // Scene objects, directly visible or edited in the scene
-    detail::ComponentVector<Object>     objects;
-    detail::ComponentVector<Emitter>    emitters;
-    detail::ComponentVector<Material>   materials;
-    detail::ComponentVector<Uplifting,
-                detail::UpliftingState> upliftings;
-    detail::ComponentVector<ColrSystem> colr_systems;
+    // Scene components, directly visible or influential in the scene
+    // On-disk, components are stored in json format
+    struct {
+      detail::ComponentVector<Object>     objects;
+      detail::ComponentVector<Emitter>    emitters;
+      detail::ComponentVector<Material>   materials;
+      detail::ComponentVector<Uplifting,
+                  detail::UpliftingState> upliftings;
+      detail::ComponentVector<ColrSystem> colr_systems;
+    } components;
 
     // Scene resources, primarily referred to by components in the scene
-    detail::ResourceVector<AlMeshData>  meshes;
-    detail::ResourceVector<DynamicImage>images;
-    detail::ResourceVector<Spec>        illuminants;
-    detail::ResourceVector<CMFS>        observers;
-    detail::ResourceVector<Basis>       bases;
+    // On-disk, resources are stored in zlib-compressed binary format
+    struct {
+      detail::ResourceVector<AlMeshData>  meshes;
+      detail::ResourceVector<DynamicImage>images;
+      detail::ResourceVector<Spec>        illuminants;
+      detail::ResourceVector<CMFS>        observers;
+      detail::ResourceVector<Basis>       bases;
+    } resources;
 
   public: // Scene helper functions
     // Obtain the spectral data of a certain color system

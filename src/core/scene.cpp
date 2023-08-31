@@ -166,73 +166,73 @@ namespace met {
   void to_json(json &js, const Scene &scene) {
     met_trace();
     js = {{ "observer_i",    scene.observer_i          },
-          { "objects",       scene.objects.data()      },
-          { "emitters",      scene.emitters.data()     },
-          { "materials",     scene.materials.data()    },
-          { "upliftings",    scene.upliftings.data()   },
-          { "colr_systems",  scene.colr_systems.data() }};
+          { "objects",       scene.components.objects.data()      },
+          { "emitters",      scene.components.emitters.data()     },
+          { "materials",     scene.components.materials.data()    },
+          { "upliftings",    scene.components.upliftings.data()   },
+          { "colr_systems",  scene.components.colr_systems.data() }};
   }
 
   void from_json(const json &js, Scene &scene) {
     met_trace();
     js.at("observer_i").get_to(scene.observer_i);
-    js.at("objects").get_to(scene.objects.data());
-    js.at("emitters").get_to(scene.emitters.data());
-    js.at("materials").get_to(scene.materials.data());
-    js.at("upliftings").get_to(scene.upliftings.data());
-    js.at("colr_systems").get_to(scene.colr_systems.data());
+    js.at("objects").get_to(scene.components.objects.data());
+    js.at("emitters").get_to(scene.components.emitters.data());
+    js.at("materials").get_to(scene.components.materials.data());
+    js.at("upliftings").get_to(scene.components.upliftings.data());
+    js.at("colr_systems").get_to(scene.components.colr_systems.data());
   }
 
   met::ColrSystem Scene::get_csys(uint i) const {
     met_trace();
-    return get_csys(colr_systems[i].value);
+    return get_csys(components.colr_systems[i].value);
   }
 
   met::ColrSystem Scene::get_csys(ColrSystem c) const {
     met_trace();
-    return { .cmfs       = observers[c.observer_i].value(),
-             .illuminant = illuminants[c.illuminant_i].value(),
+    return { .cmfs       = resources.observers[c.observer_i].value(),
+             .illuminant = resources.illuminants[c.illuminant_i].value(),
              .n_scatters = c.n_scatters };
   }
 
   met::Spec Scene::get_emitter_spd(uint i) const {
     met_trace();
-    return get_emitter_spd(emitters[i].value);
+    return get_emitter_spd(components.emitters[i].value);
   }
 
   met::Spec Scene::get_emitter_spd(Emitter e) const {
     met_trace();
-    return (illuminants[e.illuminant_i].value() * e.multiplier).eval();
+    return (resources.illuminants[e.illuminant_i].value() * e.multiplier).eval();
   }
 
   std::string Scene::get_csys_name(uint i) const {
     met_trace();
-    return get_csys_name(colr_systems[i].value);
+    return get_csys_name(components.colr_systems[i].value);
   }
 
   std::string Scene::get_csys_name(ColrSystem c) const {
     met_trace();
     return std::format("{}, {}", 
-                       observers[c.observer_i].name, 
-                       illuminants[c.illuminant_i].name);
+                       resources.observers[c.observer_i].name, 
+                       resources.illuminants[c.illuminant_i].name);
   }
 
   void Scene::to_stream(std::ostream &str) const {
     met_trace();
-    io::to_stream(meshes,      str);
-    io::to_stream(images,      str);
-    io::to_stream(illuminants, str);
-    io::to_stream(observers,   str);
-    io::to_stream(bases,       str);
+    io::to_stream(resources.meshes,      str);
+    io::to_stream(resources.images,      str);
+    io::to_stream(resources.illuminants, str);
+    io::to_stream(resources.observers,   str);
+    io::to_stream(resources.bases,       str);
   }
 
   void Scene::fr_stream(std::istream &str) {
     met_trace();
-    io::fr_stream(meshes,      str);
-    io::fr_stream(images,      str);
-    io::fr_stream(illuminants, str);
-    io::fr_stream(observers,   str);
-    io::fr_stream(bases,       str);
+    io::fr_stream(resources.meshes,      str);
+    io::fr_stream(resources.images,      str);
+    io::fr_stream(resources.illuminants, str);
+    io::fr_stream(resources.observers,   str);
+    io::fr_stream(resources.bases,       str);
   }
 
   namespace io {

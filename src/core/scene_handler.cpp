@@ -26,23 +26,22 @@ namespace met {
 
     // Pre-supply some data for an initial scene
     auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
-    scene.bases.emplace("Default basis", {
-      .mean      = loaded_tree.basis_mean,
-      .functions = loaded_tree.basis
-    });
     scene.observer_i = { .name = "Default observer", .value = 0 };
-    scene.illuminants.push("D65",      models::emitter_cie_d65);
-    scene.illuminants.push("E",        models::emitter_cie_e);
-    scene.illuminants.push("FL2",      models::emitter_cie_fl2);
-    scene.illuminants.push("FL11",     models::emitter_cie_fl11);
-    scene.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1);
-    scene.observers.push("CIE XYZ",    models::cmfs_cie_xyz);
-    scene.upliftings.emplace("Default uplifting", {
+    scene.resources.bases.emplace("Default basis", {
+      .mean      = loaded_tree.basis_mean, .functions = loaded_tree.basis
+    });
+    scene.resources.illuminants.push("D65",      models::emitter_cie_d65);
+    scene.resources.illuminants.push("E",        models::emitter_cie_e);
+    scene.resources.illuminants.push("FL2",      models::emitter_cie_fl2);
+    scene.resources.illuminants.push("FL11",     models::emitter_cie_fl11);
+    scene.resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1);
+    scene.resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz);
+    scene.components.upliftings.emplace("Default uplifting", {
       .type    = Uplifting::Type::eDelaunay,
       .basis_i = 0
     });
     Scene::ColrSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
-    scene.colr_systems.push(scene.get_csys_name(csys), csys);
+    scene.components.colr_systems.push(scene.get_csys_name(csys), csys);
   }
 
   void SceneHandler::save(const fs::path &path) {
@@ -183,7 +182,7 @@ namespace met {
             material_uuid[material_i] = material_uuid.size();
           material_i = material_uuid[material_i];
 
-          scene.objects.emplace(node->mName.C_Str(), {
+          scene.components.objects.emplace(node->mName.C_Str(), {
             .mesh_i      = i,
             .material_i  = material_i,
             .uplifting_i = 0 ,
@@ -231,11 +230,11 @@ namespace met {
           [](const aiFace &v) { return AlMeshData::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
       }
 
-      scene.meshes.emplace(mesh->mName.C_Str(), std::move(m));
+      scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));
     }
 
     // Process included materials in order
-    scene.materials.resize(material_uuid.size());
+    scene.components.materials.resize(material_uuid.size());
     for (auto [material_i_old, material_i_new] : material_uuid) {
       const auto *material = file_materials[material_i_old];
       Scene::Material m;
@@ -280,8 +279,8 @@ namespace met {
             target = it->second;
           } else {
             DynamicImage image_data = {{ .path = image_path }};
-            scene.images.emplace(image_str, std::move(image_data));
-            target = static_cast<uint>(scene.images.size() - 1);
+            scene.resources.images.emplace(image_str, std::move(image_data));
+            target = static_cast<uint>(scene.resources.images.size() - 1);
           }
         } else {
           target = image_value;
@@ -296,8 +295,8 @@ namespace met {
       image_load(m.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 });
       
       // Register material
-      scene.materials.data().at(material_i_new) = { .name  = material->GetName().C_Str(), 
-                                                    .value = std::move(m) };
+      scene.components.materials.data().at(material_i_new) 
+        = { .name  = material->GetName().C_Str(), .value = std::move(m) };
     }
 
     import_scene(std::move(scene));
@@ -310,61 +309,70 @@ namespace met {
 
   void SceneHandler::import_scene(Scene &&other) {
     // Import scene objects/emitters/materials/etc, taking care to increment indexes while bookkeeping correctly
-    std::transform(range_iter(other.upliftings.data()), 
-                   std::back_inserter(scene.upliftings.data()), [&](auto component) {
+    std::transform(range_iter(other.components.upliftings), 
+                   std::back_inserter(scene.components.upliftings.data()), [&](auto component) {
       for (auto &vert : component.value.verts) {
-        vert.csys_i += scene.colr_systems.size();
+        vert.csys_i += scene.components.colr_systems.size();
         for (auto &j : vert.csys_j)
-          j += scene.colr_systems.size();
+          j += scene.components.colr_systems.size();
         if (vert.type == Uplifting::Constraint::Type::eColorOnMesh) {
-          vert.object_i += scene.objects.size();
+          vert.object_i += scene.components.objects.size();
         }
       }
       return component;
     });
-    std::transform(range_iter(other.objects), std::back_inserter(scene.objects.data()), [&](auto component) {
-      component.value.mesh_i      += scene.meshes.size();
-      component.value.material_i  += scene.materials.size();
-      if (!other.upliftings.empty())
-        component.value.uplifting_i += scene.upliftings.size();
+    std::transform(range_iter(other.components.objects), 
+                   std::back_inserter(scene.components.objects.data()), [&](auto component) {
+      component.value.mesh_i      += scene.resources.meshes.size();
+      component.value.material_i  += scene.components.materials.size();
+      if (!other.components.upliftings.empty())
+        component.value.uplifting_i += scene.components.upliftings.size();
       return component;
     });
-    std::transform(range_iter(other.emitters), std::back_inserter(scene.emitters.data()), [&](auto component) {
-      if (!other.illuminants.empty())
-        component.value.illuminant_i += scene.illuminants.size();
+    std::transform(range_iter(other.components.emitters), 
+                   std::back_inserter(scene.components.emitters.data()), [&](auto component) {
+      if (!other.resources.illuminants.empty())
+        component.value.illuminant_i += scene.resources.illuminants.size();
       return component;
     });
-    std::transform(range_iter(other.materials), std::back_inserter(scene.materials.data()), [&](auto component) {
+    std::transform(range_iter(other.components.materials), 
+                   std::back_inserter(scene.components.materials.data()), [&](auto component) {
       if (component.value.diffuse.index() == 1)
-        component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + scene.images.size());
+        component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + scene.resources.images.size());
       if (component.value.roughness.index() == 1)
-        component.value.roughness = static_cast<uint>(std::get<1>(component.value.roughness) + scene.images.size());
+        component.value.roughness = static_cast<uint>(std::get<1>(component.value.roughness) + scene.resources.images.size());
       if (component.value.metallic.index() == 1)
-        component.value.metallic = static_cast<uint>(std::get<1>(component.value.metallic) + scene.images.size());
+        component.value.metallic = static_cast<uint>(std::get<1>(component.value.metallic) + scene.resources.images.size());
       if (component.value.opacity.index() == 1)
-        component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + scene.images.size());
+        component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + scene.resources.images.size());
       if (component.value.normals.index() == 1)
-        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + scene.images.size());
+        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + scene.resources.images.size());
       return component;
     });
-    std::transform(range_iter(other.colr_systems), std::back_inserter(scene.colr_systems.data()), [&](auto component) {
-      if (!other.observers.empty())
-        component.value.observer_i   += scene.observers.size();
-      if (!other.illuminants.empty())
-        component.value.illuminant_i += scene.illuminants.size();
+    std::transform(range_iter(other.components.colr_systems), 
+                   std::back_inserter(scene.components.colr_systems.data()), [&](auto component) {
+      if (!other.resources.observers.empty())
+        component.value.observer_i   += scene.resources.observers.size();
+      if (!other.resources.illuminants.empty())
+        component.value.illuminant_i += scene.resources.illuminants.size();
       return component;
     });
 
     // Append scene resources from other scene behind current scene's components
-    scene.meshes.data().insert(scene.meshes.end(),           std::make_move_iterator(other.meshes.begin()),
-                                                             std::make_move_iterator(other.meshes.end()));
-    scene.images.data().insert(scene.images.end(),           std::make_move_iterator(other.images.begin()),
-                                                             std::make_move_iterator(other.images.end()));
-    scene.illuminants.data().insert(scene.illuminants.end(), std::make_move_iterator(other.illuminants.begin()),
-                                                             std::make_move_iterator(other.illuminants.end()));
-    scene.observers.data().insert(scene.observers.end(),     std::make_move_iterator(other.observers.begin()),
-                                                             std::make_move_iterator(other.observers.end()));
-    scene.bases.data().insert(scene.bases.end(),             std::make_move_iterator(other.bases.begin()),
-                                                             std::make_move_iterator(other.bases.end()));
+    scene.resources.meshes.data().insert(scene.resources.meshes.end(),           
+      std::make_move_iterator(other.resources.meshes.begin()),
+      std::make_move_iterator(other.resources.meshes.end()));
+    scene.resources.images.data().insert(scene.resources.images.end(),           
+      std::make_move_iterator(other.resources.images.begin()),
+      std::make_move_iterator(other.resources.images.end()));
+    scene.resources.illuminants.data().insert(scene.resources.illuminants.end(), 
+      std::make_move_iterator(other.resources.illuminants.begin()),
+      std::make_move_iterator(other.resources.illuminants.end()));
+    scene.resources.observers.data().insert(scene.resources.observers.end(),     
+      std::make_move_iterator(other.resources.observers.begin()),
+      std::make_move_iterator(other.resources.observers.end()));
+    scene.resources.bases.data().insert(scene.resources.bases.end(),             
+      std::make_move_iterator(other.resources.bases.begin()),
+      std::make_move_iterator(other.resources.bases.end()));
   }
 } // namespace met

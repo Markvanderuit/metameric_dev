@@ -170,7 +170,18 @@ namespace met::detail {
     using Comp = Component<Ty, State>;
     std::vector<Comp> m_data;
 
-  public:
+  public: // State handling
+    constexpr void set_mutated(bool b) {
+      met_trace();
+      rng::for_each(m_data, [b](auto &rsrc) { rsrc.set_mutated(b); });
+    }
+
+    constexpr bool is_mutated() const {
+      met_trace();
+      return rng::any_of(m_data, [](const auto &rsrc) { return rsrc.is_mutated(); });
+    }
+
+  public: // Vector overloads
     constexpr void push(std::string_view name, const Ty &value) {
       m_data.push_back(Comp { .name = std::string(name), .value = value });
     }
@@ -236,16 +247,30 @@ namespace met::detail {
     using Rsrc = Resource<Ty>;
     std::vector<Rsrc> m_data;
 
-  public:
+  public: // State handling
+    constexpr void set_mutated(bool b) {
+      met_trace();
+      rng::for_each(m_data, [b](auto &rsrc) { rsrc.set_mutated(b); });
+    }
+
+    constexpr bool is_mutated() const {
+      met_trace();
+      return rng::any_of(m_data, [](const auto &rsrc) { return rsrc.is_mutated(); });
+    }
+
+  public: // Vector overloads
     constexpr void push(std::string_view name, const Ty &value) {
+      met_trace();
       m_data.push_back(Rsrc(std::string(name), value));
     }
 
     constexpr void emplace(std::string_view name, Ty &&value) {
+      met_trace();
       m_data.emplace_back(Rsrc(std::string(name), std::move(value)));
     }
     
     constexpr void erase(std::string_view name) {
+      met_trace();
       auto it = rng::find(m_data, name, &Rsrc::name);
       debug::check_expr(it != m_data.end(), "Erased scene resource does not exist");
       m_data.erase(it);
@@ -257,11 +282,13 @@ namespace met::detail {
 
     // operator("...") enables named lookup
     constexpr const Rsrc &operator()(std::string_view name) const {
+      met_trace();
       auto it = rng::find(m_data, name, &Rsrc::name);
       debug::check_expr(it != m_data.end(), "Queried scene resource does not exist");
       return *it;
     }
     constexpr       Rsrc &operator()(std::string_view name)       {
+      met_trace();
       auto it = rng::find(m_data, name, &Rsrc::name);
       debug::check_expr(it != m_data.end(), "Queried scene resource does not exist");
       return *it;

@@ -51,8 +51,8 @@ namespace met {
           ImGui::EndMenuBar();
         }
 
-        if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.meshes.size()).c_str())) {
-          for (const auto &mesh : e_scene.meshes) {
+        if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
+          for (const auto &mesh : e_scene.resources.meshes) {
             if (ImGui::TreeNodeEx(mesh.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
@@ -72,8 +72,8 @@ namespace met {
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Images ({})", e_scene.images.size()).c_str())) {
-          for (const auto &image : e_scene.images) {
+        if (ImGui::CollapsingHeader(std::format("Images ({})", e_scene.resources.images.size()).c_str())) {
+          for (const auto &image : e_scene.resources.images) {
             if (ImGui::TreeNodeEx(image.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
@@ -93,8 +93,8 @@ namespace met {
           } // for (image)
         } // if (header)
 
-        if (ImGui::CollapsingHeader(std::format("Illuminant functions ({})", e_scene.illuminants.size()).c_str())) {
-          for (const auto &func : e_scene.illuminants) {
+        if (ImGui::CollapsingHeader(std::format("Illuminant functions ({})", e_scene.resources.illuminants.size()).c_str())) {
+          for (const auto &func : e_scene.resources.illuminants) {
             if (ImGui::TreeNodeEx(func.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
 
@@ -107,16 +107,16 @@ namespace met {
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Observer functions ({})", e_scene.observers.size()).c_str())) {
-          for (const auto &func : e_scene.observers) {
+        if (ImGui::CollapsingHeader(std::format("Observer functions ({})", e_scene.resources.observers.size()).c_str())) {
+          for (const auto &func : e_scene.resources.observers) {
             if (ImGui::CollapsingHeader(func.name.c_str())) {
               // ...
             }
           }
         }
 
-        if (ImGui::CollapsingHeader(std::format("Basis functions ({})", e_scene.bases.size()).c_str())) {
-          for (const auto &func : e_scene.bases) {
+        if (ImGui::CollapsingHeader(std::format("Basis functions ({})", e_scene.resources.bases.size()).c_str())) {
+          for (const auto &func : e_scene.resources.bases) {
             if (ImGui::CollapsingHeader(func.name.c_str())) {
               // ...
             }
