@@ -24,7 +24,7 @@ namespace met::detail {
     operator bool() const { return m_mutated; };
 
     virtual 
-    bool update_state(const Ty &o) = 0;
+    bool update(const Ty &o) = 0;
   };
 
   /* Default implementing class for component state tracking;
@@ -37,13 +37,13 @@ namespace met::detail {
 
   public:
     virtual 
-    bool update_state(const Ty &o) override {
+    bool update(const Ty &o) override {
       // Eigen's blocks do not support single-component equality comparison,
       // but in general most things handle this just fine; so hack in here
       if constexpr (is_approx_comparable<Ty>)
         m_mutated = !m_cache.isApprox(o);
       else
-        m_mutated = m_cache != o;
+        m_mutated = (m_cache != o);
 
       if (m_mutated)
         m_cache = o;
@@ -63,11 +63,11 @@ namespace met::detail {
 
   public:
     virtual 
-    bool update_state(const std::vector<Ty> &o) override {
+    bool update(const std::vector<Ty> &o) override {
       if (m_cache.size() == o.size()) {
         // Handle non-resize case first
         for (uint i = 0; i < m_cache.size(); ++i)
-          m_cache[i].update_state(o[i]);
+          m_cache[i].update(o[i]);
         m_mutated = rng::any_of(m_cache, [](const auto &v) { return v.is_mutated(); });
       } else {
         // Handle shrink/grow
@@ -77,12 +77,12 @@ namespace met::detail {
 
         // First compare for smaller range of remaining elements
         for (uint i = 0; i < min_r; ++i)
-          m_cache[i].update_state(o[i]);
+          m_cache[i].update(o[i]);
 
         // Potential added elements always have state as 'true'
         if (max_r == o.size())
           for (uint i = min_r; i < max_r; ++i)
-            m_cache[i].update_state(o[i]);
+            m_cache[i].update(o[i]);
         
         m_mutated = true;
       }
@@ -102,10 +102,10 @@ namespace met::detail {
     std::string name      = "";
     Ty          value     = { };
     State       state     = { };
-
+    
     constexpr friend 
     auto operator<=>(const Component &, const Component &) = default;
-
+    
   public: // Serialization
     void to_stream(std::ostream &str) const {
       met_trace();
@@ -137,10 +137,11 @@ namespace met::detail {
     Resource(std::string_view name, Ty &&value) 
     : name(name), m_value(std::move(value)) { }
 
-  public:
+  public: // State handling
     constexpr void set_mutated(bool b) { m_mutated = b; }
     constexpr bool is_mutated() const { return m_mutated; }
 
+  public: // Boilerplate
     constexpr const Ty &value() const { return m_value; }
     constexpr       Ty &value()       { set_mutated(true); return m_value; }
 
@@ -171,6 +172,11 @@ namespace met::detail {
     std::vector<Comp> m_data;
 
   public: // State handling
+    constexpr void test_mutated() {
+      met_trace();
+      rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
+    }
+
     constexpr void set_mutated(bool b) {
       met_trace();
       rng::for_each(m_data, [b](auto &rsrc) { rsrc.state.set_mutated(b); });
@@ -178,7 +184,7 @@ namespace met::detail {
 
     constexpr bool is_mutated() const {
       met_trace();
-      return rng::any_of(m_data, [](const auto &rsrc) { return rsrc.state.is_mutated(); });
+      return rng::any_of(m_data, [](const auto &rsrc) -> bool { return rsrc.state; });
     }
 
   public: // Vector overloads

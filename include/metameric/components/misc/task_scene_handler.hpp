@@ -6,12 +6,8 @@
 
 namespace met {
   struct SceneHandlerTask : public detail::TaskNode {
-    bool is_active(SchedulerHandle &info) override {
-      return info.global("scene_handler").read_only<SceneHandler>().is_mutated();
-    }
-
     void init(SchedulerHandle &info) override {
-      // Initialize empty holder objects
+      // Initialize empty holder objects for gpu-side resources
       info("meshes").set<std::vector<detail::MeshLayout>>({ });
       info("textures").set<std::vector<detail::TextureLayout>>({ });
     }
@@ -22,8 +18,9 @@ namespace met {
       const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
       const auto &e_scene         = e_scene_handler.scene;
 
-      // Process updates to mesh resources
+      // Process updates to gpu-side mesh resources 
       if (e_scene.resources.meshes.is_mutated()) {
+        fmt::print("Pushing meshes\n");
         auto &i_meshes = info("meshes").writeable<std::vector<detail::MeshLayout>>();
         i_meshes.resize(e_scene.resources.meshes.size());
 
@@ -32,11 +29,11 @@ namespace met {
           guard_continue(rsrc.is_mutated());
           i_meshes[i] = detail::MeshLayout::realize(rsrc.value());
         } // for (uint i)
-      } // if (meshes)
-
+      }
       
-      // Process updates to images resources
+      // Process updates to gpu-side image resources
       if (e_scene.resources.images.is_mutated()) {
+        fmt::print("Pushing images\n");
         auto &i_textures = info("textures").writeable<std::vector<detail::TextureLayout>>();
         i_textures.resize(e_scene.resources.images.size());
         
@@ -45,10 +42,41 @@ namespace met {
           guard_continue(rsrc.is_mutated());
           i_textures[i] = detail::TextureLayout::realize(rsrc.value());
         } // for (uint i)
-      } // if (images)
+      }
 
-      // Scene resources are now up-to-date; set internal state flags to non-mutated in scene object
-      info.global("scene_handler").writeable<SceneHandler>().set_mutated(false);
+      // Process updates to gpu-side illuminant resources
+      if (e_scene.resources.illuminants.is_mutated()) {
+        // ...
+      }
+      
+      // Process updates to gpu-side observer resources
+      if (e_scene.resources.observers.is_mutated()) {
+        // ...
+      }
+      
+      // Process updates to gpu-side basis function resources
+      if (e_scene.resources.bases.is_mutated()) {
+        // ...
+      }
+
+      // Scene resources are now up-to-date;
+      // do some bookkeeping on state tracking across resources/components
+      {
+        auto &e_scene_handler = info.global("scene_handler").writeable<SceneHandler>();
+        auto &e_scene         = e_scene_handler.scene;
+
+        e_scene.resources.meshes.set_mutated(false);
+        e_scene.resources.images.set_mutated(false);
+        e_scene.resources.illuminants.set_mutated(false);
+        e_scene.resources.observers.set_mutated(false);
+        e_scene.resources.bases.set_mutated(false);
+
+        e_scene.components.colr_systems.test_mutated();
+        e_scene.components.emitters.test_mutated();
+        e_scene.components.materials.test_mutated();
+        e_scene.components.objects.test_mutated();
+        e_scene.components.upliftings.test_mutated();
+      }
     }
   };
 } // namespace met

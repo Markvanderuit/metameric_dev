@@ -28,6 +28,7 @@
 #include <metameric/components/dev/task_random_mapping_viewer.hpp>
 #include <metameric/components/views/task_scene_resources_editor.hpp>
 #include <metameric/components/views/task_scene_components_editor.hpp>
+#include <metameric/components/misc/task_scene_handler.hpp>
 #include <ranges>
 
 namespace met {
@@ -184,6 +185,7 @@ namespace met {
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
 
+    scheduler.task("scene_handler").init<SceneHandlerTask>();
     scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
     scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
 

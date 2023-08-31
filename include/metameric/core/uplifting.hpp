@@ -75,16 +75,16 @@ namespace met {
         ComponentState<Spec>         measurement;
 
         virtual 
-        bool update_state(const Base &o) override {
-          return m_mutated = (type.update_state(o.type)
-                           || colr_i.update_state(o.colr_i)
-                           || csys_i.update_state(o.csys_i)
-                           || colr_j.update_state(o.colr_j)
-                           || csys_j.update_state(o.csys_j)
-                           || object_i.update_state(o.object_i)
-                           || object_elem_i.update_state(o.object_elem_i)
-                           || object_elem_bary.update_state(o.object_elem_bary)
-                           || measurement.update_state(o.measurement));
+        bool update(const Base &o) override {
+          return m_mutated = (type.update(o.type)
+                           || colr_i.update(o.colr_i)
+                           || csys_i.update(o.csys_i)
+                           || colr_j.update(o.colr_j)
+                           || csys_j.update(o.csys_j)
+                           || object_i.update(o.object_i)
+                           || object_elem_i.update(o.object_elem_i)
+                           || object_elem_bary.update(o.object_elem_bary)
+                           || measurement.update(o.measurement));
         }
       };
 
@@ -101,11 +101,11 @@ namespace met {
 
     public:
       virtual 
-      bool update_state(const Base &o) override {
-        return m_mutated = (type.update_state(o.type)
-                         || basis_i.update_state(o.basis_i)
-                         || verts.update_state(o.verts)
-                         || elems.update_state(o.elems));
+      bool update(const Base &o) override {
+        return m_mutated = (type.update(o.type)
+                         || basis_i.update(o.basis_i)
+                         || verts.update(o.verts)
+                         || elems.update(o.elems));
       }
     };
   } // namespace detail

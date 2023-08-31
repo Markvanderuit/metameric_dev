@@ -278,8 +278,7 @@ namespace met {
           if (auto it = image_uuid.find(image_path); it != image_uuid.end()) {
             target = it->second;
           } else {
-            DynamicImage image_data = {{ .path = image_path }};
-            scene.resources.images.emplace(image_str, std::move(image_data));
+            scene.resources.images.emplace(image_path.filename().string(), {{ .path = image_path }});
             target = static_cast<uint>(scene.resources.images.size() - 1);
           }
         } else {
@@ -287,7 +286,7 @@ namespace met {
         }
       };
       
-      // Attempt to load all referred texture images
+      // Attempt to load all referred texture images into their variant, or instead use the provided value
       image_load(m.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
       image_load(m.metallic,  metallicTexture.C_Str(), metallicValue);
       image_load(m.roughness, roughnessTexture.C_Str(), roughnessValue);

@@ -30,7 +30,11 @@ namespace met {
             }
 
             if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
-              
+              if (fs::path path; detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
+                auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
+                auto &e_scene   = e_handler.scene;
+                e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
+              }
             }
 
             if (ImGui::MenuItem("Spectral functions")) {

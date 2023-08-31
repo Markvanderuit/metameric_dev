@@ -32,7 +32,8 @@ namespace met {
             const auto &mesh_component = e_scene.resources.meshes[object.mesh_i];
 
             // Collapsible section to modify object
-            if (ImGui::TreeNodeEx(component.name.c_str())) {
+            if (ImGui::TreeNodeEx(component.name.c_str())) { 
+              // Object mesh selector
               if (ImGui::BeginCombo("Mesh", mesh_component.name.c_str())) {
                 for (uint j = 0; j < e_scene.resources.meshes.size(); ++j) {
                   if (ImGui::Selectable(e_scene.resources.meshes[j].name.c_str(), j == object.mesh_i)) {
@@ -42,26 +43,28 @@ namespace met {
                 ImGui::EndCombo();
               }
 
+              // End of collapsible section
               ImGui::TreePop();
-            }
 
-            // Handle modifications to object copy
-            if (object != component.value)
-              info.global("scene_handler").writeable<SceneHandler>().touch({
-                .name = "Modify object",
-                .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
-                .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
-              });
-
-            // Delete button at end of line
-            ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-            if (ImGui::SmallButton("X")) {
-              info.global("scene_handler").writeable<SceneHandler>().touch({
-                .name = "Delete object",
-                .redo = [i = i]                         (auto &scene) { scene.components.objects.erase(i); },
-                .undo = [o = e_scene.components.objects](auto &scene) { scene.components.objects = o;      }
-              });
-              break;
+              // Handle modifications to object copy
+              if (object != component.value) {
+                info.global("scene_handler").writeable<SceneHandler>().touch({
+                  .name = "Modify object",
+                  .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
+                  .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
+                });
+              }
+            } else {
+              // If collapsible section is closed, put delete button at end of line
+              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+              if (ImGui::SmallButton("X")) {
+                info.global("scene_handler").writeable<SceneHandler>().touch({
+                  .name = "Delete object",
+                  .redo = [i = i]                         (auto &scene) { scene.components.objects.erase(i); },
+                  .undo = [o = e_scene.components.objects](auto &scene) { scene.components.objects = o;      }
+                });
+                break;
+              }
             }
 
             ImGui::PopID();

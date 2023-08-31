@@ -26,6 +26,7 @@ namespace met::detail {
     Spec illuminant;
   };
 
+  // Structure for gpu-side mesh data
   struct MeshLayout {
     gl::Buffer verts;
     gl::Buffer norms;
@@ -36,10 +37,16 @@ namespace met::detail {
     static MeshLayout realize(const AlMeshData &);
   };
 
+  // Structure for gpu-side image data and attached sampler
   struct TextureLayout {
     std::unique_ptr<gl::AbstractTexture> texture;
     gl::Sampler                          sampler;
 
     static TextureLayout realize(const DynamicImage &);
+  };
+
+  // Structure for gpu-side illuminant spectrum data
+  struct IlluminantLayout {
+    
   };
 } // namespace met::detail

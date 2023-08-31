@@ -18,8 +18,7 @@
 
 namespace met {
   namespace detail {
-    constexpr
-    size_t size_from_format(DynamicImage::PixelFormat fmt) {
+    constexpr size_t size_from_format(DynamicImage::PixelFormat fmt) {
       switch (fmt) {
         case DynamicImage::PixelFormat::eRGB:   return 3;
         case DynamicImage::PixelFormat::eRGBA:  return 4;
@@ -28,8 +27,17 @@ namespace met {
       }      
     }
 
-    constexpr 
-    DynamicImage::PixelFormat format_from_size(size_t size) {
+    constexpr size_t size_from_type(DynamicImage::PixelType ty) {
+      switch (ty) {
+        case DynamicImage::PixelType::eUChar:  return sizeof( uchar  );
+        case DynamicImage::PixelType::eUShort: return sizeof( ushort );
+        case DynamicImage::PixelType::eUInt:   return sizeof( uint   );
+        case DynamicImage::PixelType::eFloat:  return sizeof( float  );
+        default:                               return 0;
+      }
+    }
+
+    constexpr DynamicImage::PixelFormat format_from_size(size_t size) {
       switch (size) {
         case 3: return DynamicImage::PixelFormat::eRGB;
         case 4: return DynamicImage::PixelFormat::eRGBA;
@@ -38,21 +46,10 @@ namespace met {
       }    
     }
 
-    constexpr
-    size_t size_from_type(DynamicImage::PixelType ty) {
-      switch (ty) {
-        case DynamicImage::PixelType::eUChar:  return sizeof(uchar);
-        case DynamicImage::PixelType::eUShort: return sizeof(ushort);
-        case DynamicImage::PixelType::eUInt:   return sizeof(uint);
-        case DynamicImage::PixelType::eFloat:  return sizeof(float);
-        default:                               return 0;
-      }
-    }
-
     constexpr bool is_type_float(DynamicImage::PixelType ty)   { return ty == DynamicImage::PixelType::eFloat; }
     constexpr bool is_type_integer(DynamicImage::PixelType ty) { return ty != DynamicImage::PixelType::eFloat; }
 
-    // Default value conversion; pass-through
+    // Default value conversion; probably compiled away as pass-through
     template <typename OTy, typename ITy> 
     requires (std::is_same_v<OTy, ITy>)
     OTy convert(ITy v) {
@@ -63,7 +60,7 @@ namespace met {
     template <typename OTy, typename ITy>
     requires (!std::is_same_v<OTy, ITy> && std::is_integral_v<ITy> && std::is_integral_v<OTy>)
     OTy convert(ITy v) {
-      uint vi = std::clamp(convert<uint>(v),
+      uint vi = std::clamp(static_cast<uint>(v),
                            static_cast<uint>(std::numeric_limits<OTy>::min()),
                            static_cast<uint>(std::numeric_limits<OTy>::max()));
       return static_cast<OTy>(vi);
@@ -73,18 +70,16 @@ namespace met {
     template <typename OTy, typename ITy>
     requires (std::is_integral_v<ITy> && std::is_floating_point_v<OTy>)
     OTy convert(ITy v) {
-      constexpr auto f_div = static_cast<OTy>(std::numeric_limits<ITy>::max());
-      uint vi = convert<uint>(v);
-      return static_cast<float>(vi) / f_div;
+      uint i = convert<uint>(v);
+      return static_cast<float>(i) / static_cast<OTy>(std::numeric_limits<ITy>::max());
     }
 
     // Float-to-int conversion
     template <typename OTy, typename ITy>
     requires (std::is_floating_point_v<ITy> && std::is_integral_v<OTy>)
     OTy convert(ITy v) {
-      constexpr auto f_mul = static_cast<ITy>(std::numeric_limits<OTy>::max());
-      uint vi = static_cast<uint>(v * f_mul);
-      return convert<OTy>(vi);
+      uint i = static_cast<uint>(v * static_cast<ITy>(std::numeric_limits<OTy>::max()));
+      return convert<OTy>(i);
     }
   } // namespace detail
 
