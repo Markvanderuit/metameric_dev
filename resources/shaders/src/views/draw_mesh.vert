@@ -15,17 +15,19 @@ layout(location = 1) out vec3 out_value_norm;
 layout(location = 2) out vec2 out_value_txuv;
 
 // Uniform declarations
-layout(binding = 0) uniform b_unif {
-  mat4 camera_matrix;
-  mat4 model_matrix;
-  uint use_diffuse_texture;
+layout(binding = 0) uniform b_unif_camera {
+  mat4 trf;
+} unif_camera;
+layout(binding = 1) uniform b_unif_object {
+  mat4 trf;
   vec3 diffuse_value;
-} unif;
+  uint use_diffuse_texture;
+} unif_object;
 
 void main() {
   out_value_vert = in_value_vert;
   out_value_norm = in_value_norm;
   out_value_txuv = in_value_txuv;
   
-  gl_Position = unif.camera_matrix * vec4(in_value_vert, 1);
+  gl_Position = unif_camera.trf * unif_object.trf * vec4(in_value_vert, 1);
 }

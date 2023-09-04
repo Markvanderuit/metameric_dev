@@ -98,7 +98,6 @@ namespace met::detail {
             typename State = ComponentState<Ty>>
             requires (std::derived_from<State, ComponentStateBase<Ty>>)
   struct Component {
-    bool        is_active = true;
     std::string name      = "";
     Ty          value     = { };
     State       state     = { };

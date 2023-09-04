@@ -4,6 +4,7 @@
 #include <metameric/core/scene_handler.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
+#include <metameric/components/misc/detail/scene.hpp>
 #include <format>
 
 namespace met {
@@ -17,8 +18,9 @@ namespace met {
 
       if (ImGui::Begin("Scene resources", nullptr, ImGuiWindowFlags_MenuBar)) {
         // Get external resources
-        const auto &e_handler = info.global("scene_handler").read_only<SceneHandler>();
-        const auto &e_scene   = e_handler.scene;
+        const auto &e_handler  = info.global("scene_handler").read_only<SceneHandler>();
+        const auto &e_scene    = e_handler.scene;
+        const auto &e_textures = info("scene_handler", "textures").read_only<std::vector<detail::TextureLayout>>();
 
         if (ImGui::BeginMenuBar()) {
           if (ImGui::BeginMenu("Import")) {
@@ -69,7 +71,7 @@ namespace met {
 
               if (ImGui::SmallButton("X")) {
                 debug::check_expr(false, "Not implemented");
-              } 
+              }
               
               ImGui::TreePop();
             }
@@ -77,12 +79,18 @@ namespace met {
         }
 
         if (ImGui::CollapsingHeader(std::format("Images ({})", e_scene.resources.images.size()).c_str())) {
-          for (const auto &image : e_scene.resources.images) {
+          for (uint i = 0; i < e_scene.resources.images.size(); ++i) {
+            const auto &image = e_scene.resources.images[i];
             if (ImGui::TreeNodeEx(image.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
               if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
                 ImGui::Text("Dimensions: %i x %i", image.value().size()[0], image.value().size()[1]);
                 ImGui::Value("Channels", image.value().channels());
+                
+                if (e_textures.size() > i) {
+                  ImGui::Image(ImGui::to_ptr(e_textures[i].texture->object()), { 128, 128 });
+                }
+
                 ImGui::EndTooltip();
               }
 
@@ -94,7 +102,7 @@ namespace met {
               
               ImGui::TreePop();
             } // if (treenode)
-          } // for (image)
+          } // for (i)
         } // if (header)
 
         if (ImGui::CollapsingHeader(std::format("Illuminant functions ({})", e_scene.resources.illuminants.size()).c_str())) {

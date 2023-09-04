@@ -25,7 +25,6 @@ namespace met {
 
       // Process updates to gpu-side mesh resources 
       if (!m_is_init || e_scene.resources.meshes.is_mutated()) {
-        fmt::print("Pushing meshes\n");
         auto &i_meshes = info("meshes").writeable<std::vector<detail::MeshLayout>>();
         i_meshes.resize(e_scene.resources.meshes.size());
 
@@ -38,7 +37,6 @@ namespace met {
       
       // Process updates to gpu-side image resources
       if (!m_is_init || e_scene.resources.images.is_mutated()) {
-        fmt::print("Pushing images\n");
         auto &i_textures = info("textures").writeable<std::vector<detail::TextureLayout>>();
         i_textures.resize(e_scene.resources.images.size());
         

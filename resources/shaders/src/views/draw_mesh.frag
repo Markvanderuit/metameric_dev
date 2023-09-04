@@ -16,13 +16,15 @@ layout(location = 2) in vec2 in_value_txuv;
 layout(location = 0) out vec4 out_value_colr;
 
 // Uniform declarations
-layout(binding = 0) uniform b_unif {
-  mat4 camera_matrix;
-  mat4 model_matrix;
-  uint use_diffuse_texture;
+layout(binding = 0) uniform b_unif_camera {
+  mat4 trf;
+} unif_camera;
+layout(binding = 1) uniform b_unif_object {
+  mat4 trf;
   vec3 diffuse_value;
-} unif;
-layout(binding = 1) uniform sampler2D b_diffuse_texture;
+  uint use_diffuse_texture;
+} unif_object;
+layout(binding = 2) uniform sampler2D b_diffuse_texture;
 
 void main() {
   // Hacky lambert
@@ -32,11 +34,12 @@ void main() {
 
   // Load diffuse data
   vec3 diffuse;
-  if (unif.use_diffuse_texture == 1) {
+  if (unif_object.use_diffuse_texture == 1) {
     diffuse = texture(b_diffuse_texture, in_value_txuv).xyz;
   } else {
-    diffuse = unif.diffuse_value;
+    diffuse = unif_object.diffuse_value;
   }
 
-  out_value_colr = vec4(diffuse * cos_theta, 1);
+  vec3 v = diffuse * cos_theta;
+  out_value_colr = vec4(v, 1);
 }

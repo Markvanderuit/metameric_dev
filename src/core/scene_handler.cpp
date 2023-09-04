@@ -137,7 +137,11 @@ namespace met {
     // Attempt to import the .OBJ file using ASSIMP
     Assimp::Importer imp;
     const auto *file = imp.ReadFile(path.string(), 
-      aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals);
+      aiProcess_Triangulate             | 
+      // aiProcess_GenSmoothNormals        |
+      aiProcess_FlipUVs                 |
+      aiProcess_RemoveRedundantMaterials);
+      
 
     debug::check_expr(file, 
       std::format("File at \"{}\" could not be read. ASSIMP says: \"{}\"\n", 
@@ -214,6 +218,11 @@ namespace met {
           [](const auto &v) { return AlMeshData::NormTy { v.x, v.y, v.z }; });
       }
 
+      uint tx_count = 0;
+      for (uint i = 0; i < 16; ++i)
+        tx_count += mesh->HasTextureCoords(i) ? 1 : 0;
+      fmt::print("num texture coords; {}\n", tx_count);
+      
       // Assume first set of coords is used only
       constexpr size_t default_texture_coord = 0;
       if (mesh->HasTextureCoords(default_texture_coord)) {

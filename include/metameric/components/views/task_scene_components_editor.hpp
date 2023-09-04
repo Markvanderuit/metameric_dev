@@ -29,11 +29,26 @@ namespace met {
             // We copy the object, and then test for changes
             const auto &component      = e_scene.components.objects[i];
                   auto object          = component.value;
-            const auto &mesh_component = e_scene.resources.meshes[object.mesh_i];
 
-            // Collapsible section to modify object
-            if (ImGui::TreeNodeEx(component.name.c_str())) { 
-              // Object mesh selector
+            // Add treenode section; postpone jumping into section
+            bool open_section = ImGui::TreeNodeEx(component.name.c_str());
+            
+            // Insert delete button, is_active button on same
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
+            ImGui::Checkbox("##is_active", &object.is_active);
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+            if (ImGui::Button("X")) {
+              info.global("scene_handler").writeable<SceneHandler>().touch({
+                .name = "Delete object",
+                .redo = [i = i]                         (auto &scene) { scene.components.objects.erase(i); },
+                .undo = [o = e_scene.components.objects](auto &scene) { scene.components.objects = o;      }
+              });
+              break;
+            }
+
+            if (open_section) {
+              // Object mesh selection
+              const auto &mesh_component = e_scene.resources.meshes[object.mesh_i];
               if (ImGui::BeginCombo("Mesh", mesh_component.name.c_str())) {
                 for (uint j = 0; j < e_scene.resources.meshes.size(); ++j) {
                   if (ImGui::Selectable(e_scene.resources.meshes[j].name.c_str(), j == object.mesh_i)) {
@@ -43,28 +58,26 @@ namespace met {
                 ImGui::EndCombo();
               }
 
-              // End of collapsible section
+              // Object material selection
+              const auto &material_component = e_scene.components.materials[object.material_i];
+              if (ImGui::BeginCombo("Material", material_component.name.c_str())) {
+                for (uint j = 0; j < e_scene.components.materials.size(); ++j) {
+                  if (ImGui::Selectable(e_scene.components.materials[j].name.c_str(), j == object.material_i))
+                    object.material_i = j;
+                } // for (uint j)
+                ImGui::EndCombo();
+              }
+              
               ImGui::TreePop();
+            } // if (open_section)
 
-              // Handle modifications to object copy
-              if (object != component.value) {
-                info.global("scene_handler").writeable<SceneHandler>().touch({
-                  .name = "Modify object",
-                  .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
-                  .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
-                });
-              }
-            } else {
-              // If collapsible section is closed, put delete button at end of line
-              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-              if (ImGui::SmallButton("X")) {
-                info.global("scene_handler").writeable<SceneHandler>().touch({
-                  .name = "Delete object",
-                  .redo = [i = i]                         (auto &scene) { scene.components.objects.erase(i); },
-                  .undo = [o = e_scene.components.objects](auto &scene) { scene.components.objects = o;      }
-                });
-                break;
-              }
+            // Handle modifications to object copy
+            if (object != component.value) {
+              info.global("scene_handler").writeable<SceneHandler>().touch({
+                .name = "Modify object",
+                .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
+                .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
+              });
             }
 
             ImGui::PopID();

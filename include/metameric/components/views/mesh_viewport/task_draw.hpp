@@ -9,17 +9,23 @@
 
 namespace met {
   class MeshViewportDrawTask : public detail::TaskNode {
-    struct UnifLayout {
-      alignas(64) eig::Matrix4f camera_matrix;
-      alignas(64) eig::Matrix4f model_matrix;
-      alignas(4)  bool          use_diffuse_texture;
-      alignas(16) AlColr        diffuse_value; 
+    struct UnifCameraLayout {
+     eig::Matrix4f camera_matrix;
     };
 
-    UnifLayout  *m_unif_buffer_map;
-    gl::Buffer   m_unif_buffer;
-    gl::Program  m_program;
-    gl::DrawInfo m_draw;
+    struct UnifObjectLayout {
+      alignas(64) eig::Matrix4f model_matrix;
+      alignas(16) Colr          diffuse_value; 
+      alignas(4)  bool          use_diffuse_texture;
+    };
+
+    std::vector<UnifObjectLayout *> m_unif_object_buffer_maps;
+    std::vector<gl::Buffer>         m_unif_object_buffers;
+
+    UnifCameraLayout *m_unif_camera_buffer_map;
+    gl::Buffer        m_unif_camera_buffer;
+    gl::Program       m_program;
+    gl::DrawInfo      m_draw;
     
   public:
     bool is_active(SchedulerHandle &info) override;

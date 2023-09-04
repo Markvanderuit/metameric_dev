@@ -42,6 +42,7 @@ namespace met::detail {
     gl::Sampler sampler = {{ 
       .min_filter = gl::SamplerMinFilter::eLinear,
       .mag_filter = gl::SamplerMagFilter::eLinear,
+      .wrap       = gl::SamplerWrap::eRepeat
     }};
     
     std::unique_ptr<gl::AbstractTexture> texture;

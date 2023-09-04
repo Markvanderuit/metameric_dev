@@ -20,6 +20,9 @@ namespace met {
        couldn't be simpler. A shape represented by a surface mesh, a surface
        material, and an accompanying uplifting to handle spectral data. */
     struct Object {
+      // Is drawn in viewport
+      bool is_active = true;
+
       // Indices to an underlying mesh+material, and an applied spectral uplifting
       uint mesh_i, material_i, uplifting_i;
 
@@ -29,8 +32,8 @@ namespace met {
       inline 
       bool operator==(const Object &o) const {
         return trf.isApprox(o.trf)
-            && std::tie(mesh_i, material_i, uplifting_i) 
-            == std::tie(o.mesh_i, o.material_i, o.uplifting_i);
+            && std::tie(is_active, mesh_i, material_i, uplifting_i) 
+            == std::tie(o.is_active, o.mesh_i, o.material_i, o.uplifting_i);
       }
     };
     
@@ -65,6 +68,7 @@ namespace met {
     /* Emitter representation; 
        just a simple point light for now */
     struct Emitter {
+      bool         is_active    = true; // Is drawn in viewport
       eig::Array3f p            = 1.f; // point light position
       float        multiplier   = 1.f; // power multiplier
       uint         illuminant_i = 0;   // index to spectral illuminant
@@ -72,8 +76,8 @@ namespace met {
       inline 
       bool operator==(const Emitter &o) const {
         return p.isApprox(o.p)
-            && std::tie(multiplier, illuminant_i) 
-            == std::tie(o.multiplier, o.illuminant_i);
+            && std::tie(is_active, multiplier, illuminant_i) 
+            == std::tie(o.is_active, o.multiplier, o.illuminant_i);
       }
     };
 

@@ -25,15 +25,13 @@ namespace met {
     template <typename Ty, typename State>
     void to_json(json &js, const detail::Component<Ty, State> &component) {
       met_trace();
-      js = {{ "is_active", component.is_active },
-            { "name",      component.name      },
-            { "value",     component.value     }};
+      js = {{ "name",      component.name  },
+            { "value",     component.value }};
     }
 
     template <typename Ty, typename State>
     void from_json(const json &js, detail::Component<Ty, State> &component) {
       met_trace();
-      js.at("is_active").get_to(component.is_active);
       js.at("name").get_to(component.name);
       js.at("value").get_to(component.value);
     }
@@ -83,7 +81,8 @@ namespace met {
 
   void to_json(json &js, const Scene::Object &object) {
     met_trace();
-    js = {{ "mesh_i",      object.mesh_i      },
+    js = {{ "is_active",   object.is_active   },
+          { "mesh_i",      object.mesh_i      },
           { "material_i",  object.material_i  },
           { "uplifting_i", object.uplifting_i },
           { "trf",         object.trf         }};
@@ -91,6 +90,7 @@ namespace met {
 
   void from_json(const json &js, Scene::Object &object) {
     met_trace();
+    js.at("is_active").get_to(object.is_active);
     js.at("mesh_i").get_to(object.mesh_i);
     js.at("material_i").get_to(object.material_i);
     js.at("uplifting_i").get_to(object.uplifting_i);
@@ -137,13 +137,15 @@ namespace met {
 
   void to_json(json &js, const Scene::Emitter &emitter) {
     met_trace();
-    js = {{ "p",            emitter.p            },
+    js = {{ "is_active",    emitter.is_active   },
+          { "p",            emitter.p            },
           { "multiplier",   emitter.multiplier   },
           { "illuminant_i", emitter.illuminant_i }};
   }
 
   void from_json(const json &js, Scene::Emitter &emitter) {
     met_trace();
+    js.at("is_active").get_to(emitter.is_active);
     js.at("p").get_to(emitter.p);
     js.at("multiplier").get_to(emitter.multiplier);
     js.at("illuminant_i").get_to(emitter.illuminant_i);
