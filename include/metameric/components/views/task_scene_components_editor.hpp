@@ -141,6 +141,59 @@ namespace met {
           ImGui::PopID();
         } // if (collapsing header)
 
+        if (ImGui::CollapsingHeader(std::format("Emitters ({})", e_scene.components.emitters.size()).c_str())) {
+          ImGui::PushID("emitter_data");
+
+          // Iterate over all objects
+          for (uint i = 0; i < e_scene.components.emitters.size(); ++i) {
+            guard_break(i < e_scene.components.emitters.size()); // Gracefully handle a deletion
+
+            ImGui::PushID(std::format("emitter_data_{}", i).c_str());
+
+            // We copy the emitter, and then test for changes
+            const auto &component      = e_scene.components.emitters[i];
+                  auto emitter         = component.value;
+
+            // Add treenode section; postpone jumping into section
+            bool open_section = ImGui::TreeNodeEx(component.name.c_str());
+            
+            // Insert delete button, is_active button on same
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
+            if (ImGui::SmallButton(emitter.is_active ? "V" : "H"))
+              emitter.is_active = !emitter.is_active;
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+            if (ImGui::SmallButton("X")) {
+              info.global("scene_handler").writeable<SceneHandler>().touch({
+                .name = "Delete emitter",
+                .redo = [i = i]                         (auto &scene) { scene.components.emitters.erase(i); },
+                .undo = [o = e_scene.components.emitters](auto &scene) { scene.components.emitters = o;      }
+              });
+              break;
+            }
+
+            if (open_section) {
+              detail::fun_resource_selector("Illuminant", e_scene.resources.illuminants, emitter.illuminant_i);
+              ImGui::InputFloat("Power multiplier", &emitter.multiplier);
+              
+              // ...
+              
+              ImGui::TreePop();
+            } // if (open_section)
+
+            // Handle modifications to emitter copy
+            if (emitter != component.value) {
+              info.global("scene_handler").writeable<SceneHandler>().touch({
+                .name = "Modify emitter",
+                .redo = [i = i, obj = emitter        ](auto &scene) { scene.components.emitters[i].value = obj; },
+                .undo = [i = i, obj = component.value](auto &scene) { scene.components.emitters[i].value = obj; }
+              });
+            }
+
+            ImGui::PopID();
+          } // for (uint i)
+          ImGui::PopID();
+        } // if (collapsing header)
+
         if (ImGui::CollapsingHeader(std::format("Upliftings ({})", e_scene.components.upliftings.size()).c_str())) {
           for (const auto &object : e_scene.components.upliftings) {
             if (ImGui::TreeNodeEx(object.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
@@ -154,21 +207,6 @@ namespace met {
             }
           }
         }
-
-        if (ImGui::CollapsingHeader(std::format("Emitters ({})", e_scene.components.emitters.size()).c_str())) {
-          for (const auto &object : e_scene.components.emitters) {
-            if (ImGui::TreeNodeEx(object.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-
-              if (ImGui::SmallButton("X")) {
-                debug::check_expr(false, "Not implemented");
-              } 
-              
-              ImGui::TreePop();
-            }
-          }
-        }
-
 
         if (ImGui::CollapsingHeader(std::format("Color systems ({})", e_scene.components.colr_systems.size()).c_str())) {
           for (const auto &object : e_scene.components.colr_systems) {

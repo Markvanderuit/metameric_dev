@@ -42,6 +42,11 @@ namespace met {
     });
     Scene::ColrSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     scene.components.colr_systems.push(scene.get_csys_name(csys), csys);
+    scene.components.emitters.push("Default D65 emitter", {
+      .p            = { 0, 1, 0 },
+      .multiplier   = 1.f,
+      .illuminant_i = 0
+    });
   }
 
   void SceneHandler::save(const fs::path &path) {
