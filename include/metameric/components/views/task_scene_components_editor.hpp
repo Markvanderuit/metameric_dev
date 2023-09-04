@@ -64,63 +64,71 @@ namespace met {
               detail::fun_resource_selector("Mesh", e_scene.resources.meshes, object.mesh_i);
 
               // Diffuse section
-              ImGui::Separator();
-              if (ImGui::BeginCombo("Diffuse data", object.diffuse.index() ? "Texture" : "Value")) {
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.2);
+              if (ImGui::BeginCombo("##diffuse_data", "Diffuse")) {
                 if (ImGui::Selectable("Value", object.diffuse.index() == 0))
                   object.diffuse.emplace<0>(Colr(1));
                 if (ImGui::Selectable("Texture", object.diffuse.index() == 1))
                   object.diffuse.emplace<1>(0u);
                 ImGui::EndCombo();
               } // If (BeginCombo)
+              ImGui::SameLine();
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.7);
               if (object.diffuse.index() == 0) {
-                ImGui::ColorEdit3("Diffuse color", std::get<0>(object.diffuse).data());
+                ImGui::ColorEdit3("##diffuse_value", std::get<0>(object.diffuse).data());
               } else {
-                detail::fun_resource_selector("Diffuse texture", e_scene.resources.images, std::get<1>(object.diffuse));
+                detail::fun_resource_selector("##diffuse_texture", e_scene.resources.images, std::get<1>(object.diffuse));
               }
-              
-              // Roughness section
-              ImGui::Separator();
-              if (ImGui::BeginCombo("Roughness data", object.roughness.index() ? "Texture" : "Value")) {
+             
+              // Roughess section
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.2);
+              if (ImGui::BeginCombo("##roughness_data", "Roughness")) {
                 if (ImGui::Selectable("Value", object.roughness.index() == 0))
                   object.roughness.emplace<0>(0.f);
                 if (ImGui::Selectable("Texture", object.roughness.index() == 1))
                   object.roughness.emplace<1>(0u);
                 ImGui::EndCombo();
               } // If (BeginCombo)
+              ImGui::SameLine();
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.7);
               if (object.roughness.index() == 0) {
-                ImGui::InputFloat("Roughness value", &std::get<0>(object.roughness));
+                ImGui::InputFloat("##roughness_value", &std::get<0>(object.roughness));
               } else {
-                detail::fun_resource_selector("Roughness texture", e_scene.resources.images, std::get<1>(object.roughness));
+                detail::fun_resource_selector("##roughness_texture", e_scene.resources.images, std::get<1>(object.roughness));
               }
-              
+             
               // Metallic section
-              ImGui::Separator();
-              if (ImGui::BeginCombo("Metallic data", object.metallic.index() ? "Texture" : "Value")) {
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.2);
+              if (ImGui::BeginCombo("##metallic_data", "Metallic")) {
                 if (ImGui::Selectable("Value", object.metallic.index() == 0))
-                  object.metallic.emplace<0>(0.f);
+                  object.roughness.emplace<0>(0.f);
                 if (ImGui::Selectable("Texture", object.metallic.index() == 1))
                   object.metallic.emplace<1>(0u);
                 ImGui::EndCombo();
               } // If (BeginCombo)
+              ImGui::SameLine();
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.7);
               if (object.metallic.index() == 0) {
-                ImGui::InputFloat("Metallic value", &std::get<0>(object.metallic));
+                ImGui::InputFloat("##metallic_value", &std::get<0>(object.metallic));
               } else {
-                detail::fun_resource_selector("Metallic texture", e_scene.resources.images, std::get<1>(object.metallic));
+                detail::fun_resource_selector("##metallic_texture", e_scene.resources.images, std::get<1>(object.metallic));
               }
-              
+             
               // Opacity section
-              ImGui::Separator();
-              if (ImGui::BeginCombo("Opacity data", object.opacity.index() ? "Texture" : "Value")) {
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.2);
+              if (ImGui::BeginCombo("##opacity_data", "Opacity")) {
                 if (ImGui::Selectable("Value", object.opacity.index() == 0))
-                  object.opacity.emplace<0>(1.f);
+                  object.roughness.emplace<0>(0.f);
                 if (ImGui::Selectable("Texture", object.opacity.index() == 1))
                   object.opacity.emplace<1>(0u);
                 ImGui::EndCombo();
               } // If (BeginCombo)
+              ImGui::SameLine();
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionMax().x * 0.7);
               if (object.opacity.index() == 0) {
-                ImGui::InputFloat("Opacity value", &std::get<0>(object.opacity));
+                ImGui::InputFloat("##opacity_value", &std::get<0>(object.opacity));
               } else {
-                detail::fun_resource_selector("Opacity texture", e_scene.resources.images, std::get<1>(object.opacity));
+                detail::fun_resource_selector("##opacity_texture", e_scene.resources.images, std::get<1>(object.opacity));
               }
               
               ImGui::TreePop();
