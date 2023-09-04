@@ -17,6 +17,9 @@ layout(location = 2) out vec2 out_value_txuv;
 // Uniform declarations
 layout(binding = 0) uniform b_unif {
   mat4 camera_matrix;
+  mat4 model_matrix;
+  uint use_diffuse_texture;
+  vec3 diffuse_value;
 } unif;
 
 void main() {

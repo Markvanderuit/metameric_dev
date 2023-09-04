@@ -54,9 +54,6 @@ namespace met {
     if (!info.scene_path.empty())
       scene_handler.load(info.scene_path);
 
-    auto v = (eig::Vector4f() << 1, 2, 3, 4, 5).finished();
-    fmt::print("{}\n", v);
-
     // Create and start runtime loop
     submit_metameric_editor_schedule(scheduler);
     while (!window.should_close())

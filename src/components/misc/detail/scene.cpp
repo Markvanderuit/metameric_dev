@@ -7,18 +7,18 @@ namespace met::detail {
     
     // Initialize mesh buffers
     gl::Buffer verts = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
-    gl::Buffer norms = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
-    gl::Buffer texuv = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
-    gl::Buffer elems = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
+    gl::Buffer norms = {{ .data = cnt_span<const std::byte>(mesh.norms) }};
+    gl::Buffer texuv = {{ .data = cnt_span<const std::byte>(mesh.uvs)   }};
+    gl::Buffer elems = {{ .data = cnt_span<const std::byte>(mesh.elems) }};
 
     // Initialize corresponding VAO
     gl::Array array = {{
       .buffers  = {{ .buffer = &verts, .index = 0, .stride = sizeof(AlMeshData::VertTy) },
-                    { .buffer = &norms, .index = 1, .stride = sizeof(AlMeshData::VertTy) },
-                    { .buffer = &texuv, .index = 2, .stride = sizeof(AlMeshData::UVTy)   }},
+                   { .buffer = &norms, .index = 1, .stride = sizeof(AlMeshData::VertTy) },
+                   { .buffer = &texuv, .index = 2, .stride = sizeof(AlMeshData::UVTy)   }},
       .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 },
-                    { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e3 },
-                    { .attrib_index = 2, .buffer_index = 2, .size = gl::VertexAttribSize::e2 }},
+                   { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e3 },
+                   { .attrib_index = 2, .buffer_index = 2, .size = gl::VertexAttribSize::e2 }},
       .elements = &elems
     }};
 

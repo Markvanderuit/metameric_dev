@@ -18,16 +18,25 @@ layout(location = 0) out vec4 out_value_colr;
 // Uniform declarations
 layout(binding = 0) uniform b_unif {
   mat4 camera_matrix;
+  mat4 model_matrix;
+  uint use_diffuse_texture;
+  vec3 diffuse_value;
 } unif;
-layout(binding = 1) uniform sampler2D b_txtr;
+layout(binding = 1) uniform sampler2D b_diffuse_texture;
 
 void main() {
   // Hacky lambert
-  vec3 l_dir = normalize(vec3(-1, 1, -1));
-  vec3 n_dir = normalize(in_value_norm);
+  vec3 l_dir      = normalize(vec3(-1, 1, -1));
+  vec3 n_dir      = normalize(in_value_norm);
   float cos_theta = max(dot(l_dir, n_dir), 0);
 
-  vec3 diffuse = texture(b_txtr, in_value_txuv).xyz;
+  // Load diffuse data
+  vec3 diffuse;
+  if (unif.use_diffuse_texture == 1) {
+    diffuse = texture(b_diffuse_texture, in_value_txuv).xyz;
+  } else {
+    diffuse = unif.diffuse_value;
+  }
 
   out_value_colr = vec4(diffuse * cos_theta, 1);
 }

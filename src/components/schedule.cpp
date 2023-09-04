@@ -188,6 +188,7 @@ namespace met {
     scheduler.task("scene_handler").init<SceneHandlerTask>();
     scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
     scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
+    scheduler.task("mesh_viewport").init<MeshViewportTask>();
 
     scheduler.task("frame_end").init<FrameEndTask>(false);
   }

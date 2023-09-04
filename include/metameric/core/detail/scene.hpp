@@ -125,17 +125,17 @@ namespace met::detail {
      name, and especially simple state tracking without storing a resource duplicate. */
   template <typename Ty>
   class Resource {
-    bool m_mutated = true;
-    Ty   m_value   = { };
+    bool m_mutated;
+    Ty   m_value;
 
   public:
     std::string name = "";
 
     Resource() = default;
     Resource(std::string_view name, const Ty &value) 
-    : name(name), m_value(value) { }
+    : m_mutated(true), name(name), m_value(value) { }
     Resource(std::string_view name, Ty &&value) 
-    : name(name), m_value(std::move(value)) { }
+    : m_mutated(true), name(name), m_value(std::move(value)) { }
 
   public: // State handling
     constexpr void set_mutated(bool b) { m_mutated = b; }

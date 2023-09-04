@@ -5,11 +5,16 @@
 #include <metameric/components/misc/detail/scene.hpp>
 
 namespace met {
-  struct SceneHandlerTask : public detail::TaskNode {
+  class SceneHandlerTask : public detail::TaskNode {
+    bool m_is_init = false;
+
     void init(SchedulerHandle &info) override {
       // Initialize empty holder objects for gpu-side resources
       info("meshes").set<std::vector<detail::MeshLayout>>({ });
       info("textures").set<std::vector<detail::TextureLayout>>({ });
+
+      // Force upload of all resources  on first run
+      m_is_init = false;
     }
     
     void eval(SchedulerHandle &info) override {
@@ -19,43 +24,43 @@ namespace met {
       const auto &e_scene         = e_scene_handler.scene;
 
       // Process updates to gpu-side mesh resources 
-      if (e_scene.resources.meshes.is_mutated()) {
+      if (!m_is_init || e_scene.resources.meshes.is_mutated()) {
         fmt::print("Pushing meshes\n");
         auto &i_meshes = info("meshes").writeable<std::vector<detail::MeshLayout>>();
         i_meshes.resize(e_scene.resources.meshes.size());
 
         for (uint i = 0; i < i_meshes.size(); ++i) {
           const auto &rsrc = e_scene.resources.meshes[i];
-          guard_continue(rsrc.is_mutated());
+          guard_continue(!m_is_init || rsrc.is_mutated());
           i_meshes[i] = detail::MeshLayout::realize(rsrc.value());
         } // for (uint i)
       }
       
       // Process updates to gpu-side image resources
-      if (e_scene.resources.images.is_mutated()) {
+      if (!m_is_init || e_scene.resources.images.is_mutated()) {
         fmt::print("Pushing images\n");
         auto &i_textures = info("textures").writeable<std::vector<detail::TextureLayout>>();
         i_textures.resize(e_scene.resources.images.size());
         
         for (uint i = 0; i < i_textures.size(); ++i) {
           const auto &rsrc = e_scene.resources.images[i];
-          guard_continue(rsrc.is_mutated());
+          guard_continue(!m_is_init || rsrc.is_mutated());
           i_textures[i] = detail::TextureLayout::realize(rsrc.value());
         } // for (uint i)
       }
 
       // Process updates to gpu-side illuminant resources
-      if (e_scene.resources.illuminants.is_mutated()) {
+      if (!m_is_init || e_scene.resources.illuminants.is_mutated()) {
         // ...
       }
       
       // Process updates to gpu-side observer resources
-      if (e_scene.resources.observers.is_mutated()) {
+      if (!m_is_init || e_scene.resources.observers.is_mutated()) {
         // ...
       }
       
       // Process updates to gpu-side basis function resources
-      if (e_scene.resources.bases.is_mutated()) {
+      if (!m_is_init || e_scene.resources.bases.is_mutated()) {
         // ...
       }
 
@@ -77,6 +82,8 @@ namespace met {
         e_scene.components.objects.test_mutated();
         e_scene.components.upliftings.test_mutated();
       }
+
+      m_is_init = true;
     }
   };
 } // namespace met

@@ -14,6 +14,9 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
   struct MeshViewportViewBeginTask : public detail::TaskNode {
     void init(SchedulerHandle &info) override {
       met_trace_full();
@@ -92,7 +95,6 @@ namespace met {
 
       // Get external resources 
       auto e_lrgb_target_handle = info.relative("view_begin")("lrgb_target");
-      const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
       const auto &e_lrgb_target = e_lrgb_target_handle.read_only<gl::Texture2d4f>();
 
       // Get modified resources 
@@ -100,20 +102,16 @@ namespace met {
 
       // (Re-)create framebuffer and renderbuffers if the viewport has resized
       if (!i_frame_buffer_ms.is_init() || e_lrgb_target_handle.is_mutated()) {
-        m_color_buffer_ms = {{ .size = e_lrgb_target.size().max(1) }};
-        m_depth_buffer_ms = {{ .size = e_lrgb_target.size().max(1) }};
+        m_color_buffer_ms = {{ .size = e_lrgb_target.size().max(1).eval() }};
+        m_depth_buffer_ms = {{ .size = e_lrgb_target.size().max(1).eval() }};
         i_frame_buffer_ms = {{ .type = gl::FramebufferType::eColor, .attachment = &m_color_buffer_ms },
                              { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer_ms }};
       }
 
-      eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
-                              ? eig::Array4f { 0, 0, 0, 1 } 
-                              : ImGui::GetStyleColorVec4(ImGuiCol_ChildBg);
-
       // Clear framebuffer target for next subtasks
-      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, clear_colr);
-      i_frame_buffer_ms.clear(gl::FramebufferType::eDepth, 1.f);
       i_frame_buffer_ms.bind();
+      i_frame_buffer_ms.clear(gl::FramebufferType::eColor, eig::Array4f { 0.1, 0.1, 0.1, 1 });
+      i_frame_buffer_ms.clear(gl::FramebufferType::eDepth, 1.f);
 
       // Specify viewport for next subtasks
       gl::state::set_viewport(m_color_buffer_ms.size());    
@@ -143,14 +141,15 @@ namespace met {
       met_trace_full();
 
       // Set up draw components for gamma correction
-      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
+      m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, 
+                     .mag_filter = gl::SamplerMagFilter::eNearest }};
       m_program = {{ .type = gl::ShaderType::eCompute, 
                      .glsl_path  = "resources/shaders/misc/texture_resample.comp", 
                      .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping
-      m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = gl::BufferCreateFlags::eMapWritePersistent }};
-      m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush)[0];
+      m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
+      m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
       m_uniform_map->lrgb_to_srgb = true;
     }
     
@@ -198,6 +197,9 @@ namespace met {
 
       // Dispatch prepared work
       gl::dispatch_compute(m_dispatch);
+
+      // Switch back to default framebuffer
+      gl::Framebuffer::make_default().bind();
     }
   };
   
