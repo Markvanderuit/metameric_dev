@@ -6,8 +6,19 @@
 #include <format>
 
 namespace met {
+  namespace detail {
+    constexpr
+    auto fun_resource_selector = [](std::string_view title, const auto &resources, uint &j) {
+      if (ImGui::BeginCombo(title.data(), resources[j].name.c_str())) {
+        for (uint i = 0; i < resources.size(); ++i)
+          if (ImGui::Selectable(resources[i].name.c_str(), j == i))
+            j = i;
+        ImGui::EndCombo();
+      } // if (BeginCombo)
+    };
+  } // namespace detail
+
   class SceneComponentsEditorTask : public detail::TaskNode {
-    
   public:
     void eval(SchedulerHandle &info) override {
       met_trace_full();
@@ -35,9 +46,10 @@ namespace met {
             
             // Insert delete button, is_active button on same
             ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
-            ImGui::Checkbox("##is_active", &object.is_active);
+            if (ImGui::SmallButton(object.is_active ? "V" : "H"))
+              object.is_active = !object.is_active;
             ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-            if (ImGui::Button("X")) {
+            if (ImGui::SmallButton("X")) {
               info.global("scene_handler").writeable<SceneHandler>().touch({
                 .name = "Delete object",
                 .redo = [i = i]                         (auto &scene) { scene.components.objects.erase(i); },
@@ -47,18 +59,69 @@ namespace met {
             }
 
             if (open_section) {
-              // Object mesh selection
-              const auto &mesh_component = e_scene.resources.meshes[object.mesh_i];
-              if (ImGui::BeginCombo("Mesh", mesh_component.name.c_str())) {
-                for (uint j = 0; j < e_scene.resources.meshes.size(); ++j) {
-                  if (ImGui::Selectable(e_scene.resources.meshes[j].name.c_str(), j == object.mesh_i)) {
-                    object.mesh_i = j;
-                  }
-                } // for (uint j)
-                ImGui::EndCombo();
-              } // if (begincombo)
+              // Object mesh/uplifting selection
+              detail::fun_resource_selector("Uplifting", e_scene.components.upliftings, object.uplifting_i);
+              detail::fun_resource_selector("Mesh", e_scene.resources.meshes, object.mesh_i);
 
-              // ...
+              // Diffuse section
+              ImGui::Separator();
+              if (ImGui::BeginCombo("Diffuse data", object.diffuse.index() ? "Texture" : "Value")) {
+                if (ImGui::Selectable("Value", object.diffuse.index() == 0))
+                  object.diffuse.emplace<0>(Colr(1));
+                if (ImGui::Selectable("Texture", object.diffuse.index() == 1))
+                  object.diffuse.emplace<1>(0u);
+                ImGui::EndCombo();
+              } // If (BeginCombo)
+              if (object.diffuse.index() == 0) {
+                ImGui::ColorEdit3("Diffuse color", std::get<0>(object.diffuse).data());
+              } else {
+                detail::fun_resource_selector("Diffuse texture", e_scene.resources.images, std::get<1>(object.diffuse));
+              }
+              
+              // Roughness section
+              ImGui::Separator();
+              if (ImGui::BeginCombo("Roughness data", object.roughness.index() ? "Texture" : "Value")) {
+                if (ImGui::Selectable("Value", object.roughness.index() == 0))
+                  object.roughness.emplace<0>(0.f);
+                if (ImGui::Selectable("Texture", object.roughness.index() == 1))
+                  object.roughness.emplace<1>(0u);
+                ImGui::EndCombo();
+              } // If (BeginCombo)
+              if (object.roughness.index() == 0) {
+                ImGui::InputFloat("Roughness value", &std::get<0>(object.roughness));
+              } else {
+                detail::fun_resource_selector("Roughness texture", e_scene.resources.images, std::get<1>(object.roughness));
+              }
+              
+              // Metallic section
+              ImGui::Separator();
+              if (ImGui::BeginCombo("Metallic data", object.metallic.index() ? "Texture" : "Value")) {
+                if (ImGui::Selectable("Value", object.metallic.index() == 0))
+                  object.metallic.emplace<0>(0.f);
+                if (ImGui::Selectable("Texture", object.metallic.index() == 1))
+                  object.metallic.emplace<1>(0u);
+                ImGui::EndCombo();
+              } // If (BeginCombo)
+              if (object.metallic.index() == 0) {
+                ImGui::InputFloat("Metallic value", &std::get<0>(object.metallic));
+              } else {
+                detail::fun_resource_selector("Metallic texture", e_scene.resources.images, std::get<1>(object.metallic));
+              }
+              
+              // Opacity section
+              ImGui::Separator();
+              if (ImGui::BeginCombo("Opacity data", object.opacity.index() ? "Texture" : "Value")) {
+                if (ImGui::Selectable("Value", object.opacity.index() == 0))
+                  object.opacity.emplace<0>(1.f);
+                if (ImGui::Selectable("Texture", object.opacity.index() == 1))
+                  object.opacity.emplace<1>(0u);
+                ImGui::EndCombo();
+              } // If (BeginCombo)
+              if (object.opacity.index() == 0) {
+                ImGui::InputFloat("Opacity value", &std::get<0>(object.opacity));
+              } else {
+                detail::fun_resource_selector("Opacity texture", e_scene.resources.images, std::get<1>(object.opacity));
+              }
               
               ImGui::TreePop();
             } // if (open_section)
