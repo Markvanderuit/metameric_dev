@@ -57,7 +57,6 @@ namespace met {
 
       scene.components.objects.set_mutated(b);
       scene.components.emitters.set_mutated(b);
-      scene.components.materials.set_mutated(b);
       scene.components.upliftings.set_mutated(b);
       scene.components.colr_systems.set_mutated(b);
       
@@ -73,7 +72,6 @@ namespace met {
       return scene.observer_i.state 
           || scene.components.objects.is_mutated()
           || scene.components.emitters.is_mutated()
-          || scene.components.materials.is_mutated()
           || scene.components.upliftings.is_mutated()
           || scene.components.colr_systems.is_mutated()
           || scene.resources.meshes.is_mutated()

@@ -78,7 +78,6 @@ namespace met {
       // Gather relevant component and resource data
       const auto &component = e_scene.components.objects[i];
       const auto &object   = component.value;
-      const auto &material = e_scene.components.materials[object.material_i].value;
       const auto &mesh     = e_scene.resources.meshes[object.mesh_i].value();
 
       // Skip object if flagged as inactive
@@ -92,9 +91,9 @@ namespace met {
       auto &buffer_map = m_unif_object_buffer_maps[i];
 
       // Bind relevant diffuse texture data if exists, or specify color else
-      if (material.diffuse.index() == 1) { // texture
+      if (object.diffuse.index() == 1) { // texture
         // Test if texture data is available yet on the GL side
-        uint texture_i = std::get<1>(material.diffuse);
+        uint texture_i = std::get<1>(object.diffuse);
         guard_continue(e_textures.size() > texture_i);
 
         // Bind texture and sampler to corresponding targets
@@ -102,12 +101,12 @@ namespace met {
         m_program.bind("b_diffuse_texture",  layout.sampler);
         m_program.bind("b_diffuse_texture", *layout.texture);
       } else { // constant value
-        buffer_map->diffuse_value       = std::get<0>(material.diffuse);
+        buffer_map->diffuse_value = std::get<0>(object.diffuse);
       }
       
       // Push object uniform data
       buffer_map->model_matrix        = object.trf.matrix();
-      buffer_map->use_diffuse_texture = material.diffuse.index();
+      buffer_map->use_diffuse_texture = object.diffuse.index();
       buffer.flush();
 
       // Adjust draw object for coming draw

@@ -56,17 +56,9 @@ namespace met {
                   }
                 } // for (uint j)
                 ImGui::EndCombo();
-              }
+              } // if (begincombo)
 
-              // Object material selection
-              const auto &material_component = e_scene.components.materials[object.material_i];
-              if (ImGui::BeginCombo("Material", material_component.name.c_str())) {
-                for (uint j = 0; j < e_scene.components.materials.size(); ++j) {
-                  if (ImGui::Selectable(e_scene.components.materials[j].name.c_str(), j == object.material_i))
-                    object.material_i = j;
-                } // for (uint j)
-                ImGui::EndCombo();
-              }
+              // ...
               
               ImGui::TreePop();
             } // if (open_section)
@@ -85,20 +77,6 @@ namespace met {
           
           ImGui::PopID();
         } // if (collapsing header)
-
-        if (ImGui::CollapsingHeader(std::format("Materials ({})", e_scene.components.materials.size()).c_str())) {
-          for (const auto &object : e_scene.components.materials) {
-            if (ImGui::TreeNodeEx(object.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-              ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-
-              if (ImGui::SmallButton("X")) {
-                debug::check_expr(false, "Not implemented");
-              } 
-              
-              ImGui::TreePop();
-            }
-          }
-        }
 
         if (ImGui::CollapsingHeader(std::format("Upliftings ({})", e_scene.components.upliftings.size()).c_str())) {
           for (const auto &object : e_scene.components.upliftings) {

@@ -188,7 +188,6 @@ namespace met {
 
           scene.components.objects.emplace(node->mName.C_Str(), {
             .mesh_i      = i,
-            .material_i  = material_i,
             .uplifting_i = 0 ,
             .trf         = eig::Affine3f(trf)
           });
@@ -242,11 +241,12 @@ namespace met {
       scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));
     }
 
-    // Process included materials in order
-    scene.components.materials.resize(material_uuid.size());
-    for (auto [material_i_old, material_i_new] : material_uuid) {
-      const auto *material = file_materials[material_i_old];
-      Scene::Material m;
+    // Process object material data in order
+    for (auto &component : scene.components.objects) {
+      auto &object = component.value;
+
+      // Get referred material index of mesh
+      const auto *material = file_materials[file_meshes[object.mesh_i]->mMaterialIndex];
 
       // First define default material properties, assuming no succesful loads
       aiColor3D baseColorValue(1);
@@ -294,17 +294,13 @@ namespace met {
           target = image_value;
         }
       };
-      
+
       // Attempt to load all referred texture images into their variant, or instead use the provided value
-      image_load(m.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
-      image_load(m.metallic,  metallicTexture.C_Str(), metallicValue);
-      image_load(m.roughness, roughnessTexture.C_Str(), roughnessValue);
-      image_load(m.opacity,   opacityTexture.C_Str(), opacityValue);
-      image_load(m.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 });
-      
-      // Register material
-      scene.components.materials.data().at(material_i_new) 
-        = { .name  = material->GetName().C_Str(), .value = std::move(m) };
+      image_load(object.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
+      image_load(object.metallic,  metallicTexture.C_Str(), metallicValue);
+      image_load(object.roughness, roughnessTexture.C_Str(), roughnessValue);
+      image_load(object.opacity,   opacityTexture.C_Str(), opacityValue);
+      image_load(object.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 });
     }
 
     import_scene(std::move(scene));
@@ -331,20 +327,7 @@ namespace met {
     });
     std::transform(range_iter(other.components.objects), 
                    std::back_inserter(scene.components.objects.data()), [&](auto component) {
-      component.value.mesh_i      += scene.resources.meshes.size();
-      component.value.material_i  += scene.components.materials.size();
-      if (!other.components.upliftings.empty())
-        component.value.uplifting_i += scene.components.upliftings.size();
-      return component;
-    });
-    std::transform(range_iter(other.components.emitters), 
-                   std::back_inserter(scene.components.emitters.data()), [&](auto component) {
-      if (!other.resources.illuminants.empty())
-        component.value.illuminant_i += scene.resources.illuminants.size();
-      return component;
-    });
-    std::transform(range_iter(other.components.materials), 
-                   std::back_inserter(scene.components.materials.data()), [&](auto component) {
+      component.value.mesh_i += scene.resources.meshes.size();
       if (component.value.diffuse.index() == 1)
         component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + scene.resources.images.size());
       if (component.value.roughness.index() == 1)
@@ -355,6 +338,14 @@ namespace met {
         component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + scene.resources.images.size());
       if (component.value.normals.index() == 1)
         component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + scene.resources.images.size());
+      if (!other.components.upliftings.empty())
+        component.value.uplifting_i += scene.components.upliftings.size();
+      return component;
+    });
+    std::transform(range_iter(other.components.emitters), 
+                   std::back_inserter(scene.components.emitters.data()), [&](auto component) {
+      if (!other.resources.illuminants.empty())
+        component.value.illuminant_i += scene.resources.illuminants.size();
       return component;
     });
     std::transform(range_iter(other.components.colr_systems), 

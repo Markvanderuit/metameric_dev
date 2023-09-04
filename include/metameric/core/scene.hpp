@@ -17,51 +17,39 @@ namespace met {
   struct Scene {
   public: // Scene object classes
     /* Object representation; 
-       couldn't be simpler. A shape represented by a surface mesh, a surface
-       material, and an accompanying uplifting to handle spectral data. */
+       A shape represented by a surface mesh, material data, 
+       and an accompanying uplifting to handle spectral data. */
     struct Object {
       // Is drawn in viewport
       bool is_active = true;
 
-      // Indices to an underlying mesh+material, and an applied spectral uplifting
-      uint mesh_i, material_i, uplifting_i;
+      // Indices to underlying mesh, and applied spectral uplifting
+      uint mesh_i, uplifting_i;
 
-      // Object position/rotation/scale are captured in an affine transform
-      eig::Affine3f trf;
-
-      inline 
-      bool operator==(const Object &o) const {
-        return trf.isApprox(o.trf)
-            && std::tie(is_active, mesh_i, material_i, uplifting_i) 
-            == std::tie(o.is_active, o.mesh_i, o.material_i, o.uplifting_i);
-      }
-    };
-    
-    /* Material representation; 
-       generic PBR layout; components either hold a direct value, or indices referring
-       to corresponding texture resources */
-    struct Material {
+      // Material data, packed with object; either a specified value, or a texture index
       std::variant<Colr,  uint> diffuse;
       std::variant<float, uint> roughness;
       std::variant<float, uint> metallic;
       std::variant<float, uint> opacity;
       std::variant<Colr,  uint> normals;
 
+      // Position/rotation/scale are captured in an affine transform
+      eig::Affine3f trf;
+
       inline 
-      bool operator==(const Material &o) const {
-        // Comparison can be a little unwieldy due to the different variant permutations
-        // and Eigen's lack of a single-component operator==(); we can abuse memory instead
-        bool r = std::tie(roughness, metallic, opacity) == std::tie(o.roughness, o.metallic, o.opacity);
-        guard(r && diffuse.index() == o.diffuse.index() && normals.index() == o.normals.index(), false);
+      bool operator==(const Object &o) const {
+        guard(std::tie(roughness, metallic, opacity) == std::tie(o.roughness, o.metallic, o.opacity), false);
+        guard(diffuse.index() == o.diffuse.index() && normals.index() == o.normals.index(), false);
         switch (diffuse.index()) {
-          case 0: r &= std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)); break;
-          case 1: r &= std::get<uint>(diffuse) == std::get<uint>(o.diffuse); break;
+          case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
+          case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
         }
         switch (normals.index()) {
-          case 0: r &= std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)); break;
-          case 1: r &= std::get<uint>(normals) == std::get<uint>(o.normals); break;
+          case 0: guard(std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)), false); break;
+          case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
         }
-        return r;
+        return trf.isApprox(o.trf)
+            && std::tie(is_active, mesh_i, uplifting_i) == std::tie(o.is_active, o.mesh_i, o.uplifting_i);
       }
     };
     
@@ -129,7 +117,6 @@ namespace met {
     struct {
       detail::ComponentVector<Object>     objects;
       detail::ComponentVector<Emitter>    emitters;
-      detail::ComponentVector<Material>   materials;
       detail::ComponentVector<Uplifting,
                   detail::UpliftingState> upliftings;
       detail::ComponentVector<ColrSystem> colr_systems;

@@ -76,7 +76,6 @@ namespace met {
 
         e_scene.components.colr_systems.test_mutated();
         e_scene.components.emitters.test_mutated();
-        e_scene.components.materials.test_mutated();
         e_scene.components.objects.test_mutated();
         e_scene.components.upliftings.test_mutated();
       }
