@@ -77,9 +77,9 @@ namespace met::detail {
     eig::Array3f forward_v =  m_view.matrix().transpose().col(2).head<3>();
 
     // Define translation across camera vectors
-    eig::Translation3f transform(right_v   * 2.f * delta.x()
-                               + up_v      * 2.f * delta.y()
-                               + forward_v * 2.f * delta.z());
+    eig::Translation3f transform(right_v   * m_zoom * delta.x()
+                               + up_v      * m_zoom * delta.y()
+                               + forward_v * m_zoom * delta.z());
 
     // Translate entire of camera by specified amount
     m_center = transform * m_center.matrix();

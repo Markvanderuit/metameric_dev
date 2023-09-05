@@ -128,17 +128,18 @@ namespace met::detail {
     Ty   m_value;
 
   public:
-    std::string name = "";
+    std::string name         = "";
+    bool        is_deletable = false;
 
     Resource() = default;
-    Resource(std::string_view name, const Ty &value) 
-    : m_mutated(true), name(name), m_value(value) { }
-    Resource(std::string_view name, Ty &&value) 
-    : m_mutated(true), name(name), m_value(std::move(value)) { }
+    Resource(std::string_view name, const Ty &value, bool deletable = true) 
+    : m_mutated(true), name(name), m_value(value), is_deletable(deletable) { }
+    Resource(std::string_view name, Ty &&value, bool deletable = true) 
+    : m_mutated(true), name(name), m_value(std::move(value)), is_deletable(is_deletable) { }
 
   public: // State handling
-    constexpr void set_mutated(bool b) { m_mutated = b; }
-    constexpr bool is_mutated() const { return m_mutated; }
+    constexpr void set_mutated(bool b)  { m_mutated = b; }
+    constexpr bool is_mutated()   const { return m_mutated; }
 
   public: // Boilerplate
     constexpr const Ty &value() const { return m_value; }
@@ -264,14 +265,14 @@ namespace met::detail {
     }
 
   public: // Vector overloads
-    constexpr void push(std::string_view name, const Ty &value) {
+    constexpr void push(std::string_view name, const Ty &value, bool deletable = true) {
       met_trace();
-      m_data.push_back(Rsrc(std::string(name), value));
+      m_data.push_back(Rsrc(std::string(name), value, deletable));
     }
 
-    constexpr void emplace(std::string_view name, Ty &&value) {
+    constexpr void emplace(std::string_view name, Ty &&value, bool deletable = true) {
       met_trace();
-      m_data.emplace_back(Rsrc(std::string(name), std::move(value)));
+      m_data.emplace_back(Rsrc(std::string(name), std::move(value), deletable));
     }
     
     constexpr void erase(std::string_view name) {

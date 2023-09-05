@@ -27,26 +27,20 @@ namespace met {
     // Pre-supply some data for an initial scene
     auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
     scene.observer_i = { .name = "Default observer", .value = 0 };
-    scene.resources.bases.emplace("Default basis", {
-      .mean      = loaded_tree.basis_mean, .functions = loaded_tree.basis
-    });
-    scene.resources.illuminants.push("D65",      models::emitter_cie_d65);
-    scene.resources.illuminants.push("E",        models::emitter_cie_e);
-    scene.resources.illuminants.push("FL2",      models::emitter_cie_fl2);
-    scene.resources.illuminants.push("FL11",     models::emitter_cie_fl11);
-    scene.resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1);
-    scene.resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz);
-    scene.components.upliftings.emplace("Default uplifting", {
-      .type    = Uplifting::Type::eDelaunay,
-      .basis_i = 0
-    });
+    scene.resources.bases.emplace("Default basis", 
+      { .mean = loaded_tree.basis_mean, .functions = loaded_tree.basis },     false);
+    scene.resources.illuminants.push("D65",      models::emitter_cie_d65,     false);
+    scene.resources.illuminants.push("E",        models::emitter_cie_e,       false);
+    scene.resources.illuminants.push("FL2",      models::emitter_cie_fl2,     false);
+    scene.resources.illuminants.push("FL11",     models::emitter_cie_fl11,    false);
+    scene.resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1, false);
+    scene.resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
+    scene.components.upliftings.emplace("Default uplifting",
+      { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
     Scene::ColrSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     scene.components.colr_systems.push(scene.get_csys_name(csys), csys);
     scene.components.emitters.push("Default D65 emitter", {
-      .p            = { 0, 1, 0 },
-      .multiplier   = 1.f,
-      .illuminant_i = 0
-    });
+      .p = { 0, 1, 0 }, .multiplier = 1.f, .illuminant_i = 0 });
   }
 
   void SceneHandler::save(const fs::path &path) {
