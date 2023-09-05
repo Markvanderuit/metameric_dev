@@ -219,10 +219,9 @@ namespace met {
 
       // Handle camera update: aspect ratio, scroll delta, move delta dependent on ImGui i/o
       i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
-      i_arcball.set_dist_delta(-0.5f * io.MouseWheel);
+      i_arcball.set_zoom_delta(-0.5f * io.MouseWheel);
       if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
-        i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
-      i_arcball.update_matrices();
+        i_arcball.set_ball_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
     }
   };
 } // namespace met

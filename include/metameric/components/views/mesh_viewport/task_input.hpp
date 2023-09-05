@@ -16,7 +16,7 @@ namespace met {
         .dist            = 1.f,
         .e_eye           = 1.f,
         .e_center        = 0.f,
-        .dist_delta_mult = 0.1f
+        .zoom_delta_mult = 0.1f
       });
     }
 
@@ -39,10 +39,13 @@ namespace met {
       // Handle mouse panning data
       i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
       if (io.MouseWheel != 0.f)
-        i_arcball.set_dist_delta(-io.MouseWheel);
+        i_arcball.set_zoom_delta(-io.MouseWheel);
       if (io.MouseDown[0])
-        i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
-      i_arcball.update_matrices();
+        i_arcball.set_ball_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
+      if (io.MouseDown[1]) {
+        i_arcball.set_move_delta((eig::Array3f() 
+          << eig::Array2f(io.MouseDelta.x, io.MouseDelta.y) / viewport_size.array(), 0).finished());
+      }
     }
   };
 } // namespace met

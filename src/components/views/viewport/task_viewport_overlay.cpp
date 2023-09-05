@@ -47,7 +47,7 @@ namespace met {
     info.resource("constr_selection").set(-1);
     info.resource("lrgb_color_solid_target").init<gl::Texture2d4f>({ .size = 1 });
     info.resource("srgb_color_solid_target").init<gl::Texture2d4f>({ .size = 1 });
-    info.resource("arcball").init<detail::Arcball>({ .e_eye = 1.0f, .e_center = 0.0f, .dist_delta_mult = -0.075f });
+    info.resource("arcball").init<detail::Arcball>({ .e_eye = 1.0f, .e_center = 0.0f, .zoom_delta_mult = -0.075f });
 
     // Add subtask to handle metamer set draw
     info.child_task("draw_color_solid").init<DrawColorSolidTask>(info.task().key());
@@ -470,10 +470,9 @@ namespace met {
       if (!ImGuizmo::IsUsing()) {
         auto &io = ImGui::GetIO();
         i_arcball.m_aspect = i_lrgb_target.size().x() / i_lrgb_target.size().y();
-        i_arcball.set_dist_delta(io.MouseWheel);
+        i_arcball.set_zoom_delta(io.MouseWheel);
         if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
-          i_arcball.set_pos_delta(eig::Array2f(io.MouseDelta) / i_lrgb_target.size().cast<float>());
-        i_arcball.update_matrices();
+          i_arcball.set_ball_delta(eig::Array2f(io.MouseDelta) / i_lrgb_target.size().cast<float>());
       }
 
       // Anchor position for ocs gizmo is colr + offset, minus center offset 

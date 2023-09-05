@@ -18,8 +18,9 @@ namespace met::detail {
     eig::Array3f e_up     = { 0, 1, 0 };
 
     // Multipliers to scrolling/movement deltas
-    float        dist_delta_mult = 1.f; 
-    eig::Array2f pos_delta_mult  = 1.f; 
+    float        zoom_delta_mult = 1.f; 
+    eig::Array2f ball_delta_mult = 1.f; 
+    eig::Array3f move_delta_mult = 1.f;
   };
 
   /* 
@@ -27,119 +28,75 @@ namespace met::detail {
     src: https://asliceofrendering.com/camera/2019/11/30/ArcballCamera/
   */
   class Arcball {
-    eig::Affine3f     m_view;
-    eig::Projective3f m_proj;
-    eig::Projective3f m_full;
     eig::Array3f      m_eye;
     eig::Array3f      m_center;
     eig::Array3f      m_up;
-    float             m_dist;
-    float             m_dist_delta_mult;
-    eig::Array2f      m_pos_delta_mult;
-
-  public:
-    using InfoType = ArcballCreateInfo;
-
-    /* constr */
+    float             m_zoom;
+    float             m_zoom_delta_mult;
+    eig::Array2f      m_ball_delta_mult;
+    eig::Array3f      m_move_delta_mult;
     
-    Arcball(ArcballCreateInfo info = { })
-    : m_fov_y(info.fov_y),
-      m_near_z(info.near_z),
-      m_far_z(info.far_z),
-      m_aspect(info.aspect),
-      m_dist(info.dist),
-      m_eye(info.e_eye.matrix().normalized()), 
-      m_center(info.e_center), 
-      m_up(info.e_up),
-      m_pos_delta_mult(info.pos_delta_mult),
-      m_dist_delta_mult(info.dist_delta_mult) 
-    {
-      update_matrices();
-    }
+    // Recompute output matrices
+    void update() const; 
 
-    /* public data members; call update_matrices() after changing */
+    // Mutable output matrices and auxiliary data
+    mutable bool              m_is_mutated; // Flag to test for necessity of update
+    mutable eig::Affine3f     m_view;
+    mutable eig::Projective3f m_proj;
+    mutable eig::Projective3f m_full;
+
+  public: // Public members
+    using InfoType = ArcballCreateInfo;
 
     float m_fov_y;
     float m_near_z;
     float m_far_z;
     float m_aspect;
 
-    /* public matrix accessors; call after update_matrices() */
-    
-    eig::Affine3f     & view() { return m_view; } // Access view transform
-    eig::Projective3f & proj() { return m_proj; } // Access projection transform    
-    eig::Projective3f & full() { return m_full; } // Access full proj * view transform
-    const eig::Affine3f     & view() const { return m_view; } // Access view transform
-    const eig::Projective3f & proj() const { return m_proj; } // Access projection transform    
-    const eig::Projective3f & full() const { return m_full; } // Access full proj * view transform
+  public: // Constr and boilerplate
+    Arcball() = default;
+    Arcball(ArcballCreateInfo info = { });
 
-    /* public vector accessors */
-
-    eig::Array3f       & eye()          { return m_eye;    }
-    eig::Array3f       & up()           { return m_up;     }
-    eig::Array3f       & center()       { return m_center; }
-    const eig::Array3f & eye()    const { return m_eye;    }
-    const eig::Array3f & up()     const { return m_up;     }
-    const eig::Array3f & center() const { return m_center; }
-
-    /* misc accessors */
-
-    eig::Array3f eye_pos() const { return m_center + m_dist * (m_eye - m_center); }
-    eig::Array3f eye_dir() const { return (m_eye - m_center).matrix().normalized().eval(); }
-
-    /* update functions */
-
-    // Re-compute view, projection and full transforms
-    void update_matrices() {
-      m_view = eig::lookat_rh(m_dist * (m_eye - m_center) + m_center, m_center, m_up);
-      m_proj = eig::perspective_rh_no(m_fov_y, m_aspect, m_near_z, m_far_z);
-      m_full = m_proj * m_view;
+    // Data accessors 
+    const eig::Affine3f     & view() const { 
+      met_trace();
+      if (m_is_mutated)
+        update();
+      return m_view; 
+    }
+    const eig::Projective3f & proj() const { 
+      met_trace();
+      if (m_is_mutated)
+        update();
+      return m_proj; 
+    }
+    const eig::Projective3f & full() const { 
+      met_trace();
+      if (m_is_mutated)
+        update();
+      return m_full; 
     }
 
-    // Before next update_matrices() call, set distance delta
-    void set_dist_delta(float dist_delta) {
-      m_dist = std::max(m_dist + dist_delta * m_dist_delta_mult, 0.01f);
+    // Misc accessors
+    eig::Array3f eye_pos() const { 
+      met_trace();
+      if (m_is_mutated)
+        update();
+      return m_center + m_zoom * (m_eye - m_center); 
+    }
+    eig::Array3f eye_dir() const { 
+      met_trace();
+      if (m_is_mutated)
+        update();
+      return (m_eye - m_center).matrix().normalized().eval(); 
     }
 
-    // Before next update_matrices() call, set positional delta
-    void set_pos_delta(eig::Array2f pos_delta) {
-      guard(!pos_delta.isZero());
+  public: // Camera control functions
+    void set_zoom_delta(float        delta); // Apply delta to camera zoom
+    void set_ball_delta(eig::Array2f delta); // Appply delta to camera arcball-rotate
+    void set_move_delta(eig::Array3f delta); // Apply delta to camera move
 
-      eig::Array2f delta_angle = pos_delta
-                               * m_pos_delta_mult 
-                               * eig::Array2f(-2, 1) 
-                               * std::numbers::pi_v<float>;
-      
-      // Extract required vectors
-      eig::Vector3f right_v = -m_view.matrix().transpose().col(0).head<3>();
-      eig::Vector3f view_v  =  m_view.matrix().transpose().col(2).head<3>();
-
-      // Handle view=up edgecase
-      if (view_v.dot(m_up.matrix()) * delta_angle.sign().y() >= 0.99f) {
-        delta_angle.y() = 0.f;
-      }
-
-      // Describe camera rotation around pivot on _separate_ axes
-      eig::Affine3f rot(eig::AngleAxisf(delta_angle.y(), right_v)
-                      * eig::AngleAxisf(delta_angle.x(), m_up.matrix()));
-      
-      // Apply rotation
-      m_eye = m_center + rot * (m_eye - m_center);
-    }
-
-    /* ray tracing functions */
-
-    Ray generate_ray(eig::Vector2f screen_pos) const {
-      const float tan = std::tanf(m_fov_y * .5f);
-      const auto  mat = m_view.inverse(); // camera-to-world
-
-      eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;
-      eig::Vector3f o = mat * eig::Vector3f::Zero();
-      eig::Vector3f d = (mat * eig::Vector3f(s.x() * tan * m_aspect, 
-                                             s.y() * tan, 
-                                             -1) - o).normalized();
-      
-      return { o, d };
-    }
+  public: // Misc
+    Ray generate_ray(eig::Vector2f screen_pos) const;
   };
 } // namespace met::detail
