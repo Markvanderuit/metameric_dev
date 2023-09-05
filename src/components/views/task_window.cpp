@@ -244,6 +244,38 @@ namespace met {
 
         ImGui::Separator(); 
 
+        if (ImGui::BeginMenu("Import", is_loaded)) {
+          if (ImGui::MenuItem("Wavefront (.obj)")) {
+            if (fs::path path; detail::load_dialog(path, "obj")) {
+              auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
+              e_handler.import_wavefront_obj(path);
+            }
+          }
+
+          if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
+            if (fs::path path; detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
+              auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
+              auto &e_scene   = e_handler.scene;
+              e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
+            }
+          }
+          
+          if (ImGui::MenuItem("Spectral functions")) {
+            
+          }
+
+          if (ImGui::MenuItem("Observer functions")) {
+            
+          }
+
+          if (ImGui::MenuItem("Basis functions")) {
+            
+          }
+
+          ImGui::EndMenu();
+        }
+
+
         if (ImGui::MenuItem("Export", nullptr, nullptr, is_loaded)) { detail::handle_export(info); }
 
         ImGui::Separator(); 

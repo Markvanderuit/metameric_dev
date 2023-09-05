@@ -16,46 +16,11 @@ namespace met {
 
       ImGui::ShowDemoWindow();
 
-      if (ImGui::Begin("Scene resources", nullptr, ImGuiWindowFlags_MenuBar)) {
+      if (ImGui::Begin("Scene resources")) {
         // Get external resources
         const auto &e_handler  = info.global("scene_handler").read_only<SceneHandler>();
         const auto &e_scene    = e_handler.scene;
         const auto &e_textures = info("scene_handler", "textures").read_only<std::vector<detail::TextureLayout>>();
-
-        if (ImGui::BeginMenuBar()) {
-          if (ImGui::BeginMenu("Import")) {
-            if (ImGui::MenuItem("Wavefront (.obj)")) {
-              if (fs::path path; detail::load_dialog(path, "obj")) {
-                auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
-                e_handler.import_wavefront_obj(path);
-              }
-            }
-
-            if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
-              if (fs::path path; detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
-                auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
-                auto &e_scene   = e_handler.scene;
-                e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
-              }
-            }
-
-            if (ImGui::MenuItem("Spectral functions")) {
-              
-            }
-
-            if (ImGui::MenuItem("Observer functions")) {
-              
-            }
-
-            if (ImGui::MenuItem("Basis functions")) {
-              
-            }
-            
-            ImGui::EndMenu();
-          }          
-
-          ImGui::EndMenuBar();
-        }
 
         if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
           for (const auto &mesh : e_scene.resources.meshes) {
