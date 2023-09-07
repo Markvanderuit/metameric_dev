@@ -92,9 +92,7 @@ namespace met {
       }
       ImGui::End();
 
-      if (ImGui::Begin("Settings")) {
-        
-      
+      if (ImGui::Begin("Settings")) {   
         // Get shared resources
         const auto &e_window = info.global("window").read_only<gl::Window>();
 
@@ -127,13 +125,14 @@ namespace met {
         }
 
         Spec sd = illuminants_p0[info("single_visible").writeable<uint>()];
+        fmt::print("{}\n", sd);
         ColrSystem csys_p1_free = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1 };
-        ColrSystem csys_p1_base = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65     };
+        ColrSystem csys_p1_base = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2     };
         Colr colr_free = csys_p1_free.apply_color_direct(sd);
         Colr colr_base = csys_p1_base.apply_color_direct(sd);
 
-        ImGui::ColorEdit3("Metamer (FL2)", colr_free.data());
-        ImGui::ColorEdit3("Metamer (D65)", colr_base.data());
+        ImGui::ColorEdit3("Metamer (FL2)", colr_free.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::ColorEdit3("Metamer (D65)", colr_base.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 
       }
       ImGui::End();
@@ -357,37 +356,19 @@ namespace met {
     // Given this new set of border "incident" radiances from p1, we can now generate mismatch
     // volume points for each of them and overlap these
     rng::transform(illuminants_p0, std::back_inserter(volumes_p0), [&](const Spec &illuminant_p0) {
-      ColrSystem csys_p0_base = { .cmfs = c, .illuminant = e_base            };
-      ColrSystem csys_p0_free = { .cmfs = c, .illuminant = illuminant_p0 * e };
-      std::vector<CMFS> systems_i = { csys_p0_base.finalize_direct() };
-      std::vector<Colr> signals_i = { colr_p0 };
+      ColrSystem csys_p0_base = { .cmfs = c, .illuminant = illuminant_p0 * e };
+      ColrSystem csys_p0_free = { .cmfs = c, .illuminant = e_base            };
+      std::vector<CMFS> systems = { csys_p0_base.finalize_direct() };
+      std::vector<Colr> signals = { colr_p0 };
       return generate_mismatch_boundary({
         .basis      = basis.functions,
         .basis_mean = basis.mean,
-        .systems_i  = systems_i,
-        .signals_i  = signals_i,
+        .systems_i  = systems,
+        .signals_i  = signals,
         .system_j   = csys_p0_free.finalize_direct(),
         .samples    = samples_p0
       });
     });
-
-    /* for (const Spec &illuminant_p1 : illuminants_p1) {
-      ColrSystem csys_p0_base = { .cmfs = c, .illuminant = e_base        };
-      ColrSystem csys_p0_free = { .cmfs = c, .illuminant = illuminant_p1 };
-      std::vector<CMFS> systems_i = { csys_p0_base.finalize_direct() };
-      std::vector<Colr> signals_i = { colr_p0 };
-      std::vector<Colr> volume_p0_  = generate_mismatch_boundary({
-        .basis      = basis.functions,
-        .basis_mean = basis.mean,
-        .systems_i  = systems_i,
-        .signals_i  = signals_i,
-        .system_j   = csys_p0_free.finalize_direct(),
-        .samples    = samples
-      });
-      volume_p0.insert(volume_p0.end(), range_iter(volume_p0_));
-    } */
-
-    // fmt::print("volume_p0 : {}\n", volume_p0.size());
   }
 
   void vis() {
