@@ -72,6 +72,7 @@ namespace met {
     struct UnifLayout {
       alignas(8) eig::Array2u dims;
       alignas(4) uint         iter;
+      alignas(4) uint         n_iters;
     };
 
     gl::Buffer      m_unif;
@@ -94,6 +95,7 @@ namespace met {
       // Generate mapped uniform buffer
       m_unif     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
       m_unif_map = m_unif.map_as<UnifLayout>(buffer_access_flags).data();
+      m_unif_map->n_iters = 1;
     }
     
     void eval(SchedulerHandle &info) override {
@@ -106,7 +108,7 @@ namespace met {
         m_state = {{ .size = e_target.size().prod() * sizeof(eig::Array2u) }};
         m_iter  = 0;
       }
-
+      
       // Push uniform data
       m_unif_map->dims = e_target.size();
       m_unif_map->iter = m_iter;
@@ -122,7 +124,7 @@ namespace met {
       gl::dispatch_compute({ .groups_x = ceil_div(e_target.size().x(), 16u),
                              .groups_y = ceil_div(e_target.size().y(), 16u) });
 
-      m_iter++;
+      m_iter += 1;
       fmt::print("Samples: {}\n", m_iter);
     }
   };
@@ -149,7 +151,7 @@ namespace met {
              | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
              | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
     }).writeable<gl::Window>();
-    window.set_swap_interval(0);
+    // window.set_swap_interval(0);
 
     // Initialize OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {

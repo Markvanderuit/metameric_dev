@@ -1,0 +1,370 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <math.glsl>
+#include <random_uniform.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(std140)             uniform;
+layout(std430)             buffer;
+
+/* 
+  BVH data
+*/
+
+struct BVHInfo {
+  uint levels;       // Nr. of levels in node hierarchy
+  uint nodes_begin;  // Offset to node data range in node buffer
+  uint nodes_extent; // Extent of node data range in node buffer
+};
+
+struct PackedBVHNode { vec4 a, b; };
+struct BVHNode {
+  vec3 bbox_min;    // bounding box minimum
+  vec3 bbox_max;    // bounding box maximum
+  uint data_begin;  // underlying primitive range begin
+  uint data_extent; // underlying primitive range extent
+};
+
+BVHNode unpack(in PackedBVHNode p) {
+  BVHNode n;
+  n.bbox_min    = p.a.xyz;
+  n.bbox_max    = p.b.xyz;
+  n.data_begin  = floatBitsToInt(p.a.w);
+  n.data_extent = floatBitsToInt(p.b.w);
+  return n;
+}
+
+PackedBVHNode pack(in BVHNode n) {
+  PackedBVHNode p;
+  p.a = vec4(n.bbox_min, uintBitsToFloat(n.data_begin));
+  p.b = vec4(n.bbox_max, uintBitsToFloat(n.data_extent));
+  return p;
+}
+
+/* 
+  Scene data
+*/
+
+/* Info object for referred mesh data */
+struct MeshInfo {
+  uint elems_begin;  // Offset to element data range in element buffer
+  uint elems_extent; // Extent of element data range in element buffer
+  uint verts_begin;  // Offset to vertex data range in vertex buffer
+  uint verts_extent; // Extent of vertex data range in vertex buffer
+};
+
+/* Info object to gather Scene::Object data */
+struct ObjectInfo {
+  bool is_active;           // Should the object be interacted with?
+
+  // Shape data 
+  uint mesh_i, uplifting_i; // Indices referring to auxiliary scene resources
+  mat4 trf, trf_inv;        // Transform and inverse transform data
+
+  // Material data
+  bool  albedo_use_sampler; // Use sampler or direct value?
+  uint  albedo_i;           // Sampler index
+  vec3  albedo_v;           // Direct value
+};
+
+/* Info object to gather Scene::Emitter data */
+/* struct EmitterInfo {
+  bool is_active;            // Should the object be interacted with?
+  
+  uint mesh_i, illuminant_i; // Indices referring to auxiliary scene resources
+  mat4 trf, trf_inv;         // Transform and inverse transform data
+}; */
+
+/*
+  Experimental shit
+*/
+
+struct PackedVert { vec4 a, b; };
+struct Vert {
+  vec3 p;
+  vec3 n;
+  vec2 tx;
+};
+
+Vert unpack(in PackedVert p) {
+  Vert v;
+  v.p  = p.a.xyz;
+  v.n  = p.b.xyz;
+  v.tx = vec2(p.a.w, p.b.w);
+  return v;
+}
+
+// Scene object-based representation
+layout(binding = 13) restrict readonly buffer b_mesh_info {
+  MeshInfo[] data;
+} mesh_info_buffer;
+layout(binding = 14) restrict readonly buffer b_mesh_verts {
+  PackedVert[] data;
+} mesh_verts_buffer;
+layout(binding = 15) restrict readonly buffer b_mesh_elems {
+  uvec3[] data;
+} mesh_elems_buffer;
+layout(binding = 15) restrict readonly buffer b_bvh_info {
+  BVHInfo[] data;
+} bvh_info_buffer;
+layout(binding = 16) restrict readonly buffer b_bvh_node {
+  PackedBVHNode[] data;
+} bvh_node_buffer;
+layout(binding = 17) restrict readonly buffer b_obj_info {
+  uint         n;
+  ObjectInfo[] data;
+} obj_info_buffer;
+
+
+struct Ray { vec3 o, d; };
+
+// Object describing a potential intersection
+struct Intersect {
+  float t;        // Distance to intersected position
+  uint  object_i; // Index of intersected object in scene
+  uvec3 elem;     // Indices of intersected element's vertices in object's mesh
+};
+
+// Object describing a surface interaction
+struct Interaction {
+  float t;        // Distance to intersected position
+  vec3  p;
+  vec3  n;
+  vec2  tx;
+};
+
+// Bounding box primitive intersect; not mine
+float test_bbox(in Ray r, in vec3 bbox_min, in vec3 bbox_max) {
+  vec3 tbot = -r.d * (bbox_min - r.o);
+  vec3 ttop = -r.d * (bbox_max - r.o);
+
+  vec3 tmin = min(ttop, tbot);
+  vec3 tmax = max(ttop, tbot);
+  
+  float t0 = hmax(max(tmin.xx, tmin.yz));
+  float t1 = hmin(min(tmax.xx, tmax.yz));
+
+  return t1 > max(t0, 0.0) ? t0 : FLT_MAX;
+}
+
+// Bounding box primitive intersect; not mine
+float test_bbox(in Ray r, in uint i) {
+  vec3 bbox_min = bvh_node_buffer.data[i].a.xyz,
+       bbox_max = bvh_node_buffer.data[i].b.xyz;
+
+  vec3 tbot = -r.d * (bbox_min - r.o);
+  vec3 ttop = -r.d * (bbox_max - r.o);
+
+  vec3 tmin = min(ttop, tbot);
+  vec3 tmax = max(ttop, tbot);
+  
+  float t0 = hmax(max(tmin.xx, tmin.yz));
+  float t1 = hmin(min(tmax.xx, tmax.yz));
+
+  return t1 > max(t0, 0.0) ? t0 : FLT_MAX;
+}
+
+float test_elem(in Ray r, in uvec3 el) {
+  // Gather element data
+  vec3 a = mesh_verts_buffer.data[el.x].a.xyz,
+       b = mesh_verts_buffer.data[el.y].a.xyz,
+       c = mesh_verts_buffer.data[el.z].a.xyz;
+
+  // Let's avoid branching, so all rays perform the full test for now
+  bool hit = true;
+
+  // Compute edges, plane normal
+  vec3 ab = b - a, bc = c - b, ca = a - c;
+  vec3 n  = normalize(cross(bc, ab));
+  
+  // Test if intersected plane is front-facing
+  float n_dot_d = dot(n, r.d);
+  hit = hit && (n_dot_d > 0.f);
+
+  // Test if intersection point lies within triangle's planar boundaries
+  float t = dot((a + b + c) / 3.f - r.o, n) / n_dot_d;
+  vec3 p = r.o + t * r.d;
+  hit = hit && (dot(n, cross(p - a, ab)) >= 0.f)
+                            && (dot(n, cross(p - b, bc)) >= 0.f)
+                            && (dot(n, cross(p - c, ca)) >= 0.f);
+
+  return hit ? t : FLT_MAX;
+}
+
+bool intersect_elem(in Ray r, inout Intersect its, in uvec3 el) {
+  // Gather element data
+  vec3 a = mesh_verts_buffer.data[el.x].a.xyz,
+       b = mesh_verts_buffer.data[el.y].a.xyz,
+       c = mesh_verts_buffer.data[el.z].a.xyz;
+
+  // Let's avoid branching, so all rays perform the full test for now
+  bool closest_hit = true;
+
+  // Compute edges, plane normal
+  vec3 ab = b - a, bc = c - b, ca = a - c;
+  vec3 n  = normalize(cross(bc, ab));
+  
+  // Test if intersected plane is front-facing
+  float n_dot_d = dot(n, r.d);
+  closest_hit = closest_hit && (n_dot_d > 0.f);
+
+  // Test if intersection point is closer than current point
+  float t = dot((a + b + c) / 3.f - r.o, n) / n_dot_d;
+  closest_hit = closest_hit && (t >= 0.f && t < its.t);
+
+  // Test if intersection point lies within triangle's planar boundaries
+  vec3 p = r.o + t * r.d;
+  closest_hit = closest_hit && (dot(n, cross(p - a, ab)) >= 0.f)
+                            && (dot(n, cross(p - b, bc)) >= 0.f)
+                            && (dot(n, cross(p - c, ca)) >= 0.f);
+
+  if (closest_hit) {
+    its.t    = t;
+    its.elem = el;
+  }
+
+  return closest_hit;
+}
+
+bool intersect_mesh(in Ray r, inout Intersect its, in uint i) {
+  bool closest_hit = false;
+  
+  // Gather mesh data
+  MeshInfo info = mesh_info_buffer.data[i];
+
+  // TODO traverse BVH instead
+  for (uint j = info.elems_begin; 
+            j < info.elems_begin + info.elems_extent;
+          ++j) {
+    // Offset vertex indices
+    uvec3 el = uvec3(info.verts_begin) + mesh_elems_buffer.data[j];
+
+    // Intersect with triangle
+    float t = test_elem(r, el);
+    if (t > 0 && t < FLT_MAX) {
+      its.t       = t;
+      its.elem    = el;
+      closest_hit = true;
+    }
+
+    // // Intersect with triangle
+    // if (intersect_elem(r, its, el))
+    //   closest_hit = true;
+  } // for (uint i)
+
+  return closest_hit;
+}
+
+bool intersect_object(in Ray r, inout Intersect its, in uint object_i) {
+  bool closest_hit = false;
+
+  // Inactive objects are not interacted with
+  ObjectInfo object_info = obj_info_buffer.data[object_i];
+  if (!object_info.is_active)
+    return false;
+  
+  // Transform the world-space ray into the mesh's model space
+  Ray r_l = { (object_info.trf_inv * vec4(r.o, 1)).xyz,
+              (object_info.trf_inv * vec4(r.d, 0)).xyz };
+  
+  // On closest hit with mesh, update query object
+  if (intersect_mesh(r_l, its, object_info.mesh_i)) {
+    closest_hit = true;
+    its.object_i = object_i;
+  }
+
+  return closest_hit;
+}
+
+// Intersect a scene with a ray and return an intersection object
+Intersect intersect_scene(in Ray r) {
+  Intersect its = { FLT_MAX, 0, uvec3(0) };
+
+  for (uint i = 0; i < obj_info_buffer.n; ++i) // TODO; use a top-level hierarchy
+    intersect_object(r, its, i);
+  
+  return its;
+}
+
+vec3 gen_barycentrics(vec3 a, vec3 b, vec3 c, vec3 p) {
+  vec3 ab = b - a, ac = c - a, ap = p - a;
+
+  float d00 = dot(ab, ab);
+  float d01 = dot(ab, ac);
+  float d11 = dot(ac, ac);
+  float d20 = dot(ap, ab);
+  float d21 = dot(ap, ac);
+  float den = d00 * d11 - d01 * d11;
+
+  vec3 v;
+  v.x = (d11 * d20 - d01 * d21) / den;
+  v.y = (d00 * d21 - d01 * d20) / den;
+  v.z = 1.f - v.x - v.y;
+  return v;
+}
+
+Interaction gen_interaction(in Intersect its, in Ray r) {
+  Interaction ir;
+  
+  // Determine intesection position
+  ir.t = its.t;
+  ir.p = r.o + its.t * r.d;
+  
+  // Gather triangle data and generate barycentrics
+  Vert a = unpack(mesh_verts_buffer.data[its.elem.x]),
+       b = unpack(mesh_verts_buffer.data[its.elem.y]),
+       c = unpack(mesh_verts_buffer.data[its.elem.z]);
+  vec3 bary = gen_barycentrics(a.p, b.p, c.p, ir.p);
+
+  // Determine secondary vertex data at intersect position
+  ir.n  = bary.x * a.n + bary.y * b.n + bary.z * c.n;
+  ir.tx = bary.x * a.tx + bary.y * a.tx + bary.z * c.tx;
+
+  return ir;
+}
+
+/*
+  Actual shader
+*/
+
+// Shader storage declaration
+layout(binding = 0) restrict buffer b_state { uvec2 data[]; } state_buffer;
+
+// Uniform declarations
+layout(binding = 0) uniform b_unif {
+  uvec2 dims;
+  uint  iter;
+  uint  n_iters;
+} unif_in;
+layout(binding = 1, rgba32f) restrict uniform image2D i_target;
+
+void main() {  
+  const uvec2 i = gl_GlobalInvocationID.xy;
+  const uint  j = i.y * unif_in.dims.x + i.x;
+  guard(all(lessThan(i, unif_in.dims)));
+
+  uint iter = unif_in.iter;
+
+  uvec3 state = uvec3(i, 0);
+  vec3 value = vec3(0);
+  if (iter != 0) {
+    state = uvec3(state_buffer.data[j], unif_in.iter);
+    value = imageLoad(i_target, ivec2(i)).xyz;
+  }
+
+  for (uint k = 0; k < unif_in.n_iters; ++k) {
+    vec3 next = next_3d(state);
+    if (iter == 0) {
+      value = next;
+    } else {
+      value = ((value * vec3(iter)) + next) / vec3(iter + 1);
+    }
+    iter++;
+  } // for (uint k)
+
+  // Store current sampler state and result
+  state_buffer.data[j] = state.xy;
+  imageStore(i_target, ivec2(i), vec4(vec3(value), 1));
+}
