@@ -117,11 +117,10 @@ layout(binding = 17) restrict readonly buffer b_obj_info {
   ObjectInfo[] data;
 } obj_info_buffer;
 
-
 struct Ray { vec3 o, d; };
 
 // Object describing a potential intersection
-struct Intersect {
+struct Intersection {
   float t;        // Distance to intersected position
   uint  object_i; // Index of intersected object in scene
   uvec3 elem;     // Indices of intersected element's vertices in object's mesh
@@ -193,7 +192,7 @@ float test_elem(in Ray r, in uvec3 el) {
   return hit ? t : FLT_MAX;
 }
 
-bool intersect_elem(in Ray r, inout Intersect its, in uvec3 el) {
+bool intersect_elem(in Ray r, inout Intersection its, in uvec3 el) {
   // Gather element data
   vec3 a = mesh_verts_buffer.data[el.x].a.xyz,
        b = mesh_verts_buffer.data[el.y].a.xyz,
@@ -228,12 +227,13 @@ bool intersect_elem(in Ray r, inout Intersect its, in uvec3 el) {
   return closest_hit;
 }
 
-bool intersect_mesh(in Ray r, inout Intersect its, in uint i) {
-  bool closest_hit = false;
-  
+bool intersect_mesh(in Ray r, inout Intersection its, in uint i) {
   // Gather mesh data
   MeshInfo info = mesh_info_buffer.data[i];
 
+  // Track any new hit made
+  bool closest_hit = false;
+  
   // TODO traverse BVH instead
   for (uint j = info.elems_begin; 
             j < info.elems_begin + info.elems_extent;
@@ -241,23 +241,20 @@ bool intersect_mesh(in Ray r, inout Intersect its, in uint i) {
     // Offset vertex indices
     uvec3 el = uvec3(info.verts_begin) + mesh_elems_buffer.data[j];
 
-    // Intersect with triangle
+    // Test closest hit intersection with triangle
     float t = test_elem(r, el);
-    if (t > 0 && t < FLT_MAX) {
-      its.t       = t;
-      its.elem    = el;
-      closest_hit = true;
-    }
+    guard_continue(t > 0 && t < its.t);
 
-    // // Intersect with triangle
-    // if (intersect_elem(r, its, el))
-    //   closest_hit = true;
+    // Update intersection object
+    its.t       = t;
+    its.elem    = el;
+    closest_hit = true;
   } // for (uint i)
 
   return closest_hit;
 }
 
-bool intersect_object(in Ray r, inout Intersect its, in uint object_i) {
+bool intersect_object(in Ray r, inout Intersection its, in uint object_i) {
   bool closest_hit = false;
 
   // Inactive objects are not interacted with
@@ -266,11 +263,12 @@ bool intersect_object(in Ray r, inout Intersect its, in uint object_i) {
     return false;
   
   // Transform the world-space ray into the mesh's model space
-  Ray r_l = { (object_info.trf_inv * vec4(r.o, 1)).xyz,
-              (object_info.trf_inv * vec4(r.d, 0)).xyz };
+  // TODO; this should be made significantly cheaper
+  Ray r_ = { (object_info.trf_inv * vec4(r.o, 1)).xyz,
+             (object_info.trf_inv * vec4(r.d, 0)).xyz };
   
   // On closest hit with mesh, update query object
-  if (intersect_mesh(r_l, its, object_info.mesh_i)) {
+  if (intersect_mesh(r_, its, object_info.mesh_i)) {
     closest_hit = true;
     its.object_i = object_i;
   }
@@ -280,9 +278,10 @@ bool intersect_object(in Ray r, inout Intersect its, in uint object_i) {
 
 // Intersect a scene with a ray and return an intersection object
 Intersect intersect_scene(in Ray r) {
-  Intersect its = { FLT_MAX, 0, uvec3(0) };
+  Intersection its = { FLT_MAX, 0, uvec3(0) };
 
-  for (uint i = 0; i < obj_info_buffer.n; ++i) // TODO; use a top-level hierarchy
+  // TODO; use a top-level hierarchy instead
+  for (uint i = 0; i < obj_info_buffer.n; ++i) 
     intersect_object(r, its, i);
   
   return its;
