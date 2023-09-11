@@ -3,6 +3,7 @@
 #include <guard.glsl>
 #include <math.glsl>
 #include <random_uniform.glsl>
+#include <scene.glsl>
 
 // General layout rule declarations
 layout(local_size_x = 16, local_size_y = 16) in;
@@ -47,27 +48,7 @@ PackedBVHNode pack(in BVHNode n) {
   Scene data
 */
 
-/* Info object for referred mesh data */
-struct MeshInfo {
-  uint elems_begin;  // Offset to element data range in element buffer
-  uint elems_extent; // Extent of element data range in element buffer
-  uint verts_begin;  // Offset to vertex data range in vertex buffer
-  uint verts_extent; // Extent of vertex data range in vertex buffer
-};
 
-/* Info object to gather Scene::Object data */
-struct ObjectInfo {
-  bool is_active;           // Should the object be interacted with?
-
-  // Shape data 
-  uint mesh_i, uplifting_i; // Indices referring to auxiliary scene resources
-  mat4 trf, trf_inv;        // Transform and inverse transform data
-
-  // Material data
-  bool  albedo_use_sampler; // Use sampler or direct value?
-  uint  albedo_i;           // Sampler index
-  vec3  albedo_v;           // Direct value
-};
 
 /* Info object to gather Scene::Emitter data */
 /* struct EmitterInfo {
@@ -81,41 +62,41 @@ struct ObjectInfo {
   Experimental shit
 */
 
-struct PackedVert { vec4 a, b; };
 struct Vert {
   vec3 p;
   vec3 n;
   vec2 tx;
 };
 
-Vert unpack(in PackedVert p) {
+Vert unpack(in vec4 a, in vec4 b) {
   Vert v;
-  v.p  = p.a.xyz;
-  v.n  = p.b.xyz;
-  v.tx = vec2(p.a.w, p.b.w);
+  v.p  = a.xyz;
+  v.n  = b.xyz;
+  v.tx = vec2(a.w, b.w);
   return v;
 }
 
 // Scene object-based representation
-layout(binding = 13) restrict readonly buffer b_mesh_info {
+layout(binding = 14) restrict readonly buffer b_mesh_verts_a { vec4[]  data; } mesh_verts_buffer_a;
+layout(binding = 15) restrict readonly buffer b_mesh_verts_b { vec4[]  data; } mesh_verts_buffer_b;
+layout(binding = 16) restrict readonly buffer b_mesh_elems   { uvec3[] data; } mesh_elems_buffer;
+layout(binding = 17) restrict readonly buffer b_mesh_info {
   MeshInfo[] data;
 } mesh_info_buffer;
-layout(binding = 14) restrict readonly buffer b_mesh_verts {
-  PackedVert[] data;
-} mesh_verts_buffer;
-layout(binding = 15) restrict readonly buffer b_mesh_elems {
-  uvec3[] data;
-} mesh_elems_buffer;
-layout(binding = 15) restrict readonly buffer b_bvh_info {
-  BVHInfo[] data;
-} bvh_info_buffer;
-layout(binding = 16) restrict readonly buffer b_bvh_node {
-  PackedBVHNode[] data;
-} bvh_node_buffer;
-layout(binding = 17) restrict readonly buffer b_obj_info {
-  uint         n;
+layout(binding = 18) restrict readonly buffer b_object_info {
   ObjectInfo[] data;
 } obj_info_buffer;
+layout(binding = 19) restrict readonly buffer b_scene_info {
+  uint n_meshes;
+  uint n_objects;
+  uint n_emitters;
+} scene_info_buffer;
+layout(binding = 19) restrict readonly buffer b_bvh_info {
+  BVHInfo[] data;
+} bvh_info_buffer;
+layout(binding = 20) restrict readonly buffer b_bvh_node {
+  PackedBVHNode[] data;
+} bvh_node_buffer;
 
 struct Ray { vec3 o, d; };
 
@@ -167,9 +148,9 @@ float test_bbox(in Ray r, in uint i) {
 
 float test_elem(in Ray r, in uvec3 el) {
   // Gather element data
-  vec3 a = mesh_verts_buffer.data[el.x].a.xyz,
-       b = mesh_verts_buffer.data[el.y].a.xyz,
-       c = mesh_verts_buffer.data[el.z].a.xyz;
+  vec3 a = mesh_verts_buffer_a.data[el.x].xyz,
+       b = mesh_verts_buffer_a.data[el.y].xyz,
+       c = mesh_verts_buffer_a.data[el.z].xyz;
 
   // Let's avoid branching, so all rays perform the full test for now
   bool hit = true;
@@ -194,11 +175,11 @@ float test_elem(in Ray r, in uvec3 el) {
 
 bool intersect_elem(in Ray r, inout Intersection its, in uvec3 el) {
   // Gather element data
-  vec3 a = mesh_verts_buffer.data[el.x].a.xyz,
-       b = mesh_verts_buffer.data[el.y].a.xyz,
-       c = mesh_verts_buffer.data[el.z].a.xyz;
+  vec3 a = mesh_verts_buffer_a.data[el.x].xyz,
+       b = mesh_verts_buffer_a.data[el.y].xyz,
+       c = mesh_verts_buffer_a.data[el.z].xyz;
 
-  // Let's avoid branching, so all rays perform the full test for now
+  // All rays perform the full test for now
   bool closest_hit = true;
 
   // Compute edges, plane normal
@@ -235,11 +216,11 @@ bool intersect_mesh(in Ray r, inout Intersection its, in uint i) {
   bool closest_hit = false;
   
   // TODO traverse BVH instead
-  for (uint j = info.elems_begin; 
-            j < info.elems_begin + info.elems_extent;
+  for (uint j = info.elems_offs; 
+            j < info.elems_offs + info.elems_size;
           ++j) {
     // Offset vertex indices
-    uvec3 el = uvec3(info.verts_begin) + mesh_elems_buffer.data[j];
+    uvec3 el = uvec3(info.verts_offs) + mesh_elems_buffer.data[j];
 
     // Test closest hit intersection with triangle
     float t = test_elem(r, el);
@@ -259,7 +240,7 @@ bool intersect_object(in Ray r, inout Intersection its, in uint object_i) {
 
   // Inactive objects are not interacted with
   ObjectInfo object_info = obj_info_buffer.data[object_i];
-  if (!object_info.is_active)
+  if (object_info.is_active == 0)
     return false;
   
   // Transform the world-space ray into the mesh's model space
@@ -277,11 +258,11 @@ bool intersect_object(in Ray r, inout Intersection its, in uint object_i) {
 }
 
 // Intersect a scene with a ray and return an intersection object
-Intersect intersect_scene(in Ray r) {
+Intersection intersect_scene(in Ray r) {
   Intersection its = { FLT_MAX, 0, uvec3(0) };
 
   // TODO; use a top-level hierarchy instead
-  for (uint i = 0; i < obj_info_buffer.n; ++i) 
+  for (uint i = 0; i < scene_info_buffer.n_objects; ++i) 
     intersect_object(r, its, i);
   
   return its;
@@ -304,7 +285,7 @@ vec3 gen_barycentrics(vec3 a, vec3 b, vec3 c, vec3 p) {
   return v;
 }
 
-Interaction gen_interaction(in Intersect its, in Ray r) {
+Interaction gen_interaction(in Intersection its, in Ray r) {
   Interaction ir;
   
   // Determine intesection position
@@ -312,9 +293,9 @@ Interaction gen_interaction(in Intersect its, in Ray r) {
   ir.p = r.o + its.t * r.d;
   
   // Gather triangle data and generate barycentrics
-  Vert a = unpack(mesh_verts_buffer.data[its.elem.x]),
-       b = unpack(mesh_verts_buffer.data[its.elem.y]),
-       c = unpack(mesh_verts_buffer.data[its.elem.z]);
+  Vert a = unpack(mesh_verts_buffer_a.data[its.elem.x], mesh_verts_buffer_b.data[its.elem.x]),
+       b = unpack(mesh_verts_buffer_a.data[its.elem.y], mesh_verts_buffer_b.data[its.elem.y]),
+       c = unpack(mesh_verts_buffer_a.data[its.elem.z], mesh_verts_buffer_b.data[its.elem.z]);
   vec3 bary = gen_barycentrics(a.p, b.p, c.p, ir.p);
 
   // Determine secondary vertex data at intersect position

@@ -10,24 +10,49 @@
 #include <memory>
 
 namespace met::detail {
-  struct RTObjectInfoLayout {
-    alignas(4)  uint          is_active;
+  /* Object information structure, detailing indices and values
+      referring to the object's mesh shape and surface materials. */
+  struct RTObjectInfo {
+    alignas(64) eig::Matrix4f trf;
+    alignas(64) eig::Matrix4f trf_inv;
+
+    alignas(4) uint           is_active;
+
     alignas(4)  uint          mesh_i;
     alignas(4)  uint          uplifting_i;
 
-    alignas(64) eig::Matrix4f trf;
-    alignas(64) eig::Matrix4f trf_inv;
-    
-    alignas(4)  uint          albedo_use_sampler;
-    alignas(4)  uint          albedo_i;
-    alignas(16) Colr          albedo_v;
+    alignas(4)  uint          padd; // TODO was here
+
+    // alignas(4)  uint          albedo_use_sampler;
+    // alignas(4)  uint          albedo_i;
+    // alignas(16) Colr          albedo_v;
   };
 
-  struct RTMeshInfoLayout {
-    alignas(4)  uint          elems_begin;
-    alignas(4)  uint          elems_extent;
-    alignas(4)  uint          verts_begin;
-    alignas(4)  uint          verts_extent;
+  /* Mesh information structure, detailing which range of the mesh
+     data buffers describes a specific mesh. */
+  struct RTMeshInfo {
+    alignas(4) uint verts_offs;
+    alignas(4) uint verts_size;
+    alignas(4) uint elems_offs;
+    alignas(4) uint elems_size;
+  };
+  
+  /* Mesh vertex/element data block; holds all packed-together
+     mesh data used in a scene. Should preferably be made once
+     at scene load. */
+  struct RTMeshData {
+    std::vector<RTMeshInfo> info;
+    gl::Buffer              info_gl;
+    gl::Buffer verts_a;
+    gl::Buffer verts_b;
+    gl::Buffer elems;
+    gl::Buffer elems_al;
+    gl::Array  array;
+  };
+
+  struct RTObjectData {
+    std::vector<RTObjectInfo> info;
+    gl::Buffer                info_gl;
   };
 
   struct ObjectUnifLayout {

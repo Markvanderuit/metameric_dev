@@ -33,7 +33,7 @@
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
-    /* scheduler.task("schedule_view").init<LambdaTask>([&](SchedulerHandle &info) {
+    scheduler.task("schedule_view").init<LambdaTask>([&](SchedulerHandle &info) {
       // Check if the scheduler handle implements a MapBasedSchedule
       auto *info_data = dynamic_cast<MapBasedSchedule *>(&info);
       guard(info_data);
@@ -71,7 +71,7 @@ namespace met {
         }
       }
       ImGui::End();
-    }); */
+    });
 
     /* // Temporary window to plot pca components
     scheduler.task("plot_models").init<LambdaTask>([](auto &info) {
@@ -189,6 +189,9 @@ namespace met {
     scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
     scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
     scheduler.task("mesh_viewport").init<MeshViewportTask>();
+
+    // Insert temporary unimportant tasks
+    submit_schedule_debug(scheduler);
 
     scheduler.task("frame_end").init<FrameEndTask>(false);
   }
