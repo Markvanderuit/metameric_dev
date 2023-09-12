@@ -5,27 +5,30 @@
 #include <metameric/core/scene.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
+#include <small_gl/dispatch.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <memory>
 
+namespace gl {
+  using Texture2d3fArray = gl::Texture2d<float, 3, gl::TextureType::eImageArray>;
+  using Texture2d1fArray = gl::Texture2d<float, 1, gl::TextureType::eImageArray>;
+} // namespace gl
+
 namespace met::detail {
   /* Object information structure, detailing indices and values
       referring to the object's mesh shape and surface materials. */
-  struct RTObjectInfo {
-    alignas(64) eig::Matrix4f trf;
-    alignas(64) eig::Matrix4f trf_inv;
+  struct alignas(16) RTObjectInfo {
+    alignas(16) eig::Matrix4f trf;
+    alignas(16) eig::Matrix4f trf_inv;
 
-    alignas(4) uint           is_active;
-
+    alignas(4)  bool          is_active;
     alignas(4)  uint          mesh_i;
     alignas(4)  uint          uplifting_i;
 
-    alignas(4)  uint          padd; // TODO was here
-
-    // alignas(4)  uint          albedo_use_sampler;
-    // alignas(4)  uint          albedo_i;
-    // alignas(16) Colr          albedo_v;
+    alignas(4)  bool          is_albedo_sampled;
+    alignas(4)  uint          albedo_i;
+    alignas(16) Colr          albedo_v;
   };
 
   /* Mesh information structure, detailing which range of the mesh
@@ -35,6 +38,25 @@ namespace met::detail {
     alignas(4) uint verts_size;
     alignas(4) uint elems_offs;
     alignas(4) uint elems_size;
+  };
+
+  /* Texture information structure, detailing which range of the
+     texture atlas describes a specific texture. */
+  struct RTTextureInfo {
+    alignas(4) uint         is_3f;
+    alignas(4) uint         layer;
+    alignas(8) eig::Array2u offs;
+    alignas(8) eig::Array2u size;
+  };
+
+  struct RTTextureData {
+    std::vector<RTTextureInfo> info;
+    gl::Buffer                 info_gl;
+
+    gl::Texture2d3fArray atlas_3f;
+    gl::Texture2d1fArray atlas_1f;
+    
+    static RTTextureData realize(std::span<const detail::Resource<DynamicImage>>);
   };
   
   /* Mesh vertex/element data block; holds all packed-together
@@ -48,6 +70,8 @@ namespace met::detail {
     gl::Buffer elems;
     gl::Buffer elems_al;
     gl::Array  array;
+
+    static RTMeshData realize(std::span<const AlMeshData>);
   };
 
   struct RTObjectData {
@@ -56,7 +80,7 @@ namespace met::detail {
   };
 
   struct ObjectUnifLayout {
-    eig::Matrix4f alignas(64) trf;
+    eig::Matrix4f alignas(16) trf;
   };
 
   // TODO alignas

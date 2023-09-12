@@ -1,4 +1,6 @@
 #include <metameric/components/misc/task_scene_handler.hpp>
+#include <algorithm>
+#include <deque>
 
 namespace met {
   namespace detail {
@@ -27,6 +29,8 @@ namespace met {
     info("textures").set<std::vector<detail::TextureLayout>>({ });
     info("mesh_data").set<detail::RTMeshData>({ });
     info("objc_data").set<detail::RTObjectData>({ });
+    info("txtr_data").set<detail::RTTextureData>({ });
+    info("txtr_view").set<std::vector<uint>>({});
 
     // Force upload of all resources  on first run
     m_is_init = false;
@@ -37,6 +41,7 @@ namespace met {
     
     const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
     const auto &e_scene         = e_scene_handler.scene;
+    const auto &e_images        = e_scene.resources.images;
     const auto &e_objects       = e_scene.components.objects;
 
     // Process updates to gpu-side mesh resources 
@@ -135,15 +140,21 @@ namespace met {
         
         guard_continue(!m_is_init || component.state.is_mutated());
 
+        bool is_albedo_sampled = object.diffuse.index() != 0;
+
         i_objc_data.info[i] = {
           .trf         = object.trf.matrix(),
           .trf_inv     = object.trf.inverse().matrix(),
+
+          // Fill shape data
           .is_active   = object.is_active,
           .mesh_i      = object.mesh_i,
           .uplifting_i = object.uplifting_i,
 
-          // Fill materials later
-          // .albedo_use_sampler = object.diffuse.index() != 0,
+          // Fill materials data
+          .is_albedo_sampled = is_albedo_sampled,
+          .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
+          .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse)
         };
 
         i_objc_data.info_gl.set(obj_span<const std::byte>(i_objc_data.info[i]),
@@ -153,12 +164,36 @@ namespace met {
     }
     
     // Process updates to gpu-side image resources
-    if (!m_is_init || e_scene.resources.images.is_mutated()) {
+    if (!m_is_init || e_images.is_mutated()) {
+      auto &i_txtr_data = info("txtr_data").writeable<detail::RTTextureData>();
+      i_txtr_data = detail::RTTextureData::realize(e_images.data());
+
+      // TODO delete
+
+      auto &i_views = info("txtr_view").writeable<std::vector<uint>>();
+      for (uint &i : i_views)
+        glDeleteTextures(1, &i);
+      i_views.clear();
+      for (uint i = 0; i < i_txtr_data.atlas_3f.size().z(); ++i) {
+        uint view;
+        glGenTextures(1, &view);
+        glTextureView(view, GL_TEXTURE_2D, i_txtr_data.atlas_3f.object(), GL_RGB32F,  0, 1, i, 1);
+        i_views.push_back(view);
+      }
+      for (uint i = 0; i < i_txtr_data.atlas_1f.size().z(); ++i) {
+        uint view;
+        glGenTextures(1, &view);
+        glTextureView(view, GL_TEXTURE_2D, i_txtr_data.atlas_1f.object(), GL_R32F,  0, 1, i, 1);
+        i_views.push_back(view);
+      }
+
+      // TODO delete
+      
       auto &i_textures = info("textures").writeable<std::vector<detail::TextureLayout>>();
-      i_textures.resize(e_scene.resources.images.size());
+      i_textures.resize(e_images.size());
       
       for (uint i = 0; i < i_textures.size(); ++i) {
-        const auto &rsrc = e_scene.resources.images[i];
+        const auto &rsrc = e_images[i];
         guard_continue(!m_is_init || rsrc.is_mutated());
         i_textures[i] = detail::TextureLayout::realize(rsrc.value());
       } // for (uint i)

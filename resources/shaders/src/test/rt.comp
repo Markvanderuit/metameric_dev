@@ -240,7 +240,7 @@ bool intersect_object(in Ray r, inout Intersection its, in uint object_i) {
 
   // Inactive objects are not interacted with
   ObjectInfo object_info = obj_info_buffer.data[object_i];
-  if (object_info.is_active == 0)
+  if (!object_info.is_active)
     return false;
   
   // Transform the world-space ray into the mesh's model space

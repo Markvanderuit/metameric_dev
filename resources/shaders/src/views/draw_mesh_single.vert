@@ -14,6 +14,7 @@ layout(location = 1) in vec4 in_vert_b;
 layout(location = 0) out vec3 out_value_p;
 layout(location = 1) out vec3 out_value_n;
 layout(location = 2) out vec2 out_value_tx;
+layout(location = 3) out flat uint out_value_id;
 
 // Buffer declarations
 layout(binding = 0) uniform b_unif_camera {
@@ -27,6 +28,7 @@ void main() {
   out_value_p  = in_vert_a.xyz;
   out_value_n  = in_vert_b.xyz;
   out_value_tx = vec2(in_vert_a.w, in_vert_b.w);
+  out_value_id = gl_DrawID;
 
   gl_Position = unif_camera.trf 
               * buff_objects.data[gl_DrawID].trf

@@ -3,10 +3,18 @@
 
 // Info object for referred mesh data
 struct MeshInfo {
-  uint verts_offs; // Offset to vertex data range in vertex buffer
-  uint verts_size; // Extent of vertex data range in vertex buffer
-  uint elems_offs; // Offset to element data range in element buffer
-  uint elems_size; // Extent of element data range in element buffer
+  uint verts_offs; // Offset to vert data range in verts buffer
+  uint verts_size; // Extent of vert data range in verts buffer
+  uint elems_offs; // Offset to elem data range in elems buffer
+  uint elems_size; // Extent of elem data range in elems buffer
+};
+
+// Info object for referred texture data
+struct TextureInfo {
+  bool  is_3f; // Is in the atlas_3f texture sampler, else atlas_1f?
+  uint  layer; // layer in texture array in which the texture is located
+  uvec2 offs;  // offset in pixels to layer's region storing this texture
+  uvec2 size;  // size in pixels of layer's region storing this
 };
 
 // Info object to gather Scene::Object data
@@ -16,17 +24,16 @@ struct ObjectInfo {
   mat4 trf_inv; 
 
   // Should the object be interacted with?
-  uint is_active;       
+  bool is_active;       
   
   // Indices referring to auxiliary scene resources
   uint mesh_i;              
   uint uplifting_i;
-  uint padd;
 
-  // // Material data // TODO expand
-  // uint  albedo_use_sampler; // Use sampler or direct value?
-  // uint  albedo_i;           // Sampler index
-  // vec3  albedo_v;           // Direct value
+  // Material data // TODO expand
+  bool  is_albedo_sampled; // Use sampler or direct value?
+  uint  albedo_i;          // Sampler index
+  vec3  albedo_v;          // Direct value
 };
 
 #endif // SCENE_GLSL_GUARD

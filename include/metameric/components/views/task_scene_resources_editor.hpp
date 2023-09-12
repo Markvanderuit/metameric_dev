@@ -16,6 +16,17 @@ namespace met {
 
       ImGui::ShowDemoWindow();
 
+      if (ImGui::Begin("Test viewer")) {
+        static int layer = 0;
+
+        const auto &i_views = info("scene_handler", "txtr_view").read_only<std::vector<uint>>();
+        const auto &i_data  = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
+
+        ImGui::SliderInt("Layer", &layer, 0, i_views.size() - 1);
+        ImGui::Image(ImGui::to_ptr(i_views.at(layer)), (i_data.atlas_3f.size().head<2>().cast<float>() / 16.f).eval());
+        ImGui::End();
+      }
+
       if (ImGui::Begin("Scene resources")) {
         // Get external resources
         const auto &e_handler  = info.global("scene_handler").read_only<SceneHandler>();
