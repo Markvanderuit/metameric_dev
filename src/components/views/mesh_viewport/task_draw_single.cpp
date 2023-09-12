@@ -56,7 +56,7 @@ namespace met {
     m_unif_camera_buffer_map->camera_matrix = e_arcball.full().matrix();
     m_unif_camera_buffer.flush();
     
-    // Bind fresh vertex array for draw data if mesh array was updated
+    // Set fresh vertex array for draw data if it was updated
     if (info("scene_handler", "mesh_data").is_mutated())
       m_draw.bindable_array = &e_mesh_data.array;
 
@@ -64,11 +64,10 @@ namespace met {
     if (info("scene_handler", "objc_data").is_mutated()) {
       m_draw.commands.resize(e_objects.size());
       rng::transform(e_objects, m_draw.commands.begin(), [&](const auto &comp) {
+        guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
         const auto &e_mesh_info = e_mesh_data.info.at(comp.value.mesh_i);
         return gl::MultiDrawInfo::DrawCommand {
-          .vertex_count = comp.value.is_active 
-                        ? e_mesh_info.elems_size * 3
-                        : 0,
+          .vertex_count = e_mesh_info.elems_size * 3,
           .vertex_first = e_mesh_info.elems_offs * 3
         };
       });

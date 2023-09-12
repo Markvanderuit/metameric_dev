@@ -54,7 +54,7 @@ void main() {
   ObjectInfo object_info = buff_objects.data[in_value_id];
 
   // Hacky lambert
-  vec3 l_dir      = normalize(vec3(-1, 1, -1));
+  vec3 l_dir      = normalize(vec3(1, 1, 1));
   vec3 n_dir      = normalize(in_value_n);
   float cos_theta = max(dot(l_dir, n_dir), 0);
 
