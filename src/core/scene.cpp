@@ -66,6 +66,7 @@ namespace met {
   void to_json(json &js, const Uplifting &uplifting) {
     met_trace();
     js = {{ "type",    uplifting.type    },
+          { "csys_i",  uplifting.csys_i },
           { "basis_i", uplifting.basis_i },
           { "verts",   uplifting.verts   },
           { "elems",   uplifting.elems   }};
@@ -74,6 +75,7 @@ namespace met {
   void from_json(const json &js, Uplifting &uplifting) {
     met_trace();
     js.at("type").get_to(uplifting.type);
+    js.at("csys_i").get_to(uplifting.csys_i);
     js.at("basis_i").get_to(uplifting.basis_i);
     js.at("verts").get_to(uplifting.verts);
     js.at("elems").get_to(uplifting.elems);

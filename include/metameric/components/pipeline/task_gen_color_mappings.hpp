@@ -30,9 +30,9 @@ namespace met {
   public:
     GenColorMappingTask(uint mapping_i);
 
-    void init(SchedulerHandle &) override;
     bool is_active(SchedulerHandle &) override;
-    void eval(SchedulerHandle &) override;
+    void init(SchedulerHandle &)      override;
+    void eval(SchedulerHandle &)      override;
   };
 
   class GenColorMappingResampledTask : public detail::TaskNode {

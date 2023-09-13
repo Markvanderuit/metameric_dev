@@ -7,14 +7,12 @@
 #include <vector>
 
 namespace met::detail {
-  constexpr uint texture_atlas_padding    = 16u;
-  constexpr uint texture_atlas_padding_2x = 2u * texture_atlas_padding;
-  constexpr auto texture_atlas_widths     = { 16384u + texture_atlas_padding_2x, 
-                                              12228u + texture_atlas_padding_2x, 
-                                              8192u  + texture_atlas_padding_2x };
+  constexpr uint atlas_padding    = 16u;
+  constexpr uint atlas_padding_2x = 2u * atlas_padding;
+  constexpr auto atlas_widths     = { 16384u + atlas_padding_2x, 
+                                      12228u + atlas_padding_2x, 
+                                      8192u  + atlas_padding_2x };
   
-  using TextureAtlasFormat = DynamicImage::PixelFormat;
-
   struct AtlasSpace {
     eig::Array2u offs, size; 
     uint layer;
@@ -40,24 +38,24 @@ namespace met::detail {
   constexpr auto atlas_area = [](auto space) -> uint { return space.size.prod(); };
   constexpr auto atlas_maxm = [](auto space) -> eig::Array2u { return (space.offs + space.size).eval(); };
   constexpr auto atlas_test = [](AtlasCreateInfo::Image img, AtlasSpace space) -> bool {
-    return ((img.size + texture_atlas_padding_2x) <= space.size).all();
+    return ((img.size + atlas_padding_2x) <= space.size).all();
   };
   constexpr auto atlas_split = [](AtlasCreateInfo::Image img, AtlasSpace space) 
     -> std::pair<AtlasSpace, std::vector<AtlasSpace>> {
-    AtlasSpace result = { .offs  = space.offs + texture_atlas_padding,
+    AtlasSpace result = { .offs  = space.offs + atlas_padding,
                                  .size  = img.size,
                                  .layer = space.layer };
 
     std::vector<AtlasSpace> remainder;
-    if (uint remainder_x = space.size.x() - texture_atlas_padding_2x - img.size.x(); remainder_x > 0)
-      remainder.push_back({ .offs  = space.offs + eig::Array2u(texture_atlas_padding_2x + img.size.x(), 0),
-                            .size  = { space.size.x() - texture_atlas_padding_2x - img.size.x(), 
-                                       img.size.x() + texture_atlas_padding_2x },
+    if (uint remainder_x = space.size.x() - atlas_padding_2x - img.size.x(); remainder_x > 0)
+      remainder.push_back({ .offs  = space.offs + eig::Array2u(atlas_padding_2x + img.size.x(), 0),
+                            .size  = { space.size.x() - atlas_padding_2x - img.size.x(), 
+                                       img.size.x() + atlas_padding_2x },
                             .layer = space.layer });
-    if (uint remainder_y = space.size.y() - texture_atlas_padding_2x - img.size.y(); remainder_y > 0)
-      remainder.push_back({ .offs  = space.offs + eig::Array2u(0, texture_atlas_padding_2x + img.size.y()),
+    if (uint remainder_y = space.size.y() - atlas_padding_2x - img.size.y(); remainder_y > 0)
+      remainder.push_back({ .offs  = space.offs + eig::Array2u(0, atlas_padding_2x + img.size.y()),
                             .size  = { space.size.x(), 
-                                       space.size.y() - img.size.y() - texture_atlas_padding_2x },
+                                       space.size.y() - img.size.y() - atlas_padding_2x },
                             .layer = space.layer });
 
     return { result, remainder };
@@ -135,8 +133,8 @@ namespace met::detail {
     uint max_width = static_cast<uint>(gl::state::get_variable_int(gl::VariableName::eMaxTextureSize));
     
     // Generate a set of candidate atlases across several threads
-    std::vector<Atlas> candidates(texture_atlas_widths.size());
-    std::transform(std::execution::par_unseq, range_iter(texture_atlas_widths), candidates.begin(), [&](uint w) { 
+    std::vector<Atlas> candidates(atlas_widths.size());
+    std::transform(std::execution::par_unseq, range_iter(atlas_widths), candidates.begin(), [&](uint w) { 
       return generate_atlas({ .size = { std::min(w, max_width), std::numeric_limits<uint>::max() }, .data = data });  
     });
     
@@ -344,8 +342,8 @@ namespace met::detail {
       };
     }
 
-    data.info_gl = {{ .data = cnt_span<const std::byte>(data.info),
-                     .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    data.info_gl = {{ .data  = cnt_span<const std::byte>(data.info),
+                      .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
     return data;
   }

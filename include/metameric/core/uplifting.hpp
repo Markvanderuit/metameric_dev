@@ -48,6 +48,7 @@ namespace met {
       eConvexHull, eDelaunay      
     } type = Type::eDelaunay;
 
+    uint              csys_i  = 0; // Index of primary color system for input texture
     uint              basis_i = 0; // Index of used underlying basis
     std::vector<Vert> verts;       // Vertices of uplifting mesh
     std::vector<Elem> elems;       // Elements of uplifting mesh
@@ -92,6 +93,7 @@ namespace met {
       using ComponentStateBase<Base>::m_mutated;
 
       ComponentState<Base::Type> type;
+      ComponentState<uint>       csys_i;
       ComponentState<uint>       basis_i;
       ComponentStateVector<
         Base::Constraint, 
@@ -103,6 +105,7 @@ namespace met {
       virtual 
       bool update(const Base &o) override {
         return m_mutated = (type.update(o.type)
+                         || csys_i.update(o.csys_i)
                          || basis_i.update(o.basis_i)
                          || verts.update(o.verts)
                          || elems.update(o.elems));

@@ -14,6 +14,8 @@
 #include <metameric/components/pipeline/task_gen_color_mappings.hpp>
 #include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
 #include <metameric/components/pipeline/task_gen_mismatch_solid.hpp>
+#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline_new/task_gen_object_data.hpp>
 #include <metameric/components/views/task_error_viewer.hpp>
 #include <metameric/components/views/task_bary_viewer.hpp>
 #include <metameric/components/views/task_mappings_viewer.hpp>
@@ -29,7 +31,6 @@
 #include <metameric/components/views/task_scene_resources_editor.hpp>
 #include <metameric/components/views/task_scene_components_editor.hpp>
 #include <metameric/components/misc/task_scene_handler.hpp>
-#include <ranges>
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
@@ -186,6 +187,8 @@ namespace met {
     scheduler.task("window").init<WindowTask>();
 
     scheduler.task("scene_handler").init<SceneHandlerTask>();
+    scheduler.task("gen_upliftings").init<GenUpliftingsTask>();
+    scheduler.task("gen_objects").init<GenObjectsTask>();
     scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
     scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
     scheduler.task("mesh_viewport").init<MeshViewportTask>();
