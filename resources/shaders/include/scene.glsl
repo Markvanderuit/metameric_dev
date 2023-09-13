@@ -15,6 +15,8 @@ struct TextureInfo {
   uint  layer; // layer in texture array in which the texture is located
   uvec2 offs;  // offset in pixels to layer's region storing this texture
   uvec2 size;  // size in pixels of layer's region storing this
+  vec2  uv0;   // Minimum uv value, at region's pixel offset
+  vec2  uv1;   // Maximum uv value, at region's pixel offset + size
 };
 
 // Info object to gather Scene::Object data

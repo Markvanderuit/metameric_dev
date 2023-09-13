@@ -72,7 +72,7 @@ namespace met::detail {
       } else {
         // Handle shrink/grow
         size_t min_r = std::min(m_cache.size(), o.size()), 
-                max_r = std::max(m_cache.size(), o.size());
+               max_r = std::max(m_cache.size(), o.size());
         m_cache.resize(o.size());
 
         // First compare for smaller range of remaining elements
@@ -169,22 +169,36 @@ namespace met::detail {
             typename State = ComponentState<Ty>>
   class ComponentVector {
     using Comp = Component<Ty, State>;
+
+    mutable bool      m_mutated    = true;
+    mutable size_t    m_size_state = 0;
     std::vector<Comp> m_data;
 
   public: // State handling
-    constexpr void test_mutated() {
+    bool test_mutated() {
       met_trace();
-      rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
+
+      if (m_data.size() == m_size_state) {
+        m_mutated = rng::any_of(m_data, 
+          [](auto &rsrc) { return rsrc.state.update(rsrc.value); });
+      } else {
+        m_mutated    = true;
+        m_size_state = m_data.size();
+        rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
+      }
+
+      return m_mutated;
     }
 
     constexpr void set_mutated(bool b) {
       met_trace();
+      m_mutated = true;
       rng::for_each(m_data, [b](auto &rsrc) { rsrc.state.set_mutated(b); });
     }
 
     constexpr bool is_mutated() const {
       met_trace();
-      return rng::any_of(m_data, [](const auto &rsrc) -> bool { return rsrc.state; });
+      return m_mutated || rng::any_of(m_data, [](const auto &rsrc) -> bool { return rsrc.state; });
     }
 
   public: // Vector overloads

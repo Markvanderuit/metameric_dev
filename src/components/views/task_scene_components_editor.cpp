@@ -20,6 +20,7 @@ namespace met {
         case Type::eColor:       return "Color";
         case Type::eColorOnMesh: return "Color (on mesh)";
         case Type::eMeasurement: return "Measurement";
+        default:                 return "Unknown";
       };
     }
   } // namespace detail

@@ -47,14 +47,19 @@ namespace met::detail {
     alignas(4) uint         layer;
     alignas(8) eig::Array2u offs;
     alignas(8) eig::Array2u size;
+    alignas(8) eig::Array2f uv0;
+    alignas(8) eig::Array2f uv1;
   };
 
   struct RTTextureData {
     std::vector<RTTextureInfo> info;
     gl::Buffer                 info_gl;
+    gl::Texture2d3fArray       atlas_3f;
+    gl::Texture2d1fArray       atlas_1f;
 
-    gl::Texture2d3fArray atlas_3f;
-    gl::Texture2d1fArray atlas_1f;
+    // Texture view objects over each of the atlas layers
+    std::vector<gl::TextureView2d3f> views_3f;
+    std::vector<gl::TextureView2d1f> views_1f;
     
     static RTTextureData realize(std::span<const detail::Resource<DynamicImage>>);
   };
@@ -71,12 +76,15 @@ namespace met::detail {
     gl::Buffer elems_al;
     gl::Array  array;
 
-    static RTMeshData realize(std::span<const AlMeshData>);
+    static RTMeshData realize(std::span<const detail::Resource<AlMeshData>>);
   };
 
   struct RTObjectData {
     std::vector<RTObjectInfo> info;
     gl::Buffer                info_gl;
+
+    static RTObjectData realize(std::span<const detail::Component<Scene::Object>>);
+    void update(std::span<const detail::Component<Scene::Object>>);
   };
 
   struct ObjectUnifLayout {
@@ -93,25 +101,6 @@ namespace met::detail {
   struct ColrSystemUnifLayout {
     CMFS observer;
     Spec illuminant;
-  };
-
-  // Structure for gpu-side mesh data
-  struct MeshLayout {
-    gl::Buffer verts;
-    gl::Buffer norms;
-    gl::Buffer texuv;
-    gl::Buffer elems;
-    gl::Array  array;
-
-    static MeshLayout realize(const AlMeshData &);
-  };
-
-  // Structure for gpu-side image data and attached sampler
-  struct TextureLayout {
-    std::unique_ptr<gl::AbstractTexture> texture;
-    gl::Sampler                          sampler;
-
-    static TextureLayout realize(const DynamicImage &);
   };
 
   // Structure for gpu-side illuminant spectrum data

@@ -172,11 +172,17 @@ namespace met::detail {
       auto work  = work_3f[i];      
       auto space = atlas_3f.data[i];
 
+      eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
+      eig::Array2f uv0 = space.offs.cast<float>() / wh;
+      eig::Array2f uv1 = space.size.cast<float>() / wh;
+
       // Fill in info object
       data.info[work.image_i] = { .is_3f = true,
                                   .layer = space.layer,
                                   .offs  = space.offs,
-                                  .size  = space.size  };
+                                  .size  = space.size,
+                                  .uv0   = uv0,
+                                  .uv1   = uv1 };
 
       // Get a float representation of image data, and push to GL-side
       auto img = images[work.image_i].value().convert({ .pixel_type = DynamicImage::PixelType::eFloat });
@@ -190,12 +196,18 @@ namespace met::detail {
     for (uint i = 0; i < work_1f.size(); ++i) {
       auto work  = work_1f[i];      
       auto space = atlas_1f.data[i];
+
+      eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
+      eig::Array2f uv0 = space.offs.cast<float>() / wh;
+      eig::Array2f uv1 = space.size.cast<float>() / wh;
       
       // Fill in info object
       data.info[work.image_i] = { .is_3f = false,
                                   .layer = space.layer,
                                   .offs  = space.offs,
-                                  .size  = space.size  };
+                                  .size  = space.size,
+                                  .uv0   = uv0,
+                                  .uv1   = uv1 };
 
       // Get a float representation of image data, and push to GL-side
       auto img = images[work.image_i].value().convert({ .pixel_type = DynamicImage::PixelType::eFloat });
@@ -205,85 +217,179 @@ namespace met::detail {
                         { space.offs.x(), space.offs.y(), space.layer });
     } // for (uint i)
 
+    // Generate texture views for each atlas array layer
+    data.views_3f.clear();
+    for (uint i = 0; i < atlas_3f.size.z(); ++i)
+      data.views_3f.push_back({{ .texture = &data.atlas_3f, .min_layer = i }});
+    data.views_1f.clear();
+    for (uint i = 0; i < atlas_1f.size.z(); ++i)
+      data.views_1f.push_back({{ .texture = &data.atlas_1f, .min_layer = i }});
+
     // Finally, push info objects
     data.info_gl = {{ .data = cnt_span<const std::byte>(data.info) }};
 
     return data;
   }
 
-  RTMeshData RTMeshData::realize(std::span<const AlMeshData> meshes) {
+  std::pair<
+    std::vector<eig::Array4f>,
+    std::vector<eig::Array4f>
+  > pack(const AlMeshData &m) {
+    std::vector<eig::Array4f> a(m.verts.size()),
+                              b(m.verts.size());
+
+    #pragma omp parallel for
+    for (int i = 0; i < a.size(); ++i) {
+      a[i] = (eig::Array4f() << m.verts[i], m.uvs[i][0]).finished();
+      b[i] = (eig::Array4f() << m.norms[i], m.uvs[i][1]).finished();
+    }
+    
+    return { std::move(a), std::move(b) };
+  }
+
+  RTMeshData RTMeshData::realize(std::span<const detail::Resource<AlMeshData>> meshes) {
     met_trace_full();
 
-    RTMeshData data;
+    // Gather vertex/element lengths and offsets per mesh resources
+    std::vector<uint> verts_size, elems_size, verts_offs, elems_offs;
+    std::transform(range_iter(meshes), std::back_inserter(verts_size), 
+      [](const auto &m) { return static_cast<uint>(m.value().verts.size()); });
+    std::exclusive_scan(range_iter(verts_size), std::back_inserter(verts_offs), 0u);
+    std::transform(range_iter(meshes), std::back_inserter(elems_size), 
+      [](const auto &m) { return static_cast<uint>(m.value().elems.size()); });
+    std::exclusive_scan(range_iter(elems_size), std::back_inserter(elems_offs), 0u);
+
+    // Total vertex/element lengths across all meshes
+    uint n_verts = verts_size.at(verts_size.size() - 1) + verts_offs.at(verts_offs.size() - 1);
+    uint n_elems = elems_size.at(elems_size.size() - 1) + elems_offs.at(elems_offs.size() - 1);
+
+    // Holders for packed data of all meshes
+    std::vector<detail::RTMeshInfo> packed_info(meshes.size());
+    std::vector<eig::Array4f>       packed_verts_a(n_verts),
+                                    packed_verts_b(n_verts);
+    std::vector<eig::Array3u>       packed_elems(n_elems);
+    std::vector<eig::AlArray3u>     packed_elems_al(n_elems);
+
+    // Fill packed layout/data vectors
+    #pragma omp parallel for
+    for (int i = 0; i < meshes.size(); ++i) {
+      const auto &mesh = meshes[i].value();
+      auto [a, b] = pack(mesh);
+      
+      // Copy over packed data to the correctly offset range;
+      // adjust element indices to refer to the offset range as well
+      rng::copy(a,               packed_verts_a.begin()  + verts_offs[i]);
+      rng::copy(b,               packed_verts_b.begin()  + verts_offs[i]);
+      rng::transform(mesh.elems, packed_elems.begin()    + elems_offs[i], 
+        [offs = verts_offs[i]](const auto &v) { return (v + offs).eval(); });
+      rng::transform(mesh.elems, packed_elems_al.begin() + elems_offs[i], 
+        [offs = verts_offs[i]](const auto &v) { return (v + offs).eval(); });
+
+      packed_info[i] = detail::RTMeshInfo {
+        .verts_offs = verts_offs[i], .verts_size = verts_size[i],
+        .elems_offs = elems_offs[i], .elems_size = elems_size[i],
+      };
+    }
+
+    // Push layout/data to buffers
+    RTMeshData data = { 
+      .info     = packed_info,
+      .info_gl  = {{ .data = cnt_span<const std::byte>(packed_info)     }},
+      .verts_a  = {{ .data = cnt_span<const std::byte>(packed_verts_a)  }},
+      .verts_b  = {{ .data = cnt_span<const std::byte>(packed_verts_b)  }},
+      .elems    = {{ .data = cnt_span<const std::byte>(packed_elems)    }},
+      .elems_al = {{ .data = cnt_span<const std::byte>(packed_elems_al) }},
+    };
+    
+    // Define corresponding vertex array object
+    data.array = {{
+      .buffers = {{ .buffer = &data.verts_a, .index = 0, .stride = sizeof(eig::Array4f)    },
+                  { .buffer = &data.verts_b, .index = 1, .stride = sizeof(eig::Array4f)    }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 },
+                  { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e4 }},
+      .elements = &data.elems
+    }};
 
     return data;
   }
-  
-  MeshLayout MeshLayout::realize(const AlMeshData &mesh) {
+
+  RTObjectData RTObjectData::realize(std::span<const detail::Component<Scene::Object>> objects) {
     met_trace_full();
+
+    RTObjectData data;
     
-    // Initialize mesh buffers
-    gl::Buffer verts = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
-    gl::Buffer norms = {{ .data = cnt_span<const std::byte>(mesh.norms) }};
-    gl::Buffer texuv = {{ .data = cnt_span<const std::byte>(mesh.uvs)   }};
-    gl::Buffer elems = {{ .data = cnt_span<const std::byte>(mesh.elems) }};
+    data.info.resize(objects.size());
+    for (uint i = 0; i < objects.size(); ++i) {
+      const auto &component = objects[i];
+      const auto &object    = component.value;
 
-    // Initialize corresponding VAO
-    gl::Array array = {{
-      .buffers  = {{ .buffer = &verts, .index = 0, .stride = sizeof(AlMeshData::VertTy) },
-                   { .buffer = &norms, .index = 1, .stride = sizeof(AlMeshData::VertTy) },
-                   { .buffer = &texuv, .index = 2, .stride = sizeof(AlMeshData::UVTy)   }},
-      .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 },
-                   { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e3 },
-                   { .attrib_index = 2, .buffer_index = 2, .size = gl::VertexAttribSize::e2 }},
-      .elements = &elems
-    }};
+      bool is_albedo_sampled    = object.diffuse.index() != 0;
+      // bool is_roughness_sampled = object.roughness.index() != 0;
+      // bool is_metallic_sampled  = object.metallic.index() != 0;
+      // bool is_normals_sampled   = object.normals.index() != 0;
 
-    // Return structured object
-    return detail::MeshLayout {
-      .verts = std::move(verts),
-      .norms = std::move(norms),
-      .texuv = std::move(texuv),
-      .elems = std::move(elems),
-      .array = std::move(array),
-    };
-  }
+      data.info[i] = {
+        .trf         = object.trf.matrix(),
+        .trf_inv     = object.trf.inverse().matrix(),
 
-  TextureLayout TextureLayout::realize(const DynamicImage &image_) {
-    met_trace_full();
-    
-    // Convert to full float representation
-    DynamicImage image = image_.convert({ .pixel_type = DynamicImage::PixelType::eFloat });
+        // Fill shape data
+        .is_active   = object.is_active,
+        .mesh_i      = object.mesh_i,
+        .uplifting_i = object.uplifting_i,
 
-    // TODO; extract sampler initialization to "somewhere"
-    gl::Sampler sampler = {{ 
-      .min_filter = gl::SamplerMinFilter::eLinear,
-      .mag_filter = gl::SamplerMagFilter::eLinear,
-      .wrap       = gl::SamplerWrap::eRepeat
-    }};
-    
-    std::unique_ptr<gl::AbstractTexture> texture;
-    switch (image.frmt()) {
-      case TextureAtlasFormat::eAlpha:
-        texture = std::make_unique<gl::Texture2d1f>(gl::Texture2d1f::InfoType { 
-          .size = image.size(), 
-          .data = image.data<float>() 
-        });
-        break;
-      case TextureAtlasFormat::eRGB:
-        texture = std::make_unique<gl::Texture2d3f>(gl::Texture2d3f::InfoType { 
-          .size = image.size(), 
-          .data = image.data<float>() 
-        });
-        break;
-      case TextureAtlasFormat::eRGBA:
-        texture = std::make_unique<gl::Texture2d4f>(gl::Texture2d4f::InfoType { 
-          .size = image.size(), 
-          .data = image.data<float>() 
-        });
-        break;
+        // Fill materials data
+        .is_albedo_sampled = is_albedo_sampled,
+        .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
+        .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse)
+      };
     }
-    
-    return { .texture = std::move(texture), .sampler = std::move(sampler) };
+
+    data.info_gl = {{ .data = cnt_span<const std::byte>(data.info),
+                     .flags = gl::BufferCreateFlags::eStorageDynamic }};
+
+    return data;
   }
+
+  void RTObjectData::update(std::span<const detail::Component<Scene::Object>> objects) {
+      bool handle_resize = false;
+
+      // Initialize or resize object buffer to accomodate
+      if (!info_gl.is_init() || objects.size() != info.size()) {
+        info.resize(objects.size());
+        info_gl = {{ .size  = objects.size() * sizeof(detail::RTObjectInfo),
+                     .flags = gl::BufferCreateFlags::eStorageDynamic         }};
+
+        handle_resize = true;
+      }
+      
+      // Process updates to gl-side object info
+      for (uint i = 0; i < objects.size(); ++i) {
+        const auto &component = objects[i];
+        const auto &object    = component.value;
+        
+        guard_continue(handle_resize || component.state.is_mutated());
+
+        bool is_albedo_sampled = object.diffuse.index() != 0;
+
+        info[i] = {
+          .trf         = object.trf.matrix(),
+          .trf_inv     = object.trf.inverse().matrix(),
+
+          // Fill shape data
+          .is_active   = object.is_active,
+          .mesh_i      = object.mesh_i,
+          .uplifting_i = object.uplifting_i,
+
+          // Fill materials data
+          .is_albedo_sampled = is_albedo_sampled,
+          .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
+          .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse)
+        };
+
+        info_gl.set(obj_span<const std::byte>(info[i]),
+                             sizeof(detail::RTObjectInfo),
+                             sizeof(detail::RTObjectInfo) * static_cast<size_t>(i));
+      } // for (uint i)
+  }
+  
 } // namespace met::detail

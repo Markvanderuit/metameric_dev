@@ -20,11 +20,11 @@ namespace met {
 
     // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eVertex,
-                    .spirv_path = "resources/shaders/views/draw_mesh.vert.spv",
-                    .cross_path = "resources/shaders/views/draw_mesh.vert.json" },
-                  { .type       = gl::ShaderType::eFragment,
-                    .spirv_path = "resources/shaders/views/draw_mesh.frag.spv",
-                    .cross_path = "resources/shaders/views/draw_mesh.frag.json" }};
+                   .spirv_path = "resources/shaders/views/draw_mesh.vert.spv",
+                   .cross_path = "resources/shaders/views/draw_mesh.vert.json" },
+                 { .type       = gl::ShaderType::eFragment,
+                   .spirv_path = "resources/shaders/views/draw_mesh.frag.spv",
+                   .cross_path = "resources/shaders/views/draw_mesh.frag.json" }};
 
     // Initialize uniform camera buffer and corresponding mapping
     m_unif_camera_buffer     = {{ .size = sizeof(UnifCameraLayout), .flags = buffer_create_flags }};
@@ -45,78 +45,42 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    const auto &e_scene    = info.global("scene_handler").read_only<SceneHandler>().scene;
-    const auto &e_arcball  = info.relative("view_input")("arcball").read_only<detail::Arcball>();
-    const auto &e_meshes   = info("scene_handler", "meshes").read_only<std::vector<detail::MeshLayout>>();
-    const auto &e_textures = info("scene_handler", "textures").read_only<std::vector<detail::TextureLayout>>();
-
-    // Nr. of object components
-    uint n = e_scene.components.objects.size();
-
-    // Reserve a specific nr. of uniform buffers
-    m_unif_object_buffers.resize(n);
-    m_unif_object_buffer_maps.resize(n, nullptr);
-    for (uint i = 0; i < n; ++i) {
-      auto &buffer     = m_unif_object_buffers[i];
-      auto &buffer_map = m_unif_object_buffer_maps[i];
-
-      guard_continue(!buffer.is_init() || !buffer_map);
-      
-      buffer     = {{ .size = sizeof(UnifObjectLayout), .flags = buffer_create_flags }};
-      buffer_map = buffer.map_as<UnifObjectLayout>(buffer_access_flags).data();
-    } // for (uint i)
+    const auto &e_scene     = info.global("scene_handler").read_only<SceneHandler>().scene;
+    const auto &e_objects   = e_scene.components.objects;
+    const auto &e_arcball   = info.relative("view_input")("arcball").read_only<detail::Arcball>();
+    const auto &e_objc_data = info("scene_handler", "objc_data").read_only<detail::RTObjectData>();
+    const auto &e_mesh_data = info("scene_handler", "mesh_data").read_only<detail::RTMeshData>();
+    const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
 
     // Push camera matrix to uniform data
     m_unif_camera_buffer_map->camera_matrix = e_arcball.full().matrix();
     m_unif_camera_buffer.flush();
-
-    // Bind required fixed resources to corresponding targets
-    m_program.bind("b_unif_camera", m_unif_camera_buffer);
     
-    // Iterate over components in the scene and draw them
-    for (uint i = 0; i < n; ++i) {
-      // Gather relevant component and resource data
-      const auto &component = e_scene.components.objects[i];
-      const auto &object   = component.value;
-      const auto &mesh     = e_scene.resources.meshes[object.mesh_i].value();
+    // Set fresh vertex array for draw data if it was updated
+    if (info("scene_handler", "mesh_data").is_mutated())
+      m_draw.bindable_array = &e_mesh_data.array;
 
-      // Skip object if flagged as inactive
-      guard_continue(object.is_active);
+    // Assemble appropriate draw data for each object in the scene
+    if (info("scene_handler", "objc_data").is_mutated()) {
+      m_draw.commands.resize(e_objects.size());
+      rng::transform(e_objects, m_draw.commands.begin(), [&](const auto &comp) {
+        guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
+        const auto &e_mesh_info = e_mesh_data.info.at(comp.value.mesh_i);
+        return gl::MultiDrawInfo::DrawCommand {
+          .vertex_count = e_mesh_info.elems_size * 3,
+          .vertex_first = e_mesh_info.elems_offs * 3
+        };
+      });
+    }
 
-      // Skip component if mesh data is not yet pushed on the GL side
-      guard_continue(e_meshes.size() > object.mesh_i);
+    // Bind required resources to their corresponding targets
+    m_program.bind("b_unif_camera",   m_unif_camera_buffer);
+    m_program.bind("b_buff_objects",  e_objc_data.info_gl);
+    m_program.bind("b_buff_textures", e_txtr_data.info_gl);
+    m_program.bind("b_txtr_1f",       e_txtr_data.atlas_1f);
+    m_program.bind("b_txtr_3f",       e_txtr_data.atlas_3f);
 
-      // Get object uniform mapping
-      auto &buffer     = m_unif_object_buffers[i];
-      auto &buffer_map = m_unif_object_buffer_maps[i];
-
-      // Bind relevant diffuse texture data if exists, or specify color else
-      if (object.diffuse.index() == 1) { // texture
-        // Test if texture data is available yet on the GL side
-        uint texture_i = std::get<1>(object.diffuse);
-        guard_continue(e_textures.size() > texture_i);
-
-        // Bind texture and sampler to corresponding targets
-        const auto &layout = e_textures[texture_i];
-        m_program.bind("b_diffuse_texture",  layout.sampler);
-        m_program.bind("b_diffuse_texture", *layout.texture);
-      } else { // constant value
-        buffer_map->diffuse_value = std::get<0>(object.diffuse);
-      }
-      
-      // Push object uniform data
-      buffer_map->model_matrix        = object.trf.matrix();
-      buffer_map->use_diffuse_texture = object.diffuse.index();
-      buffer.flush();
-
-      // Adjust draw object for coming draw
-      m_draw.vertex_count   = static_cast<uint>(mesh.elems.size()) * 3;
-      m_draw.bindable_array = &e_meshes[object.mesh_i].array;
-
-      m_program.bind("b_unif_object", buffer);
-
-      // Dispatch draw call
-      gl::dispatch_draw(m_draw);
-    } // for (uint i)
+    // Dispatch draw call to handle entire scene
+    gl::dispatch_multidraw(m_draw);
   }
 } // namespace met

@@ -3,7 +3,6 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/task_mesh_viewport.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw.hpp>
-#include <metameric/components/views/mesh_viewport/task_draw_single.hpp>
 #include <metameric/components/views/mesh_viewport/task_input.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
@@ -211,7 +210,7 @@ namespace met {
     info.child_task("view_input").init<MeshViewportInputTask>();
     info.child_task("view_end").init<MeshViewportViewEndTask>();
     info.child_task("draw_begin").init<MeshViewportDrawBeginTask>();
-    info.child_task("draw_mesh").init<MeshViewportSingleDrawTask>();
+    info.child_task("draw_mesh").init<MeshViewportDrawTask>();
     info.child_task("draw_end").init<MeshViewportDrawEndTask>();
   }
 } // namespace met
