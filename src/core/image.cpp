@@ -3,6 +3,7 @@
 #include <limits>
 #include <format>
 #include <type_traits>
+#include <functional>
 #include <unordered_map>
 
 // Block of loader includes
@@ -18,32 +19,32 @@
 
 namespace met {
   namespace detail {
-    constexpr size_t size_from_format(Image::PixelFormat fmt) {
+    constexpr uint size_from_format(Image::PixelFormat fmt) {
       switch (fmt) {
         case Image::PixelFormat::eRGB:   return 3;
         case Image::PixelFormat::eRGBA:  return 4;
         case Image::PixelFormat::eAlpha: return 1;
-        default:                                return 0;
+        default:                         return 0;
       }      
     }
 
-    constexpr size_t size_from_type(Image::PixelType ty) {
+    constexpr uint size_from_type(Image::PixelType ty) {
       switch (ty) {
-        case Image::PixelType::eUChar:  return sizeof( uchar  );
-        case Image::PixelType::eUShort: return sizeof( ushort );
-        case Image::PixelType::eUInt:   return sizeof( uint   );
-        case Image::PixelType::eFloat:  return sizeof( float  );
-        default:                               return 0;
+        case Image::PixelType::eUChar:  return static_cast<uint>(sizeof( uchar  ));
+        case Image::PixelType::eUShort: return static_cast<uint>(sizeof( ushort ));
+        case Image::PixelType::eUInt:   return static_cast<uint>(sizeof( uint   ));
+        case Image::PixelType::eFloat:  return static_cast<uint>(sizeof( float  ));
+        default:                        return 0;
       }
     }
 
-    constexpr Image::PixelFormat format_from_size(size_t size) {
+    constexpr Image::PixelFormat format_from_size(uint size) {
       switch (size) {
-        case 3: return Image::PixelFormat::eRGB;
-        case 4: return Image::PixelFormat::eRGBA;
-        case 1: return Image::PixelFormat::eAlpha;
+        case  3: return Image::PixelFormat::eRGB;
+        case  4: return Image::PixelFormat::eRGBA;
+        case  1: return Image::PixelFormat::eAlpha;
         default: return Image::PixelFormat::eAlpha;
-      }    
+      }
     }
 
     constexpr bool is_type_float(Image::PixelType ty)   { return ty == Image::PixelType::eFloat; }
@@ -80,6 +81,50 @@ namespace met {
     OTy convert(ITy v) {
       uint i = static_cast<uint>(v * static_cast<ITy>(std::numeric_limits<OTy>::max()));
       return convert<OTy>(i);
+    }
+
+    constexpr inline
+    void convert_to_float(Image::PixelType type, const std::byte &in, float &out) {
+      using PixelType = Image::PixelType;
+      switch (type) {
+        case PixelType::eUChar:  out = convert<float>(*reinterpret_cast<const uchar *>(&in));  break;
+        case PixelType::eUShort: out = convert<float>(*reinterpret_cast<const ushort *>(&in)); break;
+        case PixelType::eUInt:   out = convert<float>(*reinterpret_cast<const uint *>(&in));   break;
+        case PixelType::eFloat:  out = *reinterpret_cast<const float *>(&in);                  break;
+      } // switch (type)
+    }
+
+    constexpr inline
+    void convert_fr_float(Image::PixelType type, const float &in, std::byte &out) {
+      using PixelType = Image::PixelType;
+      switch (type) {
+        case PixelType::eUChar:  *reinterpret_cast<uchar *>(&out)  = detail::convert<uchar>(in);  break;
+        case PixelType::eUShort: *reinterpret_cast<ushort *>(&out) = detail::convert<ushort>(in); break;
+        case PixelType::eUInt:   *reinterpret_cast<uint *>(&out)   = detail::convert<uint>(in);   break;
+        case PixelType::eFloat:  *reinterpret_cast<float *>(&out)  = in;                          break;
+      } // switch (type)
+    }
+
+    Colr convert_colr_frmt_to_xyz(Image::ColorFormat type_in, const Colr &c) {
+      using ColorFormat = Image::ColorFormat;
+      switch (type_in) {
+        case ColorFormat::eLRGB: return lrgb_to_xyz(c);
+        case ColorFormat::eSRGB: return srgb_to_xyz(c);
+        default:                 return c;
+      } // switch (type_in)
+    }
+
+    Colr convert_xyz_to_colr_frmt(Image::ColorFormat type_out, const Colr &c) {
+      using ColorFormat = Image::ColorFormat;
+      switch (type_out) {
+        case ColorFormat::eLRGB: return xyz_to_lrgb(c);
+        case ColorFormat::eSRGB: return xyz_to_srgb(c);
+        default:                 return c;
+      } // switch (type_in)
+    }
+
+    Colr convert_colr_frmt(Image::ColorFormat type_in, Image::ColorFormat type_out, const Colr &c) {
+      return convert_xyz_to_colr_frmt(type_out, convert_colr_frmt_to_xyz(type_in, c));
     }
   } // namespace detail
 
@@ -138,6 +183,7 @@ namespace met {
       // Parse header/image configuration
       m_pixel_type = PixelType::eFloat; // half-data is upcast by TinyEXR
       m_pixel_frmt = detail::format_from_size(exr_image.num_channels);
+      m_color_frmt = m_pixel_frmt == PixelFormat::eAlpha ? ColorFormat::eNone : ColorFormat::eLRGB;
       m_size = { exr_image.width, exr_image.height };
       if (exr_header.pixel_types[0] == TINYEXR_PIXELTYPE_UINT)
         m_pixel_type = PixelType::eUInt;
@@ -147,9 +193,9 @@ namespace met {
                                   * detail::size_from_type(m_pixel_type));
 
       // Used sizes and offsets
-      size_t type_size = detail::size_from_type(type());
-      size_t pixl_chan = detail::size_from_format(frmt());
-      size_t pixl_size = pixl_chan * type_size;
+      uint type_size = detail::size_from_type(pixel_type());
+      uint pixl_chan = detail::size_from_format(pixel_frmt());
+      uint pixl_size = pixl_chan * type_size;
 
       // Attempt to scatter EXR data to image memory
       std::unordered_map<std::string, uint> channel_indices = {
@@ -161,8 +207,8 @@ namespace met {
 
         #pragma omp parallel for
         for (int i = 0; i < m_size.prod(); ++i) {
-          size_t dst_offs = i * pixl_chan * type_size + chan_offs * type_size;
-          size_t src_offs = i * type_size;
+          size_t src_offs = type_size * i;
+          size_t dst_offs = type_size * (i * pixl_chan + chan_offs);
           std::memcpy(&m_data[dst_offs], &chan_data[src_offs], type_size);
         } // for (uint i)
       } // for (uint c)
@@ -183,6 +229,7 @@ namespace met {
       // Specify header/image configuration
       m_pixel_type = PixelType::eUChar;
       m_pixel_frmt = detail::format_from_size(c);
+      m_color_frmt = m_pixel_frmt == PixelFormat::eAlpha ? ColorFormat::eNone : ColorFormat::eSRGB;
       m_size       = { w, h };
 
       // Allocate image memory and copy image data over
@@ -193,28 +240,35 @@ namespace met {
       // Cleanup
       stbi_image_free(ptr);
     }
-
-    // If some form of conversion is requested, run it
-    if (info.rgb_convert != RGBConvertType::eNone)
-      *this = convert({ .rgb_convert = info.rgb_convert });
   }
 
   Image::Image(CreateInfo info)
   : m_pixel_frmt(info.pixel_frmt),
     m_pixel_type(info.pixel_type),
+    m_color_frmt(info.color_frmt),
     m_size(info.size),
     m_data(m_size.prod() * detail::size_from_format(info.pixel_frmt) 
                          * detail::size_from_type(info.pixel_type)) {
     met_trace();
 
+    // Do not allow color formats over single-value images
+    if (m_pixel_frmt == PixelFormat::eAlpha)
+      m_color_frmt = ColorFormat::eNone;
+
     // Either copy data over, or 
     // If data is provided, run a copy
     if (!info.data.empty())
       std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
+  }
 
-    // If some form of conversion is requested, run it
-    if (info.rgb_convert != RGBConvertType::eNone)
-      *this = convert({ .rgb_convert = info.rgb_convert });
+  eig::Array4f Image::sample(const eig::Array2u &xy, ColorFormat preferred_frmt) const {
+    met_trace();
+    return 0.f;
+  }
+
+  eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat preferred_frmt) const {
+    met_trace();
+    return 0.f;
   }
 
   Image Image::convert(ConvertInfo info) const {
@@ -224,70 +278,47 @@ namespace met {
     Image output = {{ 
       .pixel_frmt = info.pixel_frmt.value_or(m_pixel_frmt),
       .pixel_type = info.pixel_type.value_or(m_pixel_type),
+      .color_frmt = info.color_frmt.value_or(m_color_frmt),
       .size       = m_size
     }};
 
-    // Used sizes and offsets
-    size_t inp_chan = detail::size_from_format(frmt());
-    size_t out_chan = detail::size_from_format(output.frmt());
-    size_t trf_chan = std::min<size_t>(inp_chan, out_chan);
-    size_t inp_type_size = detail::size_from_type(type());
-    size_t out_type_size = detail::size_from_type(output.type());
-    size_t inp_pixl_size = inp_chan * inp_type_size;
-    size_t out_pixl_size = out_chan * out_type_size;
+    // Used sizes, offsets, misc
+    uint src_channel_count = detail::size_from_format(pixel_frmt());
+    uint dst_channel_count = detail::size_from_format(output.pixel_frmt());
+    uint ovl_channel_count = std::min(src_channel_count, dst_channel_count);
+    uint src_size          = detail::size_from_type(pixel_type());
+    uint dst_size          = detail::size_from_type(output.pixel_type());
 
-    // Iterate over pixel values
+    // Range over overlapping channels
+    auto ovl_channels = eig::Array4u(0, 1, 2, 3).head(ovl_channel_count).eval();
+
+    // Color format conversion helper
+    using namespace std::placeholders;
+    bool convert_colr = output.m_color_frmt != m_color_frmt && output.m_pixel_frmt != PixelFormat::eAlpha;
+    auto convert_func = std::bind(detail::convert_colr_frmt, m_color_frmt, output.m_color_frmt, _1);
+
+    // Iterate over full images
     #pragma omp parallel for
     for (int i = 0; i < output.size().prod(); ++i) {
-      size_t inp_pixel_offs = i * inp_pixl_size,
-             out_pixel_offs = i * out_pixl_size;
+      // Range over input/output channels
+      auto src_channels = (src_size * (ovl_channels + i * src_channel_count)).eval();
+      auto dst_channels = (dst_size * (ovl_channels + i * dst_channel_count)).eval();
 
-      // Iterate over overlapping channels (all channels unless resize takes place)
-      for (int j = 0; j < trf_chan; ++j) {
-        size_t inp_chan_offs = inp_pixel_offs + j * inp_type_size,
-               out_chan_offs = out_pixel_offs + j * out_type_size;
+      // Float data is used as a in-between format for conversion
+      eig::Array4f f = 0;
 
-        // Floating point is used as a common representation for conversion
-        float f = 0.f;
-        
-        // Convert input to common representation
-        switch (type()) {
-          case PixelType::eUChar:
-            f = detail::convert<float>(*reinterpret_cast<const uchar *>(&m_data[inp_chan_offs])); 
-            break;
-          case PixelType::eUShort: 
-            f = detail::convert<float>(*reinterpret_cast<const ushort *>(&m_data[inp_chan_offs]));
-            break;
-          case PixelType::eUInt:   
-            f = detail::convert<float>(*reinterpret_cast<const uint *>(&m_data[inp_chan_offs]));
-            break;
-          case PixelType::eFloat:
-            f = *reinterpret_cast<const float *>(&m_data[inp_chan_offs]);
-            break;
-        } // switch (type())
+      // Gather converted input to float representation
+      for (auto [src, ovl] : vws::zip(src_channels, ovl_channels))
+        detail::convert_to_float(pixel_type(), m_data[src], f[ovl]);
 
-        // Apply lrgb-srgb conversion on common representation if requested
-        switch (info.rgb_convert) {
-         case RGBConvertType::eSRGBtoLRGB: f = lrgb_to_srgb_f(f); break;
-         case RGBConvertType::eLRGBtoSRGB: f = srgb_to_lrgb_f(f); break;
-        }
-
-        // Convert common representation to output
-        switch (output.type()) {
-          case PixelType::eUChar:  
-            *reinterpret_cast<uchar *>(&output.m_data[out_chan_offs]) = detail::convert<uchar>(f);
-            break;
-          case PixelType::eUShort: 
-            *reinterpret_cast<ushort *>(&output.m_data[out_chan_offs]) = detail::convert<ushort>(f);
-            break;
-          case PixelType::eUInt:   
-            *reinterpret_cast<uint *>(&output.m_data[out_chan_offs]) = detail::convert<uint>(f);
-            break;
-          case PixelType::eFloat:  
-            *reinterpret_cast<float *>(&output.m_data[out_chan_offs]) = f;
-            break;
-        } // switch (output.type())
-      } // for (int j)
+      // Apply color space conversion on float representation, to the first
+      // three channels **only**
+      if (convert_colr)
+        f.head<3>() = convert_func(f.head<3>());
+      
+      // Scatter float representation to converted output
+      for (auto [ovl, dst] : vws::zip(ovl_channels, dst_channels))
+        detail::convert_fr_float(output.pixel_type(), f[ovl], output.m_data[dst]);
     } // for (int i)
 
     return output;

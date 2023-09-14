@@ -145,11 +145,13 @@ namespace met::detail {
   RTTextureData RTTextureData::realize(std::span<const detail::Resource<Image>> images) {
     met_trace_full();
 
+    guard(!images.empty(), RTTextureData { });
+
     // Generate work objects for each image and image type, before atlas generation
     std::vector<AtlasCreateInfo::Image> work_3f, work_1f;
     for (uint i = 0; i < images.size(); ++i) {
       const auto &img = images[i].value();
-      if (img.frmt() == Image::PixelFormat::eRGB) {
+      if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
         work_3f.push_back({ .image_i = i, .work_i = (uint) work_3f.size(), .size = img.size() });
       } else {
         work_1f.push_back({ .image_i = i, .work_i = (uint) work_1f.size(), .size = img.size() });
@@ -183,7 +185,10 @@ namespace met::detail {
                                   .uv1   = uv1 };
 
       // Get a float representation of image data, and push to GL-side
-      auto img = images[work.image_i].value().convert({ .pixel_type = Image::PixelType::eFloat });
+      auto img = images[work.image_i].value().convert({ 
+        .pixel_type = Image::PixelType::eFloat,
+        .color_frmt = Image::ColorFormat::eLRGB
+      });
       data.atlas_3f.set(img.data<float>(), 
                         0,
                         { space.size.x(), space.size.y(), 1           },
@@ -247,6 +252,8 @@ namespace met::detail {
 
   RTMeshData RTMeshData::realize(std::span<const detail::Resource<AlMeshData>> meshes) {
     met_trace_full();
+
+    guard(!meshes.empty(), RTMeshData { });
 
     // Gather vertex/element lengths and offsets per mesh resources
     std::vector<uint> verts_size, elems_size, verts_offs, elems_offs;
@@ -315,6 +322,7 @@ namespace met::detail {
     met_trace_full();
 
     RTObjectData data;
+    guard(!objects.empty(), data);
     
     data.info.resize(objects.size());
     for (uint i = 0; i < objects.size(); ++i) {
