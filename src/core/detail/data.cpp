@@ -75,10 +75,10 @@ namespace met::detail {
     fmt::print("  Generating object color solid boundaries\n");
 
     // Compute data points on convex hull of object color solid; used for convex hull clipping
-    auto ocs = generate_ocs_boundary({ .basis      = appl_data.loaded_basis,
-                                       .basis_mean = appl_data.loaded_basis_mean,
-                                       .system     = appl_data.project_data.csys(0).finalize_direct(), 
-                                       .samples    = detail::gen_unit_dirs<3>(1024) });
+    auto ocs = generate_ocs_boundary_colr({ .basis      = appl_data.loaded_basis,
+                                            .basis_mean = appl_data.loaded_basis_mean,
+                                            .system     = appl_data.project_data.csys(0).finalize_direct(), 
+                                            .samples    = detail::gen_unit_dirs<3>(1024) });
 
     // Generate cleaned mesh from data
     auto ocs_mesh = simplify_edge_length<HalfedgeMeshData>(

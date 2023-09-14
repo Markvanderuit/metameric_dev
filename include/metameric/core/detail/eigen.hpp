@@ -15,7 +15,7 @@ namespace met {
   template <typename Ty>
   concept is_approx_comparable = requires(const Ty &a, const Ty &b) {
     { a.isApprox(b) } -> std::convertible_to<bool>;
-  };;
+  };
 } // namespace met
 
 namespace Eigen {

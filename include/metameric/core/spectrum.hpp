@@ -112,17 +112,16 @@ namespace met {
   }
 
   // sRGB/linear sRGB/XYZ conversion shorthands
-  inline Colr srgb_to_lrgb(Colr c) { met_trace(); rng::transform(c, c.begin(), srgb_to_lrgb_f); return c; }
-  inline Colr lrgb_to_srgb(Colr c) { met_trace(); rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
-  inline Colr xyz_to_lrgb(Colr c)  { met_trace(); return models::xyz_to_srgb_transform * c.matrix();      }
-  inline Colr lrgb_to_xyz(Colr c)  { met_trace(); return models::srgb_to_xyz_transform * c.matrix();      }
-  inline Colr xyz_to_srgb(Colr c)  { met_trace(); return lrgb_to_srgb(xyz_to_lrgb(c));                    }
-  inline Colr srgb_to_xyz(Colr c)  { met_trace(); return lrgb_to_xyz(srgb_to_lrgb(c));                    }
+  inline Colr srgb_to_lrgb(Colr c) { rng::transform(c, c.begin(), srgb_to_lrgb_f); return c; }
+  inline Colr lrgb_to_srgb(Colr c) { rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
+  inline Colr xyz_to_lrgb(Colr c)  { return models::xyz_to_srgb_transform * c.matrix();      }
+  inline Colr lrgb_to_xyz(Colr c)  { return models::srgb_to_xyz_transform * c.matrix();      }
+  inline Colr xyz_to_srgb(Colr c)  { return lrgb_to_srgb(xyz_to_lrgb(c));                    }
+  inline Colr srgb_to_xyz(Colr c)  { return lrgb_to_xyz(srgb_to_lrgb(c));                    }
 
   // Convert a XYZ color to xyY
   inline
   Chro xyz_to_xy(Colr c) {
-    met_trace();
     float y = c.sum();
     return y > 0.f ? Chro(c[0] / y, c[2] / y) : 0.f;
   }

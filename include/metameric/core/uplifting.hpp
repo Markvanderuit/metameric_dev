@@ -29,8 +29,8 @@ namespace met {
       
       // If type == Type::eColorOnMesh, these determine mesh location
       uint         object_i;         // Index of object to which constraint belongs
-      uint         object_elem_i;    // Index of object element where constraint is located
-      eig::Array3f object_elem_bary; // Barycentric coordinates inside object element
+      uint         object_elem_i;    // Index of element where constraint is located on object
+      eig::Array3f object_elem_bary; // Barycentric coordinates inside element
 
       // If type == Type::eMeasurement, this holds a measured spectral constraint
       Spec measurement;

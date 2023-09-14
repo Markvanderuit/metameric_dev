@@ -133,28 +133,53 @@ namespace met {
     return s;
   } */
 
-  std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info) {
+  std::vector<Spec> generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info) {
     met_trace();
 
-    std::vector<Colr> out(info.samples.size());
+    std::vector<Spec> output(info.samples.size());
 
-    std::transform(std::execution::par_unseq, range_iter(info.samples), out.begin(), [&](const Colr &sample) {
+    std::transform(std::execution::par_unseq, range_iter(info.samples), output.begin(), [&](const Colr &sample) {
       Spec s = (info.system * sample.matrix()).eval();
       for (auto &f : s)
         f = f >= 0.f ? 1.f : 0.f;
 
       // Find nearest generalized spectrum that fits within the basis function approach
-      Spec s_ = generate_spectrum({
+      return generate_spectrum({
         .basis      = info.basis,
         .basis_mean = info.basis_mean,
         .systems    = std::vector<CMFS> { info.system },
         .signals    = std::vector<Colr> { (info.system.transpose() * s.matrix()).eval() }
       });
-
-      return (info.system.transpose() * s_.matrix()).eval();
     });
+    
+    // Filter NaNs at underconstrained output and strip redundancy from return 
+    std::erase_if(output, [](Spec &c) { return c.isNaN().any(); });
+    std::unordered_set<
+      Spec, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > output_unique(range_iter(output));
+    return std::vector<Spec>(range_iter(output_unique));
+  }
 
-    return out;
+  std::vector<Colr> generate_ocs_boundary_colr(const GenerateOCSBoundaryInfo &info) {
+    met_trace();
+
+    std::vector<Spec> input = generate_ocs_boundary_spec(info);
+    std::vector<Colr> output(input.size());
+
+    std::transform(std::execution::par_unseq, range_iter(input), output.begin(), [&](const Spec &s) {
+      return (info.system.transpose() * s.matrix()).eval();
+    });
+    
+    // Filter NaNs at underconstrained output and strip redundancy from return 
+    std::erase_if(output, [](Colr &c) { return c.isNaN().any(); });
+    std::unordered_set<
+      Colr, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > output_unique(range_iter(output));
+    return std::vector<Colr>(range_iter(output_unique));
   }
   
   std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info) {

@@ -6,7 +6,10 @@
 
 namespace met {
   class GenUpliftingDataTask : public detail::TaskNode {
-    uint uplifting_i;
+    uint              m_uplifting_i;
+    std::vector<Colr> m_csys_boundary_samples;
+    std::vector<Spec> m_csys_boundary_spectra;
+    std::vector<Colr> m_tesselation_points;
 
   public:
     GenUpliftingDataTask(uint uplifting_i);
@@ -30,7 +33,7 @@ namespace met {
       // Add subtasks to perform mapping
       m_subtasks.init(info, e_upliftings.size(), 
         [](uint i)         { return fmt::format("gen_uplifting_{}", i); },
-        [](auto &, uint i) { return GenUpliftingDataTask(i);                });
+        [](auto &, uint i) { return GenUpliftingDataTask(i);            });
     }
 
     void eval(SchedulerHandle &info) override {

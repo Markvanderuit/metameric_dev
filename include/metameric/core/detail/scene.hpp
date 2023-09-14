@@ -89,6 +89,11 @@ namespace met::detail {
 
       return m_mutated;
     }
+
+  public: // Boilerplate
+    // operator[...] exposes throwing at()
+    constexpr const auto &operator[](uint i) const { return m_cache.at(i); }
+    constexpr       auto &operator[](uint i)       { return m_cache.at(i); }
   };
 
   /* Scene component.
@@ -105,6 +110,13 @@ namespace met::detail {
     constexpr friend 
     auto operator<=>(const Component &, const Component &) = default;
     
+    constexpr 
+    operator bool() const { return state.is_mutated(); };
+    
+  public: // Types
+    using value_type = Ty;
+    using state_type = State;
+
   public: // Serialization
     void to_stream(std::ostream &str) const {
       met_trace();
@@ -117,6 +129,20 @@ namespace met::detail {
       io::fr_stream(name,  str);
       io::fr_stream(value, str);
     }
+    
+  public: // Structured binding; const auto &[ty, state] = component
+    template<size_t Index>
+    std::tuple_element_t<Index, Component<Ty, State>> const& get() const& {
+      static_assert(Index < 2);
+      if constexpr (Index == 0) return value;
+      if constexpr (Index == 1) return state;
+    } 
+    template<size_t Index>
+    std::tuple_element_t<Index, Component<Ty, State>> & get() & {
+      static_assert(Index < 2);
+      if constexpr (Index == 0) return value;
+      if constexpr (Index == 1) return state;
+    } 
   };
 
   /* Scene resource.
@@ -138,8 +164,9 @@ namespace met::detail {
     : m_mutated(true), name(name), m_value(std::move(value)), is_deletable(is_deletable) { }
 
   public: // State handling
-    constexpr void set_mutated(bool b)  { m_mutated = b; }
-    constexpr bool is_mutated()   const { return m_mutated; }
+    constexpr void set_mutated(bool b) { m_mutated = b;    }
+    constexpr bool is_mutated()  const { return m_mutated; }
+    constexpr operator bool()    const { return m_mutated; };
 
   public: // Boilerplate
     constexpr const Ty &value() const { return m_value; }
@@ -160,6 +187,22 @@ namespace met::detail {
       io::fr_stream(name,    str);
       io::fr_stream(m_value, str);
     }
+  
+  public: // Structured binding; const auto &[ty, state] = component
+    template<size_t Index>
+    std::tuple_element_t<Index, Resource<Ty>> const& get() const& {
+      static_assert(Index < 2);
+      if constexpr (Index == 0) return m_value;
+      if constexpr (Index == 1) return m_mutated;
+    } 
+
+    template<size_t Index>
+    std::tuple_element_t<Index, Resource<Ty>> & get() & {
+      static_assert(Index < 2);
+      set_mutated(true);
+      if constexpr (Index == 0) return m_value;
+      if constexpr (Index == 1) return m_mutated;
+    } 
   };
 
   /* Scene component vector.
@@ -341,3 +384,35 @@ namespace met::detail {
     }
   };
 } // namespace met::detail
+
+/* Here follows structured binding support for Scene::Component/Scene::Resource types.
+   I'm sure this won't backfire at all! */
+namespace std {
+  template <typename Ty>
+  struct tuple_size<::met::detail::Resource<Ty>> 
+  : integral_constant<size_t, 2> {};
+
+  template <typename Ty>
+  struct tuple_element<0, ::met::detail::Resource<Ty>> { 
+    using type = Ty;
+  };
+
+  template <typename Ty>
+  struct tuple_element<1, ::met::detail::Resource<Ty>> {
+    using type = bool;
+  };
+
+  template <typename Ty, typename State>
+  struct tuple_size<::met::detail::Component<Ty, State>> 
+  : integral_constant<size_t, 2> {};
+
+  template <typename Ty, typename State>
+  struct tuple_element<0, ::met::detail::Component<Ty, State>> { 
+    using type = met::detail::Component<Ty, State>::value_type;
+  };
+
+  template <typename Ty, typename State>
+  struct tuple_element<1, ::met::detail::Component<Ty, State>> {
+    using type = met::detail::Component<Ty, State>::state_type;
+  };
+} // namespace std

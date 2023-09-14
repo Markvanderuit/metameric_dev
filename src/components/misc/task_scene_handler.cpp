@@ -42,7 +42,7 @@ namespace met {
       else            i_objc_data.update(e_objects);
     }
 
-    // Process updates to gpu-side illuminant resources
+    /* // Process updates to gpu-side illuminant resources
     if (!m_is_init || e_scene.resources.illuminants.is_mutated()) {
       // ...
     }
@@ -55,7 +55,7 @@ namespace met {
     // Process updates to gpu-side basis function resources
     if (!m_is_init || e_scene.resources.bases.is_mutated()) {
       // ...
-    }
+    } */
 
     // Scene resources are now up-to-date;
     // do some bookkeeping on state tracking across resources/components

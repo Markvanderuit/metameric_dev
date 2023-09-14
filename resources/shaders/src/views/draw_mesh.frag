@@ -35,12 +35,7 @@ layout(binding = 2) uniform sampler2DArray b_txtr_3f;
 
 vec4 sample_texture(uint texture_i, in vec2 tx_in) {
   TextureInfo info = buff_textures.data[texture_i];
-
-  // TODO May be able to precompute these modifiers, avoiding size queries
-  // vec2 wh = info.is_3f ? vec2(textureSize(b_txtr_3f, 0).xy)
-  //                      : vec2(textureSize(b_txtr_1f, 0).xy);
-  // vec2 tx = (vec2(info.offs) + vec2(info.size) * mod(tx_in, 1) - 0.5) / wh;
-
+  
   vec2 tx = info.uv0 + info.uv1 * mod(tx_in, 1);
 
   return info.is_3f ? texture(b_txtr_3f, vec3(tx, info.layer))

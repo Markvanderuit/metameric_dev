@@ -229,11 +229,16 @@ namespace met {
   Mesh generate_delaunay(std::span<const Vector> data) {
     met_trace();
 
-    // Query qhull for a delaunay tetrahedralization structure
     std::vector<eig::Array3f> input(range_iter(data));
-    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
-    auto qh_verts = qhull.vertexList().toStdVector();
-    auto qh_elems = qhull.facetList().toStdVector();
+
+    std::vector<orgQhull::QhullVertex> qh_verts;
+    std::vector<orgQhull::QhullFacet>  qh_elems;
+    { // qhull
+      met_trace_n("qhull_generate_delaunay");
+      auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
+      qh_verts = qhull.vertexList().toStdVector();
+      qh_elems = qhull.facetList().toStdVector();
+    } // qhull
 
     // Assign incremental IDs to qh_verts; Qhull does not seem to manage removed vertices properly?
     #pragma omp parallel for
@@ -242,19 +247,20 @@ namespace met {
 
     // Assemble indexed data from qhull format
     std::vector<eig::Array3f> verts(qh_verts.size());
-    std::vector<eig::Array4u> elems(qh_elems.size());
     std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
-      [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
+      [](const auto &vt) { return Mesh::VertTy(vt.point().constBegin()); });
 
     // Undo QHull's unnecessary scatter-because-screw-you-aaaaaargh
     std::vector<uint> vertex_idx(data.size());
-    for (uint i = 0; i < data.size(); ++i) {
-      auto it = std::ranges::find_if(data, [&](const auto &v) { return v.isApprox(verts[i]); });
+    #pragma omp parallel for
+    for (int i = 0; i < vertex_idx.size(); ++i) {
+      auto it = rng::find_if(data, [&](const auto &v) { return v.isApprox(verts[i]); });
       guard_continue(it != data.end());
       vertex_idx[i] = std::distance(data.begin(), it);
     }
     
     // Build element data
+    std::vector<eig::Array4u> elems(qh_elems.size());
     std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [&](const auto &el) {
       eig::Array4u el_;
       std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 

@@ -62,11 +62,13 @@ namespace met {
         const auto &mesh   = e_meshes[object.mesh_i].value();
         const auto &elem   = mesh.elems[object_query.i];
 
+        // Hit position
+        eig::Vector3f p = camera_ray.o + object_query.t * camera_ray.d;
+
         // Determine barycentrics at hit position 
         eig::Vector3f bary;
         {
           eig::Vector3f a = mesh.verts[elem[0]], b = mesh.verts[elem[1]], c = mesh.verts[elem[2]];
-          eig::Vector3f p = camera_ray.o + object_query.t * camera_ray.d;
           eig::Vector3f ab = b - a, ac = c - a, ap = p - a;
 
           float d00 = ab.dot(ab);        
@@ -75,8 +77,7 @@ namespace met {
           float d20 = ap.dot(ab);        
           float d21 = ap.dot(ac);     
           float den = d00 * d11 - d01 * d01;    
-
-          eig::Vector3f bary;
+          
           bary.y() = (d11 * d20 - d01 * d21) / den;
           bary.z() = (d00 * d21 - d01 * d20) / den;
           bary.x() = 1.f - bary.y() - bary.z();

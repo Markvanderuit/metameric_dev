@@ -39,8 +39,8 @@ namespace met {
 
   // Corresponding functions to above generate objects
   Spec generate_spectrum(GenerateSpectrumInfo info);
-  /* Spec generate_spectrum_recursive(GenerateSpectrumInfo info); */
-  std::vector<Colr> generate_ocs_boundary(const GenerateOCSBoundaryInfo &info);
+  std::vector<Spec> generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info);
+  std::vector<Colr> generate_ocs_boundary_colr(const GenerateOCSBoundaryInfo &info);
   std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info);
 
   /* Info struct for generation of a gamut, given color constraint information */

@@ -67,10 +67,10 @@ namespace met {
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Compute data points on convex hull of object color solid
-    auto data = generate_ocs_boundary({ .basis      = e_appl_data.loaded_basis,
-                                        .basis_mean = e_appl_data.loaded_basis_mean, 
-                                        .system     = e_proj_data.csys(0).finalize_direct(), 
-                                        .samples    = detail::gen_unit_dirs<3>(n_samples) });
+    auto data = generate_ocs_boundary_colr({ .basis      = e_appl_data.loaded_basis,
+                                             .basis_mean = e_appl_data.loaded_basis_mean, 
+                                             .system     = e_proj_data.csys(0).finalize_direct(), 
+                                             .samples    = detail::gen_unit_dirs<3>(n_samples) });
 
     // Generate cleaned mesh from data
     auto mesh = simplify_edge_length<AlMeshData>(
