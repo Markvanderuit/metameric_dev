@@ -4,6 +4,10 @@
 #include <metameric/core/utility.hpp>
 
 namespace met {
+  /* 
+    Spectrum/color/color system data
+  */
+
   /* Define metameric's spectral range layout */
   constexpr static float wavelength_min      = MET_WAVELENGTH_MIN;
   constexpr static float wavelength_max      = MET_WAVELENGTH_MAX;  
@@ -26,6 +30,30 @@ namespace met {
   /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
   using AlColr = eig::AlArray<float, 3>;
   using Basis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
+
+  /* System object defining how a reflectance-to-color conversion is performed */
+  struct ColrSystem {
+    // Public members
+    CMFS cmfs;       // Color matching or sensor response functions, defining the observer
+    Spec illuminant; // Illuminant under which observation is performed
+    uint n_scatters; // Nr. of recursive scatters of observed refletance; default 1
+
+    // Simplify the CMFS/illuminant into color system spectra
+    CMFS finalize_direct() const;
+    CMFS finalize_indirect(const Spec &sd) const;
+    
+    // Obtain a color by applying this spectral mapping
+    Colr apply_color_direct(const Spec &sd) const { met_trace(); return finalize_direct().transpose() * sd.pow(n_scatters).matrix().eval();  }
+    Colr apply_color_indirect(const Spec &sd) const { met_trace(); return finalize_indirect(sd).transpose() * sd.matrix();  }
+
+    // Operator shorthands
+    Colr operator()(const Spec &s) const { met_trace(); return apply_color_direct(s);  }
+    bool operator==(const ColrSystem &o) const { met_trace(); return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant); }
+  };
+
+  /* 
+    Hardcoded model data.
+  */
   
   /* Define pre-included color matching functions, SPD models, etc. */
   namespace models {
@@ -51,36 +79,11 @@ namespace met {
     extern Spec emitter_cie_ledrgb1;  // CIE standard illuminant LED-RGB1; R/G/B LEDs
   } // namespace models
 
-  /* Linear trichromatic color space described as a linear transformation to/from CIE XYZ  */
-  struct ColrSpace {
-    eig::Matrix3f xyz_to_rgb_transform;
-    eig::Matrix3f rgb_to_xyz_transform;
+  /* 
+    Miscellaneous functions.
+  */
 
-    Colr to_xyz(Colr c_rgb) const { met_trace(); return rgb_to_xyz_transform * c_rgb.matrix(); }
-    Colr to_rgb(Colr c_xyz) const { met_trace(); return xyz_to_rgb_transform * c_xyz.matrix(); }
-  };
-  
-  /* System object defining how a reflectance-to-color conversion is ultimately performed */
-  struct ColrSystem {
-    // Public members
-    CMFS cmfs;       // Color matching or sensor response functions, defining the observer
-    Spec illuminant; // Illuminant under which observation is performed
-    uint n_scatters; // Nr. of recursive scatters of observed refletance; default 1
-
-    // Simplify the CMFS/illuminant into color system spectra
-    CMFS finalize_direct() const;
-    CMFS finalize_indirect(const Spec &sd) const;
-    
-    // Obtain a color by applying this spectral mapping
-    Colr apply_color_direct(const Spec &sd) const { met_trace(); return finalize_direct().transpose() * sd.pow(n_scatters).matrix().eval();  }
-    Colr apply_color_indirect(const Spec &sd) const { met_trace(); return finalize_indirect(sd).transpose() * sd.matrix();  }
-
-    // Operator shorthands
-    Colr operator()(const Spec &s) const { met_trace(); return apply_color_direct(s);  }
-    bool operator==(const ColrSystem &o) const { met_trace(); return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant); }
-  };
-
-  // Given a spectral bin, obtain the relevant central wavelength
+  // Given a spectral bin, obtain the relevant central wavelength of that bin
   constexpr inline
   float wavelength_at_index(size_t i) {
     debug::check_expr(i >= 0 && i < wavelength_samples, 
@@ -88,7 +91,7 @@ namespace met {
     return wavelength_min + wavelength_ssize * (static_cast<float>(i) + .5f);
   }
 
-  // Given a wavelength, obtain the relevant spectral bin's index
+  // Given a wavelength, obtain the relevant surrounding spectral bin's index
   constexpr inline
   size_t index_at_wavelength(float wvl) {
     debug::check_expr(wvl >= wavelength_min && wvl <= wavelength_max, 
@@ -96,43 +99,25 @@ namespace met {
     return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
   }
 
-  inline constexpr
+  // Convert a value in sRGB to linear sRGB
+  constexpr inline
   float srgb_to_lrgb_f(float f) {
     return f <= 0.04045f ? f / 12.92f : std::pow<float>((f + 0.055f) / 1.055f, 2.4f);
   }
 
-  inline constexpr
+  // Convert a value in linear sRGB to sRGB
+  constexpr inline
   float lrgb_to_srgb_f(float f) {
     return f <= 0.003130f ? f * 12.92f : std::pow<float>(f, 1.0f / 2.4f) * 1.055f - 0.055f;
   }
 
-  // Convert a gamma-corrected sRGB value to linear sRGB
-  inline
-  Colr srgb_to_lrgb(Colr c) {
-    met_trace();
-    /* constexpr auto srgb_to_lrgb_f = [](float f) {
-      return f <= 0.04045f ? f / 12.92f : std::pow<float>((f + 0.055f) / 1.055f, 2.4f);
-    }; */
-    std::ranges::transform(c, c.begin(), srgb_to_lrgb_f);
-    return c;
-  }
-
-  // Convert a linear sRGB value to gamma-corrected sRGB
-  inline
-  Colr lrgb_to_srgb(Colr c) {
-    met_trace();
-    /* constexpr auto lrgb_to_srgb_f = [](float f) {
-      return f <= 0.003130f ? f * 12.92f : std::pow<float>(f, 1.0f / 2.4f) * 1.055f - 0.055f;
-    }; */
-    std::ranges::transform(c, c.begin(), lrgb_to_srgb_f);
-    return c;
-  }
-
-  // XYZ/linear sRGB color space transformation shorthands
-  inline Colr xyz_to_lrgb(Colr c) { met_trace(); return models::xyz_to_srgb_transform * c.matrix(); }
-  inline Colr lrgb_to_xyz(Colr c) { met_trace(); return models::srgb_to_xyz_transform * c.matrix(); }
-  inline Colr xyz_to_srgb(Colr c) { met_trace(); return lrgb_to_srgb(xyz_to_lrgb(c)); }
-  inline Colr srgb_to_xyz(Colr c) { met_trace(); return lrgb_to_xyz(srgb_to_lrgb(c)); }
+  // sRGB/linear sRGB/XYZ conversion shorthands
+  inline Colr srgb_to_lrgb(Colr c) { met_trace(); rng::transform(c, c.begin(), srgb_to_lrgb_f); return c; }
+  inline Colr lrgb_to_srgb(Colr c) { met_trace(); rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
+  inline Colr xyz_to_lrgb(Colr c)  { met_trace(); return models::xyz_to_srgb_transform * c.matrix();      }
+  inline Colr lrgb_to_xyz(Colr c)  { met_trace(); return models::srgb_to_xyz_transform * c.matrix();      }
+  inline Colr xyz_to_srgb(Colr c)  { met_trace(); return lrgb_to_srgb(xyz_to_lrgb(c));                    }
+  inline Colr srgb_to_xyz(Colr c)  { met_trace(); return lrgb_to_xyz(srgb_to_lrgb(c));                    }
 
   // Convert a XYZ color to xyY
   inline

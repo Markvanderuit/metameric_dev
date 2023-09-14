@@ -64,7 +64,7 @@ namespace met {
 // Application entry point
 int main() {
   /* try { */
-    met::create_metameric_editor({ .scene_path = "C:/Users/mark/Desktop/Meshes/CoffeeCart_01_4k.blend/CoffeeCart_01_4k.json" });
+    met::create_metameric_editor({ .scene_path = "C:/Users/markv/Desktop/Meshes/CoffeeCart_01_4k.blend/CoffeeCart_01_4k.json" });
   /* } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;

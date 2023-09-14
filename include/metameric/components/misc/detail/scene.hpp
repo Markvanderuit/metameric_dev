@@ -61,7 +61,7 @@ namespace met::detail {
     std::vector<gl::TextureView2d3f> views_3f;
     std::vector<gl::TextureView2d1f> views_1f;
     
-    static RTTextureData realize(std::span<const detail::Resource<DynamicImage>>);
+    static RTTextureData realize(std::span<const detail::Resource<Image>>);
   };
   
   /* Mesh vertex/element data block; holds all packed-together

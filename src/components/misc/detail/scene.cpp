@@ -142,14 +142,14 @@ namespace met::detail {
     return *rng::max_element(candidates, rng::less {}, metric);
   }
 
-  RTTextureData RTTextureData::realize(std::span<const detail::Resource<DynamicImage>> images) {
+  RTTextureData RTTextureData::realize(std::span<const detail::Resource<Image>> images) {
     met_trace_full();
 
     // Generate work objects for each image and image type, before atlas generation
     std::vector<AtlasCreateInfo::Image> work_3f, work_1f;
     for (uint i = 0; i < images.size(); ++i) {
       const auto &img = images[i].value();
-      if (img.frmt() == DynamicImage::PixelFormat::eRGB) {
+      if (img.frmt() == Image::PixelFormat::eRGB) {
         work_3f.push_back({ .image_i = i, .work_i = (uint) work_3f.size(), .size = img.size() });
       } else {
         work_1f.push_back({ .image_i = i, .work_i = (uint) work_1f.size(), .size = img.size() });
@@ -183,7 +183,7 @@ namespace met::detail {
                                   .uv1   = uv1 };
 
       // Get a float representation of image data, and push to GL-side
-      auto img = images[work.image_i].value().convert({ .pixel_type = DynamicImage::PixelType::eFloat });
+      auto img = images[work.image_i].value().convert({ .pixel_type = Image::PixelType::eFloat });
       data.atlas_3f.set(img.data<float>(), 
                         0,
                         { space.size.x(), space.size.y(), 1           },
@@ -208,7 +208,7 @@ namespace met::detail {
                                   .uv1   = uv1 };
 
       // Get a float representation of image data, and push to GL-side
-      auto img = images[work.image_i].value().convert({ .pixel_type = DynamicImage::PixelType::eFloat });
+      auto img = images[work.image_i].value().convert({ .pixel_type = Image::PixelType::eFloat });
       data.atlas_1f.set(img.data<float>(), 
                         0,
                         { space.size.x(), space.size.y(), 1           },

@@ -126,7 +126,7 @@ namespace met {
     // On-disk, resources are stored in zlib-compressed binary format
     struct {
       detail::ResourceVector<AlMeshData>  meshes;
-      detail::ResourceVector<DynamicImage>images;
+      detail::ResourceVector<Image>       images;
       detail::ResourceVector<Spec>        illuminants;
       detail::ResourceVector<CMFS>        observers;
       detail::ResourceVector<Basis>       bases;
