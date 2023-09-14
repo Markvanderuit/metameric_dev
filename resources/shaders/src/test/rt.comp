@@ -276,12 +276,12 @@ vec3 gen_barycentrics(vec3 a, vec3 b, vec3 c, vec3 p) {
   float d11 = dot(ac, ac);
   float d20 = dot(ap, ab);
   float d21 = dot(ap, ac);
-  float den = d00 * d11 - d01 * d11;
+  float den = d00 * d11 - d01 * d01;
 
   vec3 v;
-  v.x = (d11 * d20 - d01 * d21) / den;
-  v.y = (d00 * d21 - d01 * d20) / den;
-  v.z = 1.f - v.x - v.y;
+  v.y = (d11 * d20 - d01 * d21) / den;
+  v.z = (d00 * d21 - d01 * d20) / den;
+  v.x = 1.f - v.y - v.z;
   return v;
 }
 

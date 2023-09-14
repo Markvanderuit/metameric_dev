@@ -60,6 +60,6 @@ void main() {
                ? sample_texture(object_info.albedo_i, in_value_tx).xyz
                : object_info.albedo_v;
 
-  vec3 v = diffuse * cos_theta;
+  vec3 v = /* vec3(mod(in_value_tx, 1), 0); */  diffuse * cos_theta;
   out_value_colr = vec4(v, 1);
 }

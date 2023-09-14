@@ -261,17 +261,19 @@ namespace met {
       std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
   }
 
-  eig::Array4f Image::sample(const eig::Array2u &xy, ColorFormat preferred_frmt) const {
+  eig::Array4f Image::sample_image(const eig::Array2u &xy, ColorFormat preferred_frmt) const {
     met_trace();
+
+    uint i = xy.y() * m_size.x() + xy.x();
 
     uint type_size = detail::size_from_type(pixel_type());
     uint frmt_size = detail::size_from_format(pixel_frmt());
     auto dst_range  = eig::Array4u(0, 1, 2, 3).head(frmt_size).eval();
-    auto src_range  = (type_size * (dst_range + xy.y() * m_size.x() + xy.x() * frmt_size)).eval();
+    auto src_range  = (type_size * (i * frmt_size + dst_range)).eval();
 
     eig::Array4f f = 0.f;
     for (auto [src, dst] : vws::zip(src_range, dst_range))
-      detail::convert_to_float(pixel_type(), m_data[src], f[dst]);
+      detail::convert_to_float(m_pixel_type, m_data[src], f[dst]);
 
     if (preferred_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
       f.head<3>() = detail::convert_colr_frmt(m_color_frmt, preferred_frmt, f.head<3>());
@@ -282,15 +284,15 @@ namespace met {
   eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat preferred_frmt) const {
     met_trace();
 
-    eig::Array2f xy    = ((uv * m_size.cast<float>()) + 0.5f);
-    eig::Array2f lerp  = xy - xy.floor();;
+    eig::Array2f xy   = (uv * m_size.cast<float>() - 0.5f).eval();
+    eig::Array2f lerp = xy - xy.floor();
     eig::Array2u minv = xy.floor().cast<uint>();
     eig::Array2u maxv = xy.ceil().cast<uint>();
 
-    auto a = sample(minv,                                preferred_frmt) * (1.f - lerp.x());
-    auto b = sample(eig::Array2f { maxv.x(), minv.y() }, preferred_frmt) * lerp.x();
-    auto c = sample(eig::Array2f { minv.x(), maxv.y() }, preferred_frmt) * (1.f - lerp.x());
-    auto d = sample(maxv,                                preferred_frmt) * lerp.x();
+    auto a = sample_image({ minv.x(), minv.x( )}, preferred_frmt) * (1.f - lerp.x());
+    auto b = sample_image({ maxv.x(), minv.y() }, preferred_frmt) * lerp.x();
+    auto c = sample_image({ minv.x(), maxv.y() }, preferred_frmt) * (1.f - lerp.x());
+    auto d = sample_image({ maxv.x(), maxv.y() }, preferred_frmt) * lerp.x();
     
     return (1.f - lerp.y()) * (a + b) + lerp.y() * (c + d);
   }
@@ -335,8 +337,7 @@ namespace met {
       for (auto [src, ovl] : vws::zip(src_channels, ovl_channels))
         detail::convert_to_float(pixel_type(), m_data[src], f[ovl]);
 
-      // Apply color space conversion on float representation, to the first
-      // three channels **only**
+      // Apply color space conversion on float representation, to the first three channels **only**
       if (convert_colr)
         f.head<3>() = convert_func(f.head<3>());
       

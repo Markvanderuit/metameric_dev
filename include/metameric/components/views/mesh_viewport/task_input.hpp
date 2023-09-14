@@ -30,6 +30,7 @@ namespace met {
       const auto &e_scene   = info.global("scene_handler").read_only<SceneHandler>().scene;
       const auto &e_objects = e_scene.components.objects;
       const auto &e_meshes  = e_scene.resources.meshes;
+      const auto &e_images  = e_scene.resources.images;
       const auto &i_arcball = info.resource("arcball").read_only<detail::Arcball>();
       const auto &io        = ImGui::GetIO();
 
@@ -56,8 +57,55 @@ namespace met {
         }
       }
       
-      if (object_query)
-        fmt::print("Hit {}\n", e_objects[object_i].name);
+      if (object_query) {
+        const auto &object = e_objects[object_i].value;
+        const auto &mesh   = e_meshes[object.mesh_i].value();
+        const auto &elem   = mesh.elems[object_query.i];
+
+        // Determine barycentrics at hit position 
+        eig::Vector3f bary;
+        {
+          eig::Vector3f a = mesh.verts[elem[0]], b = mesh.verts[elem[1]], c = mesh.verts[elem[2]];
+          eig::Vector3f p = camera_ray.o + object_query.t * camera_ray.d;
+          eig::Vector3f ab = b - a, ac = c - a, ap = p - a;
+
+          float d00 = ab.dot(ab);        
+          float d01 = ab.dot(ac);        
+          float d11 = ac.dot(ac);        
+          float d20 = ap.dot(ab);        
+          float d21 = ap.dot(ac);     
+          float den = d00 * d11 - d01 * d01;    
+
+          eig::Vector3f bary;
+          bary.y() = (d11 * d20 - d01 * d21) / den;
+          bary.z() = (d00 * d21 - d01 * d20) / den;
+          bary.x() = 1.f - bary.y() - bary.z();
+        }
+
+        // Determine UVs at hit position
+        eig::Array2f uv = (mesh.uvs[elem[0]] * bary[0]
+                         + mesh.uvs[elem[1]] * bary[1]
+                         + mesh.uvs[elem[2]] * bary[2])
+                         .unaryExpr([](float f) { return std::fmod(f, 1.f); });
+
+        // Sample surface albedo at hit position
+        Colr sample;
+        if (object.diffuse.index() == 0) {
+          sample = std::get<0>(object.diffuse);
+        } else {
+          const auto &e_image = e_images[std::get<1>(object.diffuse)].value();
+          sample = e_image.sample(uv, Image::ColorFormat::eSRGB).head<3>();
+        }
+
+        // Draw temporary tooltip at mouse position
+        ImGui::BeginTooltip();
+        Colr p_colr  = lrgb_to_srgb(p);
+        Colr uv_colr = lrgb_to_srgb(Colr { uv.x(), uv.y(), 0 });
+        ImGui::ColorEdit3("Position", p_colr.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::ColorEdit3("UV", uv_colr.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::ColorEdit3("Sample", sample.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+        ImGui::EndTooltip();
+      }
     }
 
     void eval(SchedulerHandle &info) override {
