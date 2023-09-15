@@ -13,19 +13,24 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
-      /* if (ImGui::Begin("Texture atlas")) {
+      if (ImGui::Begin("Texture atlas")) {
         // Get external resources
         const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
 
+        auto wh = e_txtr_data.atlas_3f.size().head<2>().eval();
+        auto r  = wh.cast<float>().x() / wh.cast<float>().y();
+
+
+
         for (uint i = 0; i < e_txtr_data.views_3f.size(); ++i) {
           if (ImGui::BeginChild(fmt::format("child_{}", i).c_str(), { 0, 0 }, true)) {
-            ImGui::Image(ImGui::to_ptr(e_txtr_data.views_3f[i].object()), { 128, 128 });
+            ImGui::Image(ImGui::to_ptr(e_txtr_data.views_3f[i].object()), { r * 1024, 1024 });
           }
           ImGui::EndChild();
         }
 
         ImGui::End();
-      } */
+      }
 
       ImGui::ShowDemoWindow();
 

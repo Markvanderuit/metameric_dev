@@ -138,7 +138,7 @@ namespace met::detail {
       return generate_atlas({ .size = { std::min(w, max_width), std::numeric_limits<uint>::max() }, .data = data });  
     });
     
-    // Determine best the available atlas based on the provided metric and return
+    // Determine the best available atlas based on the provided metric and return
     return *rng::max_element(candidates, rng::less {}, metric);
   }
 
