@@ -136,7 +136,7 @@ namespace met {
           << eig::Array2f(io.MouseDelta.x, io.MouseDelta.y) / viewport_size.array(), 0).finished());
       }
 
-      eval_rt(info);
+      // eval_rt(info);
     }
   };
 } // namespace met

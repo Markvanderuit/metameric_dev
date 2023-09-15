@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/scene.hpp>
+#include <metameric/components/misc/detail/texture_atlas.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
@@ -54,6 +55,10 @@ namespace met::detail {
   struct RTTextureData {
     std::vector<RTTextureInfo> info;
     gl::Buffer                 info_gl;
+
+    TextureAtlas<float, 3>     _atlas_3f;
+    TextureAtlas<float, 1>     _atlas_1f;
+
     gl::Texture2d3fArray       atlas_3f;
     gl::Texture2d1fArray       atlas_1f;
 

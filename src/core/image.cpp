@@ -188,6 +188,8 @@ namespace met {
       if (exr_header.pixel_types[0] == TINYEXR_PIXELTYPE_UINT)
         m_pixel_type = PixelType::eUInt;
       
+      fmt::print("num_channels : {}\n", exr_image.num_channels);
+      
       // Allocate image memory
       m_data.resize(m_size.prod() * detail::size_from_format(m_pixel_frmt) 
                                   * detail::size_from_type(m_pixel_type));

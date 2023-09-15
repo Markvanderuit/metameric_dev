@@ -147,89 +147,166 @@ namespace met::detail {
 
     guard(!images.empty(), RTTextureData { });
 
-    // Generate work objects for each image and image type, before atlas generation
-    std::vector<AtlasCreateInfo::Image> work_3f, work_1f;
+    // Generate inputs for texture atlas generation
+    std::vector<TextureAtlas<float, 3>::ImageInput> inputs_3f;
+    std::vector<TextureAtlas<float, 1>::ImageInput> inputs_1f;
+    std::vector<uint>                               inputs_i;
     for (uint i = 0; i < images.size(); ++i) {
       const auto &img = images[i].value();
       if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
-        work_3f.push_back({ .image_i = i, .work_i = (uint) work_3f.size(), .size = img.size() });
+        inputs_i.push_back(inputs_3f.size());
+        inputs_3f.push_back({ .image_i = i, .size = img.size() });
       } else {
-        work_1f.push_back({ .image_i = i, .work_i = (uint) work_1f.size(), .size = img.size() });
+        inputs_i.push_back(inputs_1f.size());
+        inputs_1f.push_back({ .image_i = i, .size = img.size() });
       }
-    }
-
-    // Generate texture atlases for 3- and 1-component textures, go for best area usage
-    auto atlas_3f = generate_texture_atlas(work_3f, texture_atlas_metric_ratio);
-    auto atlas_1f = generate_texture_atlas(work_1f, texture_atlas_metric_ratio);
-
-    // Next, now that we know the atlas layout, we can allocate texture arrays
-    RTTextureData data = { .info = std::vector<RTTextureInfo>(images.size()),
-                           .atlas_3f = {{ .size = atlas_3f.size }},
-                           .atlas_1f = {{ .size = atlas_1f.size }} };
-
-    // Next we push image data to their respective atlases
-    for (uint i = 0; i < work_3f.size(); ++i) {
-      auto work  = work_3f[i];      
-      auto space = atlas_3f.data[i];
-
-      eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
-      eig::Array2f uv0 = space.offs.cast<float>() / wh;
-      eig::Array2f uv1 = space.size.cast<float>() / wh;
-
-      // Fill in info object
-      data.info[work.image_i] = { .is_3f = true,
-                                  .layer = space.layer,
-                                  .offs  = space.offs,
-                                  .size  = space.size,
-                                  .uv0   = uv0,
-                                  .uv1   = uv1 };
-
-      // Get a float representation of image data, and push to GL-side
-      auto img = images[work.image_i].value().convert({ 
-        .pixel_type = Image::PixelType::eFloat,
-        .color_frmt = Image::ColorFormat::eLRGB
-      });
-      data.atlas_3f.set(img.data<float>(), 
-                        0,
-                        { space.size.x(), space.size.y(), 1           },
-                        { space.offs.x(), space.offs.y(), space.layer });
     } // for (uint i)
 
-    // .. continued 
-    for (uint i = 0; i < work_1f.size(); ++i) {
-      auto work  = work_1f[i];      
-      auto space = atlas_1f.data[i];
+    // Generate data objects and initialize atlases
+    RTTextureData data = { .info      = std::vector<RTTextureInfo>(images.size()),
+                           ._atlas_3f = {{ .inputs = inputs_3f }},
+                           ._atlas_1f = {{ .inputs = inputs_1f }}};
 
-      eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
-      eig::Array2f uv0 = space.offs.cast<float>() / wh;
-      eig::Array2f uv1 = space.size.cast<float>() / wh;
-      
-      // Fill in info object
-      data.info[work.image_i] = { .is_3f = false,
-                                  .layer = space.layer,
-                                  .offs  = space.offs,
-                                  .size  = space.size,
-                                  .uv0   = uv0,
-                                  .uv1   = uv1 };
+    for (uint i = 0; i < inputs_i.size(); ++i) {
+      const auto &img = images[i].value();
+      if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
+        fmt::print("inserting {} as rgb\n", images[i].name);
+        auto resrv = data._atlas_3f.reservation(inputs_i[i]);
+        auto size  = data._atlas_3f.size();
 
-      // Get a float representation of image data, and push to GL-side
-      auto img = images[work.image_i].value().convert({ .pixel_type = Image::PixelType::eFloat });
-      data.atlas_1f.set(img.data<float>(), 
-                        0,
-                        { space.size.x(), space.size.y(), 1           },
-                        { space.offs.x(), space.offs.y(), space.layer });
+        eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>();
+        eig::Array2f uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
+
+        // Fill in info object
+        data.info[i] = { .is_3f = true,
+                         .layer = resrv.layer_i,
+                         .offs  = resrv.offs,
+                         .size  = resrv.size,
+                         .uv0   = uv0,
+                         .uv1   = uv1 };
+
+        // Get a float representation of image data, and push it to GL-side
+        auto imgf = img.convert({ 
+          .pixel_type = Image::PixelType::eFloat,
+          .color_frmt = Image::ColorFormat::eLRGB
+        });
+        data._atlas_3f.texture().set(imgf.data<float>(), 0,
+          { resrv.size.x(), resrv.size.y(), 1             },
+          { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
+      } else {
+        fmt::print("inserting {} as a\n", images[i].name);
+        auto resrv = data._atlas_1f.reservation(inputs_i[i]);
+        auto size  = data._atlas_1f.size();
+
+        eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>();
+        eig::Array2f uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
+
+        // Fill in info object
+        data.info[i] = { .is_3f = false,
+                         .layer = resrv.layer_i,
+                         .offs  = resrv.offs,
+                         .size  = resrv.size,
+                         .uv0   = uv0,
+                         .uv1   = uv1 };
+
+        // Get a float representation of image data, and push it to GL-side
+        auto imgf = img.convert({ 
+          .pixel_type = Image::PixelType::eFloat
+        });
+        data._atlas_1f.texture().set(imgf.data<float>(), 0,
+          { resrv.size.x(), resrv.size.y(), 1             },
+          { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
+      }
     } // for (uint i)
-
-    // Generate texture views for each atlas array layer
-    data.views_3f.clear();
-    for (uint i = 0; i < atlas_3f.size.z(); ++i)
-      data.views_3f.push_back({{ .texture = &data.atlas_3f, .min_layer = i }});
-    data.views_1f.clear();
-    for (uint i = 0; i < atlas_1f.size.z(); ++i)
-      data.views_1f.push_back({{ .texture = &data.atlas_1f, .min_layer = i }});
 
     // Finally, push info objects
     data.info_gl = {{ .data = cnt_span<const std::byte>(data.info) }};
+
+    // END HERE
+
+    // // Generate work objects for each image and image type, before atlas generation
+    // std::vector<AtlasCreateInfo::Image> work_3f, work_1f;
+    // for (uint i = 0; i < images.size(); ++i) {
+    //   const auto &img = images[i].value();
+    //   if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
+    //     work_3f.push_back({ .image_i = i, .work_i = (uint) work_3f.size(), .size = img.size() });
+    //   } else {
+    //     work_1f.push_back({ .image_i = i, .work_i = (uint) work_1f.size(), .size = img.size() });
+    //   }
+    // }
+
+    // // Generate texture atlases for 3- and 1-component textures, go for best area usage
+    // auto atlas_3f = generate_texture_atlas(work_3f, texture_atlas_metric_ratio);
+    // auto atlas_1f = generate_texture_atlas(work_1f, texture_atlas_metric_ratio);
+
+    // // Next, now that we know the atlas layout, we can allocate texture arrays
+    // RTTextureData data = { .info = std::vector<RTTextureInfo>(images.size()),
+    //                        .atlas_3f = {{ .size = atlas_3f.size }},
+    //                        .atlas_1f = {{ .size = atlas_1f.size }} };
+
+    // // Next we push image data to their respective atlases
+    // for (uint i = 0; i < work_3f.size(); ++i) {
+    //   auto work  = work_3f[i];      
+    //   auto space = atlas_3f.data[i];
+
+    //   eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
+    //   eig::Array2f uv0 = space.offs.cast<float>() / wh;
+    //   eig::Array2f uv1 = space.size.cast<float>() / wh;
+
+    //   // Fill in info object
+    //   data.info[work.image_i] = { .is_3f = true,
+    //                               .layer = space.layer,
+    //                               .offs  = space.offs,
+    //                               .size  = space.size,
+    //                               .uv0   = uv0,
+    //                               .uv1   = uv1 };
+
+    //   // Get a float representation of image data, and push to GL-side
+    //   auto img = images[work.image_i].value().convert({ 
+    //     .pixel_type = Image::PixelType::eFloat,
+    //     .color_frmt = Image::ColorFormat::eLRGB
+    //   });
+    //   data.atlas_3f.set(img.data<float>(), 
+    //                     0,
+    //                     { space.size.x(), space.size.y(), 1           },
+    //                     { space.offs.x(), space.offs.y(), space.layer });
+    // } // for (uint i)
+
+    // // .. continued 
+    // for (uint i = 0; i < work_1f.size(); ++i) {
+    //   auto work  = work_1f[i];      
+    //   auto space = atlas_1f.data[i];
+
+    //   eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
+    //   eig::Array2f uv0 = space.offs.cast<float>() / wh;
+    //   eig::Array2f uv1 = space.size.cast<float>() / wh;
+      
+    //   // Fill in info object
+    //   data.info[work.image_i] = { .is_3f = false,
+    //                               .layer = space.layer,
+    //                               .offs  = space.offs,
+    //                               .size  = space.size,
+    //                               .uv0   = uv0,
+    //                               .uv1   = uv1 };
+
+    //   // Get a float representation of image data, and push to GL-side
+    //   auto img = images[work.image_i].value().convert({ .pixel_type = Image::PixelType::eFloat });
+    //   data.atlas_1f.set(img.data<float>(), 
+    //                     0,
+    //                     { space.size.x(), space.size.y(), 1           },
+    //                     { space.offs.x(), space.offs.y(), space.layer });
+    // } // for (uint i)
+
+    // Generate texture views for each atlas array layer
+    data.views_3f.clear();
+    for (uint i = 0; i < data._atlas_3f.size().z(); ++i)
+      data.views_3f.push_back({{ .texture = &data._atlas_3f.texture(), .min_layer = i }});
+    data.views_1f.clear();
+    for (uint i = 0; i < data._atlas_1f.size().z(); ++i)
+      data.views_1f.push_back({{ .texture = &data._atlas_1f.texture(), .min_layer = i }});
+
+    // // Finally, push info objects
+    // data.info_gl = {{ .data = cnt_span<const std::byte>(data.info) }};
 
     return data;
   }

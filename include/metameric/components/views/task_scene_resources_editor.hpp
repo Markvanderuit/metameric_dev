@@ -13,7 +13,7 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
-      if (ImGui::Begin("Texture atlas")) {
+      /* if (ImGui::Begin("Texture atlas")) {
         // Get external resources
         const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
 
@@ -30,7 +30,7 @@ namespace met {
         }
 
         ImGui::End();
-      }
+      } */
 
       ImGui::ShowDemoWindow();
 
