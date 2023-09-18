@@ -18,7 +18,7 @@ namespace met {
   void SceneHandler::create() {
     met_trace();
 
-    // Clear out all scene handler state first
+    // Clear out all state first
     scene      = { };
     save_path  = "";
     save_state = SaveState::eNew;
@@ -26,6 +26,7 @@ namespace met {
 
     // Pre-supply some data for an initial scene
     auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
+    scene.settings   = { .name = "Settings", .value = { .texture_size = Settings::TextureSize::eHigh }};
     scene.observer_i = { .name = "Default observer", .value = 0 };
     scene.resources.bases.emplace("Default basis", 
       { .mean = loaded_tree.basis_mean, .functions = loaded_tree.basis },     false);

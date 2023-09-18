@@ -13,24 +13,23 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
-      /* if (ImGui::Begin("Texture atlas")) {
+      
+      if (ImGui::Begin("Texture atlas")) {
         // Get external resources
         const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
-
-        auto wh = e_txtr_data.atlas_3f.size().head<2>().eval();
-        auto r  = wh.cast<float>().x() / wh.cast<float>().y();
-
-
-
-        for (uint i = 0; i < e_txtr_data.views_3f.size(); ++i) {
-          if (ImGui::BeginChild(fmt::format("child_{}", i).c_str(), { 0, 0 }, true)) {
-            ImGui::Image(ImGui::to_ptr(e_txtr_data.views_3f[i].object()), { r * 1024, 1024 });
+        const auto &e_atlas = e_txtr_data.atlas_3f;
+        
+        // Spawn views
+        for (uint i = 0; i < e_atlas.size().z(); ++i) {
+          for (uint j = 0; j < e_atlas.levels(); ++j) {
+            ImGui::Image(ImGui::to_ptr(e_atlas.view(i, j).object()), { 128, 128 });
+            if (j < e_atlas.levels() - 1)
+              ImGui::SameLine();
           }
-          ImGui::EndChild();
         }
 
         ImGui::End();
-      } */
+      }
 
       ImGui::ShowDemoWindow();
 
@@ -71,12 +70,12 @@ namespace met {
                 ImGui::Text("Dimensions: %i x %i", image.value().size()[0], image.value().size()[1]);
                 ImGui::Value("Channels", image.value().channels());
                 
-                if (e_txtr_data.info.size() > i) {
+                /* if (e_txtr_data.info.size() > i) {
                   const auto &info = e_txtr_data.info[i];
                   const auto *txtr = info.is_3f ? (gl::AbstractTexture*) &e_txtr_data.views_3f[info.layer]
                                                 : (gl::AbstractTexture*) &e_txtr_data.views_1f[info.layer];
                   ImGui::Image(ImGui::to_ptr(txtr->object()), { 128, 128 }, info.uv0, (info.uv0 + info.uv1).eval());
-                }
+                } */
 
                 ImGui::EndTooltip();
               }

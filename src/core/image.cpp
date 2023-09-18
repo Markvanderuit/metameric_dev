@@ -263,38 +263,49 @@ namespace met {
       std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
   }
 
-  eig::Array4f Image::sample_image(const eig::Array2u &xy, ColorFormat preferred_frmt) const {
-    met_trace();
-
+  void Image::set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt) {
     uint i = xy.y() * m_size.x() + xy.x();
 
-    uint type_size = detail::size_from_type(pixel_type());
-    uint frmt_size = detail::size_from_format(pixel_frmt());
+    uint type_size  = detail::size_from_type(m_pixel_type);
+    uint frmt_size  = detail::size_from_format(m_pixel_frmt);
+    auto src_range = eig::Array4u(0, 1, 2, 3).head(frmt_size).eval();
+    auto dst_range  = (type_size * (i * frmt_size + src_range)).eval();
+
+    if (input_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
+      v.head<3>() = detail::convert_colr_frmt(m_color_frmt, input_frmt, v.head<3>());
+
+    for (auto [src, dst] : vws::zip(src_range, dst_range))
+      detail::convert_fr_float(m_pixel_type, v[src], m_data[dst]);
+  }
+
+  eig::Array4f Image::get_pixel(const eig::Array2u &xy, ColorFormat output_frmt) const {
+    uint i = xy.y() * m_size.x() + xy.x();
+
+    uint type_size  = detail::size_from_type(m_pixel_type);
+    uint frmt_size  = detail::size_from_format(m_pixel_frmt);
     auto dst_range  = eig::Array4u(0, 1, 2, 3).head(frmt_size).eval();
     auto src_range  = (type_size * (i * frmt_size + dst_range)).eval();
 
-    eig::Array4f f = 0.f;
+    eig::Array4f v = 0.f;
     for (auto [src, dst] : vws::zip(src_range, dst_range))
-      detail::convert_to_float(m_pixel_type, m_data[src], f[dst]);
+      detail::convert_to_float(m_pixel_type, m_data[src], v[dst]);
 
-    if (preferred_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
-      f.head<3>() = detail::convert_colr_frmt(m_color_frmt, preferred_frmt, f.head<3>());
-
-    return f;
+    if (output_frmt != ColorFormat::eNone && m_color_frmt != ColorFormat::eNone)
+      v.head<3>() = detail::convert_colr_frmt(m_color_frmt, output_frmt, v.head<3>());
+    
+    return v;
   }
 
-  eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat preferred_frmt) const {
-    met_trace();
-
+  eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat output_frmt) const {
     eig::Array2f xy   = (uv * m_size.cast<float>() - 0.5f).eval();
     eig::Array2f lerp = xy - xy.floor();
     eig::Array2u minv = xy.floor().cast<uint>();
     eig::Array2u maxv = xy.ceil().cast<uint>();
 
-    auto a = sample_image({ minv.x(), minv.x( )}, preferred_frmt) * (1.f - lerp.x());
-    auto b = sample_image({ maxv.x(), minv.y() }, preferred_frmt) * lerp.x();
-    auto c = sample_image({ minv.x(), maxv.y() }, preferred_frmt) * (1.f - lerp.x());
-    auto d = sample_image({ maxv.x(), maxv.y() }, preferred_frmt) * lerp.x();
+    auto a = get_pixel({ minv.x(), minv.y() }, output_frmt) * (1.f - lerp.x());
+    auto b = get_pixel({ maxv.x(), minv.y() }, output_frmt) * lerp.x();
+    auto c = get_pixel({ minv.x(), maxv.y() }, output_frmt) * (1.f - lerp.x());
+    auto d = get_pixel({ maxv.x(), maxv.y() }, output_frmt) * lerp.x();
     
     return (1.f - lerp.y()) * (a + b) + lerp.y() * (c + d);
   }
@@ -307,46 +318,59 @@ namespace met {
       .pixel_frmt = info.pixel_frmt.value_or(m_pixel_frmt),
       .pixel_type = info.pixel_type.value_or(m_pixel_type),
       .color_frmt = info.color_frmt.value_or(m_color_frmt),
-      .size       = m_size
+      .size       = info.resize_to.isZero() ? m_size : info.resize_to
     }};
 
     // Used sizes, offsets, misc
-    uint src_channel_count = detail::size_from_format(pixel_frmt());
-    uint dst_channel_count = detail::size_from_format(output.pixel_frmt());
-    uint ovl_channel_count = std::min(src_channel_count, dst_channel_count);
-    uint src_size          = detail::size_from_type(pixel_type());
-    uint dst_size          = detail::size_from_type(output.pixel_type());
+    uint src_channel_count = detail::size_from_format(m_pixel_frmt);
+    uint dst_channel_count = detail::size_from_format(output.m_pixel_frmt);
+    uint src_size          = detail::size_from_type(m_pixel_type);
+    uint dst_size          = detail::size_from_type(output.m_pixel_type);
 
     // Range over overlapping channels
-    auto ovl_channels = eig::Array4u(0, 1, 2, 3).head(ovl_channel_count).eval();
+    auto ovl_channels = eig::Array4u(0, 1, 2, 3).head(std::min(src_channel_count, dst_channel_count)).eval();
 
     // Color format conversion helper
     using namespace std::placeholders;
     bool convert_colr = output.m_color_frmt != m_color_frmt && output.m_pixel_frmt != PixelFormat::eAlpha;
     auto convert_func = std::bind(detail::convert_colr_frmt, m_color_frmt, output.m_color_frmt, _1);
 
-    // Iterate over full images
-    #pragma omp parallel for
-    for (int i = 0; i < output.size().prod(); ++i) {
-      // Range over input/output channels
-      auto src_channels = (src_size * (ovl_channels + i * src_channel_count)).eval();
-      auto dst_channels = (dst_size * (ovl_channels + i * dst_channel_count)).eval();
+    // Perform transfer with conversion
+    if (output.size().isApprox(m_size)) {
+      // Images are same in size; perform full transfer. It's more efficient to 
+      // handle per-pixel conversion here, than with set_pixel(get_pixel())
+      #pragma omp parallel for
+      for (int i = 0; i < output.size().prod(); ++i) {
+        // Range over input/output channels
+        auto src_channels = (src_size * (ovl_channels + i * src_channel_count)).eval();
+        auto dst_channels = (dst_size * (ovl_channels + i * dst_channel_count)).eval();
 
-      // Float data is used as a in-between format for conversion
-      eig::Array4f f = 0;
+        // Float data is used as a in-between format for conversion
+        eig::Array4f f = 0;
 
-      // Gather converted input to float representation
-      for (auto [src, ovl] : vws::zip(src_channels, ovl_channels))
-        detail::convert_to_float(pixel_type(), m_data[src], f[ovl]);
+        // Gather converted input to float representation
+        for (auto [src, ovl] : vws::zip(src_channels, ovl_channels))
+          detail::convert_to_float(m_pixel_type, m_data[src], f[ovl]);
 
-      // Apply color space conversion on float representation, to the first three channels **only**
-      if (convert_colr)
-        f.head<3>() = convert_func(f.head<3>());
-      
-      // Scatter float representation to converted output
-      for (auto [ovl, dst] : vws::zip(ovl_channels, dst_channels))
-        detail::convert_fr_float(output.pixel_type(), f[ovl], output.m_data[dst]);
-    } // for (int i)
+        // Apply color space conversion on float representation, to the first three channels **only**
+        if (convert_colr)
+          f.head<3>() = convert_func(f.head<3>());
+        
+        // Scatter float representation to converted output
+        for (auto [ovl, dst] : vws::zip(ovl_channels, dst_channels))
+          detail::convert_fr_float(output.m_pixel_type, f[ovl], output.m_data[dst]);
+      } // for (int i)
+    } else {
+      // Images differ in size; perform resample
+      #pragma omp parallel for
+      for (int y = 0; y < output.size().y(); ++y) {
+        for (int x = 0; x < output.size().x(); ++x) {
+          eig::Array2u pixel  = { x, y };
+          eig::Array2f uv     = ((pixel.cast<float>() + 0.5f) / output.size().cast<float>());
+          output.set_pixel(pixel, sample(uv, output.m_color_frmt));
+        } // for (int x)
+      } // for (int y)
+    }
 
     return output;
   }

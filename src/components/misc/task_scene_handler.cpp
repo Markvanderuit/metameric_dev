@@ -20,6 +20,7 @@ namespace met {
     
     const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
     const auto &e_scene         = e_scene_handler.scene;
+    const auto &e_settings      = e_scene.settings;
     const auto &e_images        = e_scene.resources.images;
     const auto &e_meshes        = e_scene.resources.meshes;
     const auto &e_objects       = e_scene.components.objects;
@@ -31,11 +32,12 @@ namespace met {
     }
     
     // Process updates to gpu-side image resources
-    if (!m_is_init || e_images.is_mutated()) {
+    if (!m_is_init || e_images.is_mutated() || e_settings.state.texture_size) {
       auto &i_txtr_data = info("txtr_data").writeable<detail::RTTextureData>();
-      i_txtr_data = detail::RTTextureData::realize(e_images);
+      i_txtr_data = detail::RTTextureData::realize(e_settings.value.texture_size, e_images);
     }
 
+    // Process updates to gpu-side object components
     if (!m_is_init || e_objects.is_mutated()) {
       auto &i_objc_data = info("objc_data").writeable<detail::RTObjectData>();
       if (!m_is_init) i_objc_data = detail::RTObjectData::realize(e_objects);
@@ -62,6 +64,9 @@ namespace met {
     {
       auto &e_scene_handler = info.global("scene_handler").writeable<SceneHandler>();
       auto &e_scene         = e_scene_handler.scene;
+
+      e_scene.settings.state.update(e_scene.settings.value);
+      e_scene.observer_i.state.update(e_scene.observer_i.value);
 
       e_scene.resources.meshes.set_mutated(false);
       e_scene.resources.images.set_mutated(false);

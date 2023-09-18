@@ -7,308 +7,95 @@
 #include <vector>
 
 namespace met::detail {
-  constexpr uint atlas_padding    = 16u;
-  constexpr uint atlas_padding_2x = 2u * atlas_padding;
-  constexpr auto atlas_widths     = { 16384u + atlas_padding_2x, 
-                                      12228u + atlas_padding_2x, 
-                                      8192u  + atlas_padding_2x };
-  
-  struct AtlasSpace {
-    eig::Array2u offs, size; 
-    uint layer;
-  };
-
-  struct Atlas {
-    eig::Array3u            size; // 3rd component accounts for texture arrays
-    std::vector<AtlasSpace> data;
-  };
-
-  struct AtlasCreateInfo {
-    struct Image {
-      uint image_i, work_i;
-      eig::Array2u size;
-    };
-    
-    eig::Array2u       size; // Initial size to use for atlas generation
-    std::vector<Image> data; // Input image references to build over
-  };
-
-  /* Texture atlas helper functions */
-
-  constexpr auto atlas_area = [](auto space) -> uint { return space.size.prod(); };
-  constexpr auto atlas_maxm = [](auto space) -> eig::Array2u { return (space.offs + space.size).eval(); };
-  constexpr auto atlas_test = [](AtlasCreateInfo::Image img, AtlasSpace space) -> bool {
-    return ((img.size + atlas_padding_2x) <= space.size).all();
-  };
-  constexpr auto atlas_split = [](AtlasCreateInfo::Image img, AtlasSpace space) 
-    -> std::pair<AtlasSpace, std::vector<AtlasSpace>> {
-    AtlasSpace result = { .offs  = space.offs + atlas_padding,
-                                 .size  = img.size,
-                                 .layer = space.layer };
-
-    std::vector<AtlasSpace> remainder;
-    if (uint remainder_x = space.size.x() - atlas_padding_2x - img.size.x(); remainder_x > 0)
-      remainder.push_back({ .offs  = space.offs + eig::Array2u(atlas_padding_2x + img.size.x(), 0),
-                            .size  = { space.size.x() - atlas_padding_2x - img.size.x(), 
-                                       img.size.x() + atlas_padding_2x },
-                            .layer = space.layer });
-    if (uint remainder_y = space.size.y() - atlas_padding_2x - img.size.y(); remainder_y > 0)
-      remainder.push_back({ .offs  = space.offs + eig::Array2u(0, atlas_padding_2x + img.size.y()),
-                            .size  = { space.size.x(), 
-                                       space.size.y() - img.size.y() - atlas_padding_2x },
-                            .layer = space.layer });
-
-    return { result, remainder };
-  };
-
- Atlas generate_atlas(AtlasCreateInfo info) {
-    met_trace();
-  
-    // Current nr. of layers in use for the different image formats
-    uint layer_count = 1;
-
-    // Space vectors; we start with (uninitialized) reserved space for all images, and empty space for all 
-    // formats and at a maximum size, which will be shrunk later
-    std::vector<AtlasSpace> reserved_spaces(info.data.size());
-    std::vector<AtlasSpace> empty_spaces = {{ .offs = 0, .size = info.size, .layer = 0 }};
-
-    // Process a work queue over the generated work, sorted by decreasing image area
-    rng::sort(info.data, rng::greater {}, atlas_area);
-    std::deque<AtlasCreateInfo::Image> work_queue(range_iter(info.data));
-    while (!work_queue.empty()) {
-      auto &work = work_queue.front();
-
-      // Generate a view over empty spaces where the image would, potentially, fit;
-      // this incorporates padding
-      auto available_space = vws::filter(empty_spaces, [work](auto s) { return atlas_test(work, s); });
-
-      // If no space is available, we add a layer and restart
-      if (available_space.empty()) {
-        // Add a new layer for the required image type
-        empty_spaces.push_back({ .offs  = 0, 
-                                 .size  = info.size, 
-                                 .layer = layer_count++ });
-        continue;
-      }
-
-      // Find the smallest available space for current work
-      auto smallest_space_it = rng::min_element(available_space, {}, atlas_area);
-      
-      // Part of smallest space is reserved for the current image work
-      // Split the smallest space; part is reserved for the current image, while
-      // part is made available as empty space. The original is removed
-      auto [reserved, remainder] = atlas_split(work, *smallest_space_it);
-      empty_spaces.erase(smallest_space_it.base());
-      reserved_spaces[work.work_i] = reserved;
-      empty_spaces.insert(empty_spaces.end(), range_iter(remainder));
-
-      // Work for this image is removed from the queue, as space has been found
-      work_queue.pop_front();
-    } // while (work_queue)
-    
-    auto maxm = rng::fold_left(reserved_spaces | vws::transform(atlas_maxm), eig::Array2u(0), 
-      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-
-    return Atlas { .size = { maxm.x(), maxm.y(), layer_count },
-                   .data = reserved_spaces };
-  }
-
-  float texture_atlas_metric_ratio(const Atlas &atlas) {
-    met_trace();
-    return static_cast<float>(atlas.size.minCoeff()) 
-         / static_cast<float>(atlas.size.maxCoeff());
-  }
-
-  float texture_atlas_metric_area(const Atlas &atlas) {
-    met_trace();
-    uint full_area = atlas.size.prod();
-    uint used_area = rng::fold_left(atlas.data | vws::transform(atlas_area), 0u, std::plus {});
-    return static_cast<float>(used_area) / static_cast<float>(full_area);
-  }
-
-  Atlas generate_texture_atlas(const std::vector<AtlasCreateInfo::Image> &data, auto metric) {
-    met_trace();
-
-    // Use a clamped maximum width; up to GL_MAX_TEXTURE_SIZE
-    uint max_width = static_cast<uint>(gl::state::get_variable_int(gl::VariableName::eMaxTextureSize));
-    
-    // Generate a set of candidate atlases across several threads
-    std::vector<Atlas> candidates(atlas_widths.size());
-    std::transform(std::execution::par_unseq, range_iter(atlas_widths), candidates.begin(), [&](uint w) { 
-      return generate_atlas({ .size = { std::min(w, max_width), std::numeric_limits<uint>::max() }, .data = data });  
-    });
-    
-    // Determine the best available atlas based on the provided metric and return
-    return *rng::max_element(candidates, rng::less {}, metric);
-  }
-
-  RTTextureData RTTextureData::realize(std::span<const detail::Resource<Image>> images) {
+  RTTextureData RTTextureData::realize(Settings::TextureSize texture_size, std::span<const detail::Resource<Image>> images) {
     met_trace_full();
-
     guard(!images.empty(), RTTextureData { });
 
-    // Generate inputs for texture atlas generation
-    std::vector<TextureAtlas<float, 3>::ImageInput> inputs_3f;
-    std::vector<TextureAtlas<float, 1>::ImageInput> inputs_1f;
-    std::vector<uint>                               inputs_i;
+    // Generate inputs for texture atlas
+    std::vector<eig::Array2u> inputs_3f, inputs_1f;
+    std::vector<uint>         inputs_i;
     for (uint i = 0; i < images.size(); ++i) {
       const auto &img = images[i].value();
       if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
         inputs_i.push_back(inputs_3f.size());
-        inputs_3f.push_back({ .image_i = i, .size = img.size() });
+        inputs_3f.push_back(img.size());
       } else {
         inputs_i.push_back(inputs_1f.size());
-        inputs_1f.push_back({ .image_i = i, .size = img.size() });
+        inputs_1f.push_back(img.size());
       }
     } // for (uint i)
 
-    // Generate data objects and initialize atlases
-    RTTextureData data = { .info      = std::vector<RTTextureInfo>(images.size()),
-                           ._atlas_3f = {{ .inputs = inputs_3f }},
-                           ._atlas_1f = {{ .inputs = inputs_1f }}};
+    // Determine maximum texture sizes, and restrict texture sizes to these values to keep things simple
+    eig::Array2u maxm_3f = rng::fold_left(inputs_3f, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+    eig::Array2u maxm_1f = rng::fold_left(inputs_1f, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+    switch (texture_size) {
+      case Settings::TextureSize::eHigh:
+        maxm_3f = maxm_3f.cwiseMin(2048u); maxm_1f = maxm_1f.cwiseMin(2048u); break;
+      case Settings::TextureSize::eMed:
+        maxm_3f = maxm_3f.cwiseMin(1024u); maxm_1f = maxm_1f.cwiseMin(1024u); break;
+      case Settings::TextureSize::eLow:
+        maxm_3f = maxm_3f.cwiseMin(512u); maxm_1f = maxm_1f.cwiseMin(512u); break;
+    }
+    for (auto &input : inputs_3f) input = maxm_3f;
+    for (auto &input : inputs_1f) input = maxm_1f;
 
+    // Generate data objects and initialize atlases
+    RTTextureData data = { .info          = std::vector<RTTextureInfo>(images.size()),
+                           .atlas_indices = inputs_i,
+                           .atlas_3f      = {{ .sizes   = inputs_3f, .levels  = 1 + maxm_3f.log2().maxCoeff() }},
+                           .atlas_1f      = {{ .sizes   = inputs_1f, .levels  = 1 + maxm_1f.log2().maxCoeff() }}};
     for (uint i = 0; i < inputs_i.size(); ++i) {
       const auto &img = images[i].value();
-      if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
-        fmt::print("inserting {} as rgb\n", images[i].name);
-        auto resrv = data._atlas_3f.reservation(inputs_i[i]);
-        auto size  = data._atlas_3f.size();
 
-        eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>();
-        eig::Array2f uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
+      bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
+      auto size  = is_3f ? data.atlas_3f.size() : data.atlas_1f.size();
+      auto resrv = is_3f ? data.atlas_3f.reservation(inputs_i[i])
+                         : data.atlas_1f.reservation(inputs_i[i]);
 
-        // Fill in info object
-        data.info[i] = { .is_3f = true,
-                         .layer = resrv.layer_i,
-                         .offs  = resrv.offs,
-                         .size  = resrv.size,
-                         .uv0   = uv0,
-                         .uv1   = uv1 };
+      // Determine UV coordinates of the texture inside the full atlas
+      eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>();
+      eig::Array2f uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
 
-        // Get a float representation of image data, and push it to GL-side
-        auto imgf = img.convert({ 
-          .pixel_type = Image::PixelType::eFloat,
-          .color_frmt = Image::ColorFormat::eLRGB
-        });
-        data._atlas_3f.texture().set(imgf.data<float>(), 0,
+      // Fill in info object
+      data.info[i] = { .is_3f = is_3f,
+                       .layer = resrv.layer_i,
+                       .offs  = resrv.offs,
+                       .size  = resrv.size,
+                       .uv0   = uv0,
+                       .uv1   = uv1 };
+                      
+      // Get a float representation of image data, and push it to GL-side
+      auto imgf = img.convert({ .resize_to  = is_3f ? maxm_3f : maxm_1f,
+                                .pixel_type = Image::PixelType::eFloat,
+                                .color_frmt = Image::ColorFormat::eLRGB });
+      if (is_3f) {
+        data.atlas_3f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
       } else {
-        fmt::print("inserting {} as a\n", images[i].name);
-        auto resrv = data._atlas_1f.reservation(inputs_i[i]);
-        auto size  = data._atlas_1f.size();
-
-        eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>();
-        eig::Array2f uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
-
-        // Fill in info object
-        data.info[i] = { .is_3f = false,
-                         .layer = resrv.layer_i,
-                         .offs  = resrv.offs,
-                         .size  = resrv.size,
-                         .uv0   = uv0,
-                         .uv1   = uv1 };
-
-        // Get a float representation of image data, and push it to GL-side
-        auto imgf = img.convert({ 
-          .pixel_type = Image::PixelType::eFloat
-        });
-        data._atlas_1f.texture().set(imgf.data<float>(), 0,
+        data.atlas_1f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
       }
     } // for (uint i)
+
+    // Fill in mip data using OpenGL's base functions
+    data.atlas_3f.texture().generate_mipmaps();
+    data.atlas_1f.texture().generate_mipmaps();
 
     // Finally, push info objects
     data.info_gl = {{ .data = cnt_span<const std::byte>(data.info) }};
 
-    // END HERE
-
-    // // Generate work objects for each image and image type, before atlas generation
-    // std::vector<AtlasCreateInfo::Image> work_3f, work_1f;
-    // for (uint i = 0; i < images.size(); ++i) {
-    //   const auto &img = images[i].value();
-    //   if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
-    //     work_3f.push_back({ .image_i = i, .work_i = (uint) work_3f.size(), .size = img.size() });
-    //   } else {
-    //     work_1f.push_back({ .image_i = i, .work_i = (uint) work_1f.size(), .size = img.size() });
-    //   }
-    // }
-
-    // // Generate texture atlases for 3- and 1-component textures, go for best area usage
-    // auto atlas_3f = generate_texture_atlas(work_3f, texture_atlas_metric_ratio);
-    // auto atlas_1f = generate_texture_atlas(work_1f, texture_atlas_metric_ratio);
-
-    // // Next, now that we know the atlas layout, we can allocate texture arrays
-    // RTTextureData data = { .info = std::vector<RTTextureInfo>(images.size()),
-    //                        .atlas_3f = {{ .size = atlas_3f.size }},
-    //                        .atlas_1f = {{ .size = atlas_1f.size }} };
-
-    // // Next we push image data to their respective atlases
-    // for (uint i = 0; i < work_3f.size(); ++i) {
-    //   auto work  = work_3f[i];      
-    //   auto space = atlas_3f.data[i];
-
-    //   eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
-    //   eig::Array2f uv0 = space.offs.cast<float>() / wh;
-    //   eig::Array2f uv1 = space.size.cast<float>() / wh;
-
-    //   // Fill in info object
-    //   data.info[work.image_i] = { .is_3f = true,
-    //                               .layer = space.layer,
-    //                               .offs  = space.offs,
-    //                               .size  = space.size,
-    //                               .uv0   = uv0,
-    //                               .uv1   = uv1 };
-
-    //   // Get a float representation of image data, and push to GL-side
-    //   auto img = images[work.image_i].value().convert({ 
-    //     .pixel_type = Image::PixelType::eFloat,
-    //     .color_frmt = Image::ColorFormat::eLRGB
-    //   });
-    //   data.atlas_3f.set(img.data<float>(), 
-    //                     0,
-    //                     { space.size.x(), space.size.y(), 1           },
-    //                     { space.offs.x(), space.offs.y(), space.layer });
-    // } // for (uint i)
-
-    // // .. continued 
-    // for (uint i = 0; i < work_1f.size(); ++i) {
-    //   auto work  = work_1f[i];      
-    //   auto space = atlas_1f.data[i];
-
-    //   eig::Array2f wh  = atlas_3f.size.head<2>().cast<float>();
-    //   eig::Array2f uv0 = space.offs.cast<float>() / wh;
-    //   eig::Array2f uv1 = space.size.cast<float>() / wh;
-      
-    //   // Fill in info object
-    //   data.info[work.image_i] = { .is_3f = false,
-    //                               .layer = space.layer,
-    //                               .offs  = space.offs,
-    //                               .size  = space.size,
-    //                               .uv0   = uv0,
-    //                               .uv1   = uv1 };
-
-    //   // Get a float representation of image data, and push to GL-side
-    //   auto img = images[work.image_i].value().convert({ .pixel_type = Image::PixelType::eFloat });
-    //   data.atlas_1f.set(img.data<float>(), 
-    //                     0,
-    //                     { space.size.x(), space.size.y(), 1           },
-    //                     { space.offs.x(), space.offs.y(), space.layer });
-    // } // for (uint i)
-
-    // Generate texture views for each atlas array layer
-    data.views_3f.clear();
-    for (uint i = 0; i < data._atlas_3f.size().z(); ++i)
-      data.views_3f.push_back({{ .texture = &data._atlas_3f.texture(), .min_layer = i }});
-    data.views_1f.clear();
-    for (uint i = 0; i < data._atlas_1f.size().z(); ++i)
-      data.views_1f.push_back({{ .texture = &data._atlas_1f.texture(), .min_layer = i }});
-
-    // // Finally, push info objects
-    // data.info_gl = {{ .data = cnt_span<const std::byte>(data.info) }};
-
     return data;
+  }
+
+  void RTTextureData::update(std::span<const detail::Resource<Image>>) {
+    met_trace();
+    bool handle_resize = false;
+
+    
+
+
   }
 
   std::pair<
@@ -374,7 +161,7 @@ namespace met::detail {
     }
 
     // Push layout/data to buffers
-    RTMeshData data = { 
+    RTMeshData data = {
       .info     = packed_info,
       .info_gl  = {{ .data = cnt_span<const std::byte>(packed_info)     }},
       .verts_a  = {{ .data = cnt_span<const std::byte>(packed_verts_a)  }},
@@ -434,6 +221,7 @@ namespace met::detail {
   }
 
   void RTObjectData::update(std::span<const detail::Component<Scene::Object>> objects) {
+      met_trace();
       bool handle_resize = false;
 
       // Initialize or resize object buffer to accomodate
@@ -474,5 +262,4 @@ namespace met::detail {
                              sizeof(detail::RTObjectInfo) * static_cast<size_t>(i));
       } // for (uint i)
   }
-  
 } // namespace met::detail

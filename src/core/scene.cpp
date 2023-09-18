@@ -81,6 +81,16 @@ namespace met {
     js.at("elems").get_to(uplifting.elems);
   }
 
+  void to_json(json &js, const Settings &settings) {
+    met_trace();
+    js = {{ "texture_size", settings.texture_size }};
+  }
+
+  void from_json(const json &js, Settings &settings) {
+    met_trace();
+    js.at("texture_size").get_to(settings.texture_size);
+  }
+
   void to_json(json &js, const Scene::Object &object) {
     met_trace();
     js = {{ "is_active",   object.is_active   },
@@ -159,7 +169,8 @@ namespace met {
 
   void to_json(json &js, const Scene &scene) {
     met_trace();
-    js = {{ "observer_i",    scene.observer_i          },
+    js = {{ "settings",      scene.settings                       },
+          { "observer_i",    scene.observer_i                     },
           { "objects",       scene.components.objects.data()      },
           { "emitters",      scene.components.emitters.data()     },
           { "upliftings",    scene.components.upliftings.data()   },
@@ -168,6 +179,7 @@ namespace met {
 
   void from_json(const json &js, Scene &scene) {
     met_trace();
+    js.at("settings").get_to(scene.settings);
     js.at("observer_i").get_to(scene.observer_i);
     js.at("objects").get_to(scene.components.objects.data());
     js.at("emitters").get_to(scene.components.emitters.data());

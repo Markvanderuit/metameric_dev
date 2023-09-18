@@ -44,29 +44,23 @@ namespace met::detail {
   /* Texture information structure, detailing which range of the
      texture atlas describes a specific texture. */
   struct RTTextureInfo {
-    alignas(4) uint         is_3f;
+    alignas(4) bool         is_3f;
     alignas(4) uint         layer;
-    alignas(8) eig::Array2u offs;
-    alignas(8) eig::Array2u size;
-    alignas(8) eig::Array2f uv0;
-    alignas(8) eig::Array2f uv1;
+    alignas(8) eig::Array2u offs, size;
+    alignas(8) eig::Array2f uv0, uv1;
   };
 
   struct RTTextureData {
     std::vector<RTTextureInfo> info;
     gl::Buffer                 info_gl;
 
-    TextureAtlas<float, 3>     _atlas_3f;
-    TextureAtlas<float, 1>     _atlas_1f;
-
-    gl::Texture2d3fArray       atlas_3f;
-    gl::Texture2d1fArray       atlas_1f;
-
-    // Texture view objects over each of the atlas layers
-    std::vector<gl::TextureView2d3f> views_3f;
-    std::vector<gl::TextureView2d1f> views_1f;
+    // Texture atlases to store all loaded image data in f32 format on the GL side
+    std::vector<uint>          atlas_indices;
+    TextureAtlas<float, 3>     atlas_3f;
+    TextureAtlas<float, 1>     atlas_1f;
     
-    static RTTextureData realize(std::span<const detail::Resource<Image>>);
+    static RTTextureData realize(Settings::TextureSize texture_size, std::span<const detail::Resource<Image>>);
+    void update(std::span<const detail::Resource<Image>>);
   };
   
   /* Mesh vertex/element data block; holds all packed-together
@@ -88,28 +82,11 @@ namespace met::detail {
     std::vector<RTObjectInfo> info;
     gl::Buffer                info_gl;
 
+    // Texture atlas to hold all uplifting-related barycentric data in f32 format
+    std::vector<uint>         atlas_indices;
+    TextureAtlas<float, 3>    atlas_3f;
+
     static RTObjectData realize(std::span<const detail::Component<Scene::Object>>);
     void update(std::span<const detail::Component<Scene::Object>>);
-  };
-
-  struct ObjectUnifLayout {
-    eig::Matrix4f alignas(16) trf;
-  };
-
-  // TODO alignas
-  struct EmitterUnifLayout {
-    eig::Array3f alignas(16) p;
-    Spec                     value;
-  };
-
-  // TODO alignas
-  struct ColrSystemUnifLayout {
-    CMFS observer;
-    Spec illuminant;
-  };
-
-  // Structure for gpu-side illuminant spectrum data
-  struct IlluminantLayout {
-    
   };
 } // namespace met::detail

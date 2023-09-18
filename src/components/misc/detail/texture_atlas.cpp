@@ -1,106 +1,135 @@
 #include <metameric/components/misc/detail/texture_atlas.hpp>
 
 namespace met::detail {
-  constexpr uint atlas_padding    = 16u;
-  constexpr uint atlas_padding_2x = 2u * atlas_padding;
-
-  constexpr auto atlas_area = [](auto space) -> uint { return space.size.prod(); };
-  constexpr auto atlas_maxm = [](auto space) -> eig::Array2u { return (space.offs + space.size).eval(); };
-  constexpr auto atlas_test = [](auto img, auto space) -> bool {
-    return ((img.size + atlas_padding_2x) <= space.size).all();
-  };
-  constexpr auto atlas_split = [](auto img, auto space) {
+  constexpr auto atlas_split = [](auto padded_size, auto space) {
     using Space = decltype(space);
 
-    Space result = { .layer_i = space.layer_i,
-                     .offs    = space.offs + atlas_padding,
-                     .size    = img.size };
-
+    Space result = { .layer_i = space.layer_i, .offs = space.offs, .size = padded_size };
     std::vector<Space> remainder;
-    if (uint remainder_x = space.size.x() - atlas_padding_2x - img.size.x(); remainder_x > 0)
+
+    // Split off horizontal remainder
+    if (uint remainder_x = space.size.x() - padded_size.x(); remainder_x > 0)
       remainder.push_back({ .layer_i = space.layer_i,
-                            .offs    = space.offs + eig::Array2u(atlas_padding_2x + img.size.x(), 0),
-                            .size    = { space.size.x() - atlas_padding_2x - img.size.x(), 
-                                         img.size.x() + atlas_padding_2x }  });
-    if (uint remainder_y = space.size.y() - atlas_padding_2x - img.size.y(); remainder_y > 0)
+                            .offs    = space.offs + eig::Array2u(padded_size.x(), 0),
+                            .size 
+                               = { space.size.x() - padded_size.x(), padded_size.y() } });
+    
+    // Split off vertical remainder
+    if (uint remainder_y = space.size.y() - padded_size.y(); remainder_y > 0)
       remainder.push_back({ .layer_i = space.layer_i,
-                            .offs    = space.offs + eig::Array2u(0, atlas_padding_2x + img.size.y()),
-                            .size    = { space.size.x(), 
-                                         space.size.y() - img.size.y() - atlas_padding_2x } });
+                            .offs    = space.offs + eig::Array2u(0, padded_size.y()),
+                            .size    = { space.size.x(), space.size.y() - padded_size.y() } });
 
     return std::pair { result, remainder };
   };
 
-  /* template <typename T, uint D>
-  void TextureAtlas<T, D>::reserve(const eig::Array3u &size) {
-    met_trace_full();
-    
-  }
-
   template <typename T, uint D>
-  void TextureAtlas<T, D>::resize(const eig::Array3u &size) {
+  void TextureAtlas<T, D>::reserve(vect size, uint count, uint levels, uint padding) {
     met_trace_full();
-
-    Texture texture_new = {{ .size = size }};
-
-  } */
+    std::vector<vect> v(count, size);
+    reserve(v, levels, padding);
+  }
   
   template <typename T, uint D>
-  TextureAtlas<T, D>::TextureAtlas(CreateInfo info)
-  : m_inputs(info.inputs) {
+  void TextureAtlas<T, D>::reserve(std::span<vect> sizes, uint levels, uint padding) {
     met_trace_full();
-    
-    // Current nr. of layers in use for the different image formats
-    uint n_layers = 1;
 
-    // Space vectors; we start with (uninitialized) reserved space for all images, and empty space for all 
-    // formats and at a maximum size, which will be shrunk later
+    // Clear out view objects on potential reallocates
+    m_texture_views.clear();
+
+    m_padding = padding;
+
+    // Determine maximum reserved sizes, and current layer where we are reserving space
+    uint width  = rng::max(sizes, {}, [](auto v) { return v.x(); }).x() + 2 * padding,
+         height = rng::max(sizes, {}, [](auto v) { return v.y(); }).y() + 2 * padding,
+         layers = 1;
+
+    // Keep the old layout and texture around for now
+    std::vector<TextureAtlasSpace> old_resrv(m_resrv);
+    Texture old_texture;
+    if (m_texture.is_init())
+      std::swap(old_texture, m_texture);
+
+    // We start with empty space at a maximum size, which can be shrunk layer
     m_resrv.clear();
-    m_resrv.resize(info.inputs.size());
-    m_empty = {{ .layer_i = 0, .offs = 0, .size = 16384u }};
+    m_empty = {{ .layer_i = 0, .offs = 0, .size = { width, height } }};
 
-    // Process a work queue over the generated work, sorted by decreasing image area
-    rng::sort(info.inputs, rng::greater {}, atlas_area);
-    std::deque<ImageInput> work_queue(range_iter(info.inputs));
-    while (!work_queue.empty()) {
-      auto &work = work_queue.front();
+    // We process a work queue over the required sizes, sorted by area
+    std::vector<vect> sizes_sorted(range_iter(sizes));
+    rng::sort(sizes_sorted, rng::greater {}, [](const auto &v) { return v.prod(); });
+    std::deque<vect> sizes_queue(range_iter(sizes_sorted));
 
-      // Generate a view over empty spaces where the image would, potentially, fit;
-      // this incorporates padding
-      auto available_space = vws::filter(m_empty, [work](auto s) { return atlas_test(work, s); });
+    // Iterate over the work queue over the required sizes
+    while (!sizes_queue.empty()) {
+      vect size = sizes_queue.front() + 2 * m_padding;
 
-      // If no space is available, we add a layer and restart
-      if (available_space.empty()) {
-        m_empty.push_back({ .layer_i = n_layers++, .offs  = 0, .size  = 16384 });
+      // Generate a view over empty spaces where the current work fits
+      auto candidate_vw = vws::filter(m_empty, [&](auto s) { return (size <= s.size).all(); });
+
+      // If no suitable empty space was found, add a layer and restart
+      if (candidate_vw.empty()) {
+        m_empty.push_back({ .layer_i = layers++, .offs  = 0, .size = { width, height } });
         continue;
       }
 
-      // Find the smallest available space for current work
-      auto smallest_space_it = rng::min_element(available_space, {}, atlas_area);
-      
-      // Part of smallest space is reserved for the current image work
-      // Split the smallest space; part is reserved for the current image, while
-      // part is made available as empty space. The original is removed
-      auto [resrv, remainder] = atlas_split(work, *smallest_space_it);
-      m_empty.erase(smallest_space_it.base());
-      m_resrv[work.image_i] = resrv;
+      // Find the smallest suitable space for the current work
+      auto candidate_it = rng::min_element(candidate_vw, {}, [](auto s) { return s.size.prod(); });
+
+      // Split canndidate into reserved part, and put remainder(s) into empty space
+      // for later insertions
+      auto [reserved, remainder] = atlas_split(size, *candidate_it);
+      m_empty.erase(candidate_it.base());
       m_empty.insert(m_empty.end(), range_iter(remainder));
 
-      // Work for this image is removed from the queue, as space has been found
-      work_queue.pop_front();
-    } // while (work_queue)
+      // Strip padding from the reserved space, and store it
+      reserved.offs += padding;
+      reserved.size -= padding * 2;
+      m_resrv.push_back(reserved);
 
-    auto maxm = rng::fold_left(m_resrv | vws::transform(atlas_maxm), eig::Array2u(0), 
-      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+      sizes_queue.pop_front();
+    } // while (!sizes_queue.empty())
 
-    // Allocate the texture
-    m_texture = {{ .size = eig::Array3u { maxm.x(), maxm.y(), n_layers } }};
+    // Allocate the new texture
+    m_texture = {{ .size = eig::Array3u { width, height, layers }, .levels = levels }};
+
+    // Generate relevant view objects
+    for (uint i = 0; i < layers; ++i)
+      for (uint j = 0; j < levels; ++j)
+        m_texture_views.push_back({{ .texture   = &m_texture, .min_level = j, .min_layer = i }});
+  }
+
+  template <typename T, uint D>
+  void TextureAtlas<T, D>::shrink_to_fit() {
+    guard(m_texture.is_init());
+    met_trace_full();
+
+    // Clear out view objects on potential reallocates
+    m_texture_views.clear();
+
+    // Determine the maximum size necessary for all reserved space
+    auto view = m_resrv | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
+    auto maxm = rng::fold_left(view, vect(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
+    auto maxl = 1 + rng::max(m_resrv, {}, &TextureAtlasSpace::layer_i).layer_i;
+
+    // Allocate the resulting texture
+    m_texture = {{ .size   = eig::Array3u { maxm.x(), maxm.y(), maxl }, .levels = m_texture.levels() }};
+
+    // Generate relevant view objects
+    for (uint i = 0; i < m_texture.size().z(); ++i)
+      for (uint j = 0; j < m_texture.levels(); ++j)
+        m_texture_views.push_back({{ .texture   = &m_texture, .min_level = j, .min_layer = i }});
+  }
+
+  template <typename T, uint D>
+  TextureAtlas<T, D>::TextureAtlas(TextureAtlasCreateInfo info)
+  : m_method(info.method) {
+    met_trace();
+    reserve(info.sizes, info.levels, info.padding);
   }
 
   /* Explicit template instantiations */
 
-  #define met_explicit_atlas(type, components)   \
-    template class TextureAtlas<type, components>;
+  #define met_explicit_atlas(type, components) template class TextureAtlas<type, components>;
     
   #define met_explicit_atlas_components(type)    \
     met_explicit_atlas(type, 1)                  \

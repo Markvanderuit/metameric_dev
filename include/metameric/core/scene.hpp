@@ -5,6 +5,7 @@
 #include <metameric/core/image.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/uplifting.hpp>
+#include <metameric/core/settings.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/scene.hpp>
 #include <variant>
@@ -110,7 +111,9 @@ namespace met {
 
   public: // Scene data
     // Miscellaneous
-    detail::Component<uint> observer_i; // Primary observer index; simple enough for now
+    detail::Component<Settings,
+                   detail::SettingsState> settings;   // Miscellaneous settings; e.g. texture size
+    detail::Component<uint>               observer_i; // Primary observer index; simple enough for now
 
     // Scene components, directly visible or influential in the scene
     // On-disk, components are stored in json format

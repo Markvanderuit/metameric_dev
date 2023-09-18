@@ -16,55 +16,86 @@
 */
 
 namespace met::detail {
+  enum class AtlasBuildMethod { eLayered, eSpread };
+
+  // Return object for reserved space in a TextureAtlas
+  struct TextureAtlasSpace {
+    using vect = eig::Array2u;
+
+    uint layer_i;
+    vect offs, size;
+  };
+
+  // Helper object for initializing TextureAtlas
+  struct TextureAtlasCreateInfo {
+    using vect = eig::Array2u;
+
+    std::vector<vect> sizes;
+    uint              levels  = 1u;
+    uint              padding = 0u;
+    AtlasBuildMethod  method  = AtlasBuildMethod::eLayered;
+  };
+
+  /* TextureAtlas
+     Simple wrapper around OpenGL-side array texture for handling of a number
+     of similarly-sized textures.
+   */
   template <typename T, uint D>
   struct TextureAtlas {
-    struct ImageInput {
-      uint         image_i; // Index of input image in outside space
-      eig::Array2u size;    // 2D reserved space of input image
-    };
-
-    struct ImageResrv {
-      uint         layer_i;
-      eig::Array2u offs;
-      eig::Array2u size;
-    };
-
-    struct CreateInfo {
-      std::vector<ImageInput> inputs;
-    };
+    using Texture     = gl::Texture2d<T, D, gl::TextureType::eImageArray>;
+    using TextureView = gl::TextureView2d<T, D>;
+    using vect        = eig::Array2u;
 
   private:
-    using Texture = gl::Texture2d<T, D, gl::TextureType::eImageArray>;
-
+    AtlasBuildMethod         m_method;
+    uint                     m_padding;
     Texture                  m_texture;
-    std::vector<ImageInput>  m_inputs;
-    std::vector<ImageResrv>  m_resrv;
-    std::vector<ImageResrv>  m_empty;
+    std::vector<TextureView> m_texture_views;
+    std::vector<TextureAtlasSpace>       m_resrv, m_empty;
 
   public:
-    using InfoType = CreateInfo;
+    using InfoType = TextureAtlasCreateInfo;
 
     TextureAtlas() = default;
-    TextureAtlas(CreateInfo info);
+   ~TextureAtlas() = default;
+    TextureAtlas(TextureAtlasCreateInfo info);
+
+  public: // Reservation management
+    void reserve(vect size, uint count, uint levels = 1u, uint padding = 0u);
+    void reserve(std::span<vect> sizes, uint levels = 1u, uint padding = 0u);
+    void shrink_to_fit();
+    // void insert(uint i);
+    // void erase(uint i);
+    // void push_back();
 
   public:
-          auto   size()    const { return m_texture.size(); }
-    const auto & texture() const { return m_texture;        }
-          auto & texture()       { return m_texture;        }
+          auto   size()    const { return m_texture.size();   }
+          auto   levels()  const { return m_texture.levels(); }
+    const auto & texture() const { return m_texture;          }
+          auto & texture()       { return m_texture;          }
 
-    const ImageResrv &reservation(uint i) const { return m_resrv[i]; };
+    const auto & view(uint layer = 0, uint level = 0) const { 
+      return m_texture_views[layer * m_texture.levels() + level]; 
+    }
+    auto & view(uint layer = 0, uint level = 0) { 
+      return m_texture_views[layer * m_texture.levels() + level]; 
+    }
+
+    const TextureAtlasSpace &reservation(uint i) const { return m_resrv[i]; };
 
     inline void swap(TextureAtlas &o) {
       met_trace();
       using std::swap;
-      swap(m_texture, o.m_texture);
-      swap(m_inputs,  o.m_inputs);
-      swap(m_resrv,   o.m_resrv);
-      swap(m_empty,   o.m_empty);
+      swap(m_padding,       o.m_padding);
+      swap(m_method,        o.m_method);
+      swap(m_texture,       o.m_texture);
+      swap(m_texture_views, o.m_texture_views);
+      swap(m_resrv,         o.m_resrv);
+      swap(m_empty,         o.m_empty);
     }
 
     inline bool operator==(const TextureAtlas &o) const {
-      return m_texture == o.m_texture;
+      return m_texture == o.m_texture; // unique, owned resource
     }
 
     met_declare_noncopyable(TextureAtlas);

@@ -34,6 +34,7 @@ namespace met {
     };
 
     struct ConvertInfo {
+      eig::Array2u               resize_to  = 0;
       std::optional<PixelFormat> pixel_frmt = { };
       std::optional<PixelType>   pixel_type = { };
       std::optional<ColorFormat> color_frmt = { };
@@ -76,8 +77,9 @@ namespace met {
     met_declare_noncopyable(Image);
 
   public: // Pixel queries and format conversions
-    eig::Array4f sample_image(const eig::Array2u &xy, ColorFormat preferred_frmt = ColorFormat::eNone) const;
-    eig::Array4f sample(const eig::Array2f &uv, ColorFormat preferred_frmt = ColorFormat::eNone) const;
+    void         set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
+    eig::Array4f get_pixel(const eig::Array2u &xy, ColorFormat output_frmt = ColorFormat::eNone) const;
+    eig::Array4f sample(const eig::Array2f &uv, ColorFormat output_frmt = ColorFormat::eNone) const;
     Image        convert(ConvertInfo info) const;
 
   public: // Misc
