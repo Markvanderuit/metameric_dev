@@ -7,9 +7,10 @@
 #include <omp.h>
 #include <execution>
 #include <numbers>
+#include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr uint n_system_boundary_samples = 256u;
+  constexpr uint n_system_boundary_samples = 128u;
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -205,6 +206,8 @@ namespace met {
     if (tesselation_stale) {
       i_tesselation = generate_delaunay<AlDelaunayData, Colr>(m_tesselation_points);
     }
+
+    fmt::print("layers: {}\n", gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers));
 
     // 4. Consolidate and upload data to GL-side in one nice place
     {

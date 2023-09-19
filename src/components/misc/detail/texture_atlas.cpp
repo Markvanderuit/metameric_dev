@@ -34,9 +34,17 @@ namespace met::detail {
   void TextureAtlas<T, D>::reserve(std::span<vect> sizes, uint levels, uint padding) {
     met_trace_full();
 
+    // Catch
+    if (sizes.empty()) {
+      m_texture = {{ .size = { 1 + 2 * padding, 1 + 2 * padding, 1 }} };
+      m_texture_views.clear();
+      m_padding = padding;
+      return;
+    }
+
     // Clear out view objects on potential reallocates
     m_texture_views.clear();
-
+    
     m_padding = padding;
 
     // Determine maximum reserved sizes, and current layer where we are reserving space

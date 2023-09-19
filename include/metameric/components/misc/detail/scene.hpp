@@ -50,6 +50,8 @@ namespace met::detail {
     alignas(8) eig::Array2f uv0, uv1;
   };
 
+  /* Texture data block; holds all packed together image data
+     in an f32 format. Generated on image import/load. */
   struct RTTextureData {
     std::vector<RTTextureInfo> info;
     gl::Buffer                 info_gl;
@@ -60,33 +62,62 @@ namespace met::detail {
     TextureAtlas<float, 1>     atlas_1f;
     
     static RTTextureData realize(Settings::TextureSize texture_size, std::span<const detail::Resource<Image>>);
-    void update(std::span<const detail::Resource<Image>>);
   };
   
   /* Mesh vertex/element data block; holds all packed-together
-     mesh data used in a scene. Should preferably be made once
-     at scene load. */
+     mesh data used in a scene. Generated on obj scene import/load. */
   struct RTMeshData {
     std::vector<RTMeshInfo> info;
     gl::Buffer              info_gl;
-    gl::Buffer verts_a;
-    gl::Buffer verts_b;
-    gl::Buffer elems;
-    gl::Buffer elems_al;
-    gl::Array  array;
+    gl::Buffer              verts_a, verts_b;
+    gl::Buffer              elems, elems_al;
+    gl::Array               array;
 
     static RTMeshData realize(std::span<const detail::Resource<AlMeshData>>);
   };
 
+  /* Object layout data block; holds all packed-together scene
+     object data (mostly indices to other things). Generated on
+     scene load, and updated whenever scene is edited. */
   struct RTObjectData {
     std::vector<RTObjectInfo> info;
     gl::Buffer                info_gl;
 
-    // Texture atlas to hold all uplifting-related barycentric data in f32 format
-    std::vector<uint>         atlas_indices;
-    TextureAtlas<float, 3>    atlas_3f;
-
     static RTObjectData realize(std::span<const detail::Component<Scene::Object>>);
     void update(std::span<const detail::Component<Scene::Object>>);
+  };
+
+  /* Uplifting information structure, detailing which range of the
+     tesselation spectra is used for this uplifting. */
+  struct RTUpliftingInfo {
+    uint elem_offs; 
+    uint elem_size;
+  };
+
+  /* Gathered uplifting data block; holds all packed-together
+     uplifting data used in a scene, on a per-uplifting 
+     and a per-object basis. Allocated but not filled in; 
+     content is generated on the fly by the uplifting pipeline. */
+  struct RTUpliftingData {
+    using Texture1d4fArray = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
+    using ElemSpec         = eig::Array<float, wavelength_samples, 4>;
+    
+    // Info objects to detail range of the spectra used by each uplifting
+    std::vector<RTUpliftingInfo> info;
+    gl::Buffer                   info_gl;
+    std::span<RTUpliftingInfo>   info_gl_mapping;
+
+    // All constraint spectra per-uplifting are packed per tetrahedron
+    // for fast sampled access during rendering
+    Texture1d4fArray             spectra_elem_gl_texture; // Texture array layout for all spectra
+    gl::Buffer                   spectra_elem_gl;         // Mapped buffer for pixel buffer copy
+    std::span<Spec>              spectra_elem_gl_mapping; // Corresponding map
+
+    // Texture atlas to hold texture barycentrics per-object
+    std::vector<uint>            atlas_indices;
+    TextureAtlas<float, 4>       atlas_4f;
+
+    static RTUpliftingData realize(const Scene &scene);
+    void update(const Scene &scene);
   };
 } // namespace met::detail
