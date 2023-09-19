@@ -4,6 +4,7 @@
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/views/task_window.hpp>
 #include <metameric/components/views/task_create_project.hpp>
+#include <metameric/components/views/task_settings_editor.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
@@ -213,6 +214,12 @@ namespace met {
     // Get external resources
     const auto &e_handler = info.global("scene_handler").read_only<SceneHandler>();
 
+    // Query handler state that is used in several places
+    bool is_loaded  = e_handler.save_state != SceneHandler::SaveState::eUnloaded;
+    bool is_savable = e_handler.save_state != SceneHandler::SaveState::eSaved 
+                   && e_handler.save_state != SceneHandler::SaveState::eNew && is_loaded;
+    
+
     // Modals/popups have to be on the same level of stack as OpenPopup(), so track this state
     // and call OpenPopup() at the end if true
     m_open_close_modal  = false;
@@ -224,10 +231,6 @@ namespace met {
       /* File menu follows */
       
       if (ImGui::BeginMenu("File")) {
-        const bool is_loaded  = e_handler.save_state != SceneHandler::SaveState::eUnloaded;
-        const bool is_savable = e_handler.save_state != SceneHandler::SaveState::eSaved 
-                             && e_handler.save_state != SceneHandler::SaveState::eNew && is_loaded;
-        
         /* Main section follows */
 
         if (ImGui::MenuItem("New..."))                             { detail::handle_new(info); }
@@ -289,12 +292,25 @@ namespace met {
 
       /* Edit menu follows */
 
-      if (ImGui::BeginMenu("Edit")) {
-        auto &e_handler = info.global("scene_handler").writeable<SceneHandler>();
+      if (ImGui::BeginMenu("Edit", is_loaded)) {
         const bool is_undo = e_handler.mod_i >= 0;
         const bool is_redo = e_handler.mod_i < int(e_handler.mods.size()) - 1;
-        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { e_handler.undo_mod(); }
-        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { e_handler.redo_mod(); }
+
+        if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { 
+          info.global("scene_handler").writeable<SceneHandler>().undo_mod(); 
+        }
+        if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { 
+          info.global("scene_handler").writeable<SceneHandler>().redo_mod(); 
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Settings", nullptr, nullptr)) {
+          if (auto handle = info.child_task("settings_editor"); !handle.is_init()) {
+            handle.init<SettingsEditorTask>();
+          }
+        }
+
         ImGui::EndMenu();
       }
 

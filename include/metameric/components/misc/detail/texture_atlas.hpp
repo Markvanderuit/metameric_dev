@@ -4,16 +4,6 @@
 #include <algorithm>
 #include <deque>
 #include <execution>
-#include <ranges>
-#include <vector>
-
-/* 
-  Need to be able to
-
-  - provide a list of images and their sizes, and have the
-    place reserve them **and** create corresponding buffers.
-  - allowing adding/removing specific images
-*/
 
 namespace met::detail {
   enum class AtlasBuildMethod { eLayered, eSpread };
@@ -47,11 +37,11 @@ namespace met::detail {
     using vect        = eig::Array2u;
 
   private:
-    AtlasBuildMethod         m_method;
-    uint                     m_padding;
-    Texture                  m_texture;
-    std::vector<TextureView> m_texture_views;
-    std::vector<TextureAtlasSpace>       m_resrv, m_empty;
+    AtlasBuildMethod               m_method;
+    uint                           m_padding;
+    Texture                        m_texture;
+    std::vector<TextureView>       m_texture_views;
+    std::vector<TextureAtlasSpace> m_resrv, m_empty;
 
   public:
     using InfoType = TextureAtlasCreateInfo;
@@ -64,9 +54,6 @@ namespace met::detail {
     void reserve(vect size, uint count, uint levels = 1u, uint padding = 0u);
     void reserve(std::span<vect> sizes, uint levels = 1u, uint padding = 0u);
     void shrink_to_fit();
-    // void insert(uint i);
-    // void erase(uint i);
-    // void push_back();
 
   public:
           auto   size()    const { return m_texture.size();   }

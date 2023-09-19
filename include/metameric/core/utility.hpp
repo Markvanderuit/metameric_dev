@@ -2,9 +2,9 @@
 
 #include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/utility.hpp>
+#include <ranges>
 #include <span>
 #include <source_location>
-#include <ranges>
 
 // Simple guard statement syntactic sugar
 #define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
