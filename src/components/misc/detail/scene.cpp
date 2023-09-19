@@ -7,6 +7,10 @@
 #include <vector>
 
 namespace met::detail {
+  constexpr uint max_upliftings = 8u;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
   RTTextureData RTTextureData::realize(Settings::TextureSize texture_size, std::span<const detail::Resource<Image>> images) {
     met_trace_full();
     guard(!images.empty(), RTTextureData { });
@@ -278,14 +282,34 @@ namespace met::detail {
     uint max_texture_layers = 
       std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
 
+    // Initialize info buffer up to maximum nr of supported upliftings
+    {
+      data.spectra_info.resize(max_upliftings, { 0, 0 });
+      data.spectra_info_gl = {{ .data  = cnt_span<const std::byte>(data.spectra_info), 
+                                .flags = buffer_create_flags }};
+      data.spectra_info_gl_mapping = data.spectra_info_gl.map_as<RTUpliftingInfo>(buffer_access_flags);
+    }
+
     // Pre-allocated up to the maximum size necessary; as this
     // is actually a reasonable 2mb
     {
-      data.spectra_elem_gl_texture = {{ .size = { wavelength_samples, max_texture_layers } }};
-      data.spectra_elem_gl         = {{ .size = max_texture_layers * sizeof(RTUpliftingData::ElemSpec), 
-                                        .flags = gl::BufferCreateFlags::eMapWritePersistent }};
-      data.spectra_elem_gl_mapping = data.spectra_elem_gl.map_as<Spec>(gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush);
+      data.spectra_elem_gl_texture = {{ .size  = { wavelength_samples, max_texture_layers } }};
+      data.spectra_elem_gl         = {{ .size  = max_texture_layers * sizeof(RTUpliftingData::ElemSpec), 
+                                        .flags = buffer_create_flags }};
+      data.spectra_elem_gl_mapping = data.spectra_elem_gl.map_as<Spec>(buffer_access_flags);
     }
+
+    data.update(scene);
+    return data;
+  }
+
+  void RTUpliftingData::update(const Scene &scene) {
+    met_trace_full();
+
+    // Get external resources
+    const auto &e_objects  = scene.components.objects;
+    const auto &e_images   = scene.resources.images;
+    const auto &e_settings = scene.settings;
 
     // Set up texture atlas, allocating an image-appropriate texture block per object
     {
@@ -316,23 +340,8 @@ namespace met::detail {
       for (auto &input : inputs_4f) input = maxm_4f;
 
       // Push to GL
-      data.atlas_indices = inputs_i;
-      data.atlas_4f      = {{ .sizes = inputs_4f, .levels = 1 + maxm_4f.log2().maxCoeff() }};
+      atlas_indices = inputs_i;
+      atlas_4f      = {{ .sizes = inputs_4f, .levels = 1 + maxm_4f.log2().maxCoeff() }};
     }
-
-    // Initialize info buffer
-    {
-      
-    }
-
-    data.update(scene);
-
-    return data;
-  }
-
-  void RTUpliftingData::update(const Scene &scene) {
-    met_trace_full();
-
-    
   }
 } // namespace met::detail

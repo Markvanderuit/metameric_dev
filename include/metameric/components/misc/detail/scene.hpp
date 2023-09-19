@@ -103,9 +103,9 @@ namespace met::detail {
     using ElemSpec         = eig::Array<float, wavelength_samples, 4>;
     
     // Info objects to detail range of the spectra used by each uplifting
-    std::vector<RTUpliftingInfo> info;
-    gl::Buffer                   info_gl;
-    std::span<RTUpliftingInfo>   info_gl_mapping;
+    std::vector<RTUpliftingInfo> spectra_info;
+    gl::Buffer                   spectra_info_gl;
+    std::span<RTUpliftingInfo>   spectra_info_gl_mapping;
 
     // All constraint spectra per-uplifting are packed per tetrahedron
     // for fast sampled access during rendering

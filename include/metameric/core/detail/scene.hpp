@@ -61,6 +61,8 @@ namespace met::detail {
     using ComponentStateBase<std::vector<Ty>>::m_mutated;
     std::vector<State> m_cache  = { };
 
+    bool m_resized = false;
+
   public:
     virtual 
     bool update(const std::vector<Ty> &o) override {
@@ -69,6 +71,7 @@ namespace met::detail {
         for (uint i = 0; i < m_cache.size(); ++i)
           m_cache[i].update(o[i]);
         m_mutated = rng::any_of(m_cache, [](const auto &v) { return v.is_mutated(); });
+        m_resized = true;
       } else {
         // Handle shrink/grow
         size_t min_r = std::min(m_cache.size(), o.size()), 
@@ -85,10 +88,14 @@ namespace met::detail {
             m_cache[i].update(o[i]);
         
         m_mutated = true;
+        m_resized = false;
       }
 
       return m_mutated;
     }
+
+    constexpr
+    bool is_resized() const { return m_resized; }
 
   public: // Boilerplate
     // operator[...] exposes throwing at()

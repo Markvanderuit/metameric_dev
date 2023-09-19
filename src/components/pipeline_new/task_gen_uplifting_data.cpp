@@ -191,7 +191,7 @@ namespace met {
       }
       
       // Add to set of spectra, and to tesselation input points
-      i_spectra[m_csys_boundary_spectra.size() + i]            = s;
+      i_spectra[m_csys_boundary_spectra.size() + i] = s;
 
       // We only store colors for tesselation if the 'primary' color has updated
       // as otherwise it'd trigger on every constraint modification
@@ -206,8 +206,6 @@ namespace met {
     if (tesselation_stale) {
       i_tesselation = generate_delaunay<AlDelaunayData, Colr>(m_tesselation_points);
     }
-
-    fmt::print("layers: {}\n", gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers));
 
     // 4. Consolidate and upload data to GL-side in one nice place
     {
