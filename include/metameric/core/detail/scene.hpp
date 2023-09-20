@@ -4,6 +4,7 @@
 #include <metameric/core/utility.hpp>
 #include <functional>
 #include <type_traits>
+#include <variant>
 
 namespace met::detail {
   /* Virtual base class for component state tracking in the
@@ -51,6 +52,37 @@ namespace met::detail {
       return m_mutated;
     }
   };
+  
+  template <typename T0, typename T1>
+  class ComponentVariantState : public ComponentStateBase<std::variant<T0, T1>> {
+    using Ty = std::variant<T0, T1>;
+    using ComponentStateBase<Ty>::m_mutated;
+    Ty m_cache = { };
+
+  public:
+    virtual 
+    bool update(const Ty &o) override {
+      // Eigen's blocks do not support single-component equality comparison,
+      // but in general most things handle this just fine; so hack in here
+      if (o.index() != m_cache.index()) {
+        m_mutated = true;
+      } else if (o.index() == 0) {
+        const auto &o_ = std::get<0>(o), &m_ = std::get<0>(m_cache);
+        if constexpr (is_approx_comparable<T0>) m_mutated = !m_.isApprox(o_);
+        else                                    m_mutated = (m_ != o_);
+      } else if (o.index() == 1) {
+        const auto &o_ = std::get<1>(o), &m_ = std::get<1>(m_cache);
+        if constexpr (is_approx_comparable<T1>) m_mutated = !m_.isApprox(o_);
+        else                                    m_mutated = (m_ != o_);
+      }
+
+      if (m_mutated)
+        m_cache = o;
+      
+      return m_mutated;
+    }
+  };
+
 
   /* Wrapper class for component state tracking; tracks
      state across a vector of components, and handles
@@ -221,6 +253,7 @@ namespace met::detail {
     using Comp = Component<Ty, State>;
 
     mutable bool      m_mutated    = true;
+    mutable bool      m_resized    = false;
     mutable size_t    m_size_state = 0;
     std::vector<Comp> m_data;
 
@@ -229,9 +262,11 @@ namespace met::detail {
       met_trace();
 
       if (m_data.size() == m_size_state) {
+        m_resized = false;
         m_mutated = rng::any_of(m_data, 
           [](auto &rsrc) { return rsrc.state.update(rsrc.value); });
       } else {
+        m_resized    = true;
         m_mutated    = true;
         m_size_state = m_data.size();
         rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
@@ -247,8 +282,11 @@ namespace met::detail {
     }
 
     constexpr bool is_mutated() const {
-      met_trace();
       return m_mutated || rng::any_of(m_data, [](const auto &rsrc) -> bool { return rsrc.state; });
+    }
+
+    constexpr bool is_resized() const {
+      return m_resized;
     }
 
   public: // Vector overloads

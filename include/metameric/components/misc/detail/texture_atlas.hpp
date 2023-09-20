@@ -68,7 +68,8 @@ namespace met::detail {
       return m_texture_views[layer * m_texture.levels() + level]; 
     }
 
-    const TextureAtlasSpace &reservation(uint i) const { return m_resrv[i]; };
+    const auto &reservation(uint i) const { return m_resrv[i]; }
+    const auto &reservations()      const { return m_resrv;    }
 
     inline void swap(TextureAtlas &o) {
       met_trace();

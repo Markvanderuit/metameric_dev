@@ -53,7 +53,7 @@ namespace met {
             && std::tie(is_active, mesh_i, uplifting_i) == std::tie(o.is_active, o.mesh_i, o.uplifting_i);
       }
     };
-    
+
     /* Emitter representation; 
        just a simple point light for now */
     struct Emitter {
@@ -109,6 +109,37 @@ namespace met {
       }
     };
 
+  public: // State helpers
+    struct ObjectState : public detail::ComponentStateBase<Object> {
+      using Base = Object;
+      using ComponentStateBase<Base>::m_mutated;
+      
+      detail::ComponentState<bool>               is_active;
+      detail::ComponentState<uint>               mesh_i;
+      detail::ComponentState<uint>               uplifting_i;
+      detail::ComponentVariantState<Colr,  uint> diffuse;
+      detail::ComponentVariantState<float, uint> roughness;
+      detail::ComponentVariantState<float, uint> metallic;
+      detail::ComponentVariantState<float, uint> opacity;
+      detail::ComponentVariantState<Colr,  uint> normals;
+      detail::ComponentState<eig::Affine3f>      trf;
+
+    public:
+      virtual bool update(const Base &o) override {
+        m_mutated = (is_active.update(o.is_active)
+                 ||  mesh_i.update(o.mesh_i)
+                 ||  uplifting_i.update(o.uplifting_i)
+                 ||  diffuse.update(o.diffuse)
+                 ||  roughness.update(o.roughness)
+                 ||  metallic.update(o.metallic)
+                 ||  opacity.update(o.opacity)
+                 ||  normals.update(o.normals)
+                 ||  trf.update(o.trf));
+        return m_mutated;
+      }
+    };
+    
+
   public: // Scene data
     // Miscellaneous
     detail::Component<Settings,
@@ -118,7 +149,8 @@ namespace met {
     // Scene components, directly visible or influential in the scene
     // On-disk, components are stored in json format
     struct {
-      detail::ComponentVector<Object>     objects;
+      detail::ComponentVector<Object,
+                             ObjectState> objects;
       detail::ComponentVector<Emitter>    emitters;
       detail::ComponentVector<Uplifting,
                   detail::UpliftingState> upliftings;

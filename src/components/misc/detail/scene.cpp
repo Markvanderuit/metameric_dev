@@ -7,92 +7,119 @@
 #include <vector>
 
 namespace met::detail {
-  constexpr uint max_upliftings = 8u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  RTTextureData RTTextureData::realize(Settings::TextureSize texture_size, std::span<const detail::Resource<Image>> images) {
+  eig::Array2u clamp_size_by_setting(Settings::TextureSize setting, eig::Array2u size) {
+    switch (setting) {
+      case Settings::TextureSize::eHigh: return size.cwiseMin(2048u);
+      case Settings::TextureSize::eMed:  return size.cwiseMin(1024u);
+      case Settings::TextureSize::eLow:  return size.cwiseMin(512u);
+      default:                           return size;
+    }
+  }
+
+  RTTextureData RTTextureData::realize(const Scene &scene) {
     met_trace_full();
-    guard(!images.empty(), RTTextureData { });
+    RTTextureData data;
+    data.update(scene);
+    return data;
+  }
+
+  bool RTTextureData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.resources.images.is_mutated() || scene.settings.state.texture_size;
+  }
+
+  void RTTextureData::update(const Scene &scene) {
+    met_trace_full();
+
+    // Get external resources
+    const auto &e_images   = scene.resources.images;
+    const auto &e_settings = scene.settings.value.texture_size;
+
+    guard(!e_images.empty());
+
+    // Set atlas object indices to all inf
+    atlas_indices.resize(e_images.size());
+    rng::fill(atlas_indices, std::numeric_limits<uint>::max());
 
     // Generate inputs for texture atlas
     std::vector<eig::Array2u> inputs_3f, inputs_1f;
-    std::vector<uint>         inputs_i;
-    for (uint i = 0; i < images.size(); ++i) {
-      const auto &img = images[i].value();
-      if (img.pixel_frmt() == Image::PixelFormat::eRGB) {
-        inputs_i.push_back(inputs_3f.size());
-        inputs_3f.push_back(img.size());
-      } else {
-        inputs_i.push_back(inputs_1f.size());
-        inputs_1f.push_back(img.size());
-      }
+    for (uint i = 0; i < e_images.size(); ++i) {
+      const auto &img = e_images[i].value();
+      bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
+
+      atlas_indices[i] = is_3f ? inputs_3f.size() : inputs_1f.size();
+      
+      if (is_3f) inputs_3f.push_back(img.size());
+      else       inputs_1f.push_back(img.size());
     } // for (uint i)
 
-    // Determine maximum texture sizes, and restrict texture sizes to these values to keep things simple
-    eig::Array2u maxm_3f = rng::fold_left(inputs_3f, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u maxm_1f = rng::fold_left(inputs_1f, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    switch (texture_size) {
-      case Settings::TextureSize::eHigh:
-        maxm_3f = maxm_3f.cwiseMin(2048u); maxm_1f = maxm_1f.cwiseMin(2048u); break;
-      case Settings::TextureSize::eMed:
-        maxm_3f = maxm_3f.cwiseMin(1024u); maxm_1f = maxm_1f.cwiseMin(1024u); break;
-      case Settings::TextureSize::eLow:
-        maxm_3f = maxm_3f.cwiseMin(512u); maxm_1f = maxm_1f.cwiseMin(512u); break;
-    }
-    for (auto &input : inputs_3f) input = maxm_3f;
-    for (auto &input : inputs_1f) input = maxm_1f;
+    // Determine maximum texture sizes, and texture scaling necessary to uphold size settings
+    eig::Array2u maximal_3f = rng::fold_left(inputs_3f, eig::Array2u(0), 
+      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+    eig::Array2u maximal_1f = rng::fold_left(inputs_1f, eig::Array2u(0), 
+      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+    eig::Array2u clamped_3f = clamp_size_by_setting(e_settings, maximal_3f);
+    eig::Array2u clamped_1f = clamp_size_by_setting(e_settings, maximal_1f);
+    eig::Array2f scaled_3f  = clamped_3f.cast<float>() / maximal_3f.cast<float>();
+    eig::Array2f scaled_1f  = clamped_1f.cast<float>() / maximal_1f.cast<float>();
 
-    // Generate data objects and initialize atlases
-    RTTextureData data = { .info          = std::vector<RTTextureInfo>(images.size()),
-                           .atlas_indices = inputs_i,
-                           .atlas_3f      = {{ .sizes   = inputs_3f, .levels = 1 + maxm_3f.log2().maxCoeff() }},
-                           .atlas_1f      = {{ .sizes   = inputs_1f, .levels = 1 + maxm_1f.log2().maxCoeff() }}};
-    for (uint i = 0; i < images.size(); ++i) {
-      const auto &img = images[i].value();
+    // Scale input sizes by appropriate texture scaling
+    for (auto &input : inputs_3f)
+      input = (input.cast<float>() * scaled_3f).max(1.f).cast<uint>().eval();
+    for (auto &input : inputs_1f)
+      input = (input.cast<float>() * scaled_1f).max(1.f).cast<uint>().eval();
 
+    // Rebuild texture atlases with mips
+    atlas_3f = {{ .sizes   = inputs_3f, .levels = 1 + clamped_3f.log2().maxCoeff() }};
+    atlas_1f = {{ .sizes   = inputs_1f, .levels = 1 + clamped_1f.log2().maxCoeff() }};
+    
+    // Process image data
+    info.resize(e_images.size());
+    for (uint i = 0; i < e_images.size(); ++i) {
+      const auto &img = e_images[i].value();
+
+      // Load reservation from appropriate atlas (3f or 1f)
       bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
-      auto size  = is_3f ? data.atlas_3f.size() : data.atlas_1f.size();
-      auto resrv = is_3f ? data.atlas_3f.reservation(inputs_i[i])
-                         : data.atlas_1f.reservation(inputs_i[i]);
+      auto size  = is_3f ? atlas_3f.size() 
+                         : atlas_1f.size();
+      auto resrv = is_3f ? atlas_3f.reservation(atlas_indices[i])
+                         : atlas_1f.reservation(atlas_indices[i]);
 
       // Determine UV coordinates of the texture inside the full atlas
-      eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>();
-      eig::Array2f uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
+      eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>(),
+                   uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
 
       // Fill in info object
-      data.info[i] = { .is_3f = is_3f,
-                       .layer = resrv.layer_i,
-                       .offs  = resrv.offs,
-                       .size  = resrv.size,
-                       .uv0   = uv0,
-                       .uv1   = uv1 };
-                      
-      // Get a float representation of image data, and push it to GL-side
-      auto imgf = img.convert({ .resize_to  = is_3f ? maxm_3f : maxm_1f,
+      info[i] = { .is_3f = is_3f,      .layer = resrv.layer_i,
+                  .offs  = resrv.offs, .size  = resrv.size,
+                  .uv0   = uv0,        .uv1   = uv1 };
+
+      // Get a resampled float representation of image data
+      auto imgf = img.convert({ .resize_to  = resrv.size,
                                 .pixel_type = Image::PixelType::eFloat,
                                 .color_frmt = Image::ColorFormat::eLRGB });
+      
+      // Put image in appropriate place
       if (is_3f) {
-        data.atlas_3f.texture().set(imgf.data<float>(), 0,
+        atlas_3f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
       } else {
-        data.atlas_1f.texture().set(imgf.data<float>(), 0,
+        atlas_1f.texture().set(imgf.data<float>(), 0,
           { resrv.size.x(), resrv.size.y(), 1             },
           { resrv.offs.x(), resrv.offs.y(), resrv.layer_i });
       }
     } // for (uint i)
 
     // Fill in mip data using OpenGL's base functions
-    if (data.atlas_3f.texture().is_init())
-      data.atlas_3f.texture().generate_mipmaps();
-    if (data.atlas_1f.texture().is_init())
-      data.atlas_1f.texture().generate_mipmaps();
+    if (atlas_3f.texture().is_init()) atlas_3f.texture().generate_mipmaps();
+    if (atlas_1f.texture().is_init()) atlas_1f.texture().generate_mipmaps();
 
     // Finally, push info objects
-    data.info_gl = {{ .data = cnt_span<const std::byte>(data.info) }};
-
-    return data;
+    info_gl = {{ .data = cnt_span<const std::byte>(info) }};
   }
 
   std::pair<
@@ -179,17 +206,20 @@ namespace met::detail {
     return data;
   }
 
-  RTObjectData RTObjectData::realize(std::span<const detail::Component<Scene::Object>> objects) {
+  RTObjectData RTObjectData::realize(const Scene &scene) {
     met_trace_full();
 
+    // Get external resources
+    const auto e_objects = scene.components.objects;
+    
     RTObjectData data;
-    guard(!objects.empty(), data);
+    guard(!e_objects.empty(), data);
     
     // Build object info data
     {
-      data.info.resize(objects.size());
-      for (uint i = 0; i < objects.size(); ++i) {
-        const auto &component = objects[i];
+      data.info.resize(e_objects.size());
+      for (uint i = 0; i < e_objects.size(); ++i) {
+        const auto &component = e_objects[i];
         const auto &object    = component.value;
 
         bool is_albedo_sampled    = object.diffuse.index() != 0;
@@ -226,22 +256,31 @@ namespace met::detail {
     return data;
   }
 
-  void RTObjectData::update(std::span<const detail::Component<Scene::Object>> objects) {
-      met_trace();
+  bool RTObjectData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.components.objects.is_mutated();
+  }
+
+  void RTObjectData::update(const Scene &scene) {
+      met_trace_full();
+      
+      // Get external resources
+      const auto e_objects = scene.components.objects;
+
       bool handle_resize = false;
 
       // Initialize or resize object buffer to accomodate
-      if (!info_gl.is_init() || objects.size() != info.size()) {
-        info.resize(objects.size());
-        info_gl = {{ .size  = objects.size() * sizeof(detail::RTObjectInfo),
+      if (!info_gl.is_init() || e_objects.size() != info.size()) {
+        info.resize(e_objects.size());
+        info_gl = {{ .size  = e_objects.size() * sizeof(detail::RTObjectInfo),
                      .flags = gl::BufferCreateFlags::eStorageDynamic         }};
 
         handle_resize = true;
       }
       
       // Process updates to gl-side object info
-      for (uint i = 0; i < objects.size(); ++i) {
-        const auto &component = objects[i];
+      for (uint i = 0; i < e_objects.size(); ++i) {
+        const auto &component = e_objects[i];
         const auto &object    = component.value;
         
         guard_continue(handle_resize || component.state.is_mutated());
@@ -272,6 +311,9 @@ namespace met::detail {
   RTUpliftingData RTUpliftingData::realize(const Scene &scene) {
     met_trace_full();
 
+    // Fixed settings 
+    constexpr uint max_upliftings = 8u;
+
     // Get external resources
     const auto &e_objects  = scene.components.objects;
     const auto &e_images   = scene.resources.images;
@@ -282,7 +324,8 @@ namespace met::detail {
     uint max_texture_layers = 
       std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
 
-    // Initialize info buffer up to maximum nr of supported upliftings
+    // Initialize info buffer up to maximum nr of supported upliftings;
+    // so no resizing will take place
     {
       data.spectra_info.resize(max_upliftings, { 0, 0 });
       data.spectra_info_gl = {{ .data  = cnt_span<const std::byte>(data.spectra_info), 
@@ -290,8 +333,8 @@ namespace met::detail {
       data.spectra_info_gl_mapping = data.spectra_info_gl.map_as<RTUpliftingInfo>(buffer_access_flags);
     }
 
-    // Pre-allocated up to the maximum size necessary; as this
-    // is actually a reasonable 2mb
+    // Pre-allocated up to the maximum size necessary; as this  is actually a reasonable 2mb
+    // so no resizing will take place
     {
       data.spectra_elem_gl_texture = {{ .size  = { wavelength_samples, max_texture_layers } }};
       data.spectra_elem_gl         = {{ .size  = max_texture_layers * sizeof(RTUpliftingData::ElemSpec), 
@@ -303,45 +346,59 @@ namespace met::detail {
     return data;
   }
 
+  bool RTUpliftingData::is_stale(const Scene &scene) const {
+    met_trace();
+
+    // Get shared resources
+    const auto &e_objects  = scene.components.objects;
+    const auto &e_settings = scene.settings;
+
+    // Views over objects; objects with diffuse textures, objects which underwent a state change
+    auto stale_objects = e_objects  
+                       | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; }) 
+                       | vws::filter([](const auto &comp) { return comp.state.diffuse;              });
+                       
+    // Accumulate reasons for returning
+    return !atlas_4f.texture().is_init()
+        || e_objects.is_resized()
+        || e_settings.state.texture_size
+        || !stale_objects.empty();
+  }
+
   void RTUpliftingData::update(const Scene &scene) {
     met_trace_full();
 
-    // Get external resources
+    // Get shared resources
     const auto &e_objects  = scene.components.objects;
     const auto &e_images   = scene.resources.images;
-    const auto &e_settings = scene.settings;
+    const auto &e_settings = scene.settings.value.texture_size;
 
-    // Set up texture atlas, allocating an image-appropriate texture block per object
-    {
-      std::vector<eig::Array2u> inputs_4f;
-      std::vector<uint>         inputs_i;
-      
-      // Gather necessary texture sizes
-      for (uint i = 0; i < e_objects.size(); ++i) {
-        const auto &[e_obj, e_obj_state] = e_objects[i];
-        if (e_obj.diffuse.index() == 0) {
-          // Object uses color value
-          inputs_i.push_back(std::numeric_limits<uint>::max()); // TODO hack that's gonna bite you
-        } else {
-          // Object has reference texture
-          const auto &[e_img, e_img_state] = e_images[std::get<1>(e_obj.diffuse)];
-          inputs_i.push_back(inputs_4f.size());
-          inputs_4f.push_back(e_img.size());
-        }
-      } // for (uint i)
+    // Set atlas object indices to all inf
+    atlas_indices.resize(e_objects.size());
+    rng::fill(atlas_indices, std::numeric_limits<uint>::max());
 
-      // Determine maximum texture sizes, and restrict texture sizes to these values to keep things simple
-      eig::Array2u maxm_4f = rng::fold_left(inputs_4f, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-      switch (e_settings.value.texture_size) {
-        case Settings::TextureSize::eHigh: maxm_4f = maxm_4f.cwiseMin(2048u); break;
-        case Settings::TextureSize::eMed:  maxm_4f = maxm_4f.cwiseMin(1024u); break;
-        case Settings::TextureSize::eLow:  maxm_4f = maxm_4f.cwiseMin(512u); break;
-      }
-      for (auto &input : inputs_4f) input = maxm_4f;
+    // Gather necessary texture sizes, and set relevant indices of objects in atlas
+    std::vector<eig::Array2u> inputs;
+    for (uint i = 0; i < e_objects.size(); ++i) {
+      const auto &[e_obj, e_obj_state] = e_objects[i];
 
-      // Push to GL
-      atlas_indices = inputs_i;
-      atlas_4f      = {{ .sizes = inputs_4f, .levels = 1 + maxm_4f.log2().maxCoeff() }};
-    }
+      // Object diffuse references image? Get it
+      guard_continue(e_obj.diffuse.index());
+      const auto &[e_img, e_img_state] = e_images[std::get<1>(e_obj.diffuse)];
+
+      atlas_indices[i] = inputs.size();
+      inputs.push_back(e_img.size());
+    } // for (uint i)
+
+    // Determine maximum texture sizes, and scale input sizes w.r.t. to this value
+    eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
+      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+    eig::Array2u clamped_4f = clamp_size_by_setting(e_settings, maximal_4f);
+    eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
+    for (auto &input : inputs)
+      input = (input.cast<float>() * scaled_4f).max(1.f).cast<uint>().eval();
+
+    // Rebuild texture atlas with mips
+    atlas_4f = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }};
   }
 } // namespace met::detail

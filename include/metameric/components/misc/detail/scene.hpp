@@ -61,7 +61,9 @@ namespace met::detail {
     TextureAtlas<float, 3>     atlas_3f;
     TextureAtlas<float, 1>     atlas_1f;
     
-    static RTTextureData realize(Settings::TextureSize texture_size, std::span<const detail::Resource<Image>>);
+    static RTTextureData realize(const Scene &scene);
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
   };
   
   /* Mesh vertex/element data block; holds all packed-together
@@ -83,8 +85,9 @@ namespace met::detail {
     std::vector<RTObjectInfo> info;
     gl::Buffer                info_gl;
 
-    static RTObjectData realize(std::span<const detail::Component<Scene::Object>>);
-    void update(std::span<const detail::Component<Scene::Object>>);
+    static RTObjectData realize(const Scene &scene);
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
   };
 
   /* Uplifting information structure, detailing which range of the
@@ -118,6 +121,7 @@ namespace met::detail {
     TextureAtlas<float, 4>       atlas_4f;
 
     static RTUpliftingData realize(const Scene &scene);
+    bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
   };
 } // namespace met::detail

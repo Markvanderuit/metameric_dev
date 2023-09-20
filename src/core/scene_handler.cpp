@@ -78,7 +78,7 @@ namespace met {
 
     // Apply change
     mod.redo(scene);
-    fmt::print("Touch!\n");
+    fmt::print("Touch (remove after debug)\n");
 
     // Ensure mod list doesn't exceed fixed length
     // and set the current mod to its end
