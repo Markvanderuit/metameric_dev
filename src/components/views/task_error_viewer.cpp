@@ -70,7 +70,7 @@ namespace met {
       for (uint i = 0; i < e_vert_spec.size(); ++i)
         reflectance += bary[i] * e_vert_spec[i];
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunayData>();
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
       eig::Array4f bary   = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 

@@ -75,7 +75,7 @@ namespace met::detail {
     gl::Buffer              elems, elems_al;
     gl::Array               array;
 
-    static RTMeshData realize(std::span<const detail::Resource<AlMeshData>>);
+    static RTMeshData realize(std::span<const detail::Resource<AlMesh>>);
   };
 
   /* Object layout data block; holds all packed-together scene

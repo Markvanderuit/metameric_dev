@@ -25,24 +25,24 @@ namespace met {
 
   /* Simple indexed mesh representation with optional normal/texcoord data */
   template <typename Vt, typename El>
-  struct MeshDataBase {
-    using VertTy = Vt;
-    using ElemTy = El;
-    using NormTy = Vt;
-    using UVTy   = eig::Array2f;
+  struct MeshBase {
+    using vert_type = Vt;
+    using elem_type = El;
+    using norm_type = Vt;
+    using txuv_type = eig::Array2f;
 
   public:
     // Primary mesh data; must be available
-    std::vector<VertTy> verts;
-    std::vector<ElemTy> elems;
+    std::vector<vert_type> verts;
+    std::vector<elem_type> elems;
     
     // Secondary mesh data; might be available, should query
-    std::vector<VertTy> norms;
-    std::vector<UVTy>   uvs;
+    std::vector<vert_type> norms;
+    std::vector<txuv_type> txuvs;
 
     // Data queries for secondary mesh data, available per-vertex
     bool has_norms() const { return norms.size() == verts.size(); }
-    bool has_uvs()   const { return uvs.size()   == verts.size(); }
+    bool has_txuvs() const { return txuvs.size() == verts.size(); }
 
   public: // Serialization
     void to_stream(std::ostream &str) const {
@@ -50,7 +50,7 @@ namespace met {
       io::to_stream(verts, str);
       io::to_stream(elems, str);
       io::to_stream(norms, str);
-      io::to_stream(uvs,   str);
+      io::to_stream(txuvs, str);
     }
 
     void fr_stream(std::istream &str) {
@@ -58,14 +58,15 @@ namespace met {
       io::fr_stream(verts, str);
       io::fr_stream(elems, str);
       io::fr_stream(norms, str);
-      io::fr_stream(uvs,   str);
+      io::fr_stream(txuvs, str);
     }
   };
   
-  using MeshData       = MeshDataBase<eig::Array3f,   eig::Array3u>;
-  using AlMeshData     = MeshDataBase<eig::AlArray3f, eig::Array3u>;
-  using DelaunayData   = MeshDataBase<eig::Array3f,   eig::Array4u>;
-  using AlDelaunayData = MeshDataBase<eig::AlArray3f, eig::Array4u>;
+  // General mesh/delaunay types used throughout the application
+  using Mesh       = MeshBase<eig::Array3f,   eig::Array3u>;
+  using AlMesh     = MeshBase<eig::AlArray3f, eig::Array3u>;
+  using Delaunay   = MeshBase<eig::Array3f,   eig::Array4u>;
+  using AlDelaunay = MeshBase<eig::AlArray3f, eig::Array4u>;
 
   // Convert between halfedge/indexed/aligned mesh data structures
   template <typename OutputMesh, typename InputMesh>

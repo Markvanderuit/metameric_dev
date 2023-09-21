@@ -108,7 +108,7 @@ namespace met {
     
     // Misc application data
     Texture2d3f loaded_texture;     // F32 RGB image extracted from project data
-    AlMeshData  loaded_mesh;        // Indexed mesh data supplied by user at runtime for viewing
+    AlMesh  loaded_mesh;        // Indexed mesh data supplied by user at runtime for viewing
     Basis       loaded_basis;       // Basis functions obtained through PCA of measured spectra
 
   public: /* project management; create/load/save/clear */

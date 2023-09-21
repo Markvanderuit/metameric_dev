@@ -84,9 +84,9 @@ namespace met {
         }
 
         // Determine UVs at hit position
-        eig::Array2f uv = (mesh.uvs[elem[0]] * bary[0]
-                         + mesh.uvs[elem[1]] * bary[1]
-                         + mesh.uvs[elem[2]] * bary[2])
+        eig::Array2f uv = (mesh.txuvs[elem[0]] * bary[0]
+                         + mesh.txuvs[elem[1]] * bary[1]
+                         + mesh.txuvs[elem[2]] * bary[2])
                          .unaryExpr([](float f) { return std::fmod(f, 1.f); });
 
         // Sample surface albedo at hit position

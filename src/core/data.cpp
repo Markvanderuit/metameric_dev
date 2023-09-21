@@ -111,7 +111,7 @@ namespace met {
     for (auto ext : mesh_exts) {
       fs::path path = io::path_with_ext(project_path, ext);
       guard_continue(fs::exists(path));
-      loaded_mesh = io::load_mesh<AlMeshData>(path);
+      loaded_mesh = io::load_mesh<AlMesh>(path);
       break;
     }
   }

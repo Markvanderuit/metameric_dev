@@ -124,11 +124,11 @@ namespace met {
   /* Explicit template instantiations */
 
   template
-  RayQuery raytrace_vert<MeshData>(const Ray &, const MeshData &, float);
+  RayQuery raytrace_vert<Mesh>(const Ray &, const Mesh &, float);
   template
-  RayQuery raytrace_vert<AlMeshData>(const Ray &, const AlMeshData &, float);
+  RayQuery raytrace_vert<AlMesh>(const Ray &, const AlMesh &, float);
   template
-  RayQuery raytrace_elem<MeshData>(const Ray &, const MeshData &, bool);
+  RayQuery raytrace_elem<Mesh>(const Ray &, const Mesh &, bool);
   template
-  RayQuery raytrace_elem<AlMeshData>(const Ray &, const AlMeshData &, bool);
+  RayQuery raytrace_elem<AlMesh>(const Ray &, const AlMesh &, bool);
 } // namespace met

@@ -15,7 +15,6 @@
 #include <queue>
 #include <unordered_map>
 
-
 /* 
   std::variant serialization helper for json
   src: https://github.com/nlohmann/json/issues/1261#issuecomment-426200060
@@ -443,20 +442,20 @@ namespace met {
 
     // Process included meshes in order
     for (const auto *mesh : file_meshes) {
-      AlMeshData m;
+      AlMesh m;
 
       if (mesh->HasPositions()) {
         std::span verts = { mesh->mVertices, mesh->mNumVertices };
         m.verts.resize(verts.size());
         std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
-          [](const auto &v) { return AlMeshData::VertTy { v.x, v.y, v.z }; });
+          [](const auto &v) { return AlMesh::vert_type { v.x, v.y, v.z }; });
       }
     
       if (mesh->HasNormals()) {
         std::span norms = { mesh->mNormals, mesh->mNumVertices };
         m.norms.resize(norms.size());
         std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
-          [](const auto &v) { return AlMeshData::NormTy { v.x, v.y, v.z }; });
+          [](const auto &v) { return AlMesh::norm_type { v.x, v.y, v.z }; });
       }
 
       uint tx_count = 0;
@@ -467,17 +466,17 @@ namespace met {
       // Assume first set of coords is used only
       constexpr size_t default_texture_coord = 0;
       if (mesh->HasTextureCoords(default_texture_coord)) {
-        std::span uvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
-        m.uvs.resize(uvs.size());
-        std::transform(std::execution::par_unseq, range_iter(uvs), m.uvs.begin(),
-          [](const auto &v) { return AlMeshData::UVTy { v.x, v.y }; });
+        std::span txuvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
+        m.txuvs.resize(txuvs.size());
+        std::transform(std::execution::par_unseq, range_iter(txuvs), m.txuvs.begin(),
+          [](const auto &v) { return AlMesh::txuv_type { v.x, v.y }; });
       }
 
       if (mesh->HasFaces()) {
         std::span elems = { mesh->mFaces, mesh->mNumFaces };
         m.elems.resize(elems.size());
         std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
-          [](const aiFace &v) { return AlMeshData::ElemTy { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
+          [](const aiFace &v) { return AlMesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
       }
 
       scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));

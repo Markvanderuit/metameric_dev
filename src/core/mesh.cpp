@@ -23,8 +23,8 @@ namespace met {
   }
 
   template <>
-  HalfedgeMeshData convert_mesh<HalfedgeMeshData, MeshData>(const MeshData &mesh_) {
-    met_trace_n("MeshData -> HalfedgeMeshData");
+  HalfedgeMeshData convert_mesh<HalfedgeMeshData, Mesh>(const Mesh &mesh_) {
+    met_trace_n("Mesh -> HalfedgeMeshData");
 
     // UV and normal data is lost during conversion
     const auto &[verts, elems, _norms, _uvs] = mesh_;
@@ -50,8 +50,8 @@ namespace met {
   }
   
   template <>
-  MeshData convert_mesh<MeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-    met_trace_n("HalfedgeMeshData -> MeshData");
+  Mesh convert_mesh<Mesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+    met_trace_n("HalfedgeMeshData -> Mesh");
     
     std::vector<eig::Array3f> verts(mesh.n_vertices());
     std::vector<eig::Array3u> faces(mesh.n_faces());
@@ -68,42 +68,42 @@ namespace met {
   }
 
   template <>
-  MeshData convert_mesh<MeshData, AlMeshData>(const AlMeshData &mesh) {
-    met_trace_n("AlMeshData -> MeshData");
+  Mesh convert_mesh<Mesh, AlMesh>(const AlMesh &mesh) {
+    met_trace_n("AlMeshData -> Mesh");
     return { 
       .verts = std::vector<eig::Array3f>(range_iter(mesh.verts)), 
       .elems = mesh.elems,
       .norms = std::vector<eig::Array3f>(range_iter(mesh.norms)),
-      .uvs   = mesh.uvs 
+      .txuvs   = mesh.txuvs 
     };
   }
 
   template <>
-  AlMeshData convert_mesh<AlMeshData, MeshData>(const MeshData &mesh) {
-    met_trace_n("MeshData -> AlMeshData");
+  AlMesh convert_mesh<AlMesh, Mesh>(const Mesh &mesh) {
+    met_trace_n("Mesh -> AlMeshData");
     return { 
       .verts = std::vector<eig::AlArray3f>(range_iter(mesh.verts)), 
       .elems = mesh.elems,
       .norms = std::vector<eig::AlArray3f>(range_iter(mesh.norms)),
-      .uvs   = mesh.uvs 
+      .txuvs   = mesh.txuvs 
     };
   }
 
   template <>
-  AlMeshData convert_mesh<AlMeshData, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+  AlMesh convert_mesh<AlMesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
     met_trace_n("HalfedgeMeshData -> AlMeshData");
-    return convert_mesh<AlMeshData>(convert_mesh<MeshData>(mesh));
+    return convert_mesh<AlMesh>(convert_mesh<Mesh>(mesh));
   }
 
   template <>
-  HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlMeshData>(const AlMeshData &mesh) {
+  HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlMesh>(const AlMesh &mesh) {
     met_trace_n("AlMeshData -> HalfedgeMeshData");
-    return convert_mesh<HalfedgeMeshData>(convert_mesh<MeshData>(mesh));
+    return convert_mesh<HalfedgeMeshData>(convert_mesh<Mesh>(mesh));
   }
 
   template <>
-  MeshData convert_mesh<MeshData, DelaunayData>(const DelaunayData &mesh) {
-    met_trace_n("DelaunayData -> MeshData");
+  Mesh convert_mesh<Mesh, Delaunay>(const Delaunay &mesh) {
+    met_trace_n("Delaunay -> Mesh");
     
     std::vector<eig::Array3u> elems(4 * mesh.elems.size());
 
@@ -119,31 +119,31 @@ namespace met {
   }
 
   template <>
-  DelaunayData convert_mesh<DelaunayData, AlDelaunayData>(const AlDelaunayData &mesh) {
-    met_trace_n("AlDelaunayData -> DelaunayData");
+  Delaunay convert_mesh<Delaunay, AlDelaunay>(const AlDelaunay &mesh) {
+    met_trace_n("AlDelaunayData -> Delaunay");
     return { std::vector<eig::Array3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
-  AlDelaunayData convert_mesh<AlDelaunayData, DelaunayData>(const DelaunayData &mesh) {
-    met_trace_n("DelaunayData -> AlDelaunayData");
+  AlDelaunay convert_mesh<AlDelaunay, Delaunay>(const Delaunay &mesh) {
+    met_trace_n("Delaunay -> AlDelaunayData");
     return { std::vector<eig::AlArray3f>(range_iter(mesh.verts)), mesh.elems };
   }
 
   template <>
-  AlMeshData convert_mesh<AlMeshData, DelaunayData>(const DelaunayData &mesh) {
-    met_trace_n("DelaunayData -> AlMeshData");
-    return convert_mesh<AlMeshData>(convert_mesh<MeshData>(mesh));
+  AlMesh convert_mesh<AlMesh, Delaunay>(const Delaunay &mesh) {
+    met_trace_n("Delaunay -> AlMeshData");
+    return convert_mesh<AlMesh>(convert_mesh<Mesh>(mesh));
   }
 
   template <>
-  AlMeshData convert_mesh<AlMeshData, AlDelaunayData>(const AlDelaunayData &mesh) {
+  AlMesh convert_mesh<AlMesh, AlDelaunay>(const AlDelaunay &mesh) {
     met_trace_n("AlDelaunayData -> AlMeshData");
-    return convert_mesh<AlMeshData>(convert_mesh<DelaunayData>(mesh));
+    return convert_mesh<AlMesh>(convert_mesh<Delaunay>(mesh));
   }
 
-  template <typename Mesh>
-  Mesh generate_octahedron() {
+  template <typename MeshTy>
+  MeshTy generate_octahedron() {
     met_trace();
     
     using V = eig::Array3f;
@@ -154,11 +154,11 @@ namespace met {
     std::vector<E> elems = { E(0, 2, 1), E(3, 1, 2), E(0, 1, 5), E(3, 5, 1),
                              E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
 
-    return convert_mesh<Mesh>(MeshData { verts, elems });
+    return convert_mesh<MeshTy>(Mesh { verts, elems });
   }
   
-  template <typename Mesh>
-  Mesh generate_spheroid(uint n_subdivs) {
+  template <typename MeshTy>
+  MeshTy generate_spheroid(uint n_subdivs) {
     met_trace();
 
     // Start with an octahedron; doing loop subdivision and normalizing the resulting vertices
@@ -180,11 +180,11 @@ namespace met {
     std::for_each(std::execution::par_unseq, range_iter(mesh.vertices()),
       [&](auto vh) { mesh.point(vh).normalize(); });
     
-    return convert_mesh<Mesh>(mesh);
+    return convert_mesh<MeshTy>(mesh);
   }
 
-  template <typename Mesh, typename Vector>
-  Mesh generate_convex_hull(std::span<const Vector> data) {
+  template <typename MeshTy, typename Vector>
+  MeshTy generate_convex_hull(std::span<const Vector> data) {
     met_trace();
 
     // Query qhull for a convex hull structure
@@ -222,11 +222,11 @@ namespace met {
         el = eig::Array3u { el[2], el[1], el[0] };
     }); 
 
-    return convert_mesh<Mesh>(MeshData { verts, elems });
+    return convert_mesh<MeshTy>(Mesh { verts, elems });
   }
   
-  template <typename Mesh, typename Vector>
-  Mesh generate_delaunay(std::span<const Vector> data) {
+  template <typename MeshTy, typename Vector>
+  MeshTy generate_delaunay(std::span<const Vector> data) {
     met_trace();
 
     std::vector<eig::Array3f> input(range_iter(data));
@@ -248,7 +248,7 @@ namespace met {
     // Assemble indexed data from qhull format
     std::vector<eig::Array3f> verts(qh_verts.size());
     std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
-      [](const auto &vt) { return Mesh::VertTy(vt.point().constBegin()); });
+      [](const auto &vt) { return Mesh::vert_type(vt.point().constBegin()); });
 
     // Undo QHull's unnecessary scatter-because-screw-you-aaaaaargh
     std::vector<uint> vertex_idx(data.size());
@@ -268,7 +268,7 @@ namespace met {
       return el_;
     });
 
-    return convert_mesh<Mesh>(DelaunayData { std::vector<eig::Array3f>(range_iter(data)), elems });
+    return convert_mesh<MeshTy>(Delaunay { std::vector<eig::Array3f>(range_iter(data)), elems });
   }
 
   template <typename OutputMesh, typename InputMesh>
@@ -358,13 +358,13 @@ namespace met {
 
   #define declare_function_all_inputs(OutputMesh)                                                     \
     declare_function_mesh_output_only(OutputMesh)                                                     \
-    declare_function_output_input(OutputMesh, MeshData)                                               \
-    declare_function_output_input(OutputMesh, AlMeshData)                                             \
+    declare_function_output_input(OutputMesh, Mesh)                                               \
+    declare_function_output_input(OutputMesh, AlMesh)                                             \
     declare_function_output_input(OutputMesh, HalfedgeMeshData)
   
-  declare_function_delaunay_output_only(DelaunayData)
-  declare_function_delaunay_output_only(AlDelaunayData)
-  declare_function_all_inputs(MeshData)
-  declare_function_all_inputs(AlMeshData)
+  declare_function_delaunay_output_only(Delaunay)
+  declare_function_delaunay_output_only(AlDelaunay)
+  declare_function_all_inputs(Mesh)
+  declare_function_all_inputs(AlMesh)
   declare_function_all_inputs(HalfedgeMeshData)
 } // namespace met

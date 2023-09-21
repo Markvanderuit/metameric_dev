@@ -6,7 +6,7 @@
 
 namespace met {
   class GenObjectDataTask : public detail::TaskNode {
-    uint object_i;
+    uint m_object_i;
 
   public:
     GenObjectDataTask(uint object_i);

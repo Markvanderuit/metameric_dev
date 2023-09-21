@@ -125,20 +125,20 @@ namespace met::detail {
   std::pair<
     std::vector<eig::Array4f>,
     std::vector<eig::Array4f>
-  > pack(const AlMeshData &m) {
+  > pack(const AlMesh &m) {
     std::vector<eig::Array4f> a(m.verts.size()),
                               b(m.verts.size());
 
     #pragma omp parallel for
     for (int i = 0; i < a.size(); ++i) {
-      a[i] = (eig::Array4f() << m.verts[i], m.uvs[i][0]).finished();
-      b[i] = (eig::Array4f() << m.norms[i], m.uvs[i][1]).finished();
+      a[i] = (eig::Array4f() << m.verts[i], m.txuvs[i][0]).finished();
+      b[i] = (eig::Array4f() << m.norms[i], m.txuvs[i][1]).finished();
     }
     
     return { std::move(a), std::move(b) };
   }
 
-  RTMeshData RTMeshData::realize(std::span<const detail::Resource<AlMeshData>> meshes) {
+  RTMeshData RTMeshData::realize(std::span<const detail::Resource<AlMesh>> meshes) {
     met_trace_full();
 
     guard(!meshes.empty(), RTMeshData { });

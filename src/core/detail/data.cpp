@@ -87,8 +87,8 @@ namespace met::detail {
 
     // Generate simplified concave hull fitting texture data, then fit convex hull around this
     auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(appl_data.loaded_texture.data());
-    auto chull_mesh = generate_convex_hull<MeshData, eig::Array3f>(
-      simplify_volume<MeshData>(chull_base, n_exterior_samples, &ocs_mesh).verts
+    auto chull_mesh = generate_convex_hull<Mesh, eig::Array3f>(
+      simplify_volume<Mesh>(chull_base, n_exterior_samples, &ocs_mesh).verts
     );
 
     fmt::print("  Convex hull result: {} vertices, {} elements\n", 

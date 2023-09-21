@@ -67,7 +67,7 @@ namespace met {
       if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
         // Display mesh data, dependent on what data is available
         if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-          const auto &e_delaunay = rsrc.read_only<AlDelaunayData>();
+          const auto &e_delaunay = rsrc.read_only<AlDelaunay>();
           ImGui::Value("Vertices", static_cast<uint>(e_delaunay.verts.size()));
           ImGui::Value("Elements", static_cast<uint>(e_delaunay.elems.size()));
         } else {

@@ -66,7 +66,7 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlDelaunayData>();
+    const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
     const auto &e_view_state  = info("state", "view_state").read_only<ViewportState>();
 
     // Select tree

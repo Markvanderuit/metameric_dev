@@ -59,7 +59,7 @@ namespace met {
     m_pack_map = m_pack_buffer.map_as<ElemPack>(buffer_access_flags);
 
     // Initialize tesselation structure, and search tree over tesselation structure
-    info("delaunay").set<AlDelaunayData>({ });
+    info("delaunay").set<AlDelaunay>({ });
     const auto &elem_tree = info("elem_tree").set<BVH>(BVH(buffer_init_size)).read_only<BVH>();
     
     // Initialize search tree over color data
@@ -184,7 +184,7 @@ namespace met {
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_delaunay    = info("delaunay").writeable<AlDelaunayData>();
+    auto &i_delaunay    = info("delaunay").writeable<AlDelaunay>();
     auto &i_elem_tree   = info("elem_tree").writeable<BVH>();
     auto &i_colr_tree   = info("colr_tree").read_only<BVHColr>();
     auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
@@ -194,11 +194,11 @@ namespace met {
     // Generate new delaunay structure and search tree
     std::vector<Colr> delaunay_input(e_proj_data.verts.size());
     std::ranges::transform(e_proj_data.verts, delaunay_input.begin(), [](const auto &vt) { return vt.colr_i; });
-    i_delaunay = generate_delaunay<AlDelaunayData, Colr>(delaunay_input);
+    i_delaunay = generate_delaunay<AlDelaunay, Colr>(delaunay_input);
     /* i_elem_tree.build(i_delaunay.verts, i_delaunay.elems); */
 
     // Recover triangle element data and store in project
-    auto [_verts, elems, _norms, _uvs] = convert_mesh<AlMeshData>(i_delaunay);
+    auto [_verts, elems, _norms, _uvs] = convert_mesh<AlMesh>(i_delaunay);
     info.global("appl_data").writeable<ApplicationData>().project_data.elems = elems;
 
     // Push stale vertices

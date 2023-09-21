@@ -66,22 +66,23 @@ namespace met {
     met_trace_full();
     m_csys_boundary_samples = detail::gen_unit_dirs<3>(n_system_boundary_samples);
     info("spectra").set<std::vector<Spec>>({ });
-    info("tesselation").set<AlDelaunayData>({ });
+    info("tesselation").set<AlDelaunay>({ });
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_scene                = info.global("scene").read_only<Scene>();
-    const auto &[e_uplifting, e_state] = e_scene.components.upliftings[m_uplifting_i];
-    const auto &e_csys                 = e_scene.components.colr_systems[e_uplifting.csys_i];
-    const auto &e_basis                = e_scene.resources.bases[e_uplifting.basis_i];
-    const auto &e_objects              = e_scene.components.objects;
-    const auto &e_meshes               = e_scene.resources.meshes;
-    const auto &e_images               = e_scene.resources.images;
-          auto &i_spectra              = info("spectra").writeable<std::vector<Spec>>();
-          auto &i_tesselation          = info("tesselation").writeable<AlDelaunayData>();
+    const auto &e_scene       = info.global("scene").read_only<Scene>();
+    const auto &[e_uplifting, 
+                 e_state]     = e_scene.components.upliftings[m_uplifting_i];
+    const auto &e_csys        = e_scene.components.colr_systems[e_uplifting.csys_i];
+    const auto &e_basis       = e_scene.resources.bases[e_uplifting.basis_i];
+    const auto &e_objects     = e_scene.components.objects;
+    const auto &e_meshes      = e_scene.resources.meshes;
+    const auto &e_images      = e_scene.resources.images;
+          auto &i_spectra     = info("spectra").writeable<std::vector<Spec>>();
+          auto &i_tesselation = info("tesselation").writeable<AlDelaunay>();
     
     // Internal state helper flags
     bool generally_stale   = e_state.basis_i || e_basis || e_state.csys_i  || e_csys;
@@ -149,9 +150,9 @@ namespace met {
         const auto &e_object = e_objects[vert.object_i].value;
         const auto &e_mesh   = e_meshes[e_object.mesh_i].value();
         const auto &e_elem   = e_mesh.elems[vert.object_elem_i];
-        eig::Array2f uv = (e_mesh.uvs[e_elem[0]] * vert.object_elem_bary[0]
-                          + e_mesh.uvs[e_elem[1]] * vert.object_elem_bary[1]
-                          + e_mesh.uvs[e_elem[2]] * vert.object_elem_bary[2])
+        eig::Array2f uv = (e_mesh.txuvs[e_elem[0]] * vert.object_elem_bary[0]
+                          + e_mesh.txuvs[e_elem[1]] * vert.object_elem_bary[1]
+                          + e_mesh.txuvs[e_elem[2]] * vert.object_elem_bary[2])
                         .unaryExpr([](float f) { return std::fmod(f, 1.f); });
 
         // Sample surface albedo at uv position
@@ -200,12 +201,13 @@ namespace met {
 
     // 3. Generate color system tesselation
     if (tesselation_stale) {
-      i_tesselation = generate_delaunay<AlDelaunayData, Colr>(m_tesselation_points);
+      i_tesselation = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
     }
 
     // 4. Consolidate and upload data to GL-side in one nice place
     {
-      
+      // TODO start here
+      // ...
     }
   }
 } // namespace met
