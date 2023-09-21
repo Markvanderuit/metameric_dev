@@ -58,8 +58,8 @@ namespace met {
 
   bool GenUpliftingDataTask::is_active(SchedulerHandle &info) {
     met_trace();
-    const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
-    return e_scene_handler.scene.components.upliftings[m_uplifting_i];
+    const auto &e_scene = info.global("scene").read_only<Scene>();
+    return e_scene.components.upliftings[m_uplifting_i];
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -73,8 +73,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_scene_handler        = info.global("scene_handler").read_only<SceneHandler>();
-    const auto &e_scene                = e_scene_handler.scene;
+    const auto &e_scene                = info.global("scene").read_only<Scene>();
     const auto &[e_uplifting, e_state] = e_scene.components.upliftings[m_uplifting_i];
     const auto &e_csys                 = e_scene.components.colr_systems[e_uplifting.csys_i];
     const auto &e_basis                = e_scene.resources.bases[e_uplifting.basis_i];
@@ -93,8 +92,7 @@ namespace met {
 
     // 1. Generate color system boundary spectra on relevant state change
     if (generally_stale) {
-      m_csys_boundary_spectra = generate_ocs_boundary_spec({ .basis      = e_basis.value().functions,
-                                                             .basis_mean = e_basis.value().mean,
+      m_csys_boundary_spectra = generate_ocs_boundary_spec({ .basis      = e_basis.value(),
                                                              .system     = csys,
                                                              .samples    = m_csys_boundary_samples });
 
@@ -138,8 +136,7 @@ namespace met {
 
         // Generate a metamer satisfying the system+signal constraint set
         s = generate_spectrum({
-          .basis      = e_basis.value().functions,
-          .basis_mean = e_basis.value().mean,
+          .basis      = e_basis.value(),
           .systems    = systems,
           .signals    = signals,
           .solve_dual = true
@@ -176,8 +173,7 @@ namespace met {
 
         // Generate a metamer satisfying the system+signal constraint set
         s = generate_spectrum({
-          .basis      = e_basis.value().functions,
-          .basis_mean = e_basis.value().mean,
+          .basis      = e_basis.value(),
           .systems    = systems,
           .signals    = signals,
           .solve_dual = true

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene_handler.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 
 namespace met {
@@ -27,8 +27,8 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
-      const auto &e_upliftings    = e_scene_handler.scene.components.upliftings;
+      const auto &e_scene      = info.global("scene").read_only<Scene>();
+      const auto &e_upliftings = e_scene.components.upliftings;
 
       // Add subtasks to perform mapping
       m_subtasks.init(info, e_upliftings.size(), 
@@ -40,8 +40,8 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
-      const auto &e_upliftings    = e_scene_handler.scene.components.upliftings;
+      const auto &e_scene      = info.global("scene").read_only<Scene>();
+      const auto &e_upliftings = e_scene.components.upliftings;
 
       // Adjust nr. of subtasks
       m_subtasks.eval(info, e_upliftings.size());

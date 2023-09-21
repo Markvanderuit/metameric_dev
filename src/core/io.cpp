@@ -425,7 +425,7 @@ namespace met::io {
     float data_wvl_min = wvls[0],
           data_wvl_max = wvls[wvls.size() - 1];
 
-    Basis s = 0.f;
+    Basis s = { .mean = 0.f, .func = 0.f };
 
     for (size_t j = 0; j < wavelength_bases; ++j) {
       for (size_t i = 0; i < wavelength_samples; ++i) {
@@ -455,13 +455,13 @@ namespace met::io {
           float interp_a = std::lerp(value_a, value_b, (clamp_a - wvl_a) * inv_ab),
                 interp_b = std::lerp(value_a, value_b, (clamp_b - wvl_a) * inv_ab);
 
-          s(i, j) += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
+          s.func(i, j) += .5f * (interp_a + interp_b) * (clamp_b - clamp_a);
         }
-        s(i, j) /= wavelength_ssize;
+        s.func(i, j) /= wavelength_ssize;
       }
     }
 
-    return s.eval();
+    return s;
   }
   
   std::array<std::vector<float>, 2> spectrum_to_data(const Spec &s) {

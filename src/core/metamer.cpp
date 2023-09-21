@@ -25,15 +25,15 @@ namespace met {
     LPParameters params(M, N);
 
     // Obtain appropriate nr. of basis functions from data
-    eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
+    eig::MatrixXf basis = info.basis.func.block(0, 0, wavelength_samples, N).eval();
 
     // Construct basis bounds
-    Spec upper_bounds = Spec(1.0) - info.basis_mean;
+    Spec upper_bounds = Spec(1.0) - info.basis.mean;
     Spec lower_bounds = upper_bounds - Spec(1.0); 
 
     // Add constraints to ensure resulting spectra produce the given color signals
     for (uint i = 0; i < info.systems.size(); ++i) {
-      Colr signal_offs = (info.systems[i].transpose() * info.basis_mean.matrix()).transpose().eval();
+      Colr signal_offs = (info.systems[i].transpose() * info.basis.mean.matrix()).transpose().eval();
       params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
       params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
     }
@@ -57,8 +57,8 @@ namespace met {
     auto [opt_min, res_min] = lp_solve_res(params);
 
     // Obtain spectral reflectance
-    Spec s_max = info.basis_mean + Spec(basis * res_max.cast<float>().matrix());
-    Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
+    Spec s_max = info.basis.mean + Spec(basis * res_max.cast<float>().matrix());
+    Spec s_min = info.basis.mean + Spec(basis * res_min.cast<float>().matrix());
     return (0.5 * (s_min + s_max)).eval();
   }
 
@@ -82,7 +82,7 @@ namespace met {
       eig::MatrixXf basis = info.basis.block(0, 0, wavelength_samples, N).eval();
 
       // Construct basis bounds
-      Spec upper_bounds = Spec(1.0) - info.basis_mean;
+      Spec upper_bounds = Spec(1.0) - info.basis.mean;
       Spec lower_bounds = upper_bounds - Spec(1.0); 
 
       // Normalized sensitivity weight minimization to prevent border issues
@@ -92,7 +92,7 @@ namespace met {
 
       // Add constraints to ensure resulting spectra produce the given color signals
       for (uint i = 0; i < info.systems.size(); ++i) {
-        Colr signal_offs = (info.systems[i].transpose() * info.basis_mean.matrix()).transpose().eval();
+        Colr signal_offs = (info.systems[i].transpose() * info.basis.mean.matrix()).transpose().eval();
         params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
         params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
       }
@@ -116,8 +116,8 @@ namespace met {
       auto [opt_min, res_min] = lp_solve_res(params);
 
       // Obtain spectral reflectance
-      Spec s_max = info.basis_mean + Spec(basis * res_max.cast<float>().matrix());
-      Spec s_min = info.basis_mean + Spec(basis * res_min.cast<float>().matrix());
+      Spec s_max = info.basis.mean + Spec(basis * res_max.cast<float>().matrix());
+      Spec s_min = info.basis.mean + Spec(basis * res_min.cast<float>().matrix());
       Spec s_new = (0.5 * (s_min + s_max)).eval();
 
       // On first run, obtain any (possibly infeasible) result
@@ -146,7 +146,6 @@ namespace met {
       // Find nearest generalized spectrum that fits within the basis function approach
       return generate_spectrum({
         .basis      = info.basis,
-        .basis_mean = info.basis_mean,
         .systems    = std::vector<CMFS> { info.system },
         .signals    = std::vector<Colr> { (info.system.transpose() * s.matrix()).eval() }
       });
@@ -188,10 +187,10 @@ namespace met {
     using Syst = eig::Matrix<float, 3, wavelength_bases>;
     
     // Generate color system spectra for basis function parameters
-    auto csys_j = (info.system_j.transpose() * info.basis).eval();
+    auto csys_j = (info.system_j.transpose() * info.basis.func).eval();
     auto csys_i = std::vector<Syst>(info.systems_i.size());
     std::ranges::transform(info.systems_i, csys_i.begin(),
-      [&](const auto &m) { return (m.transpose() * info.basis).eval(); });    
+      [&](const auto &m) { return (m.transpose() * info.basis.func).eval(); });    
 
     // Initialize parameter object for LP solver, given expected matrix sizes
     const uint N = wavelength_bases;
@@ -207,8 +206,8 @@ namespace met {
     }
 
     // Add [0, 1] bounds constraints
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = info.basis.cast<double>();
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = info.basis.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = info.basis.func.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = info.basis.func.cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = Spec(0.0).cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = Spec(1.0).cast<double>();
     params.r.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = LPCompare::eGE;
@@ -270,7 +269,7 @@ namespace met {
     params.objective = LPObjective::eMinimize;
     
     // Construct basis bounds
-    Spec upper_bounds = Spec(1.0) - info.basis_mean;
+    Spec upper_bounds = Spec(1.0) - info.basis.mean;
     Spec lower_bounds = upper_bounds - Spec(1.0); 
 
     // Clear untouched matrix values to 0
@@ -279,7 +278,7 @@ namespace met {
     // Normalized sensitivity weight minimization to prevent border issues
     Spec w = (info.systems[0].rowwise().sum() / 3.f).eval(); // Average of three rows, not luminance?!
     w = (Spec(1.0) - (w / w.sum())).eval();
-    auto C = (w.matrix().transpose() * info.basis).transpose().eval();
+    auto C = (w.matrix().transpose() * info.basis.func).transpose().eval();
 
     // Specify objective function using the above weight
     for (uint i = 0; i <  n_bary; ++i)
@@ -289,8 +288,8 @@ namespace met {
     for (uint i = 0; i < info.signals.size(); ++i) {
       const Signal &signal = info.signals[i];
 
-      auto signal_csys = (info.systems[signal.syst_i].transpose() * info.basis).eval();
-      Colr signal_avg  = (info.systems[signal.syst_i].transpose() * info.basis_mean.matrix()).transpose().eval();
+      auto signal_csys = (info.systems[signal.syst_i].transpose() * info.basis.func).eval();
+      Colr signal_avg  = (info.systems[signal.syst_i].transpose() * info.basis.mean.matrix()).transpose().eval();
 
       for (uint j = 0; j < n_bary; ++j) {
         auto A = (signal_csys * signal.bary_v[j]).cast<double>().eval();
@@ -302,9 +301,9 @@ namespace met {
     }
 
     // Add roundtrip constraints for gamut vertex positions
-    const auto gamut_csys = (info.systems[0].transpose() * info.basis).cast<double>().eval();
+    const auto gamut_csys = (info.systems[0].transpose() * info.basis.func).cast<double>().eval();
     const uint gamut_offs = info.signals.size() * n_colr;
-    const Colr gamut_avg  = (info.systems[0].transpose() * info.basis_mean.matrix()).transpose().eval();
+    const Colr gamut_avg  = (info.systems[0].transpose() * info.basis.mean.matrix()).transpose().eval();
     for (uint i = 0; i < info.gamut.size(); ++i) {
       auto b =( info.gamut[i] - gamut_avg).cast<double>().eval();
       params.A.block(gamut_offs + i * n_colr, i * n_base, rowcol(gamut_csys)) = gamut_csys;
@@ -314,7 +313,7 @@ namespace met {
     // Add boundedness constraints for resulting spectra
     const uint l_offs = gamut_offs + info.gamut.size() * n_colr;
     const uint u_offs = l_offs + n_bary * n_spec;
-    const auto basis = info.basis.cast<double>().eval();
+    const auto basis = info.basis.func.cast<double>().eval();
     for (uint i = 0; i < n_bary; ++i) {
       params.A.block(l_offs + i * n_spec, i * n_base, rowcol(basis)) = basis;
       params.A.block(u_offs + i * n_spec, i * n_base, rowcol(basis)) = basis;
@@ -333,8 +332,8 @@ namespace met {
     // Obtain basis function weights from solution and compute resulting spectra
     std::vector<Spec> out(n_bary);
     for (uint i = 0; i < n_bary; ++i)
-      out[i] = (info.basis_mean 
-        + (info.basis 
+      out[i] = (info.basis.mean 
+        + (info.basis.func 
           * eig::Matrix<float, wavelength_bases, 1>(x_min.block<n_base, 1>(n_base * i, 0))
           ).array().eval()
       ).cwiseMax(0.f).cwiseMin(1.f).eval();

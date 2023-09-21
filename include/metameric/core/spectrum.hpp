@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
 
 namespace met {
@@ -29,7 +30,34 @@ namespace met {
 
   /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
   using AlColr = eig::AlArray<float, 3>;
-  using Basis = eig::Matrix<float, wavelength_samples, wavelength_bases>;
+
+  /* Basis function object, using a offset around its mean */
+  struct Basis {
+    using BMat = eig::Matrix<float, wavelength_samples, wavelength_bases>;
+
+    Spec mean; // Mean offset
+    BMat func; // Basis functions around mean ooffset
+
+  public: // Boilerplate
+    inline
+    bool operator==(const Basis &o) const {
+      return mean.isApprox(o.mean) && func.isApprox(o.func);
+    }
+
+    inline
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(mean, str);
+      io::to_stream(func, str);
+    }
+
+    inline
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(mean, str);
+      io::fr_stream(func, str);
+    }
+  };
 
   /* System object defining how a reflectance-to-color conversion is performed */
   struct ColrSystem {
@@ -45,10 +73,29 @@ namespace met {
     // Obtain a color by applying this spectral mapping
     Colr apply_color_direct(const Spec &sd) const { met_trace(); return finalize_direct().transpose() * sd.pow(n_scatters).matrix().eval();  }
     Colr apply_color_indirect(const Spec &sd) const { met_trace(); return finalize_indirect(sd).transpose() * sd.matrix();  }
-
-    // Operator shorthands
     Colr operator()(const Spec &s) const { met_trace(); return apply_color_direct(s);  }
-    bool operator==(const ColrSystem &o) const { met_trace(); return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant); }
+
+  public: // Boilerplate
+    inline
+    bool operator==(const ColrSystem &o) const { 
+      return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant) && n_scatters == o.n_scatters;
+    }
+
+    inline
+    void to_stream(std::ostream &str) const {
+      met_trace();
+      io::to_stream(cmfs,       str);
+      io::to_stream(illuminant, str);
+      io::to_stream(n_scatters, str);
+    }
+
+    inline
+    void fr_stream(std::istream &str) {
+      met_trace();
+      io::fr_stream(cmfs,       str);
+      io::fr_stream(illuminant, str);
+      io::fr_stream(n_scatters, str);
+    }
   };
 
   /* 

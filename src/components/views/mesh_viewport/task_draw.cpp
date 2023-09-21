@@ -1,4 +1,4 @@
-#include <metameric/core/scene_handler.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/misc/detail/scene.hpp>
@@ -12,7 +12,7 @@ namespace met {
   bool MeshViewportDrawTask::is_active(SchedulerHandle &info) {
     met_trace();
     return info.relative("view_begin")("is_active").read_only<bool>()
-       && !info.global("scene_handler").read_only<SceneHandler>().scene.components.objects.empty();
+       && !info.global("scene").read_only<Scene>().components.objects.empty();
   }
 
   void MeshViewportDrawTask::init(SchedulerHandle &info) {
@@ -45,7 +45,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    const auto &e_scene     = info.global("scene_handler").read_only<SceneHandler>().scene;
+    const auto &e_scene     = info.global("scene").read_only<Scene>();
     const auto &e_objects   = e_scene.components.objects;
     const auto &e_arcball   = info.relative("view_input")("arcball").read_only<detail::Arcball>();
     const auto &e_objc_data = info("scene_handler", "objc_data").read_only<detail::RTObjectData>();

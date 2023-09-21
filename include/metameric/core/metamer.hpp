@@ -7,8 +7,7 @@
 namespace met {
   /* Info struct for generation of a spectral reflectance, given color signals and color systems */
   struct GenerateSpectrumInfo {
-    const Basis          &basis;         // Spectral basis functions
-    const Spec           &basis_mean;    // Mean of spectral basis functions
+    const Basis           &basis;        // Spectral basis functions
     std::span<const CMFS> systems;       // Color systems in which signals are available
     std::span<const Colr> signals;       // Signal samples in their respective color systems
 
@@ -22,7 +21,6 @@ namespace met {
   /* Info struct for sampling-based generation of points on the object color solid of a color system */
   struct GenerateOCSBoundaryInfo {
     const Basis          &basis;      // Spectral basis functions
-    const Spec           &basis_mean; // Mean of spectral basis functions
     CMFS                  system;     // Color system spectra describing the expected gamut
     std::span<const Colr> samples;    // Random unit vector samples in 3 dimensions
   };
@@ -30,7 +28,6 @@ namespace met {
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
   struct GenerateMismatchBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
-    const Spec                   &basis_mean; // Mean of spectral basis functions
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     const CMFS                   &system_j;   // Color system for mismatching region
@@ -52,7 +49,6 @@ namespace met {
     };
 
     const Basis        &basis;      // Spectral basis functions
-    const Spec         &basis_mean; // Mean of spectral basis functions
     std::vector<Colr>   gamut;      // Known gamut
     std::vector<CMFS>   systems;    // Color systems
     std::vector<Signal> signals;    // Color signals and corresponding information

@@ -14,21 +14,20 @@ namespace met {
     // Node data
     uint  depth;
     Chro  bbox_min, bbox_max; // Bounding box
-    Spec  basis_mean; // Average of spectra used to build basis functions
     Basis basis;      // Basis functions over spectra in bounding box region
     
     // Child node data
     std::vector<BasisTreeNode> children;
     
   public: /* public methods */
-    std::pair<Spec, Basis> traverse(const Chro &xy) const {
+    Basis traverse(const Chro &xy) const {
       if (depth == 1)
-        return { basis_mean, basis };
+        return basis;
         
       if (auto it = std::ranges::find_if(children, [&](const auto &n) { return n.is_in_node(xy); }); it != children.end()) {
         return it->traverse(xy);
       } else {
-        return { basis_mean, basis };
+        return basis;
       }
     }
 

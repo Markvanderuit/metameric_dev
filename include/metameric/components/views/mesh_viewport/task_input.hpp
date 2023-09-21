@@ -3,7 +3,7 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/ray.hpp>
-#include <metameric/core/scene_handler.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -27,7 +27,7 @@ namespace met {
       met_trace();
 
       // Get shared resources
-      const auto &e_scene   = info.global("scene_handler").read_only<SceneHandler>().scene;
+      const auto &e_scene   = info.global("scene").read_only<Scene>();
       const auto &e_objects = e_scene.components.objects;
       const auto &e_meshes  = e_scene.resources.meshes;
       const auto &e_images  = e_scene.resources.images;

@@ -13,6 +13,16 @@ namespace met {
     }
   } // namespace io
 
+  void from_json(const met::json &js, met::Basis &b) {
+    b.mean = js.at("mean").get<Spec>();
+    b.func = js.at("func").get<met::Basis::BMat>();
+  }
+
+  void to_json(met::json &js, const met::Basis &b) {
+    js["mean"] = b.mean;
+    js["func"] = b.func;
+  }
+
   void from_json(const json &js, ProjectData::CSys &v) {
     v.cmfs       = js.at("cmfs").get<uint>();
     v.illuminant = js.at("illuminant").get<uint>();
@@ -59,9 +69,9 @@ namespace met {
     auto block = basis.eval().block<data_wvls, wavelength_bases>(0, 0).transpose().eval();
     // auto block = basis.transpose().eval().block<data_wvls, wavelength_bases>(0, 0).eval();
     for (uint i = 0; i < wavelength_bases; ++i) {
-      b.basis.col(i) = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(block.row(i).eval()), true);
+      b.basis.func.col(i) = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(block.row(i).eval()), true);
     }
-    b.basis_mean = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(mean), true);
+    b.basis.mean = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(mean), true);
   }
   
   void to_json(json &js, const BasisTreeNode &b) {
@@ -144,13 +154,13 @@ namespace Eigen {
     js = std::vector<met::CMFS::value_type>(r.begin(), r.end());
   }
   
-  void from_json(const met::json &js, met::Basis &b) {
+  void from_json(const met::json &js, met::Basis::BMat &b) {
     std::ranges::copy(js, b.reshaped().begin());
   }
 
-  void to_json(met::json &js, const met::Basis &b) {
+  void to_json(met::json &js, const met::Basis::BMat &b) {
     auto r = b.reshaped();
-    js = std::vector<met::Basis::value_type>(r.begin(), r.end());
+    js = std::vector<met::Basis::BMat::value_type>(r.begin(), r.end());
   }
   
   void from_json(const met::json& js, met::Chro &v) {

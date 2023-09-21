@@ -76,7 +76,6 @@ namespace met::detail {
 
     // Compute data points on convex hull of object color solid; used for convex hull clipping
     auto ocs = generate_ocs_boundary_colr({ .basis      = appl_data.loaded_basis,
-                                            .basis_mean = appl_data.loaded_basis_mean,
                                             .system     = appl_data.project_data.csys(0).finalize_direct(), 
                                             .samples    = detail::gen_unit_dirs<3>(1024) });
 
@@ -189,7 +188,6 @@ namespace met::detail {
           // Generate new spectrum given the current set of systems+signals as solver constraints
           Spec sd = generate_spectrum({ 
             .basis      = appl_data.loaded_basis,
-            .basis_mean = appl_data.loaded_basis_mean,
             .systems    = std::span<CMFS> { systems }, 
             .signals    = std::span<Colr> { signals }
           });
@@ -340,7 +338,6 @@ namespace met::detail {
         // Solve using image constraints directly
         GenerateGamutInfo info = {
           .basis      = appl_data.loaded_basis,
-          .basis_mean = appl_data.loaded_basis_mean,
           .gamut      = verts,
           .systems    = std::vector<CMFS>(appl_data.project_data.color_systems.size()),
           .signals    = std::vector<GenerateGamutInfo::Signal>(n_samples)
@@ -399,7 +396,6 @@ namespace met::detail {
             
             Spec valid_spec = generate_spectrum({
               .basis      = appl_data.loaded_basis,
-              .basis_mean = appl_data.loaded_basis_mean,
               .systems    = systems, 
               .signals    = signals
             });

@@ -33,7 +33,7 @@
 
 namespace met {
   // Data objects
-  Scene::Basis                   basis;
+  Basis                          basis;
   std::vector<eig::ArrayXf>      samples_p1;
   std::vector<eig::ArrayXf>      samples_p0;
   std::vector<Spec>              illuminants_p0;

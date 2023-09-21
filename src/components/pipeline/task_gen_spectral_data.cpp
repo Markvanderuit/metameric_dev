@@ -55,7 +55,6 @@ namespace met {
       // Generate new spectrum given the above systems+signals as solver constraints
       i_spectra[i] = generate_spectrum({ 
         .basis      = e_appl_data.loaded_basis,
-        .basis_mean = e_appl_data.loaded_basis_mean,
         .systems    = std::span<CMFS> { systems }, 
         .signals    = std::span<Colr> { signals },
         .solve_dual = true

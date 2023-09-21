@@ -26,6 +26,10 @@ namespace met {
   /* json (de)serialization for BasisTreeNode type must be declared in met scope*/
   void from_json(const json &js, BasisTreeNode &b);
   void to_json(json &js, const BasisTreeNode &b);
+
+  /* json (de)serialization for BasisTreeNode type must be declared in met scope*/
+  void from_json(const json &js, Basis &b);
+  void to_json(json &js, const Basis &b);
 } // namespace met
 
 /* json (de)serializations for specific Eigen types must be declared in Eigen scope */
@@ -45,8 +49,8 @@ namespace Eigen {
   void from_json(const met::json& js, met::CMFS &v);
   void to_json(met::json &js, const met::CMFS &v);
 
-  void from_json(const met::json &js, met::Basis &b);
-  void to_json(met::json &js, const met::Basis &b);
+  void from_json(const met::json &js, met::Basis::BMat &b);
+  void to_json(met::json &js, const met::Basis::BMat &b);
   
   void from_json(const met::json& js, met::Chro &v);
   void to_json(met::json &js, const met::Chro &v);

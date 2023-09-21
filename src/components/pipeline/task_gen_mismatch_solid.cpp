@@ -143,8 +143,7 @@ namespace met {
     const auto &i_samples = info(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
 
     // Generate points on metamer set boundary; store in aligned format
-    auto data = generate_mismatch_boundary({ .basis      = e_appl_data.loaded_basis, 
-                                             .basis_mean = e_appl_data.loaded_basis_mean, 
+    auto data = generate_mismatch_boundary({ .basis      = e_appl_data.loaded_basis,
                                              .systems_i  = cmfs_i, 
                                              .signals_i  = sign_i, 
                                              .system_j   = cmfs_j, 

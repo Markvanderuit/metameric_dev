@@ -1,4 +1,5 @@
 #include <metameric/components/misc/task_scene_handler.hpp>
+#include <metameric/components/misc/detail/scene.hpp>
 #include <algorithm>
 #include <deque>
 
@@ -12,14 +13,11 @@ namespace met {
     info("txtr_data").set<detail::RTTextureData>({ });
     info("uplf_data").set<detail::RTUpliftingData>({ });
 
-    // Run initial state test
-    {
-      auto &e_scene_handler = info.global("scene_handler").writeable<SceneHandler>();
-      auto &e_scene         = e_scene_handler.scene;
+    { // Run initial state test
+      auto &e_scene = info.global("scene").writeable<Scene>();
 
-      e_scene.settings.state.update(e_scene.settings.value);
-      e_scene.observer_i.state.update(e_scene.observer_i.value);
-
+      e_scene.components.settings.state.update(e_scene.components.settings.value);
+      e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
       e_scene.components.colr_systems.test_mutated();
       e_scene.components.emitters.test_mutated();
       e_scene.components.objects.test_mutated();
@@ -34,41 +32,29 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    const auto &e_scene_handler = info.global("scene_handler").read_only<SceneHandler>();
-    const auto &e_scene         = e_scene_handler.scene;
-    const auto &e_settings      = e_scene.settings;
-    const auto &e_images        = e_scene.resources.images;
-    const auto &e_meshes        = e_scene.resources.meshes;
-    const auto &e_objects       = e_scene.components.objects;
-    const auto &e_upliftings    = e_scene.components.upliftings;
+    const auto &e_scene = info.global("scene").read_only<Scene>();
 
     { // Pre-load bookkeeping on components; test for changes from last iteration
-      auto &e_scene_handler = info.global("scene_handler").writeable<SceneHandler>();
-      auto &e_scene         = e_scene_handler.scene;
+      auto &e_scene = info.global("scene").writeable<Scene>();
 
-      e_scene.settings.state.update(e_scene.settings.value);
-      e_scene.observer_i.state.update(e_scene.observer_i.value);
-
+      e_scene.components.settings.state.update(e_scene.components.settings.value);
+      e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
       e_scene.components.colr_systems.test_mutated();
       e_scene.components.emitters.test_mutated();
       e_scene.components.objects.test_mutated();
       e_scene.components.upliftings.test_mutated();
     }
 
-    // Get uninitialized handles to holder objects
-    // we avoid accessing these as writeable unless absolutely necessary
-    auto i_mesh_data = info("mesh_data");
-    auto i_txtr_data = info("txtr_data");
-    auto i_uplf_data = info("uplf_data");
-    auto i_objc_data = info("objc_data");
-
     // Process updates to gpu-side mesh resources 
+    const auto &e_meshes = e_scene.resources.meshes;
+    auto i_mesh_data = info("mesh_data");
     if (!m_is_init || e_meshes.is_mutated()) {
       auto &i_mesh_data = info("mesh_data").writeable<detail::RTMeshData>();
       i_mesh_data = detail::RTMeshData::realize(e_meshes);
     }
     
     // Process updates to gpu-side image resources
+    auto i_txtr_data = info("txtr_data");
     if (!m_is_init) {
       i_txtr_data.writeable<detail::RTTextureData>() = detail::RTTextureData::realize(e_scene);
     } else if (i_txtr_data.read_only<detail::RTTextureData>().is_stale(e_scene)) {
@@ -76,6 +62,7 @@ namespace met {
     }
 
     // Process updates to gpu-side object components
+    auto i_objc_data = info("objc_data");
     if (!m_is_init) {
       i_objc_data.writeable<detail::RTObjectData>() = detail::RTObjectData::realize(e_scene);
     } else if (i_objc_data.read_only<detail::RTObjectData>().is_stale(e_scene)) {
@@ -83,6 +70,7 @@ namespace met {
     }
 
     // Process updates to gpu-side uplifting resources
+    auto i_uplf_data = info("uplf_data");
     if (!m_is_init) {
       i_uplf_data.writeable<detail::RTUpliftingData>() = detail::RTUpliftingData::realize(e_scene);
     } else if (i_uplf_data.read_only<detail::RTUpliftingData>().is_stale(e_scene)) {
@@ -90,9 +78,8 @@ namespace met {
     }
 
     { // Post-load bookkeeping on resources; assume no further changes
-      auto &e_scene_handler = info.global("scene_handler").writeable<SceneHandler>();
-      auto &e_scene         = e_scene_handler.scene;
-
+      auto &e_scene = info.global("scene").writeable<Scene>();
+      
       e_scene.resources.meshes.set_mutated(false);
       e_scene.resources.images.set_mutated(false);
       e_scene.resources.illuminants.set_mutated(false);

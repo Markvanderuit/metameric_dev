@@ -1,8 +1,6 @@
 #pragma once
 
-#include <metameric/core/scene_handler.hpp>
 #include <metameric/core/scheduler.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
 
 namespace met {
   class SceneHandlerTask : public detail::TaskNode {

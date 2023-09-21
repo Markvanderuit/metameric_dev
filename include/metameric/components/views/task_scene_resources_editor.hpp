@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene_handler.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/misc/detail/scene.hpp>
@@ -13,21 +13,22 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
-      
-      if (ImGui::Begin("Texture atlas")) {
-        // Get external resources
-        const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
-        const auto &e_atlas = e_txtr_data.atlas_3f;
-        
-        // Spawn views
-        for (uint i = 0; i < e_atlas.size().z(); ++i) {
-          for (uint j = 0; j < e_atlas.levels(); ++j) {
-            ImGui::Image(ImGui::to_ptr(e_atlas.view(i, j).object()), { 128, 128 });
-            if (j < e_atlas.levels() - 1)
-              ImGui::SameLine();
-          }
-        }
+      // Get external resources
+      const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
+      const auto &e_atlas = e_txtr_data.atlas_3f;
 
+      if (e_atlas.texture().is_init()) {
+        if (ImGui::Begin("Texture atlas")) {
+          // Spawn views
+          for (uint i = 0; i < e_atlas.size().z(); ++i) {
+            for (uint j = 0; j < e_atlas.levels(); ++j) {
+              ImGui::Image(ImGui::to_ptr(e_atlas.view(i, j).object()), { 128, 128 });
+              if (j < e_atlas.levels() - 1)
+                ImGui::SameLine();
+            }
+          }
+
+        }
         ImGui::End();
       }
 
@@ -35,8 +36,7 @@ namespace met {
 
       if (ImGui::Begin("Scene resources")) {
         // Get external resources
-        const auto &e_handler   = info.global("scene_handler").read_only<SceneHandler>();
-        const auto &e_scene     = e_handler.scene;
+        const auto &e_scene     = info.global("scene").read_only<Scene>();
         const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
 
         if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {

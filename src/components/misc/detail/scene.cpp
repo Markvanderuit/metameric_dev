@@ -28,7 +28,7 @@ namespace met::detail {
 
   bool RTTextureData::is_stale(const Scene &scene) const {
     met_trace();
-    return scene.resources.images.is_mutated() || scene.settings.state.texture_size;
+    return scene.resources.images.is_mutated() || scene.components.settings.state.texture_size;
   }
 
   void RTTextureData::update(const Scene &scene) {
@@ -36,7 +36,7 @@ namespace met::detail {
 
     // Get external resources
     const auto &e_images   = scene.resources.images;
-    const auto &e_settings = scene.settings.value.texture_size;
+    const auto &e_settings = scene.components.settings.value.texture_size;
 
     guard(!e_images.empty());
 
@@ -316,8 +316,8 @@ namespace met::detail {
 
     // Get external resources
     const auto &e_objects  = scene.components.objects;
+    const auto &e_settings = scene.components.settings;
     const auto &e_images   = scene.resources.images;
-    const auto &e_settings = scene.settings;
 
     RTUpliftingData data;
 
@@ -351,7 +351,7 @@ namespace met::detail {
 
     // Get shared resources
     const auto &e_objects  = scene.components.objects;
-    const auto &e_settings = scene.settings;
+    const auto &e_settings = scene.components.settings;
 
     // Views over objects; objects with diffuse textures, objects which underwent a state change
     auto stale_objects = e_objects  
@@ -369,9 +369,9 @@ namespace met::detail {
     met_trace_full();
 
     // Get shared resources
+    const auto &e_settings = scene.components.settings.value.texture_size;
     const auto &e_objects  = scene.components.objects;
     const auto &e_images   = scene.resources.images;
-    const auto &e_settings = scene.settings.value.texture_size;
 
     // Set atlas object indices to all inf
     atlas_indices.resize(e_objects.size());

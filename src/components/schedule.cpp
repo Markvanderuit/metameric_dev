@@ -1,6 +1,6 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/scheduler.hpp>
-#include <metameric/core/scene_handler.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
@@ -165,7 +165,7 @@ namespace met {
   void submit_metameric_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
     met_trace();
 
-    debug::check_expr(scheduler.global("scene_handler").is_init() && 
+    debug::check_expr(scheduler.global("scene").is_init() && 
                       scheduler.global("window").is_init());
     
     scheduler.clear();
@@ -178,7 +178,7 @@ namespace met {
   void submit_metameric_editor_schedule_loaded(detail::SchedulerBase &scheduler) {
     met_trace();
 
-    debug::check_expr(scheduler.global("scene_handler").is_init() && 
+    debug::check_expr(scheduler.global("scene").is_init() && 
                       scheduler.global("window").is_init());
     
     scheduler.clear();
@@ -202,11 +202,11 @@ namespace met {
   void submit_metameric_editor_schedule(detail::SchedulerBase &scheduler) {
     met_trace();
 
-    debug::check_expr(scheduler.global("scene_handler").is_init() && 
+    debug::check_expr(scheduler.global("scene").is_init() && 
                       scheduler.global("window").is_init());
 
-    const auto &e_handler = scheduler.global("scene_handler").read_only<SceneHandler>();
-    if (e_handler.save_state == SceneHandler::SaveState::eUnloaded) {
+    const auto &e_scene = scheduler.global("scene").read_only<Scene>();
+    if (e_scene.save_state == Scene::SaveState::eUnloaded) {
       submit_metameric_editor_schedule_unloaded(scheduler);
     } else {
       submit_metameric_editor_schedule_loaded(scheduler);

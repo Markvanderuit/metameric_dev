@@ -1,5 +1,4 @@
-#include <metameric/core/scene_handler.hpp>
-#include <metameric/core/image.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/components/schedule.hpp>
 #include <small_gl/window.hpp>
 #include <fmt/core.h>
@@ -46,13 +45,13 @@ namespace met {
     }
 
     // Initialize scene handler, as a resource owned by the scheduler
-    auto &scene_handler = scheduler.global("scene_handler").set<SceneHandler>({
+    auto &scene = scheduler.global("scene").set<Scene>({
       /* ... */
-    }).writeable<SceneHandler>();
+    }).writeable<Scene>();
 
     // Load scene if a scene path is provided
     if (!info.scene_path.empty())
-      scene_handler.load(info.scene_path);
+      scene.load(info.scene_path);
 
     // Create and start runtime loop
     submit_metameric_editor_schedule(scheduler);

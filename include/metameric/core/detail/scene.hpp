@@ -54,9 +54,10 @@ namespace met::detail {
   };
   
   template <typename T0, typename T1>
-  class ComponentVariantState : public ComponentStateBase<std::variant<T0, T1>> {
+  class ComponentStateVariant : public ComponentStateBase<std::variant<T0, T1>> {
     using Ty = std::variant<T0, T1>;
     using ComponentStateBase<Ty>::m_mutated;
+
     Ty m_cache = { };
 
   public:
@@ -245,8 +246,8 @@ namespace met::detail {
   };
 
   /* Scene component vector.
-     Encapsulates std::vector<Component<Ty>> to handle named component lookups and some minor
-     syntactic sugar for easy component initialization. */
+     Encapsulates std::vector<Component<Ty>> to handle named component lookups and s
+     and state tracking. */
   template <typename Ty,
             typename State = ComponentState<Ty>>
   class ComponentVector {
@@ -262,14 +263,14 @@ namespace met::detail {
       met_trace();
 
       if (m_data.size() == m_size_state) {
+        rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
         m_resized = false;
-        m_mutated = rng::any_of(m_data, 
-          [](auto &rsrc) { return rsrc.state.update(rsrc.value); });
+        m_mutated = rng::any_of(m_data, [](auto &rsrc) { return rsrc.state.is_mutated(); });
       } else {
+        rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
         m_resized    = true;
         m_mutated    = true;
         m_size_state = m_data.size();
-        rng::for_each(m_data, [](auto &rsrc) { rsrc.state.update(rsrc.value); });
       }
 
       return m_mutated;
@@ -282,7 +283,7 @@ namespace met::detail {
     }
 
     constexpr bool is_mutated() const {
-      return m_mutated || rng::any_of(m_data, [](const auto &rsrc) -> bool { return rsrc.state; });
+      return m_mutated; // || rng::any_of(m_data, [](const auto &rsrc) -> bool { return rsrc.state; });
     }
 
     constexpr bool is_resized() const {
