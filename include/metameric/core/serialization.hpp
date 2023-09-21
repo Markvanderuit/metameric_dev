@@ -16,22 +16,22 @@ namespace met::io {
   };
 
   // Serialization for eigen dense types
-  template <typename Ty> requires (!is_serializable<Ty> && is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && eig::is_approx_comparable<Ty>)
   void to_stream(const Ty &ty, std::ostream &str) {
     str.write(reinterpret_cast<const char *>(ty.data()), sizeof(std::decay_t<decltype(ty)>));
   }
-  template <typename Ty> requires (!is_serializable<Ty> && is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && eig::is_approx_comparable<Ty>)
   void fr_stream(Ty &ty, std::istream &str) {
     str.read(reinterpret_cast<char *>(ty.data()), sizeof(std::decay_t<decltype(ty)>));
   }
 
   // Serialization for most types
-  template <typename Ty> requires (!is_serializable<Ty> && !is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && !eig::is_approx_comparable<Ty>)
   void to_stream(const Ty &ty, std::ostream &str) {
     met_trace();
     str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
   }
-  template <typename Ty> requires (!is_serializable<Ty> && !is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && !eig::is_approx_comparable<Ty>)
   void fr_stream(Ty &ty, std::istream &str) {
     met_trace();
     str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
@@ -53,14 +53,14 @@ namespace met::io {
   }
 
   // Serialization for std::vector of most types
-  template <typename Ty> requires (!is_serializable<Ty> && !is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && !eig::is_approx_comparable<Ty>)
   void to_stream(const std::vector<Ty> &v, std::ostream &str) {
     met_trace();
     size_t n = v.size();
     to_stream(n, str);
     str.write(reinterpret_cast<const char *>(v.data()), sizeof(std::decay_t<decltype(v)>::value_type) * v.size());
   }
-  template <typename Ty> requires (!is_serializable<Ty> && !is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && !eig::is_approx_comparable<Ty>)
   void fr_stream(std::vector<Ty> &v, std::istream &str) {
     met_trace();
     size_t n = 0;
@@ -99,14 +99,14 @@ namespace met::io {
   }
 
   // Serialization for vectors of eigen types
-  template <typename Ty> requires (!is_serializable<Ty> && is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && eig::is_approx_comparable<Ty>)
   void to_stream(const std::vector<Ty> &v, std::ostream &str) {
     met_trace();
     size_t n = v.size();
     to_stream(n, str);
     str.write(reinterpret_cast<const char *>(v.data()), sizeof(std::decay_t<decltype(v)>::value_type) * n);
   }
-  template <typename Ty> requires (!is_serializable<Ty> && is_approx_comparable<Ty>)
+  template <typename Ty> requires (!is_serializable<Ty> && eig::is_approx_comparable<Ty>)
   void fr_stream(std::vector<Ty> &v, std::istream &str) {
     met_trace();
     size_t n = 0;

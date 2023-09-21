@@ -6,7 +6,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene_components.hpp>
-#include <metameric/core/detail/scene.hpp>
 #include <variant>
 
 namespace met {
@@ -19,22 +18,22 @@ namespace met {
     // Scene components, directly visible or influential in the scene
     // On-disk, these are stored in json format
     struct {
-      detail::ComponentVector<ColrSystemComponent>               colr_systems;
-      detail::ComponentVector<EmitterComponent>                  emitters;
-      detail::ComponentVector<Object,    detail::ObjectState>    objects;
-      detail::ComponentVector<Uplifting, detail::UpliftingState> upliftings;
-      detail::Component<Settings,        detail::SettingsState>  settings;   // Miscellaneous settings; e.g. texture size
-      detail::Component<uint>                                    observer_i; // Primary observer index; simple enough for now
+      detail::Components<ColorSystem> colr_systems;
+      detail::Components<Emitter>     emitters;
+      detail::Components<Object>      objects;
+      detail::Components<Uplifting>   upliftings;
+      detail::Component<Settings>     settings;   // Miscellaneous settings; e.g. texture size
+      detail::Component<uint>         observer_i; // Primary observer index; simple enough for now
     } components;
 
     // Scene resources, primarily referred to by components in the scene
     // On-disk, these are stored in zlib-compressed binary format
     struct {
-      detail::ResourceVector<AlMeshData>  meshes;
-      detail::ResourceVector<Image>       images;
-      detail::ResourceVector<Spec>        illuminants;
-      detail::ResourceVector<CMFS>        observers;
-      detail::ResourceVector<Basis>       bases;
+      detail::Resources<AlMeshData>  meshes;
+      detail::Resources<Image>       images;
+      detail::Resources<Spec>        illuminants;
+      detail::Resources<CMFS>        observers;
+      detail::Resources<Basis>       bases;
     } resources;
 
   public: // Save state and IO handling
@@ -80,15 +79,15 @@ namespace met {
   public: // Scene data helper functions
     // Obtain a pretty-printed name of a certain color system
     std::string get_csys_name(uint i)                const;
-    std::string get_csys_name(ColrSystemComponent c) const;
+    std::string get_csys_name(ColorSystem c) const;
 
     // Obtain the spectral data of a certain color system
     met::ColrSystem get_csys(uint i)                const;
-    met::ColrSystem get_csys(ColrSystemComponent c) const;
+    met::ColrSystem get_csys(ColorSystem c) const;
 
     // Obtain the spectral data of a certain emitter
     met::Spec get_emitter_spd(uint i)             const;
-    met::Spec get_emitter_spd(EmitterComponent e) const;
+    met::Spec get_emitter_spd(Emitter e) const;
     
   public: // Serialization
     void to_stream(std::ostream &str) const;

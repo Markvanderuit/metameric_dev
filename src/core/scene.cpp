@@ -36,15 +36,15 @@ namespace met {
   constexpr auto scene_o_flags = std::ios::out | std::ios::binary | std::ios::trunc;
 
   namespace detail {
-    template <typename Ty, typename State>
-    void to_json(json &js, const detail::Component<Ty, State> &component) {
+    template <typename Ty>
+    void to_json(json &js, const detail::Component<Ty> &component) {
       met_trace();
-      js = {{ "name",      component.name  },
-            { "value",     component.value }};
+      js = {{ "name",  component.name  },
+            { "value", component.value }};
     }
 
-    template <typename Ty, typename State>
-    void from_json(const json &js, detail::Component<Ty, State> &component) {
+    template <typename Ty>
+    void from_json(const json &js, detail::Component<Ty> &component) {
       met_trace();
       js.at("name").get_to(component.name);
       js.at("value").get_to(component.value);
@@ -151,7 +151,7 @@ namespace met {
     }
   }
 
-  void to_json(json &js, const EmitterComponent &emitter) {
+  void to_json(json &js, const Emitter &emitter) {
     met_trace();
     js = {{ "is_active",    emitter.is_active   },
           { "p",            emitter.p            },
@@ -159,7 +159,7 @@ namespace met {
           { "illuminant_i", emitter.illuminant_i }};
   }
 
-  void from_json(const json &js, EmitterComponent &emitter) {
+  void from_json(const json &js, Emitter &emitter) {
     met_trace();
     js.at("is_active").get_to(emitter.is_active);
     js.at("p").get_to(emitter.p);
@@ -167,14 +167,14 @@ namespace met {
     js.at("illuminant_i").get_to(emitter.illuminant_i);
   }
 
-  void to_json(json &js, const ColrSystemComponent &csys) {
+  void to_json(json &js, const ColorSystem &csys) {
     met_trace();
     js = {{ "observer_i",   csys.observer_i       },
           { "illuminant_i", csys.illuminant_i },
           { "n_scatters",   csys.n_scatters   }};
   }
 
-  void from_json(const json &js, ColrSystemComponent &csys) {
+  void from_json(const json &js, ColorSystem &csys) {
     met_trace();
     js.at("observer_i").get_to(csys.observer_i);
     js.at("illuminant_i").get_to(csys.illuminant_i);
@@ -223,7 +223,7 @@ namespace met {
     resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
     components.upliftings.emplace("Default uplifting",
       { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
-    ColrSystemComponent csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
+    ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     components.colr_systems.push(get_csys_name(csys), csys);
     components.emitters.push("Default D65 emitter", {
       .p = { 0, 1, 0 }, .multiplier = 1.f, .illuminant_i = 0 });
@@ -602,7 +602,7 @@ namespace met {
     return get_csys(components.colr_systems[i].value);
   }
 
-  met::ColrSystem Scene::get_csys(ColrSystemComponent c) const {
+  met::ColrSystem Scene::get_csys(ColorSystem c) const {
     met_trace();
     return { .cmfs       = resources.observers[c.observer_i].value(),
              .illuminant = resources.illuminants[c.illuminant_i].value(),
@@ -614,7 +614,7 @@ namespace met {
     return get_emitter_spd(components.emitters[i].value);
   }
 
-  met::Spec Scene::get_emitter_spd(EmitterComponent e) const {
+  met::Spec Scene::get_emitter_spd(Emitter e) const {
     met_trace();
     return (resources.illuminants[e.illuminant_i].value() * e.multiplier).eval();
   }
@@ -624,7 +624,7 @@ namespace met {
     return get_csys_name(components.colr_systems[i].value);
   }
 
-  std::string Scene::get_csys_name(ColrSystemComponent c) const {
+  std::string Scene::get_csys_name(ColorSystem c) const {
     met_trace();
     return std::format("{}, {}", 
                        resources.observers[c.observer_i].name, 

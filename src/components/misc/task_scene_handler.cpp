@@ -18,10 +18,10 @@ namespace met {
 
       e_scene.components.settings.state.update(e_scene.components.settings.value);
       e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
-      e_scene.components.colr_systems.test_mutated();
-      e_scene.components.emitters.test_mutated();
-      e_scene.components.objects.test_mutated();
-      e_scene.components.upliftings.test_mutated();
+      e_scene.components.colr_systems.update();
+      e_scene.components.emitters.update();
+      e_scene.components.objects.update();
+      e_scene.components.upliftings.update();
     }
 
     // Force upload of all resources  on first run
@@ -39,10 +39,10 @@ namespace met {
 
       e_scene.components.settings.state.update(e_scene.components.settings.value);
       e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
-      e_scene.components.colr_systems.test_mutated();
-      e_scene.components.emitters.test_mutated();
-      e_scene.components.objects.test_mutated();
-      e_scene.components.upliftings.test_mutated();
+      e_scene.components.colr_systems.update();
+      e_scene.components.emitters.update();
+      e_scene.components.objects.update();
+      e_scene.components.upliftings.update();
     }
 
     // Process updates to gpu-side mesh resources 

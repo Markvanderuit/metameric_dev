@@ -8,17 +8,30 @@
 
 #include <Eigen/Dense>
 
+// Introduce 'eig' namespace shorthand in the metameric namespace
 namespace met {
-  namespace eig = Eigen; // namespace shorthand
+  namespace eig = Eigen;
+} // namespace met
 
+namespace Eigen {
   // Concept for detecting Eigen's isApprox(...) member function
+  // on arbitrary types
   template <typename Ty>
   concept is_approx_comparable = requires(const Ty &a, const Ty &b) {
     { a.isApprox(b) } -> std::convertible_to<bool>;
   };
-} // namespace met
 
-namespace Eigen {
+  // Eigen's blocks do not support single-component equality comparison,
+  // but in general most things handle this just fine;
+  // here's a nice hack for the few times this requires writing code twice
+  template <typename Ty>
+  bool safe_approx_compare(const Ty &a, const Ty &b) {
+    if constexpr (is_approx_comparable<Ty>)
+      return a.isApprox(b);
+    else
+      return a == b;
+  }
+
   namespace detail {
     template <size_t D>
     constexpr 

@@ -1,29 +1,36 @@
 #pragma once
 
-#include <metameric/core/detail/scene.hpp>
+#include <metameric/core/detail/scene_components.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <vector>
 
 namespace met {
+  // FWD
+  namespace detail {
+    struct UpliftingState;
+    struct ObjectState;
+    struct SettingsState;
+  } // namespace detail
+
   /* Color system representation; a simple referral to CMFS and illuminant data */
-  struct ColrSystemComponent {
+  struct ColorSystem {
     uint observer_i   = 0;
     uint illuminant_i = 0;
     uint n_scatters   = 0;
 
-    friend auto operator<=>(const ColrSystemComponent &, const ColrSystemComponent &) = default;
+    friend auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
   };
 
-  /* Emitter representation;  just a simple point light for now */
-  struct EmitterComponent {
+  /* Emitter representation; just a simple point light for now */
+  struct Emitter {
     bool         is_active    = true; // Is drawn in viewport
     eig::Array3f p            = 1.f; // point light position
     float        multiplier   = 1.f; // power multiplier
     uint         illuminant_i = 0;   // index to spectral illuminant
 
     inline 
-    bool operator==(const EmitterComponent &o) const {
+    bool operator==(const Emitter &o) const {
       guard(std::tie(is_active, multiplier, illuminant_i) 
          == std::tie(o.is_active, o.multiplier, o.illuminant_i), false);
       return p.isApprox(o.p);
@@ -34,6 +41,8 @@ namespace met {
      A shape represented by a surface mesh, material data, 
      and an accompanying uplifting to handle spectral data. */
   struct Object {
+    using state_type = detail::ObjectState;
+
     // Is drawn in viewport
     bool is_active = true;
 
@@ -42,10 +51,10 @@ namespace met {
 
     // Material data, packed with object; either a specified value, or a texture index
     std::variant<Colr,  uint> diffuse;
+    std::variant<Colr,  uint> normals;
     std::variant<float, uint> roughness;
     std::variant<float, uint> metallic;
     std::variant<float, uint> opacity;
-    std::variant<Colr,  uint> normals;
 
     // Position/rotation/scale are captured in an affine transform
     eig::Affine3f trf;
@@ -69,6 +78,8 @@ namespace met {
 
   /* Scene settings data layout. */
   struct Settings {
+    using state_type = detail::SettingsState;
+
     // Texture render size; input res, 2048x2048, 1024x1024, or 512x512
     enum class TextureSize { eFull, eHigh, eMed, eLow } texture_size;
 
@@ -80,6 +91,8 @@ namespace met {
      vertices describing spectral behavior. Kept separate from Scene object,
      given its centrality to the codebase. */
   struct Uplifting {
+    using state_type = detail::UpliftingState;
+
     // The mesh structure connects a set of user-configured constraints; 
     // there are three types and they can be used intermittently:
     // - Color values across different systems, primary color sampled from a color space position
@@ -129,15 +142,15 @@ namespace met {
       using Base = Object;
       using ComponentStateBase<Base>::m_mutated;
       
-      detail::ComponentState<bool>               is_active;
-      detail::ComponentState<uint>               mesh_i;
-      detail::ComponentState<uint>               uplifting_i;
-      detail::ComponentStateVariant<Colr,  uint> diffuse;
-      detail::ComponentStateVariant<float, uint> roughness;
-      detail::ComponentStateVariant<float, uint> metallic;
-      detail::ComponentStateVariant<float, uint> opacity;
-      detail::ComponentStateVariant<Colr,  uint> normals;
-      detail::ComponentState<eig::Affine3f>      trf;
+      detail::ComponentState<decltype(Base::is_active)>    is_active;
+      detail::ComponentState<decltype(Base::mesh_i)>       mesh_i;
+      detail::ComponentState<decltype(Base::uplifting_i)>  uplifting_i;
+      detail::ComponentState<decltype(Base::diffuse)>      diffuse;
+      detail::ComponentState<decltype(Base::normals)>      normals;
+      detail::ComponentState<decltype(Base::roughness)>    roughness;
+      detail::ComponentState<decltype(Base::metallic)>     metallic;
+      detail::ComponentState<decltype(Base::opacity)>      opacity;
+      detail::ComponentState<decltype(Base::trf)>          trf;
 
     public:
       virtual bool update(const Base &o) override {
@@ -160,7 +173,7 @@ namespace met {
       using Base = Settings;
       using ComponentStateBase<Base>::m_mutated;
 
-      ComponentState<Base::TextureSize> texture_size;
+      ComponentState<decltype(Base::texture_size)> texture_size;
 
     public:
       virtual 
@@ -175,44 +188,41 @@ namespace met {
         using Base = Uplifting::Constraint;
         using ComponentStateBase<Base>::m_mutated;
         
-        ComponentState<Base::Type>   type;
-
-        ComponentState<Colr>         colr_i;
-        ComponentState<uint>         csys_i;
-        ComponentStateVector<Colr>   colr_j;
-        ComponentStateVector<uint>   csys_j;
-
-        ComponentState<uint>         object_i;
-        ComponentState<uint>         object_elem_i;
-        ComponentState<eig::Array3f> object_elem_bary;
-        
-        ComponentState<Spec>         measurement;
+        ComponentState<decltype(Base::type)>                type;
+        ComponentState<decltype(Base::colr_i)>              colr_i;
+        ComponentState<decltype(Base::csys_i)>              csys_i;
+        ComponentStates<decltype(Base::colr_j)::value_type> colr_j;
+        ComponentStates<decltype(Base::csys_j)::value_type> csys_j;
+        ComponentState<decltype(Base::object_i)>             object_i;
+        ComponentState<decltype(Base::object_elem_i)>        object_elem_i;
+        ComponentState<decltype(Base::object_elem_bary)>     object_elem_bary;
+        ComponentState<decltype(Base::measurement)>          measurement;
 
         virtual 
         bool update(const Base &o) override {
-          return m_mutated = (type.update(o.type)
-                           || colr_i.update(o.colr_i)
-                           || csys_i.update(o.csys_i)
-                           || colr_j.update(o.colr_j)
-                           || csys_j.update(o.csys_j)
-                           || object_i.update(o.object_i)
-                           || object_elem_i.update(o.object_elem_i)
-                           || object_elem_bary.update(o.object_elem_bary)
-                           || measurement.update(o.measurement));
+          return m_mutated = (
+            type.update(o.type)                         |
+            colr_i.update(o.colr_i)                     |
+            csys_i.update(o.csys_i)                     |
+            colr_j.update(o.colr_j)                     |
+            csys_j.update(o.csys_j)                     |
+            object_i.update(o.object_i)                 |
+            object_elem_i.update(o.object_elem_i)       |
+            object_elem_bary.update(o.object_elem_bary) |
+            measurement.update(o.measurement)
+          );
         }
       };
 
       using Base = Uplifting;
       using ComponentStateBase<Base>::m_mutated;
 
-      ComponentState<Base::Type> type;
-      ComponentState<uint>       csys_i;
-      ComponentState<uint>       basis_i;
-      ComponentStateVector<
-        Base::Constraint, 
-        ConstraintState>         verts;
-      ComponentStateVector<
-        Base::Elem>              elems;
+      ComponentState<decltype(Base::type)>               type;
+      ComponentState<decltype(Base::csys_i)>             csys_i;
+      ComponentState<decltype(Base::basis_i)>            basis_i;
+      ComponentStates<decltype(Base::verts)::value_type, 
+                                        ConstraintState> verts;
+      ComponentStates<decltype(Base::elems)::value_type> elems;
 
     public:
       virtual 
