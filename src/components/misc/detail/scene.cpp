@@ -119,17 +119,17 @@ namespace met::detail {
     // Finally, push info objects
     info_gl = {{ .data = cnt_span<const std::byte>(info) }};
   }
-
+  
   std::pair<
     std::vector<eig::Array4f>,
     std::vector<eig::Array4f>
   > pack(const Mesh &m) {
     std::vector<eig::Array4f> a(m.verts.size()), b(m.verts.size());
-
+    
     #pragma omp parallel for
     for (int i = 0; i < a.size(); ++i) {
-      a[i] = (eig::Array4f() << m.verts[i], m.txuvs[i][0]).finished();
-      b[i] = (eig::Array4f() << m.norms[i], m.txuvs[i][1]).finished();
+      a[i] = (eig::Array4f() << m.verts[i], m.has_txuvs() ? m.txuvs[i][0] : 0).finished();
+      b[i] = (eig::Array4f() << m.norms[i], m.has_txuvs() ? m.txuvs[i][1] : 0).finished();
     }
     
     return { std::move(a), std::move(b) };

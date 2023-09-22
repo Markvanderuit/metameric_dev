@@ -76,9 +76,12 @@ namespace met {
     // Bind required resources to their corresponding targets
     m_program.bind("b_unif_camera",   m_unif_camera_buffer);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
-    m_program.bind("b_buff_textures", e_txtr_data.info_gl);
-    m_program.bind("b_txtr_1f",       e_txtr_data.atlas_1f.texture());
-    m_program.bind("b_txtr_3f",       e_txtr_data.atlas_3f.texture());
+    if (e_txtr_data.info_gl.is_init())
+      m_program.bind("b_buff_textures", e_txtr_data.info_gl);
+    if (e_txtr_data.atlas_1f.texture().is_init())
+      m_program.bind("b_txtr_1f", e_txtr_data.atlas_1f.texture());
+    if (e_txtr_data.atlas_3f.texture().is_init())
+      m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
 
     // Dispatch draw call to handle entire scene
     gl::dispatch_multidraw(m_draw);

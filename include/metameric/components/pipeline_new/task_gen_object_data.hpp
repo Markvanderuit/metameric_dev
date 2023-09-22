@@ -3,9 +3,9 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
+#include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/dispatch.hpp>
-#include <small_gl/buffer.hpp>
 
 namespace met {
   class GenObjectDataTask : public detail::TaskNode {

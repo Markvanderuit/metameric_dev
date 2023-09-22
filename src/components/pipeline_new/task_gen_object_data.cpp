@@ -1,6 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/pipeline_new/task_gen_object_data.hpp>
 #include <metameric/components/misc/detail/scene.hpp>
+#include <small_gl/texture.hpp>
 #include <format>
 
 namespace met {
@@ -90,7 +91,7 @@ namespace met {
     // m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
     m_program.bind("b_buff_textures", e_txtr_data.info_gl);
-
+    
 
   }
 } // namespace met
