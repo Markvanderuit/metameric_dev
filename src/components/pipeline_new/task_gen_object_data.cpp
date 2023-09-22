@@ -36,8 +36,8 @@ namespace met {
 
     // Initialize objects for compute dispatch
     m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/pipeline/gen_delaunay_weights.comp.spv",
-                   .cross_path = "resources/shaders/pipeline/gen_delaunay_weights.comp.json" }};
+                   .spirv_path = "resources/shaders/pipeline_new/gen_tesselation_weights.comp.spv",
+                   .cross_path = "resources/shaders/pipeline_new/gen_tesselation_weights.comp.json" }};
     m_dispatch = { .bindable_program = &m_program }; 
     
     // Initialize uniform buffer and writeable, flushable mapping
@@ -65,7 +65,7 @@ namespace met {
     const auto &e_tesselation = info(uplifting_task_name, "tesselation").getr<AlDelaunay>();
 
     // Push stale packed tetrahedral data
-    // TODO; move to gen_uplifting_data
+    // TODO; move to gen_uplifting_data so it is per-uplifting, not per-texture
     std::transform(std::execution::par_unseq, range_iter(e_tesselation.elems), m_pack_map.begin(), 
     [&](const auto &el) {
       const auto vts = el | indexed_view(e_tesselation.verts);
@@ -91,7 +91,7 @@ namespace met {
     // m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
     m_program.bind("b_buff_textures", e_txtr_data.info_gl);
-    
 
+    // TODO dispatch
   }
 } // namespace met
