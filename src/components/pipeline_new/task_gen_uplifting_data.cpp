@@ -7,6 +7,7 @@
 #include <omp.h>
 #include <execution>
 #include <numbers>
+#include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
 
 namespace met {
@@ -67,6 +68,8 @@ namespace met {
     m_csys_boundary_samples = detail::gen_unit_dirs<3>(n_system_boundary_samples);
     info("spectra").set<std::vector<Spec>>({ });
     info("tesselation").set<AlDelaunay>({ });
+    info("tesselation_vt_gl").set<gl::Buffer>({ });
+    info("tesselation_el_gl").set<gl::Buffer>({ });
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
@@ -82,11 +85,11 @@ namespace met {
     const auto &e_meshes      = e_scene.resources.meshes;
     const auto &e_images      = e_scene.resources.images;
           auto &i_spectra     = info("spectra").getw<std::vector<Spec>>();
-          auto &i_tesselation = info("tesselation").getw<AlDelaunay>();
     
     // Internal state helper flags
     bool generally_stale   = e_state.basis_i || e_basis || e_state.csys_i  || e_csys;
-    bool tesselation_stale = generally_stale;
+    bool tesselation_stale = false; // generally_stale
+      // || rng::any_of(e_state.verts, [](const auto &state) { return state.colr_i.is_mutated(); });
 
     // Baseline color system spectra in which the 'uplifted' texture is defined
     CMFS csys = e_scene.get_csys(e_csys).finalize_direct();
@@ -201,13 +204,13 @@ namespace met {
 
     // 3. Generate color system tesselation
     if (tesselation_stale) {
-      i_tesselation = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
-    }
+      auto &i_tesselation       = info("tesselation").getw<AlDelaunay>();
+      // auto &i_tesselation_vt_gl = info("tesselation_vt_gl").getw<gl::Buffer>();
+      // auto &i_tesselation_el_gl = info("tesselation_el_gl").getw<gl::Buffer>();
 
-    // 4. Consolidate and upload data to GL-side in one nice place
-    {
-      // TODO start here
-      // ...
+      i_tesselation       = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
+      // i_tesselation_vt_gl = {{ .data = cnt_span<const std::byte>(i_tesselation.verts) }};
+      // i_tesselation_el_gl = {{ .data = cnt_span<const std::byte>(i_tesselation.elems) }};
     }
   }
 } // namespace met

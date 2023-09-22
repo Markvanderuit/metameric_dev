@@ -3,10 +3,34 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/dispatch.hpp>
+#include <small_gl/buffer.hpp>
 
 namespace met {
   class GenObjectDataTask : public detail::TaskNode {
     uint m_object_i;
+    
+    struct UnifLayout {
+      uint object_i; // Index of active object
+      uint n_verts;  // Nr. of vertices defining tesselation
+      uint n_elems;  // Nr. of elements defining tesselation
+    };
+
+    // Packed wrapper data for tetrahedron; 64 bytes for std430 
+    struct ElemPack {
+      eig::Matrix<float, 4, 3> inv; // Last column is padding
+      eig::Matrix<float, 4, 1> sub; // Last value is padding
+    };
+
+    gl::ComputeInfo           m_dispatch;
+    gl::Program               m_program;
+    gl::Buffer                m_pack_buffer;
+    gl::Buffer                m_unif_buffer;
+    UnifLayout               *m_unif_map;
+    std::span<ElemPack>       m_pack_map;
+    std::span<eig::AlArray3f> m_vert_map;
+    std::span<eig::Array4u>   m_elem_map;
 
   public:
     GenObjectDataTask(uint object_i);

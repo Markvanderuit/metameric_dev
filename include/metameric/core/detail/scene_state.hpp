@@ -141,5 +141,16 @@ namespace met::detail {
     // operator[...] exposes throwing at()
     constexpr const auto &operator[](uint i) const { return m_cache.at(i); }
     constexpr       auto &operator[](uint i)       { return m_cache.at(i); }
+    
+    // Bookkeeping; expose the underlying std::vector, instead of a direct pointer
+    constexpr const auto & data() const { return m_cache; }
+    constexpr       auto & data()       { return m_cache; }
+
+    // Boilerplate
+    constexpr auto size()  const { return m_cache.size();  }
+    constexpr auto begin() const { return m_cache.begin(); }
+    constexpr auto end()   const { return m_cache.end();   }
+    constexpr auto begin()       { return m_cache.begin(); }
+    constexpr auto end()         { return m_cache.end();   }
   };
 } // namespace met::detail
