@@ -54,7 +54,6 @@ namespace met {
     met_trace();
     js = {{ "type",             cstr.type             },
           { "colr_i",           cstr.colr_i           },
-          { "csys_i",           cstr.csys_i           },
           { "colr_j",           cstr.colr_j           },
           { "csys_j",           cstr.csys_j           },
           { "object_i",         cstr.object_i         },
@@ -67,7 +66,6 @@ namespace met {
     met_trace();
     js.at("type").get_to(cstr.type);
     js.at("colr_i").get_to(cstr.colr_i);
-    js.at("csys_i").get_to(cstr.csys_i);
     js.at("colr_j").get_to(cstr.colr_j);
     js.at("csys_j").get_to(cstr.csys_j);
     js.at("object_i").get_to(cstr.object_i);
@@ -79,10 +77,9 @@ namespace met {
   void to_json(json &js, const Uplifting &uplifting) {
     met_trace();
     js = {{ "type",    uplifting.type    },
-          { "csys_i",  uplifting.csys_i },
+          { "csys_i",  uplifting.csys_i  },
           { "basis_i", uplifting.basis_i },
-          { "verts",   uplifting.verts   },
-          { "elems",   uplifting.elems   }};
+          { "verts",   uplifting.verts   }};
   }
 
   void from_json(const json &js, Uplifting &uplifting) {
@@ -91,7 +88,6 @@ namespace met {
     js.at("csys_i").get_to(uplifting.csys_i);
     js.at("basis_i").get_to(uplifting.basis_i);
     js.at("verts").get_to(uplifting.verts);
-    js.at("elems").get_to(uplifting.elems);
   }
 
   void to_json(json &js, const Settings &settings) {
@@ -302,8 +298,8 @@ namespace met {
     // Import scene objects/emitters/materials/etc, taking care to increment indexes while bookkeeping correctly
     std::transform(range_iter(other.components.upliftings), 
                    std::back_inserter(components.upliftings.data()), [&](auto component) {
+      component.value.csys_i += components.colr_systems.size();
       for (auto &vert : component.value.verts) {
-        vert.csys_i += components.colr_systems.size();
         for (auto &j : vert.csys_j)
           j += components.colr_systems.size();
         if (vert.type == Uplifting::Constraint::Type::eColorOnMesh) {
@@ -442,20 +438,20 @@ namespace met {
 
     // Process included meshes in order
     for (const auto *mesh : file_meshes) {
-      AlMesh m;
+      Mesh m;
 
       if (mesh->HasPositions()) {
         std::span verts = { mesh->mVertices, mesh->mNumVertices };
         m.verts.resize(verts.size());
         std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
-          [](const auto &v) { return AlMesh::vert_type { v.x, v.y, v.z }; });
+          [](const auto &v) { return Mesh::vert_type { v.x, v.y, v.z }; });
       }
     
       if (mesh->HasNormals()) {
         std::span norms = { mesh->mNormals, mesh->mNumVertices };
         m.norms.resize(norms.size());
         std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
-          [](const auto &v) { return AlMesh::norm_type { v.x, v.y, v.z }; });
+          [](const auto &v) { return Mesh::norm_type { v.x, v.y, v.z }; });
       }
 
       uint tx_count = 0;
@@ -469,14 +465,14 @@ namespace met {
         std::span txuvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
         m.txuvs.resize(txuvs.size());
         std::transform(std::execution::par_unseq, range_iter(txuvs), m.txuvs.begin(),
-          [](const auto &v) { return AlMesh::txuv_type { v.x, v.y }; });
+          [](const auto &v) { return Mesh::txuv_type { v.x, v.y }; });
       }
 
       if (mesh->HasFaces()) {
         std::span elems = { mesh->mFaces, mesh->mNumFaces };
         m.elems.resize(elems.size());
         std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
-          [](const aiFace &v) { return AlMesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
+          [](const aiFace &v) { return Mesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
       }
 
       scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));

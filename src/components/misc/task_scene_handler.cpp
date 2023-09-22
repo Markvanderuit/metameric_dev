@@ -6,12 +6,15 @@
 namespace met {
   void SceneHandlerTask::init(SchedulerHandle &info) {
     met_trace();
+
+    // Get external resources
+    const auto &e_scene = info.global("scene").read_only<Scene>();
     
     // Initialize empty holder objects for gpu-side resources
-    info("objc_data").set<detail::RTObjectData>({ });
-    info("mesh_data").set<detail::RTMeshData>({ });
-    info("txtr_data").set<detail::RTTextureData>({ });
-    info("uplf_data").set<detail::RTUpliftingData>({ });
+    info("objc_data").init<detail::RTObjectData>(e_scene);
+    info("mesh_data").init<detail::RTMeshData>(e_scene);
+    info("txtr_data").init<detail::RTTextureData>(e_scene);
+    info("uplf_data").init<detail::RTUpliftingData>(e_scene);
 
     { // Run initial state test
       auto &e_scene = info.global("scene").writeable<Scene>();
@@ -45,36 +48,24 @@ namespace met {
       e_scene.components.upliftings.update();
     }
 
-    // Process updates to gpu-side mesh resources 
-    const auto &e_meshes = e_scene.resources.meshes;
-    auto i_mesh_data = info("mesh_data");
-    if (!m_is_init || e_meshes.is_mutated()) {
-      auto &i_mesh_data = info("mesh_data").writeable<detail::RTMeshData>();
-      i_mesh_data = detail::RTMeshData::realize(e_meshes);
+    // Process updates to gpu-side mesh resources
+    if (auto handle = info("mesh_data"); handle.read_only<detail::RTMeshData>().is_stale(e_scene)) {
+      handle.writeable<detail::RTMeshData>().update(e_scene);
     }
     
     // Process updates to gpu-side image resources
-    auto i_txtr_data = info("txtr_data");
-    if (!m_is_init) {
-      i_txtr_data.writeable<detail::RTTextureData>() = detail::RTTextureData::realize(e_scene);
-    } else if (i_txtr_data.read_only<detail::RTTextureData>().is_stale(e_scene)) {
-      i_txtr_data.writeable<detail::RTTextureData>().update(e_scene);
+    if (auto handle = info("txtr_data"); handle.read_only<detail::RTTextureData>().is_stale(e_scene)) {
+      handle.writeable<detail::RTTextureData>().update(e_scene);
     }
 
     // Process updates to gpu-side object components
-    auto i_objc_data = info("objc_data");
-    if (!m_is_init) {
-      i_objc_data.writeable<detail::RTObjectData>() = detail::RTObjectData::realize(e_scene);
-    } else if (i_objc_data.read_only<detail::RTObjectData>().is_stale(e_scene)) {
-      i_objc_data.writeable<detail::RTObjectData>().update(e_scene);
+    if (auto handle = info("objc_data"); handle.read_only<detail::RTObjectData>().is_stale(e_scene)) {
+      handle.writeable<detail::RTObjectData>().update(e_scene);
     }
 
     // Process updates to gpu-side uplifting resources
-    auto i_uplf_data = info("uplf_data");
-    if (!m_is_init) {
-      i_uplf_data.writeable<detail::RTUpliftingData>() = detail::RTUpliftingData::realize(e_scene);
-    } else if (i_uplf_data.read_only<detail::RTUpliftingData>().is_stale(e_scene)) {
-      i_uplf_data.writeable<detail::RTUpliftingData>().update(e_scene);
+    if (auto handle = info("uplf_data"); handle.read_only<detail::RTUpliftingData>().is_stale(e_scene)) {
+      handle.writeable<detail::RTUpliftingData>().update(e_scene);
     }
 
     { // Post-load bookkeeping on resources; assume no further changes

@@ -60,8 +60,11 @@ namespace met::detail {
     std::vector<uint>          atlas_indices;
     TextureAtlas<float, 3>     atlas_3f;
     TextureAtlas<float, 1>     atlas_1f;
-    
-    static RTTextureData realize(const Scene &scene);
+  
+  public:
+    RTTextureData() = default;
+    RTTextureData(const Scene &);
+
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
   };
@@ -75,7 +78,12 @@ namespace met::detail {
     gl::Buffer              elems, elems_al;
     gl::Array               array;
 
-    static RTMeshData realize(std::span<const detail::Resource<AlMesh>>);
+  public:
+    RTMeshData() = default;
+    RTMeshData(const Scene &);
+
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
   };
 
   /* Object layout data block; holds all packed-together scene
@@ -85,7 +93,10 @@ namespace met::detail {
     std::vector<RTObjectInfo> info;
     gl::Buffer                info_gl;
 
-    static RTObjectData realize(const Scene &scene);
+  public:
+    RTObjectData() = default;
+    RTObjectData(const Scene &);
+
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
   };
@@ -120,7 +131,10 @@ namespace met::detail {
     std::vector<uint>            atlas_indices;
     TextureAtlas<float, 4>       atlas_4f;
 
-    static RTUpliftingData realize(const Scene &scene);
+  public:
+    RTUpliftingData() = default;
+    RTUpliftingData(const Scene &);
+
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
   };

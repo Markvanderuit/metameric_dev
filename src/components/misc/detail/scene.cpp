@@ -19,11 +19,9 @@ namespace met::detail {
     }
   }
 
-  RTTextureData RTTextureData::realize(const Scene &scene) {
-    met_trace_full();
-    RTTextureData data;
-    data.update(scene);
-    return data;
+  RTTextureData::RTTextureData(const Scene &scene) {
+    met_trace();
+    update(scene);
   }
 
   bool RTTextureData::is_stale(const Scene &scene) const {
@@ -125,9 +123,8 @@ namespace met::detail {
   std::pair<
     std::vector<eig::Array4f>,
     std::vector<eig::Array4f>
-  > pack(const AlMesh &m) {
-    std::vector<eig::Array4f> a(m.verts.size()),
-                              b(m.verts.size());
+  > pack(const Mesh &m) {
+    std::vector<eig::Array4f> a(m.verts.size()), b(m.verts.size());
 
     #pragma omp parallel for
     for (int i = 0; i < a.size(); ++i) {
@@ -138,17 +135,30 @@ namespace met::detail {
     return { std::move(a), std::move(b) };
   }
 
-  RTMeshData RTMeshData::realize(std::span<const detail::Resource<AlMesh>> meshes) {
+  RTMeshData::RTMeshData(const Scene &scene) {
+    met_trace();
+    update(scene);
+  }
+
+  bool RTMeshData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.resources.meshes.is_mutated();
+  }
+
+  void RTMeshData::update(const Scene &scene) {
     met_trace_full();
 
-    guard(!meshes.empty(), RTMeshData { });
+    // Get external resources
+    const auto e_meshes = scene.resources.meshes;
+
+    guard(!e_meshes.empty());
 
     // Gather vertex/element lengths and offsets per mesh resources
     std::vector<uint> verts_size, elems_size, verts_offs, elems_offs;
-    std::transform(range_iter(meshes), std::back_inserter(verts_size), 
+    std::transform(range_iter(e_meshes), std::back_inserter(verts_size), 
       [](const auto &m) { return static_cast<uint>(m.value().verts.size()); });
     std::exclusive_scan(range_iter(verts_size), std::back_inserter(verts_offs), 0u);
-    std::transform(range_iter(meshes), std::back_inserter(elems_size), 
+    std::transform(range_iter(e_meshes), std::back_inserter(elems_size), 
       [](const auto &m) { return static_cast<uint>(m.value().elems.size()); });
     std::exclusive_scan(range_iter(elems_size), std::back_inserter(elems_offs), 0u);
 
@@ -157,16 +167,17 @@ namespace met::detail {
     uint n_elems = elems_size.at(elems_size.size() - 1) + elems_offs.at(elems_offs.size() - 1);
 
     // Holders for packed data of all meshes
-    std::vector<detail::RTMeshInfo> packed_info(meshes.size());
+    std::vector<detail::RTMeshInfo> packed_info(e_meshes.size());
     std::vector<eig::Array4f>       packed_verts_a(n_verts),
                                     packed_verts_b(n_verts);
     std::vector<eig::Array3u>       packed_elems(n_elems);
     std::vector<eig::AlArray3u>     packed_elems_al(n_elems);
 
-    // Fill packed layout/data vectors
+    // Fill packed layout/data info object
+    info.resize(e_meshes.size());
     #pragma omp parallel for
-    for (int i = 0; i < meshes.size(); ++i) {
-      const auto &mesh = meshes[i].value();
+    for (int i = 0; i < e_meshes.size(); ++i) {
+      const auto &mesh = e_meshes[i].value();
       auto [a, b] = pack(mesh);
       
       // Copy over packed data to the correctly offset range;
@@ -178,46 +189,40 @@ namespace met::detail {
       rng::transform(mesh.elems, packed_elems_al.begin() + elems_offs[i], 
         [offs = verts_offs[i]](const auto &v) { return (v + offs).eval(); });
 
-      packed_info[i] = detail::RTMeshInfo {
+      info[i] = detail::RTMeshInfo {
         .verts_offs = verts_offs[i], .verts_size = verts_size[i],
         .elems_offs = elems_offs[i], .elems_size = elems_size[i],
       };
     }
 
-    // Push layout/data to buffers
-    RTMeshData data = {
-      .info     = packed_info,
-      .info_gl  = {{ .data = cnt_span<const std::byte>(packed_info)     }},
-      .verts_a  = {{ .data = cnt_span<const std::byte>(packed_verts_a)  }},
-      .verts_b  = {{ .data = cnt_span<const std::byte>(packed_verts_b)  }},
-      .elems    = {{ .data = cnt_span<const std::byte>(packed_elems)    }},
-      .elems_al = {{ .data = cnt_span<const std::byte>(packed_elems_al) }},
-    };
+    // Push layout/data to GL buffers
+    info_gl  = {{ .data = cnt_span<const std::byte>(packed_info)     }};
+    verts_a  = {{ .data = cnt_span<const std::byte>(packed_verts_a)  }};
+    verts_b  = {{ .data = cnt_span<const std::byte>(packed_verts_b)  }};
+    elems    = {{ .data = cnt_span<const std::byte>(packed_elems)    }};
+    elems_al = {{ .data = cnt_span<const std::byte>(packed_elems_al) }};
     
     // Define corresponding vertex array object
-    data.array = {{
-      .buffers = {{ .buffer = &data.verts_a, .index = 0, .stride = sizeof(eig::Array4f)    },
-                  { .buffer = &data.verts_b, .index = 1, .stride = sizeof(eig::Array4f)    }},
+    array = {{
+      .buffers = {{ .buffer = &verts_a, .index = 0, .stride = sizeof(eig::Array4f)    },
+                  { .buffer = &verts_b, .index = 1, .stride = sizeof(eig::Array4f)    }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 },
                   { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e4 }},
-      .elements = &data.elems
+      .elements = &elems
     }};
-
-    return data;
   }
 
-  RTObjectData RTObjectData::realize(const Scene &scene) {
+  RTObjectData::RTObjectData(const Scene &scene) {
     met_trace_full();
 
     // Get external resources
     const auto e_objects = scene.components.objects;
     
-    RTObjectData data;
-    guard(!e_objects.empty(), data);
+    guard(!e_objects.empty());
     
     // Build object info data
     {
-      data.info.resize(e_objects.size());
+      info.resize(e_objects.size());
       for (uint i = 0; i < e_objects.size(); ++i) {
         const auto &component = e_objects[i];
         const auto &object    = component.value;
@@ -227,7 +232,7 @@ namespace met::detail {
         // bool is_metallic_sampled  = object.metallic.index() != 0;
         // bool is_normals_sampled   = object.normals.index() != 0;
 
-        data.info[i] = {
+        info[i] = {
           .trf         = object.trf.matrix(),
           .trf_inv     = object.trf.inverse().matrix(),
 
@@ -244,16 +249,14 @@ namespace met::detail {
       }
 
       // Push to GL-side
-      data.info_gl = {{ .data  = cnt_span<const std::byte>(data.info),
-                        .flags = gl::BufferCreateFlags::eStorageDynamic }};
+      info_gl = {{ .data  = cnt_span<const std::byte>(info),
+                   .flags = gl::BufferCreateFlags::eStorageDynamic }};
     }
 
     // Build barycentric data atlas
     {
 
     }
-
-    return data;
   }
 
   bool RTObjectData::is_stale(const Scene &scene) const {
@@ -308,7 +311,7 @@ namespace met::detail {
       } // for (uint i)
   }
 
-  RTUpliftingData RTUpliftingData::realize(const Scene &scene) {
+  RTUpliftingData::RTUpliftingData(const Scene &scene) {
     met_trace_full();
 
     // Fixed settings 
@@ -319,31 +322,28 @@ namespace met::detail {
     const auto &e_settings = scene.components.settings;
     const auto &e_images   = scene.resources.images;
 
-    RTUpliftingData data;
-
     uint max_texture_layers = 
       std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
 
     // Initialize info buffer up to maximum nr of supported upliftings;
     // so no resizing will take place
     {
-      data.spectra_info.resize(max_upliftings, { 0, 0 });
-      data.spectra_info_gl = {{ .data  = cnt_span<const std::byte>(data.spectra_info), 
-                                .flags = buffer_create_flags }};
-      data.spectra_info_gl_mapping = data.spectra_info_gl.map_as<RTUpliftingInfo>(buffer_access_flags);
+      spectra_info.resize(max_upliftings, { 0, 0 });
+      spectra_info_gl = {{ .data  = cnt_span<const std::byte>(spectra_info), 
+                           .flags = buffer_create_flags }};
+      spectra_info_gl_mapping = spectra_info_gl.map_as<RTUpliftingInfo>(buffer_access_flags);
     }
 
     // Pre-allocated up to the maximum size necessary; as this  is actually a reasonable 2mb
     // so no resizing will take place
     {
-      data.spectra_elem_gl_texture = {{ .size  = { wavelength_samples, max_texture_layers } }};
-      data.spectra_elem_gl         = {{ .size  = max_texture_layers * sizeof(RTUpliftingData::ElemSpec), 
-                                        .flags = buffer_create_flags }};
-      data.spectra_elem_gl_mapping = data.spectra_elem_gl.map_as<Spec>(buffer_access_flags);
+      spectra_elem_gl_texture = {{ .size  = { wavelength_samples, max_texture_layers } }};
+      spectra_elem_gl         = {{ .size  = max_texture_layers * sizeof(RTUpliftingData::ElemSpec), 
+                                   .flags = buffer_create_flags }};
+      spectra_elem_gl_mapping = spectra_elem_gl.map_as<Spec>(buffer_access_flags);
     }
 
-    data.update(scene);
-    return data;
+    update(scene);
   }
 
   bool RTUpliftingData::is_stale(const Scene &scene) const {

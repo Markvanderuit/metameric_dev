@@ -94,7 +94,7 @@ namespace met {
     }
   
     template <typename Ty, typename InfoTy = Ty::InfoType>
-    ResourceHandle & init(InfoTy info) {
+    ResourceHandle & init(const InfoTy &info) {
       met_trace();
       m_rsrc_handle = m_schd_handle->add_rsrc_impl({ .task_key = m_rsrc_key.task_key, 
                                                      .rsrc_key = m_rsrc_key.rsrc_key,

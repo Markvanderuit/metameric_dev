@@ -19,7 +19,8 @@ namespace met {
     uint illuminant_i = 0;
     uint n_scatters   = 0;
 
-    friend auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
+    friend
+    auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
   };
 
   /* Emitter representation; just a simple point light for now */
@@ -104,8 +105,7 @@ namespace met {
       } type = Type::eColor;
 
       // If type == Type::eColor, these are the color constraints
-      Colr              colr_i; // Expected color under a primary color system 
-      uint              csys_i; // Index referring to the primary color system
+      Colr              colr_i; // Expected color under primary color system 
       std::vector<Colr> colr_j; // Expected colors under secondary color systems
       std::vector<uint> csys_j; // Indices of the secondary color systems
       
@@ -117,11 +117,6 @@ namespace met {
       // If type == Type::eMeasurement, this holds a measured spectral constraint
       Spec measurement;
     };
-    
-    // Shorthands for the mesh structure; note, with the delaunay mesh connecting 
-    // elements are generated on the fly, they are only stored for the convex hull
-    using Vert = Constraint;
-    using Elem = eig::Array3u;
 
     // The mesh structure defines how constraints are connected; e.g. as points
     // on a convex hull with generalized barycentrics for the interior, or points 
@@ -130,10 +125,9 @@ namespace met {
       eConvexHull, eDelaunay      
     } type = Type::eDelaunay;
 
-    uint              csys_i  = 0; // Index of primary color system for input texture
-    uint              basis_i = 0; // Index of used underlying basis
-    std::vector<Vert> verts;       // Vertices of uplifting mesh
-    std::vector<Elem> elems;       // Elements of uplifting mesh
+    uint                    csys_i  = 0; // Index of primary color system
+    uint                    basis_i = 0; // Index of used underlying basis
+    std::vector<Constraint> verts;       // Vertex constraints on uplifting mesh
   };
   
   namespace detail {
@@ -190,20 +184,18 @@ namespace met {
         
         ComponentState<decltype(Base::type)>                type;
         ComponentState<decltype(Base::colr_i)>              colr_i;
-        ComponentState<decltype(Base::csys_i)>              csys_i;
         ComponentStates<decltype(Base::colr_j)::value_type> colr_j;
         ComponentStates<decltype(Base::csys_j)::value_type> csys_j;
-        ComponentState<decltype(Base::object_i)>             object_i;
-        ComponentState<decltype(Base::object_elem_i)>        object_elem_i;
-        ComponentState<decltype(Base::object_elem_bary)>     object_elem_bary;
-        ComponentState<decltype(Base::measurement)>          measurement;
+        ComponentState<decltype(Base::object_i)>            object_i;
+        ComponentState<decltype(Base::object_elem_i)>       object_elem_i;
+        ComponentState<decltype(Base::object_elem_bary)>    object_elem_bary;
+        ComponentState<decltype(Base::measurement)>         measurement;
 
         virtual 
         bool update(const Base &o) override {
           return m_mutated = (
             type.update(o.type)                         |
             colr_i.update(o.colr_i)                     |
-            csys_i.update(o.csys_i)                     |
             colr_j.update(o.colr_j)                     |
             csys_j.update(o.csys_j)                     |
             object_i.update(o.object_i)                 |
@@ -222,7 +214,6 @@ namespace met {
       ComponentState<decltype(Base::basis_i)>            basis_i;
       ComponentStates<decltype(Base::verts)::value_type, 
                                         ConstraintState> verts;
-      ComponentStates<decltype(Base::elems)::value_type> elems;
 
     public:
       virtual 
@@ -231,8 +222,7 @@ namespace met {
           type.update(o.type)       | 
           csys_i.update(o.csys_i)   |
           basis_i.update(o.basis_i) | 
-          verts.update(o.verts)     | 
-          elems.update(o.elems)
+          verts.update(o.verts)
         );
       }
     };

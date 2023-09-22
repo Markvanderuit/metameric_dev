@@ -29,11 +29,11 @@ namespace met {
     // Scene resources, primarily referred to by components in the scene
     // On-disk, these are stored in zlib-compressed binary format
     struct {
-      detail::Resources<AlMesh> meshes;
-      detail::Resources<Image>  images;
-      detail::Resources<Spec>   illuminants;
-      detail::Resources<CMFS>   observers;
-      detail::Resources<Basis>  bases;
+      detail::Resources<Mesh>  meshes;
+      detail::Resources<Image> images;
+      detail::Resources<Spec>  illuminants;
+      detail::Resources<CMFS>  observers;
+      detail::Resources<Basis> bases;
     } resources;
     
   public: // Save state and IO handling
