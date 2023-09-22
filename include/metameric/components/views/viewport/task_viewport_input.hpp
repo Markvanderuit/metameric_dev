@@ -40,12 +40,12 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-      const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
-      const auto &e_window    = info.global("window").read_only<gl::Window>();
+      const auto &e_vert_slct = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
+      const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").getr<int>();
+      const auto &e_window    = info.global("window").getr<gl::Window>();
 
       // Get modified resources
-      auto &e_appl_data = info.global("appl_data").writeable<ApplicationData>();
+      auto &e_appl_data = info.global("appl_data").getw<ApplicationData>();
       auto &e_proj_data = e_appl_data.project_data;
       auto &io          = ImGui::GetIO();
 
@@ -67,7 +67,7 @@ namespace met {
       if (ImGui::Begin("Vertex editing", nullptr, window_flags)) {
         // Display mesh data, dependent on what data is available
         if (auto rsrc = info("gen_convex_weights", "delaunay"); rsrc.is_init()) {
-          const auto &e_delaunay = rsrc.read_only<AlDelaunay>();
+          const auto &e_delaunay = rsrc.getr<AlDelaunay>();
           ImGui::Value("Vertices", static_cast<uint>(e_delaunay.verts.size()));
           ImGui::Value("Elements", static_cast<uint>(e_delaunay.elems.size()));
         } else {
@@ -85,8 +85,8 @@ namespace met {
           });
 
           // Select newly added vertex
-          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>() = { static_cast<uint>(e_proj_data.verts.size() - 1) };
-          info.resource("viewport.overlay", "constr_selection").writeable<int>() = -1;
+          info.resource("viewport.input.vert", "selection").getw<std::vector<uint>>() = { static_cast<uint>(e_proj_data.verts.size() - 1) };
+          info.resource("viewport.overlay", "constr_selection").getw<int>() = -1;
         }
 
         ImGui::SameLine();
@@ -110,8 +110,8 @@ namespace met {
           });
 
           // Clear selection after deleting vertex
-          info.resource("viewport.input.vert", "selection").writeable<std::vector<uint>>().clear();
-          info.resource("viewport.overlay", "constr_selection").writeable<int>() = -1;
+          info.resource("viewport.input.vert", "selection").getw<std::vector<uint>>().clear();
+          info.resource("viewport.overlay", "constr_selection").getw<int>() = -1;
         }
         if (e_vert_slct.empty()) ImGui::EndDisabled();
       }
@@ -215,7 +215,7 @@ namespace met {
       guard(ImGui::IsItemHovered());
 
       // Get modified resources
-      auto &i_arcball = info.resource("arcball").writeable<detail::Arcball>();
+      auto &i_arcball = info.resource("arcball").getw<detail::Arcball>();
 
       // Handle camera update: aspect ratio, scroll delta, move delta dependent on ImGui i/o
       i_arcball.m_aspect = viewport_size.x() / viewport_size.y();

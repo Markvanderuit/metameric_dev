@@ -44,8 +44,8 @@ namespace met::detail {
   void TextureFromBufferTask<Ty>::eval(SchedulerHandle &info) {
     met_trace_full();
     m_program.bind("b_uniform", m_uniform);
-    m_program.bind("b_buffer",  info(m_info.input_key.first, m_info.input_key.second).read_only<gl::Buffer>());
-    m_program.bind("i_image",   info(m_info.output_key).writeable<Ty>());
+    m_program.bind("b_buffer",  info(m_info.input_key.first, m_info.input_key.second).getr<gl::Buffer>());
+    m_program.bind("i_image",   info(m_info.output_key).getw<Ty>());
     gl::dispatch_compute(m_dispatch);
   }
 

@@ -82,7 +82,7 @@ namespace met {
                                * eig::Array2f(.67f, 0.3f);
 
         // Do some stuff with the PCA bases
-        const auto &pca = info.global("appl_data").read_only<ApplicationData>().loaded_basis;
+        const auto &pca = info.global("appl_data").getr<ApplicationData>().loaded_basis;
         for (uint i = 0; i < pca.cols(); ++i) {
           ImGui::PlotLines(fmt::format("Component {}", i).c_str(), pca.col(i).data(), 
             wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
@@ -95,7 +95,7 @@ namespace met {
   void submit_schedule_main(detail::SchedulerBase &scheduler) {
     debug::check_expr(scheduler.global("appl_data").is_init() && scheduler.global("window").is_init());
 
-    const auto &e_appl_data = scheduler.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = scheduler.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
     scheduler.clear();
@@ -151,7 +151,7 @@ namespace met {
     debug::check_expr(scheduler.global("window").is_init());
 
     if (auto rsrc = scheduler.global("appl_data"); rsrc.is_init()) {
-      const auto &e_appl_data = rsrc.read_only<ApplicationData>();
+      const auto &e_appl_data = rsrc.getr<ApplicationData>();
       if (e_appl_data.project_save != ProjectSaveState::eUnloaded) {
         submit_schedule_main(scheduler);
       } else {
@@ -205,7 +205,7 @@ namespace met {
     debug::check_expr(scheduler.global("scene").is_init() && 
                       scheduler.global("window").is_init());
 
-    const auto &e_scene = scheduler.global("scene").read_only<Scene>();
+    const auto &e_scene = scheduler.global("scene").getr<Scene>();
     if (e_scene.save_state == Scene::SaveState::eUnloaded) {
       submit_metameric_editor_schedule_unloaded(scheduler);
     } else {

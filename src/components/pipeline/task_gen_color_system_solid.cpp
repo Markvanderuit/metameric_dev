@@ -56,14 +56,14 @@ namespace met {
 
   bool GenColorSystemSolidTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info("state", "proj_state").read_only<ProjectState>().csys[0];
+    return info("state", "proj_state").getr<ProjectState>().csys[0];
   }
 
   void GenColorSystemSolidTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Compute data points on convex hull of object color solid

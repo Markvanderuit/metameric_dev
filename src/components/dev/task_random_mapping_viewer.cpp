@@ -9,7 +9,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Initialize texture generation subtasks
@@ -33,9 +33,9 @@ namespace met {
     // Get external resources
     if (ImGui::Begin("Random mappings viewer")) {
       // Get external resources
-      const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
-      const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<
+      const auto &e_constraints = info("gen_random_constraints", "constraints").getr<
         std::vector<std::vector<ProjectData::Vert>>
       >();
       uint e_images_n = e_constraints.size();
@@ -65,8 +65,8 @@ namespace met {
           continue;
         }
         guard_continue(info.task(gen_name).is_init());
-        // const auto &e_texture = info(gen_name, "colr_texture").read_only<gl::Texture2d4f>();
-        const auto &e_texture = info(gen_name, "texture").read_only<gl::Texture2d4f>();
+        // const auto &e_texture = info(gen_name, "colr_texture").getr<gl::Texture2d4f>();
+        const auto &e_texture = info(gen_name, "texture").getr<gl::Texture2d4f>();
 
         // Bulk of content
         ImGui::BeginGroup();
@@ -76,7 +76,7 @@ namespace met {
         ImGui::Text(fmt::format("Random #{}", i).c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton("Apply")) {
-          auto &e_proj_data = info.global("appl_data").writeable<ApplicationData>().project_data;
+          auto &e_proj_data = info.global("appl_data").getw<ApplicationData>().project_data;
           for (uint j = 0; j < e_proj_data.verts.size(); ++j) {
             const auto &constr = e_constraints[i][j];
             e_proj_data.verts[j].csys_j = constr.csys_j;

@@ -24,7 +24,7 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_scene   = info.global("scene").read_only<Scene>();
+      const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_objects = e_scene.components.objects;
 
       // Add subtasks to perform mapping
@@ -37,7 +37,7 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_scene   = info.global("scene").read_only<Scene>();
+      const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_objects = e_scene.components.objects;
 
       // Adjust nr. of subtasks

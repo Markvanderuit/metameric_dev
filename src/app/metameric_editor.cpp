@@ -36,7 +36,7 @@ namespace met {
       .flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eFocused 
              | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
              | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
-    }).writeable<gl::Window>();
+    }).getw<gl::Window>();
 
     // Initialize OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {
@@ -47,7 +47,7 @@ namespace met {
     // Initialize scene handler, as a resource owned by the scheduler
     auto &scene = scheduler.global("scene").set<Scene>({
       /* ... */
-    }).writeable<Scene>();
+    }).getw<Scene>();
 
     // Load scene if a scene path is provided
     if (!info.scene_path.empty())

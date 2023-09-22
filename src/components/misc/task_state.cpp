@@ -122,12 +122,12 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
-    const auto &e_arcball    = info("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_vert_selct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_vert_mover = info("viewport.input.vert", "mouseover").read_only<std::vector<uint>>();
-    const auto &e_cstr_selct = info("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_arcball    = info("viewport.input", "arcball").getr<detail::Arcball>();
+    const auto &e_vert_selct = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &e_vert_mover = info("viewport.input.vert", "mouseover").getr<std::vector<uint>>();
+    const auto &e_cstr_selct = info("viewport.overlay", "constr_selection").getr<int>();
 
     // Copies of resources
     ViewportState view_state;
@@ -173,9 +173,9 @@ namespace met {
       || view_state.cstr_selection || view_state.camera_matrix || view_state.camera_aspect;
 
     // Submit state changes to scheduler objects
-    if (auto rsrc = info("view_state"); view_state || rsrc.read_only<ViewportState>())
-      rsrc.writeable<ViewportState>() = view_state;
-    if (auto rsrc = info("proj_state"); proj_state || rsrc.read_only<ProjectState>())
-      rsrc.writeable<ProjectState>() = proj_state;
+    if (auto rsrc = info("view_state"); view_state || rsrc.getr<ViewportState>())
+      rsrc.getw<ViewportState>() = view_state;
+    if (auto rsrc = info("proj_state"); proj_state || rsrc.getr<ProjectState>())
+      rsrc.getw<ProjectState>() = proj_state;
   }
 } // namespace met

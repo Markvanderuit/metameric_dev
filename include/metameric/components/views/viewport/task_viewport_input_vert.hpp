@@ -37,12 +37,12 @@ namespace met {
       guard(ImGui::IsItemHovered());
 
       // Get external resources
-      const auto &i_arcball         = info.resource("viewport.input", "arcball").read_only<detail::Arcball>();
-      const auto &e_cstr_slct       = info.resource("viewport.overlay", "constr_selection").read_only<int>();
-      const auto &i_selection_const = info.resource("selection").read_only<std::vector<uint>>();
+      const auto &i_arcball         = info.resource("viewport.input", "arcball").getr<detail::Arcball>();
+      const auto &e_cstr_slct       = info.resource("viewport.overlay", "constr_selection").getr<int>();
+      const auto &i_selection_const = info.resource("selection").getr<std::vector<uint>>();
 
       // Get modified resources
-      auto &e_app_data  = info.global("appl_data").writeable<ApplicationData>();
+      auto &e_app_data  = info.global("appl_data").getw<ApplicationData>();
       auto &e_verts     = e_app_data.project_data.verts;
       auto &io          = ImGui::GetIO();
 
@@ -92,21 +92,21 @@ namespace met {
           auto br = eig::Array2f(io.MouseClickedPos[1]).max(eig::Array2f(io.MousePos)).eval();
                     
           // Push vertex indices on selection list
-          auto &i_selection = info.resource("selection").writeable<std::vector<uint>>();
+          auto &i_selection = info.resource("selection").getw<std::vector<uint>>();
           i_selection.clear();
           std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_rectangle, std::back_inserter(i_selection));
         }
 
         // Left-click selects a single gamut position
         if (io.MouseClicked[0] && (i_selection_const.empty() || !ImGuizmo::IsOver())) {
-          auto &i_selection = info.resource("selection").writeable<std::vector<uint>>();
+          auto &i_selection = info.resource("selection").getw<std::vector<uint>>();
           i_selection.clear();
           std::ranges::copy(std::views::iota(0u, e_verts.size()) | selector_near | std::views::take(1), std::back_inserter(i_selection));
         }
 
         // Store new_mouseover on change
-        if (!std::ranges::equal(info.resource("mouseover").read_only<std::vector<uint>>(), mouseover))
-          info.resource("mouseover").writeable<std::vector<uint>>() = mouseover;
+        if (!std::ranges::equal(info.resource("mouseover").getr<std::vector<uint>>(), mouseover))
+          info.resource("mouseover").getw<std::vector<uint>>() = mouseover;
       }
 
       // Continue only if a selection has been made
@@ -119,7 +119,7 @@ namespace met {
       int new_cstr_slct = i_selection_const.empty()
         ? -1 : std::min(e_cstr_slct, static_cast<int>(e_verts[i_selection_const[0]].colr_j.size() - 1));
       if (e_cstr_slct != new_cstr_slct)
-        info.resource("viewport.overlay", "constr_selection").writeable<int>() = new_cstr_slct;
+        info.resource("viewport.overlay", "constr_selection").getw<int>() = new_cstr_slct;
 
       // Range over- and center of selected gamut positions
       constexpr

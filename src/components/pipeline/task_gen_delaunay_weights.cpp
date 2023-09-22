@@ -27,7 +27,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_colr_data = e_appl_data.loaded_texture;
     const auto &e_proj_data = e_appl_data.project_data;
     
@@ -60,11 +60,11 @@ namespace met {
 
     // Initialize tesselation structure, and search tree over tesselation structure
     info("delaunay").set<AlDelaunay>({ });
-    const auto &elem_tree = info("elem_tree").set<BVH>(BVH(buffer_init_size)).read_only<BVH>();
+    const auto &elem_tree = info("elem_tree").set<BVH>(BVH(buffer_init_size)).getr<BVH>();
     
     // Initialize search tree over color data
     std::vector<Colr> colr_data(range_iter(e_colr_data.data()));
-    const auto &i_colr_tree = info("colr_tree").set(BVHColr(cnt_span<Colr>(colr_data))).read_only<BVHColr>();
+    const auto &i_colr_tree = info("colr_tree").set(BVHColr(cnt_span<Colr>(colr_data))).getr<BVHColr>();
 
     // Initialize buffer holding barycentric weights
     info("colr_buffer").set(std::move(colr_buffer)); // OpenGL buffer storing texture color positions
@@ -172,23 +172,23 @@ namespace met {
   
   bool GenDelaunayWeightsTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info("state", "proj_state").read_only<ProjectState>().verts;
+    return info("state", "proj_state").getr<ProjectState>().verts;
   }
 
   void GenDelaunayWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_delaunay    = info("delaunay").writeable<AlDelaunay>();
-    auto &i_elem_tree   = info("elem_tree").writeable<BVH>();
-    auto &i_colr_tree   = info("colr_tree").read_only<BVHColr>();
-    auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
-    auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
+    auto &i_delaunay    = info("delaunay").getw<AlDelaunay>();
+    auto &i_elem_tree   = info("elem_tree").getw<BVH>();
+    auto &i_colr_tree   = info("colr_tree").getr<BVHColr>();
+    auto &i_vert_buffer = info("vert_buffer").getw<gl::Buffer>();
+    auto &i_elem_buffer = info("elem_buffer").getw<gl::Buffer>();
     /* auto &i_tree_buffer = info("tree_buffer").writeable<gl::Buffer>(); */
 
     // Generate new delaunay structure and search tree
@@ -199,7 +199,7 @@ namespace met {
 
     // Recover triangle element data and store in project
     auto [_verts, elems, _norms, _uvs] = convert_mesh<AlMesh>(i_delaunay);
-    info.global("appl_data").writeable<ApplicationData>().project_data.elems = elems;
+    info.global("appl_data").getw<ApplicationData>().project_data.elems = elems;
 
     // Push stale vertices
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.verts.size()))
@@ -244,8 +244,8 @@ namespace met {
     // Bind required buffers to corresponding targets
     m_program.bind("b_unif", m_uniform_buffer);
     m_program.bind("b_pack", m_pack_buffer);
-    m_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+    m_program.bind("b_posi", info("colr_buffer").getr<gl::Buffer>());
+    m_program.bind("b_bary", info("bary_buffer").getw<gl::Buffer>());
     
     // Dispatch shader to generate delaunay convex weights
     gl::dispatch_compute(m_dispatch);
@@ -350,7 +350,7 @@ namespace met {
         m_bvh_finl_program.bind("b_elem", m_bvh_elem_buffer);
         m_bvh_finl_program.bind("b_ordr", m_bvh_elem_ordr_buffer);
         m_bvh_finl_program.bind("b_refr", m_bvh_colr_refr_buffer);
-        m_bvh_finl_program.bind("b_posi", info("colr_buffer").read_only<gl::Buffer>());
+        m_bvh_finl_program.bind("b_posi", info("colr_buffer").getr<gl::Buffer>());
         m_bvh_finl_program.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
 
         // Dispatch shader to finalize delaunay convex weights

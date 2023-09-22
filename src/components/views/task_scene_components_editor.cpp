@@ -42,7 +42,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources and shorthands
-    const auto &e_scene      = info.global("scene").read_only<Scene>();
+    const auto &e_scene      = info.global("scene").getr<Scene>();
     const auto &e_objects    = e_scene.components.objects;
     const auto &e_upliftings = e_scene.components.upliftings;
     const auto &e_meshes     = e_scene.resources.meshes;
@@ -71,7 +71,7 @@ namespace met {
         object.is_active = !object.is_active;
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
       if (ImGui::SmallButton("X")) {
-        info.global("scene").writeable<Scene>().touch({
+        info.global("scene").getw<Scene>().touch({
           .name = "Delete object",
           .redo = [i = i]        (auto &scene) { scene.components.objects.erase(i); },
           .undo = [o = e_objects](auto &scene) { scene.components.objects = o;      }
@@ -159,7 +159,7 @@ namespace met {
 
       // Handle modifications to object copy
       if (object != component.value) {
-        info.global("scene").writeable<Scene>().touch({
+        info.global("scene").getw<Scene>().touch({
           .name = "Modify object",
           .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
           .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
@@ -176,7 +176,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_scene       = info.global("scene").read_only<Scene>();
+    const auto &e_scene       = info.global("scene").getr<Scene>();
     const auto &e_emitters    = e_scene.components.emitters;
     const auto &e_illuminants = e_scene.resources.illuminants;
 
@@ -203,7 +203,7 @@ namespace met {
         emitter.is_active = !emitter.is_active;
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
       if (ImGui::SmallButton("X")) {
-        info.global("scene").writeable<Scene>().touch({
+        info.global("scene").getw<Scene>().touch({
           .name = "Delete emitter",
           .redo = [i = i]         (auto &scene) { scene.components.emitters.erase(i); },
           .undo = [o = e_emitters](auto &scene) { scene.components.emitters = o;      }
@@ -221,7 +221,7 @@ namespace met {
 
       // Handle modifications to emitter copy
       if (emitter != component.value) {
-        info.global("scene").writeable<Scene>().touch({
+        info.global("scene").getw<Scene>().touch({
           .name = "Modify emitter",
           .redo = [i = i, obj = emitter        ](auto &scene) { scene.components.emitters[i].value = obj; },
           .undo = [i = i, obj = component.value](auto &scene) { scene.components.emitters[i].value = obj; }
@@ -238,7 +238,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources and shorthands
-    const auto &e_scene      = info.global("scene").read_only<Scene>();
+    const auto &e_scene      = info.global("scene").getr<Scene>();
     const auto &e_upliftings = e_scene.components.upliftings;
 
     // Spawn a collapsing header section
@@ -262,7 +262,7 @@ namespace met {
       // Insert delete button, is_active button on same
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
       if (ImGui::SmallButton("X")) {
-        info.global("scene").writeable<Scene>().touch({
+        info.global("scene").getw<Scene>().touch({
           .name = "Delete uplifting",
           .redo = [i = i]           (auto &scene) { scene.components.upliftings.erase(i); },
           .undo = [o = e_upliftings](auto &scene) { scene.components.upliftings = o;      }
@@ -299,7 +299,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources and shorthands
-    const auto &e_scene        = info.global("scene").read_only<Scene>();
+    const auto &e_scene        = info.global("scene").getr<Scene>();
     const auto &e_colr_systems = e_scene.components.colr_systems;
 
     // Spawn a collapsing header section

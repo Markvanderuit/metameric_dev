@@ -15,7 +15,7 @@ namespace met {
       
       if (ImGui::Begin("Settings", &is_settings_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking)) {
         // Get external resources
-        const auto &e_scene               = info.global("scene").read_only<Scene>();
+        const auto &e_scene               = info.global("scene").getr<Scene>();
         const auto &[e_settings, e_state] = e_scene.components.settings;
 
         // Texture name helper
@@ -38,7 +38,7 @@ namespace met {
 
         // Test if settings are changed, and apply
         if (settings != e_settings) {
-          auto &e_scene = info.global("scene").writeable<Scene>();
+          auto &e_scene = info.global("scene").getw<Scene>();
           e_scene.components.settings.value = settings;
         }
       }

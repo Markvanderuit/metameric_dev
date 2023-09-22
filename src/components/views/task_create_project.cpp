@@ -32,7 +32,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_window = info.global("window").read_only<gl::Window>();
+    const auto &e_window = info.global("window").getr<gl::Window>();
     
     if (ImGui::BeginPopupModal(m_view_title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       // Primary image and data sections are nested within headers
@@ -90,7 +90,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_window = info.global("window").read_only<gl::Window>();
+    const auto &e_window = info.global("window").getr<gl::Window>();
 
     const float child_height = img_sec_height * e_window.content_scale();
     if (ImGui::BeginChild("##images_wrapper", { 2 * child_height, child_height }, false, ImGuiWindowFlags_HorizontalScrollbar)) {
@@ -186,7 +186,7 @@ namespace met {
     ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
 
     // Get shared resources
-    const auto &e_window = info.global("window").read_only<gl::Window>();
+    const auto &e_window = info.global("window").getr<gl::Window>();
     
     // Get wavelength values for x-axis in plots
     Spec x_values;
@@ -308,7 +308,7 @@ namespace met {
   }
 
   bool CreateProjectTask::create_project_safe(SchedulerHandle &info) {
-    const auto &e_app_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_app_data = info.global("appl_data").getr<ApplicationData>();
     if (e_app_data.project_save == ProjectSaveState::eUnsaved || e_app_data.project_save == ProjectSaveState::eNew) {
       ImGui::OpenPopup("Warning: unsaved progress", 0);
       return false;
@@ -322,7 +322,7 @@ namespace met {
 
   bool CreateProjectTask::create_project(SchedulerHandle &info) {
     // Create a new project
-    info.global("appl_data").writeable<ApplicationData>().create(std::move(m_proj_data));
+    info.global("appl_data").getw<ApplicationData>().create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
     submit_schedule_main(info);

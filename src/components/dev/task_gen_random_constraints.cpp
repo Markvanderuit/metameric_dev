@@ -64,9 +64,9 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
+    const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
 
     // Test state validity
     guard(e_proj_data.color_systems.size() > 1 &&
@@ -80,14 +80,14 @@ namespace met {
     met_trace();
     
     // Get external resources
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_verts       = e_proj_data.verts;
-    const auto &e_vert_select = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &i_samples_6d  = info("samples").read_only<std::vector<eig::ArrayXf>>();
+    const auto &e_vert_select = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &i_samples_6d  = info("samples").getr<std::vector<eig::ArrayXf>>();
 
     // Get modified resources
-    auto &i_constraints = info("constraints").writeable<
+    auto &i_constraints = info("constraints").getw<
       std::vector<std::vector<ProjectData::Vert>>
     >();
 

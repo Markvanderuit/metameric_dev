@@ -16,8 +16,8 @@ namespace met {
     auto subtask_name  = fmt::format("{}.gen_mapping", info.task().key());
 
     // Get external resources
-    const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").getr<gl::Buffer>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_colr_data   = e_appl_data.loaded_texture;
 
@@ -41,11 +41,11 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_colr_data = e_appl_data.loaded_texture;
-    const auto &e_vert_spec = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
-    const auto &e_window    = info.global("window").read_only<gl::Window>();
+    const auto &e_vert_spec = info("gen_spectral_data", "spectra").getr<std::vector<Spec>>();
+    const auto &e_window    = info.global("window").getr<gl::Window>();
 
     // Spawn tooltip
     ImGui::BeginTooltip();
@@ -69,7 +69,7 @@ namespace met {
       for (uint i = 0; i < e_vert_spec.size(); ++i)
         reflectance += bary[i] * e_vert_spec[i];
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").getr<AlDelaunay>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
       eig::Array4f bary   = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
@@ -108,7 +108,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
     // Initialize a set of rolling buffers, and map these for reading
@@ -137,11 +137,11 @@ namespace met {
 
     if (ImGui::Begin("Weight viewer")) {
       // Get external resources
-      const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
       const auto &e_txtr_data  = e_appl_data.loaded_texture;
       const auto &e_proj_data  = e_appl_data.project_data;
       const auto &e_mappings   = e_proj_data.color_systems;
-      const auto &e_cstr_selct = info("viewport.overlay", "constr_selection").read_only<int>();
+      const auto &e_cstr_selct = info("viewport.overlay", "constr_selection").getr<int>();
 
       // Local state
       bool handle_toolip = false;
@@ -164,7 +164,7 @@ namespace met {
 
       // 3. Display ImGui components to show error and select mapping
       if (auto handle = info.resource(subtask_name, "colr_texture"); handle.is_init()) {
-        const auto &resource = handle.read_only<gl::Texture2d4f>();
+        const auto &resource = handle.getr<gl::Texture2d4f>();
         ImGui::Image(ImGui::to_ptr(resource.object()), texture_size);
 
         // 4. Signal tooltip and start data copy

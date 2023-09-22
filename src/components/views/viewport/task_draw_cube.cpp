@@ -39,7 +39,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
 
     // Setup program for instanced billboard point draw
     m_program = {{ .type = gl::ShaderType::eVertex,   
@@ -77,8 +77,8 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    const auto &e_arcball    = info("viewport.input", "arcball").read_only<detail::Arcball>();
-    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
+    const auto &e_arcball    = info("viewport.input", "arcball").getr<detail::Arcball>();
+    const auto &e_view_state = info("state", "view_state").getr<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,       true),

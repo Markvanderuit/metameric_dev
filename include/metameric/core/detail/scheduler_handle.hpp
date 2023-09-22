@@ -80,17 +80,17 @@ namespace met {
     
   public: /* Accessors */
     template <typename Ty> 
-    const Ty & read_only() const { 
+    const Ty & getr() const { 
       met_trace();
-      debug::check_expr(is_init(), "ResourceHandle::read_only<>() failed for empty resource handle");
-      return m_rsrc_handle->read_only<Ty>(); 
+      debug::check_expr(is_init(), "ResourceHandle::getr<>() failed for empty resource handle");
+      return m_rsrc_handle->getr<Ty>(); 
     }
 
     template <typename Ty>
-    Ty & writeable() { 
+    Ty & getw() { 
       met_trace();
-      debug::check_expr(is_init(), "ResourceHandle::writeable<>() failed for empty resource handle");
-      return m_rsrc_handle->writeable<Ty>(); 
+      debug::check_expr(is_init(), "ResourceHandle::getw<>() failed for empty resource handle");
+      return m_rsrc_handle->getw<Ty>(); 
     }
   
     template <typename Ty, typename InfoTy = Ty::InfoType>

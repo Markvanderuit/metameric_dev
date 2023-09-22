@@ -27,7 +27,7 @@ namespace met {
 
       // Get modified resources
       auto &io = ImGui::GetIO();
-      auto &i_panscan = info.resource("panscan").writeable<detail::Panscan>();
+      auto &i_panscan = info.resource("panscan").getw<detail::Panscan>();
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 

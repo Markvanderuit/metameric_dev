@@ -23,7 +23,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_texture = info.global("appl_data").read_only<ApplicationData>().loaded_texture;
+    const auto &e_texture = info.global("appl_data").getr<ApplicationData>().loaded_texture;
 
     // Generate 8-bit packed texture data with identical elements stripped
     std::unordered_set<uint> packed_set;
@@ -61,7 +61,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources 
-    const auto &e_view_state = info.resource("state", "view_state").read_only<ViewportState>();
+    const auto &e_view_state = info.resource("state", "view_state").getr<ViewportState>();
 
     // Declare scoped OpenGL state
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eMSAA,     false),
@@ -70,7 +70,7 @@ namespace met {
     
     // Set varying program uniforms
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      const auto &e_arcball = info("viewport.input", "arcball").read_only<detail::Arcball>();
+      const auto &e_arcball = info("viewport.input", "arcball").getr<detail::Arcball>();
       m_uniform_map->camera_matrix = e_arcball.full().matrix();
       m_uniform_map->camera_aspect = { 1.f, e_arcball.m_aspect };
       m_uniform_buffer.flush();
@@ -79,7 +79,7 @@ namespace met {
     // Bind resources and submit draw
     m_program.bind("b_unif_buffer", m_uniform_buffer);
     m_program.bind("b_data_buffer", m_data_buffer);
-    // m_program.bind("b_erro_buffer", info.resource("error_viewer", "colr_buffer").read_only<gl::Buffer>());
+    // m_program.bind("b_erro_buffer", info.resource("error_viewer", "colr_buffer").getr<gl::Buffer>());
     gl::dispatch_draw(m_draw);
   }
 } // namespace met

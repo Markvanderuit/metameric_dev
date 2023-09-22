@@ -47,7 +47,7 @@ namespace met {
       .flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eFocused 
              | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
              | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
-    }).writeable<gl::Window>();
+    }).getw<gl::Window>();
 
     // Initialize OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {
@@ -61,7 +61,7 @@ namespace met {
       .loaded_basis      = loaded_tree.basis,
       .loaded_basis_mean = loaded_tree.basis_mean,
       .color_mode        = info.app_cmode
-    }).writeable<ApplicationData>();
+    }).getw<ApplicationData>();
 
     // Load project data if a path is provided
     if (!info.project_path.empty())

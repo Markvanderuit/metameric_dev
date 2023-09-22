@@ -79,7 +79,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Generate reused 6/9/12/X dimensional samples for color solid sampling
@@ -96,13 +96,13 @@ namespace met {
   bool GenMismatchSolidTask::is_active(SchedulerHandle &info) {
     met_trace();
     
-    const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
-    const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
+    const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").getr<int>();
+    const auto &e_vert_slct = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
 
     guard(e_cstr_slct != -1 && !e_vert_slct.empty(), false);
 
-    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
+    const auto &e_view_state = info("state", "view_state").getr<ViewportState>();
+    const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
     
     return e_proj_state.verts[e_vert_slct[0]] || e_view_state.vert_selection || e_view_state.cstr_selection;
   }
@@ -111,10 +111,10 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").read_only<int>();
-    const auto &e_vert_slct = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_vert_sd   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>()[e_vert_slct[0]];
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_cstr_slct = info("viewport.overlay", "constr_selection").getr<int>();
+    const auto &e_vert_slct = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &e_vert_sd   = info("gen_spectral_data", "spectra").getr<std::vector<Spec>>()[e_vert_slct[0]];
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     const auto &e_vert      = e_appl_data.project_data.verts[e_vert_slct[0]];
 
@@ -135,12 +135,12 @@ namespace met {
     const bool is_overlap = std::ranges::any_of(cmfs_i, [&cmfs_j](const CMFS &cmfs_i) { return cmfs_i.isApprox(cmfs_j); });
     if (is_overlap) {
       info("chull_mesh").set<AlMesh>({ });
-      info("chull_cntr").writeable<Colr>() = e_vert.colr_i;
+      info("chull_cntr").getw<Colr>() = e_vert.colr_i;
       return;
     }
 
     // Obtain 6/9/12/X dimensional random unit vectors for the given configration
-    const auto &i_samples = info(fmt::format("samples_{}", cmfs_i.size())).read_only<std::vector<eig::ArrayXf>>();
+    const auto &i_samples = info(fmt::format("samples_{}", cmfs_i.size())).getr<std::vector<eig::ArrayXf>>();
 
     // Generate points on metamer set boundary; store in aligned format
     auto data = generate_mismatch_boundary({ .basis      = e_appl_data.loaded_basis,
@@ -158,7 +158,7 @@ namespace met {
               / static_cast<float>(data.size());
 
     // Submit mesh data
-    info("chull_mesh").writeable<AlMesh>() = std::move(mesh);
-    info("chull_cntr").writeable<Colr>() = cntr;
+    info("chull_mesh").getw<AlMesh>() = std::move(mesh);
+    info("chull_cntr").getw<Colr>() = cntr;
   }
 } // namespace met

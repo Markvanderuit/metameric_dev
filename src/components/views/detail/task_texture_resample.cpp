@@ -41,8 +41,8 @@ namespace met::detail {
     // Bind image/sampler resources, then dispatch shader to perform resample
     m_program.bind("b_uniform", m_uniform_buffer);
     m_program.bind("s_image_r", m_sampler);
-    m_program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).read_only<Ty>());
-    m_program.bind("i_image_w", info(m_info.output_key).writeable<Ty>());
+    m_program.bind("s_image_r", info(m_info.input_key.first, m_info.input_key.second).getr<Ty>());
+    m_program.bind("i_image_w", info(m_info.output_key).getw<Ty>());
     gl::dispatch_compute(m_dispatch);
     
     m_is_mutated = false;

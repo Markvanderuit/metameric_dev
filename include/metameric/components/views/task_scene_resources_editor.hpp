@@ -14,7 +14,7 @@ namespace met {
       met_trace_full();
 
       // Get external resources
-      const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
+      const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
       const auto &e_atlas = e_txtr_data.atlas_3f;
 
       if (e_atlas.texture().is_init()) {
@@ -36,8 +36,8 @@ namespace met {
 
       if (ImGui::Begin("Scene resources")) {
         // Get external resources
-        const auto &e_scene     = info.global("scene").read_only<Scene>();
-        const auto &e_txtr_data = info("scene_handler", "txtr_data").read_only<detail::RTTextureData>();
+        const auto &e_scene     = info.global("scene").getr<Scene>();
+        const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
 
         if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
           for (const auto &mesh : e_scene.resources.meshes) {

@@ -140,6 +140,7 @@ namespace met {
       LinearSchedulerHandle handle(*this, task_key);
       guard_continue(task->is_active(handle));
       task->eval(handle);
+      task->set_first_eval(false);
 
       // Process signal flags; clear tasks/resources if requested
       if (has_flag(handle.return_flags, LinearSchedulerHandleFlags::eClearTasks)) clear();

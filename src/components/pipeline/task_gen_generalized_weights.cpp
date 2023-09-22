@@ -18,7 +18,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_colr_data = e_appl_data.loaded_texture;
     const auto &e_proj_data = e_appl_data.project_data;
     
@@ -56,20 +56,20 @@ namespace met {
 
   bool GenGeneralizedWeightsTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info("state", "proj_state").read_only<ProjectState>().verts;
+    return info("state", "proj_state").getr<ProjectState>().verts;
   }
 
   void GenGeneralizedWeightsTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get external resources
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_vert_buffer = info("vert_buffer").writeable<gl::Buffer>();
-    auto &i_elem_buffer = info("elem_buffer").writeable<gl::Buffer>();
+    auto &i_vert_buffer = info("vert_buffer").getw<gl::Buffer>();
+    auto &i_elem_buffer = info("elem_buffer").getw<gl::Buffer>();
 
     // Describe ranges over stale mesh vertices/elements
     auto vert_range = std::views::iota(0u, static_cast<uint>(e_proj_state.verts.size()))
@@ -96,8 +96,8 @@ namespace met {
     m_program_bary.bind("b_unif", m_uniform_buffer);
     m_program_bary.bind("b_vert", i_vert_buffer);
     m_program_bary.bind("b_elem", i_elem_buffer);
-    m_program_bary.bind("b_colr", info("colr_buffer").read_only<gl::Buffer>());
-    m_program_bary.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+    m_program_bary.bind("b_colr", info("colr_buffer").getr<gl::Buffer>());
+    m_program_bary.bind("b_bary", info("bary_buffer").getw<gl::Buffer>());
 
     // Dispatch shader to generate generalized barycentric weights
     gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);
@@ -105,7 +105,7 @@ namespace met {
 
     // Bind required resources
     m_program_norm.bind("b_unif", m_uniform_buffer);
-    m_program_norm.bind("b_bary", info("bary_buffer").writeable<gl::Buffer>());
+    m_program_norm.bind("b_bary", info("bary_buffer").getw<gl::Buffer>());
 
     // Dispatch shader to normalize generalized barycentric weights
     gl::sync::memory_barrier(gl::BarrierFlags::eStorageBuffer);

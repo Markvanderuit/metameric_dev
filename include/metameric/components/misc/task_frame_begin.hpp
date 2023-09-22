@@ -11,7 +11,7 @@ namespace met {
       met_trace();
 
       // Get external resources
-      const auto &e_window = info.global("window").read_only<gl::Window>();
+      const auto &e_window = info.global("window").getr<gl::Window>();
 
       // Initialize ImGui for all following tasks
       ImGui::Init(e_window);

@@ -22,7 +22,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
 
     // Initialize dispatch objects
@@ -66,21 +66,21 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_proj_state  = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_verts       = info("gen_random_constraints", "constraints").read_only<
+    const auto &e_proj_state  = info("state", "proj_state").getr<ProjectState>();
+    const auto &e_verts       = info("gen_random_constraints", "constraints").getr<
       std::vector<std::vector<ProjectData::Vert>>
     >().at(m_constraint_i);
-    const auto &e_vert_slct   = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
+    const auto &e_vert_slct   = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").getr<std::vector<Spec>>();
 
     // Update uniform data
     if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
       m_unif_map->n_verts = e_proj_data.verts.size();
       m_unif_map->n_elems = e_proj_data.elems.size();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
+      const auto &e_delaunay = info("gen_convex_weights", "delaunay").getr<AlDelaunay>();
       m_unif_map->n_verts = e_delaunay.verts.size();
       m_unif_map->n_elems = e_delaunay.elems.size();
     }
@@ -100,10 +100,10 @@ namespace met {
 
     // Bind required buffers to corresponding targets
     m_program.bind("b_unif", m_unif_buffer);
-    m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").getr<gl::Buffer>());
     m_program.bind("b_vert", m_vert_buffer);
-    m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_colr", info("colr_buffer").writeable<gl::Buffer>());
+    m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").getr<gl::Buffer>());
+    m_program.bind("b_colr", info("colr_buffer").getw<gl::Buffer>());
 
     // Dispatch shader to generate color-mapped buffer
     gl::dispatch_compute(m_dispatch);
@@ -115,7 +115,7 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<std::vector<std::vector<ProjectData::Vert>>>();
+    const auto &e_constraints = info("gen_random_constraints", "constraints").getr<std::vector<std::vector<ProjectData::Vert>>>();
 
     // Add subtasks to perform mapping
     m_mapping_subtasks.init(info, e_constraints.size(), 
@@ -127,7 +127,7 @@ namespace met {
     met_trace();
     
     // Get external resources
-    const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<std::vector<std::vector<ProjectData::Vert>>>();
+    const auto &e_constraints = info("gen_random_constraints", "constraints").getr<std::vector<std::vector<ProjectData::Vert>>>();
 
     // Adjust nr. of subtasks
     m_mapping_subtasks.eval(info, e_constraints.size());

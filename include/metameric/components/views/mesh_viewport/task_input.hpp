@@ -27,11 +27,11 @@ namespace met {
       met_trace();
 
       // Get shared resources
-      const auto &e_scene   = info.global("scene").read_only<Scene>();
+      const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_objects = e_scene.components.objects;
       const auto &e_meshes  = e_scene.resources.meshes;
       const auto &e_images  = e_scene.resources.images;
-      const auto &i_arcball = info.resource("arcball").read_only<detail::Arcball>();
+      const auto &i_arcball = info.resource("arcball").getr<detail::Arcball>();
       const auto &io        = ImGui::GetIO();
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
@@ -117,7 +117,7 @@ namespace met {
 
       // Get modified resources
       auto &io        = ImGui::GetIO();
-      auto &i_arcball = info.resource("arcball").writeable<detail::Arcball>();
+      auto &i_arcball = info.resource("arcball").getw<detail::Arcball>();
 
       // Compute viewport offs, size minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 

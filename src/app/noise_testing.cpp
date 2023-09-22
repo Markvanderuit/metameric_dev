@@ -57,9 +57,9 @@ namespace met {
         // Handle viewport-sized texture allocation
         eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                    - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-        const auto &i_target = info("target").read_only<gl::Texture2d4f>();
+        const auto &i_target = info("target").getr<gl::Texture2d4f>();
         if (!i_target.is_init() || (i_target.size() != viewport_size.cast<uint>()).any())
-          info("target").writeable<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
+          info("target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
 
         // Draw target to viewport as frame-filling image
         ImGui::Image(ImGui::to_ptr(i_target.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
@@ -102,7 +102,7 @@ namespace met {
       met_trace_full();
       
       // Get shared resources
-      const auto &e_target = info("view", "target").read_only<gl::Texture2d4f>();
+      const auto &e_target = info("view", "target").getr<gl::Texture2d4f>();
 
       if (info("view", "target").is_mutated()) {
         m_state = {{ .size = e_target.size().prod() * sizeof(eig::Array2u) }};
@@ -150,7 +150,7 @@ namespace met {
       .flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eFocused 
              | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
              | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
-    }).writeable<gl::Window>();
+    }).getw<gl::Window>();
     // window.set_swap_interval(0);
 
     // Initialize OpenGL debug messages, if requested

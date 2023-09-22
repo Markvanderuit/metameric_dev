@@ -40,6 +40,16 @@ namespace met {
 
       // Override and implement; on false return, eval(...) is not called
       virtual bool is_active(SchedulerHandle &) { return true; }
+
+    private:
+      bool m_first_eval = true;
+
+    public:
+      // Track whether eval() is called the first time, in
+      // case some initalization needs to be handled outside
+      // TaskNode::init()
+      bool is_first_eval() const  { return m_first_eval; }
+      void set_first_eval(bool b) { m_first_eval = b;    }
     };
 
     // Abstract base class for application resources;
@@ -54,13 +64,13 @@ namespace met {
       bool mutated() const { return m_is_mutated; }
 
       template <typename Ty>
-      const Ty & read_only() const {
+      const Ty & getr() const {
         met_trace();
         return static_cast<const RsrcImpl<Ty> *>(this)->m_object;
       }
 
       template <typename Ty>
-      Ty & writeable() {
+      Ty & getw() {
         met_trace();
         set_mutated(true);
         return static_cast<RsrcImpl<Ty> *>(this)->m_object;

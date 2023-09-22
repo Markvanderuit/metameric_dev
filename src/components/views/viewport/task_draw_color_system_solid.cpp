@@ -60,13 +60,13 @@ namespace met {
     met_trace_full();
 
     // Get external state resources
-    const auto &e_proj_state = info.resource("state", "proj_state").read_only<ProjectState>();
-    const auto &e_view_state = info.resource("state", "view_state").read_only<ViewportState>();
+    const auto &e_proj_state = info.resource("state", "proj_state").getr<ProjectState>();
+    const auto &e_view_state = info.resource("state", "view_state").getr<ViewportState>();
 
     // Instantiate new vertex array if mesh data has changed; 
     // this change is extremely rare, so we can afford creating new buffers
     if (auto rsrc = info.resource("gen_color_system_solid", "chull_mesh"); rsrc.is_mutated()) {
-      const auto &[e_verts, e_elems, _norms, _uvs] = rsrc.read_only<AlMesh>();
+      const auto &[e_verts, e_elems, _norms, _uvs] = rsrc.getr<AlMesh>();
 
       m_vert_buffer = {{ .data = cnt_span<const std::byte>(e_verts) }};
       m_elem_buffer = {{ .data = cnt_span<const std::byte>(e_elems) }};
@@ -83,7 +83,7 @@ namespace met {
     
     // Update varying uniform data
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      auto &e_arcball = info.resource("viewport.input", "arcball").writeable<detail::Arcball>();
+      auto &e_arcball = info.resource("viewport.input", "arcball").getw<detail::Arcball>();
       auto camera_matrix = e_arcball.full().matrix();
       m_unif_map_line->camera_matrix = camera_matrix;
       m_unif_map_fill->camera_matrix = camera_matrix;
@@ -94,11 +94,11 @@ namespace met {
     // Experimental clamping code for vertex modification
     if (e_proj_state.verts) {
       // Get external resources
-      const auto &e_chull_mesh = info.resource("gen_color_system_solid", "chull_mesh").read_only<AlMesh>();
-      const auto &e_chull_cntr = info.resource("gen_color_system_solid", "chull_cntr").read_only<Colr>();
+      const auto &e_chull_mesh = info.resource("gen_color_system_solid", "chull_mesh").getr<AlMesh>();
+      const auto &e_chull_cntr = info.resource("gen_color_system_solid", "chull_cntr").getr<Colr>();
 
       // Get modified resources
-      auto &e_appl_data  = info.global("appl_data").writeable<ApplicationData>();
+      auto &e_appl_data  = info.global("appl_data").getw<ApplicationData>();
       auto &e_proj_data  = e_appl_data.project_data;
       
       #pragma omp parallel for

@@ -25,7 +25,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_colr_data = e_appl_data.loaded_texture;
     
     // Setup mapped buffer objects
@@ -66,12 +66,12 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    const auto &e_delaunay    = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
-    const auto &e_view_state  = info("state", "view_state").read_only<ViewportState>();
+    const auto &e_delaunay    = info("gen_convex_weights", "delaunay").getr<AlDelaunay>();
+    const auto &e_view_state  = info("state", "view_state").getr<ViewportState>();
 
     // Select tree
-    const auto &tree_data   = info("gen_convex_weights", "elem_tree").read_only<BVH>();
-    const auto &tree_buffer = info("gen_convex_weights", "tree_buffer").read_only<gl::Buffer>();
+    const auto &tree_data   = info("gen_convex_weights", "elem_tree").getr<BVH>();
+    const auto &tree_buffer = info("gen_convex_weights", "tree_buffer").getr<gl::Buffer>();
     // const auto &tree_data   = m_tree_points;
     // const auto &tree_buffer = m_tree_buffer;
 
@@ -88,7 +88,7 @@ namespace met {
 
     // On relevant state change, update uniform buffer data
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      const auto &e_arcball = info("viewport.input", "arcball").read_only<detail::Arcball>();
+      const auto &e_arcball = info("viewport.input", "arcball").getr<detail::Arcball>();
       m_camr_map->matrix = e_arcball.full().matrix();
       m_camr_map->aspect = { 1.f, e_arcball.m_aspect };
       m_camr_buffer.flush();

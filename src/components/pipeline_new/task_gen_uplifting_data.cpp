@@ -58,7 +58,7 @@ namespace met {
 
   bool GenUpliftingDataTask::is_active(SchedulerHandle &info) {
     met_trace();
-    const auto &e_scene = info.global("scene").read_only<Scene>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
     return e_scene.components.upliftings[m_uplifting_i];
   }
 
@@ -73,7 +73,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_scene       = info.global("scene").read_only<Scene>();
+    const auto &e_scene       = info.global("scene").getr<Scene>();
     const auto &[e_uplifting, 
                  e_state]     = e_scene.components.upliftings[m_uplifting_i];
     const auto &e_csys        = e_scene.components.colr_systems[e_uplifting.csys_i];
@@ -81,8 +81,8 @@ namespace met {
     const auto &e_objects     = e_scene.components.objects;
     const auto &e_meshes      = e_scene.resources.meshes;
     const auto &e_images      = e_scene.resources.images;
-          auto &i_spectra     = info("spectra").writeable<std::vector<Spec>>();
-          auto &i_tesselation = info("tesselation").writeable<AlDelaunay>();
+          auto &i_spectra     = info("spectra").getw<std::vector<Spec>>();
+          auto &i_tesselation = info("tesselation").getw<AlDelaunay>();
     
     // Internal state helper flags
     bool generally_stale   = e_state.basis_i || e_basis || e_state.csys_i  || e_csys;

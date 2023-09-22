@@ -21,7 +21,7 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
 
     // Set up gamut buffer and establish a flushable mapping
@@ -54,8 +54,8 @@ namespace met {
     
     auto rsrc = info("gen_random_constraints", "constraints");
 
-    guard(rsrc.is_init() && !rsrc.read_only<std::vector<std::vector<ProjectData::Vert>>>().empty(), false);
-    guard(info.global("appl_data").read_only<ApplicationData>().project_data.color_systems.size() > 1, false);
+    guard(rsrc.is_init() && !rsrc.getr<std::vector<std::vector<ProjectData::Vert>>>().empty(), false);
+    guard(info.global("appl_data").getr<ApplicationData>().project_data.color_systems.size() > 1, false);
 
     return true;
   }
@@ -64,14 +64,14 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_verts       = e_proj_data.verts;
-    const auto &e_panscan     = info.relative("view_input")("panscan").read_only<detail::Panscan>();
-    const auto &e_lrgb_target = info.relative("view_begin")("lrgb_target").read_only<gl::Texture2d4f>();
-    const auto &e_vert_select = info("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
-    const auto &e_constraints = info("gen_random_constraints", "constraints").read_only<
+    const auto &e_panscan     = info.relative("view_input")("panscan").getr<detail::Panscan>();
+    const auto &e_lrgb_target = info.relative("view_begin")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_vert_select = info("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &e_vert_spec   = info("gen_spectral_data", "spectra").getr<std::vector<Spec>>();
+    const auto &e_constraints = info("gen_random_constraints", "constraints").getr<
       std::vector<std::vector<ProjectData::Vert>>
     >();
 
@@ -127,7 +127,7 @@ namespace met {
     }
 
     // Only perform consecutive draw if the view is active
-    guard(info.relative("view_begin")("is_active").read_only<bool>());
+    guard(info.relative("view_begin")("is_active").getr<bool>());
 
     // Set local state
     gl::state::ScopedSet(gl::DrawCapability::eCullOp,     false);
@@ -137,8 +137,8 @@ namespace met {
     m_program.bind("b_unif", m_unif_buffer);
     m_program.bind("b_data", m_data_buffer);
     m_program.bind("b_vert", m_vert_buffer);
-    m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>());
-    m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").read_only<gl::Buffer>());
+    m_program.bind("b_bary", info("gen_convex_weights", "bary_buffer").getr<gl::Buffer>());
+    m_program.bind("b_elem", info("gen_convex_weights", "elem_buffer").getr<gl::Buffer>());
 
     // Dispatch shader to draw color-mapped quads
     gl::dispatch_draw(m_draw);

@@ -28,9 +28,9 @@ namespace met {
     met_trace_full();
 
     // Get shared resources
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
-    const auto &e_vert_buffer = info.resource("gen_convex_weights", "vert_buffer").read_only<gl::Buffer>();
+    const auto &e_vert_buffer = info.resource("gen_convex_weights", "vert_buffer").getr<gl::Buffer>();
 
     // Setup mapped buffer objects
     std::vector<float> size_init(init_vert_support, vert_deslct_size);
@@ -98,9 +98,9 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_view_state = info("state", "view_state").read_only<ViewportState>();
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
+    const auto &e_view_state = info("state", "view_state").getr<ViewportState>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // On relevant state change, update mesh buffer data
@@ -131,8 +131,8 @@ namespace met {
 
     // On relevant state change, update selection buffer data
     if (e_view_state.vert_selection || e_view_state.vert_mouseover) {
-      const auto &e_vert_select = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-      const auto &e_vert_msover = info.resource("viewport.input.vert", "mouseover").read_only<std::vector<uint>>();
+      const auto &e_vert_select = info.resource("viewport.input.vert", "selection").getr<std::vector<uint>>();
+      const auto &e_vert_msover = info.resource("viewport.input.vert", "mouseover").getr<std::vector<uint>>();
       
       std::ranges::fill(m_size_map, vert_deslct_size);
       std::ranges::for_each(e_vert_msover, [&](uint i) { m_size_map[i] = vert_msover_size; });
@@ -142,7 +142,7 @@ namespace met {
 
     // On relevant state change, update uniform buffer data
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
-      const auto &e_arcball = info("viewport.input", "arcball").read_only<detail::Arcball>();
+      const auto &e_arcball = info("viewport.input", "arcball").getr<detail::Arcball>();
       m_camr_map->matrix = e_arcball.full().matrix();
       m_camr_map->aspect = { 1.f, e_arcball.m_aspect };
       m_camr_buffer.flush();
@@ -159,7 +159,7 @@ namespace met {
     gl::dispatch_draw(m_elem_draw);
 
     // Bind resources and dispatch vertex draw
-    m_vert_program.bind("b_posi",   info("gen_convex_weights", "vert_buffer").read_only<gl::Buffer>());
+    m_vert_program.bind("b_posi",   info("gen_convex_weights", "vert_buffer").getr<gl::Buffer>());
     m_vert_program.bind("b_size",   m_size_buffer);
     m_vert_program.bind("b_camera", m_camr_buffer);
     m_vert_program.bind("b_value",  m_unif_buffer);

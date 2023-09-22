@@ -25,7 +25,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
 
     // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
     auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
@@ -110,8 +110,8 @@ namespace met {
 
     // Verify that vertex and constraint are selected before continuing, as this draw operation
     // is otherwise not even visible
-    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").read_only<int>();
+    const auto &e_vert_slct = info.resource("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &e_cstr_slct = info.resource("viewport.overlay", "constr_selection").getr<int>();
     return e_vert_slct.size() == 1 && e_cstr_slct != -1;
   }
 
@@ -119,19 +119,19 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_vert_slct  = info.resource("viewport.input.vert", "selection").read_only<std::vector<uint>>();
-    const auto &e_cstr_slct  = info.resource("viewport.overlay", "constr_selection").read_only<int>();
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_vert_slct  = info.resource("viewport.input.vert", "selection").getr<std::vector<uint>>();
+    const auto &e_cstr_slct  = info.resource("viewport.overlay", "constr_selection").getr<int>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
     const auto &e_vert       = e_proj_data.verts[e_vert_slct[0]];
-    const auto &e_proj_state = info.resource("state", "proj_state").read_only<ProjectState>();
-    const auto &e_view_state = info.resource("state", "view_state").read_only<ViewportState>();
-    const auto &e_arcball    = info.resource(m_parent, "arcball").read_only<detail::Arcball>();
-    const auto &e_csol_cntr  = info.resource("gen_mismatch_solid", "chull_cntr").read_only<Colr>();
+    const auto &e_proj_state = info.resource("state", "proj_state").getr<ProjectState>();
+    const auto &e_view_state = info.resource("state", "view_state").getr<ViewportState>();
+    const auto &e_arcball    = info.resource(m_parent, "arcball").getr<detail::Arcball>();
+    const auto &e_csol_cntr  = info.resource("gen_mismatch_solid", "chull_cntr").getr<Colr>();
 
     // Get modified resources
-    auto &e_lrgb_target = info.resource(m_parent, "lrgb_color_solid_target").writeable<gl::Texture2d4f>();
-    auto &e_srgb_target = info.resource(m_parent, "srgb_color_solid_target").writeable<gl::Texture2d4f>();
+    auto &e_lrgb_target = info.resource(m_parent, "lrgb_color_solid_target").getw<gl::Texture2d4f>();
+    auto &e_srgb_target = info.resource(m_parent, "srgb_color_solid_target").getw<gl::Texture2d4f>();
 
     // (Re-)create framebuffers. Multisampled framebuffer uses multisampled renderbuffers as 
     // attachments, while the non-multisampled framebuffer targets the lrgb texture for output;
@@ -155,7 +155,7 @@ namespace met {
     // Stream data to vertex array if mesh data has changed; this change is on-line, so
     // we copy to existing buffers
     if (auto rsrc = info.resource("gen_mismatch_solid", "chull_mesh"); rsrc.is_mutated()) {
-      const auto &[verts, elems, _norms, _uvs] = rsrc.read_only<AlMesh>();
+      const auto &[verts, elems, _norms, _uvs] = rsrc.getr<AlMesh>();
       if (verts.empty()) {
         m_chull_dispatch.vertex_count = 0;
         m_point_dispatch.vertex_count = 0;

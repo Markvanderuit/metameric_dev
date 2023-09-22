@@ -28,8 +28,8 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      const auto &i_lrgb_target = info("lrgb_target").read_only<gl::Texture2d4f>();
-      const auto &i_srgb_target = info("srgb_target").read_only<gl::Texture2d4f>();
+      const auto &i_lrgb_target = info("lrgb_target").getr<gl::Texture2d4f>();
+      const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
 
       // Declare scoped ImGui style state
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
@@ -44,8 +44,8 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).any()) {
-        info("lrgb_target").writeable<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
-        info("srgb_target").writeable<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
+        info("lrgb_target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
+        info("srgb_target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
       }
 
       // Insert image, applying viewport texture to viewport; texture can be safely drawn 
@@ -89,11 +89,11 @@ namespace met {
 
       // Get external resources 
       auto e_lrgb_target_handle = info.relative("view_begin")("lrgb_target");
-      const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
-      const auto &e_lrgb_target = e_lrgb_target_handle.read_only<gl::Texture2d4f>();
+      const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
+      const auto &e_lrgb_target = e_lrgb_target_handle.getr<gl::Texture2d4f>();
 
       // Get modified resources 
-      auto &i_frame_buffer_ms = info("frame_buffer_ms").writeable<gl::Framebuffer>();
+      auto &i_frame_buffer_ms = info("frame_buffer_ms").getw<gl::Framebuffer>();
 
       // (Re-)create framebuffer and renderbuffers if the viewport has resized
       if (!i_frame_buffer_ms.is_init() || e_lrgb_target_handle.is_mutated()) {
@@ -160,7 +160,7 @@ namespace met {
       
       // Get external resources 
       auto e_lrgb_target_handle = view_begin_handle("lrgb_target");
-      const auto &e_lrgb_target = e_lrgb_target_handle.read_only<gl::Texture2d4f>();
+      const auto &e_lrgb_target = e_lrgb_target_handle.getr<gl::Texture2d4f>();
 
       // (Re-)create framebuffer if the viewport has resized
       if (!m_frame_buffer.is_init() || e_lrgb_target_handle.is_mutated()) {
@@ -169,7 +169,7 @@ namespace met {
 
       // Blit color results into the single-sampled framebuffer with attached target draw_texture
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer);
-      draw_begin_handle("frame_buffer_ms").read_only<gl::Framebuffer>().blit_to(m_frame_buffer, 
+      draw_begin_handle("frame_buffer_ms").getr<gl::Framebuffer>().blit_to(m_frame_buffer, 
         e_lrgb_target.size(), 0u, e_lrgb_target.size(), 0u, gl::FramebufferMaskFlags::eColor);
 
       // Set dispatch size correctly, if input texture size changed
@@ -187,7 +187,7 @@ namespace met {
       m_program.bind("b_uniform", m_uniform_buffer);
       m_program.bind("s_image_r", m_sampler);
       m_program.bind("s_image_r", e_lrgb_target);
-      m_program.bind("i_image_w", view_begin_handle("srgb_target").writeable<gl::Texture2d4f>());
+      m_program.bind("i_image_w", view_begin_handle("srgb_target").getw<gl::Texture2d4f>());
 
       // Dispatch prepared work
       gl::dispatch_compute(m_dispatch);

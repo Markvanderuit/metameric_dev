@@ -72,9 +72,9 @@ namespace met {
         // Handle viewport-sized texture allocation
         eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                    - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-        const auto &i_target = info("target").read_only<gl::Texture2d4f>();
+        const auto &i_target = info("target").getr<gl::Texture2d4f>();
         if (!i_target.is_init() || (i_target.size() != viewport_size.cast<uint>()).any())
-          info("target").writeable<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
+          info("target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
 
         // Draw target to viewport as frame-filling image
         ImGui::Image(ImGui::to_ptr(i_target.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
@@ -82,7 +82,7 @@ namespace met {
         // Process camera input
         auto &io = ImGui::GetIO();
         if (io.MouseWheel != 0.f || io.MouseDown[1] || io.MouseDown[2]) {
-          auto &i_camera = info("camera").writeable<detail::Arcball>();
+          auto &i_camera = info("camera").getw<detail::Arcball>();
           i_camera.m_aspect = viewport_size.x() / viewport_size.y();
           if (io.MouseWheel != 0.f) i_camera.set_zoom_delta(-io.MouseWheel);
           if (io.MouseDown[1])      i_camera.set_ball_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
@@ -94,18 +94,18 @@ namespace met {
 
       if (ImGui::Begin("Settings")) {   
         // Get shared resources
-        const auto &e_window = info.global("window").read_only<gl::Window>();
+        const auto &e_window = info.global("window").getr<gl::Window>();
 
         // Draw settings
         uint v_min = 0, v_max = volumes_p0.size() - 1;
-        ImGui::Checkbox("All visible", &info("all_visible").writeable<bool>());
-        ImGui::SliderScalar("Single visible", ImGuiDataType_U32, &info("single_visible").writeable<uint>(), &v_min, &v_max);
+        ImGui::Checkbox("All visible", &info("all_visible").getw<bool>());
+        ImGui::SliderScalar("Single visible", ImGuiDataType_U32, &info("single_visible").getw<uint>(), &v_min, &v_max);
 
         ImGui::Separator();
 
         // Draw spectrum plot
         if (ImPlot::BeginPlot("Illuminant", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-          Spec sd = illuminants_p0[info("single_visible").writeable<uint>()];
+          Spec sd = illuminants_p0[info("single_visible").getw<uint>()];
 
           // Get wavelength values for x-axis in plot
           Spec x_values;
@@ -124,7 +124,7 @@ namespace met {
           ImPlot::EndPlot();
         }
 
-        Spec sd = illuminants_p0[info("single_visible").writeable<uint>()];
+        Spec sd = illuminants_p0[info("single_visible").getw<uint>()];
         fmt::print("{}\n", sd);
         ColrSystem csys_p1_free = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1 };
         ColrSystem csys_p1_base = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2     };
@@ -200,19 +200,19 @@ namespace met {
       // First, handle framebuffer allocate/resize
       if (const auto &e_target_rsrc = info("view", "target"); 
           !m_framebuffer.is_init() || e_target_rsrc.is_mutated()) {
-        const auto &e_target = e_target_rsrc.read_only<gl::Texture2d4f>();
+        const auto &e_target = e_target_rsrc.getr<gl::Texture2d4f>();
         m_framebuffer = {{ .type = gl::FramebufferType::eColor, .attachment = &e_target }};
       }
 
       // Next, handle camera transform update
       if (const auto &e_camera_rsrc = info("view", "camera"); e_camera_rsrc.is_mutated()) {
-        const auto &e_camera = e_camera_rsrc.read_only<detail::Arcball>();
+        const auto &e_camera = e_camera_rsrc.getr<detail::Arcball>();
         m_unif_map->camera_trf = e_camera.full().matrix();
         m_unif.flush();
       }
 
       // Framebuffer state
-      gl::state::set_viewport(info("view", "target").read_only<gl::Texture2d4f>().size());
+      gl::state::set_viewport(info("view", "target").getr<gl::Texture2d4f>().size());
       m_framebuffer.clear(gl::FramebufferType::eColor, eig::Array4f { 0, 0, 0, 1 });
       m_framebuffer.clear(gl::FramebufferType::eDepth, 1.f);
 
@@ -231,11 +231,11 @@ namespace met {
       m_program.bind("b_uniform", m_unif);
       
       // Dispatch separate draws
-      if (info("view", "all_visible").read_only<bool>()) {
+      if (info("view", "all_visible").getr<bool>()) {
         for (const auto &dispatch : m_dispatches)
           gl::dispatch_draw(dispatch);
       } else {
-        gl::dispatch_draw(m_dispatches[info("view", "single_visible").read_only<uint>()]);
+        gl::dispatch_draw(m_dispatches[info("view", "single_visible").getr<uint>()]);
       }
     }
   };
@@ -384,7 +384,7 @@ namespace met {
       .flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eFocused 
              | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
              | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
-    }).writeable<gl::Window>();
+    }).getw<gl::Window>();
 
     // Initialize OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {

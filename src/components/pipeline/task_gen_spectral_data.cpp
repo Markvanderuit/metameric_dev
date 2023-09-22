@@ -20,19 +20,19 @@ namespace met {
 
   bool GenSpectralDataTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info("state", "proj_state").read_only<ProjectState>().verts;
+    return info("state", "proj_state").getr<ProjectState>().verts;
   }
   
   void GenSpectralDataTask::eval(SchedulerHandle &info) {
     met_trace();
     
     // Get external resources
-    const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-    const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
+    const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data  = e_appl_data.project_data;
 
     // Get modified resources
-    auto &i_spectra = info("spectra").writeable<std::vector<Spec>>();
+    auto &i_spectra = info("spectra").getw<std::vector<Spec>>();
 
     // Resize is non-destructive on growth, and otherwise data needs deleting anyways
     i_spectra.resize(e_proj_data.verts.size()); 

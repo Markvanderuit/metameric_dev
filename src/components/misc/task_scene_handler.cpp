@@ -8,37 +8,23 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_scene = info.global("scene").read_only<Scene>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
     
-    // Initialize empty holder objects for gpu-side resources
+    // Initialize holder objects for gpu-side resources for newly loaded scene
     info("objc_data").init<detail::RTObjectData>(e_scene);
     info("mesh_data").init<detail::RTMeshData>(e_scene);
     info("txtr_data").init<detail::RTTextureData>(e_scene);
     info("uplf_data").init<detail::RTUpliftingData>(e_scene);
-
-    { // Run initial state test
-      auto &e_scene = info.global("scene").writeable<Scene>();
-
-      e_scene.components.settings.state.update(e_scene.components.settings.value);
-      e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
-      e_scene.components.colr_systems.update();
-      e_scene.components.emitters.update();
-      e_scene.components.objects.update();
-      e_scene.components.upliftings.update();
-    }
-
-    // Force upload of all resources  on first run
-    m_is_init = false;
   }
 
   void SceneHandlerTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
     // Get external resources
-    const auto &e_scene = info.global("scene").read_only<Scene>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
 
-    { // Pre-load bookkeeping on components; test for changes from last iteration
-      auto &e_scene = info.global("scene").writeable<Scene>();
+    { // Pre-load bookkeeping on components; test for state changes from last iteration
+      auto &e_scene = info.global("scene").getw<Scene>();
 
       e_scene.components.settings.state.update(e_scene.components.settings.value);
       e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
@@ -49,27 +35,24 @@ namespace met {
     }
 
     // Process updates to gpu-side mesh resources
-    if (auto handle = info("mesh_data"); handle.read_only<detail::RTMeshData>().is_stale(e_scene)) {
-      handle.writeable<detail::RTMeshData>().update(e_scene);
-    }
+    if (auto handle = info("mesh_data"); handle.getr<detail::RTMeshData>().is_stale(e_scene))
+      handle.getw<detail::RTMeshData>().update(e_scene);
     
     // Process updates to gpu-side image resources
-    if (auto handle = info("txtr_data"); handle.read_only<detail::RTTextureData>().is_stale(e_scene)) {
-      handle.writeable<detail::RTTextureData>().update(e_scene);
-    }
+    if (auto handle = info("txtr_data"); handle.getr<detail::RTTextureData>().is_stale(e_scene))
+      handle.getw<detail::RTTextureData>().update(e_scene);
 
     // Process updates to gpu-side object components
-    if (auto handle = info("objc_data"); handle.read_only<detail::RTObjectData>().is_stale(e_scene)) {
-      handle.writeable<detail::RTObjectData>().update(e_scene);
-    }
+    if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
+      handle.getw<detail::RTObjectData>().update(e_scene);
 
     // Process updates to gpu-side uplifting resources
-    if (auto handle = info("uplf_data"); handle.read_only<detail::RTUpliftingData>().is_stale(e_scene)) {
-      handle.writeable<detail::RTUpliftingData>().update(e_scene);
-    }
+    if (auto handle = info("uplf_data"); handle.getr<detail::RTUpliftingData>().is_stale(e_scene))
+      handle.getw<detail::RTUpliftingData>().update(e_scene);
 
-    { // Post-load bookkeeping on resources; assume no further changes
-      auto &e_scene = info.global("scene").writeable<Scene>();
+    { // Post-load bookkeeping on resources; assume no further changes as gpu-side
+      // resources should be up-to-date now
+      auto &e_scene = info.global("scene").getw<Scene>();
       
       e_scene.resources.meshes.set_mutated(false);
       e_scene.resources.images.set_mutated(false);
@@ -77,7 +60,5 @@ namespace met {
       e_scene.resources.observers.set_mutated(false);
       e_scene.resources.bases.set_mutated(false);
     }
-
-    m_is_init = true;
   }
 } // namespace met

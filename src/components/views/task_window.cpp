@@ -24,7 +24,7 @@ namespace met {
       met_trace_full();
       
       // Initialize new project
-      info.global("scene").writeable<Scene>().create();
+      info.global("scene").getw<Scene>().create();
 
       // Clear OpenGL state
       gl::Program::unbind_all();
@@ -39,7 +39,7 @@ namespace met {
       // Open a file picker
       if (fs::path path; detail::load_dialog(path, "json")) {
         // Initialize existing project
-        info.global("scene").writeable<Scene>().load(path);
+        info.global("scene").getw<Scene>().load(path);
 
         // Clear OpenGL state
         gl::Program::unbind_all();
@@ -55,7 +55,7 @@ namespace met {
     bool handle_save_as(SchedulerHandle &info) {
       met_trace_full();
       if (fs::path path; detail::save_dialog(path, "json")) {
-        info.global("scene").writeable<Scene>().save(path);
+        info.global("scene").getw<Scene>().save(path);
         return true;
       }
       return false;
@@ -63,7 +63,7 @@ namespace met {
 
     bool handle_save(SchedulerHandle &info) {
       met_trace_full();
-      auto &e_scene = info.global("scene").writeable<Scene>();
+      auto &e_scene = info.global("scene").getw<Scene>();
       if (e_scene.save_state == Scene::SaveState::eNew) {
         return handle_save_as(info);
       } else {
@@ -88,7 +88,7 @@ namespace met {
       gl::Program::unbind_all();
 
       // Empty application data as project is closed
-      info.global("scene").writeable<Scene>().unload();
+      info.global("scene").getw<Scene>().unload();
       
       // Signal schedule re-creation and submit empty schedule for main view
       submit_metameric_editor_schedule_unloaded(info);
@@ -99,8 +99,8 @@ namespace met {
       
       ImGui::CloseAnyPopupIfOpen();
 
-      info.global("scene").writeable<Scene>().unload();        // Empty application data as project is closed
-      info.global("window").writeable<gl::Window>().set_should_close(); // Signal to window that it should close itself
+      info.global("scene").getw<Scene>().unload();        // Empty application data as project is closed
+      info.global("window").getw<gl::Window>().set_should_close(); // Signal to window that it should close itself
       info.clear();                                                     // Signal to scheduler that it should empty out
     }
   } // namespace detail
@@ -110,10 +110,10 @@ namespace met {
 
     if (fs::path path; detail::save_dialog(path, "met")) {
       // Get shared resources
-      const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
       const auto &e_proj_data = e_appl_data.project_data;
-      const auto &e_spectra   = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
-      const auto &e_weights   = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
+      const auto &e_spectra   = info("gen_spectral_data", "spectra").getr<std::vector<Spec>>();
+      const auto &e_weights   = info("gen_convex_weights", "bary_buffer").getr<gl::Buffer>();
 
       // Insert barriers for the following operations
       gl::sync::memory_barrier(gl::BarrierFlags::eBufferUpdate | gl::BarrierFlags::eStorageBuffer | gl::BarrierFlags::eClientMappedBuffer);
@@ -132,7 +132,7 @@ namespace met {
           .weights   = cnt_span<const float>(bary_data)
         }, io::path_with_ext(path, ".met"));
       } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-        const auto &e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
+        const auto &e_delaunay = info("gen_convex_weights", "delaunay").getr<AlDelaunay>();
 
         // Obtain barycentric data from buffer
         std::vector<eig::Array4f> bary_data(e_weights.size() / sizeof(eig::Array4f));
@@ -182,7 +182,7 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    const auto &e_scene = info.global("scene").read_only<Scene>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
 
     // Continue to close function if scene state is ok; otherwise, present modal on next frame
     if (e_scene.save_state == Scene::SaveState::eUnsaved 
@@ -197,7 +197,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_scene = info.global("scene").read_only<Scene>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
 
     // Continue to exit function if scene state is ok; otherwise, present modal on next frame
     if (e_scene.save_state == Scene::SaveState::eUnsaved 
@@ -212,7 +212,7 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    const auto &e_scene = info.global("scene").read_only<Scene>();
+    const auto &e_scene = info.global("scene").getr<Scene>();
 
     // Query handler state that is used in several places
     bool is_loaded  = e_scene.save_state != Scene::SaveState::eUnloaded;
@@ -250,14 +250,14 @@ namespace met {
         if (ImGui::BeginMenu("Import", is_loaded)) {
           if (ImGui::MenuItem("Wavefront (.obj)")) {
             if (fs::path path; detail::load_dialog(path, "obj")) {
-              auto &e_scene = info.global("scene").writeable<Scene>();
+              auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.import_wavefront_obj(path);
             }
           }
 
           if (ImGui::MenuItem("Image (.exr, .png, .jpg, ...)")) {
             if (fs::path path; detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
-              auto &e_scene = info.global("scene").writeable<Scene>();
+              auto &e_scene = info.global("scene").getw<Scene>();
               e_scene.resources.images.emplace(path.filename().string(), {{ .path = path  }});
             }
           }
@@ -296,10 +296,10 @@ namespace met {
         const bool is_redo = e_scene.mod_i < int(e_scene.mods.size()) - 1;
 
         if (ImGui::MenuItem("Undo", nullptr, nullptr, is_undo)) { 
-          info.global("scene").writeable<Scene>().undo_mod(); 
+          info.global("scene").getw<Scene>().undo_mod(); 
         }
         if (ImGui::MenuItem("Redo", nullptr, nullptr, is_redo)) { 
-          info.global("scene").writeable<Scene>().redo_mod(); 
+          info.global("scene").getw<Scene>().redo_mod(); 
         }
 
         ImGui::Separator();

@@ -14,8 +14,8 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").read_only<gl::Buffer>();
-    const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_bary_buffer = info("gen_convex_weights", "bary_buffer").getr<gl::Buffer>();
+    const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data   = e_appl_data.project_data;
     const auto &e_colr_data   = e_appl_data.loaded_texture;
 
@@ -39,9 +39,9 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
-    const auto &e_vert_spec = info("gen_spectral_data", "spectra").read_only<std::vector<Spec>>();
+    const auto &e_vert_spec = info("gen_spectral_data", "spectra").getr<std::vector<Spec>>();
 
     // Spawn tooltip
     ImGui::BeginTooltip();
@@ -71,7 +71,7 @@ namespace met {
         
       ImGui::Separator();
     } else if (e_proj_data.meshing_type == ProjectMeshingType::eDelaunay) {
-      const auto e_delaunay = info("gen_convex_weights", "delaunay").read_only<AlDelaunay>();
+      const auto e_delaunay = info("gen_convex_weights", "delaunay").getr<AlDelaunay>();
       const auto &bary_data = std::get<std::span<eig::Array4f>>(m_tooltip_maps[m_tooltip_cycle_i])[0];
 
       eig::Array4f bary   = (eig::Array4f() << bary_data.head<3>(), 1.f - bary_data.head<3>().sum()).finished(); 
@@ -121,8 +121,8 @@ namespace met {
     if (fs::path path; detail::save_dialog(path, "bmp,png,jpg,exr")) {
       // Get external resources
       auto color_task_key = fmt::format("gen_color_mapping_{}", texture_i);
-      const auto &e_colr_buffer = info(color_task_key, "colr_buffer").read_only<gl::Buffer>();
-      const auto &e_appl_data   = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_colr_buffer = info(color_task_key, "colr_buffer").getr<gl::Buffer>();
+      const auto &e_appl_data   = info.global("appl_data").getr<ApplicationData>();
 
       // Obtain cpu-side texture
       AlTexture2d3f texture_al = {{ .size = e_appl_data.loaded_texture.size() }};
@@ -137,7 +137,7 @@ namespace met {
     met_trace_full();
 
     // Get external resources
-    const auto &e_appl_data = info.global("appl_data").read_only<ApplicationData>();
+    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
     const auto &e_proj_data = e_appl_data.project_data;
     
     // Initialize a set of rolling buffers, and map these for reading
@@ -174,8 +174,8 @@ namespace met {
     
     if (ImGui::Begin("Mappings viewer")) {
       // Get external resources
-      const auto &e_proj_state = info("state", "proj_state").read_only<ProjectState>();
-      const auto &e_appl_data  = info.global("appl_data").read_only<ApplicationData>();
+      const auto &e_proj_state = info("state", "proj_state").getr<ProjectState>();
+      const auto &e_appl_data  = info.global("appl_data").getr<ApplicationData>();
       const auto &e_proj_data  = e_appl_data.project_data;
       uint e_mappings_n = e_proj_data.color_systems.size();
       
@@ -212,7 +212,7 @@ namespace met {
         // Realize external task/texture objects
         auto mask = gen_task_handle.mask(info);
         auto       &e_colr_task = gen_task_handle.realize<GenColorMappingResampledTask>();
-        const auto &e_colr_texture = mask("colr_texture").read_only<gl::Texture2d4f>();
+        const auto &e_colr_texture = mask("colr_texture").getr<gl::Texture2d4f>();
         
         ImGui::BeginGroup();
 
