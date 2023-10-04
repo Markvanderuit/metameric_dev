@@ -7,9 +7,17 @@
 namespace met {
   class GenUpliftingDataTask : public detail::TaskNode {
     uint              m_uplifting_i;
-    std::vector<Colr> m_csys_boundary_samples;
-    std::vector<Spec> m_csys_boundary_spectra;
-    std::vector<Colr> m_tesselation_points;
+
+    // Packed wrapper data for tetrahedron; 64 bytes for std430 
+    struct ElemPack {
+      eig::Matrix<float, 4, 3> inv; // Last column is padding
+      eig::Matrix<float, 4, 1> sub; // Last value is padding
+    };
+
+    std::vector<Colr>   m_csys_boundary_samples;
+    std::vector<Spec>   m_csys_boundary_spectra;
+    std::vector<Colr>   m_tesselation_points;
+    std::span<ElemPack> m_tesselation_pack_map;
 
   public:
     GenUpliftingDataTask(uint uplifting_i);

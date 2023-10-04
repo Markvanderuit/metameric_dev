@@ -4,6 +4,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/misc/detail/scene.hpp>
 #include <omp.h>
 #include <execution>
 #include <numbers>
@@ -11,11 +12,19 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  constexpr uint n_system_boundary_samples = 128u;
+  constexpr uint n_system_boundary_samples = 96u;
+  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr uint buffer_init_size = 512u;
 
+  // Generate a transforming view that performs unsigned integer index access over a range
+  constexpr auto indexed_view(const auto &v) {
+    return vws::transform([&v](uint i) { return v[i]; });
+  };
+  
   namespace detail {
-    // Given a random vector in RN bounded to [-1, 1], return a vector
-    // distributed over a gaussian distribution
+    // Given a point in R^N bounded to [-1, 1], return a point
+    // mapped to a gaussian distribution, uniformly distributed
     inline
     auto inv_gaussian_cdf(const auto &x) {
       met_trace();
@@ -24,15 +33,15 @@ namespace met {
       return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
     }
     
-    // Given a random vector in RN bounded to [-1, 1], return a uniformly
-    // distributed point on the unit sphere
+    // Given a point in R^N bounded to [-1, 1], return a point
+    // mapped to the unit sphere, uniformly distributed
     inline
     auto inv_unit_sphere_cdf(const auto &x) {
       met_trace();
       return inv_gaussian_cdf(x).matrix().normalized().eval();
     }
 
-    // Generate a set of random, uniformly distributed unit vectors in RN
+    // Generate a set of uniformly distributed unit vectors in R^N
     template <uint N>
     inline
     std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
@@ -45,6 +54,7 @@ namespace met {
         // Draw samples for this thread's range with separate sampler per thread
         // UniformSampler sampler(-1.f, 1.f, seeds[omp_get_thread_num()]);
         UniformSampler sampler(-1.f, 1.f, static_cast<uint>(omp_get_thread_num()));
+
         #pragma omp for
         for (int i = 0; i < unit_dirs.size(); ++i)
           unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd<N>());
@@ -65,11 +75,11 @@ namespace met {
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
     met_trace_full();
-    m_csys_boundary_samples = detail::gen_unit_dirs<3>(n_system_boundary_samples);
     info("spectra").set<std::vector<Spec>>({ });
     info("tesselation").set<AlDelaunay>({ });
-    info("tesselation_vt_gl").set<gl::Buffer>({ });
-    info("tesselation_el_gl").set<gl::Buffer>({ });
+    info("tesselation_pack").init<gl::Buffer>({ .size = buffer_init_size * sizeof(ElemPack), .flags = buffer_create_flags });
+    m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<ElemPack>(buffer_access_flags);
+    m_csys_boundary_samples = detail::gen_unit_dirs<3>(n_system_boundary_samples);
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
@@ -85,20 +95,23 @@ namespace met {
     const auto &e_meshes      = e_scene.resources.meshes;
     const auto &e_images      = e_scene.resources.images;
           auto &i_spectra     = info("spectra").getw<std::vector<Spec>>();
+    const auto &i_tesselation = info("tesselation").getr<AlDelaunay>();
     
-    // Internal state helper flags
-    bool generally_stale   = e_state.basis_i || e_basis || e_state.csys_i  || e_csys;
-    bool tesselation_stale = false; // generally_stale
-      // || rng::any_of(e_state.verts, [](const auto &state) { return state.colr_i.is_mutated(); });
+    // Flag tells if the color system spectra have, in any way, been modified
+    bool csys_stale = is_first_eval() || e_state.basis_i || e_basis || e_state.csys_i  || e_csys;
 
-    // Baseline color system spectra in which the 'uplifted' texture is defined
-    CMFS csys = e_scene.get_csys(e_csys).finalize_direct();
+    // Flag tells if the resulting tesselation has, in any way, been modified;
+    // this is set to true in step 2 if necessary
+    bool tssl_stale = is_first_eval();
 
-    // 1. Generate color system boundary spectra on relevant state change
-    if (generally_stale) {
-      m_csys_boundary_spectra = generate_ocs_boundary_spec({ .basis      = e_basis.value(),
-                                                             .system     = csys,
-                                                             .samples    = m_csys_boundary_samples });
+    // Color system spectra within which the 'uplifted' texture is defined
+    auto csys = e_scene.get_csys(e_csys).finalize_direct();
+
+    // 1. Generate color system boundary (spectra)
+    if (csys_stale) {
+      m_csys_boundary_spectra = generate_ocs_boundary_spec({ .basis   = e_basis.value(),
+                                                             .system  = csys,
+                                                             .samples = m_csys_boundary_samples });
 
       // For each spectrum, add a point to the set of tesselation points for later
       m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
@@ -109,7 +122,7 @@ namespace met {
       fmt::print("Sampled color system boundary, {} unique points\n", m_csys_boundary_spectra.size());
     }
 
-    // Resize relevant objects
+    // Resize internal objects
     i_spectra.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
     m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
 
@@ -117,8 +130,9 @@ namespace met {
     // Iterate over stale constraint data, and generate corresponding spectra
     #pragma omp parallel for
     for (int i = 0; i < e_uplifting.verts.size(); ++i) {
-      // We only generate a spectrum if the specific vertex is stale
-      guard_continue(e_state.verts[i] || generally_stale);
+      // We only generate a spectrum if the specific vertex was changed,
+      // or the entire underlying color system has changed
+      guard_continue(e_state.verts[i] || csys_stale);
       const auto &vert = e_uplifting.verts[i];
       
       Spec s;
@@ -140,10 +154,11 @@ namespace met {
 
         // Generate a metamer satisfying the system+signal constraint set
         s = generate_spectrum({
-          .basis      = e_basis.value(),
-          .systems    = systems,
-          .signals    = signals,
-          .solve_dual = true
+          .basis              = e_basis.value(),
+          .systems            = systems,
+          .signals            = signals,
+          .impose_boundedness = true,
+          .solve_dual         = true
         });
       } else if (vert.type == Uplifting::Constraint::Type::eColorOnMesh) {
         // Sample color constraint from mesh, and go from there
@@ -177,10 +192,11 @@ namespace met {
 
         // Generate a metamer satisfying the system+signal constraint set
         s = generate_spectrum({
-          .basis      = e_basis.value(),
-          .systems    = systems,
-          .signals    = signals,
-          .solve_dual = true
+          .basis              = e_basis.value(),
+          .systems            = systems,
+          .signals            = signals,
+          .impose_boundedness = true,
+          .solve_dual         = true
         });
       } else if (vert.type == Uplifting::Constraint::Type::eMeasurement) {
         // Use measured spectral value directly
@@ -193,24 +209,67 @@ namespace met {
       // Add to set of spectra, and to tesselation input points
       i_spectra[m_csys_boundary_spectra.size() + i] = s;
 
-      // We only store colors for tesselation if the 'primary' color has updated
-      // as otherwise it'd trigger on every constraint modification
+      // We only update vertices in the tesselation if the 'primary' has updated
+      // as otherwise we'd trigger re-tesselation on every constraint modification
       Colr prev_c = m_tesselation_points[m_csys_boundary_spectra.size() + i];
       if (!prev_c.isApprox(c)) {
         m_tesselation_points[m_csys_boundary_spectra.size() + i] = c;
-        tesselation_stale = true; // skipping atomic, as everyone's just setting to true r.n.
+        tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
       }
     } // for (int i)
 
     // 3. Generate color system tesselation
-    if (tesselation_stale) {
-      auto &i_tesselation       = info("tesselation").getw<AlDelaunay>();
-      // auto &i_tesselation_vt_gl = info("tesselation_vt_gl").getw<gl::Buffer>();
-      // auto &i_tesselation_el_gl = info("tesselation_el_gl").getw<gl::Buffer>();
+    if (tssl_stale) {
+      // Generate new tesselation
+      auto &i_tesselation = info("tesselation").getw<AlDelaunay>();
+      i_tesselation = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
 
-      i_tesselation       = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
-      // i_tesselation_vt_gl = {{ .data = cnt_span<const std::byte>(i_tesselation.verts) }};
-      // i_tesselation_el_gl = {{ .data = cnt_span<const std::byte>(i_tesselation.elems) }};
-    }
+      // Update pack map for fast per-object delaunay traversal
+      auto &i_tesselation_pack = info("tesselation_pack").getw<gl::Buffer>();
+      std::transform(std::execution::par_unseq, range_iter(i_tesselation.elems), m_tesselation_pack_map.begin(), 
+      [&](const auto &el) {
+        const auto vts = el | indexed_view(i_tesselation.verts);
+        ElemPack pack;
+        pack.inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
+          << vts[0] - vts[3], vts[1] - vts[3], vts[2] - vts[3]
+        ).finished().inverse();
+        pack.sub.head<3>() = vts[3];
+        return pack;
+      });
+      i_tesselation_pack.flush(i_tesselation.elems.size() * sizeof(ElemPack));
+
+      fmt::print("Resulting pack size: {} elems\n", i_tesselation.elems.size());
+    } // if (tssl_stale)
+
+    // 4. Modify uplifting data on the gl-side
+    // if (csys_stale) 
+    {
+      auto &e_uplifting = info("scene_handler", "uplf_data").getw<detail::RTUpliftingData>();
+      auto &info = e_uplifting.info[m_uplifting_i];
+
+      // Assemble packed spectra into mapped buffer for fast access during rendering
+      for (uint i = 0; i < i_tesselation.elems.size(); ++i) {
+        const auto &el = i_tesselation.elems[i];
+              auto &es = e_uplifting.spectra_gl_mapping[info.elem_offs + i];
+        
+        for (uint i = 0; i < 4; ++i) {
+          es.col(i) = i_spectra[el[i]];
+        }
+      }
+
+      // Copy affected info data to buffer
+      info.elem_size = i_tesselation.elems.size();
+      e_uplifting.info_gl.set(obj_span<const std::byte>(info), 
+                              sizeof(detail::RTUpliftingInfo),
+                              sizeof(detail::RTUpliftingInfo) * m_uplifting_i);
+
+      // Flush affected region of mapped spectrum buffer
+      e_uplifting.spectra_gl.flush(info.elem_size * sizeof(detail::RTUpliftingData::SpecPack),
+                                   info.elem_offs * sizeof(detail::RTUpliftingData::SpecPack));
+
+      // Copy affected region of spectrum buffer to sampleable texture
+      e_uplifting.spectra_gl_texture.set(e_uplifting.spectra_gl, 0, { wavelength_samples, info.elem_size },
+                                                                    { 0,                  info.elem_offs });
+    } // if (csys_stale)
   }
 } // namespace met

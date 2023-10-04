@@ -18,7 +18,7 @@ namespace gl {
 
 namespace met::detail {
   /* Object information structure, detailing indices and values
-      referring to the object's mesh shape and surface materials. */
+     referring to the object's mesh shape and surface materials. */
   struct alignas(16) RTObjectInfo {
     alignas(16) eig::Matrix4f trf;
     alignas(16) eig::Matrix4f trf_inv;
@@ -30,6 +30,10 @@ namespace met::detail {
     alignas(4)  bool          is_albedo_sampled;
     alignas(4)  uint          albedo_i;
     alignas(16) Colr          albedo_v;
+    
+    // atlas4f access info
+    alignas(4) uint           layer;
+    alignas(8) eig::Array2u   offs, size;
   };
 
   /* Mesh information structure, detailing which range of the mesh
@@ -93,6 +97,9 @@ namespace met::detail {
     std::vector<RTObjectInfo> info;
     gl::Buffer                info_gl;
 
+    // Texture atlas to hold barycentrics per-object
+    std::vector<uint>      atlas_indices;
+    TextureAtlas<float, 4> atlas_4f;
   public:
     RTObjectData() = default;
     RTObjectData(const Scene &);
@@ -109,27 +116,22 @@ namespace met::detail {
   };
 
   /* Gathered uplifting data block; holds all packed-together
-     uplifting data used in a scene, on a per-uplifting 
+     uplifting data used to render a scene, on a per-uplifting 
      and a per-object basis. Allocated but not filled in; 
      content is generated on the fly by the uplifting pipeline. */
   struct RTUpliftingData {
     using Texture1d4fArray = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
-    using ElemSpec         = eig::Array<float, wavelength_samples, 4>;
+    using SpecPack         = eig::Array<float, wavelength_samples, 4>;
     
     // Info objects to detail range of the spectra used by each uplifting
-    std::vector<RTUpliftingInfo> spectra_info;
-    gl::Buffer                   spectra_info_gl;
-    std::span<RTUpliftingInfo>   spectra_info_gl_mapping;
+    std::vector<RTUpliftingInfo> info;
+    gl::Buffer                   info_gl;
 
     // All constraint spectra per-uplifting are packed per tetrahedron
     // for fast sampled access during rendering
-    Texture1d4fArray             spectra_elem_gl_texture; // Texture array layout for all spectra
-    gl::Buffer                   spectra_elem_gl;         // Mapped buffer for pixel buffer copy
-    std::span<Spec>              spectra_elem_gl_mapping; // Corresponding map
-
-    // Texture atlas to hold texture barycentrics per-object
-    std::vector<uint>            atlas_indices;
-    TextureAtlas<float, 4>       atlas_4f;
+    gl::Buffer                   spectra_gl;         // Mapped buffer for pixel buffer copy
+    std::span<SpecPack>          spectra_gl_mapping; // Corresponding map
+    Texture1d4fArray             spectra_gl_texture; // Texture array layout for all spectra
 
   public:
     RTUpliftingData() = default;

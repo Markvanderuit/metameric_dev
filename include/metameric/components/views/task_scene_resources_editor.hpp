@@ -15,10 +15,10 @@ namespace met {
 
       // Get external resources
       const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-      const auto &e_atlas = e_txtr_data.atlas_3f;
 
-      if (e_atlas.texture().is_init()) {
+      if (e_txtr_data.atlas_3f.texture().is_init()) {
         if (ImGui::Begin("Texture atlas")) {
+          const auto &e_atlas = e_txtr_data.atlas_3f;
           // Spawn views
           for (uint i = 0; i < e_atlas.size().z(); ++i) {
             for (uint j = 0; j < e_atlas.levels(); ++j) {
@@ -27,7 +27,19 @@ namespace met {
                 ImGui::SameLine();
             }
           }
+        }
+        ImGui::End();
+      }
 
+      const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
+      if (e_objc_data.atlas_4f.texture().is_init()) {
+        if (ImGui::Begin("Bary atlas")) {
+          const auto &e_atlas = e_objc_data.atlas_4f;
+          // Spawn views
+          for (uint i = 0; i < e_atlas.size().z(); ++i) {
+            const auto &view = e_atlas.view(i, 0);
+            ImGui::Image(ImGui::to_ptr(view.object()), { 512, 512 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+          }
         }
         ImGui::End();
       }

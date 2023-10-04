@@ -7,12 +7,6 @@
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-  constexpr uint buffer_init_size    = 512u;
-
-  // Generate a transforming view that performs unsigned integer index access over a range
-  constexpr auto indexed_view(const auto &v) {
-    return std::views::transform([&v](uint i) { return v[i]; });
-  };
 
   GenObjectDataTask:: GenObjectDataTask(uint object_i)
   : m_object_i(object_i) { }
@@ -25,6 +19,7 @@ namespace met {
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
     
     // TODO show fine-grained dependence on object materials and tesselation
+    //      this will literally update **every time**
     return e_object.state ||  e_uplifting.state            ||
            info("scene_handler", "mesh_data").is_mutated() ||
            info("scene_handler", "txtr_data").is_mutated() ||
@@ -44,54 +39,43 @@ namespace met {
     m_unif_buffer = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
     m_unif_map    = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
     m_unif_map->object_i = m_object_i;
-
-    // Initialize buffer store for holding packed delaunay data, and map it
-    m_pack_buffer = {{ .size = buffer_init_size * sizeof(ElemPack), .flags = buffer_create_flags }};
-    m_pack_map    = m_pack_buffer.map_as<ElemPack>(buffer_access_flags);
   }
 
   void GenObjectDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
     
     // Get external resources
-    const auto &e_scene      = info.global("scene").getr<Scene>();
-    const auto &e_object     = e_scene.components.objects[m_object_i];
-    const auto &e_uplifting  = e_scene.components.upliftings[e_object.value.uplifting_i];
-    const auto &e_txtr_data  = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-    const auto &e_uplf_data  = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
-    const auto &e_objc_data  = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
+    const auto &e_scene     = info.global("scene").getr<Scene>();
+    const auto &e_object    = e_scene.components.objects[m_object_i];
+    const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
+    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
+    const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
+    const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
 
+    // Get external resources from object's selected uplifting
     auto uplifting_task_name = std::format("gen_upliftings.gen_uplifting_{}", e_object.value.uplifting_i);
     const auto &e_tesselation = info(uplifting_task_name, "tesselation").getr<AlDelaunay>();
+    const auto &e_tesselation_pack = info(uplifting_task_name, "tesselation_pack").getr<gl::Buffer>();
 
-    // Push stale packed tetrahedral data
-    // TODO; move to gen_uplifting_data so it is per-uplifting, not per-texture
-    std::transform(std::execution::par_unseq, range_iter(e_tesselation.elems), m_pack_map.begin(), 
-    [&](const auto &el) {
-      const auto vts = el | indexed_view(e_tesselation.verts);
-      ElemPack pack;
-      pack.inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
-        << vts[0] - vts[3], vts[1] - vts[3], vts[2] - vts[3]
-      ).finished().inverse();
-      pack.sub.head<3>() = vts[3];
-      return pack;
-    });
-    m_pack_buffer.flush(e_tesselation.elems.size() * sizeof(ElemPack));
+    // Determine dispatch size
+    auto dispatch_n    = e_objc_data.info[m_object_i].size;
+    auto dispatch_ndiv = ceil_div(dispatch_n, 16u);
+    m_dispatch.groups_x = dispatch_ndiv.x();
+    m_dispatch.groups_y = dispatch_ndiv.y();
 
     // Push uniform data
-    m_unif_map->n_verts = e_tesselation.verts.size();
-    m_unif_map->n_elems = e_tesselation.elems.size();
+    m_unif_map->dispatch_n = dispatch_n;
     m_unif_buffer.flush();
 
     // Bind required resources to corresponding targets
-    m_program.bind("b_unif",          m_unif_buffer);
-    m_program.bind("b_pack",          m_pack_buffer);
+    m_program.bind("b_buff_unif",     m_unif_buffer);
     m_program.bind("b_txtr_3f",       e_txtr_data.atlas_3f.texture());
-    m_program.bind("b_uplf_4f",       e_uplf_data.atlas_4f.texture());
-    // m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
+    m_program.bind("b_uplf_4f",       e_objc_data.atlas_4f.texture());
+    m_program.bind("b_buff_pack",     e_tesselation_pack);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
     m_program.bind("b_buff_textures", e_txtr_data.info_gl);
+    m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
 
-    // TODO dispatch
+    gl::dispatch_compute(m_dispatch);
   }
 } // namespace met

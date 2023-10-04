@@ -33,9 +33,20 @@ struct ObjectInfo {
   uint uplifting_i;
 
   // Material data // TODO expand
-  bool  is_albedo_sampled; // Use sampler or direct value?
-  uint  albedo_i;          // Sampler index
-  vec3  albedo_v;          // Direct value
+  bool is_albedo_sampled; // Use sampler or direct value?
+  uint albedo_i;          // Sampler index
+  vec3 albedo_v;          // Direct value
+
+  // Atlas access info
+  uint layer;
+  uvec2 offs;
+  uvec2 size;
+};
+
+// Info object to gather Scene::Uplifting relevant data
+struct UpliftInfo {
+  uint elem_offs;
+  uint elem_size;
 };
 
 #endif // SCENE_GLSL_GUARD
