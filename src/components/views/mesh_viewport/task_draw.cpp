@@ -11,7 +11,7 @@ namespace met {
 
   bool MeshViewportDrawTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info.relative("view_begin")("is_active").getr<bool>()
+    return info.relative("viewport_begin")("is_active").getr<bool>()
        && !info.global("scene").getr<Scene>().components.objects.empty();
   }
 
@@ -47,7 +47,7 @@ namespace met {
     // Get shared resources 
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_objects   = e_scene.components.objects;
-    const auto &e_arcball   = info.relative("view_input")("arcball").getr<detail::Arcball>();
+    const auto &e_arcball   = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
     const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
     const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
