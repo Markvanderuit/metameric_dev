@@ -7,9 +7,10 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class MeshViewportDrawTask : public detail::TaskNode {
+  class MeshViewportDrawUpliftedTask : public detail::TaskNode {
     struct UnifCameraLayout {
      eig::Matrix4f camera_matrix;
+     float wvl;
     };
 
     UnifCameraLayout *m_unif_camera_buffer_map;
