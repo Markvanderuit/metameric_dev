@@ -6,6 +6,11 @@
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 
+// TODO remove
+#include <metameric/components/views/detail/imgui.hpp>
+#include <implot.h>
+#include <format>
+
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
@@ -99,5 +104,39 @@ namespace met {
 
     // Dispatch draw call to handle entire scene
     gl::dispatch_multidraw(m_draw);
+
+    // Spectrum debugger
+    {
+      const auto &i_spectra = info("gen_upliftings.gen_uplifting_0", "spectra").getr<std::vector<Spec>>();
+
+      static uint wavelength_index = 0;
+      constexpr static auto plot_flags = ImPlotFlags_NoFrame | ImPlotFlags_NoMenus;
+      constexpr static auto plot_y_axis_flags = ImPlotAxisFlags_NoDecorations;
+      constexpr static auto plot_x_axis_flags = ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoGridLines;
+
+      auto window_title = std::format("Spectrum selector {}", 0);
+      if (ImGui::Begin(window_title.c_str())) {
+        uint minv = 0;
+        uint maxv = std::max(i_spectra.size(), 1ull) - 1ull;
+        ImGui::SliderScalar("Spectrum index", ImGuiDataType_U32, &wavelength_index, &minv, &maxv);
+
+        // Get wavelength values for x-axis in plots
+        Spec x_values;
+        for (uint i = 0; i < x_values.size(); ++i)
+          x_values[i] = wavelength_at_index(i);
+        
+        // Get wavelength values for y-axis in plot
+        Spec s = i_spectra.at(wavelength_index);
+        
+        // Spawn implot
+        if (ImPlot::BeginPlot("Spectrum", { 0., 0.f }, plot_flags)) {
+          ImPlot::SetupAxes("Wavelength", "Value", plot_x_axis_flags, plot_y_axis_flags);
+          ImPlot::PlotLine("##plot_line", x_values.data(), s.data(), wavelength_samples);
+          ImPlot::PlotShaded("##plot_line", x_values.data(), s.data(), wavelength_samples);
+          ImPlot::EndPlot();
+        }
+      }
+      ImGui::End();
+    }
   }
 } // namespace met

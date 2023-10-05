@@ -5,11 +5,11 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
 #include <metameric/components/misc/detail/scene.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/utility.hpp>
 #include <omp.h>
 #include <execution>
 #include <numbers>
-#include <small_gl/buffer.hpp>
-#include <small_gl/utility.hpp>
 
 namespace met {
   constexpr uint n_system_boundary_samples = 96u;
@@ -125,6 +125,9 @@ namespace met {
     // Resize internal objects
     i_spectra.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
     m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
+
+    // Copy boundary spectra over to set of spectra partaking in tesselation
+    std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), i_spectra.begin());
 
     // 2. Generate constraint spectra
     // Iterate over stale constraint data, and generate corresponding spectra

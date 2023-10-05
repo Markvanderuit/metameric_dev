@@ -11,10 +11,10 @@ namespace met {
     const auto &e_scene = info.global("scene").getr<Scene>();
     
     // Initialize holder objects for gpu-side resources for newly loaded scene
-    info("objc_data").init<detail::RTObjectData>(e_scene);
-    info("mesh_data").init<detail::RTMeshData>(e_scene);
     info("txtr_data").init<detail::RTTextureData>(e_scene);
+    info("mesh_data").init<detail::RTMeshData>(e_scene);
     info("uplf_data").init<detail::RTUpliftingData>(e_scene);
+    info("objc_data").init<detail::RTObjectData>(e_scene);
   }
 
   void SceneHandlerTask::eval(SchedulerHandle &info) {
@@ -30,25 +30,25 @@ namespace met {
       e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
       e_scene.components.colr_systems.update();
       e_scene.components.emitters.update();
-      e_scene.components.objects.update();
       e_scene.components.upliftings.update();
+      e_scene.components.objects.update();
     }
 
-    // Process updates to gpu-side mesh resources
-    if (auto handle = info("mesh_data"); handle.getr<detail::RTMeshData>().is_stale(e_scene))
-      handle.getw<detail::RTMeshData>().update(e_scene);
-    
     // Process updates to gpu-side image resources
     if (auto handle = info("txtr_data"); handle.getr<detail::RTTextureData>().is_stale(e_scene))
       handle.getw<detail::RTTextureData>().update(e_scene);
 
-    // Process updates to gpu-side object components
-    if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
-      handle.getw<detail::RTObjectData>().update(e_scene);
+    // Process updates to gpu-side mesh resources
+    if (auto handle = info("mesh_data"); handle.getr<detail::RTMeshData>().is_stale(e_scene))
+      handle.getw<detail::RTMeshData>().update(e_scene);
 
     // Process updates to gpu-side uplifting resources
     if (auto handle = info("uplf_data"); handle.getr<detail::RTUpliftingData>().is_stale(e_scene))
       handle.getw<detail::RTUpliftingData>().update(e_scene);
+
+    // Process updates to gpu-side object components
+    if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
+      handle.getw<detail::RTObjectData>().update(e_scene);
 
     { // Post-load bookkeeping on resources; assume no further changes as gpu-side
       // resources should be up-to-date now
