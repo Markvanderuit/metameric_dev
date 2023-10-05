@@ -91,9 +91,11 @@ namespace met {
     }
 
     // Push camera matrix to uniform data
-    m_unif_buffer_map->camera_matrix = e_arcball.full().matrix();
-    m_unif_buffer_map->z_near        = e_arcball.m_near_z;
-    m_unif_buffer_map->z_far         = e_arcball.m_far_z;
+    m_unif_buffer_map->trf     = e_arcball.full().matrix();
+    m_unif_buffer_map->trf_inv = e_arcball.full().matrix().inverse();
+    m_unif_buffer_map->viewport_size = e_lrgb_target.size().cast<float>();
+    m_unif_buffer_map->z_near  = e_arcball.m_near_z;
+    m_unif_buffer_map->z_far   = e_arcball.m_far_z;
     m_unif_buffer.flush();
     
     // Set fresh vertex array for draw data if it was updated

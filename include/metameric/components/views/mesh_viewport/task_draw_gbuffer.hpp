@@ -12,7 +12,9 @@ namespace met {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
 
     struct UnifLayout {
-     eig::Matrix4f camera_matrix;
+     eig::Matrix4f trf;
+     eig::Matrix4f trf_inv;
+     eig::Array2f  viewport_size;
      float         z_near;
      float         z_far;
     };
