@@ -39,7 +39,6 @@ namespace met::detail {
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       auto &i_frame_buffer_ms = info("frame_buffer_ms").getw<gl::Framebuffer>();
 
-
       // Declare scoped ImGui style state
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
