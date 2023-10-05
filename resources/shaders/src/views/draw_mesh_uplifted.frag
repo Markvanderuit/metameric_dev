@@ -39,6 +39,21 @@ layout(binding = 1) uniform sampler2DArray b_txtr_1f;
 layout(binding = 2) uniform sampler2DArray b_txtr_3f;
 layout(binding = 3) uniform sampler2DArray b_uplf_4f;
 layout(binding = 4) uniform sampler1DArray b_spec_4f;
+layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 7) uniform sampler1DArray b_csys_3f; // Color system spectra, 3 components
+
+float sample_illuminant(in uint illuminant_i, float wvl) {
+  return texture(b_illm_1f, vec2(wvl, illuminant_i)).x;
+}
+
+vec3 sample_observer(in uint observer_i, float wvl) {
+  return texture(b_cmfs_3f, vec2(wvl, observer_i)).xyz;
+}
+
+vec3 sample_colsys(in uint colsys_i, float wvl) {
+  return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
+}
 
 vec3 sample_uplift(in ObjectInfo info, in vec2 tx_in) {
   UpliftInfo uplift_info = buff_uplifts.data[info.uplifting_i];
@@ -51,10 +66,23 @@ vec3 sample_uplift(in ObjectInfo info, in vec2 tx_in) {
   uint elem_i = floatBitsToUint(bary.w) + uplift_info.elem_offs;
   bary.w = 1.f - hsum(bary.xyz);
 
-  // Sample spectrum at wavelength
-  float r = dot(bary, texture(b_spec_4f, vec2(unif.wvl, elem_i)));
+  // Quick hacky integration
+  // TODO: switch to deferred rendering
+  vec3 colr = vec3(0);
+  uint n_samples = 0;
+  for (float f = 0.0f; f < 1.0f; f += 0.01f) {
+    float r = dot(bary, texture(b_spec_4f, vec2(/* unif.wvl */f, elem_i)));
+    vec3 csys = sample_colsys(0, /* unif.wvl */f);
+    colr += csys * r;
+    n_samples++;
+  }
+  return colr;
 
-  return vec3(r);
+  // // Sample spectrum at wavelength
+  // vec3 csys = sample_colsys(0, unif.wvl);
+  // // float l = sample_illuminant(0, unif.wvl);
+
+  // return csys * r;
 }
 
 vec4 sample_texture(uint texture_i, in vec2 tx_in) {
@@ -77,10 +105,6 @@ void main() {
   // Load diffuse data if provided
   vec3 diffuse = sample_uplift(object_info, in_value_tx);
 
-  // vec3 diffuse = object_info.is_albedo_sampled
-  //              ? sample_texture(object_info.albedo_i, in_value_tx).xyz
-  //              : object_info.albedo_v;
-
-  vec3 v = /* vec3(mod(in_value_tx, 1), 0); */  diffuse * cos_theta;
+  vec3 v = diffuse * cos_theta;
   out_value_colr = vec4(v, 1);
 }

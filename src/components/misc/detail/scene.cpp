@@ -313,7 +313,7 @@ namespace met::detail {
       // Get external resources
       const auto &e_objects = scene.components.objects;
       const auto &e_images = scene.resources.images;
-      const auto &e_settings = scene.components.settings.value.texture_size;
+      const auto &e_settings = scene.components.settings;
 
       guard(!e_objects.empty());
 
@@ -334,7 +334,12 @@ namespace met::detail {
       auto stale_diffuse = e_objects
                         | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; })
                         | vws::filter([](const auto &comp) { return comp.state.diffuse; });
-      if (!stale_images.empty() || !stale_diffuse.empty() || !atlas_4f.texture().is_init()) {
+      bool handle_atlas_rebuild = stale_images.empty() 
+        || !stale_diffuse.empty() 
+        || !atlas_4f.texture().is_init()
+        || e_settings.state.texture_size;
+      
+      if (handle_atlas_rebuild) {
         // Set atlas object indices to all inf
         atlas_indices.resize(e_objects.size());
         rng::fill(atlas_indices, std::numeric_limits<uint>::max());
@@ -355,7 +360,7 @@ namespace met::detail {
         // Determine maximum texture sizes, and scale input sizes w.r.t. to this value
         eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
           [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-        eig::Array2u clamped_4f = clamp_size_by_setting(e_settings, maximal_4f);
+        eig::Array2u clamped_4f = clamp_size_by_setting(e_settings.value.texture_size, maximal_4f);
         eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
         for (auto &input : inputs)
           input = (input.cast<float>() * scaled_4f).max(1.f).cast<uint>().eval();
@@ -369,10 +374,13 @@ namespace met::detail {
         const auto &component = e_objects[i];
         const auto &object    = component.value;
         
-        guard_continue(handle_resize || component.state.is_mutated());
+        guard_continue(handle_resize || handle_atlas_rebuild || component.state.is_mutated());
 
+        // Get relevant texture info
         bool is_albedo_sampled = object.diffuse.index() != 0;
-
+        auto resrv = is_albedo_sampled ? atlas_4f.reservation(atlas_indices[i])
+                                       : detail::TextureAtlasSpace();
+        
         info[i] = {
           .trf         = object.trf.matrix(),
           .trf_inv     = object.trf.inverse().matrix(),
@@ -386,16 +394,14 @@ namespace met::detail {
           .is_albedo_sampled = is_albedo_sampled,
           .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
           .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse),
+
+          // Fill barycentric atlas data
+          .layer = resrv.layer_i,
+          .offs  = resrv.offs,
+          .size  = resrv.size
         };
 
-        // Push barycentric atlas data
-        if (is_albedo_sampled) {
-          auto resrv = atlas_4f.reservation(atlas_indices[i]);
-          info[i].layer = resrv.layer_i;
-          info[i].offs = resrv.offs;
-          info[i].size = resrv.size;
-        }
-
+        // Note; should upgrade to mapped range
         info_gl.set(obj_span<const std::byte>(info[i]),
                              sizeof(detail::RTObjectInfo),
                              sizeof(detail::RTObjectInfo) * static_cast<size_t>(i));
@@ -497,5 +503,104 @@ namespace met::detail {
 
     // Rebuild texture atlas with mips
     atlas_4f = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }}; */
+  }
+
+  RTObserverData::RTObserverData(const Scene &scene) {
+    met_trace_full();
+    
+    constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+    constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+    
+    // Initialize buffers/textures for preallocated nr. of layers;
+    // very unlikely to exceed this count
+    uint n_layers =  std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 256);
+    cmfs_gl_texture = {{ .size = { wavelength_samples, n_layers } }};
+    cmfs_gl         = {{ .size = cmfs_gl_texture.size().prod() * sizeof(eig::Array3f), .flags = buffer_create_flags }};
+    cmfs_gl_mapping = cmfs_gl.map_as<CMFS>(buffer_access_flags);
+  }
+
+  bool RTObserverData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.resources.observers.is_mutated();
+  }
+
+  void RTObserverData::update(const Scene &scene) {
+    met_trace_full();
+
+    uint i = 0;
+    for (const auto &[cmfs, state] : scene.resources.observers) {
+      guard_continue(state);
+      cmfs_gl_mapping[i] = cmfs.transpose().reshaped(wavelength_samples, 3).eval();
+      i++;
+    }
+    cmfs_gl.flush();
+    cmfs_gl_texture.set(cmfs_gl);
+  }
+
+  RTIlluminantData::RTIlluminantData(const Scene &scene) {
+    met_trace_full();
+    
+    constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+    constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
+    // Initialize buffers/textures for preallocated nr. of layers;
+    // very unlikely to exceed this count
+    uint n_layers =  std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 256);
+    illm_gl_texture = {{ .size = { wavelength_samples, n_layers } }};
+    illm_gl         = {{ .size = illm_gl_texture.size().prod() * sizeof(float), .flags = buffer_create_flags }};
+    illm_gl_mapping = illm_gl.map_as<Spec>(buffer_access_flags);
+  }
+
+  bool RTIlluminantData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.resources.illuminants.is_mutated();
+  }
+
+  void RTIlluminantData::update(const Scene &scene) {
+    met_trace_full();
+
+    uint i = 0;
+    for (const auto &[illm, state] : scene.resources.illuminants) {
+      guard_continue(state);
+      illm_gl_mapping[i] = illm;
+      i++;
+    }
+    illm_gl.flush();
+    illm_gl_texture.set(illm_gl);
+  }
+
+  RTColorSystemData::RTColorSystemData(const Scene &scene) {
+    met_trace_full();
+    
+    constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+    constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
+    // Initialize buffers/textures for preallocated nr. of layers;
+    // very unlikely to exceed this count
+    uint n_layers =  std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 256);
+    csys_gl_texture = {{ .size = { wavelength_samples, n_layers } }};
+    csys_gl         = {{ .size = csys_gl_texture.size().prod() * sizeof(eig::Array3f), .flags = buffer_create_flags }};
+    csys_gl_mapping = csys_gl.map_as<CMFS>(buffer_access_flags);
+  }
+
+  bool RTColorSystemData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.resources.illuminants.is_mutated()
+        || scene.resources.observers.is_mutated()
+        || scene.components.colr_systems.is_mutated();
+  }
+
+  void RTColorSystemData::update(const Scene &scene) {
+    met_trace_full();
+
+    uint i = 0;
+    for (const auto &[csys, state] : scene.components.colr_systems) {
+      auto func = scene.get_csys(csys).finalize_direct();
+      // Data is transposed and reshaped into a [wvls, 3]-shaped object for gpu-side layout
+      csys_gl_mapping[i] = func.transpose().reshaped(wavelength_samples, 3);
+      i++;
+    }
+    csys_gl.flush();
+    csys_gl_texture.set(csys_gl);
   }
 } // namespace met::detail

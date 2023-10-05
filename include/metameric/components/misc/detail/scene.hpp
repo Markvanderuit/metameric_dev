@@ -140,4 +140,53 @@ namespace met::detail {
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
   };
+
+  /* Gathered color system data block; holds all packed-together color system
+     spectra  */
+  struct RTObserverData {
+    using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
+
+    gl::Buffer       cmfs_gl;         // Mapped buffer for pixel buffer copy
+    std::span<CMFS>  cmfs_gl_mapping; // Corresponding map
+    Texture1d3fArray cmfs_gl_texture; // Texture array layout for interpolated lookups
+
+  public:
+    RTObserverData() = default;
+    RTObserverData(const Scene &);
+
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
+  };
+
+  /* Gathered illuminant data block; holds all packed-together illuminant
+     spectra  */
+  struct RTIlluminantData {
+    using Texture1d1fArray = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
+
+    gl::Buffer       illm_gl;         // Mapped buffer for pixel buffer copy
+    std::span<Spec>  illm_gl_mapping; // Corresponding map
+    Texture1d1fArray illm_gl_texture; // Texture array layout for interpolated lookups
+
+  public:
+    RTIlluminantData() = default;
+    RTIlluminantData(const Scene &);
+
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
+  };
+
+  struct RTColorSystemData {
+    using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
+
+    gl::Buffer       csys_gl;         // Mapped buffer for pixel buffer copy
+    std::span<CMFS>  csys_gl_mapping; // Corresponding map
+    Texture1d3fArray csys_gl_texture; // Texture array layout for interpolated lookups
+
+  public:
+    RTColorSystemData() = default;
+    RTColorSystemData(const Scene &);
+
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
+  };
 } // namespace met::detail

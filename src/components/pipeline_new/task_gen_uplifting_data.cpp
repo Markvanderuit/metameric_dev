@@ -255,9 +255,12 @@ namespace met {
         const auto &el = i_tesselation.elems[i];
               auto &es = e_uplifting.spectra_gl_mapping[info.elem_offs + i];
         
+        // Data is transposed and reshaped into a [wvls, 4]-shaped object for gpu-side layout
+        detail::RTUpliftingData::SpecPack pack;
         for (uint i = 0; i < 4; ++i) {
-          es.col(i) = i_spectra[el[i]];
+          pack.col(i) = i_spectra[el[i]];
         }
+        es = pack.transpose().reshaped(wavelength_samples, 4);
       }
 
       // Copy affected info data to buffer

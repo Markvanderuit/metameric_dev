@@ -58,6 +58,9 @@ namespace met {
     const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
     const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
     const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
+    const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
+    const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
+    const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
 
     static float wvl = 0.5f;
     if (ImGui::Begin("Test slider")) {
@@ -91,6 +94,12 @@ namespace met {
     m_program.bind("b_unif",         m_unif_camera_buffer);
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
     m_program.bind("b_buff_uplifts", e_uplf_data.info_gl);
+    m_program.bind("b_spec_4f", e_uplf_data.spectra_gl_texture);
+    m_program.bind("b_cmfs_3f", e_cmfs_data.cmfs_gl_texture);
+    m_program.bind("b_illm_1f", e_illm_data.illm_gl_texture);
+    m_program.bind("b_csys_3f", e_csys_data.csys_gl_texture);
+
+    // Bind atlas resources that may not be initialized
     if (e_txtr_data.info_gl.is_init())
       m_program.bind("b_buff_textures", e_txtr_data.info_gl);
     if (e_txtr_data.atlas_1f.texture().is_init())
@@ -99,8 +108,6 @@ namespace met {
       m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
     if (e_objc_data.atlas_4f.texture().is_init())
       m_program.bind("b_uplf_4f", e_objc_data.atlas_4f.texture());
-    if (e_uplf_data.spectra_gl_texture.is_init())
-      m_program.bind("b_spec_4f", e_uplf_data.spectra_gl_texture);
 
     // Dispatch draw call to handle entire scene
     gl::dispatch_multidraw(m_draw);

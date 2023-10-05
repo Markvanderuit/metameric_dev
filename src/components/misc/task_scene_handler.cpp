@@ -15,6 +15,19 @@ namespace met {
     info("mesh_data").init<detail::RTMeshData>(e_scene);
     info("uplf_data").init<detail::RTUpliftingData>(e_scene);
     info("objc_data").init<detail::RTObjectData>(e_scene);
+    info("cmfs_data").init<detail::RTObserverData>(e_scene);
+    info("illm_data").init<detail::RTIlluminantData>(e_scene);
+    info("csys_data").init<detail::RTColorSystemData>(e_scene);
+    
+    { // Pre-load bookkeeping on resources
+      auto &e_scene = info.global("scene").getw<Scene>();
+      
+      e_scene.resources.meshes.set_mutated(true);
+      e_scene.resources.images.set_mutated(true);
+      e_scene.resources.illuminants.set_mutated(true);
+      e_scene.resources.observers.set_mutated(true);
+      e_scene.resources.bases.set_mutated(true);
+    }
   }
 
   void SceneHandlerTask::eval(SchedulerHandle &info) {
@@ -34,6 +47,14 @@ namespace met {
       e_scene.components.objects.update();
     }
 
+    // Process updates to gpu-side illuminant components
+    if (auto handle = info("illm_data"); handle.getr<detail::RTIlluminantData>().is_stale(e_scene))
+      handle.getw<detail::RTIlluminantData>().update(e_scene);
+
+    // Process updates to gpu-side observer components
+    if (auto handle = info("cmfs_data"); handle.getr<detail::RTObserverData>().is_stale(e_scene))
+      handle.getw<detail::RTObserverData>().update(e_scene);
+      
     // Process updates to gpu-side image resources
     if (auto handle = info("txtr_data"); handle.getr<detail::RTTextureData>().is_stale(e_scene))
       handle.getw<detail::RTTextureData>().update(e_scene);
@@ -49,6 +70,10 @@ namespace met {
     // Process updates to gpu-side object components
     if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
       handle.getw<detail::RTObjectData>().update(e_scene);
+
+    // Process updates to gpu-side object components
+    if (auto handle = info("csys_data"); handle.getr<detail::RTColorSystemData>().is_stale(e_scene))
+      handle.getw<detail::RTColorSystemData>().update(e_scene);
 
     { // Post-load bookkeeping on resources; assume no further changes as gpu-side
       // resources should be up-to-date now
