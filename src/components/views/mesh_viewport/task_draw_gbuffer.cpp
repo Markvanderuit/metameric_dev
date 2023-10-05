@@ -12,7 +12,8 @@ namespace met {
 
   bool MeshViewportDrawGBufferTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info.relative("viewport_begin")("is_active").getr<bool>()
+    return (info.relative("viewport_begin")("is_active").getr<bool>()
+        ||  info.relative("viewport_input")("arcball").is_mutated())
        && !info.global("scene").getr<Scene>().components.objects.empty();
   }
 
@@ -34,8 +35,7 @@ namespace met {
     // Initialize draw object
     m_draw = { 
       .type             = gl::PrimitiveType::eTriangles,
-      .capabilities     = {/* { gl::DrawCapability::eMSAA,      true }, */
-                           { gl::DrawCapability::eDepthTest, true },
+      .capabilities     = {{ gl::DrawCapability::eDepthTest, true },
                            { gl::DrawCapability::eCullOp,    true }},
       .draw_op          = gl::DrawOp::eFill,
       .bindable_program = &m_program,
@@ -56,7 +56,9 @@ namespace met {
     met_trace_full();
 
     // Get handle to relative task resource
-    auto begin_handle = info.relative("viewport_begin");
+    auto begin_handle   = info.relative("viewport_begin");
+    auto target_handle  = begin_handle("lrgb_target");
+    auto arcball_handle = info.relative("viewport_input")("arcball");
 
     // Get shared resources 
     const auto &e_scene     = info.global("scene").getr<Scene>();
@@ -64,11 +66,10 @@ namespace met {
     const auto &e_arcball   = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
     const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
-    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-    const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
-    const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
-    const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
-    const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
+
+    // TODO: this violates EVERYTHING in terms of state, but test it
+    if (!target_handle.is_mutated() && !arcball_handle.is_mutated())
+      return;
 
     // Output lrgb target provided by viewport task
     const auto &e_lrgb_target = begin_handle("lrgb_target").getr<gl::Texture2d4f>();
@@ -117,12 +118,12 @@ namespace met {
 
     // Prepare OpenGL state
     m_fbo.bind();
-    m_fbo.clear(gl::FramebufferType::eColor, eig::Array4f { 0, 0, 0, 1 }, 0);
-    m_fbo.clear(gl::FramebufferType::eColor, eig::Array4f { 0, 0, 0, 1 }, 1);
+    m_fbo.clear(gl::FramebufferType::eColor, eig::Array4f(0), 0);
+    m_fbo.clear(gl::FramebufferType::eColor, eig::Array4f(0), 1);
     m_fbo.clear(gl::FramebufferType::eDepth, 1.f);
 
     // Bind required resources to their corresponding targets
-    m_program.bind("b_buff_unif", m_unif_buffer);
+    m_program.bind("b_buff_unif",    m_unif_buffer);
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
 
     // Dispatch draw call to handle entire scene
@@ -130,15 +131,15 @@ namespace met {
 
     // Rebind prior framebuffer
     // TODO avoid unecessary state switches
-    begin_handle("frame_buffer_ms").getr<gl::Framebuffer>().bind();
+    begin_handle("frame_buffer").getr<gl::Framebuffer>().bind();
     
-    // TODO remove debug view
+    /* // TODO remove debug view
     if (ImGui::Begin("GBuffer visualizer")) {
       const auto &i_gbuffer_norm_dp = info("gbuffer_norm_dp").getr<gl::Texture2d4f>();
       const auto &i_gbuffer_txc_idx = info("gbuffer_txc_idx").getr<gl::Texture2d4f>();
       ImGui::Image(ImGui::to_ptr(i_gbuffer_norm_dp.object()), { 512, 512 }, { 0, 1 }, { 1, 0 });
       ImGui::Image(ImGui::to_ptr(i_gbuffer_txc_idx.object()), { 512, 512 }, { 0, 1 }, { 1, 0 });
     }
-    ImGui::End();
+    ImGui::End(); */
   }
 } // namespace met

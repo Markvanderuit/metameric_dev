@@ -1,5 +1,6 @@
 #version 460 core
 
+#include <math.glsl>
 #include <scene.glsl>
 
 // Buffer layout declarations
@@ -66,8 +67,8 @@ void main() {
   // out_value_txc_idx = vec4(in_value_p, 1);
 
   // Pack outputs s.t.
-  // 0 : normal and linearized depth
+  // 0 : normal and depth
   // 1 : texture coord and object index
   out_value_norm_dp = vec4(in_value_n, d);
-  out_value_txc_idx = vec4(in_value_tx, uintBitsToFloat(in_value_id), 1);
+  out_value_txc_idx = vec4(in_value_tx, uintBitsToFloat(in_value_id), FLT_MAX);
 }

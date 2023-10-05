@@ -7,6 +7,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 
 namespace met {
@@ -112,30 +113,44 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace();
 
-      // If window is not hovered, exit now instead of handling camera input
+      // Get handle to relative task resources and non-active resources
+      auto arcball_handle = info("arcball");
+      auto begin_handle   = info.relative("viewport_begin");
+    
+      // Get shared resources 
+      const auto &e_target = begin_handle("lrgb_target").getr<gl::Texture2d4f>();
+      const auto &io       = ImGui::GetIO();
+
+      // Arcball; handle aspect modification on viewport resize
+      auto viewport_size = e_target.size().cast<float>().eval();
+      if (begin_handle("lrgb_target").is_mutated()) {
+        auto &i_arcball = arcball_handle.getw<detail::Arcball>();
+        i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
+      }
+
+      // If window is not hovered, exit now instead of handling user input
       guard(ImGui::IsItemHovered());
 
-      // Get modified resources
-      auto &io        = ImGui::GetIO();
-      auto &i_arcball = info.resource("arcball").getw<detail::Arcball>();
-
-      // Compute viewport offs, size minus ImGui's tab bars etc
-      eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-                                 + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());    
-
-      // Handle arcball control
-      i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
-      if (io.MouseWheel != 0.f)
+      // Arcball; handle mouse scroll
+      if (io.MouseWheel != 0.f) {
+        auto &i_arcball = arcball_handle.getw<detail::Arcball>();
         i_arcball.set_zoom_delta(-io.MouseWheel);
-      if (io.MouseDown[1])
+      }
+
+      // Arcball; handle right mouse controll
+      if (io.MouseDown[1]) {
+        auto &i_arcball = arcball_handle.getw<detail::Arcball>();
         i_arcball.set_ball_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());
+      }
+
+      // Arcball; handle middle mouse controll
       if (io.MouseDown[2]) {
+        auto &i_arcball = arcball_handle.getw<detail::Arcball>();
         i_arcball.set_move_delta((eig::Array3f() 
           << eig::Array2f(io.MouseDelta.x, io.MouseDelta.y) / viewport_size.array(), 0).finished());
       }
 
+      // TODO: remove
       // eval_rt(info);
     }
   };
