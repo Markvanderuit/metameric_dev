@@ -218,7 +218,7 @@ namespace met {
       auto &i_arcball = info.resource("arcball").getw<detail::Arcball>();
 
       // Handle camera update: aspect ratio, scroll delta, move delta dependent on ImGui i/o
-      i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
+      i_arcball.set_aspect(viewport_size.x() / viewport_size.y());
       i_arcball.set_zoom_delta(-0.5f * io.MouseWheel);
       if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
         i_arcball.set_ball_delta(eig::Array2f(io.MouseDelta) / viewport_size.array());

@@ -1,6 +1,7 @@
 #version 460 core
 
 #include <guard.glsl>
+#include <gbuffer.glsl>
 #include <math.glsl>
 #include <random_uniform.glsl>
 #include <scene.glsl>
@@ -36,81 +37,70 @@ layout(binding = 3) restrict readonly buffer b_buff_uplifts {
   UpliftInfo data[];
 } buff_uplifts;
 
-
-// Texture unit, ergo asampler declarations
-layout(binding = 0) uniform sampler2D      b_gbuffer_norm_dp; // G-buffer pack 0; normals, frag depth
-layout(binding = 1) uniform sampler2D      b_gbuffer_txc_idx; // G-buffer pack 1; txcoords, object idx
-layout(binding = 2) uniform sampler2DArray b_txtr_1f;         // Alpha texture atlas
-layout(binding = 3) uniform sampler2DArray b_txtr_3f;         // RGB texture atlas
-layout(binding = 4) uniform sampler2DArray b_uplf_4f;         // Uplifting weight atlas
-layout(binding = 5) uniform sampler1DArray b_spec_4f;         // Uplifting spectral atlas
-layout(binding = 6) uniform sampler1DArray b_illm_1f;         // Illuminant function data, 1 component
-layout(binding = 7) uniform sampler1DArray b_cmfs_3f;         // Observer function data, 3 components
-layout(binding = 8) uniform sampler1DArray b_csys_3f;         // Color system spectra, 3 components
+// Texture unit, ergo sampler declarations
+layout(binding = 0) uniform sampler2D      b_gbuffer; // G-buffer pack
+layout(binding = 1) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
+layout(binding = 2) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
+layout(binding = 3) uniform sampler2DArray b_uplf_4f; // Uplifting weight atlas
+layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
+layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 7) uniform sampler1DArray b_csys_3f; // Color system spectra, 3 components
 
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
-// Simple G-Buffer struct
-struct GBuffer {
-  vec3 p;        // World-space position, recovered from depth
-  vec3 n;        // World-space normals
-  vec2 tx;       // Surface texture coordinates
-  uint object_i; // UINT_MAX if no object is visible, and the object's index otherwise
-};
-
 GBuffer sample_gbuffer(in vec2 xy) {
-  vec4 p0 = texture(b_gbuffer_norm_dp, xy);
-  vec4 p1 = texture(b_gbuffer_txc_idx, xy);
-
-  // Early out if no object is visible
-  if (p1.w != FLT_MAX)
-    return GBuffer(vec3(0), vec3(0), vec2(0), UINT_MAX);
-
-  // Recover world-space position from depth
-  vec4 invp = buff_unif.inv * vec4(vec3(xy, p0.w) * 2.f - 1.f, 1);
-  vec3 p    = invp.xyz / invp.w;
-
-  // Recover object index from packed data
-  uint object_i = floatBitsToUint(p1.z);
-
-  // Return valid sample
-  return GBuffer(p, p0.xyz, p1.xy, object_i);
+  uvec4 pack = floatBitsToUint(texture(b_gbuffer, xy));
+  return decode_gbuffer(pack, xy, buff_unif.inv);
 }
 
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
   return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
 }
 
+uvec4 sample_uplift_elem(in ObjectInfo object_info, in vec2 tx_in) {
+  // Query nearest-neigbor barycentric weight for this object
+  vec2 tx = (vec2(object_info.offs) + mod(tx_in, 1.f) * vec2(object_info.size)) / textureSize(b_uplf_4f, 0).xy;
+  return uvec4(textureGather(b_uplf_4f, vec3(tx, object_info.layer), 3)); // fourth channel is non-variant :D
+}
+
+vec4 sample_uplift_bary_offset(in ObjectInfo object_info, in vec2 tx_in, in uvec2 offs) {
+  uvec2 tx = object_info.offs + uvec2(vec2(object_info.size) * mod(tx_in, 1.f)) + offs;
+  return texelFetch(b_uplf_4f, ivec3(tx, object_info.layer), 0);
+}
+
 vec4 sample_uplift_bary(in ObjectInfo object_info, in vec2 tx_in) {
   // Query nearest-neigbor barycentric weight for this object
   // TODO sample bilinearly!
-  uvec2 tx  = object_info.offs + uvec2(vec2(object_info.size) * mod(tx_in, 1.f));
-  return texelFetch(b_uplf_4f, ivec3(tx, object_info.layer), 0);
+  // uvec2 tx = object_info.offs + uvec2(vec2(object_info.size) * mod(tx_in, 1.f));
+  // return texelFetch(b_uplf_4f, ivec3(tx, object_info.layer), 0);
+
+  vec2 tx = (vec2(object_info.offs) + mod(tx_in, 1.f) * vec2(object_info.size)) / textureSize(b_uplf_4f, 0).xy;
+  return textureLod(b_uplf_4f, vec3(tx, object_info.layer), 0); // fourth channel is non-variant :D
 }
 
 float sample_uplift_refl(in UpliftInfo uplift_info, in vec4 bary, in float wvl) {
   // Extract tesselation index from packing, and replace with correct weight w
-  uint elem_i = floatBitsToUint(bary.w) + uplift_info.elem_offs;
+  uint elem_i = uint(bary.w) + uplift_info.elem_offs;
   bary.w = 1.f - hsum(bary.xyz);
   
   // Recover recovered surface reflectance for given wavelength as a dot product
   return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
 }
 
-/* float sample_uplift(in ObjectInfo object_info, in UpliftInfo uplift_info, in vec2 tx_in, in float wvl) {
-  // Query nearest-neigbor barycentric weight for this object
-  // TODO sample bilinearly!
-  uvec2 tx  = object_info.offs + uvec2(vec2(object_info.size) * mod(tx_in, 1.f));
-  vec4 bary = texelFetch(b_uplf_4f, ivec3(tx, object_info.layer), 0);
+vec3 estimate_color(in ObjectInfo object_info, in UpliftInfo uplift_info, in vec4 bary, in float wvl) {
+  float r = sample_uplift_refl(uplift_info, bary, wvl);
+  vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
+  return csys * r * float(wavelength_samples);
+}
 
-  // Extract tesselation index from packing, and replace with correct weight w
-  uint elem_i = floatBitsToUint(bary.w) + uplift_info.elem_offs;
-  bary.w = 1.f - hsum(bary.xyz);
-
-  // Recover recovered surface reflectance for given wavelength as a dot product
-  return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
-} */
+const uvec2 texel_offsets[4] = uvec2[4](
+  uvec2(0, 0),
+  uvec2(1, 0),
+  uvec2(0, 1),
+  uvec2(1, 1)
+);
 
 void main() {
   // 2D/1D image/buffer coordinates
@@ -142,21 +132,77 @@ void main() {
   if (buff_sampler.iter != 0)
     value = imageLoad(b_target_4f, ivec2(i)).xyz * float(buff_sampler.iter);
 
-  // Take direct light samples
-  vec4 bary   = sample_uplift_bary(object_info, gb.tx);
-  for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
-    float wvl = next_1d(state); // Sample next wavelength
-    
-    // Sample surface reflectance and color system spectra at wavelength
-    float r = sample_uplift_refl(uplift_info, bary, wvl);
-    vec3 csys = sample_colsys(0, wvl);
+  uvec4 indices = sample_uplift_elem(object_info, gb.tx);
+  if (all(equal(indices, uvec4(indices.x)))) {
+    // Hot path; all element indices are the same
+    vec4 bary = sample_uplift_bary(object_info, gb.tx);
 
-    // Add to direct lighting    
-    value += csys * r * float(wavelength_samples);
-  } // for (uint i)
+    // Take direct light samples
+    for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+      // Sample next wavelength
+      float wvl = next_1d(state); 
+      
+      // Evaluate surface reflectance and color system spectra at wavelength,
+      // then add to direct lighting estiamte
+      value += estimate_color(object_info, uplift_info, bary, wvl);
+    } // for (uint i)
+  } else {
+    // Cold path; border region, indices differ
+    uvec3 state_copy;
+    vec3 value_temp = vec3(0);
+    float value_weight = 0.f;
+
+    vec2 xy = mod(gb.tx, 1.f) * vec2(object_info.size);
+    xy = xy - floor(xy);
+    
+    for (uint j = 0; j < 4; ++j) {
+      state_copy = state;
+      vec4 bary = sample_uplift_bary_offset(object_info, gb.tx, texel_offsets[j]);
+
+      vec2 xy_dist = vec2(1) - abs(vec2(texel_offsets[j]) - xy);
+      float w = sdot(xy_dist);
+
+      // Take direct light samples
+      for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+        // Sample next wavelength
+        float wvl = next_1d(state_copy); 
+        
+        // Evaluate surface reflectance and color system spectra at wavelength,
+        // then add to direct lighting estimate
+        value_temp += w * estimate_color(object_info, uplift_info, bary, wvl);
+      } // for (uint i)
+
+      value_weight += w;
+    } // for (uint j)
+    state = state_copy;
+    value += value_temp; // / value_weight;
+  }
+  
+  // uint elem_i = indices.x; // floatBitsToUint(sample_uplift_bary _nearest(object_info, gb.tx).w);
+  // bary.w = uintBitsToFloat(elem_i);
+  // bary.w = indices.x;
+  // uint elem_i = uint(bary.w);
+  // for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+  //   // Sample next wavelength
+  //   float wvl = next_1d(state); 
+    
+  //   // Evaluate surface reflectance and color system spectra at wavelength,
+  //   // then add to direct lighting estiamte
+  //   value += estimate_color(object_info, uplift_info, bary, wvl);
+  // } // for (uint i)
 
   // Reweight image value by nr. of samples
   value /= float(buff_sampler.iter + buff_sampler.n_iters_per_dispatch);
+  
+  // Test overtake to mark problematic areas
+  // if (!all(equal(indices, uvec4(elem_i)))) {
+  //   value = vec3(1, 0, 1);
+  // }
+  /*  else  */
+  // {
+  //   float c = float(elem_i) / float(uplift_info.elem_size);
+  //   value = vec3(c);
+  // }
 
   // Store updated image value and sampler state
   imageStore(b_target_4f, ivec2(i), vec4(value, 1));

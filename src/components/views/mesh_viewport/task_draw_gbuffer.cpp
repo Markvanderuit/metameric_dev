@@ -13,7 +13,7 @@ namespace met {
   bool MeshViewportDrawGBufferTask::is_active(SchedulerHandle &info) {
     met_trace();
     return (info.relative("viewport_begin")("is_active").getr<bool>()
-        ||  info.relative("viewport_input")("arcball").is_mutated())
+        ||  info.relative("viewport_begin")("lrgb_target").is_mutated())
        && !info.global("scene").getr<Scene>().components.objects.empty();
   }
 
@@ -41,23 +41,14 @@ namespace met {
       .bindable_program = &m_program,
     };
 
-    /* 
-      G-buffer layout primer
-      - normals; 3 components
-      - depth; 1 component, non-linear, allows recovery of position
-      - UVs; 2 components
-      - object_id; 1 component, uint32
-     */
-    info("gbuffer_norm_dp").set<gl::Texture2d4f>({ }); // normals and linearized depth
-    info("gbuffer_txc_idx").set<gl::Texture2d4f>({ }); // txcords and object indices
+    info("gbuffer").set<gl::Texture2d4f>({ }); // packed gbuffer texture
   }
     
   void MeshViewportDrawGBufferTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
     // Get handle to relative task resource
-    auto begin_handle   = info.relative("viewport_begin");
-    auto target_handle  = begin_handle("lrgb_target");
+    auto target_handle  = info.relative("viewport_begin")("lrgb_target");
     auto arcball_handle = info.relative("viewport_input")("arcball");
 
     // Get shared resources 
@@ -66,38 +57,31 @@ namespace met {
     const auto &e_arcball   = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
     const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
+    const auto &e_target    = target_handle.getr<gl::Texture2d4f>();
 
     // TODO: this violates EVERYTHING in terms of state, but test it
-    if (!target_handle.is_mutated() && !arcball_handle.is_mutated())
-      return;
+    // if (!target_handle.is_mutated() && !arcball_handle.is_mutated())
+    //   return;
 
-    // Output lrgb target provided by viewport task
-    const auto &e_lrgb_target = begin_handle("lrgb_target").getr<gl::Texture2d4f>();
-    
     // Rebuild framebuffer and g-buffer textures if necessary
-    if (!m_fbo.is_init() || (m_fbo_depth.size() != e_lrgb_target.size()).any()) {
+    if (!m_fbo.is_init() || (m_fbo_depth.size() != e_target.size()).any()) {
       // Get write-handles to g-buffer textures
-      auto &i_gbuffer_norm_dp = info("gbuffer_norm_dp").getw<gl::Texture2d4f>();
-      auto &i_gbuffer_txc_idx = info("gbuffer_txc_idx").getw<gl::Texture2d4f>();
+      auto &i_gbuffer = info("gbuffer").getw<gl::Texture2d4f>();
       
       // Rebuild depth target and g-buffer textures
-      m_fbo_depth       = {{ .size = e_lrgb_target.size().max(1).eval() }};
-      i_gbuffer_norm_dp = {{ .size = e_lrgb_target.size().max(1).eval() }};
-      i_gbuffer_txc_idx = {{ .size = e_lrgb_target.size().max(1).eval() }};
+      m_fbo_depth = {{ .size = e_target.size().max(1).eval() }};
+      i_gbuffer   = {{ .size = e_target.size().max(1).eval() }};
 
       // Rebuild framebuffer
-      m_fbo = {{ .type = gl::FramebufferType::eColor, .index = 0, .attachment = &i_gbuffer_norm_dp },
-               { .type = gl::FramebufferType::eColor, .index = 1, .attachment = &i_gbuffer_txc_idx },
-               { .type = gl::FramebufferType::eDepth, .index = 0, .attachment = &m_fbo_depth       }};
+      m_fbo = {{ .type = gl::FramebufferType::eColor, .attachment = &i_gbuffer   },
+               { .type = gl::FramebufferType::eDepth, .attachment = &m_fbo_depth }};
     }
 
     // Push camera matrix to uniform data
-    m_unif_buffer_map->trf     = e_arcball.full().matrix();
-    m_unif_buffer_map->trf_inv = e_arcball.full().matrix().inverse();
-    m_unif_buffer_map->viewport_size = e_lrgb_target.size().cast<float>();
-    m_unif_buffer_map->z_near  = e_arcball.m_near_z;
-    m_unif_buffer_map->z_far   = e_arcball.m_far_z;
-    m_unif_buffer.flush();
+    if (target_handle.is_mutated() || arcball_handle.is_mutated()) {
+      m_unif_buffer_map->trf = e_arcball.full().matrix();
+      m_unif_buffer.flush();
+    }
     
     // Set fresh vertex array for draw data if it was updated
     if (is_first_eval() || info("scene_handler", "mesh_data").is_mutated())
@@ -116,30 +100,20 @@ namespace met {
       });
     }
 
-    // Prepare OpenGL state
+    // Prepare framebuffer state
     m_fbo.bind();
     m_fbo.clear(gl::FramebufferType::eColor, eig::Array4f(0), 0);
-    m_fbo.clear(gl::FramebufferType::eColor, eig::Array4f(0), 1);
     m_fbo.clear(gl::FramebufferType::eDepth, 1.f);
-
+    
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif",    m_unif_buffer);
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
 
     // Dispatch draw call to handle entire scene
+    gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer       | 
+                            gl::BarrierFlags::eTextureFetch       |
+                            gl::BarrierFlags::eClientMappedBuffer |
+                            gl::BarrierFlags::eUniformBuffer      );
     gl::dispatch_multidraw(m_draw);
-
-    // Rebind prior framebuffer
-    // TODO avoid unecessary state switches
-    begin_handle("frame_buffer").getr<gl::Framebuffer>().bind();
-    
-    /* // TODO remove debug view
-    if (ImGui::Begin("GBuffer visualizer")) {
-      const auto &i_gbuffer_norm_dp = info("gbuffer_norm_dp").getr<gl::Texture2d4f>();
-      const auto &i_gbuffer_txc_idx = info("gbuffer_txc_idx").getr<gl::Texture2d4f>();
-      ImGui::Image(ImGui::to_ptr(i_gbuffer_norm_dp.object()), { 512, 512 }, { 0, 1 }, { 1, 0 });
-      ImGui::Image(ImGui::to_ptr(i_gbuffer_txc_idx.object()), { 512, 512 }, { 0, 1 }, { 1, 0 });
-    }
-    ImGui::End(); */
   }
 } // namespace met

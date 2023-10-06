@@ -1,0 +1,36 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <math.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(std140) uniform;
+layout(std430) buffer;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  uvec2 viewport_size;
+} buff_unif;
+
+// Texture unit, ergo sampler declarations
+layout(binding = 0) uniform sampler2D b_direct_4f;
+// layout(binding = 1) uniform sampler2D b_indrct_4f;
+
+// Image unit, output declaration
+layout(binding = 0, rgba32f) uniform writeonly image2D b_target_4f;
+
+void main() {
+  // 2D/1D image/buffer coordinates
+  const uvec2 i = gl_GlobalInvocationID.xy;
+  const vec2 xy = (vec2(i) + 0.5) / vec2(buff_unif.viewport_size);
+  guard(all(lessThan(i, buff_unif.viewport_size)));
+
+  // Sample direct/indirect render outputs and combine
+  vec3 value = vec3(0);
+  value += texture(b_direct_4f, xy).xyz;
+  // value += texture(b_indrct_4f, xy).xyz;
+  
+  // Store combined result
+  imageStore(b_target_4f, ivec2(i), vec4(value, 1));
+}

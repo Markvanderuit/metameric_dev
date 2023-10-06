@@ -164,7 +164,7 @@ namespace met {
     view_state.vert_mouseover = detail::compare_vector<VectorState<uint>>(e_vert_mover, m_vert_mover).is_any_stale;
     view_state.cstr_selection = detail::compare_object(e_cstr_selct, m_cstr_selct);
     view_state.camera_matrix  = detail::compare_object(e_arcball.full().matrix(), m_camera_matrix);
-    view_state.camera_aspect  = detail::compare_object(e_arcball.m_aspect,        m_camera_aspect);
+    view_state.camera_aspect  = detail::compare_object(e_arcball.aspect(),        m_camera_aspect);
 
     // Set major summary flags
     proj_state.is_any_stale = proj_state.verts || proj_state.csys || proj_state.elems 

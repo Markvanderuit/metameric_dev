@@ -8,14 +8,15 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  constexpr uint n_iters_per_dispatch = 16u;
-  constexpr uint n_iters_max          = 1024u;
+  constexpr uint n_iters_per_dispatch = 64u;
+  constexpr uint n_iters_max          = 4096u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
   bool MeshViewportDrawDirectTask::is_active(SchedulerHandle &info) {
     met_trace();
     return (info.relative("viewport_begin")("is_active").getr<bool>()
+        ||  info.relative("viewport_begin")("lrgb_target").is_mutated()
         ||  info.relative("viewport_input")("arcball").is_mutated())
        && !info.global("scene").getr<Scene>().components.objects.empty();
   }
@@ -34,15 +35,18 @@ namespace met {
     m_sampler_buffer     = {{ .size = sizeof(SamplerLayout), .flags = buffer_create_flags }};
     m_sampler_buffer_map = m_sampler_buffer.map_as<SamplerLayout>(buffer_access_flags).data();
     m_sampler_buffer_map->n_iters_per_dispatch = n_iters_per_dispatch;
+
+    // Internal target texture; can be differently sized
+    info("target").set<gl::Texture2d4f>({ });
   }
     
   void MeshViewportDrawDirectTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get handle to relative task resource
-    auto begin_handle = info.relative("viewport_begin");
-    auto gbuffer_handle = info.relative("viewport_draw_gbuffer");
-    auto arcball_handle  = info.relative("viewport_input")("arcball");
+    // Get handles to relative task resource
+    auto begin_handle   = info.relative("viewport_begin");
+    auto target_handle  = begin_handle("lrgb_target");
+    auto arcball_handle = info.relative("viewport_input")("arcball");
 
     // Get shared resources 
     const auto &e_scene     = info.global("scene").getr<Scene>();
@@ -53,29 +57,39 @@ namespace met {
     const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
     const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
     const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
-    const auto &e_target    = begin_handle("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
 
-    // If viewport is resized or sampler data is not yet initialized, initialize
-    // TODO: this violates EVERYTHING in terms of state, but test it!
-    if (begin_handle("lrgb_target").is_mutated() || !m_state_buffer.is_init()) {
+    // Get modified resources
+    auto &i_target = info("target").getw<gl::Texture2d4f>();
+
+    // If target viewport is resized or sampler data is not yet initialized, initialize
+    // TODO: this violates EVERYTHING in terms of state, but test it for now!
+    if (target_handle.is_mutated() || !m_state_buffer.is_init()) {
+      const auto &e_target = target_handle.getr<gl::Texture2d4f>();
+
+      // Resize internal state buffer and target accordingly
       m_state_buffer = {{ .size = e_target.size().prod() * sizeof(eig::Array2u) }};
-      m_iter = 0; // Fresh cumulative frame!
+      i_target       = {{ .size = e_target.size() }};
+
+      // Fresh cumulative frame
+      i_target.clear();
+      m_iter = 0;
     }
 
-    // Push camera matrix to uniform data
-    if (arcball_handle.is_mutated()) {
+    // If camera moved, or view resized...
+    if (target_handle.is_mutated() || arcball_handle.is_mutated()) {
+      // Push camera matrix to uniform data
       const auto &e_arcball = arcball_handle.getr<detail::Arcball>();
       m_unif_buffer_map->trf = e_arcball.full().matrix();
       m_unif_buffer_map->inv = e_arcball.full().matrix().inverse();
-      m_iter = 0; // Fresh cumulative frame!
+
+      // Fresh cumulative frame
+      i_target.clear();
+      m_iter = 0;
     }
 
     // Early-out; the maximum sample count has been reached, and we
     // can save a bit on the energy bill
-    if (m_iter == n_iters_max) {
-      fmt::print("Boop\n");
-      m_iter++;
-    }
     if (m_iter >= n_iters_max)
       return;
 
@@ -84,7 +98,7 @@ namespace met {
     m_sampler_buffer.flush();
 
     // Specify dispatch size
-    auto dispatch_n    = e_target.size();
+    auto dispatch_n    = i_target.size();
     auto dispatch_ndiv = ceil_div(dispatch_n, 16u);
 
     // Push miscellaneous uniforms
@@ -92,18 +106,17 @@ namespace met {
     m_unif_buffer.flush();
 
     // Bind required resources to their corresponding targets
-    m_program.bind("b_buff_unif",       m_unif_buffer);
-    m_program.bind("b_buff_sampler",    m_sampler_buffer);
-    m_program.bind("b_buff_state",      m_state_buffer);
-    m_program.bind("b_buff_objects",    e_objc_data.info_gl);
-    m_program.bind("b_buff_uplifts",    e_uplf_data.info_gl);
-    m_program.bind("b_spec_4f",         e_uplf_data.spectra_gl_texture);
-    m_program.bind("b_cmfs_3f",         e_cmfs_data.cmfs_gl_texture);
-    m_program.bind("b_illm_1f",         e_illm_data.illm_gl_texture);
-    m_program.bind("b_csys_3f",         e_csys_data.csys_gl_texture);
-    m_program.bind("b_gbuffer_norm_dp", gbuffer_handle("gbuffer_norm_dp").getr<gl::Texture2d4f>());
-    m_program.bind("b_gbuffer_txc_idx", gbuffer_handle("gbuffer_txc_idx").getr<gl::Texture2d4f>());
-    m_program.bind("b_target_4f",       e_target);
+    m_program.bind("b_buff_unif",    m_unif_buffer);
+    m_program.bind("b_buff_sampler", m_sampler_buffer);
+    m_program.bind("b_buff_state",   m_state_buffer);
+    m_program.bind("b_buff_objects", e_objc_data.info_gl);
+    m_program.bind("b_buff_uplifts", e_uplf_data.info_gl);
+    m_program.bind("b_spec_4f",      e_uplf_data.spectra_gl_texture);
+    m_program.bind("b_cmfs_3f",      e_cmfs_data.cmfs_gl_texture);
+    m_program.bind("b_illm_1f",      e_illm_data.illm_gl_texture);
+    m_program.bind("b_csys_3f",      e_csys_data.csys_gl_texture);
+    m_program.bind("b_gbuffer",      e_gbuffer);
+    m_program.bind("b_target_4f",    i_target);
 
     // Bind atlas resources that may not be initialized
     if (e_txtr_data.info_gl.is_init())
@@ -116,9 +129,13 @@ namespace met {
       m_program.bind("b_uplf_4f", e_objc_data.atlas_4f.texture());
 
     // Dispatch compute shader
+    gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |
+                             gl::BarrierFlags::eTextureFetch       |
+                             gl::BarrierFlags::eClientMappedBuffer |
+                             gl::BarrierFlags::eUniformBuffer      );
     gl::dispatch_compute({ .groups_x         = dispatch_ndiv.x(),
                            .groups_y         = dispatch_ndiv.y(),
-                           .bindable_program = &m_program       });
+                           .bindable_program = &m_program      });
 
     m_iter += n_iters_per_dispatch;
   }

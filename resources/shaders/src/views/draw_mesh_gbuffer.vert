@@ -19,10 +19,6 @@ layout(location = 3) out flat uint out_value_id;
 // Buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   mat4  trf;
-  mat4  trf_inv; // TODO strip
-  vec2  viewport_size;
-  float z_near;
-  float z_far;
 } buff_unif;
 layout(binding = 0) restrict readonly buffer b_buff_objects {
   ObjectInfo[] data;

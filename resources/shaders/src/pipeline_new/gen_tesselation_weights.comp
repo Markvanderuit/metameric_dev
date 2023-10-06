@@ -93,5 +93,5 @@ void main() {
   } // for (uint j)
 
   // Store result, packing 3/4th of weights, together with the tetrahedron's index
-  store_weight(object_info, i, vec4(result_bary.xyz, uintBitsToFloat(result_indx)));
+  store_weight(object_info, i, vec4(result_bary.xyz, float(result_indx)));
 }

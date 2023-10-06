@@ -147,9 +147,8 @@ namespace met::detail {
       
       // Prepare framebuffer target for next subtasks
       i_frame_buffer.bind();
-      // TODO: should clear, but handle this differently for progressive rendering?
-      // i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
-      // i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
+      i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
+      i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
 
       // Specify viewport for next subtasks
       gl::state::set_viewport(i_lrgb_target.size());    

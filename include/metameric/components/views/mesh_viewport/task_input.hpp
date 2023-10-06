@@ -125,7 +125,7 @@ namespace met {
       auto viewport_size = e_target.size().cast<float>().eval();
       if (begin_handle("lrgb_target").is_mutated()) {
         auto &i_arcball = arcball_handle.getw<detail::Arcball>();
-        i_arcball.m_aspect = viewport_size.x() / viewport_size.y();
+        i_arcball.set_aspect(viewport_size.x() / viewport_size.y());
       }
 
       // If window is not hovered, exit now instead of handling user input

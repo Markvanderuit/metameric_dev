@@ -469,7 +469,7 @@ namespace met {
       // If gizmo is not in use, process input to update camera
       if (!ImGuizmo::IsUsing()) {
         auto &io = ImGui::GetIO();
-        i_arcball.m_aspect = i_lrgb_target.size().x() / i_lrgb_target.size().y();
+        i_arcball.set_aspect(i_lrgb_target.size().x() / i_lrgb_target.size().y());
         i_arcball.set_zoom_delta(io.MouseWheel);
         if (io.MouseDown[2] || (io.MouseDown[0] && io.KeyCtrl))
           i_arcball.set_ball_delta(eig::Array2f(io.MouseDelta) / i_lrgb_target.size().cast<float>());

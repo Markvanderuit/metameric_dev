@@ -13,10 +13,6 @@ namespace met {
 
     struct UnifLayout {
      eig::Matrix4f trf;
-     eig::Matrix4f trf_inv;
-     eig::Array2f  viewport_size;
-     float         z_near;
-     float         z_far;
     };
     
     UnifLayout       *m_unif_buffer_map;

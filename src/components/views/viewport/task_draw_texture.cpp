@@ -72,7 +72,7 @@ namespace met {
     if (e_view_state.camera_matrix || e_view_state.camera_aspect) {
       const auto &e_arcball = info("viewport.input", "arcball").getr<detail::Arcball>();
       m_uniform_map->camera_matrix = e_arcball.full().matrix();
-      m_uniform_map->camera_aspect = { 1.f, e_arcball.m_aspect };
+      m_uniform_map->camera_aspect = { 1.f, e_arcball.aspect() };
       m_uniform_buffer.flush();
     }
 

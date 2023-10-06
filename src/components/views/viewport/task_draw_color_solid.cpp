@@ -225,7 +225,7 @@ namespace met {
       m_cnstr_uniform_map->model_matrix   = transl.matrix();
       m_cnstr_uniform_map->camera_matrix  = e_arcball.full().matrix();
       m_cnstr_uniform_map->point_position = e_vert.colr_j[e_cstr_slct];
-      m_cnstr_uniform_map->point_aspect   = { 1.f, e_arcball.m_aspect };
+      m_cnstr_uniform_map->point_aspect   = { 1.f, e_arcball.aspect() };
       m_cnstr_uniform_buffer.flush();
 
       m_cnstr_program.bind("b_uniform", m_cnstr_uniform_buffer);
