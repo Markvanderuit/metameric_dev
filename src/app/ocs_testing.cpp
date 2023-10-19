@@ -344,13 +344,14 @@ namespace met {
                               .n_scatters = 1 }).finalize_direct();
       
       // Generate a sampling distribution
-      UniformSampler sampler(0.f, 1.f, 4);
-      Spec cs_flat = cs.rowwise().sum().eval();
-      Distribution ds(cnt_span<const float>(cs_flat));
+      // UniformSampler sampler(0.f, 1.f, 4);
+      // Spec cs_flat = cs.rowwise().sum().eval();
+      // Distribution ds(cnt_span<const float>(cs_flat));
       
+      auto samples_x = detail::gen_unit_dirs_x(256, 3);
+      std::vector<Colr> samples(range_iter(samples_x));
       
 
-      auto samples_x = detail::gen_unit_dirs_x(256, 3);
       /* {
         // Generate 3d gaussian samples for rendering
         std::vector<Colr> samples(samples_x.size());
@@ -358,19 +359,28 @@ namespace met {
         i_pointsets.push_back(PointsetDraw(samples, "3d gaussian samples"));
       } */
 
+      // First, weight the samples towards maximum values in the color system
       {
-
-        std::vector<Colr> samples(samples_x.size());
-        rng::transform(samples_x, samples.begin(), [](const auto &xf) { return Colr(xf.head(3)); });
         rng::transform(samples, samples.begin(), [&](const Colr &sample) { 
           Spec s = (cs * sample.matrix()).eval();
-          for (auto &f : s)
-            f = f >= 0.f ? 1.f : 0.f;
-          return (cs.transpose() * s.matrix() * 100.f).eval();
+          return (cs.transpose() * s.matrix()).normalized().eval();
         });
-        fmt::print("samples: {}\n", samples);
+      }
 
-        i_pointsets.push_back(PointsetDraw(samples, "3d csys projection"));
+      // Next, compute color system spectra
+      {
+
+        std::vector<Colr> values(samples.size());
+        rng::transform(samples, values.begin(), [&](const Colr &sample) { 
+          Spec s = (cs * sample.matrix()).eval();
+          s = (s.matrix().normalized().array() / 2.f) + Spec(1.f);
+          // for (auto &f : s)
+          //   f = f >= 0.f ? 1.f : 0.f;
+          return (cs.transpose() * s.matrix()).eval();
+        });
+        fmt::print("samples: {}\n", values);
+
+        i_pointsets.push_back(PointsetDraw(values, "3d csys projection"));
       }
     }
 
