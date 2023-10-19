@@ -82,8 +82,7 @@ namespace met {
     }
 
     uint sample(float value) const {
-      return std::distance(m_cdf.begin(), 
-                           std::ranges::lower_bound(m_cdf, value * sum()));
+      return std::distance(m_cdf.begin(), rng::lower_bound(m_cdf, value * sum()));
     }
   };
 } // namespace met
