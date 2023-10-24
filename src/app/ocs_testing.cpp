@@ -32,7 +32,7 @@
 #include <execution>
 #include <numbers>
 #include <unordered_set>
-#include "nlopt.h"
+#include "nlopt.hpp"
 
 namespace met {
   // Constants
