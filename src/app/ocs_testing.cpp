@@ -13,6 +13,7 @@
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
@@ -30,6 +31,7 @@
 #include <exception>
 #include <execution>
 #include <numbers>
+#include <unordered_set>
 
 namespace met {
   // Constants
@@ -37,11 +39,8 @@ namespace met {
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
   // Data objects
-  Basis                          basis;
-  // std::vector<eig::ArrayXf>      samples_p1;
-  // std::vector<eig::ArrayXf>      samples_p0;
-  // std::vector<Spec>              illuminants_p0;
-  // std::vector<std::vector<Colr>> volumes_p0;
+  Basis basis;
+  gl::Program point_program;
 
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
@@ -88,8 +87,62 @@ namespace met {
     }
   } // namespace detail
 
+  class AnnotatedPointsetDraw {
+    gl::Array   m_array;
+    gl::Buffer  m_buffer_posi;
+    gl::Buffer  m_buffer_size;
+    gl::Buffer  m_buffer_colr;
+    std::string m_name;
+
+  public:
+    AnnotatedPointsetDraw() = default;
+
+    AnnotatedPointsetDraw(std::span<const Colr> posi,
+                          float                 size = 1.f,
+                          eig::Array4f          colr = 1.f, 
+                          std::string_view      name = "") {
+      std::vector<AlColr>       posi_copy(range_iter(posi));
+      std::vector<float>        size_copy(posi.size(), size);
+      std::vector<eig::Array4f> colr_copy(posi.size(), colr);
+
+      m_buffer_posi = {{ .data = cnt_span<const std::byte>(posi_copy) }};
+      m_buffer_size = {{ .data = cnt_span<const std::byte>(size_copy) }};
+      m_buffer_colr = {{ .data = cnt_span<const std::byte>(colr_copy) }};
+      
+      m_array  = {{ }};
+    }
+
+    AnnotatedPointsetDraw(std::span<const Colr >        posi,
+                          std::span<const float>        size,
+                          std::span<const eig::Array4f> colr,
+                          std::string_view              name = "") {
+      std::vector<AlColr> posi_copy(range_iter(posi));
+
+      m_buffer_posi = {{ .data = cnt_span<const std::byte>(posi_copy) }};
+      m_buffer_size = {{ .data = cnt_span<const std::byte>(size)      }};
+      m_buffer_colr = {{ .data = cnt_span<const std::byte>(colr)      }};
+      
+      m_array  = {{ }};
+    }
+
+    void draw() const {
+      guard(m_array.is_init());
+      point_program.bind("b_posi_buffer", m_buffer_posi);
+      point_program.bind("b_size_buffer", m_buffer_size);
+      point_program.bind("b_colr_buffer", m_buffer_colr);
+      gl::dispatch_draw({
+        .type             = gl::PrimitiveType::eTriangles,
+        .vertex_count     = 3 * static_cast<uint>(m_buffer_posi.size() / sizeof(uint)),
+        .draw_op          = gl::DrawOp::eFill,
+        .bindable_array   = &m_array
+      });
+    }
+
+    const std::string &name() const { return m_name; }
+  };
+
   // Point set draw summary object
-  class PointsetDraw {
+ /*  class PointsetDraw {
     gl::Array   m_array;
     gl::Buffer  m_buffer;
     std::string m_name;
@@ -115,9 +168,9 @@ namespace met {
     }
 
     const std::string &name() const { return m_name; }
-  };
+  }; */
 
-  // Mesh draw summary object
+  /* // Mesh draw summary object
   struct MeshDraw {
     gl::Array  m_array;
     gl::Buffer m_buffer_vt, m_buffer_el;
@@ -145,7 +198,7 @@ namespace met {
     }
 
     const std::string &name() const { return m_name; }
-  };
+  }; */
 
   struct ViewTask : public detail::TaskNode {
     void init(SchedulerHandle &info) override {
@@ -244,36 +297,25 @@ namespace met {
   
   struct DrawTask : public detail::TaskNode {
     struct UnifLayout {
-      alignas(64) eig::Matrix4f modelv_trf;
-      alignas(64) eig::Matrix4f camera_trf;
-      alignas(4)  float         alpha;
+      alignas(64) eig::Matrix4f matrix;
+      alignas(8)  eig::Vector2f aspect;
     };
 
     gl::Buffer      m_unif;
     UnifLayout     *m_unif_map;
-    gl::Program     m_program;
     gl::Framebuffer m_framebuffer;
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
-
-      // Generate program object
-      m_program = {{ .type       = gl::ShaderType::eVertex,   
-                     .spirv_path = "resources/shaders/views/draw_csys.vert.spv",
-                     .cross_path = "resources/shaders/views/draw_csys.vert.json" },
-                   { .type       = gl::ShaderType::eFragment, 
-                     .spirv_path = "resources/shaders/views/draw_csys.frag.spv",
-                     .cross_path = "resources/shaders/views/draw_csys.frag.json" }};
                      
       // Generate mapped uniform buffer
-      m_unif     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
+      m_unif = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
       m_unif_map = m_unif.map_as<UnifLayout>(buffer_access_flags).data();
-      m_unif_map->modelv_trf = eig::Matrix4f::Identity();
-      m_unif_map->alpha      = 1.f;
+      m_unif.flush();
 
-      // Init draw info
-      info("pointsets").set<std::vector<PointsetDraw>>({ /* ... */ });
-      info("meshes").set<std::vector<MeshDraw>>({ /* ... */ });
+      // Init draw info vectors
+      info("pointsets").set<std::vector<AnnotatedPointsetDraw>>({ /* ... */ });
+      // info("meshes").set<std::vector<MeshDraw>>({ /* ... */ });
     }
     
     void eval(SchedulerHandle &info) override {
@@ -281,15 +323,17 @@ namespace met {
 
       // First, handle framebuffer allocate/resize
       if (const auto &e_target_rsrc = info("view", "target"); 
-          !m_framebuffer.is_init() || e_target_rsrc.is_mutated()) {
+          is_first_eval() || e_target_rsrc.is_mutated()) {
         const auto &e_target = e_target_rsrc.getr<gl::Texture2d4f>();
         m_framebuffer = {{ .type = gl::FramebufferType::eColor, .attachment = &e_target }};
       }
 
-      // Next, handle camera transform update
-      if (const auto &e_camera_rsrc = info("view", "camera"); e_camera_rsrc.is_mutated()) {
+      // Next, handle camera data update
+      if (const auto &e_camera_rsrc = info("view", "camera"); 
+          is_first_eval() || e_camera_rsrc.is_mutated()) {
         const auto &e_camera = e_camera_rsrc.getr<detail::Arcball>();
-        m_unif_map->camera_trf = e_camera.full().matrix();
+        m_unif_map->matrix = e_camera.full().matrix();
+        m_unif_map->aspect = { 1.f, e_camera.aspect() };
         m_unif.flush();
       }
 
@@ -299,104 +343,320 @@ namespace met {
       m_framebuffer.clear(gl::FramebufferType::eDepth, 1.f);
 
       // Draw state
-      gl::state::set_point_size(4.f);
       gl::state::set_op(gl::DepthOp::eLessOrEqual);
       gl::state::set_op(gl::CullOp::eBack);
-      gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
-      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
-                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
+      gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOne);
+      // gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
+      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
+                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false),
                                  gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
                     
       // Bind relevant resources, objects
       m_framebuffer.bind();
-      m_program.bind();
-      m_program.bind("b_uniform", m_unif);
 
-      // Get draw info
-      const auto &i_pointsets = info("pointsets").getr<std::vector<PointsetDraw>>();
-      const auto &i_meshes    = info("meshes").getr<std::vector<MeshDraw>>();
-
-      // Dispatch draws
-      // ImGui::Begin("Draw selector");
-      // ImGui::End();
-      
-      for (const auto &v : i_pointsets) {
+      // Process point set draw tasks
+      point_program.bind();
+      point_program.bind("b_unif_buffer", m_unif);
+      for (const auto &v : info("pointsets").getr<std::vector<AnnotatedPointsetDraw>>())
         v.draw();
-      }
-      for (const auto &v : i_meshes) {
-        v.draw();
-      }
-
     }
   };
 
   struct DataTask : public detail::TaskNode {
-    void init(SchedulerHandle &info) override {
-      met_trace_full();
-      
-      // Get draw info submitters
-      auto &i_pointsets = info("draw", "pointsets").getw<std::vector<PointsetDraw>>();
-      auto &i_meshes    = info("draw", "meshes").getw<std::vector<MeshDraw>>();
-
-      // Generate color system projection for rendering
-      auto cs = (ColrSystem { .cmfs = models::cmfs_cie_xyz, 
-                              .illuminant = models::emitter_cie_d65,
-                              .n_scatters = 1 }).finalize_direct();
-      
-      // Generate a sampling distribution
-      // UniformSampler sampler(0.f, 1.f, 4);
-      // Spec cs_flat = cs.rowwise().sum().eval();
-      // Distribution ds(cnt_span<const float>(cs_flat));
-      
-      auto samples_x = detail::gen_unit_dirs_x(256, 3);
-      std::vector<Colr> samples(range_iter(samples_x));
-      
-
-      /* {
-        // Generate 3d gaussian samples for rendering
-        std::vector<Colr> samples(samples_x.size());
-        rng::transform(samples_x, samples.begin(), [](const auto &xf) { return Colr(xf.head(3)); });
-        i_pointsets.push_back(PointsetDraw(samples, "3d gaussian samples"));
-      } */
-
-      // First, weight the samples towards maximum values in the color system
-      {
-        rng::transform(samples, samples.begin(), [&](const Colr &sample) { 
-          Spec s = (cs * sample.matrix()).eval();
-          return (cs.transpose() * s.matrix()).normalized().eval();
-        });
-      }
-
-      // Next, compute color system spectra
-      {
-
-        std::vector<Colr> values(samples.size());
-        rng::transform(samples, values.begin(), [&](const Colr &sample) { 
-          Spec s = (cs * sample.matrix()).eval();
-          s = (s.matrix().normalized().array() / 2.f) + Spec(1.f);
-          // for (auto &f : s)
-          //   f = f >= 0.f ? 1.f : 0.f;
-          return (cs.transpose() * s.matrix()).eval();
-        });
-        fmt::print("samples: {}\n", values);
-
-        i_pointsets.push_back(PointsetDraw(values, "3d csys projection"));
-      }
-    }
-
     void eval(SchedulerHandle &info) override {
       met_trace_full();
+      regenerate_samples(info);
+    }
 
-      // ...
+    void regenerate_samples(SchedulerHandle &info) {
+      met_trace_full();
+
+      static bool show_ocs      = true;
+      static bool show_mms      = true;
+      static uint n_samples_ocs = 256u;
+      static uint n_samples_mms = 256u;
+      static float draw_alpha = 1.f;
+      static float draw_size = 0.01f;
+      static float z = 0.5f;
+
+      if (ImGui::Begin("Settings")) {
+        ImGui::Checkbox("Show OCS", &show_ocs);
+        ImGui::Checkbox("Show MMS", &show_mms);
+        
+        const uint min_samples = 1u, max_samples = 16384u;
+        ImGui::SliderScalar("Samples (OCS)", ImGuiDataType_U32, &n_samples_ocs, &min_samples, &max_samples);
+        ImGui::SliderScalar("Samples (MMS)", ImGuiDataType_U32, &n_samples_mms, &min_samples, &max_samples);
+
+        ImGui::SliderFloat("z", &z, 0.f, 1.f);
+
+        ImGui::SliderFloat("draw alpha", &draw_alpha, 0.f, 1.f);
+        ImGui::SliderFloat("draw size", &draw_size, 1e-3, 1.f);
+      }
+      ImGui::End();
+
+      // Get draw info submitters
+      auto &i_pointsets = info("draw", "pointsets").getw<std::vector<AnnotatedPointsetDraw>>();
+      // auto &i_meshes    = info("draw", "meshes").getw<std::vector<MeshDraw>>();
+
+      // Let's work in a 1D color system for now
+      using CMF1 = Spec;
+      using CMFT = eig::Matrix<float, wavelength_samples, 2 * CMF1::ColsAtCompileTime>;
+      CMF1 cs0 =
+        (((models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_d65 * wavelength_ssize).eval()
+        / (models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_d65 * wavelength_ssize).sum())).eval();
+      CMF1 cs1 =
+        (((models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_fl2 * wavelength_ssize).eval()
+        / (models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_fl2 * wavelength_ssize).sum())).eval();
+      CMFT cst = (CMFT() << cs0, cs1).finished();
+
+      // Obtain orthogonal basis through SVD of cst
+      CMFT S = cst;
+      eig::JacobiSVD<decltype(S)> svd;
+      svd.compute(S, eig::ComputeFullV);
+      auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+      // eig::MatrixXf S(wavelength_samples, 3 + 3 * csys_i.size());
+
+
+      // Generate sample unit vectors in 2d
+
+      /* // Generate color system projection for rendering
+      auto cs = (ColrSystem { .cmfs = models::cmfs_cie_xyz, 
+                              .illuminant = models::emitter_cie_d65,
+                              .n_scatters = 1 }).finalize_direct(); */
+      // Clear render state
+      i_pointsets.clear();
+
+
+      // Find the borders of the combined set T = { z, z' } s.t. z in cs0 and z' in cs1
+      std::vector<eig::Array2f> OCS(n_samples_ocs); // store ocs for now
+      {
+        std::vector<Colr> V(n_samples_ocs);
+        std::vector<Spec> S(n_samples_ocs);
+
+        // Sample unit vectors on hypersphere
+        auto X2 = detail::gen_unit_dirs_x(n_samples_ocs, 2);
+        std::vector<eig::Array2f> X(range_iter(X2));
+
+        // Project samples on to color solid
+        rng::transform(X, S.begin(), [&](eig::Array2f unit) { 
+          return (U * unit.matrix()).eval();
+        });
+
+        // Compute optimal spectra exactly on system boundary 
+        // Note; this collapsed most sampled spectra into a small boundary set
+        rng::transform(S, S.begin(), [&](Spec s) { 
+          for (auto &f : s)
+              f = f >= 0.f ? 1.f : 0.f;
+          return s;
+        });
+
+        /* 
+          Given { z, z' } where z is a known color position, and z' is a set of nd-mismatches
+          
+         */
+
+        /* std::unordered_set<
+          Spec, 
+          decltype(eig::detail::matrix_hash<float>), 
+          decltype(eig::detail::matrix_equal)
+        > S_unique(range_iter(S));
+        S = { range_iter(S_unique) };
+        fmt::print("S unique: {}\n", S.size()); */
+        
+        // Return color solid positions
+        rng::transform(S, V.begin(), [&](Spec s) { 
+          return (Colr() << cst.transpose() * s.matrix(), 0).finished();
+        });
+
+        // Copy OCS over
+        rng::transform(V, OCS.begin(), [&](Colr c) {
+          return (eig::Array2f() << c.x(), c.y()).finished();
+        });
+
+        // Finally, submit new draw info
+        if (show_ocs)
+          i_pointsets.push_back(AnnotatedPointsetDraw(V, 1e-2, { 1, 0, 0, 1 }));
+      }
+
+      /* // Given a known color of z = 0.5, find and project closest mms points
+      {
+        std::vector<Colr> V(n_samples_mms);
+
+        // Minima, maxima on { z, z' }
+        eig::Vector2f a0 = { z, 0 }, a1 = { z, 1 };
+        
+        // Find closest two interior points
+        auto zsort = OCS;
+        rng::sort(zsort, rng::less {}, [&](const eig::Array2f &v) {
+          eig::Vector2f a = (a1 - a0).normalized();
+          eig::Vector2f b = v.matrix() - a0;
+          eig::Vector2f proj = a0 + a * a.dot(b);
+          return (v.matrix() - proj).norm();
+        });
+
+        eig::Vector2f zmin = zsort[0];
+        zsort = std::vector<eig::Array2f>(zsort.begin() + 1, zsort.begin() + 8);
+        rng::sort(zsort, rng::greater {}, [&](const eig::Array2f &v) {
+          return (v.matrix() - zmin).norm();
+        });
+        eig::Vector2f zmax = zsort[0];
+
+
+        // Find minima/maxima along projected line
+        // This is the mismatch volume boundary already, approximately
+        eig::Vector2f a = (a1 - a0).normalized();
+        float zmax_f = a.dot(zmax - a0);
+        float zmin_f = a.dot(zmin - a0);
+        zmax = a0 + a * zmax_f;
+        zmin = a0 + a * zmin_f;
+        
+        V = { (Colr() << zmin, 0.f).finished(), 
+              (Colr() << zmax, 0.f).finished() };
+
+        if (show_mms)
+          i_pointsets.push_back(AnnotatedPointsetDraw(V, draw_size, { 1, 1, 1, draw_alpha }));
+      } */
+
+      // Given a known color of z = 0.5, generate random z' and splat into lower dimension
+      {
+        std::vector<Colr>         V(n_samples_ocs);
+        std::vector<eig::Array4f> colrs(n_samples_ocs);
+        std::vector<float>        sizes(n_samples_ocs);
+
+        // Minima, maxima on { z, z' }
+        eig::Vector2f a0 = { z, 0 }, a1 = { z, 1 };
+        eig::Vector2f a = (a1 - a0).normalized();
+        
+        // Find closest two interior points
+        auto zsort = OCS;
+        rng::sort(zsort, rng::less {}, [&](const eig::Array2f &v) {
+          eig::Vector2f a = (a1 - a0).normalized();
+          eig::Vector2f b = v.matrix() - a0;
+          eig::Vector2f proj = a0 + a * a.dot(b);
+          return (v.matrix() - proj).norm();
+        });
+
+        // Splat some points
+        std::vector<eig::Array2f> splats(n_samples_ocs);
+        rng::transform(OCS, splats.begin(), [&](const eig::Vector2f &v) {
+          eig::Vector2f b = v - a0;
+          eig::Vector2f p = a0 + a * a.dot(b);
+          return p;
+        });
+
+        // Determine output colors, sizes, based on distance to line scale
+        for (uint i = 0; i < n_samples_ocs; ++i) {
+          eig::Vector2f v = splats[i];
+          eig::Vector2f ocs = OCS[i];
+          float d = (v - ocs).norm();
+          float w = std::max(1.f - 10.f * d, 0.f);
+          colrs[i] = { 1, 1, 1, draw_alpha * w };
+          sizes[i] = draw_size; // * w;
+        }
+
+        // Output positions
+        rng::transform(splats, V.begin(), [&](eig::Array2f s) { 
+          return (Colr() << s, 0).finished();
+        });
+        /* rng::transform(OCS, colrs, [&](const eig::Vector2f &v) {
+          eig::Vector2f b = v - a0;
+          float dist = a.dot(b);
+          // return eig::Array4f { 1, 1, 1, }
+        }); */
+
+        
+
+        /* eig::Vector2f zmax = *rng::min_element(OCS, {}, [&](const eig::Array2f &v) {
+          eig::Vector2f a = (a1 - a0).normalized();
+          eig::Vector2f b = v.matrix() - a0;
+          eig::Vector2f proj = a1 + a * a.dot(b);
+          return (v.matrix() - proj).norm();
+        }); */
+
+
+        /* // Generate some points within this range
+        auto X = UniformSampler(zmin_f, zmax_f, 4).next_nd(n_samples_mms);
+        rng::transform(X, V.begin(), [&](float z_) { 
+          return (Colr() << z, z_, 0).finished();
+        }); */
+
+        /* rng::transform(OCS, V.begin(), [&](eig::Array2f v) {
+          // eig::Vector2f a = (a1 - a0).normalized();
+          eig::Vector2f b = v.matrix() - a0;
+          return (Colr() << a0 + a * a.dot(b), 0).finished();
+        }); */
+
+        /* // Sample random positions in [0, 1] in color system 1
+        auto X_ = UniformSampler(0.f, 1.f, 4).next_nd(n_samples);
+        std::vector<float> Z_(range_iter(X_));
+
+        // Return color solid positions
+        rng::transform(Z_, V.begin(), [&](float z_) { 
+          return (Colr() << z, z_, 0).finished();
+        }); */
+
+        if (show_mms)
+          i_pointsets.push_back(AnnotatedPointsetDraw(V, sizes, colrs));
+      }
+
+     /*  // Generate sample unit vectors
+      auto X = detail::gen_unit_dirs_x(n_samples, 3);
+      
+      // Processed samples and resulting output colors are stored here
+      std::vector<Colr> V(n_samples);
+      std::vector<Spec> S(n_samples);
+
+      // Project samples on to color system
+      rng::copy(X, V.begin());
+      rng::transform(V, S.begin(), [&](Colr c) { 
+        return (cs * c.matrix()).eval();
+      }); 
+
+      // Next, compute optimal spectra
+      rng::transform(S, S.begin(), [&](Spec s) { 
+        if (toggle) {
+          for (auto &f : s)
+            f = f >= 0.f ? 1.f : 0.f;
+        } else {
+          s.matrix().normalize();
+        }
+        return s;
+      });
+
+      // Apply color system transform to spectra
+      rng::transform(S, V.begin(), [&](Spec s) { 
+        return (cs.transpose() * s.matrix()).eval();
+      });  */
+
+
+      // Plot window to help show some things more clearly
+      if (ImGui::Begin("Plots")) {
+        if (ImPlot::BeginPlot("Illuminant")) {
+          // Get wavelength values for x-axis in plot
+          Spec x_values;
+          for (uint i = 0; i < x_values.size(); ++i)
+            x_values[i] = wavelength_at_index(i);
+          
+          // Setup minimal format for coming line plots
+          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+          ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+          // ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0, 1.0, ImPlotCond_Always);
+        
+          // Do the thing
+          ImPlot::PlotLine("CS0 (D65)", x_values.data(), cs0.data(), wavelength_samples);
+          ImPlot::PlotLine("CS1 (F11)", x_values.data(), cs1.data(), wavelength_samples);
+
+          ImPlot::EndPlot();
+        }
+      }
+      ImGui::End();
     }
   };
 
   /* void init() {
     met_trace();
 
-    // Load basis function data
-    auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
-    basis = loaded_tree.basis;
 
     // Initialize 6D samples
     samples_p1 = detail::gen_unit_dirs_x(64, 6);
@@ -473,6 +733,9 @@ namespace met {
   void run() {
     met_trace();
     
+    // Load basis function data
+    basis = io::load_json("resources/misc/tree.json").get<BasisTreeNode>().basis;
+    
     // Scheduler is responsible for handling application tasks, resources, and runtime loop
     LinearScheduler scheduler;
 
@@ -490,6 +753,14 @@ namespace met {
       gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
       gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
     }
+    
+    // Generate program objects
+    point_program = {{ .type       = gl::ShaderType::eVertex,   
+                       .spirv_path = "resources/shaders/views/ocs_test_draw.vert.spv",
+                       .cross_path = "resources/shaders/views/ocs_test_draw.vert.json" },
+                     { .type       = gl::ShaderType::eFragment, 
+                       .spirv_path = "resources/shaders/views/ocs_test_draw.frag.spv",
+                       .cross_path = "resources/shaders/views/ocs_test_draw.frag.json" }};
 
     // Create and start runtime loop
     scheduler.task("frame_begin").init<FrameBeginTask>();

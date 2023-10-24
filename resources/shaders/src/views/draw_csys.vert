@@ -8,6 +8,8 @@ layout(binding = 0, std140) uniform b_uniform {
   mat4  model_matrix;
   mat4  camera_matrix;
   float alpha;
+  vec3  color;
+  bool  override_color;
 } unif;
 
 void main() {

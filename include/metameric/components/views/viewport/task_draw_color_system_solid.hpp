@@ -11,7 +11,11 @@ namespace met {
     struct UniformBuffer {
       alignas(64) eig::Matrix4f model_matrix;
       alignas(64) eig::Matrix4f camera_matrix;
+      
       alignas(4)  float alpha;
+      
+      alignas(16) Colr          color;
+      alignas(4)  bool override_color;
     };
     
     gl::Buffer     m_unif_buffer_line;

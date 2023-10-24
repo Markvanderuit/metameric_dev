@@ -50,8 +50,10 @@ namespace met {
     m_unif_map_fill    = m_unif_buffer_fill.map_as<UniformBuffer>(buffer_access_flags).data();
 
     // Instantiate unchanging uniform data
+    m_unif_map_line->override_color = false;
     m_unif_map_line->alpha = 0.25f;
     m_unif_map_line->model_matrix = eig::Matrix4f::Identity();
+    m_unif_map_fill->override_color = false;
     m_unif_map_fill->alpha = 0.025f;
     m_unif_map_fill->model_matrix = eig::Matrix4f::Identity();
   }

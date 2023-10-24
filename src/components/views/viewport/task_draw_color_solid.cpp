@@ -95,6 +95,7 @@ namespace met {
 
     m_draw_uniform_buffer = {{ .size = sizeof(DrawUniformBuffer), .flags = buffer_create_flags }};
     m_draw_uniform_map    = m_draw_uniform_buffer.map_as<DrawUniformBuffer>(buffer_access_flags).data();
+    m_draw_uniform_map->override_color = false;
     m_draw_uniform_map->alpha = 1.f;
 
     // Create sampler object used in gamma correction step
