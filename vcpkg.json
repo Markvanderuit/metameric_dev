@@ -18,6 +18,7 @@
     "implot",
     "nativefiledialog",
     "nlohmann-json",
+    "nlopt",
     "openmesh",
     "qhull",
     "stb",

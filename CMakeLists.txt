@@ -62,6 +62,7 @@ find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(implot    CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(NLopt     CONFIG REQUIRED)
 find_package(openmesh  CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
@@ -233,6 +234,7 @@ target_link_libraries(core PUBLIC
   Coin::Clp
   Tracy::TracyClient
   nlohmann_json::nlohmann_json
+  NLopt::nlopt
   unofficial::tinyexr::tinyexr
   ${OPENMESH_LIBRARIES}
   Qhull::qhullcpp
