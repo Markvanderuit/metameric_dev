@@ -180,8 +180,72 @@ namespace met {
     > output_unique(range_iter(output));
     return std::vector<Colr>(range_iter(output_unique));
   }
-  
-  std::vector<Colr> generate_mismatch_boundary(const GenerateMismatchBoundaryInfo &info) {
+
+  std::vector<Spec> generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info) {
+    met_trace();
+
+    using Syst = eig::Matrix<float, 3, wavelength_bases>;
+
+    // Generate color system spectra for basis function parameters
+    auto csys_j = (info.system_j.transpose() * info.basis.func).eval();
+    auto csys_i = std::vector<Syst>(info.systems_i.size());
+    std::ranges::transform(info.systems_i, csys_i.begin(),
+      [&](const auto &m) { return (m.transpose() * info.basis.func).eval(); });    
+      
+    // Initialize parameter object for LP solver, given expected matrix sizes
+    const uint N = wavelength_bases;
+    const uint M = 3 * csys_i.size() + 2 * wavelength_samples;
+    LPParameters params(M, N);
+    params.objective = LPObjective::eMaximize;
+    params.method    = LPMethod::ePrimal;
+
+    // Add color system constraints
+    for (uint i = 0; i < csys_i.size(); ++i) {
+      params.A.block<3, N>(3 * i, 0) = csys_i[i].cast<double>();
+      params.b.block<3, 1>(3 * i, 0) = info.signals_i[i].cast<double>();
+    }
+
+    // Add [0, 1] bounds constraints
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = info.basis.func.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = info.basis.func.cast<double>();
+    params.b.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = Spec(0.0).cast<double>();
+    params.b.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = Spec(1.0).cast<double>();
+    params.r.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = LPCompare::eGE;
+    params.r.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = LPCompare::eLE;
+
+    // Obtain orthogonal basis functions through SVD of color system matrix
+    eig::MatrixXf S(N, 3 + 3 * csys_i.size());
+    for (uint i = 0; i < csys_i.size(); ++i)
+      S.block<N, 3>(0, 3 * i) = csys_i[i].transpose();
+    S.block<N, 3>(0, 3 * csys_i.size()) = csys_j.transpose();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+    // Parallel solve for basis function weights defining OCS boundary spectra
+    std::vector<Spec> output(info.samples.size());
+    #pragma omp parallel
+    {
+      LPParameters local_params = params;
+      #pragma omp for
+      for (int i = 0; i < info.samples.size(); ++i) {
+        local_params.C = (U * info.samples[i].matrix()).cast<double>().eval();
+        eig::Matrix<float, wavelength_bases, 1> w = lp_solve(local_params).cast<float>().eval();
+        output[i] = info.basis.func * w;
+      }
+    }
+
+    // Filter NaNs at underconstrained output and strip redundancy from return 
+    std::erase_if(output, [](Spec &c) { return c.isNaN().any(); });
+    std::unordered_set<
+      Spec, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > output_unique(range_iter(output));
+    return std::vector<Spec>(range_iter(output_unique));
+  }
+
+  std::vector<Colr> generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info) {
     met_trace();
 
     using Syst = eig::Matrix<float, 3, wavelength_bases>;

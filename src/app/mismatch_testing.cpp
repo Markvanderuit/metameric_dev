@@ -325,7 +325,7 @@ namespace met {
     std::vector<CMFS> systems_i = { csys_p1_base.finalize_direct() };
     std::vector<Colr> signals_i = { colr_p1 };
 
-    std::vector<Colr> volume_p1  = generate_mismatch_boundary({
+    std::vector<Colr> volume_p1  = generate_mmv_boundary_colr({
       .basis      = basis.functions,
       .basis_mean = basis.mean,
       .systems_i  = systems_i,
@@ -360,7 +360,7 @@ namespace met {
       ColrSystem csys_p0_free = { .cmfs = c, .illuminant = e_base            };
       std::vector<CMFS> systems = { csys_p0_base.finalize_direct() };
       std::vector<Colr> signals = { colr_p0 };
-      return generate_mismatch_boundary({
+      return generate_mmv_boundary_colr({
         .basis      = basis.functions,
         .basis_mean = basis.mean,
         .systems_i  = systems,

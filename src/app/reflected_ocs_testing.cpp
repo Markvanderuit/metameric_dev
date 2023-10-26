@@ -31,6 +31,7 @@
 #include <exception>
 #include <execution>
 #include <numbers>
+#include <span>
 #include <unordered_set>
 #include "nlopt.hpp"
 
@@ -364,27 +365,261 @@ namespace met {
   };
 
   struct DataTask : public detail::TaskNode {
+    std::vector<Colr> ocs_pointset;
+    std::vector<Colr> mms_pointset;
+    std::vector<Spec> mms_interior;
+    std::vector<Colr> mms_interior_pointset;
+
+    CMFS cs_0, cs_1;
+    Colr cv_0 = 0.5f;
+    
+    void init(SchedulerHandle &info) override {
+      met_trace_full();
+
+      // Define illuminant-induced mismatching to quickly generate a large metamer set
+      ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
+      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1, .n_scatters = 1 };
+      cs_0 = csys_0.finalize_direct();
+      cs_1 = csys_1.finalize_direct();
+
+      // Generate OCS for cs_1
+      {
+        auto samples_ = detail::gen_unit_dirs_x(1024u, 3);
+        std::vector<Colr> samples(range_iter(samples_));
+        ocs_pointset = generate_ocs_boundary_colr({
+          .basis   = basis,
+          .system  = cs_0,
+          .samples = samples,
+        });
+      }
+
+      // Generate points on the MMS in X for now
+      auto samples   = detail::gen_unit_dirs_x(64u, 6);
+      auto systems_i = { cs_0 };
+      auto signals_i = { cv_0 };
+      // auto X_boundary
+      mms_pointset = generate_mmv_boundary_colr({
+        .basis     = basis,
+        .systems_i = systems_i,
+        .signals_i = signals_i,
+        .system_j  = cs_1,
+        .samples   = samples
+      });
+
+     /*  // Generate corresponding points in R3
+      mms_pointset.resize(X_boundary.size());
+      rng::transform(X_boundary, mms_pointset.begin(), [&](const Spec &s) {
+        return (cs_1.transpose() * s.matrix()).eval();
+      }); */
+
+      // Generate a delaunay tesselation of the MMS
+      // to sample its interior
+      auto [vt, el, _norms, _uvs] = generate_delaunay<Delaunay, eig::Array3f>(mms_pointset);
+      
+      // Compute volume of each tetrahedron in delaunay
+      std::vector<float> el_volume(el.size());
+      std::transform(std::execution::par_unseq, range_iter(el), el_volume.begin(),
+      [&](const eig::Array4u &el) {
+        // Get vertex positions for this tetrahedron
+        std::array<eig::Vector3f, 4> p;
+        std::ranges::transform(el, p.begin(), [&](uint i) { return vt[i]; });
+
+        // Compute tetrahedral volume
+        return std::abs((p[0] - p[3]).dot((p[1] - p[3]).cross(p[2] - p[3]))) / 6.f;
+      });
+
+      // Components for sampling step
+      UniformSampler sampler;
+      Distribution volume_distr(el_volume);
+
+      // Generate spectral metamers at positions in the interior
+      mms_interior.resize(1024u);
+      for (uint i = 0; i < mms_interior.size(); ++i) {
+        // First, sample barycentric weights uniformly inside a tetrahedron 
+        // (https://vcg.isti.cnr.it/jgt/tetra.htm)
+        auto sample_3d = sampler.next_nd<3>();
+        if (sample_3d.head<2>().sum() > 1.f) {
+          sample_3d.head<2>() = 1.f - sample_3d.head<2>();
+        }
+        if (sample_3d.tail<2>().sum() > 1.f) {
+          float t = sample_3d[2];
+          sample_3d[2] = 1.f - sample_3d.head<2>().sum();
+          sample_3d[1] = 1.f - t;
+        } else if (sample_3d.sum() > 1.f) {
+          float t = sample_3d[2];
+          sample_3d[2] = sample_3d.sum() - 1.f;
+          sample_3d[0] = 1.f - sample_3d[1] - t;
+        }
+
+        // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
+        std::array<eig::Vector3f, 4> p;
+        rng::transform(el[volume_distr.sample(sampler.next_1d())], p.begin(), 
+          [&](uint i) { return vt[i]; });
+          
+        // Then, recover sample position using the generated barycentric coordinates
+        eig::Array3f v = p[0] * (1.f - sample_3d.sum())
+                       + p[1] * sample_3d.x() + p[2] * sample_3d.y() + p[3] * sample_3d.z();
+
+        // Finally, generate a metamer for the sample position
+        auto systems = { cs_0, cs_1 };
+        auto signals = { cv_0, v    };
+        mms_interior[i] = generate_spectrum({
+          .basis   = basis,
+          .systems = systems,
+          .signals = signals
+        });
+      } // for (i)
+    }
+
     void eval(SchedulerHandle &info) override {
       met_trace_full();
       regenerate_samples(info);
+      regenerate_maximize(info);
+    }
+
+    /* 
+      public static double[] Solve (double[,] matrix, double[] right,
+                              double relaxation, int iterations, 
+                              double[] lo, double[] hi)
+{
+    // Validation omitted
+    var x = right;
+    double delta;
+
+    // Gauss-Seidel with Successive OverRelaxation Solver
+    for (int k = 0; k < iterations; ++k) {
+        for (int i = 0; i < right.Length; ++i) {
+            delta = 0.0f;
+
+            for (int j = 0; j < i; ++j)
+                delta += matrix [i, j] * x [j];
+            for (int j = i + 1; j < right.Length; ++j)
+                delta += matrix [i, j] * x [j];
+
+            delta = (right [i] - delta) / matrix [i, i];
+            x [i] += relaxation * (delta - x [i]);
+    // Project the solution within the lower and higher limits
+            if (x[i]<lo[i])
+                x[i]=lo[i];
+            if (x[i]>hi[i])
+                x[i]=hi[i];
+        }
+    }
+    return x;
+}
+     */
+
+    
+    void regenerate_maximize(SchedulerHandle &info) {
+      met_trace_full();
+
+      constexpr uint N     = wavelength_samples;
+      constexpr uint M     = 3;
+      constexpr uint iters = 32;
+
+      // Define vector C
+      auto C_A = (eig::Matrix<float, 2 * M, N>() << cs_0, cs_1).finished(); 
+      auto C_X = eig::Matrix<float, 2 * M, 1>(detail::gen_unit_dirs_x(1, 6)[0]);
+      auto C   = (C_A.transpose() * C_X).eval();
+
+      // Define matrix A, vector b
+      auto A = cs_0.transpose().eval();
+      auto b = cv_0;
+
+      // Define unknown solution
+      // Set initial values based on sign as guess
+      auto x = eig::Vector<float, N>(0.25f);
+      // for (uint i = 0; i < N; ++i)
+      //   x[i] = C[i] >= 0 ? 1 : 0;
+
+      // Gauss-seidel with projection? M = 3, N = 64
+      for (uint k = 0; k < iters; ++k) {
+        // First resolve x_i for i = 0, 1, 2
+        for (uint i = 0; i < M; ++i) {
+          // Compute rest-of-row sum, A_ij * x_j, but skip self
+          float sum = 0.f;
+          for (uint j = 0; j < N; ++j) {
+            guard_continue(i != j);
+            sum += A(i, j) * x[j];
+          }
+          
+          // Recompute x_i based on values to the right
+          x[i] = (b[i] - sum) / A(i,i);
+
+          // Find smallest x to right of x_i
+          auto rest = std::span(x.data() + M, N - M);
+          auto it   = rng::min_element(rest);
+          uint j    = rng::distance(rest.begin(), it) + M;
+
+          // Reproject x_i to 0 or 1 based on sign
+          // and adjust current smallest other x to preserve this projection
+          float x_old = x[i];
+          // x[i] = C[i] >= 0 ? 1 : 0;
+          x[i] = std::clamp(x[i], 0.f, 1.f);
+          
+          float c_diff = (x[i] - x_old) * C[i];
+          x[j] = (x[j] * C[j] - c_diff) / C[j];
+          x[j] = std::clamp(x[j], 0.f, 1.f);
+
+          /* // Reproject x_i to [0, 1]
+          x[i] = std::clamp(x[i], 0.f, 1.f);
+
+          // Rescale rest of vector for max(...)
+          for (uint j = i + 1; j < N; ++j) {
+            
+          } */
+        } // for (uint i)
+      } // for (uint k)
+
+      fmt::print("{}\n", x);
+      Colr cv_solve = (A * x).eval();
+
+      if (ImGui::Begin("Plots")) {
+        ImGui::InputFloat3("b", b.data());
+        ImGui::InputFloat3("v", cv_solve.data());
+
+        // Draw spectrum plot
+        if (ImPlot::BeginPlot("Illuminant", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+          Spec sd = x;
+
+          // Get wavelength values for x-axis in plot
+          Spec x_values;
+          for (uint i = 0; i < x_values.size(); ++i)
+            x_values[i] = wavelength_at_index(i);
+          Spec y_values = sd;
+
+          // Setup minimal format for coming line plots
+          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+          ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.25f, 1.25f, ImPlotCond_Always);
+
+          // Do the thing
+          ImPlot::PlotLine("", x_values.data(), y_values.data(), wavelength_samples);
+
+          ImPlot::EndPlot();
+        }
+      }
+      ImGui::End();
     }
 
     void regenerate_samples(SchedulerHandle &info) {
       met_trace_full();
 
+      // Static ImGui settings
       static bool show_ocs      = true;
       static bool show_mms      = true;
-      static uint n_samples_ocs = 256u;
-      static uint n_samples_mms = 256u;
+      static uint n_samples_ocs = 32u;
+      static uint n_samples_mms = 32u;
       static float draw_alpha = 1.f;
       static float draw_size = 0.01f;
       static float z = 0.5f;
+      static float n_scatters = 1.f;
 
       if (ImGui::Begin("Settings")) {
         ImGui::Checkbox("Show OCS", &show_ocs);
         ImGui::Checkbox("Show MMS", &show_mms);
         
-        const uint min_samples = 1u, max_samples = 16384u;
+        const uint min_samples = 1u, max_samples = 4096u;
         ImGui::SliderScalar("Samples (OCS)", ImGuiDataType_U32, &n_samples_ocs, &min_samples, &max_samples);
         ImGui::SliderScalar("Samples (MMS)", ImGuiDataType_U32, &n_samples_mms, &min_samples, &max_samples);
 
@@ -392,29 +627,68 @@ namespace met {
 
         ImGui::SliderFloat("draw alpha", &draw_alpha, 0.f, 1.f);
         ImGui::SliderFloat("draw size", &draw_size, 1e-3, 1.f);
+        ImGui::SliderFloat("nr. of scatters", &n_scatters, 1.f, 16.f);
       }
       ImGui::End();
 
       // Get draw info submitters
       auto &i_pointsets = info("draw", "pointsets").getw<std::vector<AnnotatedPointsetDraw>>();
-      // auto &i_meshes    = info("draw", "meshes").getw<std::vector<MeshDraw>>();
 
-      // Let's work in a 1D color system for now
-      using CMF1 = Spec;
-      using CMFT = eig::Matrix<float, wavelength_samples, 2 * CMF1::ColsAtCompileTime>;
-      CMF1 cs0 =
-        (((models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_d65 * wavelength_ssize).eval()
-        / (models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_d65 * wavelength_ssize).sum())).eval();
-      CMF1 cs1 =
-        (((models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_fl2 * wavelength_ssize).eval()
-        / (models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_fl2 * wavelength_ssize).sum())).eval();
-      CMFT cst = (CMFT() << cs0, cs1).finished();
+      // Clear render state
+      i_pointsets.clear();
+      
+      {
+        // Make available for rendering
+        if (show_ocs) {
+          std::vector<eig::Array4f> colrs(ocs_pointset.size());
+          std::vector<float>        sizes(ocs_pointset.size(), draw_size);
+          rng::transform(ocs_pointset, colrs.begin(), [&](const Colr &c) {
+            return (eig::Array4f() << c, draw_alpha).finished();
+          });
+          i_pointsets.push_back(AnnotatedPointsetDraw(ocs_pointset, sizes, colrs));
+        }
+      }
 
-      // Obtain orthogonal basis through SVD of cst
-      CMFT S = cst;
-      eig::JacobiSVD<decltype(S)> svd;
-      svd.compute(S, eig::ComputeFullV);
-      auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+      // First attempt
+      {
+        std::vector<Spec> spectra(range_iter(mms_interior));
+        rng::transform(spectra, spectra.begin(), [&](const Spec &s) {
+          return s.pow(n_scatters).eval();
+        });
+        
+        // Generate color positions under cs_0
+        mms_interior_pointset.resize(mms_interior.size());
+        rng::transform(spectra, mms_interior_pointset.begin(), [&](const Spec &s) {
+          return (cs_0.transpose() * s.matrix()).eval();
+        });
+
+        // Make available for rendering
+        if (show_mms) {
+          std::vector<eig::Array4f> colrs(mms_interior_pointset.size());
+          std::vector<float>        sizes(mms_interior_pointset.size(), draw_size);
+          rng::transform(mms_interior_pointset, colrs.begin(), [&](const Colr &c) {
+            return (eig::Array4f() << c, draw_alpha).finished();
+          });
+          i_pointsets.push_back(AnnotatedPointsetDraw(mms_interior_pointset, sizes, colrs));
+        }
+      }
+
+      // // Let's work in a 1D color system for now
+      // using CMF1 = Spec;
+      // using CMFT = eig::Matrix<float, wavelength_samples, 2 * CMF1::ColsAtCompileTime>;
+      // CMF1 cs0 =
+      //   (((models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_d65 * wavelength_ssize).eval()
+      //   / (models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_d65 * wavelength_ssize).sum())).eval();
+      // CMF1 cs1 =
+      //   (((models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_fl2 * wavelength_ssize).eval()
+      //   / (models::cmfs_cie_xyz.array().col(1) * models::emitter_cie_fl2 * wavelength_ssize).sum())).eval();
+      // CMFT cst = (CMFT() << cs0, cs1).finished();
+
+      // // Obtain orthogonal basis through SVD of cst
+      // CMFT S = cst;
+      // eig::JacobiSVD<decltype(S)> svd;
+      // svd.compute(S, eig::ComputeFullV);
+      // auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
       // eig::MatrixXf S(wavelength_samples, 3 + 3 * csys_i.size());
 
@@ -425,60 +699,57 @@ namespace met {
       auto cs = (ColrSystem { .cmfs = models::cmfs_cie_xyz, 
                               .illuminant = models::emitter_cie_d65,
                               .n_scatters = 1 }).finalize_direct(); */
-      // Clear render state
-      i_pointsets.clear();
 
+      // // Find the borders of the combined set T = { z, z' } s.t. z in cs0 and z' in cs1
+      // std::vector<eig::Array2f> OCS(n_samples_ocs); // store ocs for now
+      // {
+      //   std::vector<Colr> V(n_samples_ocs);
+      //   std::vector<Spec> S(n_samples_ocs);
 
-      // Find the borders of the combined set T = { z, z' } s.t. z in cs0 and z' in cs1
-      std::vector<eig::Array2f> OCS(n_samples_ocs); // store ocs for now
-      {
-        std::vector<Colr> V(n_samples_ocs);
-        std::vector<Spec> S(n_samples_ocs);
+      //   // Sample unit vectors on hypersphere
+      //   auto X2 = detail::gen_unit_dirs_x(n_samples_ocs, 2);
+      //   std::vector<eig::Array2f> X(range_iter(X2));
 
-        // Sample unit vectors on hypersphere
-        auto X2 = detail::gen_unit_dirs_x(n_samples_ocs, 2);
-        std::vector<eig::Array2f> X(range_iter(X2));
+      //   // Project samples on to color solid
+      //   rng::transform(X, S.begin(), [&](eig::Array2f unit) { 
+      //     return (U * unit.matrix()).eval();
+      //   });
 
-        // Project samples on to color solid
-        rng::transform(X, S.begin(), [&](eig::Array2f unit) { 
-          return (U * unit.matrix()).eval();
-        });
+      //   // Compute optimal spectra exactly on system boundary 
+      //   // Note; this collapsed most sampled spectra into a small boundary set
+      //   rng::transform(S, S.begin(), [&](Spec s) { 
+      //     for (auto &f : s)
+      //         f = f >= 0.f ? 1.f : 0.f;
+      //     return s;
+      //   });
 
-        // Compute optimal spectra exactly on system boundary 
-        // Note; this collapsed most sampled spectra into a small boundary set
-        rng::transform(S, S.begin(), [&](Spec s) { 
-          for (auto &f : s)
-              f = f >= 0.f ? 1.f : 0.f;
-          return s;
-        });
-
-        /* 
-          Given { z, z' } where z is a known color position, and z' is a set of nd-mismatches
+      //   /* 
+      //     Given { z, z' } where z is a known color position, and z' is a set of nd-mismatches
           
-         */
+      //    */
 
-        /* std::unordered_set<
-          Spec, 
-          decltype(eig::detail::matrix_hash<float>), 
-          decltype(eig::detail::matrix_equal)
-        > S_unique(range_iter(S));
-        S = { range_iter(S_unique) };
-        fmt::print("S unique: {}\n", S.size()); */
+      //   /* std::unordered_set<
+      //     Spec, 
+      //     decltype(eig::detail::matrix_hash<float>), 
+      //     decltype(eig::detail::matrix_equal)
+      //   > S_unique(range_iter(S));
+      //   S = { range_iter(S_unique) };
+      //   fmt::print("S unique: {}\n", S.size()); */
         
-        // Return color solid positions
-        rng::transform(S, V.begin(), [&](Spec s) { 
-          return (Colr() << cst.transpose() * s.matrix(), 0).finished();
-        });
+      //   // Return color solid positions
+      //   rng::transform(S, V.begin(), [&](Spec s) { 
+      //     return (Colr() << cst.transpose() * s.matrix(), 0).finished();
+      //   });
 
-        // Copy OCS over
-        rng::transform(V, OCS.begin(), [&](Colr c) {
-          return (eig::Array2f() << c.x(), c.y()).finished();
-        });
+      //   // Copy OCS over
+      //   rng::transform(V, OCS.begin(), [&](Colr c) {
+      //     return (eig::Array2f() << c.x(), c.y()).finished();
+      //   });
 
-        // Finally, submit new draw info
-        if (show_ocs)
-          i_pointsets.push_back(AnnotatedPointsetDraw(V, 1e-2, { 1, 0, 0, 1 }));
-      }
+      //   // Finally, submit new draw info
+      //   if (show_ocs)
+      //     i_pointsets.push_back(AnnotatedPointsetDraw(V, 1e-2, { 1, 0, 0, 1 }));
+      // }
 
       /* // Given a known color of z = 0.5, find and project closest mms points
       {
@@ -519,139 +790,87 @@ namespace met {
           i_pointsets.push_back(AnnotatedPointsetDraw(V, draw_size, { 1, 1, 1, draw_alpha }));
       } */
 
-      // Given a known color of z = 0.5, generate random z' and splat into lower dimension
-      {
-        std::vector<Colr>         V(n_samples_ocs);
-        std::vector<eig::Array4f> colrs(n_samples_ocs);
-        std::vector<float>        sizes(n_samples_ocs);
+      // // Given a known color of z = 0.5, generate random z' and splat into lower dimension
+      // {
+      //   std::vector<Colr>         V(n_samples_ocs);
+      //   std::vector<eig::Array4f> colrs(n_samples_ocs);
+      //   std::vector<float>        sizes(n_samples_ocs);
 
-        // Minima, maxima on { z, z' }
-        eig::Vector2f a0 = { z, 0 }, a1 = { z, 1 };
-        eig::Vector2f a = (a1 - a0).normalized();
+      //   // Minima, maxima on { z, z' }
+      //   eig::Vector2f a0 = { z, 0 }, a1 = { z, 1 };
+      //   eig::Vector2f a = (a1 - a0).normalized();
         
-        // Find closest two interior points
-        auto zsort = OCS;
-        rng::sort(zsort, rng::less {}, [&](const eig::Array2f &v) {
-          eig::Vector2f a = (a1 - a0).normalized();
-          eig::Vector2f b = v.matrix() - a0;
-          eig::Vector2f proj = a0 + a * a.dot(b);
-          return (v.matrix() - proj).norm();
-        });
+      //   // Find closest two interior points
+      //   auto zsort = OCS;
+      //   rng::sort(zsort, rng::less {}, [&](const eig::Array2f &v) {
+      //     eig::Vector2f a = (a1 - a0).normalized();
+      //     eig::Vector2f b = v.matrix() - a0;
+      //     eig::Vector2f proj = a0 + a * a.dot(b);
+      //     return (v.matrix() - proj).norm();
+      //   });
 
-        // Splat some points
-        std::vector<eig::Array2f> splats(n_samples_ocs);
-        rng::transform(OCS, splats.begin(), [&](const eig::Vector2f &v) {
-          eig::Vector2f b = v - a0;
-          eig::Vector2f p = a0 + a * a.dot(b);
-          return p;
-        });
+      //   // Splat some points
+      //   std::vector<eig::Array2f> splats(n_samples_ocs);
+      //   rng::transform(OCS, splats.begin(), [&](const eig::Vector2f &v) {
+      //     eig::Vector2f b = v - a0;
+      //     eig::Vector2f p = a0 + a * a.dot(b);
+      //     return p;
+      //   });
 
-        // Determine output colors, sizes, based on distance to line scale
-        for (uint i = 0; i < n_samples_ocs; ++i) {
-          eig::Vector2f v = splats[i];
-          eig::Vector2f ocs = OCS[i];
-          float d = (v - ocs).norm();
-          float w = std::max(1.f - 10.f * d, 0.f);
-          colrs[i] = { 1, 1, 1, draw_alpha * w };
-          sizes[i] = draw_size; // * w;
-        }
+      //   // Determine output colors, sizes, based on distance to line scale
+      //   for (uint i = 0; i < n_samples_ocs; ++i) {
+      //     eig::Vector2f v = splats[i];
+      //     eig::Vector2f ocs = OCS[i];
+      //     float d = (v - ocs).norm();
+      //     float w = std::max(1.f - 10.f * d, 0.f);
+      //     colrs[i] = { 1, 1, 1, draw_alpha * w };
+      //     sizes[i] = draw_size; // * w;
+      //   }
 
-        // Output positions
-        rng::transform(splats, V.begin(), [&](eig::Array2f s) { 
-          return (Colr() << s, 0).finished();
-        });
-        /* rng::transform(OCS, colrs, [&](const eig::Vector2f &v) {
-          eig::Vector2f b = v - a0;
-          float dist = a.dot(b);
-          // return eig::Array4f { 1, 1, 1, }
-        }); */
+      //   // Output positions
+      //   rng::transform(splats, V.begin(), [&](eig::Array2f s) { 
+      //     return (Colr() << s, 0).finished();
+      //   });
+      //   /* rng::transform(OCS, colrs, [&](const eig::Vector2f &v) {
+      //     eig::Vector2f b = v - a0;
+      //     float dist = a.dot(b);
+      //     // return eig::Array4f { 1, 1, 1, }
+      //   }); */
 
         
 
-        /* eig::Vector2f zmax = *rng::min_element(OCS, {}, [&](const eig::Array2f &v) {
-          eig::Vector2f a = (a1 - a0).normalized();
-          eig::Vector2f b = v.matrix() - a0;
-          eig::Vector2f proj = a1 + a * a.dot(b);
-          return (v.matrix() - proj).norm();
-        }); */
+      //   /* eig::Vector2f zmax = *rng::min_element(OCS, {}, [&](const eig::Array2f &v) {
+      //     eig::Vector2f a = (a1 - a0).normalized();
+      //     eig::Vector2f b = v.matrix() - a0;
+      //     eig::Vector2f proj = a1 + a * a.dot(b);
+      //     return (v.matrix() - proj).norm();
+      //   }); */
 
 
-        /* // Generate some points within this range
-        auto X = UniformSampler(zmin_f, zmax_f, 4).next_nd(n_samples_mms);
-        rng::transform(X, V.begin(), [&](float z_) { 
-          return (Colr() << z, z_, 0).finished();
-        }); */
+      //   /* // Generate some points within this range
+      //   auto X = UniformSampler(zmin_f, zmax_f, 4).next_nd(n_samples_mms);
+      //   rng::transform(X, V.begin(), [&](float z_) { 
+      //     return (Colr() << z, z_, 0).finished();
+      //   }); */
 
-        /* rng::transform(OCS, V.begin(), [&](eig::Array2f v) {
-          // eig::Vector2f a = (a1 - a0).normalized();
-          eig::Vector2f b = v.matrix() - a0;
-          return (Colr() << a0 + a * a.dot(b), 0).finished();
-        }); */
+      //   /* rng::transform(OCS, V.begin(), [&](eig::Array2f v) {
+      //     // eig::Vector2f a = (a1 - a0).normalized();
+      //     eig::Vector2f b = v.matrix() - a0;
+      //     return (Colr() << a0 + a * a.dot(b), 0).finished();
+      //   }); */
 
-        /* // Sample random positions in [0, 1] in color system 1
-        auto X_ = UniformSampler(0.f, 1.f, 4).next_nd(n_samples);
-        std::vector<float> Z_(range_iter(X_));
+      //   /* // Sample random positions in [0, 1] in color system 1
+      //   auto X_ = UniformSampler(0.f, 1.f, 4).next_nd(n_samples);
+      //   std::vector<float> Z_(range_iter(X_));
 
-        // Return color solid positions
-        rng::transform(Z_, V.begin(), [&](float z_) { 
-          return (Colr() << z, z_, 0).finished();
-        }); */
+      //   // Return color solid positions
+      //   rng::transform(Z_, V.begin(), [&](float z_) { 
+      //     return (Colr() << z, z_, 0).finished();
+      //   }); */
 
-        if (show_mms)
-          i_pointsets.push_back(AnnotatedPointsetDraw(V, sizes, colrs));
-      }
-
-     /*  // Generate sample unit vectors
-      auto X = detail::gen_unit_dirs_x(n_samples, 3);
-      
-      // Processed samples and resulting output colors are stored here
-      std::vector<Colr> V(n_samples);
-      std::vector<Spec> S(n_samples);
-
-      // Project samples on to color system
-      rng::copy(X, V.begin());
-      rng::transform(V, S.begin(), [&](Colr c) { 
-        return (cs * c.matrix()).eval();
-      }); 
-
-      // Next, compute optimal spectra
-      rng::transform(S, S.begin(), [&](Spec s) { 
-        if (toggle) {
-          for (auto &f : s)
-            f = f >= 0.f ? 1.f : 0.f;
-        } else {
-          s.matrix().normalize();
-        }
-        return s;
-      });
-
-      // Apply color system transform to spectra
-      rng::transform(S, V.begin(), [&](Spec s) { 
-        return (cs.transpose() * s.matrix()).eval();
-      });  */
-
-
-      // Plot window to help show some things more clearly
-      if (ImGui::Begin("Plots")) {
-        if (ImPlot::BeginPlot("Illuminant")) {
-          // Get wavelength values for x-axis in plot
-          Spec x_values;
-          for (uint i = 0; i < x_values.size(); ++i)
-            x_values[i] = wavelength_at_index(i);
-          
-          // Setup minimal format for coming line plots
-          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
-          ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
-          // ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0, 1.0, ImPlotCond_Always);
-        
-          // Do the thing
-          ImPlot::PlotLine("CS0 (D65)", x_values.data(), cs0.data(), wavelength_samples);
-          ImPlot::PlotLine("CS1 (F11)", x_values.data(), cs1.data(), wavelength_samples);
-
-          ImPlot::EndPlot();
-        }
-      }
-      ImGui::End();
+      //   if (show_mms)
+      //     i_pointsets.push_back(AnnotatedPointsetDraw(V, sizes, colrs));
+      // }
     }
   };
 
