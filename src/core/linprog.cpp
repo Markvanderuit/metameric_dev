@@ -21,7 +21,6 @@ namespace met {
     x_l =-std::numeric_limits<double>::max();
   }
 
-
   eig::ArrayXd lp_solve(const LPParameters &params) {
     met_trace();
 

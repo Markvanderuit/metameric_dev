@@ -8,6 +8,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/tree.hpp>
+#include <metameric/core/nlopt.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
@@ -33,7 +34,6 @@
 #include <numbers>
 #include <span>
 #include <unordered_set>
-#include "nlopt.hpp"
 
 namespace met {
   // Constants
@@ -995,13 +995,14 @@ namespace met {
 } // namespace met
 
 int main() {
-  /* try { */
+  try {
     // met::init();
     // met::run();
-    met::run();
-  /* } catch (const std::exception &e) {
+    met::test_nlopt();
+    // met::run();
+  } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;
-  } */
+  }
   return EXIT_SUCCESS;
 }
