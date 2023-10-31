@@ -513,17 +513,21 @@ namespace met {
     void test_nl_solve(SchedulerHandle &info) {
       met_trace_full();
 
+      static Colr cv = { 0.5, 0.3, 0.1 };
+
       std::vector<CMFS> systems = { cs_0 };
-      std::vector<Colr> signals = { cv_0 };
+      std::vector<Colr> signals = { cv };
       GenerateSpectrumInfo spectrum_info = {
         .basis   = basis,
         .systems = systems,
         .signals = signals
       };
-      // test_nlopt();
       Spec s = nl_generate_spectrum(spectrum_info);
+      Colr cv_out = (cs_0.transpose() * s.matrix()).eval();
 
       if (ImGui::Begin("Preview")) {
+        ImGui::ColorEdit3("Color", cv.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("Outpt", cv_out.data(), ImGuiColorEditFlags_Float);
         if (ImPlot::BeginPlot("Illuminant", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
           // Get wavelength values for x-axis in plot
           Spec x_values;
@@ -1029,11 +1033,11 @@ namespace met {
 } // namespace met
 
 int main() {
-  // try {
+  try {
     met::run();
-  // } catch (const std::exception &e) {
-  //   fmt::print(stderr, "{}\n", e.what());
-  //   return EXIT_FAILURE;
-  // }
+  } catch (const std::exception &e) {
+    fmt::print(stderr, "{}\n", e.what());
+    return EXIT_FAILURE;
+  }
   return EXIT_SUCCESS;
 }

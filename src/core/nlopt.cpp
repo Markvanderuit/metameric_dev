@@ -7,43 +7,71 @@ namespace met {
     met_trace();
 
     NLOptInfo solver = {
-      .n      = wavelength_samples,
+      .n      = wavelength_bases,
       .algo   = NLOptAlgo::LD_SLSQP,
       .form   = NLOptForm::eMinimize,
-      .x_init = Spec(0.5).cast<double>().eval(),
-      .upper  = Spec(1).cast<double>().eval(),
-      .lower  = Spec(0).cast<double>().eval(),
-      .max_iters = 11,
-      .relative_func_tol = 0.0,
-      .relative_xpar_tol = 0.0,
+      .x_init = Basis::BVec(0.5).cast<double>().eval(),
+      .max_iters    = 10,
+      .rel_func_tol = 1e-3,
+      .rel_xpar_tol = 1e-2,
     };
 
+    // Objective function minimizes squared l2 norm
     uint n_objc_calls = 0;
-    solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
+    solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
       n_objc_calls++;
       if (grad.size())
-        grad = (2.0 * x).eval(); // eig::Vector<double, wavelength_samples>(1);
+        grad = (2.0 * x).eval();
       return x.dot(x);
     };
+    
+    // Construct basis matrix and boundary vectors
+    auto basis = info.basis.func.cast<double>().eval();
+    Spec upper_bounds = Spec(1.0) - info.basis.mean;
+    Spec lower_bounds = upper_bounds - Spec(1.0); 
 
-    auto A = info.systems[0].transpose().cast<double>().eval();
-    auto b = info.signals[0].cast<double>().eval();
-    for (uint i = 0; i < 3; ++i) {
-      solver.eq_constraints.push_back([&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
-        auto a = A.row(i).eval();
-        if (grad.size())
-          grad = a;
-        auto f = (a * x).eval();
-        return f[0] - b[i];
+    // Add boundary inequality constraints
+    for (uint i = 0; i < wavelength_samples; ++i) {
+      solver.nq_constraints.push_back(
+        [A = basis.row(i).eval(), b = upper_bounds[i]]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
+          double f = A.dot(x);
+          if (grad.size())
+            grad = A;
+          return f - b;
+      });
+      solver.nq_constraints.push_back(
+        [A = basis.row(i).eval(), b = lower_bounds[i]]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
+          double f = -A.dot(x);
+          if (grad.size())
+            grad = -A;
+          return f + b;
       });
     }
 
+    // Add color system equality constraints
+    for (uint i = 0; i < info.systems.size(); ++i) {
+      Colr o = (info.systems[i].transpose() * info.basis.mean.matrix()).transpose().eval();
+      auto A = (info.systems[i].transpose().cast<double>() * basis).eval();
+      auto b = (info.signals[i] - o).cast<double>().eval();
+
+      for (uint j = 0; j < 3; ++j) {
+        solver.eq_constraints.push_back(
+          [A = A.row(j).eval(), b = b[j]]
+          (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
+            double f = A.dot(x);
+            if (grad.size())
+              grad = A;
+            return f - b;
+        });
+      } // for (uint j)
+    } // for (uint i)
+
+    // Optimize result and return
     NLOptResult r = solve(solver);
-    fmt::print("Halted after {} iters\n", n_objc_calls);
-    // if (r.code)
-    //   fmt::print("Error: {}\n", r.code);
-    // fmt::print("Found f{} = {} tolerance after {} iterations\n", r.x, r.objective, n_objc_calls);
-    return Spec(r.x.cast<float>());
+    Spec s = info.basis.mean + Spec((basis * r.x).cast<float>());
+    return s;
   }
 
   void test_nlopt() {
@@ -104,23 +132,27 @@ namespace met {
     }
 
     for (auto &eq : info.eq_constraints)
-      opt.add_equality_constraint(func_wrapper, &eq, info.relative_func_tol);
+      opt.add_equality_constraint(func_wrapper, &eq, info.rel_func_tol.value_or(0.0));
     for (auto &nq : info.nq_constraints)
-      opt.add_inequality_constraint(func_wrapper, &nq, info.relative_func_tol);
+      opt.add_inequality_constraint(func_wrapper, &nq, info.rel_func_tol.value_or(0.0));
 
     // Use c-api to avoid conversion to std::vector when data is already owned by eigen object
     std::vector<double> upper(range_iter(info.upper));
     std::vector<double> lower(range_iter(info.lower));
-    if (!upper.empty()) opt.set_upper_bounds(upper);
-    if (!lower.empty()) opt.set_lower_bounds(lower);
+    if (!upper.empty())
+      opt.set_upper_bounds(upper);
+    /* else
+      opt.set_upper_bounds(HUGE_VAL); */
+    if (!lower.empty())
+      opt.set_lower_bounds(lower);
+    /* else
+      opt.set_lower_bounds(-HUGE_VAL); */
 
-    // Stopping criteria
-    // opt.set_xtol_rel(info.relative_xpar_tol);
-    // opt.set_maxtime()
-    // if (info.max_iters) opt.set_maxeval(*info.max_iters);
-    // if (info.stopval) opt.set_stopval(*info.stopval);
-    // opt.set_maxtime(0.01);
-    opt.set_maxeval(11);
+    // Optional stopping criteria and tolerances
+    if (info.rel_xpar_tol) opt.set_xtol_rel(*info.rel_xpar_tol);
+    if (info.max_time)     opt.set_maxtime(*info.max_time);
+    if (info.max_iters)    opt.set_maxeval(*info.max_iters);
+    if (info.stopval)      opt.set_stopval(*info.stopval);
     
     // Placeholder for 'x' because the library enforces std::vector :S
     std::vector<double> x(info.n);
@@ -130,9 +162,10 @@ namespace met {
     // Run optimization and store results
     NLOptResult result;
     try {
-      result.code = opt.optimize(x, result.objective);
+    result.code = opt.optimize(x, result.objective);
     } catch (const std::exception &e) {
-      // fmt::print("{}\n", e.what());
+      // Blerp
+      fmt::print("{}\n", e.what());
     }
 
     // Copy over solution to result object

@@ -34,9 +34,10 @@ namespace met {
 
     // Miscellany
     std::optional<double> stopval;
-    std::optional<uint>   max_iters;
-    double relative_func_tol = 1e-06;
-    double relative_xpar_tol = 1e-03;
+    std::optional<uint>   max_iters;        
+    std::optional<double> max_time;        
+    std::optional<double> rel_func_tol; // 1e-6;
+    std::optional<double> rel_xpar_tol; // 1e-4
   };
 
   struct NLOptResult {

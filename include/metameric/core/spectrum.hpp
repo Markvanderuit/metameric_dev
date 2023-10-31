@@ -34,6 +34,7 @@ namespace met {
   /* Basis function object, using a offset around its mean */
   struct Basis {
     using BMat = eig::Matrix<float, wavelength_samples, wavelength_bases>;
+    using BVec = eig::Array<float, wavelength_bases, 1>;
 
     Spec mean; // Mean offset
     BMat func; // Basis functions around mean ooffset
