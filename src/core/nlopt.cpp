@@ -74,6 +74,29 @@ namespace met {
     return s;
   }
 
+  std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info) {
+    met_trace();
+
+    // NLOptInfo solver = {
+    //   .n      = wavelength_bases,
+    //   .algo   = NLOptAlgo::LD_SLSQP,
+    //   .form   = NLOptForm::eMaximize,
+    //   .x_init = Basis::BVec(0.5).cast<double>().eval(),
+    //   .max_iters    = 10,
+    //   .rel_func_tol = 1e-3,
+    //   .rel_xpar_tol = 1e-2,
+    // };
+    
+    // // Generate color system spectra which use basis functions
+    // auto csys_j = (info.system_j.transpose() * info.basis.func).eval();
+    // auto csys_i = std::vector<Syst>(info.systems_i.size());
+    // rng::transform(info.systems_i, csys_i.begin(),
+    //   [&](const auto &m) { return (m.transpose() * info.basis.func).eval(); });    
+
+
+    return { };
+  }
+
   void test_nlopt() {
     met_trace();
 

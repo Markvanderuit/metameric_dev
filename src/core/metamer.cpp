@@ -189,7 +189,7 @@ namespace met {
     // Generate color system spectra for basis function parameters
     auto csys_j = (info.system_j.transpose() * info.basis.func).eval();
     auto csys_i = std::vector<Syst>(info.systems_i.size());
-    std::ranges::transform(info.systems_i, csys_i.begin(),
+    rng::transform(info.systems_i, csys_i.begin(),
       [&](const auto &m) { return (m.transpose() * info.basis.func).eval(); });    
       
     // Initialize parameter object for LP solver, given expected matrix sizes
