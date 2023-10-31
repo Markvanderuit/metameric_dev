@@ -37,7 +37,7 @@
         "kind": "filesystem",
         "path": "third_party/vcpkg-registry",
         "baseline": "2023-02-22",
-        "packages": [ "qhull" ]
+        "packages": [ "qhull", "nlopt" ]
       }
     ]
   }

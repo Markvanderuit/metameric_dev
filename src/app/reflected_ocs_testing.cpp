@@ -371,7 +371,7 @@ namespace met {
     std::vector<Colr> mms_interior_pointset;
 
     CMFS cs_0, cs_1;
-    Colr cv_0 = 0.5f;
+    Colr cv_0 = { 0.5, 0.35, 0.1 };
     
     void init(SchedulerHandle &info) override {
       met_trace_full();
@@ -474,7 +474,8 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
       regenerate_samples(info);
-      regenerate_maximize(info);
+      test_nl_solve(info);
+      // regenerate_maximize(info);
     }
 
     /* 
@@ -509,6 +510,39 @@ namespace met {
 }
      */
 
+    void test_nl_solve(SchedulerHandle &info) {
+      met_trace_full();
+
+      std::vector<CMFS> systems = { cs_0 };
+      std::vector<Colr> signals = { cv_0 };
+      GenerateSpectrumInfo spectrum_info = {
+        .basis   = basis,
+        .systems = systems,
+        .signals = signals
+      };
+      // test_nlopt();
+      Spec s = nl_generate_spectrum(spectrum_info);
+
+      if (ImGui::Begin("Preview")) {
+        if (ImPlot::BeginPlot("Illuminant", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+          // Get wavelength values for x-axis in plot
+          Spec x_values;
+          for (uint i = 0; i < x_values.size(); ++i)
+            x_values[i] = wavelength_at_index(i);
+
+          // Setup minimal format for coming line plots
+          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+          ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.25f, 1.25f, ImPlotCond_Always);
+
+          // Do the thing
+          ImPlot::PlotLine("", x_values.data(), s.data(), wavelength_samples);
+
+          ImPlot::EndPlot();
+        }
+      }
+      ImGui::End();
+    }
     
     void regenerate_maximize(SchedulerHandle &info) {
       met_trace_full();
@@ -995,14 +1029,11 @@ namespace met {
 } // namespace met
 
 int main() {
-  try {
-    // met::init();
-    // met::run();
-    met::test_nlopt();
-    // met::run();
-  } catch (const std::exception &e) {
-    fmt::print(stderr, "{}\n", e.what());
-    return EXIT_FAILURE;
-  }
+  // try {
+    met::run();
+  // } catch (const std::exception &e) {
+  //   fmt::print(stderr, "{}\n", e.what());
+  //   return EXIT_FAILURE;
+  // }
   return EXIT_SUCCESS;
 }
