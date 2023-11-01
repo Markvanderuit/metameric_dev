@@ -184,16 +184,16 @@ namespace met {
   std::vector<Spec> generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info) {
     met_trace();
 
-    using Syst = eig::Matrix<float, 3, wavelength_bases>;
-
     // Generate color system spectra for basis function parameters
-    auto csys_j = (info.system_j.transpose() * info.basis.func).eval();
-    auto csys_i = std::vector<Syst>(info.systems_i.size());
-    rng::transform(info.systems_i, csys_i.begin(),
-      [&](const auto &m) { return (m.transpose() * info.basis.func).eval(); });    
+    const uint N = wavelength_samples; // wavelength_bases;
+    // auto basis = info.basis.func;
+    auto basis = eig::Matrix<float, wavelength_samples, wavelength_samples>::Identity().eval();
+    auto basis_trf = 
+      [b = basis](const auto &csys) { return (csys.transpose() * b).eval(); };
+    auto csys_j = basis_trf(info.system_j);
+    auto csys_i = vws::transform(info.systems_i, basis_trf) | rng::to<std::vector>();
       
     // Initialize parameter object for LP solver, given expected matrix sizes
-    const uint N = wavelength_bases;
     const uint M = 3 * csys_i.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
     params.objective = LPObjective::eMaximize;
@@ -206,8 +206,8 @@ namespace met {
     }
 
     // Add [0, 1] bounds constraints
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = info.basis.func.cast<double>();
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = info.basis.func.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = basis.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = basis.cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = Spec(0.0).cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = Spec(1.0).cast<double>();
     params.r.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = LPCompare::eGE;
@@ -230,8 +230,8 @@ namespace met {
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
         local_params.C = (U * info.samples[i].matrix()).cast<double>().eval();
-        eig::Matrix<float, wavelength_bases, 1> w = lp_solve(local_params).cast<float>().eval();
-        output[i] = info.basis.func * w;
+        eig::Matrix<float, N, 1> w = lp_solve(local_params).cast<float>().eval();
+        output[i] = basis * w;
       }
     }
 
@@ -248,16 +248,15 @@ namespace met {
   std::vector<Colr> generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info) {
     met_trace();
 
-    using Syst = eig::Matrix<float, 3, wavelength_bases>;
-    
     // Generate color system spectra for basis function parameters
-    auto csys_j = (info.system_j.transpose() * info.basis.func).eval();
-    auto csys_i = std::vector<Syst>(info.systems_i.size());
-    std::ranges::transform(info.systems_i, csys_i.begin(),
-      [&](const auto &m) { return (m.transpose() * info.basis.func).eval(); });    
+    const uint N = wavelength_bases;
+    auto basis = info.basis.func;
+    auto basis_trf = 
+      [b = basis](const auto &csys) { return (csys.transpose() * b).eval(); };
+    auto csys_j = basis_trf(info.system_j);
+    auto csys_i = vws::transform(info.systems_i, basis_trf) | rng::to<std::vector>();
 
     // Initialize parameter object for LP solver, given expected matrix sizes
-    const uint N = wavelength_bases;
     const uint M = 3 * csys_i.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
     params.objective = LPObjective::eMaximize;
@@ -270,8 +269,8 @@ namespace met {
     }
 
     // Add [0, 1] bounds constraints
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = info.basis.func.cast<double>();
-    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = info.basis.func.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3, 0)                      = basis.cast<double>();
+    params.A.block<wavelength_samples, N>(csys_i.size() * 3 + wavelength_samples, 0) = basis.cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = Spec(0.0).cast<double>();
     params.b.block<wavelength_samples, 1>(csys_i.size() * 3 + wavelength_samples, 0) = Spec(1.0).cast<double>();
     params.r.block<wavelength_samples, 1>(csys_i.size() * 3, 0)                      = LPCompare::eGE;
@@ -294,7 +293,7 @@ namespace met {
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
         local_params.C = (U * info.samples[i].matrix()).cast<double>().eval();
-        eig::Matrix<float, wavelength_bases, 1> w = lp_solve(local_params).cast<float>().eval();
+        eig::Matrix<float, N, 1> w = lp_solve(local_params).cast<float>().eval();
         output[i] = csys_j * w;
       }
     }

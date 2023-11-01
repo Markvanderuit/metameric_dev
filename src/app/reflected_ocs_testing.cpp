@@ -365,20 +365,23 @@ namespace met {
   };
 
   struct DataTask : public detail::TaskNode {
-    std::vector<Colr> ocs_pointset;
-    std::vector<Colr> mms_pointset;
-    std::vector<Spec> mms_interior;
-    std::vector<Colr> mms_interior_pointset;
+    std::vector<Colr> ocs_colr_set;
+    std::vector<Colr> mms_colr_set;
+    std::vector<Spec> mms_spec_set;
+
+    // std::vector<Spec> mms_interior;
+    // std::vector<Colr> mms_interior_pointset;
 
     CMFS cs_0, cs_1;
-    Colr cv_0 = { 0.5, 0.35, 0.1 };
-    
+    Colr cv_0 = { 0.5, 0.5, 0.5 };
+    float n_scatters = 1.f;
+
     void init(SchedulerHandle &info) override {
       met_trace_full();
 
       // Define illuminant-induced mismatching to quickly generate a large metamer set
       ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
-      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1, .n_scatters = 1 };
+      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
       cs_0 = csys_0.finalize_direct();
       cs_1 = csys_1.finalize_direct();
 
@@ -386,96 +389,42 @@ namespace met {
       {
         auto samples_ = detail::gen_unit_dirs_x(1024u, 3);
         std::vector<Colr> samples(range_iter(samples_));
-        ocs_pointset = generate_ocs_boundary_colr({
+        ocs_colr_set = generate_ocs_boundary_colr({
           .basis   = basis,
-          .system  = cs_0,
+          .system  = cs_1,
           .samples = samples,
         });
       }
 
-      // Generate points on the MMS in X for now
-      auto samples   = detail::gen_unit_dirs_x(64u, 6);
-      auto systems_i = { cs_0 };
-      auto signals_i = { cv_0 };
-      // auto X_boundary
-      mms_pointset = generate_mmv_boundary_colr({
-        .basis     = basis,
-        .systems_i = systems_i,
-        .signals_i = signals_i,
-        .system_j  = cs_1,
-        .samples   = samples
-      });
-
-     /*  // Generate corresponding points in R3
-      mms_pointset.resize(X_boundary.size());
-      rng::transform(X_boundary, mms_pointset.begin(), [&](const Spec &s) {
-        return (cs_1.transpose() * s.matrix()).eval();
-      }); */
-
-      // Generate a delaunay tesselation of the MMS
-      // to sample its interior
-      auto [vt, el, _norms, _uvs] = generate_delaunay<Delaunay, eig::Array3f>(mms_pointset);
       
-      // Compute volume of each tetrahedron in delaunay
-      std::vector<float> el_volume(el.size());
-      std::transform(std::execution::par_unseq, range_iter(el), el_volume.begin(),
-      [&](const eig::Array4u &el) {
-        // Get vertex positions for this tetrahedron
-        std::array<eig::Vector3f, 4> p;
-        std::ranges::transform(el, p.begin(), [&](uint i) { return vt[i]; });
-
-        // Compute tetrahedral volume
-        return std::abs((p[0] - p[3]).dot((p[1] - p[3]).cross(p[2] - p[3]))) / 6.f;
-      });
-
-      // Components for sampling step
-      UniformSampler sampler;
-      Distribution volume_distr(el_volume);
-
-      // Generate spectral metamers at positions in the interior
-      mms_interior.resize(1024u);
-      for (uint i = 0; i < mms_interior.size(); ++i) {
-        // First, sample barycentric weights uniformly inside a tetrahedron 
-        // (https://vcg.isti.cnr.it/jgt/tetra.htm)
-        auto sample_3d = sampler.next_nd<3>();
-        if (sample_3d.head<2>().sum() > 1.f) {
-          sample_3d.head<2>() = 1.f - sample_3d.head<2>();
-        }
-        if (sample_3d.tail<2>().sum() > 1.f) {
-          float t = sample_3d[2];
-          sample_3d[2] = 1.f - sample_3d.head<2>().sum();
-          sample_3d[1] = 1.f - t;
-        } else if (sample_3d.sum() > 1.f) {
-          float t = sample_3d[2];
-          sample_3d[2] = sample_3d.sum() - 1.f;
-          sample_3d[0] = 1.f - sample_3d[1] - t;
-        }
-
-        // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
-        std::array<eig::Vector3f, 4> p;
-        rng::transform(el[volume_distr.sample(sampler.next_1d())], p.begin(), 
-          [&](uint i) { return vt[i]; });
-          
-        // Then, recover sample position using the generated barycentric coordinates
-        eig::Array3f v = p[0] * (1.f - sample_3d.sum())
-                       + p[1] * sample_3d.x() + p[2] * sample_3d.y() + p[3] * sample_3d.z();
-
-        // Finally, generate a metamer for the sample position
-        auto systems = { cs_0, cs_1 };
-        auto signals = { cv_0, v    };
-        mms_interior[i] = generate_spectrum({
-          .basis   = basis,
-          .systems = systems,
-          .signals = signals
-        });
-      } // for (i)
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace_full();
+
+      {
+        // Generate points on the MMS in X for now
+        auto samples   = detail::gen_unit_dirs_x(64u, 6);
+        auto systems_i = { cs_0 };
+        auto signals_i = { cv_0 };
+        // auto X_boundary
+
+        mms_spec_set = nl_generate_mmv_boundary_spec({
+          .basis     = basis,
+          .systems_i = systems_i,
+          .signals_i = signals_i,
+          .system_j  = cs_1,
+          .samples   = samples
+        }, static_cast<double>(n_scatters));
+
+        mms_colr_set.resize(mms_spec_set.size());
+        rng::transform(mms_spec_set, mms_colr_set.begin(), [&](const Spec &s) {
+          return (cs_1.transpose() * s.matrix()).eval();
+        });
+      }
+      
       regenerate_samples(info);
       test_nl_solve(info);
-      // regenerate_maximize(info);
     }
 
     /* 
@@ -651,7 +600,6 @@ namespace met {
       static float draw_alpha = 1.f;
       static float draw_size = 0.01f;
       static float z = 0.5f;
-      static float n_scatters = 1.f;
 
       if (ImGui::Begin("Settings")) {
         ImGui::Checkbox("Show OCS", &show_ocs);
@@ -665,7 +613,40 @@ namespace met {
 
         ImGui::SliderFloat("draw alpha", &draw_alpha, 0.f, 1.f);
         ImGui::SliderFloat("draw size", &draw_size, 1e-3, 1.f);
-        ImGui::SliderFloat("nr. of scatters", &n_scatters, 1.f, 16.f);
+        ImGui::SliderFloat("Nr. of scatters", &n_scatters, 1.f, 16.f);
+
+        // MMS spectrum selection slider
+        static uint mms_spec_select = 0;
+        uint mms_min = 0, mms_max = mms_spec_set.size() - 1;
+        ImGui::SliderScalar("MMS spec index", ImGuiDataType_U32, &mms_spec_select, &mms_min, &mms_max);
+        
+        {
+          Spec s = mms_spec_set[mms_spec_select];
+          Colr out_0 = (cs_0.transpose() * s.matrix());
+          Colr out_1 = (cs_1.transpose() * s.matrix());
+          
+          ImGui::ColorEdit3("Out, cs0", out_0.data(), ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("Out, cs1", out_1.data(), ImGuiColorEditFlags_Float);
+        }
+
+        // Draw MMS spectrum plot
+        if (ImPlot::BeginPlot("MMS spectrum", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+          // Get wavelength values for x-axis in plot
+          Spec x_values;
+          for (uint i = 0; i < x_values.size(); ++i)
+            x_values[i] = wavelength_at_index(i);
+          Spec y_values = mms_spec_set[mms_spec_select];
+
+          // Setup minimal format for coming line plots
+          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+          ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.25f, 1.25f, ImPlotCond_Always);
+
+          // Do the thing
+          ImPlot::PlotLine("", x_values.data(), y_values.data(), wavelength_samples);
+
+          ImPlot::EndPlot();
+        }
       }
       ImGui::End();
 
@@ -678,16 +659,16 @@ namespace met {
       {
         // Make available for rendering
         if (show_ocs) {
-          std::vector<eig::Array4f> colrs(ocs_pointset.size());
-          std::vector<float>        sizes(ocs_pointset.size(), draw_size);
-          rng::transform(ocs_pointset, colrs.begin(), [&](const Colr &c) {
+          std::vector<eig::Array4f> colrs(ocs_colr_set.size());
+          std::vector<float>        sizes(ocs_colr_set.size(), draw_size);
+          rng::transform(ocs_colr_set, colrs.begin(), [&](const Colr &c) {
             return (eig::Array4f() << c, draw_alpha).finished();
           });
-          i_pointsets.push_back(AnnotatedPointsetDraw(ocs_pointset, sizes, colrs));
+          i_pointsets.push_back(AnnotatedPointsetDraw(ocs_colr_set, sizes, colrs));
         }
       }
 
-      // First attempt
+      /* // First attempt
       {
         std::vector<Spec> spectra(range_iter(mms_interior));
         rng::transform(spectra, spectra.begin(), [&](const Spec &s) {
@@ -708,6 +689,18 @@ namespace met {
             return (eig::Array4f() << c, draw_alpha).finished();
           });
           i_pointsets.push_back(AnnotatedPointsetDraw(mms_interior_pointset, sizes, colrs));
+        }
+      } */
+
+      // Just draw pointset
+      {
+        if (show_mms) {
+          std::vector<eig::Array4f> colrs(mms_colr_set.size());
+          std::vector<float>        sizes(mms_colr_set.size(), draw_size);
+          rng::transform(mms_colr_set, colrs.begin(), [&](const Colr &c) {
+            return (eig::Array4f() << c, draw_alpha).finished();
+          });
+          i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_set, sizes, colrs));
         }
       }
 

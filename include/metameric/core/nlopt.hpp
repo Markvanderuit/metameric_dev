@@ -47,8 +47,12 @@ namespace met {
   };
 
   NLOptResult solve(NLOptInfo &info);
+  
+  Spec nl_generate_spectrum(GenerateSpectrumInfo info);
+
+  std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info, double power);
+  
+  std::vector<Colr> nl_generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info);
 
   void test_nlopt();
-  std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info);
-  Spec nl_generate_spectrum(GenerateSpectrumInfo info);
 } // namespace met
