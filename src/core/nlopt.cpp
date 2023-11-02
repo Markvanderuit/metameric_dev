@@ -93,9 +93,9 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
       .x_init       = eig::Vector<double, N>(0.5),
-      .max_iters    = 50,
-      .rel_func_tol = 1e-2,
-      .rel_xpar_tol = 1e-2,
+      .max_iters    = 30,
+      .rel_func_tol = 1e-5,
+      .rel_xpar_tol = 1e-3,
     };
 
     // Construct color system spectra over basis matrix
@@ -103,10 +103,11 @@ namespace met {
     auto csys_i = vws::transform(info.systems_i, basis_trf) | rng::to<std::vector>();
     
     // Construct orthogonal matrix used during maximiation
-    eig::MatrixXd S(wavelength_samples, 3 + 3 * csys_i.size()); // n x 6 at the least
-    S.block<wavelength_samples, 3>(0, 0) = info.system_j.cast<double>(); //.transpose();
-    for (uint i = 0; i < csys_i.size(); ++i)
-      S.block<wavelength_samples, 3>(0, 3 + 3 * i) = info.systems_i[i].cast<double>(); //.transpose();
+    // auto S = csys_j.transpose().eval();
+    // eig::JacobiSVD<decltype(S)> svd;
+    // svd.compute(S, eig::ComputeFullV);
+    // auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+    auto S = info.system_j.cast<double>().eval();
     eig::JacobiSVD<decltype(S)> svd;
     svd.compute(S, eig::ComputeFullV);
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
@@ -117,11 +118,13 @@ namespace met {
       auto b = info.signals_i[i].cast<double>().eval();
       for (uint j = 0; j < 3; ++j) {
         solver.eq_constraints.push_back(
-          [A = A.row(j).transpose().eval(), b = b[j]]
+          [A = A.row(j).transpose().eval(), b = b[j], p = power]
           (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
             if (grad.size())
               grad = A;
+              // grad = (p * A.array() * x.array().pow(p - 1.0));
             return A.dot(x) - b;
+            // return A.dot(x.array().pow(p).matrix()) - b;
         });
       } // for (uint j)
     } // for (uint i)
@@ -140,7 +143,7 @@ namespace met {
         (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
           if (grad.size())
             grad = -A;
-          return (-A).dot(x) /* + 0.0 */;
+          return (-A).dot(x);
       });
     }
 
@@ -156,27 +159,48 @@ namespace met {
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
         // Define objective function: max_x Cx
-        auto C = ((basis.transpose() * U) * info.samples[i].matrix().cast<double>()).eval();
-
+        auto C = (U * info.samples[i].matrix().cast<double>()).eval();
         uint objective_steps = 0;
         local_solver.objective = 
-          [&objective_steps, &basis, C, power](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
+          [&objective_steps, C, &basis, power](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
+            using Spec = eig::Vector<double, wavelength_samples>;
+
             objective_steps++;
+            
+            // f(x)      = C^T x
+            // ddx(f(x)) = C
+            /* if (grad.size())
+              grad = C;
+            return (C.transpose() * x).coeff(0); */
 
+            // f(x)    = C^T (Bx)^p
+            // d(f(x)) = p * (C x (Bx)^{p - 1})^T * B
+            Spec px = (basis * x).array().pow(power);
+            Spec dx = (basis * x).array().pow(power - 1.0);
             if (grad.size())
-              grad = power * C.array() * x.array().pow(power - 1.0);
-              // grad = C;
+              grad = power * (C.cwiseProduct(dx).transpose() * basis).array();
+            return C.dot(px);
+            // return (C.transpose() * px).coeff(0);
 
-            // max_x C^T x
-            // return (C.transpose() * x_).coeff(0);
-            return (C.transpose() * x.array().pow(power).matrix()).coeff(0); // shorthand for C^T x
+            // f(x)    = C^T Bx
+            // d(f(x)) = C^T B
+            // if (grad.size())
+            //   grad = (C.transpose() * basis).transpose().eval();
+            // return (C.transpose() * (basis * x)).coeff(0);
+
+            // f(x) = C^T x^p
+            // ddx  = p(C * x^(p - 1))
+            // if (grad.size())
+            //   grad = C.array() * (power * x.array().pow(power - 1.0)).eval();
+            // return (C.transpose() * x.array().pow(power).matrix()).coeff(0);
+
+            // return 0.0;
         };
 
         // Obtain result from solver
         NLOptResult r = solve(local_solver);
-        output[i] = Spec((basis * r.x).array().pow(power).cast<float>());
-
-        fmt::print("{} -> {} steps, {} value, {} code\n", i, objective_steps, r.objective, r.code);
+        output[i] = Spec((basis * r.x).array().pow(power).cwiseMin(1.f).cwiseMax(0.f).cast<float>());
+        // fmt::print("{} -> {} steps, {} value, {} code\n", i, objective_steps, r.objective, r.code);
       } // for (int i)
     }
 

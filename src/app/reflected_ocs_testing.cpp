@@ -367,6 +367,7 @@ namespace met {
   struct DataTask : public detail::TaskNode {
     std::vector<Colr> ocs_colr_set;
     std::vector<Colr> mms_colr_set;
+    std::vector<Colr> mms_basl_set;
     std::vector<Spec> mms_spec_set;
 
     // std::vector<Spec> mms_interior;
@@ -374,6 +375,7 @@ namespace met {
 
     CMFS cs_0, cs_1;
     Colr cv_0 = { 0.5, 0.5, 0.5 };
+    Colr sample = { 0, 1, 0 };
     float n_scatters = 1.f;
 
     void init(SchedulerHandle &info) override {
@@ -381,7 +383,7 @@ namespace met {
 
       // Define illuminant-induced mismatching to quickly generate a large metamer set
       ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
-      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
+      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
       cs_0 = csys_0.finalize_direct();
       cs_1 = csys_1.finalize_direct();
 
@@ -404,11 +406,10 @@ namespace met {
 
       {
         // Generate points on the MMS in X for now
-        auto samples   = detail::gen_unit_dirs_x(64u, 6);
+        // auto samples   = detail::gen_unit_dirs_x(64u, 6);
+        auto samples   = detail::gen_unit_dirs_x(128u, 3);
         auto systems_i = { cs_0 };
         auto signals_i = { cv_0 };
-        // auto X_boundary
-
         mms_spec_set = nl_generate_mmv_boundary_spec({
           .basis     = basis,
           .systems_i = systems_i,
@@ -416,10 +417,43 @@ namespace met {
           .system_j  = cs_1,
           .samples   = samples
         }, static_cast<double>(n_scatters));
+      }
 
+      {
+        // Generate single sample point
+        std::vector<eig::ArrayXf> samples = { sample };
+        auto systems_i = { cs_0 };
+        auto signals_i = { cv_0 };
+        auto spec = nl_generate_mmv_boundary_spec({
+          .basis     = basis,
+          .systems_i = systems_i,
+          .signals_i = signals_i,
+          .system_j  = cs_1,
+          .samples   = samples
+        }, static_cast<double>(n_scatters)).at(0);
+        mms_spec_set.push_back(spec);
+      }
+
+      {
+        // Convert to color values in cs_1
         mms_colr_set.resize(mms_spec_set.size());
         rng::transform(mms_spec_set, mms_colr_set.begin(), [&](const Spec &s) {
           return (cs_1.transpose() * s.matrix()).eval();
+        });
+        mms_colr_set.push_back(sample);
+      }
+
+      {
+        // Generate baseline for comparison
+        auto samples   = detail::gen_unit_dirs_x(128u, 6);
+        auto systems_i = { cs_0 };
+        auto signals_i = { cv_0 };
+        mms_basl_set = generate_mmv_boundary_colr({
+          .basis     = basis,
+          .systems_i = systems_i,
+          .signals_i = signals_i,
+          .system_j  = cs_1,
+          .samples   = samples
         });
       }
       
@@ -475,6 +509,9 @@ namespace met {
       Colr cv_out = (cs_0.transpose() * s.matrix()).eval();
 
       if (ImGui::Begin("Preview")) {
+        ImGui::SliderFloat3("Vector", sample.data(), -1.f, 1.f);
+        sample = sample.matrix().normalized();
+
         ImGui::ColorEdit3("Color", cv.data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("Outpt", cv_out.data(), ImGuiColorEditFlags_Float);
         if (ImPlot::BeginPlot("Illuminant", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
@@ -595,15 +632,17 @@ namespace met {
       // Static ImGui settings
       static bool show_ocs      = true;
       static bool show_mms      = true;
+      static bool show_mms_basl = true;
       static uint n_samples_ocs = 32u;
       static uint n_samples_mms = 32u;
       static float draw_alpha = 1.f;
-      static float draw_size = 0.01f;
+      static float draw_size = 0.05f;
       static float z = 0.5f;
 
       if (ImGui::Begin("Settings")) {
         ImGui::Checkbox("Show OCS", &show_ocs);
         ImGui::Checkbox("Show MMS", &show_mms);
+        ImGui::Checkbox("Show MMS (baseline)", &show_mms_basl);
         
         const uint min_samples = 1u, max_samples = 4096u;
         ImGui::SliderScalar("Samples (OCS)", ImGuiDataType_U32, &n_samples_ocs, &min_samples, &max_samples);
@@ -625,6 +664,7 @@ namespace met {
           Colr out_0 = (cs_0.transpose() * s.matrix());
           Colr out_1 = (cs_1.transpose() * s.matrix());
           
+          ImGui::ColorEdit3("In,  cs0", cv_0.data(),  ImGuiColorEditFlags_Float);
           ImGui::ColorEdit3("Out, cs0", out_0.data(), ImGuiColorEditFlags_Float);
           ImGui::ColorEdit3("Out, cs1", out_1.data(), ImGuiColorEditFlags_Float);
         }
@@ -640,7 +680,7 @@ namespace met {
           // Setup minimal format for coming line plots
           ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
           ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
-          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.25f, 1.25f, ImPlotCond_Always);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0f, 1.0f, ImPlotCond_Always);
 
           // Do the thing
           ImPlot::PlotLine("", x_values.data(), y_values.data(), wavelength_samples);
@@ -700,8 +740,11 @@ namespace met {
           rng::transform(mms_colr_set, colrs.begin(), [&](const Colr &c) {
             return (eig::Array4f() << c, draw_alpha).finished();
           });
-          i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_set, sizes, colrs));
+          i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_set, draw_size /* colrs */));
         }
+
+        if (show_mms_basl)
+          i_pointsets.push_back(AnnotatedPointsetDraw(mms_basl_set, draw_size));
       }
 
       // // Let's work in a 1D color system for now
