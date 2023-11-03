@@ -83,48 +83,42 @@ namespace met {
 
     // Construct basis matrix
     constexpr uint N = wavelength_bases;
-    auto basis = info.basis.func.cast<double>().eval();
-    // auto basis = eig::Matrix<double, wavelength_samples, wavelength_samples>::Identity().eval();
+    auto B = info.basis.func.cast<double>().eval();
     auto basis_trf = 
-      [b = basis](const auto &csys) { return (csys.transpose().cast<double>() * b).eval(); };
+      [B](const auto &csys) { return (csys.transpose().cast<double>() * B).eval(); };
 
     NLOptInfo solver = {
       .n            = N,
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
       .x_init       = eig::Vector<double, N>(0.5),
-      .max_iters    = 30,
-      .rel_func_tol = 1e-5,
+      // .max_iters    = 100,
+      .rel_func_tol = 1e-2,
       .rel_xpar_tol = 1e-3,
     };
 
-    // Construct color system spectra over basis matrix
-    auto csys_j = basis_trf(info.system_j);
-    auto csys_i = vws::transform(info.systems_i, basis_trf) | rng::to<std::vector>();
-    
     // Construct orthogonal matrix used during maximiation
-    // auto S = csys_j.transpose().eval();
-    // eig::JacobiSVD<decltype(S)> svd;
-    // svd.compute(S, eig::ComputeFullV);
-    // auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
     auto S = info.system_j.cast<double>().eval();
     eig::JacobiSVD<decltype(S)> svd;
     svd.compute(S, eig::ComputeFullV);
     auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
     // Add color system equality constraints
-    for (uint i = 0; i < csys_i.size(); ++i) {
-      auto A = csys_i[i];
+    for (uint i = 0; i < info.systems_i.size(); ++i) {
+      auto A = basis_trf(info.systems_i[i]);
       auto b = info.signals_i[i].cast<double>().eval();
       for (uint j = 0; j < 3; ++j) {
         solver.eq_constraints.push_back(
-          [A = A.row(j).transpose().eval(), b = b[j], p = power]
-          (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
-            if (grad.size())
-              grad = A;
-              // grad = (p * A.array() * x.array().pow(p - 1.0));
+          [A = A.row(j).eval(), b = b[j]]
+          (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+            using Spec = eig::Vector<double, wavelength_samples>;
+
+            // Linear function:
+            // - f(x) = A^T Bx - b == 0
+            // - d(f) = A^T B
+            if (g.size())
+              g = A;
             return A.dot(x) - b;
-            // return A.dot(x.array().pow(p).matrix()) - b;
         });
       } // for (uint j)
     } // for (uint i)
@@ -132,18 +126,18 @@ namespace met {
     // Add [0, 1] boundary inequality constraints
     for (uint i = 0; i < wavelength_samples; ++i) {
       solver.nq_constraints.push_back(
-        [A = basis.row(i).transpose().eval()]
-        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
-          if (grad.size())
-            grad = A;
-          return A.dot(x) - 1.0;
+        [B = B.row(i).eval()]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          if (g.size())
+            g = B;
+          return B.dot(x) - 1.0;
       });
       solver.nq_constraints.push_back(
-        [A = basis.row(i).transpose().eval()]
-        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
-          if (grad.size())
-            grad = -A;
-          return (-A).dot(x);
+        [B = B.row(i).eval()]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          if (g.size())
+            g = -B;
+          return (-B).dot(x);
       });
     }
 
@@ -158,49 +152,39 @@ namespace met {
       
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
-        // Define objective function: max_x Cx
+        // Define objective function: max (Uk)^T (Bx)^p -> max C^T (Bx)^p
         auto C = (U * info.samples[i].matrix().cast<double>()).eval();
-        uint objective_steps = 0;
+
         local_solver.objective = 
-          [&objective_steps, C, &basis, power](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
+          [&C, &B, p = power]
+          (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) -> double {
             using Spec = eig::Vector<double, wavelength_samples>;
 
-            objective_steps++;
-            
-            // f(x)      = C^T x
-            // ddx(f(x)) = C
-            /* if (grad.size())
-              grad = C;
-            return (C.transpose() * x).coeff(0); */
-
-            // f(x)    = C^T (Bx)^p
-            // d(f(x)) = p * (C x (Bx)^{p - 1})^T * B
-            Spec px = (basis * x).array().pow(power);
-            Spec dx = (basis * x).array().pow(power - 1.0);
-            if (grad.size())
-              grad = power * (C.cwiseProduct(dx).transpose() * basis).array();
+            // Power function:
+            // - f(x) = C^T (Bx)^p
+            // - d(f) = p * (C x (Bx)^{p - 1})^T * B
+            Spec px = (B * x).array().pow(p).eval();
+            Spec dx = (B * x).array().pow(p - 1.0).eval();
+            if (g.size())
+              g = p * (C.cwiseProduct(dx).transpose() * B).array();
             return C.dot(px);
-            // return (C.transpose() * px).coeff(0);
 
-            // f(x)    = C^T Bx
-            // d(f(x)) = C^T B
-            // if (grad.size())
-            //   grad = (C.transpose() * basis).transpose().eval();
-            // return (C.transpose() * (basis * x)).coeff(0);
-
-            // f(x) = C^T x^p
-            // ddx  = p(C * x^(p - 1))
-            // if (grad.size())
-            //   grad = C.array() * (power * x.array().pow(power - 1.0)).eval();
-            // return (C.transpose() * x.array().pow(power).matrix()).coeff(0);
-
-            // return 0.0;
+            // Linear function:
+            // - f(x) = C^T Bx
+            // - d(f) = C^T B
+            /* Spec px = basis * x;
+            if (grad.size())
+              grad = (C.transpose() * basis).transpose().eval();
+            return C.dot(px); */
         };
 
         // Obtain result from solver
         NLOptResult r = solve(local_solver);
-        output[i] = Spec((basis * r.x).array().pow(power).cwiseMin(1.f).cwiseMax(0.f).cast<float>());
         // fmt::print("{} -> {} steps, {} value, {} code\n", i, objective_steps, r.objective, r.code);
+
+        // Return spectral result, raised to requested power
+        Spec s = (B * r.x).cast<float>();
+        output[i] = s.pow(power).cwiseMin(1.f).cwiseMax(0.f);
       } // for (int i)
     }
 
@@ -223,44 +207,6 @@ namespace met {
       return (info.system_j.transpose() * s.matrix()).eval();
     });
     return colors;
-  }
-
-  void test_nlopt() {
-    met_trace();
-
-    NLOptInfo info = {
-      .n      = 2,
-      .algo   = NLOptAlgo::LD_MMA,
-      .form   = NLOptForm::eMinimize,
-      .x_init = eig::Vector2d { 1.234, 5.678 },
-      .lower  = eig::Vector2d { -HUGE_VAL, 0 },
-    };
-
-    // Add objective function and inequality constraints
-    uint n_objc_calls = 0;
-    info.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
-      n_objc_calls++;
-      if (grad.size())
-        grad = eig::Vector2d { 0.0, 0.5 / std::sqrt(x[1]) };
-      return std::sqrt(x[1]);
-    };
-    info.nq_constraints.push_back([](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
-      auto d_mul = 2.0 * x[0];
-      if (grad.size())
-        grad = eig::Vector2d { 3.0 * 2.0 * (d_mul) * (d_mul), -1.0 };
-      return d_mul * d_mul * d_mul - x[1];
-    });
-    info.nq_constraints.push_back([](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) -> double {
-      auto d_mul = -1.0 * x[0] + 1.0;
-      if (grad.size())
-        grad = eig::Vector2d { 3.0 * -1.0 * (d_mul) * (d_mul), -1.0 };
-      return d_mul * d_mul * d_mul - x[1];
-    });
-
-    NLOptResult r = solve(info);
-    if (r.code)
-      fmt::print("Error: {}\n", r.code);
-    fmt::print("Found f{} = {} tolerance after {} iterations\n", r.x, r.objective, n_objc_calls);
   }
 
   NLOptResult solve(NLOptInfo &info) {
@@ -292,12 +238,8 @@ namespace met {
     std::vector<double> lower(range_iter(info.lower));
     if (!upper.empty())
       opt.set_upper_bounds(upper);
-    /* else
-      opt.set_upper_bounds(HUGE_VAL); */
     if (!lower.empty())
       opt.set_lower_bounds(lower);
-    /* else
-      opt.set_lower_bounds(-HUGE_VAL); */
 
     // Optional stopping criteria and tolerances
     if (info.rel_xpar_tol) opt.set_xtol_rel(*info.rel_xpar_tol);
@@ -314,8 +256,11 @@ namespace met {
     NLOptResult result;
     try {
       result.code = opt.optimize(x, result.objective);
+    } catch (const nlopt::roundoff_limited &e) {
+      // ... fails silently for now
+    } catch (const nlopt::forced_stop &e) {
+      // ... fails silently for now
     } catch (const std::exception &e) {
-      // Blerp
       fmt::print("{}\n", e.what());
     }
 

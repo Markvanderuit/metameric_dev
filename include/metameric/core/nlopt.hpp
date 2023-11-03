@@ -19,7 +19,7 @@ namespace met {
     >;
 
     uint      n;                           // Output dimensionality
-    NLOptAlgo algo = NLOptAlgo::LD_MMA;    // Employed algorithm
+    NLOptAlgo algo = NLOptAlgo::LD_SLSQP;  // Employed algorithm
     NLOptForm form = NLOptForm::eMinimize; // Minimize/maximize?
 
     // Function arguments
@@ -53,6 +53,4 @@ namespace met {
   std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info, double power);
   
   std::vector<Colr> nl_generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info);
-
-  void test_nlopt();
 } // namespace met
