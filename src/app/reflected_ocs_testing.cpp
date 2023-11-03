@@ -19,6 +19,7 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/framebuffer.hpp>
+#include <small_gl/renderbuffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -169,7 +170,7 @@ namespace met {
       guard(m_array.is_init());
       gl::dispatch_draw({
         .type             = gl::PrimitiveType::eTriangles,
-        .vertex_count     = 1 * static_cast<uint>(m_buffer_elem.size() / sizeof(uint)),
+        .vertex_count     = static_cast<uint>(m_buffer_elem.size() / sizeof(uint)),
         .draw_op          = gl::DrawOp::eFill,
         .bindable_array   = &m_array
       });
@@ -227,6 +228,8 @@ namespace met {
   };
   
   struct DrawTask : public detail::TaskNode {
+    using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
+
     struct UnifLayout {
       alignas(64) eig::Matrix4f matrix;
       alignas(8)  eig::Vector2f aspect;
@@ -235,6 +238,7 @@ namespace met {
     gl::Buffer      m_unif;
     UnifLayout     *m_unif_map;
     gl::Framebuffer m_framebuffer;
+    Depthbuffer     m_depthbuffer;
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
@@ -256,7 +260,9 @@ namespace met {
       if (const auto &e_target_rsrc = info("view", "target"); 
           is_first_eval() || e_target_rsrc.is_mutated()) {
         const auto &e_target = e_target_rsrc.getr<gl::Texture2d4f>();
-        m_framebuffer = {{ .type = gl::FramebufferType::eColor, .attachment = &e_target }};
+        m_depthbuffer = {{ .size = e_target.size() }};
+        m_framebuffer = {{ .type = gl::FramebufferType::eColor, .attachment = &e_target      },
+                         { .type = gl::FramebufferType::eDepth, .attachment = &m_depthbuffer }};
       }
 
       // Next, handle camera data update
@@ -281,7 +287,7 @@ namespace met {
       // Process mesh set draw tasks
       {
         auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    true),
-                                   gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false),
+                                   gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
                                    gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
         gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
         mesh_program.bind();
@@ -293,7 +299,7 @@ namespace met {
       // Process point set draw tasks
       {
         auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eCullOp,    false),
-                                   gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false),
+                                   gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true),
                                    gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true) };
         gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOne);
         point_program.bind();
@@ -305,21 +311,25 @@ namespace met {
   };
 
   struct DataTask : public detail::TaskNode {
-    std::vector<Colr> ocs_colr_set;
-    std::vector<Colr> mms_colr_set;
-    std::vector<Spec> mms_spec_set;
-    AlMesh            mms_chul;
+    std::vector<Colr>              ocs_colr_set;
+    std::vector<std::vector<Colr>> mms_colr_sets;
+    std::vector<AlMesh>            mms_chulls;
 
+      // Static ImGui settings
     CMFS cs_0, cs_1;
     Colr cv_0 = { 0.5, 0.5, 0.5 };
     Colr sample = { 0, 1, 0 };
-    float n_scatters = 1.f;
+    uint n_scatters = 1;
+    bool show_ocs    = true;
+    bool show_mms    = true;
+    float draw_alpha = 1.f;
+    float draw_size  = 0.05f;
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
 
       // Define illuminant-induced mismatching to quickly generate a large metamer set
-      ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65,  .n_scatters = 1 };
+      ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
       ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
       cs_0 = csys_0.finalize_direct();
       cs_1 = csys_1.finalize_direct();
@@ -328,7 +338,7 @@ namespace met {
       {
         auto samples_ = detail::gen_unit_dirs_x(1024u, 3);
         std::vector<Colr> samples(range_iter(samples_));
-        ocs_colr_set =generate_ocs_boundary_colr({
+        ocs_colr_set = /* nl_ */generate_ocs_boundary_colr({
           .basis   = basis,
           .system  = cs_1,
           .samples = samples,
@@ -340,7 +350,57 @@ namespace met {
       met_trace_full();
 
       {
-        static float _n_scatters = 1.f;
+        if (ImGui::Begin("Settings")) {
+          ImGui::Checkbox("Show OCS",           &show_ocs);
+          ImGui::Checkbox("Show MMS",           &show_mms);
+          ImGui::SliderFloat("draw alpha",      &draw_alpha, 0.f, 1.f);
+          ImGui::SliderFloat("draw size",       &draw_size,  1e-3, 1.f);
+
+          uint min_scatters = 1, max_scatters = 8;
+          ImGui::SliderScalar("Nr. of scatters", ImGuiDataType_U32, &n_scatters, &min_scatters, &max_scatters);
+
+          ImGui::ColorEdit3("In,  cs0", cv_0.data(),  ImGuiColorEditFlags_Float);
+
+          // MMS spectrum selection slider
+          // static uint mms_spec_select = 0;
+          // uint mms_min = 0, mms_max = mms_spec_set.size() - 1;
+          // ImGui::SliderScalar("MMS spec index", ImGuiDataType_U32, &mms_spec_select, &mms_min, &mms_max);
+          
+          // if (!mms_colr_set.empty()) {
+            // {
+              // Spec s = mms_spec_set[mms_spec_select];
+              // Colr out_0 = (cs_0.transpose() * s.matrix());
+              // Colr out_1 = (cs_1.transpose() * s.matrix());
+              
+              // ImGui::ColorEdit3("Out, cs0", out_0.data(), ImGuiColorEditFlags_Float);
+              // ImGui::ColorEdit3("Out, cs1", out_1.data(), ImGuiColorEditFlags_Float);
+            // }
+
+            // Draw MMS spectrum plot
+            /* if (ImPlot::BeginPlot("MMS spectrum", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+              // Get wavelength values for x-axis in plot
+              Spec x_values;
+              for (uint i = 0; i < x_values.size(); ++i)
+                x_values[i] = wavelength_at_index(i);
+              Spec y_values = mms_spec_set[mms_spec_select];
+
+              // Setup minimal format for coming line plots
+              ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+              ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+              ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0f, 1.0f, ImPlotCond_Always);
+
+              // Do the thing
+              ImPlot::PlotLine("", x_values.data(), y_values.data(), wavelength_samples);
+
+              ImPlot::EndPlot();
+            } */
+          // }
+        }
+        ImGui::End();
+      }
+
+      {
+        static uint _n_scatters = 1;
         static Colr _cv_0 = 0.5;
         static uint seed = 1;
         
@@ -348,39 +408,33 @@ namespace met {
           _cv_0 = cv_0;
           _n_scatters = n_scatters;
           seed = 1;
-          mms_spec_set.clear();
+          mms_colr_sets.clear();
+          mms_chulls.clear();
         }
 
-        // Generate points on the MMS in X for now
-        // auto samples   = detail::gen_unit_dirs_x(64u, 6);
-        if (seed++ < 64) { // iters
+        mms_colr_sets.resize(n_scatters);
+        mms_chulls.resize(n_scatters);
+
+        for (uint i = 0; i < n_scatters; ++i) {
+          if (i == 0) 
+            seed++;
+          guard_continue(seed < 64);
+
+          // Generate points on the MMS in X for now
           auto samples   = detail::gen_unit_dirs_x(16u, 3u, seed);
           auto systems_i = { cs_0 };
           auto signals_i = { cv_0 };
-
-          auto s = nl_generate_mmv_boundary_spec({
+          mms_colr_sets[i].append_range(nl_generate_mmv_boundary_colr({
             .basis     = basis,
             .systems_i = systems_i,
             .signals_i = signals_i,
             .system_j  = cs_1,
             .samples   = samples
-          }, static_cast<double>(n_scatters));
-          
-          mms_spec_set.append_range(s);
-        }
-      }
+          }, static_cast<double>(i + 1)));
 
-      {
-        // Convert to color values in cs_1
-        mms_colr_set.resize(mms_spec_set.size());
-        rng::transform(mms_spec_set, mms_colr_set.begin(), [&](const Spec &s) {
-          return (cs_1.transpose() * s.matrix()).eval();
-        });
-      }
-      
-      {
-        if (n_scatters >= 2.0 || !cs_1.isApprox(cs_0))
-          mms_chul = generate_convex_hull<AlMesh, Colr>(mms_colr_set);
+          if ((i + 1) > 1 || !cs_1.isApprox(cs_0))
+            mms_chulls[i] = generate_convex_hull<AlMesh, Colr>(mms_colr_sets[i]);
+        }
       }
 
       regenerate_samples(info);
@@ -389,57 +443,6 @@ namespace met {
 
     void regenerate_samples(SchedulerHandle &info) {
       met_trace_full();
-
-      // Static ImGui settings
-      static bool show_ocs    = true;
-      static bool show_mms    = true;
-      static float draw_alpha = 1.f;
-      static float draw_size  = 0.05f;
-
-      if (ImGui::Begin("Settings")) {
-        ImGui::Checkbox("Show OCS",           &show_ocs);
-        ImGui::Checkbox("Show MMS",           &show_mms);
-        ImGui::SliderFloat("draw alpha",      &draw_alpha, 0.f, 1.f);
-        ImGui::SliderFloat("draw size",       &draw_size,  1e-3, 1.f);
-        ImGui::SliderFloat("Nr. of scatters", &n_scatters, 1.f, 16.f);
-
-        // MMS spectrum selection slider
-        static uint mms_spec_select = 0;
-        uint mms_min = 0, mms_max = mms_spec_set.size() - 1;
-        ImGui::SliderScalar("MMS spec index", ImGuiDataType_U32, &mms_spec_select, &mms_min, &mms_max);
-        
-        if (!mms_spec_set.empty()) {
-          {
-            Spec s = mms_spec_set[mms_spec_select];
-            Colr out_0 = (cs_0.transpose() * s.matrix());
-            Colr out_1 = (cs_1.transpose() * s.matrix());
-            
-            ImGui::ColorEdit3("In,  cs0", cv_0.data(),  ImGuiColorEditFlags_Float);
-            ImGui::ColorEdit3("Out, cs0", out_0.data(), ImGuiColorEditFlags_Float);
-            ImGui::ColorEdit3("Out, cs1", out_1.data(), ImGuiColorEditFlags_Float);
-          }
-
-          // Draw MMS spectrum plot
-          if (ImPlot::BeginPlot("MMS spectrum", { -1.f, 128.f }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-            // Get wavelength values for x-axis in plot
-            Spec x_values;
-            for (uint i = 0; i < x_values.size(); ++i)
-              x_values[i] = wavelength_at_index(i);
-            Spec y_values = mms_spec_set[mms_spec_select];
-
-            // Setup minimal format for coming line plots
-            ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
-            ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
-            ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0f, 1.0f, ImPlotCond_Always);
-
-            // Do the thing
-            ImPlot::PlotLine("", x_values.data(), y_values.data(), wavelength_samples);
-
-            ImPlot::EndPlot();
-          }
-        }
-      }
-      ImGui::End();
 
       // Get draw info submitters
       auto &i_pointsets = info("draw", "pointsets").getw<std::vector<AnnotatedPointsetDraw>>();
@@ -461,15 +464,17 @@ namespace met {
 
       // Make MMV available for rendering
       if (show_mms) {
-        std::vector<eig::Array4f> colrs(mms_colr_set.size());
-        std::vector<float>        sizes(mms_colr_set.size(), 0.5 * draw_size);
-        rng::transform(mms_colr_set, colrs.begin(), [&](const Colr &c) {
-          return (eig::Array4f() << c, draw_alpha).finished();
-        });
-        i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_set, sizes, colrs));
+        for (uint i = 0; i < n_scatters; ++i) {
+          std::vector<eig::Array4f> colrs(mms_colr_sets[i].size());
+          std::vector<float>        sizes(mms_colr_sets[i].size(), 0.5 * draw_size);
+          rng::transform(mms_colr_sets[i], colrs.begin(), [&](const Colr &c) {
+            return (eig::Array4f() << c, draw_alpha).finished();
+          });
+          i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_sets[i], sizes, colrs));
 
-        if (n_scatters >= 2.0 || !cs_1.isApprox(cs_0))
-          i_meshes.push_back(AnnotatedMeshDraw(mms_chul));
+          if ((i + 1) > 1 || !cs_1.isApprox(cs_0))
+            i_meshes.push_back(AnnotatedMeshDraw(mms_chulls[i]));
+        }
       }
     }
   };

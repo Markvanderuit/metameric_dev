@@ -78,20 +78,121 @@ namespace met {
     return s;
   }
 
+  std::vector<Spec> nl_generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info) {
+    met_trace();
+
+    // Construct basis matrix
+    auto B = info.basis.func.cast<double>().eval();
+    auto basis_trf = 
+      [B](const auto &csys) { return (csys.transpose().cast<double>() * B).eval(); };
+      
+    NLOptInfo solver = {
+      .n            = wavelength_bases,
+      .algo         = NLOptAlgo::LD_SLSQP,
+      .form         = NLOptForm::eMaximize,
+      .x_init       = eig::Vector<double, wavelength_bases>(0.5),
+      // .max_iters    = 100,
+      .rel_func_tol = 1e-2,
+      .rel_xpar_tol = 1e-3,
+    };
+
+    // Construct orthogonal matrix used during maximiation
+    auto S = info.system.cast<double>().eval();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+    // Add [0, 1] boundary inequality constraints
+    for (uint i = 0; i < wavelength_samples; ++i) {
+      solver.nq_constraints.push_back(
+        [B = B.row(i).eval()]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          if (g.size())
+            g = B;
+          return B.dot(x) - 1.0;
+      });
+      solver.nq_constraints.push_back(
+        [B = B.row(i).eval()]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          if (g.size())
+            g = -B;
+          return (-B).dot(x);
+      });
+    } // for (uint i)
+
+    // Output data vector
+    std::vector<Spec> output(info.samples.size());
+
+    // Parallel solve for basis function weights defining OCS boundary spectra
+    #pragma omp parallel
+    {
+      // Per thread copy of current solver parameter set
+      NLOptInfo local_solver = solver;
+
+      #pragma omp for
+      for (int i = 0; i < info.samples.size(); ++i) {
+        // Define objective function: max (Uk)^T (Bx)^p -> max C^T (Bx)^p
+        auto C = (U * info.samples[i].matrix().cast<double>()).eval();
+
+        local_solver.objective = 
+          [&C, &B]
+          (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) -> double {
+            using Spec = eig::Vector<double, wavelength_samples>;
+
+            // Linear function:
+            // - f(x) = C^T Bx
+            // - d(f) = C^T B
+            Spec px = B * x;
+            if (g.size())
+              g = (C.transpose() * B).transpose().eval();
+            return C.dot(px);
+        };
+
+        // Obtain result from solver
+        NLOptResult r = solve(local_solver);
+        // fmt::print("{} -> {} steps, {} value, {} code\n", i, objective_steps, r.objective, r.code);
+
+        // Return spectral result, raised to requested power
+        Spec s = (B * r.x).cast<float>();
+        output[i] = s.cwiseMin(1.f).cwiseMax(0.f);
+      } // for (int i)
+    } // parallel
+
+    // Filter NaNs at underconstrained output and strip redundancy from return 
+    std::erase_if(output, [](Spec &c) { return c.isNaN().any(); });
+    std::unordered_set<
+      Spec, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > output_unique(range_iter(output));
+    return std::vector<Spec>(range_iter(output_unique));
+  }
+
+  std::vector<Colr> nl_generate_ocs_boundary_colr(const GenerateOCSBoundaryInfo &info) {
+    met_trace();
+
+    auto spectra = nl_generate_ocs_boundary_spec(info);
+    std::vector<Colr> colors(spectra.size());
+    std::transform(std::execution::par_unseq, range_iter(spectra), colors.begin(),
+    [&](const auto &s) -> Colr {
+      return (info.system.transpose() * s.matrix()).eval();
+    });
+    return colors;
+  }
+
   std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info, double power) {
     met_trace();
 
     // Construct basis matrix
-    constexpr uint N = wavelength_bases;
     auto B = info.basis.func.cast<double>().eval();
     auto basis_trf = 
       [B](const auto &csys) { return (csys.transpose().cast<double>() * B).eval(); };
 
     NLOptInfo solver = {
-      .n            = N,
+      .n            = wavelength_bases,
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
-      .x_init       = eig::Vector<double, N>(0.5),
+      .x_init       = eig::Vector<double, wavelength_bases>(0.5),
       // .max_iters    = 100,
       .rel_func_tol = 1e-2,
       .rel_xpar_tol = 1e-3,
@@ -198,9 +299,9 @@ namespace met {
     return std::vector<Spec>(range_iter(output_unique));
   }
 
-  std::vector<Colr> nl_generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info) {
+  std::vector<Colr> nl_generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info, double n_scatters) {
     met_trace();
-    auto spectra = nl_generate_mmv_boundary_spec(info, 1);
+    auto spectra = nl_generate_mmv_boundary_spec(info, n_scatters);
     std::vector<Colr> colors(spectra.size());
     std::transform(std::execution::par_unseq, range_iter(spectra), colors.begin(),
     [&](const auto &s) -> Colr {
