@@ -356,7 +356,7 @@ namespace met {
           ImGui::SliderFloat("draw alpha",      &draw_alpha, 0.f, 1.f);
           ImGui::SliderFloat("draw size",       &draw_size,  1e-3, 1.f);
 
-          uint min_scatters = 1, max_scatters = 8;
+          uint min_scatters = 1, max_scatters = 16;
           ImGui::SliderScalar("Nr. of scatters", ImGuiDataType_U32, &n_scatters, &min_scatters, &max_scatters);
 
           ImGui::ColorEdit3("In,  cs0", cv_0.data(),  ImGuiColorEditFlags_Float);
@@ -418,7 +418,7 @@ namespace met {
         for (uint i = 0; i < n_scatters; ++i) {
           if (i == 0) 
             seed++;
-          guard_continue(seed < 64);
+          guard_continue(seed < 3);
 
           // Generate points on the MMS in X for now
           auto samples   = detail::gen_unit_dirs_x(16u, 3u, seed);

@@ -261,11 +261,22 @@ namespace met {
           (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) -> double {
             using Spec = eig::Vector<double, wavelength_samples>;
 
+            // Additive function
+            // - f(x) = C^T (Bx) + C^T (Bx)
+            // - d(f) = C^T B + C^T B
+            /* Spec px = B * x;
+            if (grad.size())
+              grad = 2.f * (C.transpose() * B).transpose().eval();
+            return 2.f * C.dot(px); */
+            
             // Power function:
             // - f(x) = C^T (Bx)^p
             // - d(f) = p * (C x (Bx)^{p - 1})^T * B
-            Spec px = (B * x).array().pow(p).eval();
-            Spec dx = (B * x).array().pow(p - 1.0).eval();
+            // Spec px = (B * x).array().pow(p).eval();
+            // Spec dx = (B * x).array().pow(p - 1.0).eval();
+            Spec X = B * x;
+            Spec px = X.cwiseProduct(X);
+            Spec dx = X;
             if (g.size())
               g = p * (C.cwiseProduct(dx).transpose() * B).array();
             return C.dot(px);
@@ -273,15 +284,14 @@ namespace met {
             // Linear function:
             // - f(x) = C^T Bx
             // - d(f) = C^T B
-            /* Spec px = basis * x;
-            if (grad.size())
-              grad = (C.transpose() * basis).transpose().eval();
+            /* Spec px = B * x;
+            if (g.size())
+              g = (C.transpose() * B).transpose().eval();
             return C.dot(px); */
         };
 
         // Obtain result from solver
         NLOptResult r = solve(local_solver);
-        // fmt::print("{} -> {} steps, {} value, {} code\n", i, objective_steps, r.objective, r.code);
 
         // Return spectral result, raised to requested power
         Spec s = (B * r.x).cast<float>();
