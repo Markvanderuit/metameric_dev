@@ -49,11 +49,13 @@ namespace met {
   NLOptResult solve(NLOptInfo &info);
   
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
+  using CMFSPack = eig::Matrix<float, wavelength_samples, 6>;
   struct NLGenerateMMVBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     const CMFS                    &system_j;  // Color system for mismatching region
+    const CMFSPack                &system_ij; // Color system for mismatching region
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };
 

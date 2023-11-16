@@ -317,8 +317,9 @@ namespace met {
     std::vector<AlMesh>            mms_chulls_full;
     std::vector<AlMesh>            mms_chulls_aprx;
 
-      // Static ImGui settings
+    // Static ImGui settings
     CMFS cs_0, cs_1;
+    CMFSPack cs_01;
     Colr cv_0 = { 0.5, 0.5, 0.5 };
     Colr sample = { 0, 1, 0 };
     uint n_scatters = 1;
@@ -336,7 +337,11 @@ namespace met {
       ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
       ColrSystem csys_2 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
       cs_0 = csys_0.finalize_direct();
-      cs_1 = .5f * (csys_1.finalize_direct() + csys_2.finalize_direct()); // + csys_0.finalize_direct();
+
+      // TODO YOU ARE ADDING THE TWO TOGETHER, BUT CS_1 IS USED FOR COLOR PROJECTION, SO THIS NEEDS TO BE ANOTHER VAR
+      cs_1 = /* (0.5 * std::sqrt(0.70710678)) * */ (csys_0.finalize_direct() + csys_1.finalize_direct()); // + csys_0.finalize_direct();
+      // cs_1 = csys_1.finalize_direct(); // + csys_0.finalize_direct();
+      cs_01 = (CMFSPack() << cs_0, cs_1).finished();
 
       // Generate OCS for cs_1
       {
@@ -344,7 +349,7 @@ namespace met {
         std::vector<Colr> samples(range_iter(samples_));
         ocs_colr_set = /* nl_ */generate_ocs_boundary_colr({
           .basis   = basis,
-          .system  = cs_1,
+          .system  = csys_1.finalize_direct(),
           .samples = samples,
         });
       }
@@ -398,7 +403,16 @@ namespace met {
           guard_continue(seed < 64);
 
           // Generate points on the MMS in X for now
-          auto samples   = detail::gen_unit_dirs_x(6u, 3u, seed);
+          auto samples = detail::gen_unit_dirs_x(6u, 3u, seed);
+          for (auto &x : samples) {
+            fmt::print("{}\n", x);
+            x *= 0.707106781187;
+            fmt::print("{}\n", x);
+            // x.block<3, 1>(3, 0) = x.block<3, 1>(0, 0);
+            // x = x.matrix().normalized();
+            // fmt::print("x : {}\n", x);
+          }
+          
           auto systems_i = { cs_0 };
           auto signals_i = { cv_0 };
 
@@ -407,6 +421,7 @@ namespace met {
             .systems_i = systems_i,
             .signals_i = signals_i,
             .system_j  = cs_1,
+            .system_ij = cs_01,
             .samples   = samples
           }, static_cast<double>(i + 1), true));
           mms_colr_sets_aprx[i].append_range(nl_generate_mmv_boundary_colr({
@@ -414,6 +429,7 @@ namespace met {
             .systems_i = systems_i,
             .signals_i = signals_i,
             .system_j  = cs_1,
+            .system_ij = cs_01,
             .samples   = samples
           }, static_cast<double>(i + 1), false));
 

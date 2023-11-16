@@ -200,9 +200,10 @@ namespace met {
 
     // Construct orthogonal matrix used during maximiation
     auto S = info.system_j.cast<double>().eval();
-    eig::JacobiSVD<decltype(S)> svd;
-    svd.compute(S, eig::ComputeFullV);
-    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+    // auto S = info.system_j.cast<double>().eval();
+    // eig::JacobiSVD<decltype(S)> svd;
+    // svd.compute(S, eig::ComputeFullV);
+    auto U = S;// (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
     // Add color system equality constraints
     for (uint i = 0; i < info.systems_i.size(); ++i) {
@@ -251,6 +252,30 @@ namespace met {
       // Per thread copy of current solver parameter set
       NLOptInfo local_solver = solver;
       
+      /* 
+        auto C_k 
+        = 
+          A_1,k * V_1 +
+          A_2,k * V_2 +
+          A_3,k * V_3 +
+          B_1,k * V_4 +
+          B_2,k * V_5 +
+          B_3,k * V_6
+        
+        auto C_k 
+        =
+          (A_1,k + B_1,k) * W * V_1 +
+          (A_2,k + B_2,k) * W * V_2 +
+          (A_3,k + B_3,k) * W * V_3
+        =
+          A_1,k * W * V_1 + 
+          A_2,k * W * V_2 + 
+          A_3,k * W * V_3 + 
+          B_1,k * W * V_1 +
+          B_2,k * W * V_2 +
+          B_3,k * W * V_3
+       */
+
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
         // Define objective function: max (Uk)^T (Bx)^p -> max C^T (Bx)^p
