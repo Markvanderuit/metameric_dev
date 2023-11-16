@@ -180,7 +180,7 @@ namespace met {
     return colors;
   }
 
-  std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info, double power) {
+  std::vector<Spec> nl_generate_mmv_boundary_spec(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power) {
     met_trace();
 
     // Construct basis matrix
@@ -257,26 +257,24 @@ namespace met {
         auto C = (U * info.samples[i].matrix().cast<double>()).eval();
 
         local_solver.objective = 
-          [&C, &B, p = power]
+          [&C, &B, p = power, run_full_power = switch_power]
           (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) -> double {
             using Spec = eig::Vector<double, wavelength_samples>;
-
-            // Additive function
-            // - f(x) = C^T (Bx) + C^T (Bx)
-            // - d(f) = C^T B + C^T B
-            /* Spec px = B * x;
-            if (grad.size())
-              grad = 2.f * (C.transpose() * B).transpose().eval();
-            return 2.f * C.dot(px); */
             
             // Power function:
             // - f(x) = C^T (Bx)^p
             // - d(f) = p * (C x (Bx)^{p - 1})^T * B
-            // Spec px = (B * x).array().pow(p).eval();
-            // Spec dx = (B * x).array().pow(p - 1.0).eval();
             Spec X = B * x;
-            Spec px = X.cwiseProduct(X);
-            Spec dx = X;
+            Spec px, dx;
+            if (run_full_power) {
+              px = X.array().pow(p).eval();
+              dx = X.array().pow(p - 1.0).eval();
+            } else {
+              // px = X.array().pow(/* std::min(p, 4.0) */8.0).eval();
+              // dx = X.array().pow(/* std::min(p, 4.0) */8.0 - 1.0).eval();
+              px = p > 1.f ? X.cwiseProduct(X) : X;
+              dx = p > 1.f ? X : 1.f;
+            }
             if (g.size())
               g = p * (C.cwiseProduct(dx).transpose() * B).array();
             return C.dot(px);
@@ -295,6 +293,7 @@ namespace met {
 
         // Return spectral result, raised to requested power
         Spec s = (B * r.x).cast<float>();
+        
         output[i] = s.pow(power).cwiseMin(1.f).cwiseMax(0.f);
       } // for (int i)
     }
@@ -309,9 +308,9 @@ namespace met {
     return std::vector<Spec>(range_iter(output_unique));
   }
 
-  std::vector<Colr> nl_generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info, double n_scatters) {
+  std::vector<Colr> nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double n_scatters, bool switch_power) {
     met_trace();
-    auto spectra = nl_generate_mmv_boundary_spec(info, n_scatters);
+    auto spectra = nl_generate_mmv_boundary_spec(info, n_scatters, switch_power);
     std::vector<Colr> colors(spectra.size());
     std::transform(std::execution::par_unseq, range_iter(spectra), colors.begin(),
     [&](const auto &s) -> Colr {

@@ -48,10 +48,18 @@ namespace met {
 
   NLOptResult solve(NLOptInfo &info);
   
+  /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
+  struct NLGenerateMMVBoundaryInfo {
+    const Basis                  &basis;      // Spectral basis functions
+    std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
+    std::span<const Colr>         signals_i;  // Color signals for prior constraints
+    const CMFS                    &system_j;  // Color system for mismatching region
+    std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
+  };
 
   Spec              nl_generate_spectrum(GenerateSpectrumInfo info);
   std::vector<Spec> nl_generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info);
   std::vector<Colr> nl_generate_ocs_boundary_colr(const GenerateOCSBoundaryInfo &info);
-  std::vector<Spec> nl_generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info, double power);
-  std::vector<Colr> nl_generate_mmv_boundary_colr(const GenerateMMVBoundaryInfo &info, double power);
+  std::vector<Spec> nl_generate_mmv_boundary_spec(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
+  std::vector<Colr> nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
 } // namespace met
