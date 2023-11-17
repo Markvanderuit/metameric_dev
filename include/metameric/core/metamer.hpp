@@ -32,6 +32,7 @@ namespace met {
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     const CMFS                   &system_j;   // Color system for mismatching region
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
+    std::optional<CMFS> system_j_override;    // TODO remove this absolute hack
   };
 
   // Corresponding functions to above generate objects

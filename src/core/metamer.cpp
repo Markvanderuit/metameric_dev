@@ -256,6 +256,9 @@ namespace met {
     auto csys_j = basis_trf(info.system_j);
     auto csys_i = vws::transform(info.systems_i, basis_trf) | rng::to<std::vector>();
 
+    // TODO remove this absolute hack
+    auto csys_j_override = info.system_j_override.transform(basis_trf).value_or(csys_j);
+
     // Initialize parameter object for LP solver, given expected matrix sizes
     const uint M = 3 * csys_i.size() + 2 * wavelength_samples;
     LPParameters params(M, N);
@@ -294,7 +297,7 @@ namespace met {
       for (int i = 0; i < info.samples.size(); ++i) {
         local_params.C = (U * info.samples[i].matrix()).cast<double>().eval();
         eig::Matrix<float, N, 1> w = lp_solve(local_params).cast<float>().eval();
-        output[i] = csys_j * w;
+        output[i] = csys_j_override * w;
       }
     }
 

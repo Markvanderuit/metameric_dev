@@ -1,10 +1,7 @@
 #include <metameric/core/nlopt.hpp>
-#include <metameric/core/utility.hpp>
 #include <algorithm>
 #include <exception>
 #include <execution>
-#include <vector>
-#include <unordered_set>
 
 namespace met {
   Spec nl_generate_spectrum(GenerateSpectrumInfo info) {
@@ -199,11 +196,10 @@ namespace met {
     };
 
     // Construct orthogonal matrix used during maximiation
-    auto S = info.system_j.cast<double>().eval();
-    // auto S = info.system_j.cast<double>().eval();
-    // eig::JacobiSVD<decltype(S)> svd;
-    // svd.compute(S, eig::ComputeFullV);
-    auto U = S;// (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+    auto S = rng::fold_left_first(info.systems_j, std::plus<CMFS> {}).value().cast<double>().eval();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
     // Add color system equality constraints
     for (uint i = 0; i < info.systems_i.size(); ++i) {
@@ -251,30 +247,6 @@ namespace met {
     {
       // Per thread copy of current solver parameter set
       NLOptInfo local_solver = solver;
-      
-      /* 
-        auto C_k 
-        = 
-          A_1,k * V_1 +
-          A_2,k * V_2 +
-          A_3,k * V_3 +
-          B_1,k * V_4 +
-          B_2,k * V_5 +
-          B_3,k * V_6
-        
-        auto C_k 
-        =
-          (A_1,k + B_1,k) * W * V_1 +
-          (A_2,k + B_2,k) * W * V_2 +
-          (A_3,k + B_3,k) * W * V_3
-        =
-          A_1,k * W * V_1 + 
-          A_2,k * W * V_2 + 
-          A_3,k * W * V_3 + 
-          B_1,k * W * V_1 +
-          B_2,k * W * V_2 +
-          B_3,k * W * V_3
-       */
 
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
@@ -325,23 +297,27 @@ namespace met {
 
     // Filter NaNs at underconstrained output and strip redundancy from return 
     std::erase_if(output, [](Spec &c) { return c.isNaN().any(); });
-    std::unordered_set<
+    /* std::unordered_set<
       Spec, 
       decltype(Eigen::detail::matrix_hash<float>), 
       decltype(Eigen::detail::matrix_equal)
-    > output_unique(range_iter(output));
-    return std::vector<Spec>(range_iter(output_unique));
+    > output_unique(range_iter(output)); */
+    return output; // std::vector<Spec>(range_iter(output_unique));
   }
 
-  std::vector<Colr> nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double n_scatters, bool switch_power) {
+  NLMMVBoundarySet nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double n_scatters, bool switch_power) {
     met_trace();
+
+    // Generate unique boundary spectra
     auto spectra = nl_generate_mmv_boundary_spec(info, n_scatters, switch_power);
+
+    // Transform to non-unique colors
     std::vector<Colr> colors(spectra.size());
     std::transform(std::execution::par_unseq, range_iter(spectra), colors.begin(),
-    [&](const auto &s) -> Colr {
-      return (info.system_j.transpose() * s.matrix()).eval();
-    });
-    return colors;
+      [&](const auto &s) -> Colr {  return (info.system_j.transpose() * s.matrix()).eval(); });
+
+    // Collapse return value to unique colors
+    return NLMMVBoundarySet(range_iter(colors));
   }
 
   NLOptResult solve(NLOptInfo &info) {

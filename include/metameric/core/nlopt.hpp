@@ -2,8 +2,10 @@
 
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <functional>
+#include <metameric/core/utility.hpp>
 #include <nlopt.hpp>
+#include <functional>
+#include <unordered_set>
 
 namespace met {
   using NLOptAlgo = nlopt::algorithm;
@@ -48,14 +50,17 @@ namespace met {
 
   NLOptResult solve(NLOptInfo &info);
   
+  using NLMMVBoundarySet = typename std::unordered_set<
+    Colr, eig::detail::matrix_hash_t<Colr>, eig::detail::matrix_equal_t<Colr>
+  >;
+
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
-  using CMFSPack = eig::Matrix<float, wavelength_samples, 6>;
   struct NLGenerateMMVBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
+    std::span<const CMFS>         systems_j;  // Color system spectra for objective function
     const CMFS                    &system_j;  // Color system for mismatching region
-    const CMFSPack                &system_ij; // Color system for mismatching region
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };
 
@@ -63,5 +68,5 @@ namespace met {
   std::vector<Spec> nl_generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info);
   std::vector<Colr> nl_generate_ocs_boundary_colr(const GenerateOCSBoundaryInfo &info);
   std::vector<Spec> nl_generate_mmv_boundary_spec(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
-  std::vector<Colr> nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
+  NLMMVBoundarySet  nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
 } // namespace met

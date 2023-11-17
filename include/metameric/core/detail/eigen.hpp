@@ -58,6 +58,25 @@ namespace Eigen {
     auto matrix_equal = [](const auto &a, const auto &b) { 
       return a.isApprox(b); 
     };
+
+    template <typename Ty>
+    struct matrix_hash_t {
+      size_t operator()(const Ty &mat) const {
+        size_t seed = 0;
+        for (size_t i = 0; i < mat.size(); ++i) {
+          auto elem = *(mat.data() + i);
+          seed ^= std::hash<Ty::Scalar>()(elem) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+        return seed;
+      }
+    };
+
+    template <typename Ty>
+    struct matrix_equal_t { 
+      bool operator()(const Ty &a, const Ty &b) const {
+        return a.isApprox(b); 
+      }
+    };
   } // namespace detail
 
   template <class Type, size_t Size>

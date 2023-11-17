@@ -189,7 +189,11 @@ namespace met {
 
     // Query qhull for a convex hull structure
     std::vector<eig::Array3f> input(range_iter(data));
-    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "Qt Qx C-0");
+    auto qhull = orgQhull::Qhull(
+      "", 3, input.size(), cnt_span<const float>(input).data(), "Qt Qx C-0"
+      // "", 3, input.size(), cnt_span<const float>(input).data(), "QJ Q0 Po Pp"
+    );
+      
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_elems = qhull.facetList().toStdVector();
 

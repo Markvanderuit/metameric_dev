@@ -182,9 +182,9 @@ namespace met {
       met_trace_full();
       info("target").init<gl::Texture2d4f>({ .size = 1 });
       info.resource("camera").init<detail::Arcball>({ 
-        .dist            = 1.f,
-        .e_eye           = 0.f,
-        .e_center        = 1.f,
+        .dist            = 2.0f,
+        .e_eye           = 0.0f,
+        .e_center        = 1.0f,
         .zoom_delta_mult = 0.1f
       });
     }
@@ -312,16 +312,16 @@ namespace met {
 
   struct DataTask : public detail::TaskNode {
     std::vector<Colr>              ocs_colr_set;
-    std::vector<std::vector<Colr>> mms_colr_sets_full;
-    std::vector<std::vector<Colr>> mms_colr_sets_aprx;
+    std::vector<NLMMVBoundarySet>  mms_colr_sets_full;
+    std::vector<NLMMVBoundarySet>  mms_colr_sets_aprx;
     std::vector<AlMesh>            mms_chulls_full;
     std::vector<AlMesh>            mms_chulls_aprx;
 
     // Static ImGui settings
-    CMFS cs_0, cs_1;
-    CMFSPack cs_01;
+    CMFS cs_0, cs_1, cs_2, cs_3;
+    CMFS cs_v;
     Colr cv_0 = { 0.5, 0.5, 0.5 };
-    Colr sample = { 0, 1, 0 };
+    Colr cv_2 = { 0.5, 0.5, 0.5 };
     uint n_scatters = 1;
     bool switch_power = false;
     bool show_ocs    = true;
@@ -335,21 +335,21 @@ namespace met {
       // Define illuminant-induced mismatching to quickly generate a large metamer set
       ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
       ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
-      ColrSystem csys_2 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
+      ColrSystem csys_2 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2, .n_scatters = 1 };
+      ColrSystem csys_3 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1, .n_scatters = 1 };
       cs_0 = csys_0.finalize_direct();
+      cs_1 = csys_1.finalize_direct();
+      cs_2 = csys_2.finalize_direct();
+      cs_3 = csys_3.finalize_direct();
+      cs_v = cs_3;
 
-      // TODO YOU ARE ADDING THE TWO TOGETHER, BUT CS_1 IS USED FOR COLOR PROJECTION, SO THIS NEEDS TO BE ANOTHER VAR
-      cs_1 = /* (0.5 * std::sqrt(0.70710678)) * */ (csys_0.finalize_direct() + csys_1.finalize_direct()); // + csys_0.finalize_direct();
-      // cs_1 = csys_1.finalize_direct(); // + csys_0.finalize_direct();
-      cs_01 = (CMFSPack() << cs_0, cs_1).finished();
-
-      // Generate OCS for cs_1
+      // Generate OCS for cs_v
       {
         auto samples_ = detail::gen_unit_dirs_x(1024u, 3);
         std::vector<Colr> samples(range_iter(samples_));
         ocs_colr_set = /* nl_ */generate_ocs_boundary_colr({
           .basis   = basis,
-          .system  = csys_1.finalize_direct(),
+          .system  = cs_v,
           .samples = samples,
         });
       }
@@ -370,7 +370,8 @@ namespace met {
           uint min_scatters = 1, max_scatters = 16;
           ImGui::SliderScalar("Nr. of scatters", ImGuiDataType_U32, &n_scatters, &min_scatters, &max_scatters);
 
-          ImGui::ColorEdit3("In,  cs0", cv_0.data(),  ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("In, cv0", cv_0.data(),  ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("In, cv2", cv_2.data(),  ImGuiColorEditFlags_Float);
         }
         ImGui::End();
       }
@@ -378,11 +379,13 @@ namespace met {
       {
         static uint _n_scatters = 1;
         static Colr _cv_0 = 0.5;
+        static Colr _cv_2 = 0.5;
         static bool _switch_power = false;
         static uint seed = 1;
         
-        if (_n_scatters != n_scatters || !_cv_0.isApprox(cv_0)) {
+        if (_n_scatters != n_scatters || !_cv_0.isApprox(cv_0) || !_cv_2.isApprox(cv_2)) {
           _cv_0 = cv_0;
+          _cv_2 = cv_2;
           _n_scatters = n_scatters;
           seed = 1;
           
@@ -400,42 +403,74 @@ namespace met {
         for (uint i = 0; i < n_scatters; ++i) {
           if (i == 0) 
             seed++;
-          guard_continue(seed < 64);
+          guard_continue(seed < 256);
 
           // Generate points on the MMS in X for now
-          auto samples = detail::gen_unit_dirs_x(6u, 3u, seed);
-          for (auto &x : samples) {
-            fmt::print("{}\n", x);
-            x *= 0.707106781187;
-            fmt::print("{}\n", x);
-            // x.block<3, 1>(3, 0) = x.block<3, 1>(0, 0);
-            // x = x.matrix().normalized();
-            // fmt::print("x : {}\n", x);
-          }
-          
+          auto samples   = detail::gen_unit_dirs_x(6u, 3u, seed);
           auto systems_i = { cs_0 };
           auto signals_i = { cv_0 };
+          std::vector<CMFS> systems_j = { 
+            cs_3,
+            cs_0,
+            cs_2, 
+            cs_1, 
+          };
 
-          mms_colr_sets_full[i].append_range(nl_generate_mmv_boundary_colr({
+          // Reweight system contribution randomly
+          /* UniformSampler sampler(65536 + seed);
+          eig::ArrayXf sample = sampler.next_nd(systems_j.size());
+          sample /= sample.sum();
+          for (uint i = 0; i < systems_j.size(); ++i) {
+            auto &cs = systems_j[i];
+            cs = cs.array() * sample[i];
+          } */
+
+          // Generate points on the mms convex hull
+          auto samples_  = detail::gen_unit_dirs_x(6u, 6u, seed);
+          mms_colr_sets_full[i].insert_range(generate_mmv_boundary_colr({
             .basis     = basis,
             .systems_i = systems_i,
             .signals_i = signals_i,
-            .system_j  = cs_1,
-            .system_ij = cs_01,
+            .system_j  = cs_2,
+            .samples   = samples_,
+            .system_j_override = cs_v // TODO remove this absolute hack
+          }));
+          /* mms_colr_sets_full[i].insert_range(nl_generate_mmv_boundary_colr({
+            .basis     = basis,
+            .systems_i = systems_i,
+            .signals_i = signals_i,
+            .systems_j = systems_j,
+            .system_j  = cs_v,
             .samples   = samples
-          }, static_cast<double>(i + 1), true));
-          mms_colr_sets_aprx[i].append_range(nl_generate_mmv_boundary_colr({
+          }, static_cast<double>(i + 1), true)); */
+          mms_colr_sets_aprx[i].insert_range(nl_generate_mmv_boundary_colr({
             .basis     = basis,
             .systems_i = systems_i,
             .signals_i = signals_i,
-            .system_j  = cs_1,
-            .system_ij = cs_01,
+            .systems_j = systems_j,
+            .system_j  = cs_v,
             .samples   = samples
           }, static_cast<double>(i + 1), false));
 
-          if (i > 0 || !(cs_1.normalized()).isApprox(cs_0.normalized())) {
-            mms_chulls_full[i] = generate_convex_hull<AlMesh, Colr>(mms_colr_sets_full[i]);
-            mms_chulls_aprx[i] = generate_convex_hull<AlMesh, Colr>(mms_colr_sets_aprx[i]);
+          // Determine extents of generated point sets
+          auto full_max = rng::fold_left_first(mms_colr_sets_full[i], 
+            [](const auto &a, const auto &b) { return a.max(b).eval(); }).value();
+          auto full_min = rng::fold_left_first(mms_colr_sets_full[i], 
+            [](const auto &a, const auto &b) { return a.min(b).eval(); }).value();
+          auto aprx_max = rng::fold_left_first(mms_colr_sets_aprx[i], 
+            [](const auto &a, const auto &b) { return a.max(b).eval(); }).value();
+          auto aprx_min = rng::fold_left_first(mms_colr_sets_aprx[i], 
+            [](const auto &a, const auto &b) { return a.min(b).eval(); }).value();
+
+          // Generate corresponding convex hulls, if the minimum nr. of points is available
+          // and the shape is large enough for qhull to not break the application
+          if (mms_colr_sets_full[i].size() >= 4 && (full_max - full_min).minCoeff() >= 0.005f) {
+            std::vector<Colr> span(range_iter(mms_colr_sets_full[i]));
+            mms_chulls_full[i] = generate_convex_hull<AlMesh, Colr>(span);
+          }
+          if (mms_colr_sets_aprx[i].size() >= 4 && (aprx_max - aprx_min).minCoeff() >= 0.005f) {
+            std::vector<Colr> span(range_iter(mms_colr_sets_aprx[i]));
+            mms_chulls_aprx[i] = generate_convex_hull<AlMesh, Colr>(span);
           }
         }
       }
@@ -474,14 +509,21 @@ namespace met {
           // });
           // i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_sets[i], sizes, colrs));
 
-          if (i > 0 || !(cs_1.normalized()).isApprox(cs_0.normalized())) {
-            if (switch_power) {
+          if (switch_power) {
+            if (mms_chulls_full[i].verts.empty()) {
+              std::vector<Colr> span(range_iter(mms_colr_sets_full[i]));
+              i_pointsets.push_back(AnnotatedPointsetDraw(span, draw_size));
+            } else {
               i_meshes.push_back(AnnotatedMeshDraw(mms_chulls_full[i]));
+            }
+          } else {
+            if (mms_chulls_aprx[i].verts.empty()) {
+              std::vector<Colr> span(range_iter(mms_colr_sets_aprx[i]));
+              i_pointsets.push_back(AnnotatedPointsetDraw(span, draw_size));
             } else {
               i_meshes.push_back(AnnotatedMeshDraw(mms_chulls_aprx[i]));
             }
-          } else
-            i_pointsets.push_back(AnnotatedPointsetDraw(mms_colr_sets_full[i], draw_size));
+          }
         }
       }
     }
