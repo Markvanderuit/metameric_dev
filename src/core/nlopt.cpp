@@ -272,6 +272,7 @@ namespace met {
               px = p > 1.f ? X.cwiseProduct(X) : X;
               dx = p > 1.f ? X : 1.f;
             }
+            
             if (g.size())
               g = p * (C.cwiseProduct(dx).transpose() * B).array();
             return C.dot(px);

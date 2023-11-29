@@ -337,11 +337,13 @@ namespace met {
       ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
       ColrSystem csys_2 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2, .n_scatters = 1 };
       ColrSystem csys_3 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1, .n_scatters = 1 };
+
+      // Specify color system spectra
       cs_0 = csys_0.finalize_direct();
       cs_1 = csys_1.finalize_direct();
       cs_2 = csys_2.finalize_direct();
       cs_3 = csys_3.finalize_direct();
-      cs_v = cs_3;
+      cs_v = cs_1; // Visualized cs
 
       // Generate OCS for cs_v
       {
@@ -410,10 +412,10 @@ namespace met {
           auto systems_i = { cs_0 };
           auto signals_i = { cv_0 };
           std::vector<CMFS> systems_j = { 
-            cs_3,
-            cs_0,
-            cs_2, 
+            // cs_0,
             cs_1, 
+            // cs_2, 
+            // cs_3,
           };
 
           // Reweight system contribution randomly
@@ -426,23 +428,23 @@ namespace met {
           } */
 
           // Generate points on the mms convex hull
-          auto samples_  = detail::gen_unit_dirs_x(6u, 6u, seed);
-          mms_colr_sets_full[i].insert_range(generate_mmv_boundary_colr({
+          auto samples_  = detail::gen_unit_dirs_x(6u, 3u, seed);
+          /* mms_colr_sets_full[i].insert_range(nl_generate_mmv_boundary_colr({
             .basis     = basis,
             .systems_i = systems_i,
             .signals_i = signals_i,
-            .system_j  = cs_2,
+            .system_j  = cs_1,
             .samples   = samples_,
             .system_j_override = cs_v // TODO remove this absolute hack
-          }));
-          /* mms_colr_sets_full[i].insert_range(nl_generate_mmv_boundary_colr({
+          })); */
+          mms_colr_sets_full[i].insert_range(nl_generate_mmv_boundary_colr({
             .basis     = basis,
             .systems_i = systems_i,
             .signals_i = signals_i,
             .systems_j = systems_j,
             .system_j  = cs_v,
             .samples   = samples
-          }, static_cast<double>(i + 1), true)); */
+          }, static_cast<double>(i + 1), true));
           mms_colr_sets_aprx[i].insert_range(nl_generate_mmv_boundary_colr({
             .basis     = basis,
             .systems_i = systems_i,

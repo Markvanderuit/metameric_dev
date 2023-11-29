@@ -82,6 +82,7 @@ namespace met::detail {
     gl::Buffer              elems, elems_al;
     gl::Array               array;
 
+    
   public:
     RTMeshData() = default;
     RTMeshData(const Scene &);

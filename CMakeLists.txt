@@ -65,11 +65,11 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(NLopt     CONFIG REQUIRED)
 find_package(openmesh  CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
+find_package(TBB       CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
-
 # Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
@@ -85,6 +85,24 @@ option(gl_enable_exceptions  "" ${met_enable_exceptions})
 option(gl_enable_tracy       "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/small_gl_parser)
+
+# Include Intel Embree, compiled from scratch
+add_subdirectory(third_party/embree)
+set(EMBREE_TUTORIAL                  OFF CACHE BOOL " " FORCE)
+set(EMBREE_STATIC_LIB                OFF CACHE BOOL " " FORCE)
+set(EMBREE_ZIP_MODE                  OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS             OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_QUAD             OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_GRID             OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_POINT            OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_SUBDIVISION      OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_CURVE            OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_INSTANCE         ON  CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_USER             ON  CACHE BOOL " " FORCE)
+set(EMBREE_IGNORE_INVALID_RAYS       ON  CACHE BOOL " " FORCE)
+set(EMBREE_RAY_MASK                  OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS             OFF CACHE BOOL " " FORCE)
+# TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
 
 # Add together arguments to pass into small_gl_parser when processing shaders
 string(CONCAT small_gl_parser_args
