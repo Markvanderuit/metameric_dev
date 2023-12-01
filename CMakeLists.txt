@@ -87,22 +87,22 @@ add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/small_gl_parser)
 
 # Include Intel Embree, compiled from scratch
-add_subdirectory(third_party/embree)
-set(EMBREE_TUTORIAL                  OFF CACHE BOOL " " FORCE)
-set(EMBREE_STATIC_LIB                OFF CACHE BOOL " " FORCE)
-set(EMBREE_ZIP_MODE                  OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS             OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_QUAD             OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_GRID             OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_POINT            OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_SUBDIVISION      OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_CURVE            OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_INSTANCE         ON  CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_USER             ON  CACHE BOOL " " FORCE)
-set(EMBREE_IGNORE_INVALID_RAYS       ON  CACHE BOOL " " FORCE)
-set(EMBREE_RAY_MASK                  OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS             OFF CACHE BOOL " " FORCE)
+set(EMBREE_TUTORIAL             OFF CACHE BOOL " " FORCE)
+set(EMBREE_STATIC_LIB           OFF CACHE BOOL " " FORCE)
+set(EMBREE_ZIP_MODE             OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_QUAD        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_GRID        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_POINT       OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_SUBDIVISION OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_CURVE       OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_INSTANCE    ON  CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_USER        ON  CACHE BOOL " " FORCE)
+set(EMBREE_IGNORE_INVALID_RAYS  ON  CACHE BOOL " " FORCE)
+set(EMBREE_RAY_MASK             OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS        OFF CACHE BOOL " " FORCE)
 # TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
+add_subdirectory(third_party/embree)
 
 # Add together arguments to pass into small_gl_parser when processing shaders
 string(CONCAT small_gl_parser_args
@@ -250,6 +250,7 @@ target_link_libraries(core PUBLIC
   Eigen3::Eigen
   fmt::fmt-header-only
   Coin::Clp
+  embree
   Tracy::TracyClient
   nlohmann_json::nlohmann_json
   NLopt::nlopt

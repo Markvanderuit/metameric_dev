@@ -81,7 +81,6 @@ namespace met::detail {
     gl::Buffer              verts_a, verts_b;
     gl::Buffer              elems, elems_al;
     gl::Array               array;
-
     
   public:
     RTMeshData() = default;
