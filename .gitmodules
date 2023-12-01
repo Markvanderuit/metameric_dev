@@ -7,3 +7,6 @@
 [submodule "third_party/small_gl_parser"]
 	path = third_party/small_gl_parser
 	url = https://github.com/Markvanderuit/small_gl_parser.git
+[submodule "third_party/embree"]
+	path = third_party/embree
+	url = https://github.com/embree/embree.git
