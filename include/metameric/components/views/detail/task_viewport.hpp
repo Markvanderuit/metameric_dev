@@ -245,8 +245,8 @@ namespace met::detail {
       {
         // Declare scoped ImGui style state
         auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
 
         // Note: window end is post-pended here, but window begin is in ViewportBeginTask
         ImGui::End();

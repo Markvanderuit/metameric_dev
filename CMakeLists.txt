@@ -61,9 +61,9 @@ find_package(fmt       CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
 find_package(imguizmo  CONFIG REQUIRED)
 find_package(implot    CONFIG REQUIRED)
+find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(NLopt     CONFIG REQUIRED)
-find_package(openmesh  CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
 find_package(TBB       CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
@@ -255,14 +255,13 @@ target_link_libraries(core PUBLIC
   nlohmann_json::nlohmann_json
   NLopt::nlopt
   unofficial::tinyexr::tinyexr
-  ${OPENMESH_LIBRARIES}
+  meshoptimizer::meshoptimizer
   Qhull::qhullcpp
   Qhull::qhull_r
   ZLIB::ZLIB
 )
 target_include_directories(core PUBLIC
   ${STB_INCLUDE_DIRS}
-  ${OPENMESH_INCLUDE_DIRS}
   ${ZSTR_INCLUDE_DIRS}
 )
 target_compile_definitions(core PUBLIC

@@ -24,86 +24,86 @@ namespace met {
   void DrawColorSolidTask::init(SchedulerHandle &info) { 
     met_trace_full();
 
-    // Get external resources
-    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
+    // // Get external resources
+    // const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
 
-    // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
-    auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
+    // // Generate a uv sphere mesh to get an upper bound for convex hull buffer sizes
+    // auto sphere_mesh = generate_spheroid<HalfedgeMeshData>(3);
 
-    // Allocate convex hull buffer objects with predetermined maximum sizes
-    m_chull_verts = {{ .size = sphere_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = gl::BufferCreateFlags::eStorageDynamic }};
-    m_chull_elems = {{ .size = sphere_mesh.n_faces() * sizeof(eig::Array3u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    // // Allocate convex hull buffer objects with predetermined maximum sizes
+    // m_chull_verts = {{ .size = sphere_mesh.n_vertices() * sizeof(eig::AlArray3f), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    // m_chull_elems = {{ .size = sphere_mesh.n_faces() * sizeof(eig::Array3u), .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
-    // Allocate buffer objects for billboard quad draw
-    m_quad_verts = {{ .data = cnt_span<const std::byte>(quad_vert_data) }};
-    m_quad_elems = {{ .data = cnt_span<const std::byte>(quad_elem_data) }};
+    // // Allocate buffer objects for billboard quad draw
+    // m_quad_verts = {{ .data = cnt_span<const std::byte>(quad_vert_data) }};
+    // m_quad_elems = {{ .data = cnt_span<const std::byte>(quad_elem_data) }};
 
-    // Create array objects for convex hull mesh draw and straightforward point draw
-    m_cnstr_array = {{
-      .buffers = {{ .buffer = &m_quad_verts, .index = 0, .stride = 2 * sizeof(float) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e2 }},
-      .elements = &m_quad_elems
-    }};
-    m_chull_array = {{
-      .buffers = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(AlColr) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-      .elements = &m_chull_elems
-    }};
-    m_point_array = {{
-      .buffers = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(AlColr) }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
-    }};
+    // // Create array objects for convex hull mesh draw and straightforward point draw
+    // m_cnstr_array = {{
+    //   .buffers = {{ .buffer = &m_quad_verts, .index = 0, .stride = 2 * sizeof(float) }},
+    //   .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e2 }},
+    //   .elements = &m_quad_elems
+    // }};
+    // m_chull_array = {{
+    //   .buffers = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(AlColr) }},
+    //   .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+    //   .elements = &m_chull_elems
+    // }};
+    // m_point_array = {{
+    //   .buffers = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(AlColr) }},
+    //   .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }}
+    // }};
 
-    // Load shader program objects
-    m_cnstr_program = {{ .type       = gl::ShaderType::eVertex,   
-                         .spirv_path = "resources/shaders/views/draw_point.vert.spv",
-                         .cross_path = "resources/shaders/views/draw_point.vert.json" },
-                       { .type       = gl::ShaderType::eFragment, 
-                         .spirv_path = "resources/shaders/views/draw_point.frag.spv",
-                         .cross_path = "resources/shaders/views/draw_point.frag.json" }};
-    m_draw_program = {{ .type       = gl::ShaderType::eVertex,   
-                        .spirv_path = "resources/shaders/views/draw_csys.vert.spv",
-                        .cross_path = "resources/shaders/views/draw_csys.vert.json" },
-                      { .type       = gl::ShaderType::eFragment, 
-                        .spirv_path = "resources/shaders/views/draw_csys.frag.spv",
-                        .cross_path = "resources/shaders/views/draw_csys.frag.json" }};
-    m_srgb_program = {{ .type       = gl::ShaderType::eCompute,  
-                        .glsl_path  = "resources/shaders/misc/texture_resample.comp",
-                        .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
+    // // Load shader program objects
+    // m_cnstr_program = {{ .type       = gl::ShaderType::eVertex,   
+    //                      .spirv_path = "resources/shaders/views/draw_point.vert.spv",
+    //                      .cross_path = "resources/shaders/views/draw_point.vert.json" },
+    //                    { .type       = gl::ShaderType::eFragment, 
+    //                      .spirv_path = "resources/shaders/views/draw_point.frag.spv",
+    //                      .cross_path = "resources/shaders/views/draw_point.frag.json" }};
+    // m_draw_program = {{ .type       = gl::ShaderType::eVertex,   
+    //                     .spirv_path = "resources/shaders/views/draw_csys.vert.spv",
+    //                     .cross_path = "resources/shaders/views/draw_csys.vert.json" },
+    //                   { .type       = gl::ShaderType::eFragment, 
+    //                     .spirv_path = "resources/shaders/views/draw_csys.frag.spv",
+    //                     .cross_path = "resources/shaders/views/draw_csys.frag.json" }};
+    // m_srgb_program = {{ .type       = gl::ShaderType::eCompute,  
+    //                     .glsl_path  = "resources/shaders/misc/texture_resample.comp",
+    //                     .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
 
-    // Create dispatch objects to summarize draw/compute operations
-    m_cnstr_dispatch = { .type             = gl::PrimitiveType::eTriangles,
-                         .vertex_count     = quad_elem_data.size(),
-                         .bindable_array   = &m_cnstr_array,
-                         .bindable_program = &m_cnstr_program };
-    m_chull_dispatch = { .type             = gl::PrimitiveType::eTriangles,
-                         .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
-                         .bindable_array   = &m_chull_array,
-                         .bindable_program = &m_draw_program };
-    m_point_dispatch = { .type             = gl::PrimitiveType::ePoints,
-                         .vertex_count     = (uint) (m_chull_verts.size() / sizeof(eig::AlArray3f)),
-                         .bindable_array   = &m_point_array,
-                         .bindable_program = &m_draw_program };
-    m_srgb_dispatch = { .bindable_program = &m_srgb_program };
+    // // Create dispatch objects to summarize draw/compute operations
+    // m_cnstr_dispatch = { .type             = gl::PrimitiveType::eTriangles,
+    //                      .vertex_count     = quad_elem_data.size(),
+    //                      .bindable_array   = &m_cnstr_array,
+    //                      .bindable_program = &m_cnstr_program };
+    // m_chull_dispatch = { .type             = gl::PrimitiveType::eTriangles,
+    //                      .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
+    //                      .bindable_array   = &m_chull_array,
+    //                      .bindable_program = &m_draw_program };
+    // m_point_dispatch = { .type             = gl::PrimitiveType::ePoints,
+    //                      .vertex_count     = (uint) (m_chull_verts.size() / sizeof(eig::AlArray3f)),
+    //                      .bindable_array   = &m_point_array,
+    //                      .bindable_program = &m_draw_program };
+    // m_srgb_dispatch = { .bindable_program = &m_srgb_program };
 
-    m_cnstr_uniform_buffer = {{ .size = sizeof(CnstrUniformBuffer), .flags = buffer_create_flags }};
-    m_cnstr_uniform_map    = m_cnstr_uniform_buffer.map_as<CnstrUniformBuffer>(buffer_access_flags).data();
-    m_cnstr_uniform_map->point_size  = quad_vert_size;
-    m_cnstr_uniform_map->point_color = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
-                                     ? 1
-                                     : eig::Vector4f { 0, 0, 0, 1 };
+    // m_cnstr_uniform_buffer = {{ .size = sizeof(CnstrUniformBuffer), .flags = buffer_create_flags }};
+    // m_cnstr_uniform_map    = m_cnstr_uniform_buffer.map_as<CnstrUniformBuffer>(buffer_access_flags).data();
+    // m_cnstr_uniform_map->point_size  = quad_vert_size;
+    // m_cnstr_uniform_map->point_color = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
+    //                                  ? 1
+    //                                  : eig::Vector4f { 0, 0, 0, 1 };
 
-    m_draw_uniform_buffer = {{ .size = sizeof(DrawUniformBuffer), .flags = buffer_create_flags }};
-    m_draw_uniform_map    = m_draw_uniform_buffer.map_as<DrawUniformBuffer>(buffer_access_flags).data();
-    m_draw_uniform_map->override_color = false;
-    m_draw_uniform_map->alpha = 1.f;
+    // m_draw_uniform_buffer = {{ .size = sizeof(DrawUniformBuffer), .flags = buffer_create_flags }};
+    // m_draw_uniform_map    = m_draw_uniform_buffer.map_as<DrawUniformBuffer>(buffer_access_flags).data();
+    // m_draw_uniform_map->override_color = false;
+    // m_draw_uniform_map->alpha = 1.f;
 
-    // Create sampler object used in gamma correction step
-    // Instantiate objects for gamma correction step
-    m_srgb_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
-    m_srgb_uniform_buffer = {{ .size = sizeof(SrgbUniformBuffer), .flags = buffer_create_flags }};
-    m_srgb_uniform_map    = m_srgb_uniform_buffer.map_as<SrgbUniformBuffer>(buffer_access_flags).data();
-    m_srgb_uniform_map->lrgb_to_srgb = true;
+    // // Create sampler object used in gamma correction step
+    // // Instantiate objects for gamma correction step
+    // m_srgb_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, .mag_filter = gl::SamplerMagFilter::eNearest }};
+    // m_srgb_uniform_buffer = {{ .size = sizeof(SrgbUniformBuffer), .flags = buffer_create_flags }};
+    // m_srgb_uniform_map    = m_srgb_uniform_buffer.map_as<SrgbUniformBuffer>(buffer_access_flags).data();
+    // m_srgb_uniform_map->lrgb_to_srgb = true;
   }
 
   bool DrawColorSolidTask::is_active(SchedulerHandle &info) {

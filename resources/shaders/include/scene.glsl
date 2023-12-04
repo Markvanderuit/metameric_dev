@@ -32,7 +32,7 @@ struct ObjectInfo {
   uint mesh_i;              
   uint uplifting_i;
 
-  // Material data // TODO expand
+  // Material data        // TODO expand
   bool is_albedo_sampled; // Use sampler or direct value?
   uint albedo_i;          // Sampler index
   vec3 albedo_v;          // Direct value

@@ -155,8 +155,8 @@ namespace met {
     std::erase_if(output, [](Spec &c) { return c.isNaN().any(); });
     std::unordered_set<
       Spec, 
-      decltype(Eigen::detail::matrix_hash<float>), 
-      decltype(Eigen::detail::matrix_equal)
+      decltype(eig::detail::matrix_hash<float>), 
+      decltype(eig::detail::matrix_equal)
     > output_unique(range_iter(output));
     return std::vector<Spec>(range_iter(output_unique));
   }

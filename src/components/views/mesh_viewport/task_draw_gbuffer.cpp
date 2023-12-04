@@ -110,10 +110,10 @@ namespace met {
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
 
     // Dispatch draw call to handle entire scene
-    gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer       | 
-                            gl::BarrierFlags::eTextureFetch       |
-                            gl::BarrierFlags::eClientMappedBuffer |
-                            gl::BarrierFlags::eUniformBuffer      );
+    gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
+                             gl::BarrierFlags::eTextureFetch       |
+                             gl::BarrierFlags::eClientMappedBuffer |
+                             gl::BarrierFlags::eUniformBuffer      );
     gl::dispatch_multidraw(m_draw);
   }
 } // namespace met

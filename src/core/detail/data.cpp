@@ -72,378 +72,378 @@ namespace met::detail {
   void init_convex_hull(ApplicationData &appl_data, uint n_exterior_samples) {
     met_trace();
 
-    fmt::print("  Generating object color solid boundaries\n");
+    // fmt::print("  Generating object color solid boundaries\n");
 
-    // Compute data points on convex hull of object color solid; used for convex hull clipping
-    auto ocs = generate_ocs_boundary_colr({ .basis      = appl_data.loaded_basis,
-                                            .system     = appl_data.project_data.csys(0).finalize_direct(), 
-                                            .samples    = detail::gen_unit_dirs<3>(1024) });
+    // // Compute data points on convex hull of object color solid; used for convex hull clipping
+    // auto ocs = generate_ocs_boundary_colr({ .basis      = appl_data.loaded_basis,
+    //                                         .system     = appl_data.project_data.csys(0).finalize_direct(), 
+    //                                         .samples    = detail::gen_unit_dirs<3>(1024) });
 
-    // Generate cleaned mesh from data
-    auto ocs_mesh = simplify_edge_length<HalfedgeMeshData>(
-      generate_convex_hull<HalfedgeMeshData, eig::Array3f>(ocs), 0.001f);
+    // // Generate cleaned mesh from data
+    // auto ocs_mesh = simplify_edge_length<HalfedgeMeshData>(
+    //   generate_convex_hull<HalfedgeMeshData, eig::Array3f>(ocs), 0.001f);
 
-    fmt::print("  Generating simplified convex hull\n");
+    // fmt::print("  Generating simplified convex hull\n");
 
-    // Generate simplified concave hull fitting texture data, then fit convex hull around this
-    auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(appl_data.loaded_texture.data());
-    auto chull_mesh = generate_convex_hull<Mesh, eig::Array3f>(
-      simplify_volume<Mesh>(chull_base, n_exterior_samples, &ocs_mesh).verts
-    );
+    // // Generate simplified concave hull fitting texture data, then fit convex hull around this
+    // auto chull_base = generate_convex_hull<HalfedgeMeshData, eig::Array3f>(appl_data.loaded_texture.data());
+    // auto chull_mesh = generate_convex_hull<Mesh, eig::Array3f>(
+    //   simplify_volume<Mesh>(chull_base, n_exterior_samples, &ocs_mesh).verts
+    // );
 
-    fmt::print("  Convex hull result: {} vertices, {} elements\n", 
-      chull_mesh.verts.size(), chull_mesh.elems.size());
+    // fmt::print("  Convex hull result: {} vertices, {} elements\n", 
+    //   chull_mesh.verts.size(), chull_mesh.elems.size());
 
-    // Update project data with new convex hull
-    appl_data.project_data.elems = chull_mesh.elems;
-    appl_data.project_data.verts.resize(chull_mesh.verts.size());
-    std::ranges::transform(chull_mesh.verts, appl_data.project_data.verts.begin(), [](Colr c) {
-      return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
-    });
+    // // Update project data with new convex hull
+    // appl_data.project_data.elems = chull_mesh.elems;
+    // appl_data.project_data.verts.resize(chull_mesh.verts.size());
+    // std::ranges::transform(chull_mesh.verts, appl_data.project_data.verts.begin(), [](Colr c) {
+    //   return ProjectData::Vert { .colr_i = c, .csys_i = 0, .colr_j = { }, .csys_j = { } };
+    // });
   }
 
   void init_constraints_points(ApplicationData &appl_data, uint n_interior_samples,
                                std::span<const ProjectCreateInfo::ImageData> images) {
     met_trace();
 
-    guard(/* !images.empty() && */ n_interior_samples > 0);
+  //   guard(/* !images.empty() && */ n_interior_samples > 0);
 
-    // Hardcoded settings shared across next steps
-    constexpr uint sample_discretization = 256;
+  //   // Hardcoded settings shared across next steps
+  //   constexpr uint sample_discretization = 256;
 
-    // Data shared across next steps
-    std::vector<uint>              indices;
-    std::vector<Colr>              sample_colr_i(n_interior_samples);
-    std::vector<std::vector<Colr>> sample_colr_j(n_interior_samples);
+  //   // Data shared across next steps
+  //   std::vector<uint>              indices;
+  //   std::vector<Colr>              sample_colr_i(n_interior_samples);
+  //   std::vector<std::vector<Colr>> sample_colr_j(n_interior_samples);
 
-    { // 1. Build a distribution of unique color values s.t. identical texels are not sampled twice 
-      // Instantiate an unordered map storing color/uint pairs
-      std::unordered_map<
-        eig::Array3u, 
-        uint, 
-        decltype(eig::detail::matrix_hash<eig::Array3u::value_type>), 
-        decltype(eig::detail::matrix_equal)
-      > indices_map;
+  //   { // 1. Build a distribution of unique color values s.t. identical texels are not sampled twice 
+  //     // Instantiate an unordered map storing color/uint pairs
+  //     std::unordered_map<
+  //       eig::Array3u, 
+  //       uint, 
+  //       decltype(eig::detail::matrix_hash<eig::Array3u::value_type>), 
+  //       decltype(eig::detail::matrix_equal)
+  //     > indices_map;
 
-      // Insert indices of discretized image colors into the map, if they do not yet exist
-      auto colr_i_span = appl_data.loaded_texture.data();
-      for (uint i = 0; i < colr_i_span.size(); ++i)
-        indices_map.insert({ (colr_i_span[i] * sample_discretization).cast<uint>(), i });
+  //     // Insert indices of discretized image colors into the map, if they do not yet exist
+  //     auto colr_i_span = appl_data.loaded_texture.data();
+  //     for (uint i = 0; i < colr_i_span.size(); ++i)
+  //       indices_map.insert({ (colr_i_span[i] * sample_discretization).cast<uint>(), i });
 
-      // Export resulting set of indices
-      indices.resize(indices_map.size());
-      std::transform(std::execution::par_unseq, range_iter(indices_map), indices.begin(),
-        [](const auto &pair) { return pair.second; });
-    } // 1.
+  //     // Export resulting set of indices
+  //     indices.resize(indices_map.size());
+  //     std::transform(std::execution::par_unseq, range_iter(indices_map), indices.begin(),
+  //       [](const auto &pair) { return pair.second; });
+  //   } // 1.
     
-    { // 2. Sample a random subset of texels and obtain their color values from each texture
-      auto colr_i_span = appl_data.loaded_texture.data();
+  //   { // 2. Sample a random subset of texels and obtain their color values from each texture
+  //     auto colr_i_span = appl_data.loaded_texture.data();
         
-      // Define random generator
-      std::random_device rd;
-      std::mt19937 gen(rd());
+  //     // Define random generator
+  //     std::random_device rd;
+  //     std::mt19937 gen(rd());
 
-      // Draw random, unique indices from indices
-      std::vector<uint> samples = indices;
-      std::shuffle(range_iter(samples), gen);
-      samples.resize(std::min(static_cast<size_t>(n_interior_samples), samples.size()));
+  //     // Draw random, unique indices from indices
+  //     std::vector<uint> samples = indices;
+  //     std::shuffle(range_iter(samples), gen);
+  //     samples.resize(std::min(static_cast<size_t>(n_interior_samples), samples.size()));
 
-      // Extract colr_i, colr_j from input images at sampled indices
-      std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
-      if (!images.empty()) {
-        for (uint i = 0; i < n_interior_samples; ++i) {
-          sample_colr_j[i] = std::vector<Colr>(images.size());
-          std::ranges::transform(images, sample_colr_j[i].begin(), 
-            [&](const auto &info) { return info.image.data()[samples[i]]; });
-        }
-      }
-    } // 2.
+  //     // Extract colr_i, colr_j from input images at sampled indices
+  //     std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
+  //     if (!images.empty()) {
+  //       for (uint i = 0; i < n_interior_samples; ++i) {
+  //         sample_colr_j[i] = std::vector<Colr>(images.size());
+  //         std::ranges::transform(images, sample_colr_j[i].begin(), 
+  //           [&](const auto &info) { return info.image.data()[samples[i]]; });
+  //       }
+  //     }
+  //   } // 2.
     
-    { // 3. Specify constraints based on sampled texels and add to project data
-      // Mapping indices [1, ...]
-      std::vector<uint> csys_j_data(images.size());
-      std::iota(range_iter(csys_j_data), 1);
+  //   { // 3. Specify constraints based on sampled texels and add to project data
+  //     // Mapping indices [1, ...]
+  //     std::vector<uint> csys_j_data(images.size());
+  //     std::iota(range_iter(csys_j_data), 1);
       
-      // Add vertices to project data
-      appl_data.project_data.verts.reserve(appl_data.project_data.verts.size() + n_interior_samples);
-      for (uint i = 0; i < n_interior_samples; ++i) {
-        // Iterate through samples, in case bad samples still exist
-        while (i < n_interior_samples) {
-          ProjectData::Vert vt = { .colr_i = sample_colr_i[i], .csys_i = 0 };
-          if (!images.empty()) {
-            vt.colr_j = sample_colr_j[i];
-            vt.csys_j = csys_j_data;
-          }
+  //     // Add vertices to project data
+  //     appl_data.project_data.verts.reserve(appl_data.project_data.verts.size() + n_interior_samples);
+  //     for (uint i = 0; i < n_interior_samples; ++i) {
+  //       // Iterate through samples, in case bad samples still exist
+  //       while (i < n_interior_samples) {
+  //         ProjectData::Vert vt = { .colr_i = sample_colr_i[i], .csys_i = 0 };
+  //         if (!images.empty()) {
+  //           vt.colr_j = sample_colr_j[i];
+  //           vt.csys_j = csys_j_data;
+  //         }
 
-          // Obtain color system spectra for this vertex
-          std::vector<CMFS> systems = { appl_data.project_data.csys(vt.csys_i).finalize_direct() };
-          std::ranges::transform(vt.csys_j, std::back_inserter(systems), 
-            [&](uint j) { return appl_data.project_data.csys(j).finalize_direct(); });
+  //         // Obtain color system spectra for this vertex
+  //         std::vector<CMFS> systems = { appl_data.project_data.csys(vt.csys_i).finalize_direct() };
+  //         std::ranges::transform(vt.csys_j, std::back_inserter(systems), 
+  //           [&](uint j) { return appl_data.project_data.csys(j).finalize_direct(); });
 
-          // Obtain corresponding color signal for each color system
-          std::vector<Colr> signals(1 + vt.colr_j.size());
-          signals[0] = vt.colr_i;
-          std::ranges::copy(vt.colr_j, signals.begin() + 1);
+  //         // Obtain corresponding color signal for each color system
+  //         std::vector<Colr> signals(1 + vt.colr_j.size());
+  //         signals[0] = vt.colr_i;
+  //         std::ranges::copy(vt.colr_j, signals.begin() + 1);
 
-          // Generate new spectrum given the current set of systems+signals as solver constraints
-          Spec sd = generate_spectrum({ 
-            .basis      = appl_data.loaded_basis,
-            .systems    = std::span<CMFS> { systems }, 
-            .signals    = std::span<Colr> { signals }
-          });
+  //         // Generate new spectrum given the current set of systems+signals as solver constraints
+  //         Spec sd = generate_spectrum({ 
+  //           .basis      = appl_data.loaded_basis,
+  //           .systems    = std::span<CMFS> { systems }, 
+  //           .signals    = std::span<Colr> { signals }
+  //         });
 
-          // Test roundtrip error for generated spectrum, compared to input color signal
-          Colr signal_rt = appl_data.project_data.csys(0).apply_color_direct(sd);
-          float rt_error = (signal_rt - vt.colr_i).abs().sum();
+  //         // Test roundtrip error for generated spectrum, compared to input color signal
+  //         Colr signal_rt = appl_data.project_data.csys(0).apply_color_direct(sd);
+  //         float rt_error = (signal_rt - vt.colr_i).abs().sum();
 
-          // Only add vertex to data if roundtrip error is below epsilon; otherwise this sample
-          // has a bad fit (potentially indicating a problem with input data)
-          if (rt_error > 0.0001f) {
-            i++;
-            continue;
-          } else {
-            appl_data.project_data.verts.push_back(vt);
-            break;
-          }
-        } // while (i < n_interior_samples)
-      } // for (uint i < n_interior_samples)
-    } // 3.
+  //         // Only add vertex to data if roundtrip error is below epsilon; otherwise this sample
+  //         // has a bad fit (potentially indicating a problem with input data)
+  //         if (rt_error > 0.0001f) {
+  //           i++;
+  //           continue;
+  //         } else {
+  //           appl_data.project_data.verts.push_back(vt);
+  //           break;
+  //         }
+  //       } // while (i < n_interior_samples)
+  //     } // for (uint i < n_interior_samples)
+  //   } // 3.
   }
 
   void init_constraints_convex_hull(ApplicationData &appl_data, uint n_interior_samples,
                                     std::span<const ProjectCreateInfo::ImageData> images) {
-    met_trace();
+  //   met_trace();
 
-    guard(!images.empty() && n_interior_samples > 0);
+  //   guard(!images.empty() && n_interior_samples > 0);
 
-    // Hardcoded settings shared across next steps
-    constexpr uint sample_discretization = 256;
-    constexpr uint sample_attemps        = 32;
+  //   // Hardcoded settings shared across next steps
+  //   constexpr uint sample_discretization = 256;
+  //   constexpr uint sample_attemps        = 32;
 
-    // Actual samples per image
-    const uint n_samples = n_interior_samples / (images.size() + 1);
+  //   // Actual samples per image
+  //   const uint n_samples = n_interior_samples / (images.size() + 1);
 
-    // Data store shared across next steps
-    std::vector<uint> indices;
-    std::vector<Bary> bary_weights;
-    // std::vector<uint> bary_indices;
-    std::mutex solver_mutex;
-    float solver_error = std::numeric_limits<float>::max();
+  //   // Data store shared across next steps
+  //   std::vector<uint> indices;
+  //   std::vector<Bary> bary_weights;
+  //   // std::vector<uint> bary_indices;
+  //   std::mutex solver_mutex;
+  //   float solver_error = std::numeric_limits<float>::max();
     
-    // Get current set of vertices
-    std::vector<Colr> verts(appl_data.project_data.verts.size());
-    std::ranges::transform(appl_data.project_data.verts, 
-      verts.begin(), [](const auto &v) { return v.colr_i; });
+  //   // Get current set of vertices
+  //   std::vector<Colr> verts(appl_data.project_data.verts.size());
+  //   std::ranges::transform(appl_data.project_data.verts, 
+  //     verts.begin(), [](const auto &v) { return v.colr_i; });
 
-    { // 1. Build a distribution of unique color values s.t. identical texels are not sampled twice 
-      // Instantiate an unordered map storing color/uint pairs
-      std::unordered_map<
-        eig::Array3u, 
-        uint, 
-        decltype(eig::detail::matrix_hash<eig::Array3u::value_type>), 
-        decltype(eig::detail::matrix_equal)
-      > indices_map;
+  //   { // 1. Build a distribution of unique color values s.t. identical texels are not sampled twice 
+  //     // Instantiate an unordered map storing color/uint pairs
+  //     std::unordered_map<
+  //       eig::Array3u, 
+  //       uint, 
+  //       decltype(eig::detail::matrix_hash<eig::Array3u::value_type>), 
+  //       decltype(eig::detail::matrix_equal)
+  //     > indices_map;
 
-      // Insert indices of discretized image colors into the map, if they do not yet exist
-      auto colr_i_span = appl_data.loaded_texture.data();
-      for (uint i = 0; i < colr_i_span.size(); ++i)
-        indices_map.insert({ (colr_i_span[i] * sample_discretization).cast<uint>(), i });
+  //     // Insert indices of discretized image colors into the map, if they do not yet exist
+  //     auto colr_i_span = appl_data.loaded_texture.data();
+  //     for (uint i = 0; i < colr_i_span.size(); ++i)
+  //       indices_map.insert({ (colr_i_span[i] * sample_discretization).cast<uint>(), i });
 
-      // Export resulting set of indices
-      indices.resize(indices_map.size());
-      std::transform(std::execution::par_unseq, range_iter(indices_map), indices.begin(),
-        [](const auto &pair) { return pair.second; });
-    } // 1.
+  //     // Export resulting set of indices
+  //     indices.resize(indices_map.size());
+  //     std::transform(std::execution::par_unseq, range_iter(indices_map), indices.begin(),
+  //       [](const auto &pair) { return pair.second; });
+  //   } // 1.
 
-    { // 2. Generate generalized weights for the convex hull, w.r.t. the primary loaded image
-      //    (we quickly hack-reuse generalized weight shader code for this step)
+  //   { // 2. Generate generalized weights for the convex hull, w.r.t. the primary loaded image
+  //     //    (we quickly hack-reuse generalized weight shader code for this step)
 
-      const uint dispatch_n    = appl_data.loaded_texture.size().prod();
-      const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
+  //     const uint dispatch_n    = appl_data.loaded_texture.size().prod();
+  //     const uint dispatch_ndiv = ceil_div(dispatch_n, 256u);
       
-      // Initialize necessary objects for compute dispatch
-      gl::Program program {{ .type       = gl::ShaderType::eCompute,
-                             .spirv_path = "resources/shaders/pipeline/gen_generalized_weights.comp.spv",
-                             .cross_path = "resources/shaders/pipeline/gen_generalized_weights.comp.json" }};
-      gl::ComputeInfo dispatch { .groups_x         = dispatch_ndiv,
-                                 .bindable_program = &program };
+  //     // Initialize necessary objects for compute dispatch
+  //     gl::Program program {{ .type       = gl::ShaderType::eCompute,
+  //                            .spirv_path = "resources/shaders/pipeline/gen_generalized_weights.comp.spv",
+  //                            .cross_path = "resources/shaders/pipeline/gen_generalized_weights.comp.json" }};
+  //     gl::ComputeInfo dispatch { .groups_x         = dispatch_ndiv,
+  //                                .bindable_program = &program };
 
-      // Initialize uniform buffer layout
-      struct UniformBuffer { uint n, n_verts, n_elems; } uniform_buffer {
-        .n = dispatch_n,
-        .n_verts = static_cast<uint>(verts.size()),
-        .n_elems = static_cast<uint>(appl_data.project_data.elems.size())
-      };
+  //     // Initialize uniform buffer layout
+  //     struct UniformBuffer { uint n, n_verts, n_elems; } uniform_buffer {
+  //       .n = dispatch_n,
+  //       .n_verts = static_cast<uint>(verts.size()),
+  //       .n_elems = static_cast<uint>(appl_data.project_data.elems.size())
+  //     };
 
-      // Create relevant buffer objects containing properly aligned data
-      auto al_verts = std::vector<eig::AlArray3f>(range_iter(verts));
-      auto al_elems = std::vector<eig::AlArray3u>(range_iter(appl_data.project_data.elems));
-      gl::Buffer unif_buffer = {{ .data = obj_span<const std::byte>(uniform_buffer) }};
-      gl::Buffer vert_buffer = {{ .data = cnt_span<const std::byte>(al_verts) }};
-      gl::Buffer elem_buffer = {{ .data = cnt_span<const std::byte>(al_elems) }};
-      gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned(appl_data.loaded_texture).data()) }};
-      gl::Buffer wght_buffer = {{ .size = dispatch_n * sizeof(Bary), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+  //     // Create relevant buffer objects containing properly aligned data
+  //     auto al_verts = std::vector<eig::AlArray3f>(range_iter(verts));
+  //     auto al_elems = std::vector<eig::AlArray3u>(range_iter(appl_data.project_data.elems));
+  //     gl::Buffer unif_buffer = {{ .data = obj_span<const std::byte>(uniform_buffer) }};
+  //     gl::Buffer vert_buffer = {{ .data = cnt_span<const std::byte>(al_verts) }};
+  //     gl::Buffer elem_buffer = {{ .data = cnt_span<const std::byte>(al_elems) }};
+  //     gl::Buffer colr_buffer = {{ .data = cast_span<const std::byte>(io::as_aligned(appl_data.loaded_texture).data()) }};
+  //     gl::Buffer wght_buffer = {{ .size = dispatch_n * sizeof(Bary), .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
-      // Bind required resources
-      program.bind("b_unif", unif_buffer);
-      program.bind("b_vert", vert_buffer);
-      program.bind("b_elem", elem_buffer);
-      program.bind("b_colr", colr_buffer);
-      program.bind("b_bary", wght_buffer);
+  //     // Bind required resources
+  //     program.bind("b_unif", unif_buffer);
+  //     program.bind("b_vert", vert_buffer);
+  //     program.bind("b_elem", elem_buffer);
+  //     program.bind("b_colr", colr_buffer);
+  //     program.bind("b_bary", wght_buffer);
 
-      // Dispatch shader to generate generalized barycentric weights
-      gl::dispatch_compute(dispatch);
+  //     // Dispatch shader to generate generalized barycentric weights
+  //     gl::dispatch_compute(dispatch);
       
-      // Recover computed barycentric weights
-      bary_weights.resize(dispatch_n);
-      wght_buffer.get_as(cnt_span<Bary>(bary_weights));
-    } // 2.
+  //     // Recover computed barycentric weights
+  //     bary_weights.resize(dispatch_n);
+  //     wght_buffer.get_as(cnt_span<Bary>(bary_weights));
+  //   } // 2.
 
-    #pragma omp parallel for
-    for (int _i = 0; _i < sample_attemps; ++_i) {
-      auto colr_i_span = appl_data.loaded_texture.data();
+  //   #pragma omp parallel for
+  //   for (int _i = 0; _i < sample_attemps; ++_i) {
+  //     auto colr_i_span = appl_data.loaded_texture.data();
 
-      // Data store shared across next steps for current solve attempt
-      std::vector<uint> sample_indices(n_samples);
-      std::vector<Bary> sample_bary(n_samples);
-      std::vector<Colr> sample_colr_i(n_samples);
-      std::vector<std::vector<Colr>> sample_colr_j(images.size());
-      std::vector<Spec>              gamut_spec;
-      std::vector<ProjectData::Vert> gamut_verts;
-      float roundtrip_error = 0.f;
+  //     // Data store shared across next steps for current solve attempt
+  //     std::vector<uint> sample_indices(n_samples);
+  //     std::vector<Bary> sample_bary(n_samples);
+  //     std::vector<Colr> sample_colr_i(n_samples);
+  //     std::vector<std::vector<Colr>> sample_colr_j(images.size());
+  //     std::vector<Spec>              gamut_spec;
+  //     std::vector<ProjectData::Vert> gamut_verts;
+  //     float roundtrip_error = 0.f;
 
-      { // 1. Sample a random subset of texels and obtain their color values from each texture
-        auto colr_i_span = appl_data.loaded_texture.data();
+  //     { // 1. Sample a random subset of texels and obtain their color values from each texture
+  //       auto colr_i_span = appl_data.loaded_texture.data();
           
-        // Define random generator
-        std::random_device rd;
-        std::mt19937 gen(rd());
+  //       // Define random generator
+  //       std::random_device rd;
+  //       std::mt19937 gen(rd());
 
-        // Draw random, unique indices from indices
-        std::vector<uint> samples = indices;
-        std::shuffle(range_iter(samples), gen);
-        samples.resize(std::min(static_cast<size_t>(n_samples), samples.size()));
+  //       // Draw random, unique indices from indices
+  //       std::vector<uint> samples = indices;
+  //       std::shuffle(range_iter(samples), gen);
+  //       samples.resize(std::min(static_cast<size_t>(n_samples), samples.size()));
 
-        // Extract colr_i, colr_j from input images at sampled indices
-        std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
-        std::ranges::transform(samples, sample_bary.begin(), [&](uint i) { return bary_weights[i]; });
-        for (uint i = 0; i < images.size(); ++i) {
-          auto colr_j_span = images[i].image.data();
-          sample_colr_j[i] = std::vector<Colr>(n_samples);
-          std::ranges::transform(samples, sample_colr_j[i].begin(), [&](uint i) { return colr_j_span[i]; });
-        }
-      } // 1.
+  //       // Extract colr_i, colr_j from input images at sampled indices
+  //       std::ranges::transform(samples, sample_colr_i.begin(), [&](uint i) { return colr_i_span[i]; });
+  //       std::ranges::transform(samples, sample_bary.begin(), [&](uint i) { return bary_weights[i]; });
+  //       for (uint i = 0; i < images.size(); ++i) {
+  //         auto colr_j_span = images[i].image.data();
+  //         sample_colr_j[i] = std::vector<Colr>(n_samples);
+  //         std::ranges::transform(samples, sample_colr_j[i].begin(), [&](uint i) { return colr_j_span[i]; });
+  //       }
+  //     } // 1.
 
-      { // 2. Solve for a spectral gamut which satisfies the provided input
-        // Solve using image constraints directly
-        GenerateGamutInfo info = {
-          .basis      = appl_data.loaded_basis,
-          .gamut      = verts,
-          .systems    = std::vector<CMFS>(appl_data.project_data.color_systems.size()),
-          .signals    = std::vector<GenerateGamutInfo::Signal>(n_samples)
-        };
+  //     { // 2. Solve for a spectral gamut which satisfies the provided input
+  //       // Solve using image constraints directly
+  //       GenerateGamutInfo info = {
+  //         .basis      = appl_data.loaded_basis,
+  //         .gamut      = verts,
+  //         .systems    = std::vector<CMFS>(appl_data.project_data.color_systems.size()),
+  //         .signals    = std::vector<GenerateGamutInfo::Signal>(n_samples)
+  //       };
 
-        // Transform mappings
-        for (uint i = 0; i < appl_data.project_data.color_systems.size(); ++i)
-          info.systems[i] = appl_data.project_data.csys(i).finalize_direct();
+  //       // Transform mappings
+  //       for (uint i = 0; i < appl_data.project_data.color_systems.size(); ++i)
+  //         info.systems[i] = appl_data.project_data.csys(i).finalize_direct();
 
-        // Add baseline samples
-        for (uint i = 0; i < n_samples; ++i)
-          info.signals[i] = { .colr_v = sample_colr_i[i],
-                              .bary_v = sample_bary[i],
-                              .syst_i = 0 };
+  //       // Add baseline samples
+  //       for (uint i = 0; i < n_samples; ++i)
+  //         info.signals[i] = { .colr_v = sample_colr_i[i],
+  //                             .bary_v = sample_bary[i],
+  //                             .syst_i = 0 };
 
-        // Add constraint samples
-        for (uint i = 0; i < sample_colr_j.size(); ++i) {
-          const auto &values = sample_colr_j[i];
-          for (uint j = 0; j < n_samples; ++j) {
-            info.signals.push_back({
-              .colr_v = values[j],
-              .bary_v = sample_bary[j],
-              .syst_i = i + 1
-            });
-          }
-        }
+  //       // Add constraint samples
+  //       for (uint i = 0; i < sample_colr_j.size(); ++i) {
+  //         const auto &values = sample_colr_j[i];
+  //         for (uint j = 0; j < n_samples; ++j) {
+  //           info.signals.push_back({
+  //             .colr_v = values[j],
+  //             .bary_v = sample_bary[j],
+  //             .syst_i = i + 1
+  //           });
+  //         }
+  //       }
 
-        // Fire solver and cross fingers
-        gamut_spec = generate_gamut(info);
-        gamut_spec.resize(verts.size());
-      } // 2.
+  //       // Fire solver and cross fingers
+  //       gamut_spec = generate_gamut(info);
+  //       gamut_spec.resize(verts.size());
+  //     } // 2.
 
-      { // 3. Obtain verts and constraints from spectral gamut, by applying known color systems
-        for (uint i = 0; i < gamut_spec.size(); ++i) {
-          const Spec &sd = gamut_spec[i];
-          ProjectData::Vert vert;
+  //     { // 3. Obtain verts and constraints from spectral gamut, by applying known color systems
+  //       for (uint i = 0; i < gamut_spec.size(); ++i) {
+  //         const Spec &sd = gamut_spec[i];
+  //         ProjectData::Vert vert;
 
-          // Define vertex settings
-          vert.colr_i = appl_data.project_data.verts[i].colr_i;
-          vert.csys_i = 0;
+  //         // Define vertex settings
+  //         vert.colr_i = appl_data.project_data.verts[i].colr_i;
+  //         vert.csys_i = 0;
 
-          // Define constraint settings
-          for (uint j = 1; j < appl_data.project_data.color_systems.size(); ++j) {
-            vert.colr_j.push_back(appl_data.project_data.csys(j)(sd));
-            vert.csys_j.push_back(j);
-          }
+  //         // Define constraint settings
+  //         for (uint j = 1; j < appl_data.project_data.color_systems.size(); ++j) {
+  //           vert.colr_j.push_back(appl_data.project_data.csys(j)(sd));
+  //           vert.csys_j.push_back(j);
+  //         }
 
-          // Clip constraints to validity
-          {
-            std::vector<CMFS> systems = { appl_data.project_data.csys(vert.csys_i).finalize_direct() };
-            std::vector<Colr> signals = { vert.colr_i };
-            for (uint j = 0; j < vert.colr_j.size(); ++j) {
-              systems.push_back(appl_data.project_data.csys(vert.csys_j[j]).finalize_direct());
-              signals.push_back(vert.colr_j[j]);
-            }
+  //         // Clip constraints to validity
+  //         {
+  //           std::vector<CMFS> systems = { appl_data.project_data.csys(vert.csys_i).finalize_direct() };
+  //           std::vector<Colr> signals = { vert.colr_i };
+  //           for (uint j = 0; j < vert.colr_j.size(); ++j) {
+  //             systems.push_back(appl_data.project_data.csys(vert.csys_j[j]).finalize_direct());
+  //             signals.push_back(vert.colr_j[j]);
+  //           }
             
-            Spec valid_spec = generate_spectrum({
-              .basis      = appl_data.loaded_basis,
-              .systems    = systems, 
-              .signals    = signals
-            });
+  //           Spec valid_spec = generate_spectrum({
+  //             .basis      = appl_data.loaded_basis,
+  //             .systems    = systems, 
+  //             .signals    = signals
+  //           });
 
-            for (uint j = 0; j < vert.colr_j.size(); ++j) {
-              vert.colr_i = appl_data.project_data.csys(vert.csys_i)(valid_spec);
-              vert.colr_j[j] = appl_data.project_data.csys(vert.csys_j[j])(valid_spec);
-            }
-          }
+  //           for (uint j = 0; j < vert.colr_j.size(); ++j) {
+  //             vert.colr_i = appl_data.project_data.csys(vert.csys_i)(valid_spec);
+  //             vert.colr_j[j] = appl_data.project_data.csys(vert.csys_j[j])(valid_spec);
+  //           }
+  //         }
 
-          gamut_verts.push_back(vert);
-        }
-      } // 3.
+  //         gamut_verts.push_back(vert);
+  //       }
+  //     } // 3.
 
-      { // 4. Compute roundtrip error for the different inputs
-        // Squared error based on offsets to the convex hull vertices
-        /* for (uint i = 0; i < gamut_verts.size(); ++i)
-          roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum(); */
+  //     { // 4. Compute roundtrip error for the different inputs
+  //       // Squared error based on offsets to the convex hull vertices
+  //       /* for (uint i = 0; i < gamut_verts.size(); ++i)
+  //         roundtrip_error += (gamut_verts[i].colr_i - verts[i]).pow(2.f).sum(); */
 
-        // Add squared error based on sample roundtrip
-        for (uint i = 0; i < n_samples; ++i) {
-          // Recover spectrum at sample position
-          Bary w = sample_bary[i];
-          Spec s = 0.f;
-          for (uint j = 0; j < gamut_spec.size(); ++j)
-            s += w[j] * gamut_spec[j];
+  //       // Add squared error based on sample roundtrip
+  //       for (uint i = 0; i < n_samples; ++i) {
+  //         // Recover spectrum at sample position
+  //         Bary w = sample_bary[i];
+  //         Spec s = 0.f;
+  //         for (uint j = 0; j < gamut_spec.size(); ++j)
+  //           s += w[j] * gamut_spec[j];
           
-          // Add baseline sample error
-          Colr colr_i = appl_data.project_data.csys(0)(s);
-          roundtrip_error += (sample_colr_i[i] - colr_i).pow(2.f).sum();
+  //         // Add baseline sample error
+  //         Colr colr_i = appl_data.project_data.csys(0)(s);
+  //         roundtrip_error += (sample_colr_i[i] - colr_i).pow(2.f).sum();
 
-          // Add constraint sample error
-          for (uint j = 0; j < sample_colr_j.size(); ++j) {
-            Colr colr_j = appl_data.project_data.csys(j + 1)(s);
-            roundtrip_error += (sample_colr_j[j][i] - colr_j).pow(2.f).sum();
-          }
-        }
-      } // 4.
+  //         // Add constraint sample error
+  //         for (uint j = 0; j < sample_colr_j.size(); ++j) {
+  //           Colr colr_j = appl_data.project_data.csys(j + 1)(s);
+  //           roundtrip_error += (sample_colr_j[j][i] - colr_j).pow(2.f).sum();
+  //         }
+  //       }
+  //     } // 4.
       
-      { // 5. Compare and apply results
-        std::lock_guard<std::mutex> lock(solver_mutex);
-        if (roundtrip_error < solver_error) {
-          appl_data.project_data.verts = gamut_verts;
-          solver_error = roundtrip_error;
-          fmt::print("  Best error: {}\n", solver_error);
-        }
-      } // 5.
-    } // for (_i < sample_attempts)
+  //     { // 5. Compare and apply results
+  //       std::lock_guard<std::mutex> lock(solver_mutex);
+  //       if (roundtrip_error < solver_error) {
+  //         appl_data.project_data.verts = gamut_verts;
+  //         solver_error = roundtrip_error;
+  //         fmt::print("  Best error: {}\n", solver_error);
+  //       }
+  //     } // 5.
+  //   } // for (_i < sample_attempts)
   }
 
   void init_constraints(ApplicationData &appl_data, uint n_interior_samples,

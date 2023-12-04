@@ -215,10 +215,10 @@ namespace met {
         } // for (uint i)
       } // for (uint c)
 
-      fmt::print("Attempted to read: channels = {}, width = {}, height = {}, tiles = {}",
+      fmt::print("Attempted to read: channels = {}, width = {}, height = {}, tiles = {}\n",
         exr_image.num_channels, exr_image.width, exr_image.height, exr_image.num_tiles);
       for (uint i = 0; i < exr_header.num_channels; ++i)
-        fmt::print("\tchannel {}, named {}", i, exr_header.channels[i].name);
+        fmt::print("\tchannel {}, named {}\n", i, exr_header.channels[i].name);
 
       // Cleanup
       FreeEXRImage(&exr_image);

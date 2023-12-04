@@ -62,26 +62,26 @@ namespace met {
   void GenColorSystemSolidTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get external resources
-    const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
-    const auto &e_proj_data = e_appl_data.project_data;
+    // // Get external resources
+    // const auto &e_appl_data = info.global("appl_data").getr<ApplicationData>();
+    // const auto &e_proj_data = e_appl_data.project_data;
 
-    // Compute data points on convex hull of object color solid
-    auto data = generate_ocs_boundary_colr({ .basis      = e_appl_data.loaded_basis,
-                                             .system     = e_proj_data.csys(0).finalize_direct(), 
-                                             .samples    = detail::gen_unit_dirs<3>(n_samples) });
+    // // Compute data points on convex hull of object color solid
+    // auto data = generate_ocs_boundary_colr({ .basis      = e_appl_data.loaded_basis,
+    //                                          .system     = e_proj_data.csys(0).finalize_direct(), 
+    //                                          .samples    = detail::gen_unit_dirs<3>(n_samples) });
 
-    // Generate cleaned mesh from data
-    auto mesh = simplify_edge_length<AlMesh>(
-      generate_convex_hull<HalfedgeMeshData, eig::Array3f>(data), 0.001f);
+    // // Generate cleaned mesh from data
+    // auto mesh = simplify_edge_length<AlMesh>(
+    //   generate_convex_hull<HalfedgeMeshData, eig::Array3f>(data), 0.001f);
 
-    // Compute center of convex hull
-    constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };
-    auto cntr = std::reduce(std::execution::par_unseq, range_iter(mesh.verts), eig::AlArray3f(0), f_add) 
-              / static_cast<float>(mesh.verts.size());
+    // // Compute center of convex hull
+    // constexpr auto f_add = [](const auto &a, const auto &b) { return a + b; };
+    // auto cntr = std::reduce(std::execution::par_unseq, range_iter(mesh.verts), eig::AlArray3f(0), f_add) 
+    //           / static_cast<float>(mesh.verts.size());
 
-    // Submit mesh and center as resources; used by viewport draw tasks
-    info("chull_mesh").set<AlMesh>(std::move(mesh));
-    info("chull_cntr").set<eig::Array3f>(cntr);
+    // // Submit mesh and center as resources; used by viewport draw tasks
+    // info("chull_mesh").set<AlMesh>(std::move(mesh));
+    // info("chull_cntr").set<eig::Array3f>(cntr);
   }
 } // namespace met

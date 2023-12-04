@@ -40,7 +40,7 @@ vec3 decode_normal(in vec2 v) {
 // Encode 1x32f depth to two components using 16 bits
 vec2 encode_depth(in float depth)
 {
-    float depthVal = depth * (256.0*256.0 - 1.0) / (256.0*256.0);
+    float depthVal = depth * (256.0 * 256.0 - 1.0) / (256.0*256.0);
     vec3 encode = fract( depthVal * vec3(1.0, 256.0, 256.0*256.0) );
     return encode.xy - encode.yz / 256.0 + 1.0/512.0;
 }
@@ -48,7 +48,7 @@ vec2 encode_depth(in float depth)
 // Decode 1x32f depth from two components using 16 bits
 float decode_depth(in vec2 pack)
 {
-    float depth = dot( pack, 1.0 / vec2(1.0, 256.0) );
+    float depth = dot(pack, 1.0 / vec2(1.0, 256.0));
     return depth * (256.0*256.0) / (256.0*256.0 - 1.0);
 }
 

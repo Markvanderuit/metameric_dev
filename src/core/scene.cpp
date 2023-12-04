@@ -195,7 +195,6 @@ namespace met {
     js.at("upliftings").get_to(scene.components.upliftings.data());
     js.at("colr_systems").get_to(scene.components.colr_systems.data());
   }
-
   
   void Scene::create() {
     met_trace();
@@ -364,7 +363,6 @@ namespace met {
     debug::check_expr(false, "Not implemented!");
   }
   
-
   void Scene::import_wavefront_obj(const fs::path &path) {
     met_trace();
 
@@ -378,7 +376,6 @@ namespace met {
       // aiProcess_GenSmoothNormals        |
       aiProcess_FlipUVs                 |
       aiProcess_RemoveRedundantMaterials);
-      
 
     debug::check_expr(file, 
       std::format("File at \"{}\" could not be read. ASSIMP says: \"{}\"\n", 

@@ -1,11 +1,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
-#include <OpenMesh/Tools/Subdivider/Uniform/LoopT.hh>
-#include <OpenMesh/Tools/Decimater/ModEdgeLengthT.hh>
-#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
-#include <OpenMesh/Tools/Smoother/JacobiLaplaceSmootherT.hh>
-#include <OpenMesh/Core/Utils/Property.hh>
+#include <meshoptimizer.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/QhullPoints.h>
@@ -16,57 +12,89 @@
 #include <vector>
 
 namespace met {
+
+  // template <>
+  // HalfedgeMeshData convert_mesh<HalfedgeMeshData, Mesh>(const Mesh &mesh_) {
+  //   met_trace_n("Mesh -> HalfedgeMeshData");
+
+  //   // UV and normal data is lost during conversion
+  //   const auto &[verts, elems, norms, txuvs] = mesh_;
+
+  //   // Prepare mesh structure
+  //   HalfedgeMeshData mesh;
+  //   mesh.reserve(verts.size(), (verts.size() + elems.size() - 2), elems.size());
+
+  //   // Register vertices/elements single-threaded
+  //   std::vector<HalfedgeMeshData::VertexHandle> vth(verts.size());
+  //   for (uint i = 0; i < vth.size(); ++i) {
+  //     HalfedgeMeshData::Point m_vt;
+  //     rng::copy(verts[i], m_vt.begin());
+  //     auto vh = mesh.add_vertex(m_vt);
+
+  //     if (!norms.empty()) {
+  //       HalfedgeMeshData::Normal m_nr;
+  //       rng::copy(norms[i], m_nr.begin());
+  //       mesh.set_normal(vh, m_nr);
+  //     }      
+
+  //     if (!txuvs.empty()) {
+  //       HalfedgeMeshData::TexCoord2D m_tx;
+  //       rng::copy(txuvs[i], m_tx.begin());
+  //       mesh.set_texcoord2D(vh, m_tx);
+  //     }
+
+  //     vth[i] = std::move(vh);
+  //   } // for (uint i)
+
+  //   // Register faces
+  //   rng::for_each(elems, 
+  //     [&](const auto &el) { return mesh.add_face(vth[el[0]], vth[el[1]], vth[el[2]]); });
+
+  //   return mesh;
+  // }
+  
+  // template <>
+  // Mesh convert_mesh<Mesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+  //   met_trace_n("HalfedgeMeshData -> Mesh");
+    
+  //   Mesh cmesh;
+  //   cmesh.verts.resize(mesh.n_vertices());
+  //   cmesh.elems.resize(mesh.n_faces());
+
+  //   // Generate vertex data
+  //   std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), cmesh.verts.begin(), 
+  //     [&](auto vh) { return convert_vector<eig::Array3f, omesh::Vec3f>(mesh.point(vh)); });
+
+
+  //   // Generate optional data
+  //   if (mesh.has_vertex_normals()) {
+  //     cmesh.norms.resize(mesh.n_vertices());
+  //     std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), cmesh.norms.begin(), 
+  //       [&](auto vh) { return convert_vector<eig::Array3f, omesh::Vec3f>(mesh.normal(vh)); });
+  //   }
+  //   if (mesh.has_vertex_texcoords2D()) {
+  //     cmesh.txuvs.resize(mesh.n_vertices());
+  //     std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), cmesh.txuvs.begin(), 
+  //       [&](auto vh) { return convert_vector<eig::Array2f, omesh::Vec2f>(mesh.texcoord2D(vh)); });
+  //   }
+
+  //   // Generate element data
+  //   std::transform(std::execution::par_unseq, range_iter(mesh.faces()), cmesh.elems.begin(), 
+  //   [](auto fh) {
+  //     eig::Array3u el; 
+  //     rng::transform(fh.vertices(), el.begin(), [](auto vh) { return vh.idx(); });
+  //     return el;
+  //   });
+    
+  //   return cmesh;
+  // }
+
   template <typename OutputMesh, typename InputMesh>
   OutputMesh convert_mesh(const InputMesh &mesh) requires std::is_same_v<OutputMesh, InputMesh> {
     met_trace_n("Passthrough");
     return mesh;
   }
-
-  template <>
-  HalfedgeMeshData convert_mesh<HalfedgeMeshData, Mesh>(const Mesh &mesh_) {
-    met_trace_n("Mesh -> HalfedgeMeshData");
-
-    // UV and normal data is lost during conversion
-    const auto &[verts, elems, _norms, _uvs] = mesh_;
-
-    // Prepare mesh structure
-    HalfedgeMeshData mesh;
-    mesh.reserve(
-      verts.size(), (verts.size() + elems.size() - 2), 
-      elems.size()
-    );
-
-    // Register vertices/elements single-threaded
-    std::vector<HalfedgeMeshData::VertexHandle> vth(verts.size());
-    std::ranges::transform(verts, vth.begin(), [&](const auto &v) { 
-      HalfedgeMeshData::Point p;
-      std::ranges::copy(v, p.begin());
-      return mesh.add_vertex(p);
-    });
-    std::ranges::for_each(elems, 
-      [&](const auto &el) { return mesh.add_face(vth[el[0]], vth[el[1]], vth[el[2]]); });
-
-    return mesh;
-  }
   
-  template <>
-  Mesh convert_mesh<Mesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-    met_trace_n("HalfedgeMeshData -> Mesh");
-    
-    std::vector<eig::Array3f> verts(mesh.n_vertices());
-    std::vector<eig::Array3u> faces(mesh.n_faces());
-
-    std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), verts.begin(), 
-      [&](auto vh) { return convert_vector<eig::Array3f, omesh::Vec3f>(mesh.point(vh)); });
-    std::transform(std::execution::par_unseq, range_iter(mesh.faces()), faces.begin(), [](auto fh) {
-      eig::Array3u el; 
-      std::ranges::transform(fh.vertices(), el.begin(), [](auto vh) { return vh.idx(); });
-      return el;
-    });
-    
-    return { .verts = verts, .elems = faces };
-  }
-
   template <>
   Mesh convert_mesh<Mesh, AlMesh>(const AlMesh &mesh) {
     met_trace_n("AlMeshData -> Mesh");
@@ -74,7 +102,7 @@ namespace met {
       .verts = std::vector<eig::Array3f>(range_iter(mesh.verts)), 
       .elems = mesh.elems,
       .norms = std::vector<eig::Array3f>(range_iter(mesh.norms)),
-      .txuvs   = mesh.txuvs 
+      .txuvs = mesh.txuvs 
     };
   }
 
@@ -85,21 +113,21 @@ namespace met {
       .verts = std::vector<eig::AlArray3f>(range_iter(mesh.verts)), 
       .elems = mesh.elems,
       .norms = std::vector<eig::AlArray3f>(range_iter(mesh.norms)),
-      .txuvs   = mesh.txuvs 
+      .txuvs = mesh.txuvs 
     };
   }
 
-  template <>
-  AlMesh convert_mesh<AlMesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-    met_trace_n("HalfedgeMeshData -> AlMeshData");
-    return convert_mesh<AlMesh>(convert_mesh<Mesh>(mesh));
-  }
+  // template <>
+  // AlMesh convert_mesh<AlMesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
+  //   met_trace_n("HalfedgeMeshData -> AlMeshData");
+  //   return convert_mesh<AlMesh>(convert_mesh<Mesh>(mesh));
+  // }
 
-  template <>
-  HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlMesh>(const AlMesh &mesh) {
-    met_trace_n("AlMeshData -> HalfedgeMeshData");
-    return convert_mesh<HalfedgeMeshData>(convert_mesh<Mesh>(mesh));
-  }
+  // template <>
+  // HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlMesh>(const AlMesh &mesh) {
+  //   met_trace_n("AlMeshData -> HalfedgeMeshData");
+  //   return convert_mesh<HalfedgeMeshData>(convert_mesh<Mesh>(mesh));
+  // }
 
   template <>
   Mesh convert_mesh<Mesh, Delaunay>(const Delaunay &mesh) {
@@ -142,7 +170,7 @@ namespace met {
     return convert_mesh<AlMesh>(convert_mesh<Delaunay>(mesh));
   }
 
-  template <typename MeshTy>
+ /*  template <typename MeshTy>
   MeshTy generate_octahedron() {
     met_trace();
     
@@ -155,9 +183,9 @@ namespace met {
                              E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
 
     return convert_mesh<MeshTy>(Mesh { verts, elems });
-  }
+  } */
   
-  template <typename MeshTy>
+  /* template <typename MeshTy>
   MeshTy generate_spheroid(uint n_subdivs) {
     met_trace();
 
@@ -181,7 +209,7 @@ namespace met {
       [&](auto vh) { mesh.point(vh).normalize(); });
     
     return convert_mesh<MeshTy>(mesh);
-  }
+  } */
 
   template <typename MeshTy, typename Vector>
   MeshTy generate_convex_hull(std::span<const Vector> data) {
@@ -276,61 +304,183 @@ namespace met {
   }
 
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_edge_length(const InputMesh &mesh_, float max_edge_length) {
+  OutputMesh optimize_mesh(const InputMesh &mesh_) {
     met_trace();
-
-    namespace odec  = omesh::Decimater;
-    using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
-    using Decimater = odec::DecimaterT<HalfedgeMeshData>;
     
-    // Operate on a copy of the input mesh
-    auto mesh = convert_mesh<HalfedgeMeshData>(mesh_);
-
-    Decimater dec(mesh);
-    Module mod;
-
-    dec.add(mod);
-    dec.module(mod).set_binary(false);
-    dec.module(mod).set_edge_length(max_edge_length); // not zero, but just up to reasonable precision
-
-    dec.initialize();
-    dec.decimate();
-
-    mesh.garbage_collection();
-    return convert_mesh<OutputMesh>(mesh);
+    return {};
   }
 
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_volume(const InputMesh &mesh_, 
-                      uint             max_vertices, 
-                      const InputMesh *optional_bounds) {
+  OutputMesh simplify_mesh(const InputMesh &mesh_) {
     met_trace();
+    
+    // Operate on a unpadded copy of the input mesh
+    auto mesh = convert_mesh<Mesh>(mesh_);
 
-    namespace odec  = omesh::Decimater;
-    using Module    = odec::ModVolumeT<HalfedgeMeshData>::Handle;
-    using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::DefaultCollapseFunction>;
+    // First, remap to avoid potentially redundant vertices
+    // TODO; Move to clean step
+    {
+      size_t n_elems = mesh.elems.size() * 3;
+      size_t n_verts = mesh.verts.size();
 
-    // Operate on a copy of the input mesh with zero-length edges removed
-    auto mesh = simplify_edge_length<HalfedgeMeshData>(mesh_, 0.f);
+      std::vector<eig::Array3u> remap(mesh.elems.size());
 
-    Decimater dec(mesh);
-    Module mod;
+      auto dst = cnt_span<uint>(remap);
+      auto src = cnt_span<uint>(mesh.elems);
 
-    dec.add(mod);
-
-    // If provided, convert optional bounds to half edge format
-    std::optional<HalfedgeMeshData> bounds_mesh;
-    if (optional_bounds) {
-      bounds_mesh = convert_mesh<HalfedgeMeshData>(*optional_bounds);
-      dec.module(mod).set_collision_mesh(&(*bounds_mesh));
+      size_t vert_size = meshopt_generateVertexRemap(
+        dst.data(),
+        src.data(),
+        src.size(),
+        mesh.verts.data(),
+        mesh.verts.size(),
+        sizeof(Mesh::vert_type)
+      );
+      
+      Mesh remapped_mesh;
+      remapped_mesh.elems.resize(remap.size());
+      remapped_mesh.verts.resize(vert_size);
+      remapped_mesh.norms.resize(vert_size);
+      remapped_mesh.txuvs.resize(vert_size);
+      meshopt_remapIndexBuffer(cnt_span<uint>(remapped_mesh.elems).data(), src.data(), src.size(), dst.data());
+      meshopt_remapVertexBuffer(remapped_mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(Mesh::vert_type), dst.data());
+      meshopt_remapVertexBuffer(remapped_mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(Mesh::norm_type), dst.data());
+      meshopt_remapVertexBuffer(remapped_mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(Mesh::txuv_type), dst.data());
+      mesh = remapped_mesh;
     }
 
-    dec.initialize();
-    dec.decimate_to(max_vertices);
+    float threshold    = 0.05f;
+    float target_error = 1.f; // 1e-1f;
+    float lod_error    = 1.f;
+    uint options       = 0; // meshopt_SimplifyX flags, 0 is a safe default
 
-    mesh.garbage_collection();
+    size_t n_elems = mesh.elems.size() * 3;
+    size_t n_elems_target = static_cast<size_t>(n_elems * threshold);
+    fmt::print("Target = {}\n", n_elems_target);
+    
+    // Run meshoptimizer's simplify
+    std::vector<uint> target(n_elems);
+    target.resize(meshopt_simplify(target.data(), 
+                                   &mesh.elems[0][0], 
+                                   n_elems, 
+                                   &mesh.verts[0][0],
+                                   mesh.verts.size(),
+                                   sizeof(Mesh::vert_type),
+                                   n_elems_target,
+                                   target_error,
+                                   options,
+                                  &lod_error));
+    fmt::print("Reached = {}\n", target.size());
+
+    // Copy over elements
+    // NOTE; this does not account for deleted vertices!!!
+    mesh.elems.resize(target.size() / 3);
+    rng::copy(cnt_span<Mesh::elem_type>(target), mesh.elems.begin());
+    
+    // Return correct expected type
     return convert_mesh<OutputMesh>(mesh);
   }
+
+  // template <typename OutputMesh, typename InputMesh>
+  // OutputMesh simplify_edge_length(const InputMesh &mesh_, float max_edge_length) {
+  //   met_trace();
+
+  //   namespace odec  = omesh::Decimater;
+  //   using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
+  //   using Decimater = odec::DecimaterT<HalfedgeMeshData>;
+    
+  //   // Operate on a copy of the input mesh
+  //   auto mesh = convert_mesh<HalfedgeMeshData>(mesh_);
+
+  //   Decimater dec(mesh);
+  //   Module mod;
+
+  //   dec.add(mod);
+  //   dec.module(mod).set_binary(false);
+  //   dec.module(mod).set_edge_length(max_edge_length); // not zero, but just up to reasonable precision
+
+  //   dec.initialize();
+  //   dec.decimate();
+
+  //   mesh.garbage_collection();
+  //   return convert_mesh<OutputMesh>(mesh);
+  // }
+  
+  // template <typename OutputMesh, typename InputMesh>
+  // OutputMesh simplify_progressive(const InputMesh &mesh_, uint max_vertices) {
+  //   met_trace();
+
+  //   namespace odec  = omesh::Decimater;
+  //   // using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
+  //   // using Decimater = odec::DecimaterT<HalfedgeMeshData>;
+  //   using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
+  //   using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::AverageCollapseFunction>;
+  //   // using Module    = odec::ModQuadricT<HalfedgeMeshData>::Handle;
+  //   // using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::DefaultCollapseFunction>;
+  //   // using ModuleN   = odec::ModNormalFlippingT<HalfedgeMeshData>::Handle;
+
+  //   // Operate on a copy of the input mesh
+  //   HalfedgeMeshData mesh = convert_mesh<HalfedgeMeshData>(mesh_);
+    
+  //   // Face normals are not valid at this point
+  //   mesh.request_face_normals();
+  //   mesh.update_face_normals();
+
+  //   Decimater dec(mesh);
+  //   Module mod;
+  //   dec.add(mod);
+
+  //   dec.module(mod).set_binary(false);
+  //   dec.module(mod).set_edge_length(std::numeric_limits<float>::max());
+  //   // ModuleN modn;
+  //   // dec.add(modn);
+  //   // dec.module(mod).unset_max_err();
+
+  //   // dec.module(mod).set_binary(false);
+  //   // dec.module(mod).set_edge_length(std::numeric_limits<float>::max());
+  //   // dec.initialize();
+  //   // dec.decimate(1000);
+  //   // // dec.decimate_to(max_vertices);
+  //   // mesh.garbage_collection();
+
+  //   dec.initialize();
+  //   dec.decimate_to(max_vertices);
+  //   mesh.garbage_collection();
+
+  //   return convert_mesh<OutputMesh>(mesh);
+  // }
+
+  // template <typename OutputMesh, typename InputMesh>
+  // OutputMesh simplify_volume(const InputMesh &mesh_, 
+  //                     uint             max_vertices, 
+  //                     const InputMesh *optional_bounds) {
+  //   met_trace();
+
+  //   namespace odec  = omesh::Decimater;
+  //   using Module    = odec::ModVolumeT<HalfedgeMeshData>::Handle;
+  //   using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::DefaultCollapseFunction>;
+
+  //   // Operate on a copy of the input mesh with zero-length edges removed
+  //   auto mesh = simplify_edge_length<HalfedgeMeshData>(mesh_, 0.f);
+
+  //   Decimater dec(mesh);
+  //   Module mod;
+
+  //   dec.add(mod);
+
+  //   // If provided, convert optional bounds to half edge format
+  //   std::optional<HalfedgeMeshData> bounds_mesh;
+  //   if (optional_bounds) {
+  //     bounds_mesh = convert_mesh<HalfedgeMeshData>(*optional_bounds);
+  //     dec.module(mod).set_collision_mesh(&(*bounds_mesh));
+  //   }
+
+  //   dec.initialize();
+  //   dec.decimate_to(max_vertices);
+  //   mesh.garbage_collection();
+
+  //   return convert_mesh<OutputMesh>(mesh);
+  // }
 
   /* Explicit template instantiations */
   
@@ -346,29 +496,23 @@ namespace met {
     template                                                                                          \
     OutputMesh convert_mesh<OutputMesh>(const OutputMesh &);                                          \
     template                                                                                          \
-    OutputMesh generate_octahedron<OutputMesh>();                                                     \
-    template                                                                                          \
-    OutputMesh generate_spheroid<OutputMesh>(uint);                                                   \
-    template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);         \
     template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
   #define declare_function_output_input(OutputMesh, InputMesh)                                        \
     template                                                                                          \
-    OutputMesh simplify_edge_length<OutputMesh, InputMesh>(const InputMesh &, float);                 \
+    OutputMesh simplify_mesh<OutputMesh, InputMesh>(const InputMesh &);                               \
     template                                                                                          \
-    OutputMesh simplify_volume<OutputMesh, InputMesh>(const InputMesh &, uint, const InputMesh *);
+    OutputMesh optimize_mesh<OutputMesh, InputMesh>(const InputMesh &);
 
   #define declare_function_all_inputs(OutputMesh)                                                     \
     declare_function_mesh_output_only(OutputMesh)                                                     \
-    declare_function_output_input(OutputMesh, Mesh)                                               \
-    declare_function_output_input(OutputMesh, AlMesh)                                             \
-    declare_function_output_input(OutputMesh, HalfedgeMeshData)
+    declare_function_output_input(OutputMesh, Mesh)                                                   \
+    declare_function_output_input(OutputMesh, AlMesh)
   
   declare_function_delaunay_output_only(Delaunay)
   declare_function_delaunay_output_only(AlDelaunay)
   declare_function_all_inputs(Mesh)
   declare_function_all_inputs(AlMesh)
-  declare_function_all_inputs(HalfedgeMeshData)
 } // namespace met

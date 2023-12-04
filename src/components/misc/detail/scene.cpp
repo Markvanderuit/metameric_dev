@@ -1,5 +1,6 @@
 #include <metameric/components/misc/detail/scene.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/embree.hpp>
 #include <algorithm>
 #include <deque>
 #include <execution>
@@ -120,6 +121,7 @@ namespace met::detail {
     info_gl = {{ .data = cnt_span<const std::byte>(info) }};
   }
   
+
   std::pair<
     std::vector<eig::Array4f>,
     std::vector<eig::Array4f>
@@ -153,13 +155,41 @@ namespace met::detail {
 
     guard(!e_meshes.empty());
 
+    // Generate a simplified representation of each mesh data
+    std::vector<Mesh> simplified(e_meshes.size());
+    std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), 
+      [](const auto &m) { return simplify_mesh<Mesh>(m.value()); });
+
+    /* fmt::print("verts {} -> {}\n", 
+      e_meshes[0].value().verts.size(),
+      simplified[0].verts.size());
+    fmt::print("elems {} -> {}\n", 
+      e_meshes[0].value().elems.size(),
+      simplified[0].elems.size()); */
+
+    // TODO remove
+    // {
+    //   const auto &mesh = simplified[0]; //.value();
+    //   auto bvh = detail::create_bvh({
+    //     .mesh            = mesh,
+    //     .n_node_children = 8, // 2, 4, 8
+    //     .n_leaf_children = 8,
+    //   });
+
+    //   /* for (uint i = 0; i < bvh.nodes.size(); ++i) {
+    //     const auto &node = bvh.nodes[i];
+    //     fmt::print("{} - minb = {}, maxb = {}, type = {}, children = {}\n ", 
+    //       i, node.minb, node.maxb, node.is_leaf() ? "leaf" : "node", node.data1);
+    //   } */
+    // }
+
     // Gather vertex/element lengths and offsets per mesh resources
     std::vector<uint> verts_size, elems_size, verts_offs, elems_offs;
-    std::transform(range_iter(e_meshes), std::back_inserter(verts_size), 
-      [](const auto &m) { return static_cast<uint>(m.value().verts.size()); });
+    std::transform(range_iter(simplified), std::back_inserter(verts_size), 
+      [](const auto &m) { return static_cast<uint>(m.verts.size()); });
     std::exclusive_scan(range_iter(verts_size), std::back_inserter(verts_offs), 0u);
-    std::transform(range_iter(e_meshes), std::back_inserter(elems_size), 
-      [](const auto &m) { return static_cast<uint>(m.value().elems.size()); });
+    std::transform(range_iter(simplified), std::back_inserter(elems_size), 
+      [](const auto &m) { return static_cast<uint>(m.elems.size()); });
     std::exclusive_scan(range_iter(elems_size), std::back_inserter(elems_offs), 0u);
 
     // Total vertex/element lengths across all meshes
@@ -167,17 +197,17 @@ namespace met::detail {
     uint n_elems = elems_size.at(elems_size.size() - 1) + elems_offs.at(elems_offs.size() - 1);
 
     // Holders for packed data of all meshes
-    std::vector<detail::RTMeshInfo> packed_info(e_meshes.size());
+    std::vector<detail::RTMeshInfo> packed_info(simplified.size());
     std::vector<eig::Array4f>       packed_verts_a(n_verts),
                                     packed_verts_b(n_verts);
     std::vector<eig::Array3u>       packed_elems(n_elems);
     std::vector<eig::AlArray3u>     packed_elems_al(n_elems);
 
     // Fill packed layout/data info object
-    info.resize(e_meshes.size());
+    info.resize(simplified.size());
     #pragma omp parallel for
-    for (int i = 0; i < e_meshes.size(); ++i) {
-      const auto &mesh = e_meshes[i].value();
+    for (int i = 0; i < simplified.size(); ++i) {
+      const auto &mesh = simplified[i];
       auto [a, b] = pack(mesh);
       
       // Copy over packed data to the correctly offset range;

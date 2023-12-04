@@ -16,6 +16,7 @@
       "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
     "imguizmo", 
     "implot",
+    "meshoptimizer",
     "nativefiledialog",
     "nlohmann-json",
     "nlopt",
@@ -38,7 +39,7 @@
         "kind": "filesystem",
         "path": "third_party/vcpkg-registry",
         "baseline": "2023-02-22",
-        "packages": [ "qhull", "nlopt" ]
+        "packages": [ "meshoptimizer", "qhull", "nlopt" ]
       }
     ]
   }

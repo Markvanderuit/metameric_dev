@@ -3,7 +3,6 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/openmesh.hpp>
 #include <array>
 #include <span>
 #include <vector>
@@ -11,19 +10,7 @@
 #include <utility>
 
 namespace met {
-  /* Mesh formats */
-
-  // Triangle mesh traits for the openmesh halfedge implementation 
-  struct HalfedgeMeshTraits : public omesh::DefaultTraits {
-    VertexAttributes(omesh::Attributes::Status);
-    HalfedgeAttributes(omesh::Attributes::PrevHalfedge | omesh::Attributes::Status);
-    FaceAttributes(omesh::Attributes::Normal | omesh::Attributes::Status);
-  };
-
-  // Triangle mesh shorthand for the openmesh halfedge implementation 
-  using HalfedgeMeshData = omesh::TriMesh_ArrayKernelT<HalfedgeMeshTraits>;
-
-  /* Simple indexed mesh representation with optional normal/texcoord data */
+  // Simple indexed mesh representation with optional normal/texcoord data
   template <typename Vt, typename El>
   struct MeshBase {
     using vert_type = Vt;
@@ -68,19 +55,19 @@ namespace met {
   using Delaunay   = MeshBase<eig::Array3f,   eig::Array4u>;
   using AlDelaunay = MeshBase<eig::AlArray3f, eig::Array4u>;
 
-  // Convert between halfedge/indexed/aligned mesh data structures
+  // Convert between indexed/aligned mesh data structures
   template <typename OutputMesh, typename InputMesh>
   OutputMesh convert_mesh(const InputMesh &mesh);
 
   /* Generational helper functions */
 
-  // Returns a simple octahedral mesh, fitted inside a unit cube
-  template <typename Mesh>
-  Mesh generate_octahedron();
+  // // Returns a simple octahedral mesh, fitted inside a unit cube
+  // template <typename Mesh>
+  // Mesh generate_octahedron();
   
-  // Returns a repeatedly subdivided spherical mesh, fitted inside a unit cube
-  template <typename Mesh>
-  Mesh generate_spheroid(uint n_subdivs = 3);
+  // // Returns a repeatedly subdivided spherical mesh, fitted inside a unit cube
+  // template <typename Mesh>
+  // Mesh generate_spheroid(uint n_subdivs = 3);
 
   // Returns a convex hull mesh around a set of points in 3D
   template <typename Mesh, typename Vector>
@@ -89,15 +76,25 @@ namespace met {
   // Returns a set of simplices representing a delaunay triangulation of a set of points in 3D
   template <typename Mesh, typename Vector>
   Mesh generate_delaunay(std::span<const Vector> data);
+  
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh optimize_mesh(const InputMesh &mesh);
+
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh simplify_mesh(const InputMesh &mesh);
 
   /* Mesh simplification functions */
 
-  // Performs progressive edge collapse for edges below max_edge_length
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_edge_length(const InputMesh &mesh, float max_edge_length = 0.f);
+  // // Performs progressive edge collapse for edges below max_edge_length
+  // template <typename OutputMesh, typename InputMesh>
+  // OutputMesh simplify_edge_length(const InputMesh &mesh, float max_edge_length = 0.f);
 
-  // Performs volume-preserving progressive edge collapse until max_vertices remain; newly placed vertices
-  // are optionally clipped into a secondary mesh optional_bounds
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_volume(const InputMesh &mesh, uint max_vertices, const InputMesh *optional_bounds = nullptr);
+  // // Performs progressive edge collapse until max_vertices remain; newly placed vertices
+  // template <typename OutputMesh, typename InputMesh>
+  // OutputMesh simplify_progressive(const InputMesh &mesh, uint max_vertices);
+
+  // // Performs volume-preserving progressive edge collapse until max_vertices remain; newly placed vertices
+  // // are optionally clipped into a secondary mesh optional_bounds
+  // template <typename OutputMesh, typename InputMesh>
+  // OutputMesh simplify_volume(const InputMesh &mesh, uint max_vertices, const InputMesh *optional_bounds = nullptr);
 } // namespace met
