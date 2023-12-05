@@ -12,7 +12,6 @@
 #include <vector>
 
 namespace met {
-
   // template <>
   // HalfedgeMeshData convert_mesh<HalfedgeMeshData, Mesh>(const Mesh &mesh_) {
   //   met_trace_n("Mesh -> HalfedgeMeshData");
@@ -304,183 +303,156 @@ namespace met {
   }
 
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh optimize_mesh(const InputMesh &mesh_) {
+  OutputMesh remap_mesh(const InputMesh &mesh) {
     met_trace();
-    
-    return {};
+
+    // First, add all mesh attribute streams that need remapping
+    std::vector<meshopt_Stream> attribute_streams;
+    attribute_streams.push_back({ mesh.verts.data(), sizeof(eig::Array3f), sizeof(InputMesh::vert_type) });
+    if (!mesh.norms.empty())
+      attribute_streams.push_back({ mesh.norms.data(), sizeof(eig::Array3f), sizeof(InputMesh::norm_type) });
+    if (!mesh.txuvs.empty())
+      attribute_streams.push_back({ mesh.txuvs.data(), sizeof(eig::Array2f), sizeof(InputMesh::txuv_type) });
+
+    // Second, get spans over source/destination index memory, then generate remapping
+    std::vector<eig::Array3u> remap(mesh.verts.size());
+    auto dst = cnt_span<uint>(remap);
+    auto src = cnt_span<const uint>(mesh.elems);
+    size_t n_remapped_verts = meshopt_generateVertexRemapMulti(
+      dst.data(), 
+      src.data(),
+      src.size(),
+      mesh.verts.size(),
+      attribute_streams.data(),
+      attribute_streams.size()
+    );
+
+    // Third, create new mesh to remap into
+    InputMesh mesh_;
+    mesh_.elems.resize(mesh.elems.size());
+    mesh_.verts.resize(n_remapped_verts);
+    if (!mesh.norms.empty())
+      mesh_.norms.resize(n_remapped_verts);
+    if (!mesh.txuvs.empty())
+      mesh_.txuvs.resize(n_remapped_verts);
+
+    // Let meshopt do remapping
+    meshopt_remapIndexBuffer(cnt_span<uint>(mesh_.elems).data(), src.data(), src.size(), dst.data());
+    meshopt_remapVertexBuffer(mesh_.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(InputMesh::vert_type), dst.data());
+    if (!mesh.norms.empty())
+      meshopt_remapVertexBuffer(mesh_.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(InputMesh::norm_type), dst.data());
+    if (!mesh.txuvs.empty())
+      meshopt_remapVertexBuffer(mesh_.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(InputMesh::txuv_type), dst.data());
+
+    return convert_mesh<OutputMesh>(mesh_);
   }
 
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_mesh(const InputMesh &mesh_) {
+  OutputMesh compact_mesh(const InputMesh &mesh) {
     met_trace();
+
+    // First, get spans over source/destination index memory, then generate remapping
+    std::vector<eig::Array3u> remap(mesh.verts.size());
+    auto dst = cnt_span<uint>(remap);
+    auto src = cnt_span<const uint>(mesh.elems);
+    size_t n_remapped_verts = meshopt_optimizeVertexFetchRemap(
+      dst.data(),
+      src.data(),
+      src.size(),
+      mesh.verts.size()
+    );
+
+    // Second, create new mesh to remap into
+    InputMesh mesh_;
+    mesh_.elems.resize(mesh.elems.size());
+    mesh_.verts.resize(n_remapped_verts);
+    if (!mesh.norms.empty())
+      mesh_.norms.resize(n_remapped_verts);
+    if (!mesh.txuvs.empty())
+      mesh_.txuvs.resize(n_remapped_verts);
+
+    // Let meshopt do remapping
+    meshopt_remapIndexBuffer(cnt_span<uint>(mesh_.elems).data(), src.data(), src.size(), dst.data());
+    meshopt_remapVertexBuffer(mesh_.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(InputMesh::vert_type), dst.data());
+    if (!mesh.norms.empty())
+      meshopt_remapVertexBuffer(mesh_.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(InputMesh::norm_type), dst.data());
+    if (!mesh.txuvs.empty())
+      meshopt_remapVertexBuffer(mesh_.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(InputMesh::txuv_type), dst.data());
     
-    // Operate on a unpadded copy of the input mesh
-    auto mesh = convert_mesh<Mesh>(mesh_);
-
-    // First, remap to avoid potentially redundant vertices
-    // TODO; Move to clean step
-    {
-      size_t n_elems = mesh.elems.size() * 3;
-      size_t n_verts = mesh.verts.size();
-
-      std::vector<eig::Array3u> remap(mesh.elems.size());
-
-      auto dst = cnt_span<uint>(remap);
-      auto src = cnt_span<uint>(mesh.elems);
-
-      size_t vert_size = meshopt_generateVertexRemap(
-        dst.data(),
-        src.data(),
-        src.size(),
-        mesh.verts.data(),
-        mesh.verts.size(),
-        sizeof(Mesh::vert_type)
-      );
-      
-      Mesh remapped_mesh;
-      remapped_mesh.elems.resize(remap.size());
-      remapped_mesh.verts.resize(vert_size);
-      remapped_mesh.norms.resize(vert_size);
-      remapped_mesh.txuvs.resize(vert_size);
-      meshopt_remapIndexBuffer(cnt_span<uint>(remapped_mesh.elems).data(), src.data(), src.size(), dst.data());
-      meshopt_remapVertexBuffer(remapped_mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(Mesh::vert_type), dst.data());
-      meshopt_remapVertexBuffer(remapped_mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(Mesh::norm_type), dst.data());
-      meshopt_remapVertexBuffer(remapped_mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(Mesh::txuv_type), dst.data());
-      mesh = remapped_mesh;
-    }
-
-    float threshold    = 0.05f;
-    float target_error = 1.f; // 1e-1f;
-    float lod_error    = 1.f;
-    uint options       = 0; // meshopt_SimplifyX flags, 0 is a safe default
-
-    size_t n_elems = mesh.elems.size() * 3;
-    size_t n_elems_target = static_cast<size_t>(n_elems * threshold);
-    fmt::print("Target = {}\n", n_elems_target);
-    
-    // Run meshoptimizer's simplify
-    std::vector<uint> target(n_elems);
-    target.resize(meshopt_simplify(target.data(), 
-                                   &mesh.elems[0][0], 
-                                   n_elems, 
-                                   &mesh.verts[0][0],
-                                   mesh.verts.size(),
-                                   sizeof(Mesh::vert_type),
-                                   n_elems_target,
-                                   target_error,
-                                   options,
-                                  &lod_error));
-    fmt::print("Reached = {}\n", target.size());
-
-    // Copy over elements
-    // NOTE; this does not account for deleted vertices!!!
-    mesh.elems.resize(target.size() / 3);
-    rng::copy(cnt_span<Mesh::elem_type>(target), mesh.elems.begin());
-    
-    // Return correct expected type
-    return convert_mesh<OutputMesh>(mesh);
+    return convert_mesh<OutputMesh>(mesh_);
   }
 
-  // template <typename OutputMesh, typename InputMesh>
-  // OutputMesh simplify_edge_length(const InputMesh &mesh_, float max_edge_length) {
-  //   met_trace();
-
-  //   namespace odec  = omesh::Decimater;
-  //   using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
-  //   using Decimater = odec::DecimaterT<HalfedgeMeshData>;
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh simplify_mesh(const InputMesh &mesh_, uint target_elems, float target_error) {
+    met_trace();
     
-  //   // Operate on a copy of the input mesh
-  //   auto mesh = convert_mesh<HalfedgeMeshData>(mesh_);
-
-  //   Decimater dec(mesh);
-  //   Module mod;
-
-  //   dec.add(mod);
-  //   dec.module(mod).set_binary(false);
-  //   dec.module(mod).set_edge_length(max_edge_length); // not zero, but just up to reasonable precision
-
-  //   dec.initialize();
-  //   dec.decimate();
-
-  //   mesh.garbage_collection();
-  //   return convert_mesh<OutputMesh>(mesh);
-  // }
-  
-  // template <typename OutputMesh, typename InputMesh>
-  // OutputMesh simplify_progressive(const InputMesh &mesh_, uint max_vertices) {
-  //   met_trace();
-
-  //   namespace odec  = omesh::Decimater;
-  //   // using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
-  //   // using Decimater = odec::DecimaterT<HalfedgeMeshData>;
-  //   using Module    = odec::ModEdgeLengthT<HalfedgeMeshData>::Handle;
-  //   using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::AverageCollapseFunction>;
-  //   // using Module    = odec::ModQuadricT<HalfedgeMeshData>::Handle;
-  //   // using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::DefaultCollapseFunction>;
-  //   // using ModuleN   = odec::ModNormalFlippingT<HalfedgeMeshData>::Handle;
-
-  //   // Operate on a copy of the input mesh
-  //   HalfedgeMeshData mesh = convert_mesh<HalfedgeMeshData>(mesh_);
+    // Operate on a unpadded and correctly indexed copy of the input mesh
+    auto mesh = remap_mesh<Mesh>(mesh_);
     
-  //   // Face normals are not valid at this point
-  //   mesh.request_face_normals();
-  //   mesh.update_face_normals();
+    // Generate output/input ranges
+    std::vector<eig::Array3u> remap(mesh.elems.size());
+    auto dst = cnt_span<uint>(remap);
+    auto src = cnt_span<uint>(mesh.elems);
+    
+    // Run meshoptimizer's simplify
+    size_t elem_size = meshopt_simplify(dst.data(), 
+                                        src.data(), 
+                                        src.size(), 
+                                        mesh.verts[0].data(),
+                                        mesh.verts.size(),
+                                        sizeof(Mesh::vert_type),
+                                        target_elems * 3,
+                                        target_error,
+                                        0,
+                                        nullptr);
 
-  //   Decimater dec(mesh);
-  //   Module mod;
-  //   dec.add(mod);
+    // Copy over elements
+    remap.resize(elem_size / 3);
+    remap.shrink_to_fit();
+    mesh.elems = remap;
 
-  //   dec.module(mod).set_binary(false);
-  //   dec.module(mod).set_edge_length(std::numeric_limits<float>::max());
-  //   // ModuleN modn;
-  //   // dec.add(modn);
-  //   // dec.module(mod).unset_max_err();
+    // Return correct expected type, discarding unused vertices
+    return compact_mesh<OutputMesh>(mesh);
+  }
 
-  //   // dec.module(mod).set_binary(false);
-  //   // dec.module(mod).set_edge_length(std::numeric_limits<float>::max());
-  //   // dec.initialize();
-  //   // dec.decimate(1000);
-  //   // // dec.decimate_to(max_vertices);
-  //   // mesh.garbage_collection();
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh decimate_mesh(const InputMesh &mesh_, uint target_elems, float target_error) {
+    met_trace();
+    
+    // Operate on a unpadded and correctly indexed copy of the input mesh
+    auto mesh = remap_mesh<Mesh>(mesh_);
+    
+    // Generate output/input ranges
+    std::vector<eig::Array3u> remap(mesh.elems.size());
+    auto dst = cnt_span<uint>(remap);
+    auto src = cnt_span<const uint>(mesh.elems);
+    
+    // Run meshoptimizer's simplifySloppy
+    size_t elem_size = meshopt_simplifySloppy(dst.data(), 
+                                              src.data(), 
+                                              src.size(), 
+                                              mesh.verts[0].data(),
+                                              mesh.verts.size(),
+                                              sizeof(Mesh::vert_type),
+                                              target_elems * 3,
+                                              target_error,
+                                              nullptr);
 
-  //   dec.initialize();
-  //   dec.decimate_to(max_vertices);
-  //   mesh.garbage_collection();
+    // Copy over elements
+    remap.resize(elem_size / 3);
+    remap.shrink_to_fit();
+    mesh.elems = remap;
 
-  //   return convert_mesh<OutputMesh>(mesh);
-  // }
+    // Return correct expected type, discarding unused vertices
+    return compact_mesh<OutputMesh>(mesh);
+  }
 
-  // template <typename OutputMesh, typename InputMesh>
-  // OutputMesh simplify_volume(const InputMesh &mesh_, 
-  //                     uint             max_vertices, 
-  //                     const InputMesh *optional_bounds) {
-  //   met_trace();
-
-  //   namespace odec  = omesh::Decimater;
-  //   using Module    = odec::ModVolumeT<HalfedgeMeshData>::Handle;
-  //   using Decimater = odec::CollapsingDecimater<HalfedgeMeshData, odec::DefaultCollapseFunction>;
-
-  //   // Operate on a copy of the input mesh with zero-length edges removed
-  //   auto mesh = simplify_edge_length<HalfedgeMeshData>(mesh_, 0.f);
-
-  //   Decimater dec(mesh);
-  //   Module mod;
-
-  //   dec.add(mod);
-
-  //   // If provided, convert optional bounds to half edge format
-  //   std::optional<HalfedgeMeshData> bounds_mesh;
-  //   if (optional_bounds) {
-  //     bounds_mesh = convert_mesh<HalfedgeMeshData>(*optional_bounds);
-  //     dec.module(mod).set_collision_mesh(&(*bounds_mesh));
-  //   }
-
-  //   dec.initialize();
-  //   dec.decimate_to(max_vertices);
-  //   mesh.garbage_collection();
-
-  //   return convert_mesh<OutputMesh>(mesh);
-  // }
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh optimize_mesh(const InputMesh &mesh_) {
+    met_trace();
+    // ...
+    return {};
+  }
 
   /* Explicit template instantiations */
   
@@ -502,7 +474,13 @@ namespace met {
 
   #define declare_function_output_input(OutputMesh, InputMesh)                                        \
     template                                                                                          \
-    OutputMesh simplify_mesh<OutputMesh, InputMesh>(const InputMesh &);                               \
+    OutputMesh remap_mesh<OutputMesh, InputMesh>(const InputMesh &);                                  \
+    template                                                                                          \
+    OutputMesh compact_mesh<OutputMesh, InputMesh>(const InputMesh &);                                \
+    template                                                                                          \
+    OutputMesh simplify_mesh<OutputMesh, InputMesh>(const InputMesh &, uint, float);                  \
+    template                                                                                          \
+    OutputMesh decimate_mesh<OutputMesh, InputMesh>(const InputMesh &, uint, float);                  \
     template                                                                                          \
     OutputMesh optimize_mesh<OutputMesh, InputMesh>(const InputMesh &);
 

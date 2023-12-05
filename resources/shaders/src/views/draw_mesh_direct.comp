@@ -50,6 +50,9 @@ layout(binding = 7) uniform sampler1DArray b_csys_3f; // Color system spectra, 3
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
+// Hardcoded value for now
+vec3 hardcoded_ldir = normalize(vec3(1));
+
 GBuffer sample_gbuffer(in vec2 xy) {
   uvec4 pack = floatBitsToUint(texture(b_gbuffer, xy));
   return decode_gbuffer(pack, xy, buff_unif.inv);
@@ -74,11 +77,11 @@ float sample_uplift_refl(in UpliftInfo uplift_info, in vec4 bary, in float wvl) 
   return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
 }
 
-vec3 fetch_color_part(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in uvec2 tx) {
+vec3 fetch_color_part(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb, in uvec2 px) {
   vec3 value = vec3(0);
   
   // Element indices differ, so sample weights separately
-  vec4 bary = texelFetch(b_uplf_4f, ivec3(tx, object_info.layer), 0);
+  vec4 bary = texelFetch(b_uplf_4f, ivec3(px, object_info.layer), 0);
   
   // Take direct light samples
   for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
@@ -94,13 +97,14 @@ vec3 fetch_color_part(inout uvec3 state, in ObjectInfo object_info, in UpliftInf
     value += csys * r * float(wavelength_samples);
   } // for (uint i)
 
-  return value;
+  float cos_theta = dot(gb.n, hardcoded_ldir);
+  return value * cos_theta;
 }
 
-vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in vec2 tx) {
+vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb) {
   const uvec2 texel_offsets[4] = uvec2[4](uvec2(0, 0), uvec2(1, 0), uvec2(0, 1), uvec2(1, 1));
 
-  vec2  tx_full  = vec2(object_info.offs) + vec2(object_info.size) * tx - vec2(0.5f);
+  vec2  tx_full  = vec2(object_info.offs) + vec2(object_info.size) * gb.tx - vec2(0.5f);
   uvec2 tx_floor = uvec2(tx_full);
   vec2  alpha    = mod(tx_full, 1.f);
 
@@ -108,19 +112,20 @@ vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo upl
   uvec3   state_;
   for (uint i = 0; i < 4; ++i) {
     state_ = state;
-    values[i] = fetch_color_part(state_, object_info, uplift_info, tx_floor + texel_offsets[i]);
+    uvec2 px = tx_floor + texel_offsets[i];
+    values[i] = fetch_color_part(state_, object_info, uplift_info, gb, px);
   }
   state = state_;
 
   return mix(mix(values[0], values[1], alpha.x), mix(values[2], values[3], alpha.x), alpha.y);
 }
 
-vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in vec2 tx) {
+vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb) {
   vec3 value = vec3(0);
 
   // All element indices are the same, so sample barycentric weights directly
   // TODO add uv components to uniform buffer
-  vec2 tx_bary = (vec2(object_info.offs) + vec2(object_info.size) * tx) / textureSize(b_uplf_4f, 0).xy;
+  vec2 tx_bary = (vec2(object_info.offs) + vec2(object_info.size) * gb.tx) / textureSize(b_uplf_4f, 0).xy;
   vec4 bary = textureLod(b_uplf_4f, vec3(tx_bary, object_info.layer), 0);
   
   // Take direct light samples
@@ -136,7 +141,8 @@ vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo up
     value += csys * r;
   } // for (uint i)
 
-  return value * float(wavelength_samples);
+  float cos_theta = dot(gb.n, hardcoded_ldir);
+  return value * float(wavelength_samples) * cos_theta;
 }
 
 void main() {
@@ -171,11 +177,11 @@ void main() {
 
   uvec4 indices = sample_uplift_bary_indices(object_info, gb.tx);
   if (all(equal(indices, uvec4(indices.x)))) {
-    // Hot path; all element indices are the same
-    value += sample_color(state, object_info, uplift_info, gb.tx);
+    // Hot path; all element indices are the same, we can do a texture gather
+    value += sample_color(state, object_info, uplift_info, gb);
   } else {
-    // Cold path; border region, indices differ, manually combine samples
-    value += fetch_color(state, object_info, uplift_info, gb.tx);
+    // Cold path; border region, indices differ, manually combine samples, very very frightening
+    value += fetch_color(state, object_info, uplift_info, gb);
   }
 
   // Reweight image value by actual nr. of samples

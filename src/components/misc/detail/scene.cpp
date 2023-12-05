@@ -158,30 +158,23 @@ namespace met::detail {
     // Generate a simplified representation of each mesh data
     std::vector<Mesh> simplified(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), 
-      [](const auto &m) { return simplify_mesh<Mesh>(m.value()); });
+      [](const auto &m) { return simplify_mesh<Mesh>(m.value(), 16384, 1e-2); });
 
-    /* fmt::print("verts {} -> {}\n", 
-      e_meshes[0].value().verts.size(),
-      simplified[0].verts.size());
-    fmt::print("elems {} -> {}\n", 
-      e_meshes[0].value().elems.size(),
-      simplified[0].elems.size()); */
+    /* // TODO remove
+    {
+      const auto &mesh = simplified[0]; //.value();
+      auto bvh = detail::create_bvh({
+        .mesh            = mesh,
+        .n_node_children = 8, // 2, 4, 8
+        .n_leaf_children = 8,
+      });
 
-    // TODO remove
-    // {
-    //   const auto &mesh = simplified[0]; //.value();
-    //   auto bvh = detail::create_bvh({
-    //     .mesh            = mesh,
-    //     .n_node_children = 8, // 2, 4, 8
-    //     .n_leaf_children = 8,
-    //   });
-
-    //   /* for (uint i = 0; i < bvh.nodes.size(); ++i) {
-    //     const auto &node = bvh.nodes[i];
-    //     fmt::print("{} - minb = {}, maxb = {}, type = {}, children = {}\n ", 
-    //       i, node.minb, node.maxb, node.is_leaf() ? "leaf" : "node", node.data1);
-    //   } */
-    // }
+      for (uint i = 0; i < bvh.nodes.size(); ++i) {
+        const auto &node = bvh.nodes[i];
+        fmt::print("{} - minb = {}, maxb = {}, type = {}, children = {}\n ", 
+          i, node.minb, node.maxb, node.is_leaf() ? "leaf" : "node", node.data1);
+      }
+    } */
 
     // Gather vertex/element lengths and offsets per mesh resources
     std::vector<uint> verts_size, elems_size, verts_offs, elems_offs;

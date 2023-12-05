@@ -61,14 +61,6 @@ namespace met {
 
   /* Generational helper functions */
 
-  // // Returns a simple octahedral mesh, fitted inside a unit cube
-  // template <typename Mesh>
-  // Mesh generate_octahedron();
-  
-  // // Returns a repeatedly subdivided spherical mesh, fitted inside a unit cube
-  // template <typename Mesh>
-  // Mesh generate_spheroid(uint n_subdivs = 3);
-
   // Returns a convex hull mesh around a set of points in 3D
   template <typename Mesh, typename Vector>
   Mesh generate_convex_hull(std::span<const Vector> data);
@@ -77,24 +69,25 @@ namespace met {
   template <typename Mesh, typename Vector>
   Mesh generate_delaunay(std::span<const Vector> data);
   
+  /* Modification functions */
+  
+  // Restructure mesh indexing to strip redundant vertices
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh remap_mesh(const InputMesh &mesh);
+  
+  // Restructure mesh indexing to strip unused vertices
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh compact_mesh(const InputMesh &mesh);
+
+  // Run several Meshoptimizer methods that do not affect visual appearance
   template <typename OutputMesh, typename InputMesh>
   OutputMesh optimize_mesh(const InputMesh &mesh);
 
+  // Run Meshoptimizer's simplify s.a. it does affect visual appearance but preserves topology
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_mesh(const InputMesh &mesh);
+  OutputMesh simplify_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
 
-  /* Mesh simplification functions */
-
-  // // Performs progressive edge collapse for edges below max_edge_length
-  // template <typename OutputMesh, typename InputMesh>
-  // OutputMesh simplify_edge_length(const InputMesh &mesh, float max_edge_length = 0.f);
-
-  // // Performs progressive edge collapse until max_vertices remain; newly placed vertices
-  // template <typename OutputMesh, typename InputMesh>
-  // OutputMesh simplify_progressive(const InputMesh &mesh, uint max_vertices);
-
-  // // Performs volume-preserving progressive edge collapse until max_vertices remain; newly placed vertices
-  // // are optionally clipped into a secondary mesh optional_bounds
-  // template <typename OutputMesh, typename InputMesh>
-  // OutputMesh simplify_volume(const InputMesh &mesh, uint max_vertices, const InputMesh *optional_bounds = nullptr);
+  // Run Meshoptimizer's simplify s.a. it does affect visual appearance and destroys topology
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh decimate_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
 } // namespace met
