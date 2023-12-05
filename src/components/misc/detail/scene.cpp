@@ -157,8 +157,11 @@ namespace met::detail {
 
     // Generate a simplified representation of each mesh data
     std::vector<Mesh> simplified(e_meshes.size());
-    std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), 
-      [](const auto &m) { return simplify_mesh<Mesh>(m.value(), 16384, 1e-2); });
+    std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), [](const auto &m) { 
+        auto mesh = simplify_mesh<Mesh>(m.value(), 256, 1e-2); 
+        mesh = renormalize_mesh<Mesh>(mesh);
+        return mesh;
+    });
 
     /* // TODO remove
     {

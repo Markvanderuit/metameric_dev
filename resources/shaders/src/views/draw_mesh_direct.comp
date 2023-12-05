@@ -51,7 +51,7 @@ layout(binding = 7) uniform sampler1DArray b_csys_3f; // Color system spectra, 3
 layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
 // Hardcoded value for now
-vec3 hardcoded_ldir = normalize(vec3(1));
+vec3 hardcoded_ldir = normalize(vec3(-1, 1, 1));
 
 GBuffer sample_gbuffer(in vec2 xy) {
   uvec4 pack = floatBitsToUint(texture(b_gbuffer, xy));
@@ -186,7 +186,7 @@ void main() {
 
   // Reweight image value by actual nr. of samples
   value /= float(buff_sampler.iter + buff_sampler.n_iters_per_dispatch);
-  // value = vec3(gb.tx, 0); // /= float(buff_sampler.iter + buff_sampler.n_iters_per_dispatch);
+  // value = vec3(gb.n);
 
   // Store updated image value and sampler state
   imageStore(b_target_4f, ivec2(i), vec4(value, 1));

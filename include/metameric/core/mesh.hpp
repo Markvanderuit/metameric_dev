@@ -83,6 +83,10 @@ namespace met {
   template <typename OutputMesh, typename InputMesh>
   OutputMesh optimize_mesh(const InputMesh &mesh);
 
+  // (Re)compute vertex normals from scratch
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh renormalize_mesh(const InputMesh &mesh);
+
   // Run Meshoptimizer's simplify s.a. it does affect visual appearance but preserves topology
   template <typename OutputMesh, typename InputMesh>
   OutputMesh simplify_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());

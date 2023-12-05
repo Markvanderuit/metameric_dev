@@ -382,6 +382,34 @@ namespace met {
     return convert_mesh<OutputMesh>(mesh_);
   }
 
+  
+  // (Re)compute vertex normals from scratch
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh renormalize_mesh(const InputMesh &mesh_) {
+    met_trace();
+
+    // Prepare output mesh
+    auto mesh = convert_mesh<OutputMesh>(mesh_);
+    mesh.norms = std::vector<typename OutputMesh::norm_type>(mesh.verts.size(), OutputMesh::norm_type(0));
+
+    // Generate unnormalized face vectors and add to output normals
+    for (const auto &el : mesh.elems) {
+      eig::Vector3f a = mesh.verts[el[0]], 
+                    b = mesh.verts[el[1]], 
+                    c = mesh.verts[el[2]];
+      eig::Array3f n = (b - a).cross(c - a);
+      mesh.norms[el[0]] += n;
+      mesh.norms[el[1]] += n;
+      mesh.norms[el[2]] += n;
+    }
+
+    // Normalize output 
+    std::transform(std::execution::par_unseq, range_iter(mesh.norms), mesh.norms.begin(), 
+      [](const auto &n) { return n.matrix().normalized().eval(); });
+
+    return mesh;
+  }
+
   template <typename OutputMesh, typename InputMesh>
   OutputMesh simplify_mesh(const InputMesh &mesh_, uint target_elems, float target_error) {
     met_trace();
@@ -475,6 +503,8 @@ namespace met {
   #define declare_function_output_input(OutputMesh, InputMesh)                                        \
     template                                                                                          \
     OutputMesh remap_mesh<OutputMesh, InputMesh>(const InputMesh &);                                  \
+    template                                                                                          \
+    OutputMesh renormalize_mesh<OutputMesh, InputMesh>(const InputMesh &);                            \
     template                                                                                          \
     OutputMesh compact_mesh<OutputMesh, InputMesh>(const InputMesh &);                                \
     template                                                                                          \
