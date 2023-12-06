@@ -155,12 +155,17 @@ namespace met::detail {
 
     guard(!e_meshes.empty());
 
-    // Generate a simplified representation of each mesh data
+    // Generate a simplified representation of each scene mesh
     std::vector<Mesh> simplified(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), [](const auto &m) { 
-        auto mesh = simplify_mesh<Mesh>(m.value(), 256, 1e-2); 
-        mesh = renormalize_mesh<Mesh>(mesh);
-        return mesh;
+        Mesh copy = m.value();
+        simplify_mesh(copy, 128, 1e-2);
+        // renormalize_mesh(copy);
+
+        fmt::print("Simplified mesh vert count: {} -> {}\n", m.value().verts.size(), copy.verts.size());
+        fmt::print("Simplified mesh elem count: {} -> {}\n", m.value().elems.size(), copy.elems.size());
+
+        return copy;
     });
 
     /* // TODO remove

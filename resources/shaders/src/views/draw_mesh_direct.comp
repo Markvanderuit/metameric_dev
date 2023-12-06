@@ -97,8 +97,8 @@ vec3 fetch_color_part(inout uvec3 state, in ObjectInfo object_info, in UpliftInf
     value += csys * r * float(wavelength_samples);
   } // for (uint i)
 
-  float cos_theta = dot(gb.n, hardcoded_ldir);
-  return value * cos_theta;
+  // float cos_theta = dot(gb.n, hardcoded_ldir);
+  return value; // * cos_theta;
 }
 
 vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb) {
@@ -141,8 +141,8 @@ vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo up
     value += csys * r;
   } // for (uint i)
 
-  float cos_theta = dot(gb.n, hardcoded_ldir);
-  return value * float(wavelength_samples) * cos_theta;
+  // float cos_theta = dot(gb.n, hardcoded_ldir);
+  return value * float(wavelength_samples); // * cos_theta;
 }
 
 void main() {

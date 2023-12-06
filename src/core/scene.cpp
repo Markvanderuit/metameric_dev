@@ -472,6 +472,10 @@ namespace met {
           [](const aiFace &v) { return Mesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
       }
 
+      // Ensure mesh data is properly corrected and redundant vertices are stripped
+      remap_mesh(m);
+      compact_mesh(m);
+
       scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));
     }
 

@@ -28,8 +28,8 @@ namespace met {
     std::vector<txuv_type> txuvs;
 
     // Data queries for secondary mesh data, available per-vertex
-    bool has_norms() const { return norms.size() == verts.size(); }
-    bool has_txuvs() const { return txuvs.size() == verts.size(); }
+    bool has_norms() const { return !norms.empty(); }
+    bool has_txuvs() const { return !txuvs.empty(); }
 
   public: // Serialization
     void to_stream(std::ostream &str) const {
@@ -55,10 +55,6 @@ namespace met {
   using Delaunay   = MeshBase<eig::Array3f,   eig::Array4u>;
   using AlDelaunay = MeshBase<eig::AlArray3f, eig::Array4u>;
 
-  // Convert between indexed/aligned mesh data structures
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh convert_mesh(const InputMesh &mesh);
-
   /* Generational helper functions */
 
   // Returns a convex hull mesh around a set of points in 3D
@@ -69,29 +65,89 @@ namespace met {
   template <typename Mesh, typename Vector>
   Mesh generate_delaunay(std::span<const Vector> data);
   
-  /* Modification functions */
+  /* In-place modification functions */
   
+  // (Re)compute smooth vertex normals from scratch
+  template <typename MeshTy>
+  void renormalize_mesh(MeshTy &mesh);
+  
+  // Restructure mesh indexing to strip redundant/unused elements
+  template <typename MeshTy>
+  void remap_mesh(MeshTy &mesh);
+  
+  // Restructure mesh indexing to strip redundant/unused vertices
+  template <typename MeshTy>
+  void compact_mesh(MeshTy &mesh);
+
+  // Run several Meshoptimizer methods that do not affect visual appearance
+  template <typename MeshTy>
+  void optimize_mesh(MeshTy &mesh);
+
+  // Run Meshoptimizer's simplify, affecting visual appearance but preserving topology
+  template <typename MeshTy>
+  void simplify_mesh(MeshTy &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
+
+  // Run Meshoptimizer's simpliy,  affecting visual appearance and foregoeing topology
+  template <typename MeshTy>
+  void decimate_mesh(MeshTy &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
+
+  /* Copying modification functions */
+  
+  // Convert between indexed/aligned/other mesh types
+  template <typename OutputMesh, typename InputMesh>
+  OutputMesh convert_mesh(const InputMesh &mesh);
+
   // Restructure mesh indexing to strip redundant vertices
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh remap_mesh(const InputMesh &mesh);
+  OutputMesh remapped_mesh(const InputMesh &mesh) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    remap_mesh(copy);
+    return copy;
+  }
   
   // Restructure mesh indexing to strip unused vertices
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh compact_mesh(const InputMesh &mesh);
+  OutputMesh compacted_mesh(const InputMesh &mesh) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    compact_mesh(copy);
+    return copy;
+  }
 
   // Run several Meshoptimizer methods that do not affect visual appearance
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh optimize_mesh(const InputMesh &mesh);
+  OutputMesh optimized_mesh(const InputMesh &mesh) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    optimize_mesh(copy);
+    return copy;
+  }
 
   // (Re)compute vertex normals from scratch
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh renormalize_mesh(const InputMesh &mesh);
+  OutputMesh renormalized_mesh(const InputMesh &mesh) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    renormalize_mesh(copy);
+    return copy;
+  }
 
   // Run Meshoptimizer's simplify s.a. it does affect visual appearance but preserves topology
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
+  OutputMesh simplified_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max()) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    simplify_mesh(copy, target_elems, target_error);
+    return copy;
+  }
 
   // Run Meshoptimizer's simplify s.a. it does affect visual appearance and destroys topology
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh decimate_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
+  OutputMesh decimated_mesh(const InputMesh &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max()) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    decimate_mesh(copy, target_elems, target_error);
+    return copy;
+  }
 } // namespace met

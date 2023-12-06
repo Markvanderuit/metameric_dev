@@ -283,7 +283,11 @@ namespace met::io {
       std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
         [](const aiFace &v) { return AlMesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
     }
-
+    
+    // Ensure mesh data is properly corrected and redundant vertices are stripped
+    remap_mesh(m);
+    compact_mesh(m);
+    
     return convert_mesh<Mesh>(m);
   }
 

@@ -12,84 +12,33 @@
 #include <vector>
 
 namespace met {
-  // template <>
-  // HalfedgeMeshData convert_mesh<HalfedgeMeshData, Mesh>(const Mesh &mesh_) {
-  //   met_trace_n("Mesh -> HalfedgeMeshData");
+  namespace detail {
+    template <typename MeshTy>
+    void grow_mesh(MeshTy &mesh, size_t n_verts) {
+      mesh.verts.resize(n_verts);
+      if (mesh.has_norms())
+        mesh.norms.resize(n_verts);
+      if (mesh.has_txuvs())
+        mesh.txuvs.resize(n_verts);
+    }
 
-  //   // UV and normal data is lost during conversion
-  //   const auto &[verts, elems, norms, txuvs] = mesh_;
-
-  //   // Prepare mesh structure
-  //   HalfedgeMeshData mesh;
-  //   mesh.reserve(verts.size(), (verts.size() + elems.size() - 2), elems.size());
-
-  //   // Register vertices/elements single-threaded
-  //   std::vector<HalfedgeMeshData::VertexHandle> vth(verts.size());
-  //   for (uint i = 0; i < vth.size(); ++i) {
-  //     HalfedgeMeshData::Point m_vt;
-  //     rng::copy(verts[i], m_vt.begin());
-  //     auto vh = mesh.add_vertex(m_vt);
-
-  //     if (!norms.empty()) {
-  //       HalfedgeMeshData::Normal m_nr;
-  //       rng::copy(norms[i], m_nr.begin());
-  //       mesh.set_normal(vh, m_nr);
-  //     }      
-
-  //     if (!txuvs.empty()) {
-  //       HalfedgeMeshData::TexCoord2D m_tx;
-  //       rng::copy(txuvs[i], m_tx.begin());
-  //       mesh.set_texcoord2D(vh, m_tx);
-  //     }
-
-  //     vth[i] = std::move(vh);
-  //   } // for (uint i)
-
-  //   // Register faces
-  //   rng::for_each(elems, 
-  //     [&](const auto &el) { return mesh.add_face(vth[el[0]], vth[el[1]], vth[el[2]]); });
-
-  //   return mesh;
-  // }
-  
-  // template <>
-  // Mesh convert_mesh<Mesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-  //   met_trace_n("HalfedgeMeshData -> Mesh");
-    
-  //   Mesh cmesh;
-  //   cmesh.verts.resize(mesh.n_vertices());
-  //   cmesh.elems.resize(mesh.n_faces());
-
-  //   // Generate vertex data
-  //   std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), cmesh.verts.begin(), 
-  //     [&](auto vh) { return convert_vector<eig::Array3f, omesh::Vec3f>(mesh.point(vh)); });
-
-
-  //   // Generate optional data
-  //   if (mesh.has_vertex_normals()) {
-  //     cmesh.norms.resize(mesh.n_vertices());
-  //     std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), cmesh.norms.begin(), 
-  //       [&](auto vh) { return convert_vector<eig::Array3f, omesh::Vec3f>(mesh.normal(vh)); });
-  //   }
-  //   if (mesh.has_vertex_texcoords2D()) {
-  //     cmesh.txuvs.resize(mesh.n_vertices());
-  //     std::transform(std::execution::par_unseq, range_iter(mesh.vertices()), cmesh.txuvs.begin(), 
-  //       [&](auto vh) { return convert_vector<eig::Array2f, omesh::Vec2f>(mesh.texcoord2D(vh)); });
-  //   }
-
-  //   // Generate element data
-  //   std::transform(std::execution::par_unseq, range_iter(mesh.faces()), cmesh.elems.begin(), 
-  //   [](auto fh) {
-  //     eig::Array3u el; 
-  //     rng::transform(fh.vertices(), el.begin(), [](auto vh) { return vh.idx(); });
-  //     return el;
-  //   });
-    
-  //   return cmesh;
-  // }
+    template <typename MeshTy>
+    void shrink_mesh_to_fit(MeshTy &mesh, size_t n_verts) {
+      mesh.verts.resize(n_verts);
+      mesh.verts.shrink_to_fit();
+      if (mesh.has_norms()) {
+        mesh.norms.resize(n_verts);
+        mesh.norms.shrink_to_fit();
+      }
+      if (mesh.has_txuvs()) {
+        mesh.txuvs.resize(n_verts);
+        mesh.txuvs.shrink_to_fit();
+      }
+    }
+  }
 
   template <typename OutputMesh, typename InputMesh>
-  OutputMesh convert_mesh(const InputMesh &mesh) requires std::is_same_v<OutputMesh, InputMesh> {
+  OutputMesh convert_mesh(const InputMesh &mesh) requires std::same_as<OutputMesh, InputMesh> {
     met_trace_n("Passthrough");
     return mesh;
   }
@@ -115,18 +64,6 @@ namespace met {
       .txuvs = mesh.txuvs 
     };
   }
-
-  // template <>
-  // AlMesh convert_mesh<AlMesh, HalfedgeMeshData>(const HalfedgeMeshData &mesh) {
-  //   met_trace_n("HalfedgeMeshData -> AlMeshData");
-  //   return convert_mesh<AlMesh>(convert_mesh<Mesh>(mesh));
-  // }
-
-  // template <>
-  // HalfedgeMeshData convert_mesh<HalfedgeMeshData, AlMesh>(const AlMesh &mesh) {
-  //   met_trace_n("AlMeshData -> HalfedgeMeshData");
-  //   return convert_mesh<HalfedgeMeshData>(convert_mesh<Mesh>(mesh));
-  // }
 
   template <>
   Mesh convert_mesh<Mesh, Delaunay>(const Delaunay &mesh) {
@@ -299,98 +236,16 @@ namespace met {
       return el_;
     });
 
-    return convert_mesh<MeshTy>(Delaunay { std::vector<eig::Array3f>(range_iter(data)), elems });
+    return convert_mesh<MeshTy, Delaunay>(Delaunay { std::vector<eig::Array3f>(range_iter(data)), elems });
   }
 
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh remap_mesh(const InputMesh &mesh) {
+  template <typename MeshTy>
+  void renormalize_mesh(MeshTy &mesh) {
     met_trace();
 
-    // First, add all mesh attribute streams that need remapping
-    std::vector<meshopt_Stream> attribute_streams;
-    attribute_streams.push_back({ mesh.verts.data(), sizeof(eig::Array3f), sizeof(InputMesh::vert_type) });
-    if (!mesh.norms.empty())
-      attribute_streams.push_back({ mesh.norms.data(), sizeof(eig::Array3f), sizeof(InputMesh::norm_type) });
-    if (!mesh.txuvs.empty())
-      attribute_streams.push_back({ mesh.txuvs.data(), sizeof(eig::Array2f), sizeof(InputMesh::txuv_type) });
-
-    // Second, get spans over source/destination index memory, then generate remapping
-    std::vector<eig::Array3u> remap(mesh.verts.size());
-    auto dst = cnt_span<uint>(remap);
-    auto src = cnt_span<const uint>(mesh.elems);
-    size_t n_remapped_verts = meshopt_generateVertexRemapMulti(
-      dst.data(), 
-      src.data(),
-      src.size(),
-      mesh.verts.size(),
-      attribute_streams.data(),
-      attribute_streams.size()
-    );
-
-    // Third, create new mesh to remap into
-    InputMesh mesh_;
-    mesh_.elems.resize(mesh.elems.size());
-    mesh_.verts.resize(n_remapped_verts);
-    if (!mesh.norms.empty())
-      mesh_.norms.resize(n_remapped_verts);
-    if (!mesh.txuvs.empty())
-      mesh_.txuvs.resize(n_remapped_verts);
-
-    // Let meshopt do remapping
-    meshopt_remapIndexBuffer(cnt_span<uint>(mesh_.elems).data(), src.data(), src.size(), dst.data());
-    meshopt_remapVertexBuffer(mesh_.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(InputMesh::vert_type), dst.data());
-    if (!mesh.norms.empty())
-      meshopt_remapVertexBuffer(mesh_.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(InputMesh::norm_type), dst.data());
-    if (!mesh.txuvs.empty())
-      meshopt_remapVertexBuffer(mesh_.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(InputMesh::txuv_type), dst.data());
-
-    return convert_mesh<OutputMesh>(mesh_);
-  }
-
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh compact_mesh(const InputMesh &mesh) {
-    met_trace();
-
-    // First, get spans over source/destination index memory, then generate remapping
-    std::vector<eig::Array3u> remap(mesh.verts.size());
-    auto dst = cnt_span<uint>(remap);
-    auto src = cnt_span<const uint>(mesh.elems);
-    size_t n_remapped_verts = meshopt_optimizeVertexFetchRemap(
-      dst.data(),
-      src.data(),
-      src.size(),
-      mesh.verts.size()
-    );
-
-    // Second, create new mesh to remap into
-    InputMesh mesh_;
-    mesh_.elems.resize(mesh.elems.size());
-    mesh_.verts.resize(n_remapped_verts);
-    if (!mesh.norms.empty())
-      mesh_.norms.resize(n_remapped_verts);
-    if (!mesh.txuvs.empty())
-      mesh_.txuvs.resize(n_remapped_verts);
-
-    // Let meshopt do remapping
-    meshopt_remapIndexBuffer(cnt_span<uint>(mesh_.elems).data(), src.data(), src.size(), dst.data());
-    meshopt_remapVertexBuffer(mesh_.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(InputMesh::vert_type), dst.data());
-    if (!mesh.norms.empty())
-      meshopt_remapVertexBuffer(mesh_.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(InputMesh::norm_type), dst.data());
-    if (!mesh.txuvs.empty())
-      meshopt_remapVertexBuffer(mesh_.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(InputMesh::txuv_type), dst.data());
-    
-    return convert_mesh<OutputMesh>(mesh_);
-  }
-
-  
-  // (Re)compute vertex normals from scratch
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh renormalize_mesh(const InputMesh &mesh_) {
-    met_trace();
-
-    // Prepare output mesh
-    auto mesh = convert_mesh<OutputMesh>(mesh_);
-    mesh.norms = std::vector<typename OutputMesh::norm_type>(mesh.verts.size(), OutputMesh::norm_type(0));
+    // Reset all normal data to 0
+    mesh.norms.clear();
+    mesh.norms.resize(mesh.verts.size(), MeshTy::norm_type(0));
 
     // Generate unnormalized face vectors and add to output normals
     for (const auto &el : mesh.elems) {
@@ -406,80 +261,118 @@ namespace met {
     // Normalize output 
     std::transform(std::execution::par_unseq, range_iter(mesh.norms), mesh.norms.begin(), 
       [](const auto &n) { return n.matrix().normalized().eval(); });
-
-    return mesh;
   }
-
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh simplify_mesh(const InputMesh &mesh_, uint target_elems, float target_error) {
+  
+  template <typename MeshTy>
+  void remap_mesh(MeshTy &mesh) {
     met_trace();
-    
-    // Operate on a unpadded and correctly indexed copy of the input mesh
-    auto mesh = remap_mesh<Mesh>(mesh_);
-    
-    // Generate output/input ranges
-    std::vector<eig::Array3u> remap(mesh.elems.size());
-    auto dst = cnt_span<uint>(remap);
-    auto src = cnt_span<uint>(mesh.elems);
-    
-    // Run meshoptimizer's simplify
-    size_t elem_size = meshopt_simplify(dst.data(), 
-                                        src.data(), 
-                                        src.size(), 
-                                        mesh.verts[0].data(),
-                                        mesh.verts.size(),
-                                        sizeof(Mesh::vert_type),
-                                        target_elems * 3,
-                                        target_error,
-                                        0,
-                                        nullptr);
 
-    // Copy over elements
-    remap.resize(elem_size / 3);
-    remap.shrink_to_fit();
-    mesh.elems = remap;
-
-    // Return correct expected type, discarding unused vertices
-    return compact_mesh<OutputMesh>(mesh);
-  }
-
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh decimate_mesh(const InputMesh &mesh_, uint target_elems, float target_error) {
-    met_trace();
-    
-    // Operate on a unpadded and correctly indexed copy of the input mesh
-    auto mesh = remap_mesh<Mesh>(mesh_);
-    
-    // Generate output/input ranges
-    std::vector<eig::Array3u> remap(mesh.elems.size());
-    auto dst = cnt_span<uint>(remap);
+    // Instantiate temporary buffer used for remapping operation, and
+    // obtain a per-index view over mesh elements
+    auto dst = std::vector<uint>(mesh.verts.size() * 3);
     auto src = cnt_span<const uint>(mesh.elems);
     
-    // Run meshoptimizer's simplifySloppy
-    size_t elem_size = meshopt_simplifySloppy(dst.data(), 
-                                              src.data(), 
-                                              src.size(), 
-                                              mesh.verts[0].data(),
-                                              mesh.verts.size(),
-                                              sizeof(Mesh::vert_type),
-                                              target_elems * 3,
-                                              target_error,
-                                              nullptr);
+    // First, set up all mesh attribute streams that need remapping
+    std::vector<meshopt_Stream> attribs;
+    attribs.push_back({ mesh.verts.data(), sizeof(eig::Array3f), sizeof(MeshTy::vert_type) });
+    if (mesh.has_norms())
+      attribs.push_back({ mesh.norms.data(), sizeof(eig::Array3f), sizeof(MeshTy::norm_type) });
+    if (mesh.has_txuvs())
+      attribs.push_back({ mesh.txuvs.data(), sizeof(eig::Array2f), sizeof(MeshTy::txuv_type) });
 
-    // Copy over elements
-    remap.resize(elem_size / 3);
-    remap.shrink_to_fit();
-    mesh.elems = remap;
+    // Generate remap buffer
+    size_t n_verts = meshopt_generateVertexRemapMulti(
+      dst.data(), src.data(), src.size(), mesh.verts.size(), attribs.data(), attribs.size());
 
-    // Return correct expected type, discarding unused vertices
-    return compact_mesh<OutputMesh>(mesh);
+    // Expand mesh data if necessary
+    detail::grow_mesh(mesh, std::max(n_verts, mesh.verts.size()));
+
+    // Given remap buffer, remap all data in the mesh in-place
+    meshopt_remapIndexBuffer(cnt_span<uint>(mesh.elems).data(), src.data(), src.size(), dst.data());
+    meshopt_remapVertexBuffer(mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(MeshTy::vert_type), dst.data());
+    if (mesh.has_norms())
+      meshopt_remapVertexBuffer(mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(MeshTy::norm_type), dst.data());
+    if (mesh.has_txuvs())
+      meshopt_remapVertexBuffer(mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(MeshTy::txuv_type), dst.data());
+      
+    // Shrink-to-fit mesh data if possible
+    detail::shrink_mesh_to_fit(mesh, n_verts);
+  }
+  
+  template <typename MeshTy>
+  void compact_mesh(MeshTy &mesh) {
+    met_trace();
+
+    // Instantiate temporary buffer used for remapping operation, and
+    // obtain a per-index view over mesh elements
+    auto dst = std::vector<uint>(mesh.verts.size() * 3);
+    auto src = cnt_span<const uint>(mesh.elems);
+    
+    // Generate remap buffer
+    size_t n_verts = 
+      meshopt_optimizeVertexFetchRemap(dst.data(), src.data(), src.size(), mesh.verts.size());
+
+    // Expand mesh data if necessary
+    detail::grow_mesh(mesh, std::max(n_verts, mesh.verts.size()));
+
+    // Given remap buffer, remap all data in the mesh in-place
+    meshopt_remapIndexBuffer(cnt_span<uint>(mesh.elems).data(), src.data(), src.size(), dst.data());
+    meshopt_remapVertexBuffer(mesh.verts.data(), mesh.verts.data(), mesh.verts.size(), sizeof(MeshTy::vert_type), dst.data());
+    if (mesh.has_norms())
+      meshopt_remapVertexBuffer(mesh.norms.data(), mesh.norms.data(), mesh.norms.size(), sizeof(MeshTy::norm_type), dst.data());
+    if (mesh.has_txuvs())
+      meshopt_remapVertexBuffer(mesh.txuvs.data(), mesh.txuvs.data(), mesh.txuvs.size(), sizeof(MeshTy::txuv_type), dst.data());
+
+    // Shrink-to-fit mesh data if possible
+    detail::shrink_mesh_to_fit(mesh, n_verts);
   }
 
-  template <typename OutputMesh, typename InputMesh>
-  OutputMesh optimize_mesh(const InputMesh &mesh_) {
+  
+  template <typename MeshTy>
+  void optimize_mesh(MeshTy &mesh) {
     met_trace();
-    // ...
-    return {};
+
+    // TODO implement ...
+  }
+  
+  template <typename MeshTy>
+  void simplify_mesh(MeshTy &mesh, uint target_elems, float target_error) {
+    met_trace();
+
+    // Generate output/input ranges
+    auto dst = std::vector<eig::Array3u>(mesh.elems.size());
+    auto src = cnt_span<uint>(mesh.elems);
+
+    // Run meshoptimizer's simplify in-place
+    size_t n_elems = meshopt_simplify(
+      src.data(), src.data(), src.size(), 
+      mesh.verts[0].data(), mesh.verts.size(), sizeof(MeshTy::vert_type),
+      target_elems * 3, target_error, 0, nullptr) / 3;
+
+    // Compact resulting mesh
+    mesh.elems.resize(n_elems);
+    mesh.elems.shrink_to_fit();
+    compact_mesh(mesh);
+  }
+
+  template <typename MeshTy>
+  void decimate_mesh(MeshTy &mesh, uint target_elems, float target_error) {
+    met_trace();
+
+    // Generate output/input ranges
+    auto dst = std::vector<eig::Array3u>(mesh.elems.size());
+    auto src = cnt_span<uint>(mesh.elems);
+    
+    // Run meshoptimizer's simplifySloppy in-place
+    size_t n_elems = meshopt_simplifySloppy(
+      src.data(), src.data(), src.size(), 
+      mesh.verts[0].data(), mesh.verts.size(), sizeof(MeshTy::vert_type),
+      target_elems * 3, target_error, nullptr) / 3;
+
+    // Compact resulting mesh
+    mesh.elems.resize(n_elems);
+    mesh.elems.shrink_to_fit();
+    compact_mesh(mesh);
   }
 
   /* Explicit template instantiations */
@@ -496,31 +389,24 @@ namespace met {
     template                                                                                          \
     OutputMesh convert_mesh<OutputMesh>(const OutputMesh &);                                          \
     template                                                                                          \
+    void simplify_mesh<OutputMesh>(OutputMesh &, uint, float);                                        \
+    template                                                                                          \
+    void decimate_mesh<OutputMesh>(OutputMesh &, uint, float);                                        \
+    template                                                                                          \
+    void compact_mesh<OutputMesh>(OutputMesh &);                                                      \
+    template                                                                                          \
+    void remap_mesh<OutputMesh>(OutputMesh &);                                                        \
+    template                                                                                          \
+    void optimize_mesh<OutputMesh>(OutputMesh &);                                                     \
+    template                                                                                          \
+    void renormalize_mesh<OutputMesh>(OutputMesh &);                                                  \
+    template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);         \
     template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::AlArray3f>(std::span<const eig::AlArray3f>);
 
-  #define declare_function_output_input(OutputMesh, InputMesh)                                        \
-    template                                                                                          \
-    OutputMesh remap_mesh<OutputMesh, InputMesh>(const InputMesh &);                                  \
-    template                                                                                          \
-    OutputMesh renormalize_mesh<OutputMesh, InputMesh>(const InputMesh &);                            \
-    template                                                                                          \
-    OutputMesh compact_mesh<OutputMesh, InputMesh>(const InputMesh &);                                \
-    template                                                                                          \
-    OutputMesh simplify_mesh<OutputMesh, InputMesh>(const InputMesh &, uint, float);                  \
-    template                                                                                          \
-    OutputMesh decimate_mesh<OutputMesh, InputMesh>(const InputMesh &, uint, float);                  \
-    template                                                                                          \
-    OutputMesh optimize_mesh<OutputMesh, InputMesh>(const InputMesh &);
-
-  #define declare_function_all_inputs(OutputMesh)                                                     \
-    declare_function_mesh_output_only(OutputMesh)                                                     \
-    declare_function_output_input(OutputMesh, Mesh)                                                   \
-    declare_function_output_input(OutputMesh, AlMesh)
-  
   declare_function_delaunay_output_only(Delaunay)
   declare_function_delaunay_output_only(AlDelaunay)
-  declare_function_all_inputs(Mesh)
-  declare_function_all_inputs(AlMesh)
+  declare_function_mesh_output_only(Mesh)
+  declare_function_mesh_output_only(AlMesh)
 } // namespace met
