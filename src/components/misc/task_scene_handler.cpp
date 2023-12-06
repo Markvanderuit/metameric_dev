@@ -21,7 +21,6 @@ namespace met {
     
     { // Pre-load bookkeeping on resources
       auto &e_scene = info.global("scene").getw<Scene>();
-      
       e_scene.resources.meshes.set_mutated(true);
       e_scene.resources.images.set_mutated(true);
       e_scene.resources.illuminants.set_mutated(true);
@@ -38,7 +37,6 @@ namespace met {
 
     { // Pre-load bookkeeping on components; test for state changes from last iteration
       auto &e_scene = info.global("scene").getw<Scene>();
-
       e_scene.components.settings.state.update(e_scene.components.settings.value);
       e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
       e_scene.components.colr_systems.update();
@@ -80,9 +78,8 @@ namespace met {
       handle.getw<detail::RTObjectData>().update(e_scene);
 
     { // Post-load bookkeeping on resources; assume no further changes as gpu-side
-      // resources should be up-to-date now
+      // All resources should be up-to-date now
       auto &e_scene = info.global("scene").getw<Scene>();
-      
       e_scene.resources.meshes.set_mutated(false);
       e_scene.resources.images.set_mutated(false);
       e_scene.resources.illuminants.set_mutated(false);

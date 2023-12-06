@@ -79,7 +79,10 @@ namespace met::detail {
   // Object data structure
   // Holds gl-side packed object data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct RTObjectData {
+  class RTObjectData {
+    mutable bool m_is_atlas_stale = true;
+
+  public:
     // Uniform object layout;
     // provides information for a single object, and how to access
     // its mesh surface and material textures from other buffers.
@@ -95,7 +98,7 @@ namespace met::detail {
       alignas(4)  uint          albedo_i;
       alignas(16) Colr          albedo_v;
       
-      // atlas4f access info
+      // barycentric atlas access info
       alignas(4) uint           layer;
       alignas(8) eig::Array2u   offs, size;
     };
@@ -103,10 +106,7 @@ namespace met::detail {
   public:
     std::vector<ObjectInfo> info;
     gl::Buffer              info_gl;
-
-    // Texture atlas to hold barycentrics per-object
-    std::vector<uint>      atlas_indices;
-    TextureAtlas<float, 4> atlas_4f;
+    TextureAtlas<float, 4>  atlas_bary;
 
   public:
     RTObjectData() = default;
@@ -114,6 +114,11 @@ namespace met::detail {
 
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
+  
+  public:
+    bool is_atlas_stale() const {
+      return m_is_atlas_stale;
+    }
   };
   
   // Uplifting data structure
@@ -143,7 +148,7 @@ namespace met::detail {
     gl::Buffer                   spectra_gl;         // Mapped buffer for pixel buffer copy
     std::span<SpecPack>          spectra_gl_mapping; // Corresponding map
     Texture1d4fArray             spectra_gl_texture; // Texture array layout for all spectra
-
+    
   public:
     RTUpliftingData() = default;
     RTUpliftingData(const Scene &);

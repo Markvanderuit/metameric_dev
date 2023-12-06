@@ -15,14 +15,9 @@ namespace met {
 
   bool MeshViewportDrawDirectTask::is_active(SchedulerHandle &info) {
     met_trace();
-
     auto is_objc_present = !info.global("scene").getr<Scene>().components.objects.empty();
     auto is_view_present = info.relative("viewport_begin")("is_active").getr<bool>();
-    auto is_objc_updated = info("scene_handler", "objc_data").is_mutated();
-    auto is_view_updated = info.relative("viewport_begin")("lrgb_target").is_mutated()
-                       ||  info.relative("viewport_input")("arcball").is_mutated();
-
-    return is_objc_present && (is_objc_updated || is_view_updated);
+    return is_objc_present && is_view_present; 
   }
 
   void MeshViewportDrawDirectTask::init(SchedulerHandle &info) {
@@ -69,7 +64,7 @@ namespace met {
 
     // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
-    bool restart_frame = rebuild_frame || target_handle.is_mutated() || arcball_handle.is_mutated() || object_handle.is_mutated();
+    bool restart_frame = arcball_handle.is_mutated() || object_handle.is_mutated();
 
     // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
@@ -80,7 +75,7 @@ namespace met {
     }
 
     // Re-start state if something like camera/scene changed
-    if (restart_frame) {
+    if (rebuild_frame || restart_frame) {
       // Push fresh camera matrix to uniform data
       const auto &e_arcball = arcball_handle.getr<detail::Arcball>();
       m_unif_buffer_map->trf = e_arcball.full().matrix();
@@ -93,8 +88,7 @@ namespace met {
 
     // Early-out; the maximum sample count has been reached, and we
     // can save a bit on the energy bill
-    if (m_iter >= n_iters_max)
-      return;
+    guard(m_iter < n_iters_max);
 
     // Set sampler uniform
     m_sampler_buffer_map->iter = m_iter;
@@ -128,8 +122,8 @@ namespace met {
       m_program.bind("b_txtr_1f", e_txtr_data.atlas_1f.texture());
     if (e_txtr_data.atlas_3f.texture().is_init())
       m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
-    if (e_objc_data.atlas_4f.texture().is_init())
-      m_program.bind("b_uplf_4f", e_objc_data.atlas_4f.texture());
+    if (e_objc_data.atlas_bary.texture().is_init())
+      m_program.bind("b_uplf_4f", e_objc_data.atlas_bary.texture());
 
     // Dispatch compute shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |

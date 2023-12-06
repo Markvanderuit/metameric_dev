@@ -32,9 +32,9 @@ namespace met {
       }
 
       const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
-      if (e_objc_data.atlas_4f.texture().is_init()) {
+      if (e_objc_data.atlas_bary.texture().is_init()) {
         if (ImGui::Begin("Bary atlas")) {
-          const auto &e_atlas = e_objc_data.atlas_4f;
+          const auto &e_atlas = e_objc_data.atlas_bary;
           // Spawn views
           for (uint i = 0; i < e_atlas.size().z(); ++i) {
             const auto &view = e_atlas.view(i, 0);

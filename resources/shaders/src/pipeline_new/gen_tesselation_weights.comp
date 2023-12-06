@@ -39,10 +39,12 @@ layout(binding = 2, rgba32f) uniform restrict writeonly image2DArray b_uplf_4f;
 
 vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
   if (object_info.is_albedo_sampled) {
+    // Color value is supplied by scene texture
     TextureInfo info = buff_textures.data[object_info.albedo_i];
     uvec2 tx = info.offs + min(tx_in, info.size - 1);
     return vec3(texelFetch(b_txtr_3f, ivec3(tx_in, info.layer), 0));
   } else {
+    // Color value is specified directly
     return object_info.albedo_v;
   }
 }

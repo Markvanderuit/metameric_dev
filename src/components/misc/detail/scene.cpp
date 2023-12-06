@@ -22,7 +22,8 @@ namespace met::detail {
 
   RTTextureData::RTTextureData(const Scene &scene) {
     met_trace();
-    update(scene);
+    // Initialize on first run
+    // update(scene);
   }
 
   bool RTTextureData::is_stale(const Scene &scene) const {
@@ -137,7 +138,8 @@ namespace met::detail {
 
   RTMeshData::RTMeshData(const Scene &scene) {
     met_trace();
-    update(scene);
+    // Initialize on first run
+    // update(scene);
   }
 
   bool RTMeshData::is_stale(const Scene &scene) const {
@@ -157,11 +159,11 @@ namespace met::detail {
     std::vector<Mesh> simplified(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), [](const auto &m) { 
         Mesh copy = m.value();
-        simplify_mesh(copy, 128, 1e-2);
+        // simplify_mesh(copy, 128, 1e-2);
         // renormalize_mesh(copy);
 
-        fmt::print("Simplified mesh vert count: {} -> {}\n", m.value().verts.size(), copy.verts.size());
-        fmt::print("Simplified mesh elem count: {} -> {}\n", m.value().elems.size(), copy.elems.size());
+        // fmt::print("Simplified mesh vert count: {} -> {}\n", m.value().verts.size(), copy.verts.size());
+        // fmt::print("Simplified mesh elem count: {} -> {}\n", m.value().elems.size(), copy.elems.size());
 
         return copy;
     });
@@ -243,81 +245,15 @@ namespace met::detail {
 
   RTObjectData::RTObjectData(const Scene &scene) {
     met_trace_full();
-
-    // Get external resources
-    const auto &e_settings = scene.components.settings.value.texture_size;
-    const auto &e_objects  = scene.components.objects;
-    const auto &e_images   = scene.resources.images;
-    
-    guard(!e_objects.empty());
-    
-    // Build object info data
-    {
-      info.resize(e_objects.size());
-      for (uint i = 0; i < e_objects.size(); ++i) {
-        const auto &component = e_objects[i];
-        const auto &object    = component.value;
-
-        bool is_albedo_sampled    = object.diffuse.index() != 0;
-        // bool is_roughness_sampled = object.roughness.index() != 0;
-        // bool is_metallic_sampled  = object.metallic.index() != 0;
-        // bool is_normals_sampled   = object.normals.index() != 0;
-
-        info[i] = {
-          .trf         = object.trf.matrix(),
-          .trf_inv     = object.trf.inverse().matrix(),
-
-          // Fill shape data
-          .is_active   = object.is_active,
-          .mesh_i      = object.mesh_i,
-          .uplifting_i = object.uplifting_i,
-
-          // Fill materials data
-          .is_albedo_sampled = is_albedo_sampled,
-          .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
-          .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse),
-        };
-      }
-    }
-
-    // Build barycentric data atlas
-    {
-      // Set atlas object indices to all inf
-      atlas_indices.resize(e_objects.size());
-      rng::fill(atlas_indices, std::numeric_limits<uint>::max());
-
-      // Gather necessary texture sizes, and set relevant indices of objects in atlas
-      std::vector<eig::Array2u> inputs;
-      for (uint i = 0; i < e_objects.size(); ++i) {
-        const auto &[e_obj, e_obj_state] = e_objects[i];
-
-        // Object diffuse references image? Get it
-        guard_continue(e_obj.diffuse.index());
-        const auto &[e_img, e_img_state] = e_images[std::get<1>(e_obj.diffuse)];
-
-        atlas_indices[i] = inputs.size();
-        inputs.push_back(e_img.size());
-      } // for (uint i)
-
-      // Determine maximum texture sizes, and scale input sizes w.r.t. to this value
-      eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
-        [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-      eig::Array2u clamped_4f = clamp_size_by_setting(e_settings, maximal_4f);
-      eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
-      for (auto &input : inputs)
-        input = (input.cast<float>() * scaled_4f).max(1.f).cast<uint>().eval();
-
-      // Rebuild texture atlas without mips
-      atlas_4f = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }};
-    }
-    
-    // Push to GL-side
-    info_gl = {{ .data  = cnt_span<const std::byte>(info),
-                 .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    // Initialize on first run
+    // update(scene);
   }
 
   bool RTObjectData::is_stale(const Scene &scene) const {
     met_trace();
+
+    // Set to false, ensuring atlas only becomes stale after update()
+    m_is_atlas_stale = false;
 
     // Get shared resources
     const auto &e_objects  = scene.components.objects;
@@ -330,23 +266,24 @@ namespace met::detail {
                       | vws::filter([&](const auto &comp) { return e_images[std::get<1>(comp.value.diffuse)].is_mutated(); });
 
     // Accumulate reasons for returning
-    return !atlas_4f.texture().is_init() 
-        || e_settings.state.texture_size 
+    return !atlas_bary.texture().is_init() 
+        || !info_gl.is_init()
+        || !stale_images.empty()
         || e_objects.is_mutated()
-        || stale_images;
+        || e_settings.state.texture_size;
   }
-
+  
   void RTObjectData::update(const Scene &scene) {
       met_trace_full();
-      
+            
       // Get external resources
-      const auto &e_objects = scene.components.objects;
-      const auto &e_images = scene.resources.images;
+      const auto &e_objects  = scene.components.objects;
+      const auto &e_images   = scene.resources.images;
       const auto &e_settings = scene.components.settings;
 
       guard(!e_objects.empty());
 
-      // Initialize or resize object buffer to accomodate
+      // Initialize or resize object buffer to accomodate correct nr of objects
       bool handle_resize = false;
       if (!info_gl.is_init() || e_objects.size() != info.size()) {
         info.resize(e_objects.size());
@@ -356,35 +293,39 @@ namespace met::detail {
         handle_resize = true;
       }
       
-      // Initialize or rebuild barycentric atlas if necessary
-      auto stale_images = e_objects
-                        | vws::filter([ ](const auto &comp) { return comp.value.diffuse.index() == 1; })
-                        | vws::filter([&](const auto &comp) { return e_images[std::get<1>(comp.value.diffuse)].is_mutated(); });
-      auto stale_diffuse = e_objects
-                        | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; })
-                        | vws::filter([](const auto &comp) { return comp.state.diffuse; });
-      bool handle_atlas_rebuild = stale_images.empty() 
-        || !stale_diffuse.empty() 
-        || !atlas_4f.texture().is_init()
-        || e_settings.state.texture_size;
-      
-      if (handle_atlas_rebuild) {
-        // Set atlas object indices to all inf
-        atlas_indices.resize(e_objects.size());
-        rng::fill(atlas_indices, std::numeric_limits<uint>::max());
+      // View over all objects with textures whose underlying texture was changed
+      auto stale_textures = e_objects
+                          | vws::filter([ ](const auto &comp) { return comp.value.diffuse.index() == 1; })
+                          | vws::filter([&](const auto &comp) { return e_images[std::get<1>(comp.value.diffuse)].is_mutated(); });
 
+      // View over all objects with textures whose texture index was changed
+      auto stale_indices = e_objects
+                         | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; })
+                         | vws::filter([](const auto &comp) { return comp.state.diffuse;              });
+
+      // Initialize or rebuild barycentric atlas if necessary
+      m_is_atlas_stale =  
+           !stale_textures.empty()          // Rebuild if a referred-to texture was changed
+        || !stale_indices.empty()           // Rebuild if a referral was changed
+        || !atlas_bary.texture().is_init()  // Rebuild if the atlas does not yet exist
+        || e_settings.state.texture_size    // Rebuild if texture size setting was changed
+        || handle_resize;                   // Rebuild if nr. of objects necessitated resize
+      
+      if (m_is_atlas_stale) {
         // Gather necessary texture sizes, and set relevant indices of objects in atlas
         std::vector<eig::Array2u> inputs;
         for (uint i = 0; i < e_objects.size(); ++i) {
           const auto &[e_obj, e_obj_state] = e_objects[i];
-
-          // Object diffuse references image? Get it
-          guard_continue(e_obj.diffuse.index());
-          const auto &[e_img, e_img_state] = e_images[std::get<1>(e_obj.diffuse)];
-
-          atlas_indices[i] = inputs.size();
-          inputs.push_back(e_img.size());
+          
+          if (e_obj.diffuse.index()) {
+            const auto &e_img = e_images[std::get<1>(e_obj.diffuse)].value();
+            inputs.push_back(e_img.size());
+          } else {
+            // A small 4x4 patch to ensure sampling at its center always returns the right value
+            inputs.push_back({ 4, 4 });
+          }
         } // for (uint i)
+        fmt::print("Atlas inputs: {}\n", inputs);
 
         // Determine maximum texture sizes, and scale input sizes w.r.t. to this value
         eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
@@ -395,7 +336,12 @@ namespace met::detail {
           input = (input.cast<float>() * scaled_4f).max(1.f).cast<uint>().eval();
 
         // Rebuild texture atlas without mips
-        atlas_4f = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }};
+        atlas_bary = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }};
+
+        fmt::print("Rebuilt atlas_bary\n");
+        for (const TextureAtlasSpace &s : atlas_bary.reservations()) {
+          fmt::print("\tlayer = {}, offs = {}, size = {}\n", s.layer_i, s.offs, s.size);
+        }
       }
 
       // Process updates to gl-side object info
@@ -403,12 +349,11 @@ namespace met::detail {
         const auto &component = e_objects[i];
         const auto &object    = component.value;
         
-        guard_continue(handle_resize || handle_atlas_rebuild || component.state.is_mutated());
+        guard_continue(handle_resize || m_is_atlas_stale || component.state.is_mutated());
 
         // Get relevant texture info
         bool is_albedo_sampled = object.diffuse.index() != 0;
-        auto resrv = is_albedo_sampled ? atlas_4f.reservation(atlas_indices[i])
-                                       : detail::TextureAtlasSpace();
+        auto resrv = atlas_bary.reservation(i);
         
         info[i] = {
           .trf         = object.trf.matrix(),
@@ -433,6 +378,8 @@ namespace met::detail {
         // Note; should upgrade to mapped range
         info_gl.set(obj_span<const std::byte>(info[i]), sizeof(ObjectInfo), sizeof(ObjectInfo) * static_cast<size_t>(i));
       } // for (uint i)
+      
+      fmt::print("Updating objects\n");
   }
 
   RTUpliftingData::RTUpliftingData(const Scene &scene) {
@@ -470,66 +417,16 @@ namespace met::detail {
                               .flags = buffer_create_flags }};
       spectra_gl_mapping = spectra_gl.map_as<SpecPack>(buffer_access_flags);
     }
-
-    update(scene);
   }
 
   bool RTUpliftingData::is_stale(const Scene &scene) const {
     met_trace();
-
     return false;
-
-    /* // Get shared resources
-    const auto &e_objects  = scene.components.objects;
-    const auto &e_settings = scene.components.settings;
-
-    // Views over objects; objects with diffuse textures, objects which underwent a state change
-    auto stale_objects = e_objects  
-                       | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; }) 
-                       | vws::filter([](const auto &comp) { return comp.state.diffuse;              });
-                       
-    // Accumulate reasons for returning
-    return !atlas_4f.texture().is_init()
-        || e_objects.is_resized()
-        || e_settings.state.texture_size
-        || !stale_objects.empty(); */
   }
 
   void RTUpliftingData::update(const Scene &scene) {
-    met_trace_full();
-
-    // Get shared resources
-    const auto &e_settings = scene.components.settings.value.texture_size;
-    const auto &e_objects  = scene.components.objects;
-    const auto &e_images   = scene.resources.images;
-
-    /* // Set atlas object indices to all inf
-    atlas_indices.resize(e_objects.size());
-    rng::fill(atlas_indices, std::numeric_limits<uint>::max());
-
-    // Gather necessary texture sizes, and set relevant indices of objects in atlas
-    std::vector<eig::Array2u> inputs;
-    for (uint i = 0; i < e_objects.size(); ++i) {
-      const auto &[e_obj, e_obj_state] = e_objects[i];
-
-      // Object diffuse references image? Get it
-      guard_continue(e_obj.diffuse.index());
-      const auto &[e_img, e_img_state] = e_images[std::get<1>(e_obj.diffuse)];
-
-      atlas_indices[i] = inputs.size();
-      inputs.push_back(e_img.size());
-    } // for (uint i)
-
-    // Determine maximum texture sizes, and scale input sizes w.r.t. to this value
-    eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
-      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u clamped_4f = clamp_size_by_setting(e_settings, maximal_4f);
-    eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
-    for (auto &input : inputs)
-      input = (input.cast<float>() * scaled_4f).max(1.f).cast<uint>().eval();
-
-    // Rebuild texture atlas with mips
-    atlas_4f = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }}; */
+    met_trace();
+    // Never runs; is instead filled in by subsequent uplifting pipeline
   }
 
   RTObserverData::RTObserverData(const Scene &scene) {

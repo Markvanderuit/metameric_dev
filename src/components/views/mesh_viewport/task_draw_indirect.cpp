@@ -125,8 +125,8 @@ namespace met {
       m_program.bind("b_txtr_1f", e_txtr_data.atlas_1f.texture());
     if (e_txtr_data.atlas_3f.texture().is_init())
       m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
-    if (e_objc_data.atlas_4f.texture().is_init())
-      m_program.bind("b_uplf_4f", e_objc_data.atlas_4f.texture());
+    if (e_objc_data.atlas_bary.texture().is_init())
+      m_program.bind("b_uplf_4f", e_objc_data.atlas_bary.texture());
 
     // Dispatch compute shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |

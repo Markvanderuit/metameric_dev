@@ -18,11 +18,13 @@ namespace met {
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_object    = e_scene.components.objects[m_object_i];
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
+    const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
 
      // Force on first run, then make dependent on uplifting/object
     return is_first_eval()                                 ||
            e_object.state                                  ||  
            e_uplifting.state                               ||
+           e_objc_data.is_atlas_stale()                    ||
            info("scene_handler", "mesh_data").is_mutated() ||
            info("scene_handler", "txtr_data").is_mutated();
   }
@@ -60,7 +62,7 @@ namespace met {
     const auto &e_tesselation_pack = info(uplifting_task_name, "tesselation_pack").getr<gl::Buffer>();
 
     // Determine dispatch size
-    auto dispatch_n    = e_objc_info.is_albedo_sampled ? e_objc_info.size : eig::Array2u(1);
+    auto dispatch_n    = e_objc_info.size;
     auto dispatch_ndiv = ceil_div(dispatch_n, 16u);
     m_dispatch.groups_x = dispatch_ndiv.x();
     m_dispatch.groups_y = dispatch_ndiv.y();
@@ -72,7 +74,7 @@ namespace met {
     // Bind required resources to corresponding targets
     m_program.bind("b_buff_unif",     m_unif_buffer);
     m_program.bind("b_txtr_3f",       e_txtr_data.atlas_3f.texture());
-    m_program.bind("b_uplf_4f",       e_objc_data.atlas_4f.texture());
+    m_program.bind("b_uplf_4f",       e_objc_data.atlas_bary.texture());
     m_program.bind("b_buff_pack",     e_tesselation_pack);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
     m_program.bind("b_buff_textures", e_txtr_data.info_gl);
@@ -80,12 +82,11 @@ namespace met {
 
     gl::dispatch_compute(m_dispatch);
     
+    fmt::print("Gen object, dispat {} * {}\n", dispatch_n.x(), dispatch_n.y());
     if (e_objc_info.is_albedo_sampled) {
-      fmt::print("Gen {}, sample from {}\n", m_object_i, e_objc_info.albedo_i);
+      fmt::print("\tGen {}, sample from {}\n", m_object_i, e_objc_info.albedo_i);
     } else {
-      fmt::print("Gen {}, value is {}\n", m_object_i, e_objc_info.albedo_v);
+      fmt::print("\tGen {}, value is {}\n", m_object_i, e_objc_info.albedo_v);
     }
-
-    // fmt::print("Generating object data, dispatched {} * {}\n", dispatch_n.x(), dispatch_n.y());
   }
 } // namespace met
