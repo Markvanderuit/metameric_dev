@@ -14,16 +14,17 @@ namespace met {
   bool GenObjectDataTask::is_active(SchedulerHandle &info) {
     met_trace();
     
+    // Get external resources
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_object    = e_scene.components.objects[m_object_i];
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
-    
-    // TODO show fine-grained dependence on object materials and tesselation
-    //      this will literally update **every time**
-    return e_object.state ||  e_uplifting.state            ||
+
+     // Force on first run, then make dependent on uplifting/object
+    return is_first_eval()                                 ||
+           e_object.state                                  ||  
+           e_uplifting.state                               ||
            info("scene_handler", "mesh_data").is_mutated() ||
-           info("scene_handler", "txtr_data").is_mutated() ||
-           info("scene_handler", "uplf_data").is_mutated();
+           info("scene_handler", "txtr_data").is_mutated();
   }
 
   void GenObjectDataTask::init(SchedulerHandle &info) {
@@ -51,6 +52,7 @@ namespace met {
     const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
     const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
+    const auto &e_objc_info = e_objc_data.info[m_object_i];
 
     // Get external resources from object's selected uplifting
     auto uplifting_task_name = std::format("gen_upliftings.gen_uplifting_{}", e_object.value.uplifting_i);
@@ -58,7 +60,7 @@ namespace met {
     const auto &e_tesselation_pack = info(uplifting_task_name, "tesselation_pack").getr<gl::Buffer>();
 
     // Determine dispatch size
-    auto dispatch_n    = e_objc_data.info[m_object_i].size;
+    auto dispatch_n    = e_objc_info.is_albedo_sampled ? e_objc_info.size : eig::Array2u(1);
     auto dispatch_ndiv = ceil_div(dispatch_n, 16u);
     m_dispatch.groups_x = dispatch_ndiv.x();
     m_dispatch.groups_y = dispatch_ndiv.y();
@@ -77,5 +79,13 @@ namespace met {
     m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
 
     gl::dispatch_compute(m_dispatch);
+    
+    if (e_objc_info.is_albedo_sampled) {
+      fmt::print("Gen {}, sample from {}\n", m_object_i, e_objc_info.albedo_i);
+    } else {
+      fmt::print("Gen {}, value is {}\n", m_object_i, e_objc_info.albedo_v);
+    }
+
+    // fmt::print("Generating object data, dispatched {} * {}\n", dispatch_n.x(), dispatch_n.y());
   }
 } // namespace met

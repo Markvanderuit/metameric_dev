@@ -15,10 +15,14 @@ namespace met {
 
   bool MeshViewportDrawDirectTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return (info.relative("viewport_begin")("is_active").getr<bool>()
-        ||  info.relative("viewport_begin")("lrgb_target").is_mutated()
-        ||  info.relative("viewport_input")("arcball").is_mutated())
-       && !info.global("scene").getr<Scene>().components.objects.empty();
+
+    auto is_objc_present = !info.global("scene").getr<Scene>().components.objects.empty();
+    auto is_view_present = info.relative("viewport_begin")("is_active").getr<bool>();
+    auto is_objc_updated = info("scene_handler", "objc_data").is_mutated();
+    auto is_view_updated = info.relative("viewport_begin")("lrgb_target").is_mutated()
+                       ||  info.relative("viewport_input")("arcball").is_mutated();
+
+    return is_objc_present && (is_objc_updated || is_view_updated);
   }
 
   void MeshViewportDrawDirectTask::init(SchedulerHandle &info) {
@@ -47,6 +51,7 @@ namespace met {
     auto begin_handle   = info.relative("viewport_begin");
     auto target_handle  = begin_handle("lrgb_target");
     auto arcball_handle = info.relative("viewport_input")("arcball");
+    auto object_handle  = info("scene_handler", "objc_data");
 
     // Get shared resources 
     const auto &e_scene     = info.global("scene").getr<Scene>();
@@ -62,28 +67,26 @@ namespace met {
     // Get modified resources
     auto &i_target = info("target").getw<gl::Texture2d4f>();
 
-    // If target viewport is resized or sampler data is not yet initialized, initialize
-    // TODO: this violates EVERYTHING in terms of state, but test it for now!
-    if (target_handle.is_mutated() || !m_state_buffer.is_init()) {
-      const auto &e_target = target_handle.getr<gl::Texture2d4f>();
+    // Some state flags to test when to restart sampling
+    bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
+    bool restart_frame = rebuild_frame || target_handle.is_mutated() || arcball_handle.is_mutated() || object_handle.is_mutated();
 
+    // Re-initialize state if target viewport is resized or needs initializing
+    if (rebuild_frame) {
       // Resize internal state buffer and target accordingly
+      const auto &e_target = target_handle.getr<gl::Texture2d4f>();
       m_state_buffer = {{ .size = e_target.size().prod() * sizeof(eig::Array2u) }};
       i_target       = {{ .size = e_target.size() }};
-
-      // Fresh cumulative frame
-      i_target.clear();
-      m_iter = 0;
     }
 
-    // If camera moved, or view resized...
-    if (target_handle.is_mutated() || arcball_handle.is_mutated()) {
-      // Push camera matrix to uniform data
+    // Re-start state if something like camera/scene changed
+    if (restart_frame) {
+      // Push fresh camera matrix to uniform data
       const auto &e_arcball = arcball_handle.getr<detail::Arcball>();
       m_unif_buffer_map->trf = e_arcball.full().matrix();
       m_unif_buffer_map->inv = e_arcball.full().matrix().inverse();
 
-      // Fresh cumulative frame
+      // Set cumulative frame to 0
       i_target.clear();
       m_iter = 0;
     }

@@ -39,9 +39,8 @@ namespace met::detail {
 
     guard(!e_images.empty());
 
-    // Set atlas object indices to all inf
-    atlas_indices.resize(e_images.size());
-    rng::fill(atlas_indices, std::numeric_limits<uint>::max());
+    // Keep track of which atlas' position a texture needs to be stuffed in
+    std::vector<uint> atlas_indices(e_images.size(), std::numeric_limits<uint>::max());\
 
     // Generate inputs for texture atlas
     std::vector<eig::Array2u> inputs_3f, inputs_1f;
@@ -120,7 +119,6 @@ namespace met::detail {
     // Finally, push info objects
     info_gl = {{ .data = cnt_span<const std::byte>(info) }};
   }
-  
 
   std::pair<
     std::vector<eig::Array4f>,
@@ -198,11 +196,11 @@ namespace met::detail {
     uint n_elems = elems_size.at(elems_size.size() - 1) + elems_offs.at(elems_offs.size() - 1);
 
     // Holders for packed data of all meshes
-    std::vector<detail::RTMeshInfo> packed_info(simplified.size());
-    std::vector<eig::Array4f>       packed_verts_a(n_verts),
-                                    packed_verts_b(n_verts);
-    std::vector<eig::Array3u>       packed_elems(n_elems);
-    std::vector<eig::AlArray3u>     packed_elems_al(n_elems);
+    std::vector<MeshInfo>       packed_info(simplified.size());
+    std::vector<eig::Array4f>   packed_verts_a(n_verts),
+                                packed_verts_b(n_verts);
+    std::vector<eig::Array3u>   packed_elems(n_elems);
+    std::vector<eig::AlArray3u> packed_elems_al(n_elems);
 
     // Fill packed layout/data info object
     info.resize(simplified.size());
@@ -220,7 +218,7 @@ namespace met::detail {
       rng::transform(mesh.elems, packed_elems_al.begin() + elems_offs[i], 
         [offs = verts_offs[i]](const auto &v) { return (v + offs).eval(); });
 
-      info[i] = detail::RTMeshInfo {
+      info[i] = {
         .verts_offs = verts_offs[i], .verts_size = verts_size[i],
         .elems_offs = elems_offs[i], .elems_size = elems_size[i],
       };
@@ -352,8 +350,8 @@ namespace met::detail {
       bool handle_resize = false;
       if (!info_gl.is_init() || e_objects.size() != info.size()) {
         info.resize(e_objects.size());
-        info_gl = {{ .size  = e_objects.size() * sizeof(detail::RTObjectInfo),
-                     .flags = gl::BufferCreateFlags::eStorageDynamic         }};
+        info_gl = {{ .size  = e_objects.size() * sizeof(ObjectInfo),
+                     .flags = gl::BufferCreateFlags::eStorageDynamic }};
 
         handle_resize = true;
       }
@@ -433,9 +431,7 @@ namespace met::detail {
         };
 
         // Note; should upgrade to mapped range
-        info_gl.set(obj_span<const std::byte>(info[i]),
-                             sizeof(detail::RTObjectInfo),
-                             sizeof(detail::RTObjectInfo) * static_cast<size_t>(i));
+        info_gl.set(obj_span<const std::byte>(info[i]), sizeof(ObjectInfo), sizeof(ObjectInfo) * static_cast<size_t>(i));
       } // for (uint i)
   }
 

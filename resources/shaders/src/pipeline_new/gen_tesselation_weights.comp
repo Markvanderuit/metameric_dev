@@ -37,10 +37,14 @@ layout(binding = 3) restrict readonly buffer b_buff_pack {
 layout(binding = 1) uniform sampler2DArray b_txtr_3f;
 layout(binding = 2, rgba32f) uniform restrict writeonly image2DArray b_uplf_4f;
 
-vec4 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
-  TextureInfo info = buff_textures.data[object_info.albedo_i];
-  uvec2 tx = info.offs + min(tx_in, info.size - 1);
-  return texelFetch(b_txtr_3f, ivec3(tx_in, info.layer), 0);
+vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
+  if (object_info.is_albedo_sampled) {
+    TextureInfo info = buff_textures.data[object_info.albedo_i];
+    uvec2 tx = info.offs + min(tx_in, info.size - 1);
+    return vec3(texelFetch(b_txtr_3f, ivec3(tx_in, info.layer), 0));
+  } else {
+    return object_info.albedo_v;
+  }
 }
 
 void store_weight(in ObjectInfo info, in uvec2 tx_in, in vec4 bary) {

@@ -12,9 +12,14 @@ namespace met {
 
   bool MeshViewportDrawGBufferTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return (info.relative("viewport_begin")("is_active").getr<bool>()
-        ||  info.relative("viewport_begin")("lrgb_target").is_mutated())
-       && !info.global("scene").getr<Scene>().components.objects.empty();
+
+    auto is_objc_present = !info.global("scene").getr<Scene>().components.objects.empty();
+    auto is_view_present = info.relative("viewport_begin")("is_active").getr<bool>();
+    auto is_objc_updated = info("scene_handler", "objc_data").is_mutated();
+    auto is_view_updated = info.relative("viewport_begin")("lrgb_target").is_mutated()
+                       ||  info.relative("viewport_input")("arcball").is_mutated();
+
+    return is_objc_present && is_view_present && (is_objc_updated || is_view_updated);
   }
 
   void MeshViewportDrawGBufferTask::init(SchedulerHandle &info) {

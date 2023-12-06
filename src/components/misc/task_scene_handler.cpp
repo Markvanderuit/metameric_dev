@@ -47,6 +47,10 @@ namespace met {
       e_scene.components.objects.update();
     }
 
+    if (e_scene.components.objects.is_mutated()) {
+      fmt::print("Objects updated\n");
+    }
+
     // Process updates to gpu-side illuminant components
     if (auto handle = info("illm_data"); handle.getr<detail::RTIlluminantData>().is_stale(e_scene))
       handle.getw<detail::RTIlluminantData>().update(e_scene);
@@ -54,6 +58,10 @@ namespace met {
     // Process updates to gpu-side observer components
     if (auto handle = info("cmfs_data"); handle.getr<detail::RTObserverData>().is_stale(e_scene))
       handle.getw<detail::RTObserverData>().update(e_scene);
+
+    // Process updates to gpu-side object components
+    if (auto handle = info("csys_data"); handle.getr<detail::RTColorSystemData>().is_stale(e_scene))
+      handle.getw<detail::RTColorSystemData>().update(e_scene);
       
     // Process updates to gpu-side image resources
     if (auto handle = info("txtr_data"); handle.getr<detail::RTTextureData>().is_stale(e_scene))
@@ -70,10 +78,6 @@ namespace met {
     // Process updates to gpu-side object components
     if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
       handle.getw<detail::RTObjectData>().update(e_scene);
-
-    // Process updates to gpu-side object components
-    if (auto handle = info("csys_data"); handle.getr<detail::RTColorSystemData>().is_stale(e_scene))
-      handle.getw<detail::RTColorSystemData>().update(e_scene);
 
     { // Post-load bookkeeping on resources; assume no further changes as gpu-side
       // resources should be up-to-date now

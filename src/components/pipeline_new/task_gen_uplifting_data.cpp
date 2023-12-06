@@ -69,8 +69,13 @@ namespace met {
 
   bool GenUpliftingDataTask::is_active(SchedulerHandle &info) {
     met_trace();
+    
+    // Get external resources
     const auto &e_scene = info.global("scene").getr<Scene>();
-    return e_scene.components.upliftings[m_uplifting_i];
+    const auto &e_uplifting = e_scene.components.upliftings[m_uplifting_i];
+
+     // Force on first run, then make dependent on uplifting only
+    return is_first_eval() || e_uplifting;
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -172,8 +177,8 @@ namespace met {
         const auto &e_mesh   = e_meshes[e_object.mesh_i].value();
         const auto &e_elem   = e_mesh.elems[vert.object_elem_i];
         eig::Array2f uv = (e_mesh.txuvs[e_elem[0]] * vert.object_elem_bary[0]
-                          + e_mesh.txuvs[e_elem[1]] * vert.object_elem_bary[1]
-                          + e_mesh.txuvs[e_elem[2]] * vert.object_elem_bary[2])
+                         + e_mesh.txuvs[e_elem[1]] * vert.object_elem_bary[1]
+                         + e_mesh.txuvs[e_elem[2]] * vert.object_elem_bary[2])
                         .unaryExpr([](float f) { return std::fmod(f, 1.f); });
 
         // Sample surface albedo at uv position
@@ -266,8 +271,8 @@ namespace met {
       // Copy affected info data to buffer
       info.elem_size = i_tesselation.elems.size();
       e_uplifting.info_gl.set(obj_span<const std::byte>(info), 
-                              sizeof(detail::RTUpliftingInfo),
-                              sizeof(detail::RTUpliftingInfo) * m_uplifting_i);
+                              sizeof(detail::RTUpliftingData::UpliftingInfo), 
+                              sizeof(detail::RTUpliftingData::UpliftingInfo) * m_uplifting_i);
 
       // Flush affected region of mapped spectrum buffer
       e_uplifting.spectra_gl.flush(info.elem_size * sizeof(detail::RTUpliftingData::SpecPack),

@@ -6,7 +6,7 @@
 
 namespace met {
   class GenUpliftingDataTask : public detail::TaskNode {
-    uint              m_uplifting_i;
+    uint m_uplifting_i;
 
     // Packed wrapper data for tetrahedron; 64 bytes for std430 
     struct ElemPack {

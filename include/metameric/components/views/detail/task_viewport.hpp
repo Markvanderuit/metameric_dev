@@ -304,8 +304,8 @@ namespace met::detail {
           eig::Array2u dispatch_n    = e_lrgb_target.size();
           eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
           m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                        .groups_y = dispatch_ndiv.y(),
-                        .bindable_program = &m_program };
+                         .groups_y = dispatch_ndiv.y(),
+                         .bindable_program = &m_program };
           m_uniform_map->size = dispatch_n;
           m_uniform_buffer.flush();
         }
