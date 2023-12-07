@@ -234,8 +234,84 @@ namespace met::detail {
     }};
   }
 
-  RTObjectData::RTObjectData(const Scene &scene) {
+  
+  RTBVHData::RTBVHData(const Scene &) {
+    met_trace();
+    // ...
+  }
+
+  bool RTBVHData::is_stale(const Scene &scene) const {
+    met_trace();
+    return scene.resources.meshes.is_mutated();
+  }
+
+  void RTBVHData::update(const Scene &scene) {
     met_trace_full();
+
+    // Get external resources
+    const auto &e_meshes = scene.resources.meshes;
+    guard(!e_meshes.empty());
+
+    // Generate a simplified representation of each scene mesh
+    std::vector<Mesh> bl_meshes(e_meshes.size());
+    std::transform(std::execution::par_unseq, range_iter(e_meshes), bl_meshes.begin(), [](const auto &m) { 
+        Mesh copy = m.value();
+        simplify_mesh(copy, 128, 1e-2);
+        // renormalize_mesh(copy);
+        return copy;
+    });
+
+    // Generate an acceleration structure over each scene mesh
+    std::vector<BVH> bl_bvhs(e_meshes.size());
+    rng::transform(bl_meshes, bl_bvhs.begin(), [](const auto &mesh) { 
+      return create_bvh({ 
+        .mesh            = mesh,
+        .n_node_children = 8, // 2, 4, 8
+        .n_leaf_children = 8,
+      });
+    });
+
+    // Gather node/prim lengths and offsets per bvh
+    std::vector<uint> nodes_size, prims_size, nodes_offs, prims_offs;
+    std::transform(range_iter(bl_bvhs), std::back_inserter(nodes_size), 
+      [](const auto &m) { return static_cast<uint>(m.nodes.size()); });
+    std::exclusive_scan(range_iter(nodes_size), std::back_inserter(nodes_offs), 0u);
+    std::transform(range_iter(bl_bvhs), std::back_inserter(prims_size), 
+      [](const auto &m) { return static_cast<uint>(m.prims.size()); });
+    std::exclusive_scan(range_iter(prims_size), std::back_inserter(prims_offs), 0u);
+
+    // Total nodes/prims lengths across all bvhs
+    uint n_nodes = nodes_size.at(nodes_size.size() - 1) + nodes_offs.at(nodes_offs.size() - 1);
+    uint n_prims = prims_size.at(prims_size.size() - 1) + prims_offs.at(prims_offs.size() - 1);
+
+    // Holders for packed data of all bvhs
+    std::vector<BVH::Node> packed_nodes(n_nodes);
+    std::vector<uint>      packed_prims(n_prims);
+    std::vector<BVHInfo>   info(bl_bvhs.size());
+    
+    // Fill packed and layout data
+    #pragma omp parallel for
+    for (int i = 0; i < bl_bvhs.size(); ++i) {
+      const auto &bvh = bl_bvhs[i];
+
+      // Copy over packed data to the correctly offset range;
+      rng::copy(bvh.nodes, packed_nodes.begin() + nodes_offs[i]);
+      rng::copy(bvh.prims, packed_prims.begin() + prims_offs[i]);
+
+      info[i] = {
+        .nodes_offs = nodes_offs[i], .nodes_size = nodes_size[i],
+        .prims_offs = prims_offs[i], .prims_size = prims_size[i],
+      };
+    } // for (int i)
+
+    // Push layout/data to GL buffers
+    bl_bvh_info  = {{ .data = cnt_span<const std::byte>(info)         }};
+    bl_bvh_nodes = {{ .data = cnt_span<const std::byte>(packed_nodes) }};
+    bl_bvh_prims = {{ .data = cnt_span<const std::byte>(packed_prims) }};
+  }
+
+  RTObjectData::RTObjectData(const Scene &scene) {
+    met_trace();
     // Initialize on first run
     // update(scene);
   }

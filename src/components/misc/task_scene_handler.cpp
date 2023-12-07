@@ -18,6 +18,7 @@ namespace met {
     info("cmfs_data").init<detail::RTObserverData>(e_scene);
     info("illm_data").init<detail::RTIlluminantData>(e_scene);
     info("csys_data").init<detail::RTColorSystemData>(e_scene);
+    info("bvhs_data").init<detail::RTBVHData>(e_scene);
     
     { // Pre-load bookkeeping on resources
       auto &e_scene = info.global("scene").getw<Scene>();
@@ -72,6 +73,10 @@ namespace met {
     // Process updates to gpu-side object components
     if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
       handle.getw<detail::RTObjectData>().update(e_scene);
+
+    // Process updates to gpu-side bvh acceleration data
+    if (auto handle = info("bvhs_data"); handle.getr<detail::RTBVHData>().is_stale(e_scene))
+      handle.getw<detail::RTBVHData>().update(e_scene);
 
     { // Post-load bookkeeping on resources; assume no further changes as gpu-side
       // All resources should be up-to-date now

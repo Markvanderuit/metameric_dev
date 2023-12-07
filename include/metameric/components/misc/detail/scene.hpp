@@ -86,6 +86,35 @@ namespace met::detail {
     void update(const Scene &scene);
   };
 
+  // Scene BVH data structure
+  // Holds both cpu/gl-side bottom-level BVH over each mesh, and
+  // a top-level BVH over the set of objects in scene.
+  struct RTBVHData {
+    // Uniform object layout;
+    // provides information for accessing parts of
+    // bvh data from the packed buffers.
+    struct BVHInfo {
+      alignas(4) uint nodes_offs;
+      alignas(4) uint nodes_size;
+      alignas(4) uint prims_offs;
+      alignas(4) uint prims_size;
+    };
+
+  public:
+    gl::Buffer bl_bvh_info;
+    gl::Buffer bl_bvh_nodes;
+    gl::Buffer bl_bvh_prims;
+    // gl::Buffer tl_bvh_nodes;
+    // gl::Buffer tl_bvh_prims;
+    
+  public:
+    RTBVHData() = default;
+    RTBVHData(const Scene &);
+
+    bool is_stale(const Scene &scene) const;
+    void update(const Scene &scene);
+  };
+
   // Object data structure
   // Holds gl-side packed object data in the scene, as well as
   // accompanying info blocks to read said data gl-side

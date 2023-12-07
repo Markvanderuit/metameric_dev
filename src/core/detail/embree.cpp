@@ -64,14 +64,7 @@ namespace met::detail {
     return scene;
   }
 
-
-  // Basic BVH AABB
-  // Matches RTCBounds alignment
-  struct RTCBVHBbox {
-    eig::AlArray3f minb, maxb;
-  };
-
-  RTCBVHBbox merge(const RTCBVHBbox &a, const RTCBVHBbox &b) {
+  BVHBBox merge(const BVHBBox &a, const BVHBBox &b) {
     return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
   }
 
@@ -81,7 +74,7 @@ namespace met::detail {
 
   // Base struct
   struct RTCBVHNode {
-    RTCBVHBbox bounds;
+    BVHBBox bounds;
 
     virtual bool is_inner() const = 0;
   };
@@ -103,7 +96,7 @@ namespace met::detail {
 
       std::memcpy(&bounds, prim_p, sizeof(RTCBuildPrimitive));
       for (size_t i = 1; i < size; ++i) {
-        RTCBVHBbox merge_bounds;
+        BVHBBox merge_bounds;
         std::memcpy(&merge_bounds, &prim_p[i], sizeof(RTCBounds));
         bounds = merge(bounds, merge_bounds);
       }
@@ -139,41 +132,23 @@ namespace met::detail {
     auto &node = *static_cast<RTCBVHTreeNode<K> *>(node_p);
     std::memcpy(&node.bounds, bounds[0], sizeof(RTCBounds));
     for (size_t i = 1; i < n_children; ++i) {
-      RTCBVHBbox merge_bounds;
+      BVHBBox merge_bounds;
       std::memcpy(&merge_bounds, bounds[i], sizeof(RTCBounds));
       node.bounds = merge(node.bounds, merge_bounds);
     }
   }
 
+  struct BVHCreateInternalInfo {
+    std::span<const RTCBuildPrimitive> data; // Range of bounding boxes to build BVH over
+    uint n_node_children;                    // Maximum fan-out of BVH on each node
+    uint n_leaf_children;                    // Maximum nr of primitives on each leaf
+  };
+
   template <uint K>
-  BVH create_bvh_template(BVHCreateInfo info) {
+  BVH create_bvh_template(BVHCreateInternalInfo info) {
     met_trace();
 
-    const auto &mesh = info.mesh;
-
-    // Build BVH primitive structs; use indexed iterator over mesh 
-    // elements because we need to assign indices to them
-    std::vector<RTCBuildPrimitive> prims(mesh.elems.size());
-    #pragma omp parallel for
-    for (int i = 0; i < mesh.elems.size(); ++i) {
-      using VTy = Mesh::vert_type;
-      using ETy = Mesh::elem_type;
-
-      const ETy el = mesh.elems[i];
-      
-      // Find the minimal/maximal components bounding the element
-      auto vts = el | vws::transform([&](uint i) { return mesh.verts[i]; }) | vws::take(3);
-      auto minb = rng::fold_left_first(vts, [](VTy a, VTy b) { return a.cwiseMin(b).eval(); }).value();
-      auto maxb = rng::fold_left_first(vts, [](VTy a, VTy b) { return a.cwiseMax(b).eval(); }).value();
-
-      // Construct and assign BVH primitive object
-      RTCBuildPrimitive prim;
-      prim.geomID = 0;
-      prim.primID = static_cast<uint>(i);
-      std::tie(prim.lower_x, prim.lower_y, prim.lower_z) = { minb[0], minb[1], minb[2] };
-      std::tie(prim.upper_x, prim.upper_y, prim.upper_z) = { maxb[0], maxb[1], maxb[2] };
-      prims[i] = prim;
-    } // for (int i)
+    std::vector<RTCBuildPrimitive> prims(range_iter(info.data));
 
     // Initializie new BVH structure
     RTCBVH rtc_bvh = rtcNewBVH(get_rtc_device());
@@ -260,14 +235,64 @@ namespace met::detail {
 
   // Wrapper function to do templated generation with a runtime constant
   template <uint... Ks>
-  BVH create_bvh_template_wrapper(BVHCreateInfo info) {
-    using FTy = BVH(*)(BVHCreateInfo);
+  BVH create_bvh_template_wrapper(BVHCreateInternalInfo info) {
+    using FTy = BVH(*)(BVHCreateInternalInfo);
     constexpr FTy f[] = { create_bvh_template<Ks>... };
     return f[std::min(info.n_node_children, 8u) >> 2](info);
   }
 
-  BVH create_bvh(BVHCreateInfo info) {
+  BVH create_bvh(BVHCreateMeshInfo info) {
     met_trace();
-    return create_bvh_template_wrapper<2, 4, 8>(info);
+
+    // Build BVH primitive structs; use indexed iterator over mesh 
+    // elements because we need to assign indices to them
+    const auto &mesh = info.mesh;
+    std::vector<RTCBuildPrimitive> prims(mesh.elems.size());
+    #pragma omp parallel for
+    for (int i = 0; i < mesh.elems.size(); ++i) {
+      using VTy = Mesh::vert_type;
+      using ETy = Mesh::elem_type;
+
+      const ETy el = mesh.elems[i];
+      
+      // Find the minimal/maximal components bounding the element
+      auto vts = el | vws::transform([&](uint i) { return mesh.verts[i]; }) | vws::take(3);
+      auto minb = rng::fold_left_first(vts, [](VTy a, VTy b) { return a.cwiseMin(b).eval(); }).value();
+      auto maxb = rng::fold_left_first(vts, [](VTy a, VTy b) { return a.cwiseMax(b).eval(); }).value();
+
+      // Construct and assign BVH primitive object
+      RTCBuildPrimitive prim;
+      prim.geomID = 0;
+      prim.primID = static_cast<uint>(i);
+      std::tie(prim.lower_x, prim.lower_y, prim.lower_z) = { minb[0], minb[1], minb[2] };
+      std::tie(prim.upper_x, prim.upper_y, prim.upper_z) = { maxb[0], maxb[1], maxb[2] };
+      prims[i] = prim;
+    } // for (int i)
+
+    return create_bvh_template_wrapper<2, 4, 8>({
+      .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
+    });
+  }
+  
+  BVH create_bvh(BVHCreateBBoxInfo info) {
+    met_trace();
+
+    // Build BVH primitive structs; use indexed iterator over mesh 
+    // elements because we need to assign indices to them
+    std::vector<RTCBuildPrimitive> prims(info.bbox.size());
+    #pragma omp parallel for
+    for (int i = 0; i < info.bbox.size(); ++i) {
+      auto bbox = info.bbox[i];
+      RTCBuildPrimitive prim;
+      prim.geomID = 0;
+      prim.primID = static_cast<uint>(i);
+      std::tie(prim.lower_x, prim.lower_y, prim.lower_z) = { bbox.minb[0], bbox.minb[1], bbox.minb[2] };
+      std::tie(prim.upper_x, prim.upper_y, prim.upper_z) = { bbox.maxb[0], bbox.maxb[1], bbox.maxb[2] };
+      prims[i] = prim;
+    } // for (int i)
+
+    return create_bvh_template_wrapper<2, 4, 8>({
+      .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
+    });
   }
 } // met::detail

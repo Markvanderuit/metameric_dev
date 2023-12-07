@@ -4,11 +4,23 @@
 #include <array>
 
 namespace met::detail {
+  // Basic BVH axis-aligned bounding box
+  // Fit for std140/430 layout, and matches embree's RTCBounds alignment
+  struct BVHBBox {
+    eig::AlArray3f minb, maxb;
+  };
+
   // BVH helper struct
-  struct BVHCreateInfo {
-    const Mesh &mesh;     // Reference mesh to build BVH over
-    uint n_node_children; // Maximum fan-out of BVH on each node
-    uint n_leaf_children; // Maximum nr of primitives on each leaf
+  struct BVHCreateMeshInfo {
+    const Mesh &mesh;               // Reference mesh to build BVH over
+    uint n_node_children = 2;       // Maximum fan-out of BVH on each node
+    uint n_leaf_children = 1;       // Maximum nr of primitives on each leaf
+  };
+
+  struct BVHCreateBBoxInfo {
+    std::span<const BVHBBox> bbox;  // Range of bounding boxes to build BVH over
+    uint n_node_children = 2;       // Maximum fan-out of BVH on each node
+    uint n_leaf_children = 1;       // Maximum nr of primitives on each leaf
   };
 
   // Generic BVH over a structure of bbox primitives;
@@ -38,5 +50,6 @@ namespace met::detail {
     std::vector<uint> prims; // Unsorted indices of underlying primitivers
   };
 
-  BVH create_bvh(BVHCreateInfo info);
+  BVH create_bvh(BVHCreateMeshInfo info);
+  BVH create_bvh(BVHCreateBBoxInfo info);
 } // met::detail
