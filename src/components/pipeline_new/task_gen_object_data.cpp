@@ -19,7 +19,7 @@ namespace met {
     const auto &e_object    = e_scene.components.objects[m_object_i];
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
 
-     // Force on first run, then make dependent on uplifting/object
+    // Force on first run, then make dependent on uplifting/object
     return is_first_eval()                                 ||
            e_object.state                                  ||  
            e_uplifting.state                               ||
@@ -53,7 +53,7 @@ namespace met {
     const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
     const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
-    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
+    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
     const auto &e_objc_info = e_objc_data.info[m_object_i];
 
     // Get external resources from object's selected uplifting
@@ -61,9 +61,9 @@ namespace met {
     const auto &e_tesselation = info(uplifting_task_name, "tesselation").getr<AlDelaunay>();
     const auto &e_tesselation_pack = info(uplifting_task_name, "tesselation_pack").getr<gl::Buffer>();
 
-    // Determine dispatch size
-    auto dispatch_n    = e_objc_info.size;
-    auto dispatch_ndiv = ceil_div(dispatch_n, 16u);
+    // Determine dispatch size as the size of the object's patch in the barycentric texture atlas
+    auto dispatch_n     = e_bary_data.patch(m_object_i).size;
+    auto dispatch_ndiv  = ceil_div(dispatch_n, 16u);
     m_dispatch.groups_x = dispatch_ndiv.x();
     m_dispatch.groups_y = dispatch_ndiv.y();
 
@@ -74,12 +74,12 @@ namespace met {
     // Bind required resources to corresponding targets
     m_program.bind("b_buff_unif",     m_unif_buffer);
     m_program.bind("b_txtr_3f",       e_txtr_data.atlas_3f.texture());
-    m_program.bind("b_bary_4f",       e_bary_data.atls_4f.texture());
+    m_program.bind("b_bary_4f",       e_bary_data.texture());
     m_program.bind("b_buff_pack",     e_tesselation_pack);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
     m_program.bind("b_buff_textures", e_txtr_data.info_gl);
     m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
-    m_program.bind("b_buff_weights",  e_bary_data.info_gl);
+    m_program.bind("b_buff_weights",  e_bary_data.buffer());
 
     gl::dispatch_compute(m_dispatch);
     

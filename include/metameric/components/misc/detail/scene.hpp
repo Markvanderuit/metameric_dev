@@ -89,10 +89,7 @@ namespace met::detail {
   // Object data structure
   // Holds gl-side packed object data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  class RTObjectData {
-    mutable bool m_is_atlas_stale = true;
-
-  public:
+  struct RTObjectData {
     // Uniform object layout;
     // provides information for a single object, and how to access
     // its mesh surface and material textures from other buffers.
@@ -107,16 +104,11 @@ namespace met::detail {
       alignas(4)  bool          is_albedo_sampled;
       alignas(4)  uint          albedo_i;
       alignas(16) Colr          albedo_v;
-      
-      // barycentric atlas access info
-      alignas(4) uint           layer;
-      alignas(8) eig::Array2u   offs, size;
     };
 
   public:
     std::vector<ObjectInfo> info;
     gl::Buffer              info_gl;
-    TextureAtlas<float, 4>  atlas_bary;
 
   public:
     RTObjectData() = default;
@@ -124,27 +116,14 @@ namespace met::detail {
 
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
-  
-  public:
-    bool is_atlas_stale() const {
-      return m_is_atlas_stale;
-    }
   };
 
   // Object weight data structure
   // Holds gl-side texture atlas storing tesselation weights, as
   // well as accompanying info blocks to read said atlas
   struct RTObjectWeightData {
-    // barycentric atlas access info
-    struct ObjectWeightInfo {
-      alignas(4) uint           layer;
-      alignas(8) eig::Array2u   offs, size;
-    };
-
-  public:
-    std::vector<ObjectWeightInfo> info;
-    gl::Buffer                    info_gl;
-    TextureAtlas<float, 4>        atls_4f;
+    gl::Buffer             info_gl;
+    TextureAtlas<float, 4> atls_4f;
   };
   
   // Uplifting data structure
@@ -183,7 +162,7 @@ namespace met::detail {
     void update(const Scene &scene);
   };
 
-  // C<FS spectra data structure
+  // CMFS spectra data structure
   // Holds gl-side packed cmfs data in the scene.
   struct RTObserverData {
     using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;

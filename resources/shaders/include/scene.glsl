@@ -36,11 +36,6 @@ struct ObjectInfo {
   bool is_albedo_sampled; // Use sampler or direct value?
   uint albedo_i;          // Sampler index
   vec3 albedo_v;          // Direct value
-
-  // Atlas access info
-  uint layer;
-  uvec2 offs;
-  uvec2 size;
 };
 
 // Atlas access info

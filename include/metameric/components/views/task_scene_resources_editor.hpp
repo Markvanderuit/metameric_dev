@@ -15,36 +15,32 @@ namespace met {
 
       // Get external resources
       const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-
-      if (e_txtr_data.atlas_3f.texture().is_init()) {
-        if (ImGui::Begin("Texture atlas")) {
-          const auto &e_atlas = e_txtr_data.atlas_3f;
-          // Spawn views
-          for (uint i = 0; i < e_atlas.size().z(); ++i) {
-            for (uint j = 0; j < e_atlas.levels(); ++j) {
-              ImGui::Image(ImGui::to_ptr(e_atlas.view(i, j).object()), { 128, 128 });
-              if (j < e_atlas.levels() - 1)
-                ImGui::SameLine();
-            }
-          }
-        }
-        ImGui::End();
-      }
-
       const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
-      if (e_bary_data.atls_4f.texture().is_init()) {
-        if (ImGui::Begin("Bary atlas")) {
-          const auto &e_atlas = e_bary_data.atls_4f;
-          // Spawn views
-          for (uint i = 0; i < e_atlas.size().z(); ++i) {
-            const auto &view = e_atlas.view(i, 0);
-            ImGui::Image(ImGui::to_ptr(view.object()), { 512, 512 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+
+      // Spawn view of texture atlas interiors
+      if (ImGui::Begin("Texture atlas")) {
+        const auto &e_atlas = e_txtr_data.atlas_3f;
+        // Spawn views
+        for (uint i = 0; i < e_atlas.capacity().z(); ++i) {
+          for (uint j = 0; j < e_atlas.levels(); ++j) {
+            ImGui::Image(ImGui::to_ptr(e_atlas.view(i, j).object()), { 256, 256 });
+            if (j < e_atlas.levels() - 1)
+              ImGui::SameLine();
           }
         }
-        ImGui::End();
       }
+      ImGui::End();
 
-      ImGui::ShowDemoWindow();
+      // Spawn view of weight atlas interiors
+      if (ImGui::Begin("Bary atlas")) {
+        const auto &e_atlas = e_bary_data.atls_4f;
+        // Spawn views
+        for (uint i = 0; i < e_atlas.capacity().z(); ++i) {
+          const auto &view = e_atlas.view(i, 0);
+          ImGui::Image(ImGui::to_ptr(view.object()), { 256, 256 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+        }
+      }
+      ImGui::End();
 
       if (ImGui::Begin("Scene resources")) {
         // Get external resources

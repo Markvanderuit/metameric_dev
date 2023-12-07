@@ -45,7 +45,7 @@ vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
     // Color value is supplied by scene texture
     TextureInfo info = buff_textures.data[object_info.albedo_i];
     uvec2 tx = info.offs + min(tx_in, info.size - 1);
-    return vec3(texelFetch(b_txtr_3f, ivec3(tx_in, info.layer), 0));
+    return vec3(texelFetch(b_txtr_3f, ivec3(tx, info.layer), 0));
   } else {
     // Color value is specified directly
     return object_info.albedo_v;
