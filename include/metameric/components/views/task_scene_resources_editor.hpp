@@ -31,10 +31,10 @@ namespace met {
         ImGui::End();
       }
 
-      const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
-      if (e_objc_data.atlas_bary.texture().is_init()) {
+      const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
+      if (e_bary_data.atls_4f.texture().is_init()) {
         if (ImGui::Begin("Bary atlas")) {
-          const auto &e_atlas = e_objc_data.atlas_bary;
+          const auto &e_atlas = e_bary_data.atls_4f;
           // Spawn views
           for (uint i = 0; i < e_atlas.size().z(); ++i) {
             const auto &view = e_atlas.view(i, 0);

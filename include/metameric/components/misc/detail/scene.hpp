@@ -17,6 +17,16 @@ namespace gl {
 } // namespace gl
 
 namespace met::detail {
+  inline
+  eig::Array2u clamp_size_by_setting(Settings::TextureSize setting, eig::Array2u size) {
+    switch (setting) {
+      case Settings::TextureSize::eHigh: return size.cwiseMin(2048u);
+      case Settings::TextureSize::eMed:  return size.cwiseMin(1024u);
+      case Settings::TextureSize::eLow:  return size.cwiseMin(512u);
+      default:                           return size;
+    }
+  }
+
   // Texture data structure
   // Holds gl-side packed image data in the scene, as well as
   // accompanying info blocks to read said data gl-side
@@ -119,6 +129,22 @@ namespace met::detail {
     bool is_atlas_stale() const {
       return m_is_atlas_stale;
     }
+  };
+
+  // Object weight data structure
+  // Holds gl-side texture atlas storing tesselation weights, as
+  // well as accompanying info blocks to read said atlas
+  struct RTObjectWeightData {
+    // barycentric atlas access info
+    struct ObjectWeightInfo {
+      alignas(4) uint           layer;
+      alignas(8) eig::Array2u   offs, size;
+    };
+
+  public:
+    std::vector<ObjectWeightInfo> info;
+    gl::Buffer                    info_gl;
+    TextureAtlas<float, 4>        atls_4f;
   };
   
   // Uplifting data structure

@@ -3,6 +3,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
+#include <metameric/components/misc/detail/scene.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/dispatch.hpp>
@@ -46,6 +47,9 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_objects = e_scene.components.objects;
 
+      // Add texture atlas object, non-initialized
+      info("bary_data").set<detail::RTObjectWeightData>({ });
+
       // Add subtasks to perform mapping
       m_subtasks.init(info, e_objects.size(), 
         [](uint i)         { return fmt::format("gen_object_{}", i); },
@@ -61,6 +65,77 @@ namespace met {
 
       // Adjust nr. of subtasks
       m_subtasks.eval(info, e_objects.size());
+
+      // Check if atlas needs rebuilding
+      if (!e_objects.empty()) {
+        // Get external resources
+        const auto &e_images   = e_scene.resources.images;
+        const auto &e_settings = e_scene.components.settings;
+
+        // Get weight atlas handle and value
+        auto i_bary_handle = info("bary_data");
+        const auto &i_bary_data = i_bary_handle.getr<detail::RTObjectWeightData>();
+
+        /* // View over all objects with textures whose underlying texture was changed
+        auto stale_textures = e_objects
+                            | vws::filter([ ](const auto &comp) { return comp.value.diffuse.index() == 1; })
+                            | vws::filter([&](const auto &comp) { return e_images[std::get<1>(comp.value.diffuse)].is_mutated(); });
+
+        // View over all objects with textures whose texture index was changed
+        auto stale_indices = e_objects
+                          | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; })
+                          | vws::filter([](const auto &comp) { return comp.state.diffuse;              });
+
+        bool is_atlas_stale =
+          !stale_textures.empty()                  || // Rebuild if a referred texture was changed
+          !stale_indices.empty()                   || // Rebiuld if an object switched to another texture
+           e_settings.state.texture_size           || // Rebuild if texture size setting was changed
+          !i_bary_data.atls_4f.texture().is_init()    // Atlas was not initialized
+          ; */
+
+        // Gather necessary texture sizes for each object
+        std::vector<eig::Array2u> inputs(e_objects.size());
+        rng::transform(e_objects, inputs.begin(), [&](const auto &comp) -> eig::Array2u {
+          const auto &e_obj = comp.value;
+          if (auto value_ptr = std::get_if<uint>(&e_obj.diffuse)) {
+            // Texture index is specified; insert texture size in the atlas inputs
+            const auto &e_img = e_images[*value_ptr].value();
+            return e_img.size();
+          } else {
+            // Color value specified directly; a small 4x4 texture patch should be put in
+            // the atlas for this object
+            return { 4, 4 };
+          }
+        });
+
+        // Determine maximum texture sizes, and scale atlas inputs w.r.t. to this value and
+        // specified texture settings
+        eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
+          [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+        eig::Array2u clamped_4f = detail::clamp_size_by_setting(e_settings.value.texture_size, maximal_4f);
+        eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
+        for (auto &input : inputs)
+          input = (input.cast<float>() * scaled_4f).max(2.f).cast<uint>().eval();
+
+        // Test if the necessitated inputs fit exactly in the atlas' current reserved spaces
+        auto reservations = i_bary_data.atls_4f.reservations() | vws::transform(&detail::TextureAtlasSpace::size);
+        bool is_exact_fit = rng::equal(inputs, reservations, eig::safe_approx_compare<eig::Array2u>);
+        
+        // For now, rebuild atlas if an exact fit to the current atlas is not seen, instead of
+        // doing something clever
+        if (!is_exact_fit || !i_bary_data.atls_4f.texture().is_init()) {
+          auto &i_bary_data = i_bary_handle.getw<detail::RTObjectWeightData>();
+          
+          i_bary_data.atls_4f = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }};
+
+          // TODO reuse object and push to buffer automatically inside atlas
+          i_bary_data.info.resize(e_objects.size());
+          rng::transform(i_bary_data.atls_4f.reservations(), i_bary_data.info.begin(), [](const auto &rsrv) {
+            return detail::RTObjectWeightData::ObjectWeightInfo { .layer = rsrv.layer_i, .offs  = rsrv.offs, .size  = rsrv.size };
+          });
+          i_bary_data.info_gl = {{ .data = cnt_span<const std::byte>(i_bary_data.info) }};
+        }
+      }
     }
   };
 } // namespace met

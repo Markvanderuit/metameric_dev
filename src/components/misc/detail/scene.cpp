@@ -11,15 +11,6 @@ namespace met::detail {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  eig::Array2u clamp_size_by_setting(Settings::TextureSize setting, eig::Array2u size) {
-    switch (setting) {
-      case Settings::TextureSize::eHigh: return size.cwiseMin(2048u);
-      case Settings::TextureSize::eMed:  return size.cwiseMin(1024u);
-      case Settings::TextureSize::eLow:  return size.cwiseMin(512u);
-      default:                           return size;
-    }
-  }
-
   RTTextureData::RTTextureData(const Scene &scene) {
     met_trace();
     // Initialize on first run

@@ -29,13 +29,16 @@ layout(binding = 1) restrict readonly buffer b_buff_textures {
 layout(binding = 2) restrict readonly buffer b_buff_uplifts {
   UpliftInfo data[];
 } buff_uplifts;
-layout(binding = 3) restrict readonly buffer b_buff_pack { 
+layout(binding = 3) restrict readonly buffer b_buff_weights {
+  ObjectBaryInfo data[];
+} buff_weights;
+layout(binding = 4) restrict readonly buffer b_buff_pack { 
   Elem data[]; 
 } pack_buffer;
 
 // Image/sampler declarations
 layout(binding = 1) uniform sampler2DArray b_txtr_3f;
-layout(binding = 2, rgba32f) uniform restrict writeonly image2DArray b_uplf_4f;
+layout(binding = 2, rgba32f) uniform restrict writeonly image2DArray b_bary_4f;
 
 vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
   if (object_info.is_albedo_sampled) {
@@ -49,9 +52,9 @@ vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
   }
 }
 
-void store_weight(in ObjectInfo info, in uvec2 tx_in, in vec4 bary) {
+void store_weight(in ObjectBaryInfo info, in uvec2 tx_in, in vec4 bary) {
   uvec2 tx = info.offs + min(tx_in, info.size - 1);
-  imageStore(b_uplf_4f, ivec3(tx, info.layer), bary);
+  imageStore(b_bary_4f, ivec3(tx, info.layer), bary);
 }
 
 // Shared memory declarations
@@ -66,8 +69,9 @@ void load_shared(uint n) {
 
 void main() {
   // Load relevant object/uplifting data
-  ObjectInfo object_info = buff_objects.data[unif.object_i];
-  UpliftInfo uplift_info = buff_uplifts.data[object_info.uplifting_i];
+  ObjectBaryInfo weight_info = buff_weights.data[unif.object_i];
+  ObjectInfo     object_info = buff_objects.data[unif.object_i];
+  UpliftInfo     uplift_info = buff_uplifts.data[object_info.uplifting_i];
 
   // Load pack data into shared memory
   load_shared(uplift_info.elem_size);
@@ -99,5 +103,5 @@ void main() {
   } // for (uint j)
 
   // Store result, packing 3/4th of weights, together with the tetrahedron's index
-  store_weight(object_info, i, vec4(result_bary.xyz, float(result_indx)));
+  store_weight(weight_info, i, vec4(result_bary.xyz, float(result_indx)));
 }

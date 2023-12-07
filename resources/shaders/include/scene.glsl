@@ -43,6 +43,13 @@ struct ObjectInfo {
   uvec2 size;
 };
 
+// Atlas access info
+struct ObjectBaryInfo {
+  uint layer;
+  uvec2 offs;
+  uvec2 size;
+};
+
 // Info object to gather Scene::Uplifting relevant data
 struct UpliftInfo {
   uint elem_offs;

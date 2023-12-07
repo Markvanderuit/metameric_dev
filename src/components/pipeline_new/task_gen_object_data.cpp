@@ -18,14 +18,13 @@ namespace met {
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_object    = e_scene.components.objects[m_object_i];
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
 
      // Force on first run, then make dependent on uplifting/object
     return is_first_eval()                                 ||
            e_object.state                                  ||  
            e_uplifting.state                               ||
-           e_objc_data.is_atlas_stale()                    ||
-           info("scene_handler", "mesh_data").is_mutated() ||
+           info("gen_objects",   "bary_data").is_mutated() ||
+           info("scene_handler", "mesh_data").is_mutated() || 
            info("scene_handler", "txtr_data").is_mutated();
   }
 
@@ -54,6 +53,7 @@ namespace met {
     const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
     const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
+    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
     const auto &e_objc_info = e_objc_data.info[m_object_i];
 
     // Get external resources from object's selected uplifting
@@ -74,11 +74,12 @@ namespace met {
     // Bind required resources to corresponding targets
     m_program.bind("b_buff_unif",     m_unif_buffer);
     m_program.bind("b_txtr_3f",       e_txtr_data.atlas_3f.texture());
-    m_program.bind("b_uplf_4f",       e_objc_data.atlas_bary.texture());
+    m_program.bind("b_bary_4f",       e_bary_data.atls_4f.texture());
     m_program.bind("b_buff_pack",     e_tesselation_pack);
     m_program.bind("b_buff_objects",  e_objc_data.info_gl);
     m_program.bind("b_buff_textures", e_txtr_data.info_gl);
     m_program.bind("b_buff_uplifts",  e_uplf_data.info_gl);
+    m_program.bind("b_buff_weights",  e_bary_data.info_gl);
 
     gl::dispatch_compute(m_dispatch);
     

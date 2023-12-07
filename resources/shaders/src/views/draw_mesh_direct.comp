@@ -36,12 +36,15 @@ layout(binding = 2) restrict readonly buffer b_buff_textures {
 layout(binding = 3) restrict readonly buffer b_buff_uplifts {
   UpliftInfo data[];
 } buff_uplifts;
+layout(binding = 4) restrict readonly buffer b_buff_weights {
+  ObjectBaryInfo data[];
+} buff_weights;
 
 // Texture unit, ergo sampler declarations
 layout(binding = 0) uniform sampler2D      b_gbuffer; // G-buffer pack
 layout(binding = 1) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
 layout(binding = 2) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
-layout(binding = 3) uniform sampler2DArray b_uplf_4f; // Uplifting weight atlas
+layout(binding = 3) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
 layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
 layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
@@ -62,11 +65,11 @@ vec3 sample_colsys(in uint colsys_i, in float wvl) {
   return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
 }
 
-uvec4 sample_uplift_bary_indices(in ObjectInfo object_info, in GBuffer gb) {
+uvec4 sample_uplift_bary_indices(in ObjectInfo object_info, in ObjectBaryInfo weight_info, in GBuffer gb) {
   // Query nearest-neigbor barycentric weight for this object
   vec2 tx_gbuf = object_info.is_albedo_sampled ? gb.tx : vec2(0.5f);
-  vec2 tx = (vec2(object_info.offs) + vec2(object_info.size) * tx_gbuf) / textureSize(b_uplf_4f, 0).xy;
-  return uvec4(textureGather(b_uplf_4f, vec3(tx, object_info.layer), 3)); // fourth channel is non-variant :D
+  vec2 tx = (vec2(weight_info.offs) + vec2(weight_info.size) * tx_gbuf) / textureSize(b_bary_4f, 0).xy;
+  return uvec4(textureGather(b_bary_4f, vec3(tx, weight_info.layer), 3)); // fourth channel is non-variant :D
 }
 
 float sample_uplift_refl(in UpliftInfo uplift_info, in vec4 bary, in float wvl) {
@@ -78,11 +81,11 @@ float sample_uplift_refl(in UpliftInfo uplift_info, in vec4 bary, in float wvl) 
   return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
 }
 
-vec3 fetch_color_part(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb, in uvec2 px) {
+vec3 fetch_color_part(inout uvec3 state, in ObjectBaryInfo weight_info, in UpliftInfo uplift_info, in GBuffer gb, in uvec2 px) {
   vec3 value = vec3(0);
   
   // Element indices differ, so sample weights separately
-  vec4 bary = texelFetch(b_uplf_4f, ivec3(px, object_info.layer), 0);
+  vec4 bary = texelFetch(b_bary_4f, ivec3(px, weight_info.layer), 0);
   
   // Take direct light samples
   for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
@@ -102,11 +105,11 @@ vec3 fetch_color_part(inout uvec3 state, in ObjectInfo object_info, in UpliftInf
   return value; // * cos_theta;
 }
 
-vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb) {
+vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in ObjectBaryInfo weight_info, in UpliftInfo uplift_info, in GBuffer gb) {
   const uvec2 texel_offsets[4] = uvec2[4](uvec2(0, 0), uvec2(1, 0), uvec2(0, 1), uvec2(1, 1));
 
   vec2  tx_gbuf = object_info.is_albedo_sampled ? gb.tx : vec2(0.5f);
-  vec2  tx_full  = vec2(object_info.offs) + vec2(object_info.size) * tx_gbuf - vec2(0.5f);
+  vec2  tx_full  = vec2(weight_info.offs) + vec2(weight_info.size) * tx_gbuf - vec2(0.5f);
   uvec2 tx_floor = uvec2(tx_full);
   vec2  alpha    = mod(tx_full, 1.f);
 
@@ -115,20 +118,20 @@ vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo upl
   for (uint i = 0; i < 4; ++i) {
     state_ = state;
     uvec2 px = tx_floor + texel_offsets[i];
-    values[i] = fetch_color_part(state_, object_info, uplift_info, gb, px);
+    values[i] = fetch_color_part(state_, weight_info, uplift_info, gb, px);
   }
   state = state_;
 
   return mix(mix(values[0], values[1], alpha.x), mix(values[2], values[3], alpha.x), alpha.y);
 }
 
-vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in UpliftInfo uplift_info, in GBuffer gb) {
+vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in ObjectBaryInfo weight_info, in UpliftInfo uplift_info, in GBuffer gb) {
   vec3 value = vec3(0);
 
   // All element indices are the same, so sample barycentric weights directly
   vec2 tx_gbuf = object_info.is_albedo_sampled ? gb.tx : vec2(0.5f);
-  vec2 tx_bary = (vec2(object_info.offs) + vec2(object_info.size) * tx_gbuf) / textureSize(b_uplf_4f, 0).xy;
-  vec4 bary = textureLod(b_uplf_4f, vec3(tx_bary, object_info.layer), 0);
+  vec2 tx_bary = (vec2(weight_info.offs) + vec2(weight_info.size) * tx_gbuf) / textureSize(b_bary_4f, 0).xy;
+  vec4 bary = textureLod(b_bary_4f, vec3(tx_bary, weight_info.layer), 0);
   
   // Take direct light samples
   for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
@@ -169,21 +172,22 @@ void main() {
   }
 
   // Load relevant info objects
-  ObjectInfo object_info = buff_objects.data[gb.object_i];
-  UpliftInfo uplift_info = buff_uplifts.data[object_info.uplifting_i];
+  ObjectBaryInfo weight_info = buff_weights.data[gb.object_i];
+  ObjectInfo     object_info = buff_objects.data[gb.object_i];
+  UpliftInfo     uplift_info = buff_uplifts.data[object_info.uplifting_i];
 
   // Initialize image value, or load it if the frame is cumulative
   vec3 value = vec3(0);
   if (buff_sampler.iter != 0)
     value = imageLoad(b_target_4f, ivec2(i)).xyz * float(buff_sampler.iter);
 
-  uvec4 indices = sample_uplift_bary_indices(object_info, gb);
+  uvec4 indices = sample_uplift_bary_indices(object_info, weight_info, gb);
   if (all(equal(indices, uvec4(indices.x)))) {
     // Hot path; all element indices are the same, we can do a texture gather
-    value += sample_color(state, object_info, uplift_info, gb);
+    value += sample_color(state, object_info, weight_info, uplift_info, gb);
   } else {
     // Cold path; border region, indices differ, manually combine samples, very very frightening
-    value += fetch_color(state, object_info, uplift_info, gb);
+    value += fetch_color(state, object_info, weight_info, uplift_info, gb);
   }
 
   // Reweight image value by actual nr. of samples

@@ -47,6 +47,7 @@ namespace met {
     auto target_handle  = begin_handle("lrgb_target");
     auto arcball_handle = info.relative("viewport_input")("arcball");
     auto object_handle  = info("scene_handler", "objc_data");
+    auto weight_handle  = info("gen_objects", "bary_data");
 
     // Get shared resources 
     const auto &e_scene     = info.global("scene").getr<Scene>();
@@ -57,6 +58,7 @@ namespace met {
     const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
     const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
     const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
+    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
     const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
 
     // Get modified resources
@@ -64,7 +66,7 @@ namespace met {
 
     // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
-    bool restart_frame = arcball_handle.is_mutated() || object_handle.is_mutated();
+    bool restart_frame = arcball_handle.is_mutated() || object_handle.is_mutated() || weight_handle.is_mutated();
 
     // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
@@ -108,6 +110,7 @@ namespace met {
     m_program.bind("b_buff_state",   m_state_buffer);
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
     m_program.bind("b_buff_uplifts", e_uplf_data.info_gl);
+    m_program.bind("b_buff_weights", e_bary_data.info_gl);
     m_program.bind("b_spec_4f",      e_uplf_data.spectra_gl_texture);
     m_program.bind("b_cmfs_3f",      e_cmfs_data.cmfs_gl_texture);
     m_program.bind("b_illm_1f",      e_illm_data.illm_gl_texture);
@@ -115,15 +118,15 @@ namespace met {
     m_program.bind("b_gbuffer",      e_gbuffer);
     m_program.bind("b_target_4f",    i_target);
 
-    // Bind atlas resources that may not be initialized
+    // Bind atlas resources that may not yet be initialized
     if (e_txtr_data.info_gl.is_init())
       m_program.bind("b_buff_textures", e_txtr_data.info_gl);
     if (e_txtr_data.atlas_1f.texture().is_init())
       m_program.bind("b_txtr_1f", e_txtr_data.atlas_1f.texture());
     if (e_txtr_data.atlas_3f.texture().is_init())
       m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
-    if (e_objc_data.atlas_bary.texture().is_init())
-      m_program.bind("b_uplf_4f", e_objc_data.atlas_bary.texture());
+    if (e_bary_data.atls_4f.texture().is_init())
+      m_program.bind("b_bary_4f", e_bary_data.atls_4f.texture());
 
     // Dispatch compute shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |
