@@ -15,7 +15,7 @@ namespace met {
 
       // Get external resources
       const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-      const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
+      const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
 
       // Spawn view of texture atlas interiors
       if (ImGui::Begin("Texture atlas")) {
@@ -33,10 +33,8 @@ namespace met {
 
       // Spawn view of weight atlas interiors
       if (ImGui::Begin("Bary atlas")) {
-        const auto &e_atlas = e_bary_data.atls_4f;
-        // Spawn views
-        for (uint i = 0; i < e_atlas.capacity().z(); ++i) {
-          const auto &view = e_atlas.view(i, 0);
+        for (uint i = 0; i < e_bary_data.capacity().z(); ++i) {
+          const auto &view = e_bary_data.view(i, 0);
           ImGui::Image(ImGui::to_ptr(view.object()), { 256, 256 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
         }
       }

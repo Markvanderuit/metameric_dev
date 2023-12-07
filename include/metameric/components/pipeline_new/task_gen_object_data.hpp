@@ -107,20 +107,9 @@ namespace met {
         bool is_exact_fit = rng::equal(inputs, i_bary_data.patches(),
           eig::safe_approx_compare<eig::Array2u>, {}, &detail::TextureAtlasBase::PatchLayout::size);
 
-        // For now, rebuild atlas if an exact fit to the current atlas is not seen, instead of
-        // doing something clever
-        if (!is_exact_fit) {
-          auto &i_bary_data = i_bary_handle.getw<detail::TextureAtlas<float, 4>>();
-          i_bary_data.resize(inputs);
-
-          fmt::print("Rebuilt atls_4f\n");
-          for (const auto &i : inputs) {
-            fmt::print("\tInput: size = {}\n", i);
-          }
-          for (const auto &s : i_bary_data.patches()) {
-            fmt::print("\tOutput: layer = {}, offs = {}, size = {}\n", s.layer_i, s.offs, s.size);
-          }
-        }
+        // Internally refit atlas if inputs don't match the atlas' current layout
+        if (!is_exact_fit)
+          i_bary_handle.getw<detail::TextureAtlas<float, 4>>().resize(inputs);
       }
     }
   };

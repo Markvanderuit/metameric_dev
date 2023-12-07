@@ -117,14 +117,6 @@ namespace met::detail {
     bool is_stale(const Scene &scene) const;
     void update(const Scene &scene);
   };
-
-  // Object weight data structure
-  // Holds gl-side texture atlas storing tesselation weights, as
-  // well as accompanying info blocks to read said atlas
-  struct RTObjectWeightData {
-    gl::Buffer             info_gl;
-    TextureAtlas<float, 4> atls_4f;
-  };
   
   // Uplifting data structure
   // Holds gl-side packed uplifting data in the scene, as well as

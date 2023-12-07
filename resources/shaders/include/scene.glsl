@@ -39,10 +39,12 @@ struct ObjectInfo {
 };
 
 // Atlas access info
-struct ObjectBaryInfo {
-  uint layer;
-  uvec2 offs;
-  uvec2 size;
+struct AtlasLayout {
+  uint layer;  // layer in texture array in which the patch is located
+  uvec2 offs;  // offset in pixels to texture's region storing this patch
+  uvec2 size;  // size in pixels of texture's region storing this patch
+  vec2  uv0;   // Minimum uv value, at region's offset
+  vec2  uv1;   // Maximum uv value, at region's offset + size
 };
 
 // Info object to gather Scene::Uplifting relevant data

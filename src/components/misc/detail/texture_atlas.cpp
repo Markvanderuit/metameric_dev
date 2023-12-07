@@ -41,7 +41,7 @@ namespace met::detail {
   template <typename T, uint D>
   void TextureAtlas<T, D>::init_views() {
     guard(m_texture.is_init());
-    for (uint i = 0; i < m_texture.size().z(); ++i)
+    for (uint i = 0; i < capacity().z(); ++i)
       for (uint j = 0; j < m_levels; ++j)
         m_texture_views.push_back({{ .texture = &m_texture, .min_level = j, .min_layer = i }});
   }
@@ -62,9 +62,9 @@ namespace met::detail {
   void TextureAtlas<T, D>::clear() {
     met_trace_full();
     m_patches.clear();
-    m_free.resize(m_texture.size().z());
+    m_free.resize(capacity().z());
     for (uint i = 0; i < m_free.size(); ++i)
-      m_free[i] = { .layer_i = i, .offs = 0, .size = m_texture.size().head<2>() };
+      m_free[i] = { .layer_i = i, .offs = 0, .size = capacity().head<2>() };
   }
 
   template <typename T, uint D>
@@ -174,9 +174,12 @@ namespace met::detail {
       m_free.erase(candidate_it.base());
       m_free.insert(m_free.end(), range_iter(remainder));
 
-      // Strip padding from the reserved space, and store it at the matching index
-      patch.offs += m_padding;
-      patch.size -= m_padding * 2;
+      // Strip padding from the reserved space, and store it at the matching index;
+      // also precompute UV0/UV1 as these make texture lookups slightly faster
+      patch.offs  += m_padding;
+      patch.size  -= m_padding * 2;
+      patch.uv0    = patch.offs.cast<float>() / new_capacity.head<2>().cast<float>();
+      patch.uv1    = patch.size.cast<float>() / new_capacity.head<2>().cast<float>();
       m_patches[i] = patch;
 
       work_queue.pop_front();

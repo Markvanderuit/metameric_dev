@@ -32,7 +32,7 @@ namespace met::detail {
     guard(!e_images.empty());
 
     // Keep track of which atlas' position a texture needs to be stuffed in
-    std::vector<uint> atlas_indices(e_images.size(), std::numeric_limits<uint>::max());\
+    std::vector<uint> indices(e_images.size(), std::numeric_limits<uint>::max());\
 
     // Generate inputs for texture atlas
     std::vector<eig::Array2u> inputs_3f, inputs_1f;
@@ -40,7 +40,7 @@ namespace met::detail {
       const auto &img = e_images[i].value();
       bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
 
-      atlas_indices[i] = is_3f ? inputs_3f.size() : inputs_1f.size();
+      indices[i] = is_3f ? inputs_3f.size() : inputs_1f.size();
       
       if (is_3f) inputs_3f.push_back(img.size());
       else       inputs_1f.push_back(img.size());
@@ -75,8 +75,8 @@ namespace met::detail {
       bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
       auto size  = is_3f ? atlas_3f.capacity() 
                          : atlas_1f.capacity();
-      auto resrv = is_3f ? atlas_3f.patch(atlas_indices[i])
-                         : atlas_1f.patch(atlas_indices[i]);
+      auto resrv = is_3f ? atlas_3f.patch(indices[i])
+                         : atlas_1f.patch(indices[i]);
 
       // Determine UV coordinates of the texture inside the full atlas
       eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>(),
@@ -272,52 +272,6 @@ namespace met::detail {
         handle_resize = true;
       }
       
-      /* // View over all objects with textures whose underlying texture was changed
-      auto stale_textures = e_objects
-                          | vws::filter([ ](const auto &comp) { return comp.value.diffuse.index() == 1; })
-                          | vws::filter([&](const auto &comp) { return e_images[std::get<1>(comp.value.diffuse)].is_mutated(); });
-
-      // View over all objects with textures whose texture index was changed
-      auto stale_indices = e_objects
-                         | vws::filter([](const auto &comp) { return comp.value.diffuse.index() == 1; })
-                         | vws::filter([](const auto &comp) { return comp.state.diffuse;              }); */
-
-      /* // Initialize or rebuild barycentric atlas if necessary
-      m_is_atlas_stale =  
-           !stale_textures.empty()          // Rebuild if a referred-to texture was changed
-        || !stale_indices.empty()           // Rebuild if a referral was changed
-        || !atlas_bary.texture().is_init()  // Rebuild if the atlas does not yet exist
-        || e_settings.state.texture_size    // Rebuild if texture size setting was changed
-        || handle_resize;                   // Rebuild if nr. of objects necessitated resize */
-      
-      /* if (m_is_atlas_stale) {
-        // Gather necessary texture sizes, and set relevant indices of objects in atlas
-        std::vector<eig::Array2u> inputs;
-        for (uint i = 0; i < e_objects.size(); ++i) {
-          const auto &[e_obj, e_obj_state] = e_objects[i];
-          
-          if (e_obj.diffuse.index()) {
-            const auto &e_img = e_images[std::get<1>(e_obj.diffuse)].value();
-            inputs.push_back(e_img.size());
-          } else {
-            // A small 4x4 patch to ensure sampling at its center always returns the right value
-            inputs.push_back({ 4, 4 });
-          }
-        } // for (uint i)
-        fmt::print("Atlas inputs: {}\n", inputs);
-
-        // Determine maximum texture sizes, and scale input sizes w.r.t. to this value
-        eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
-          [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-        eig::Array2u clamped_4f = clamp_size_by_setting(e_settings.value.texture_size, maximal_4f);
-        eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
-        for (auto &input : inputs)
-          input = (input.cast<float>() * scaled_4f).max(1.f).cast<uint>().eval();
-
-        // Rebuild texture atlas without mips
-        atlas_bary = {{ .sizes = inputs, .levels = 1 + clamped_4f.log2().maxCoeff() }};
-      } */
-
       // Process updates to gl-side object info
       for (uint i = 0; i < e_objects.size(); ++i) {
         const auto &component = e_objects[i];

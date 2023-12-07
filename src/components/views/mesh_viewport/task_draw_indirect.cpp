@@ -59,7 +59,7 @@ namespace met {
     const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
     const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
     const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
-    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::RTObjectWeightData>();
+    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
     const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
 
     // Get modified resources
@@ -114,7 +114,7 @@ namespace met {
     m_program.bind("b_buff_state",   m_state_buffer);
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
     m_program.bind("b_buff_uplifts", e_uplf_data.info_gl);
-    m_program.bind("b_buff_weights", e_bary_data.info_gl);
+    m_program.bind("b_buff_weights", e_bary_data.buffer());
     m_program.bind("b_spec_4f",      e_uplf_data.spectra_gl_texture);
     m_program.bind("b_cmfs_3f",      e_cmfs_data.cmfs_gl_texture);
     m_program.bind("b_illm_1f",      e_illm_data.illm_gl_texture);
@@ -129,8 +129,8 @@ namespace met {
       m_program.bind("b_txtr_1f", e_txtr_data.atlas_1f.texture());
     if (e_txtr_data.atlas_3f.texture().is_init())
       m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
-    if (e_bary_data.atls_4f.texture().is_init())
-      m_program.bind("b_bary_4f", e_bary_data.atls_4f.texture());
+    if (e_bary_data.texture().is_init())
+      m_program.bind("b_bary_4f", e_bary_data.texture());
 
     // Dispatch compute shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |

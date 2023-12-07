@@ -20,7 +20,8 @@ namespace met::detail {
     // fit for std140/std430 buffer layout
     struct PatchLayout {
       alignas(4) uint layer_i;
-      alignas(8) vec2 offs, size;
+      alignas(8) eig::Array2u offs, size;
+      alignas(8) eig::Array2f uv0, uv1;
     };
 
     // Helper object for initializing TextureAtlas

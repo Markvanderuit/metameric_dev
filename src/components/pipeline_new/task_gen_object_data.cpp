@@ -82,12 +82,5 @@ namespace met {
     m_program.bind("b_buff_weights",  e_bary_data.buffer());
 
     gl::dispatch_compute(m_dispatch);
-    
-    fmt::print("Gen object, dispat {} * {}\n", dispatch_n.x(), dispatch_n.y());
-    if (e_objc_info.is_albedo_sampled) {
-      fmt::print("\tGen {}, sample from {}\n", m_object_i, e_objc_info.albedo_i);
-    } else {
-      fmt::print("\tGen {}, value is {}\n", m_object_i, e_objc_info.albedo_v);
-    }
   }
 } // namespace met
