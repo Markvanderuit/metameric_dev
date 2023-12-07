@@ -90,7 +90,7 @@ namespace met {
             return e_img.size();
           } else {
             // Color specified directly; a small 2x2 patch suffices
-            return { 2, 2 };
+            return { 256, 256 };
           }
         });
 
@@ -108,8 +108,15 @@ namespace met {
           eig::safe_approx_compare<eig::Array2u>, {}, &detail::TextureAtlasBase::PatchLayout::size);
 
         // Internally refit atlas if inputs don't match the atlas' current layout
-        if (!is_exact_fit)
+        if (!is_exact_fit) {
           i_bary_handle.getw<detail::TextureAtlas<float, 4>>().resize(inputs);
+
+          fmt::print("Rebuilt atlas\n");
+          for (const auto &patch : i_bary_data.patches()) {
+            fmt::print("\toffs = {}, size = {}, uv0 = {}, uv1 = {}\n", patch.offs, patch.size, patch.uv0, patch.uv1);
+          }
+
+        }
       }
     }
   };

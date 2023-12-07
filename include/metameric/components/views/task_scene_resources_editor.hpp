@@ -35,7 +35,7 @@ namespace met {
       if (ImGui::Begin("Bary atlas")) {
         for (uint i = 0; i < e_bary_data.capacity().z(); ++i) {
           const auto &view = e_bary_data.view(i, 0);
-          ImGui::Image(ImGui::to_ptr(view.object()), { 256, 256 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+          ImGui::Image(ImGui::to_ptr(view.object()), { 512, 512 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
         }
       }
       ImGui::End();

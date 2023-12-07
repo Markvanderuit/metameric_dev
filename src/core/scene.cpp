@@ -549,7 +549,6 @@ namespace met {
 
     // Apply change
     mod.redo(*this);
-    fmt::print("Touch (remove after debug)\n");
 
     // Ensure mod list doesn't exceed fixed length
     // and set the current mod to its end

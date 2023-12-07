@@ -98,6 +98,7 @@ namespace met::detail {
       alignas(16) eig::Matrix4f trf_inv;
 
       alignas(4)  bool          is_active;
+
       alignas(4)  uint          mesh_i;
       alignas(4)  uint          uplifting_i;
 

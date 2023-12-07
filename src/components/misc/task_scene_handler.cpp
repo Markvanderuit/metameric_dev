@@ -45,10 +45,6 @@ namespace met {
       e_scene.components.objects.update();
     }
 
-    if (e_scene.components.objects.is_mutated()) {
-      fmt::print("Objects updated\n");
-    }
-
     // Process updates to gpu-side illuminant components
     if (auto handle = info("illm_data"); handle.getr<detail::RTIlluminantData>().is_stale(e_scene))
       handle.getw<detail::RTIlluminantData>().update(e_scene);

@@ -74,6 +74,9 @@ namespace met::detail {
     // Ensure the underlying texture's capacity is greater or equal than `size`
     void reserve(vec3 size);
 
+    // Reduce the underlying texture's capacity to tightly fit the current patch sizes
+    void shrink_to_fit();
+
     vec3 capacity() const { 
       return m_texture.is_init() ? m_texture.size() : 0;
     }
@@ -105,6 +108,7 @@ namespace met::detail {
       swap(m_patches,       o.m_patches);
       swap(m_free,          o.m_free);
       swap(m_texture,       o.m_texture);
+      swap(m_buffer,        o.m_buffer);
       swap(m_texture_views, o.m_texture_views);
     }
 
