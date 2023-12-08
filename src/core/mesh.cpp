@@ -374,6 +374,33 @@ namespace met {
     mesh.elems.shrink_to_fit();
     compact_mesh(mesh);
   }
+  
+  template <typename MeshTy>
+  eig::Matrix4f unitize_mesh(MeshTy &mesh) {
+    met_trace();
+
+    // Establish bounding box around mesh's vertices
+    eig::Array3f minb = std::reduce(std::execution::par_unseq,
+                                    range_iter(mesh.verts),
+                                    eig::Array3f(std::numeric_limits<float>::max()),
+                                    [](auto a, auto b) { return a.cwiseMin(b).eval(); });
+    eig::Array3f maxb = std::reduce(std::execution::par_unseq,
+                                    range_iter(mesh.verts),
+                                    eig::Array3f(std::numeric_limits<float>::min()),
+                                    [](auto a, auto b) { return a.cwiseMin(b).eval(); });
+    
+    // Generate transformation to move vertices to a [0, 1] bbox
+    auto trf = (eig::Scaling((maxb - minb).matrix().eval()) 
+             *  eig::Translation3f(-minb)).matrix();
+
+    // // Apply transformation to each point
+    // std::for_each(std::execution::par_unseq, range_iter(mesh.verts), [&](auto &v) {
+    //   v = (trf * (eig::Vector4f() << v, 1).finished()).head<3>().eval();
+    // });
+
+    return trf.inverse().eval();
+  }
+
 
   /* Explicit template instantiations */
   
@@ -399,7 +426,9 @@ namespace met {
     template                                                                                          \
     void optimize_mesh<OutputMesh>(OutputMesh &);                                                     \
     template                                                                                          \
-    void renormalize_mesh<OutputMesh>(OutputMesh &);                                                  \
+    void renormalize_mesh<OutputMesh>(OutputMesh &);                                                      \
+    template                                                                                          \
+    eig::Matrix4f unitize_mesh<OutputMesh>(OutputMesh &);                                                 \
     template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);         \
     template                                                                                          \

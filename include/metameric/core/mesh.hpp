@@ -91,6 +91,11 @@ namespace met {
   template <typename MeshTy>
   void decimate_mesh(MeshTy &mesh, uint target_elems, float target_error = std::numeric_limits<float>::max());
 
+  // Adjust a mesh s.t. the entire shape fits within [0, 1], and return
+  // a transform to invert the operation
+  template <typename MeshTy>
+  eig::Matrix4f unitize_mesh(MeshTy &mesh);
+
   /* Copying modification functions */
   
   // Convert between indexed/aligned/other mesh types
@@ -149,5 +154,14 @@ namespace met {
     auto copy = convert_mesh<OutputMesh>(mesh);
     decimate_mesh(copy, target_elems, target_error);
     return copy;
+  }
+
+  // Run Meshoptimizer's simplify s.a. it does affect visual appearance and destroys topology
+  template <typename OutputMesh, typename InputMesh>
+  std::pair<OutputMesh, eig::Matrix4f> unitized_mesh(const InputMesh &mesh) {
+    met_trace();
+    auto copy = convert_mesh<OutputMesh>(mesh);
+    auto trnf = unitize_mesh(copy);
+    return { copy, trnf };
   }
 } // namespace met

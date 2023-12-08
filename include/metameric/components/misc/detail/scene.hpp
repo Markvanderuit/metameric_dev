@@ -65,10 +65,11 @@ namespace met::detail {
     // provides information for accessing parts of
     // mesh data from the packed buffer.
     struct MeshInfo {
-      alignas(4) uint verts_offs;
-      alignas(4) uint verts_size;
-      alignas(4) uint elems_offs;
-      alignas(4) uint elems_size;
+      alignas(16) eig::Matrix4f trf;
+      alignas(4)  uint verts_offs;
+      alignas(4)  uint verts_size;
+      alignas(4)  uint elems_offs;
+      alignas(4)  uint elems_size;
     };
     
   public:

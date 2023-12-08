@@ -3,6 +3,7 @@
 
 // Info object for referred mesh data
 struct MeshInfo {
+  mat4 trf;        // Transform data
   uint verts_offs; // Offset to vert data range in verts buffer
   uint verts_size; // Extent of vert data range in verts buffer
   uint elems_offs; // Offset to elem data range in elems buffer

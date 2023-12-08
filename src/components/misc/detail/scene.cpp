@@ -86,8 +86,14 @@ namespace met::detail {
       // Fill packed data buffers
       #pragma omp parallel for
       for (int i = 0; i < meshes.size(); ++i) {
-        const auto &mesh = meshes[i];
+        // Fit mesh to [0, 1]
+        auto [mesh, inv] = unitized_mesh<Mesh>(meshes[i]);
+
+        // Pack vertex data tightly
         auto [a, b] = pack(mesh);
+        
+        // Store inverse to undo [0, 1] packing
+        info[i].trf = inv;
         
         // Copy over packed data to the correctly offset range;
         // adjust element indices to refer to the offset range as well

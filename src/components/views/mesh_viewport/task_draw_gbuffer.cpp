@@ -113,6 +113,7 @@ namespace met {
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif",    m_unif_buffer);
     m_program.bind("b_buff_objects", e_objc_data.info_gl);
+    m_program.bind("b_buff_meshes",  e_mesh_data.info_gl);
 
     // Dispatch draw call to handle entire scene
     gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
