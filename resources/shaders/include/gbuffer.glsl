@@ -12,15 +12,16 @@ struct GBuffer {
 };
 
 float signNotZero(float f){
-  return(f >= 0.0) ? 1.0 : -1.0;
+  return f >= 0.0 ? 1.0 : -1.0;
 }
+
 vec2 signNotZero(vec2 v) {
   return vec2(signNotZero(v.x), signNotZero(v.y));
 }
 
 // Octagonal encoding for normal vectors; 3x32f -> 2x32f
 vec2 encode_normal(vec3 n) {
-  float l1 = abs(n.x) + abs(n.y) + abs(n.z);
+  float l1 = hsum(abs(n));
   vec2 v = n.xy * (1.f / l1);
   if (n.z < 0.0) {
     v = (1.0 - abs(v.yx)) * signNotZero(v.xy);
@@ -52,6 +53,7 @@ float decode_depth(in vec2 pack)
     return depth * (256.0*256.0) / (256.0*256.0 - 1.0);
 }
 
+// Generate packed data from gbuffer inputs
 uvec4 encode_gbuffer(in float d, in vec3 n, in vec2 tx, in uint object_i) {
   uvec4 pack = uvec4(0);
 
@@ -68,6 +70,7 @@ uvec4 encode_gbuffer(in float d, in vec3 n, in vec2 tx, in uint object_i) {
   return pack;
 }
 
+// Generate gbuffer object from packed inputs
 GBuffer decode_gbuffer(in uvec4 v, in vec2 xy, in mat4 d_inv) {
   GBuffer gb;
 

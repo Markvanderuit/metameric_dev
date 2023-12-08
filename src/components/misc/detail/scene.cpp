@@ -1,6 +1,8 @@
 #include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/core/packing.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/embree.hpp>
+#include <bit>
 #include <algorithm>
 #include <deque>
 #include <execution>
@@ -10,6 +12,96 @@
 namespace met::detail {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+
+  std::pair<
+    std::vector<eig::Array4f>,
+    std::vector<eig::Array4f>
+  > pack(const Mesh &m) {
+    std::vector<eig::Array4f> a(m.verts.size()), b(m.verts.size());
+    
+    #pragma omp parallel for
+    for (int i = 0; i < a.size(); ++i) {
+      // Get uv's, pre-apply mirrored repeat
+      eig::Array2f txuv = m.has_txuvs() ? m.txuvs[i].unaryExpr([](float f) {
+        int i = static_cast<int>(f);
+        if (i % 2) f = 1.f - (f - i);
+        else       f = f - i;
+        return f;
+      }).eval() : 0.f;
+
+      // Tightly pack normals using octagonal encoding trick
+      uint n = pack_snorm_2x16(pack_snorm_2x32_octagonal(m.norms[i]));
+
+      a[i] = (eig::Array4f() << m.verts[i], std::bit_cast<float>(pack_unorm_2x16(txuv))).finished();
+      b[i] = (eig::Array4f() << std::bit_cast<float>(n), 0, 0, 0).finished();
+      // b[i] = (eig::Array4f() << m.norms[i], 0).finished();
+      
+      
+      // a[i] = (eig::Array4f() << m.verts[i], m.has_txuvs() ? m.txuvs[i][0] : 0).finished();
+      // b[i] = (eig::Array4f() << m.norms[i], m.has_txuvs() ? m.txuvs[i][1] : 0).finished();
+    }
+    
+    return { std::move(a), std::move(b) };
+  }
+
+  struct MeshPacking {
+    using MeshInfo = RTMeshData::MeshInfo;
+
+    std::vector<MeshInfo>       info;
+    std::vector<eig::Array4f>   verts_a, verts_b;
+    std::vector<eig::Array3u>   elems;
+    std::vector<eig::AlArray3u> elems_al;
+
+    // Default constr.
+    MeshPacking() = default;
+
+    // Constr. over a set of meshes
+    MeshPacking(std::span<const Mesh> meshes) {
+      std::vector<uint> verts_size(meshes.size()), // Nr. of verts in mesh i
+                        elems_size(meshes.size()), // Nr. of elems in mesh i
+                        verts_offs(meshes.size()), // Nr. of verts prior to mesh i
+                        elems_offs(meshes.size()); // Nr. of elems prior to mesh i
+
+      // Fill in vert/elem sizes and scans
+      rng::transform(meshes, verts_size.begin(), [](const Mesh &m) -> uint { return m.verts.size(); });
+      rng::transform(meshes, elems_size.begin(), [](const Mesh &m) -> uint { return m.elems.size(); });
+      std::exclusive_scan(range_iter(verts_size), verts_offs.begin(), 0u);
+      std::exclusive_scan(range_iter(elems_size), elems_offs.begin(), 0u);
+
+      // Assign sizes/offsets into info object
+      info.resize(meshes.size());
+      for (int i = 0; i < meshes.size(); ++i) {
+        info[i] = {
+          .verts_offs = verts_offs[i], .verts_size = verts_size[i],
+          .elems_offs = elems_offs[i], .elems_size = elems_size[i],
+        };
+      }
+
+      // Resize packed data buffers to total vertex/element lengths across all meshes
+      verts_a.resize(info.back().verts_size + info.back().verts_offs);
+      verts_b.resize(info.back().verts_size + info.back().verts_offs);
+      elems.resize(info.back().elems_size + info.back().elems_offs);
+      elems_al.resize(info.back().elems_size + info.back().elems_offs);
+
+      // Fill packed data buffers
+      #pragma omp parallel for
+      for (int i = 0; i < meshes.size(); ++i) {
+        const auto &mesh = meshes[i];
+        auto [a, b] = pack(mesh);
+        
+        // Copy over packed data to the correctly offset range;
+        // adjust element indices to refer to the offset range as well
+        rng::copy(a, verts_a.begin() + info[i].verts_offs);
+        rng::copy(b, verts_b.begin() + info[i].verts_offs);
+        rng::transform(mesh.elems, elems.begin() + info[i].elems_offs, 
+          [o = info[i].verts_offs](const auto &v) { return (v + o).eval(); });
+      }
+
+      // Fill aligned element data for some fringe cases
+      rng::copy(elems, elems_al.begin());
+    }
+  };
+
 
   RTTextureData::RTTextureData(const Scene &scene) {
     met_trace();
@@ -112,21 +204,6 @@ namespace met::detail {
     info_gl = {{ .data = cnt_span<const std::byte>(info) }};
   }
 
-  std::pair<
-    std::vector<eig::Array4f>,
-    std::vector<eig::Array4f>
-  > pack(const Mesh &m) {
-    std::vector<eig::Array4f> a(m.verts.size()), b(m.verts.size());
-    
-    #pragma omp parallel for
-    for (int i = 0; i < a.size(); ++i) {
-      a[i] = (eig::Array4f() << m.verts[i], m.has_txuvs() ? m.txuvs[i][0] : 0).finished();
-      b[i] = (eig::Array4f() << m.norms[i], m.has_txuvs() ? m.txuvs[i][1] : 0).finished();
-    }
-    
-    return { std::move(a), std::move(b) };
-  }
-
   RTMeshData::RTMeshData(const Scene &scene) {
     met_trace();
     // Initialize on first run
@@ -143,86 +220,26 @@ namespace met::detail {
 
     // Get external resources
     const auto &e_meshes = scene.resources.meshes;
-
     guard(!e_meshes.empty());
 
-    // Generate a simplified representation of each scene mesh
-    std::vector<Mesh> simplified(e_meshes.size());
-    std::transform(std::execution::par_unseq, range_iter(e_meshes), simplified.begin(), [](const auto &m) { 
-        Mesh copy = m.value();
-        // simplify_mesh(copy, 128, 1e-2);
-        // renormalize_mesh(copy);
-
-        // fmt::print("Simplified mesh vert count: {} -> {}\n", m.value().verts.size(), copy.verts.size());
-        // fmt::print("Simplified mesh elem count: {} -> {}\n", m.value().elems.size(), copy.elems.size());
-
-        return copy;
+    // Generate a cleaned, simplified version of each scene mesh
+    std::vector<Mesh> meshes(e_meshes.size());
+    std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
+      Mesh copy = m.value();
+      simplify_mesh(copy, 100'000, 1e-2);
+      optimize_mesh(copy);
+      return copy;
     });
 
-    /* // TODO remove
-    {
-      const auto &mesh = simplified[0]; //.value();
-      auto bvh = detail::create_bvh({
-        .mesh            = mesh,
-        .n_node_children = 8, // 2, 4, 8
-        .n_leaf_children = 8,
-      });
-
-      for (uint i = 0; i < bvh.nodes.size(); ++i) {
-        const auto &node = bvh.nodes[i];
-        fmt::print("{} - minb = {}, maxb = {}, type = {}, children = {}\n ", 
-          i, node.minb, node.maxb, node.is_leaf() ? "leaf" : "node", node.data1);
-      }
-    } */
-
-    // Gather vertex/element lengths and offsets per mesh resources
-    std::vector<uint> verts_size, elems_size, verts_offs, elems_offs;
-    std::transform(range_iter(simplified), std::back_inserter(verts_size), 
-      [](const auto &m) { return static_cast<uint>(m.verts.size()); });
-    std::exclusive_scan(range_iter(verts_size), std::back_inserter(verts_offs), 0u);
-    std::transform(range_iter(simplified), std::back_inserter(elems_size), 
-      [](const auto &m) { return static_cast<uint>(m.elems.size()); });
-    std::exclusive_scan(range_iter(elems_size), std::back_inserter(elems_offs), 0u);
-
-    // Total vertex/element lengths across all meshes
-    uint n_verts = verts_size.at(verts_size.size() - 1) + verts_offs.at(verts_offs.size() - 1);
-    uint n_elems = elems_size.at(elems_size.size() - 1) + elems_offs.at(elems_offs.size() - 1);
-
-    // Holders for packed data of all meshes
-    std::vector<MeshInfo>       packed_info(simplified.size());
-    std::vector<eig::Array4f>   packed_verts_a(n_verts),
-                                packed_verts_b(n_verts);
-    std::vector<eig::Array3u>   packed_elems(n_elems);
-    std::vector<eig::AlArray3u> packed_elems_al(n_elems);
-
-    // Fill packed layout/data info object
-    info.resize(simplified.size());
-    #pragma omp parallel for
-    for (int i = 0; i < simplified.size(); ++i) {
-      const auto &mesh = simplified[i];
-      auto [a, b] = pack(mesh);
-      
-      // Copy over packed data to the correctly offset range;
-      // adjust element indices to refer to the offset range as well
-      rng::copy(a,               packed_verts_a.begin()  + verts_offs[i]);
-      rng::copy(b,               packed_verts_b.begin()  + verts_offs[i]);
-      rng::transform(mesh.elems, packed_elems.begin()    + elems_offs[i], 
-        [offs = verts_offs[i]](const auto &v) { return (v + offs).eval(); });
-      rng::transform(mesh.elems, packed_elems_al.begin() + elems_offs[i], 
-        [offs = verts_offs[i]](const auto &v) { return (v + offs).eval(); });
-
-      info[i] = {
-        .verts_offs = verts_offs[i], .verts_size = verts_size[i],
-        .elems_offs = elems_offs[i], .elems_size = elems_size[i],
-      };
-    }
+    // Pack meshes together into one object
+    auto mesh_pack = MeshPacking(meshes);
 
     // Push layout/data to GL buffers
-    info_gl  = {{ .data = cnt_span<const std::byte>(packed_info)     }};
-    verts_a  = {{ .data = cnt_span<const std::byte>(packed_verts_a)  }};
-    verts_b  = {{ .data = cnt_span<const std::byte>(packed_verts_b)  }};
-    elems    = {{ .data = cnt_span<const std::byte>(packed_elems)    }};
-    elems_al = {{ .data = cnt_span<const std::byte>(packed_elems_al) }};
+    info_gl  = {{ .data = cnt_span<const std::byte>(mesh_pack.info)     }};
+    verts_a  = {{ .data = cnt_span<const std::byte>(mesh_pack.verts_a)  }};
+    verts_b  = {{ .data = cnt_span<const std::byte>(mesh_pack.verts_b)  }};
+    elems    = {{ .data = cnt_span<const std::byte>(mesh_pack.elems)    }};
+    elems_al = {{ .data = cnt_span<const std::byte>(mesh_pack.elems_al) }};
     
     // Define corresponding vertex array object
     array = {{
@@ -232,6 +249,9 @@ namespace met::detail {
                   { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e4 }},
       .elements = &elems
     }};
+
+    // Copy over info object for later access
+    info = std::move(mesh_pack.info);
   }
 
   
@@ -308,6 +328,13 @@ namespace met::detail {
     bl_bvh_info  = {{ .data = cnt_span<const std::byte>(info)         }};
     bl_bvh_nodes = {{ .data = cnt_span<const std::byte>(packed_nodes) }};
     bl_bvh_prims = {{ .data = cnt_span<const std::byte>(packed_prims) }};
+
+    fmt::print("BVH pack sizes: {} nodes, {} prims, {} and {} bytes\n", 
+      bl_bvh_nodes.size() / sizeof(BVH::Node), 
+      bl_bvh_prims.size() / sizeof(uint),
+      bl_bvh_nodes.size(), 
+      bl_bvh_prims.size()
+    );
   }
 
   RTObjectData::RTObjectData(const Scene &scene) {

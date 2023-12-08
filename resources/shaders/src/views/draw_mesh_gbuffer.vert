@@ -1,6 +1,7 @@
 #version 460 core
 
 #include <scene.glsl>
+#include <gbuffer.glsl>
 
 // Buffer layout declarations
 layout(std140) uniform;
@@ -25,11 +26,15 @@ layout(binding = 0) restrict readonly buffer b_buff_objects {
 } buff_objects;
 
 void main() {
+  // Unpack tightly packed vertex data to obtain vertex positions, normals and uvs
   out_value_p  = in_vert_a.xyz;
-  out_value_n  = in_vert_b.xyz;
-  out_value_tx = vec2(in_vert_a.w, in_vert_b.w);
-  out_value_id = gl_DrawID;
+  out_value_n  = decode_normal(unpackSnorm2x16(floatBitsToUint(in_vert_b.x)));
+  out_value_tx = unpackUnorm2x16(floatBitsToUint(in_vert_a.w));
 
+  // The index in glMultiDraw* matches the index of a specific object
+  out_value_id = gl_DrawID;
+  
+  // Vertex output is view * world * position
   gl_Position = buff_unif.trf 
               * buff_objects.data[gl_DrawID].trf
               * vec4(out_value_p, 1);

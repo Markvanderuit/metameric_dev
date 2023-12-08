@@ -194,6 +194,7 @@ void main() {
 
   // Reweight image value by actual nr. of samples
   value /= float(buff_sampler.iter + buff_sampler.n_iters_per_dispatch);
+  value = gb.n;
 
   // Store updated image value and sampler state
   imageStore(b_target_4f, ivec2(i), vec4(value, 1));
