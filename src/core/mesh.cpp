@@ -387,16 +387,16 @@ namespace met {
     eig::Array3f maxb = std::reduce(std::execution::par_unseq,
                                     range_iter(mesh.verts),
                                     eig::Array3f(std::numeric_limits<float>::min()),
-                                    [](auto a, auto b) { return a.cwiseMin(b).eval(); });
+                                    [](auto a, auto b) { return a.cwiseMax(b).eval(); });
     
     // Generate transformation to move vertices to a [0, 1] bbox
-    auto trf = (eig::Scaling((maxb - minb).matrix().eval()) 
+    auto trf = (eig::Scaling((1.f / (maxb - minb)).matrix().eval()) 
              *  eig::Translation3f(-minb)).matrix();
-
-    // // Apply transformation to each point
-    // std::for_each(std::execution::par_unseq, range_iter(mesh.verts), [&](auto &v) {
-    //   v = (trf * (eig::Vector4f() << v, 1).finished()).head<3>().eval();
-    // });
+    
+    // Apply transformation to each point
+    std::for_each(std::execution::par_unseq, range_iter(mesh.verts), [&](auto &v) {
+      v = (trf * (eig::Vector4f() << v, 1).finished()).head<3>().eval();
+    });
 
     return trf.inverse().eval();
   }

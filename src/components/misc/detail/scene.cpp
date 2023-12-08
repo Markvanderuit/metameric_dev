@@ -13,45 +13,24 @@ namespace met::detail {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  std::pair<
-    std::vector<eig::Array4f>,
-    std::vector<eig::Array4f>
-  > pack(const Mesh &m) {
-    std::vector<eig::Array4f> a(m.verts.size()), b(m.verts.size());
-    
-    #pragma omp parallel for
-    for (int i = 0; i < a.size(); ++i) {
-      // Get uv's, pre-apply mirrored repeat
-      eig::Array2f txuv = m.has_txuvs() ? m.txuvs[i].unaryExpr([](float f) {
-        int i = static_cast<int>(f);
-        if (i % 2) f = 1.f - (f - i);
-        else       f = f - i;
-        return f;
-      }).eval() : 0.f;
-
-      // Tightly pack normals using octagonal encoding trick
-      uint n = pack_snorm_2x16(pack_snorm_2x32_octagonal(m.norms[i]));
-
-      a[i] = (eig::Array4f() << m.verts[i], std::bit_cast<float>(pack_unorm_2x16(txuv))).finished();
-      b[i] = (eig::Array4f() << std::bit_cast<float>(n), 0, 0, 0).finished();
-      // b[i] = (eig::Array4f() << m.norms[i], 0).finished();
-      
-      
-      // a[i] = (eig::Array4f() << m.verts[i], m.has_txuvs() ? m.txuvs[i][0] : 0).finished();
-      // b[i] = (eig::Array4f() << m.norms[i], m.has_txuvs() ? m.txuvs[i][1] : 0).finished();
-    }
-    
-    return { std::move(a), std::move(b) };
-  }
-
   struct MeshPacking {
     using MeshInfo = RTMeshData::MeshInfo;
 
+    // Packed vertex struct data
+    struct VertexPack {
+      uint p0; // unorm, 2x16
+      uint p1; // unorm, 1x16 + padding 1x16
+      uint n;  // snorm, 2x16
+      uint tx; // unorm, 2x16
+    };
+
+  public:
     std::vector<MeshInfo>       info;
-    std::vector<eig::Array4f>   verts_a, verts_b;
+    std::vector<VertexPack>     verts;
     std::vector<eig::Array3u>   elems;
     std::vector<eig::AlArray3u> elems_al;
 
+  public:
     // Default constr.
     MeshPacking() = default;
 
@@ -78,8 +57,7 @@ namespace met::detail {
       }
 
       // Resize packed data buffers to total vertex/element lengths across all meshes
-      verts_a.resize(info.back().verts_size + info.back().verts_offs);
-      verts_b.resize(info.back().verts_size + info.back().verts_offs);
+      verts.resize(info.back().verts_size + info.back().verts_offs);
       elems.resize(info.back().elems_size + info.back().elems_offs);
       elems_al.resize(info.back().elems_size + info.back().elems_offs);
 
@@ -89,21 +67,36 @@ namespace met::detail {
         // Fit mesh to [0, 1]
         auto [mesh, inv] = unitized_mesh<Mesh>(meshes[i]);
 
-        // Pack vertex data tightly
-        auto [a, b] = pack(mesh);
-        
         // Store inverse to undo [0, 1] packing
         info[i].trf = inv;
+
+        // Pack vertex data tightly and copy to the correctly offset range
+        #pragma omp parallel for
+        for (int j = 0; j < mesh.verts.size(); ++j) {
+          // Get uv's, pre-apply a mirrored repeat for some meshes
+          eig::Array2f txuv = mesh.has_txuvs() ? mesh.txuvs[j].unaryExpr([](float f) {
+            int i = static_cast<int>(f);
+            if (i % 2) f = 1.f - (f - i);
+            else       f = f - i;
+            return f;
+          }).eval() : 0.f;
+
+          VertexPack pack = {
+            .p0 = pack_unorm_2x16({ mesh.verts[j].x(), mesh.verts[j].y() }),
+            .p1 = pack_unorm_2x16({ mesh.verts[j].z(), 0.f               }),
+            .n  = pack_snorm_2x16(pack_snorm_2x32_octagonal(mesh.norms[j])),
+            .tx = pack_unorm_2x16(txuv)
+          };
+
+          verts[info[i].verts_offs + j] = pack;
+        } // for (int j)
         
-        // Copy over packed data to the correctly offset range;
-        // adjust element indices to refer to the offset range as well
-        rng::copy(a, verts_a.begin() + info[i].verts_offs);
-        rng::copy(b, verts_b.begin() + info[i].verts_offs);
+        // Copy element indices and adjust to refer to the offset range as well
         rng::transform(mesh.elems, elems.begin() + info[i].elems_offs, 
           [o = info[i].verts_offs](const auto &v) { return (v + o).eval(); });
       }
 
-      // Fill aligned element data for some fringe cases
+      // Keep around aligned element data for some fringe cases
       rng::copy(elems, elems_al.begin());
     }
   };
@@ -242,17 +235,14 @@ namespace met::detail {
 
     // Push layout/data to GL buffers
     info_gl  = {{ .data = cnt_span<const std::byte>(mesh_pack.info)     }};
-    verts_a  = {{ .data = cnt_span<const std::byte>(mesh_pack.verts_a)  }};
-    verts_b  = {{ .data = cnt_span<const std::byte>(mesh_pack.verts_b)  }};
+    verts    = {{ .data = cnt_span<const std::byte>(mesh_pack.verts)    }};
     elems    = {{ .data = cnt_span<const std::byte>(mesh_pack.elems)    }};
     elems_al = {{ .data = cnt_span<const std::byte>(mesh_pack.elems_al) }};
     
     // Define corresponding vertex array object
     array = {{
-      .buffers = {{ .buffer = &verts_a, .index = 0, .stride = sizeof(eig::Array4f)    },
-                  { .buffer = &verts_b, .index = 1, .stride = sizeof(eig::Array4f)    }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 },
-                  { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e4 }},
+      .buffers = {{ .buffer = &verts, .index = 0, .stride = sizeof(eig::Array4u)           }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }},
       .elements = &elems
     }};
 

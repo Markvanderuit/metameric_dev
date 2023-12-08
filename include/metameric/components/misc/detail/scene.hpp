@@ -75,7 +75,7 @@ namespace met::detail {
   public:
     std::vector<MeshInfo> info;
     gl::Buffer            info_gl;
-    gl::Buffer            verts_a, verts_b;
+    gl::Buffer            verts;
     gl::Buffer            elems, elems_al;
     gl::Array             array;
     

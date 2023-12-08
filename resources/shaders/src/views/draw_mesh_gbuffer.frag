@@ -12,10 +12,9 @@ layout(std430) buffer;
 layout(early_fragment_tests) in;
 
 // Fragment input declarations
-layout(location = 0) in vec3      in_value_p;
-layout(location = 1) in vec3      in_value_n;
-layout(location = 2) in vec2      in_value_tx;
-layout(location = 3) in flat uint in_value_id;
+layout(location = 0) in vec3      in_value_n;
+layout(location = 1) in vec2      in_value_tx;
+layout(location = 2) in flat uint in_value_id;
 
 // Fragment output declarations
 layout(location = 0) out vec4 out_value; // G-Buffer encoding
