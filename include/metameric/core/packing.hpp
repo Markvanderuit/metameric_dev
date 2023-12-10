@@ -171,7 +171,7 @@ namespace met {
   }
 
 
-// Octagonal encoding for normal vectors; 3x32f -> 2x32f
+  // Octagonal encoding for normal vectors; 3x32f -> 2x32f
   eig::Array2f pack_snorm_2x32_octagonal(const eig::Array3f &n) {
     float l1 = n.abs().sum();
     eig::Array2f v = n.head<2>() * (1.f / l1);

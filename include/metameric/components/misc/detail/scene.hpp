@@ -102,12 +102,11 @@ namespace met::detail {
     };
 
   public:
-    gl::Buffer bl_bvh_info;
-    gl::Buffer bl_bvh_nodes;
-    gl::Buffer bl_bvh_prims;
-    // gl::Buffer tl_bvh_nodes;
-    // gl::Buffer tl_bvh_prims;
-    
+    std::vector<BVHInfo> info;
+    gl::Buffer           info_gl;
+    gl::Buffer           nodes;
+    gl::Buffer           prims;
+
   public:
     RTBVHData() = default;
     RTBVHData(const Scene &);
