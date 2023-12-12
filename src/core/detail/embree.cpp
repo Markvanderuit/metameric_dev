@@ -179,7 +179,7 @@ namespace met::detail {
 
     // Construct BVH and acquire pointer to root node
     auto root_p = static_cast<RTCBVHNode *>(rtcBuildBVH(&args));
-    
+        
     // Prepare external BVH format and resize its blocks
     BVH bvh;
     bvh.nodes.reserve(prims.size() * 2 / K);

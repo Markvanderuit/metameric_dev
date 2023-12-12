@@ -15,19 +15,27 @@ struct BBox {
 };
 
 struct Hit {
-
+  vec3 p;
+  vec3 n;
+  vec2 tx;
+  uint mesh_i;
+  uint uplf_i;
 };
 
-void swap(inout float a, inout float b) {
-  float t = a;
-  a = b;
-  b = t;
-}
+struct RayQuery {
+  vec3  o;
+  float t;
+  vec3  d;
+  uint  object_i;
+};
 
-bool intersect_ray_bbox(in Ray ray, in BBox bbox, inout float t_isct) {
+// Shorter test; generally returns true if the ray is within the bbox
+bool intersect_ray_bbox_fast(in Ray ray, in BBox bbox, inout float t_isct) {
   vec3 inv_ray_d = 1.f / ray.d;
 
   vec3 t1 = (bbox.minb - ray.o) * inv_ray_d;
+  vec3 t2 = (bbox.maxb - ray.o) * inv_ray_d;
+
   if (inv_ray_d.x < 0.f)
     swap(t1.x, t2.x);
   if (inv_ray_d.y < 0.f)
@@ -36,20 +44,45 @@ bool intersect_ray_bbox(in Ray ray, in BBox bbox, inout float t_isct) {
     swap(t1.z, t2.z);
 
   float t_min = hmax(t1);
-  float t_max = hmax(t2);
+  float t_max = hmin(t2);
 
   t_isct = t_min;
 
   return !(t_min > t_max || t_max < 0.f || t_min > ray.t);
 }
 
-bool intersect_ray_prim(inout Ray ray, in vec3 p0, in vec3 p1, in vec3 p2) {
+bool intersect_ray_bbox(inout Ray ray, in BBox bbox) {
+  vec3 inv_ray_d = 1.f / ray.d;
+
+  vec3 t_min = bbox.minb - ray.o;
+  vec3 t_max = bbox.maxb - ray.o;
+
+  bvec3 degenerate = equal(ray.d, vec3(0));
+  t_max = mix(t_max * inv_ray_d, vec3(FLT_MAX), degenerate);
+  t_min = mix(t_min * inv_ray_d, vec3(FLT_MIN), degenerate);
+
+  float t_in  = hmax(min(t_min, t_max));
+  float t_out = hmin(max(t_min, t_max));
+
+  if (t_in < 0.f && t_out > 0.f) {
+    t_in = t_out;
+    t_out = FLT_MAX;
+  }
+
+  if (t_in > t_out || t_in < 0.f || t_in > ray.t)
+    return false;
+  
+  ray.t = t_in;
+  return true;
+}
+
+bool intersect_ray_prim(inout Ray ray, in vec3 a, in vec3 b, in vec3 c) {
   vec3 ab = b - a;
   vec3 bc = c - b;
   vec3 ca = a - c;
 
   // Plane normal
-  vec3 n  = normalize(bc.cross(ab)); // TODO is normalize necessary?
+  vec3 n  = normalize(cross(bc, ab)); // TODO is normalize necessary?
 
   // Backface test
   float n_dot_d = dot(n, ray.d);
@@ -63,9 +96,9 @@ bool intersect_ray_prim(inout Ray ray, in vec3 p0, in vec3 p1, in vec3 p2) {
   
   // Point-in-triangle test
   vec3 p = ray.o + t * ray.d;
-  return dot(n, cross(p - a, ab)) >= 0.f &&
-         dot(n, cross(p - b, bc)) >= 0.f &&
-         dot(n, cross(p - c, ca)) >= 0.f;
+  return (dot(n, cross(p - a, ab)) >= 0.f) &&
+         (dot(n, cross(p - b, bc)) >= 0.f) &&
+         (dot(n, cross(p - c, ca)) >= 0.f);
 }
 
 #endif // RAY_GLSL_GUARD

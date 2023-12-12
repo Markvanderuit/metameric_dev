@@ -1,0 +1,129 @@
+#version 460 core
+
+// Enable necessary subgroup extensions
+#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_KHR_shader_subgroup_shuffle    : require
+#extension GL_KHR_shader_subgroup_vote       : require
+
+// General layout rule declarations
+layout(local_size_x_id = 0) in;
+layout(std140)              uniform;
+layout(std430)              buffer;
+
+#include <bvh.glsl>
+#include <guard.glsl>
+#include <math.glsl>
+#include <scene.glsl>
+
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_info {
+  BVHInfo data[];
+} buff_bvhs_info;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
+  BVHNodePack data[];
+} buff_bvhs_node;
+layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim {
+  BVHPrimPack data[];
+} buff_bvhs_prim;
+layout(binding = 3) restrict readonly buffer b_buff_objc_info {
+  ObjectInfo data[];
+} buff_objc_info;
+layout(binding = 4) restrict coherent buffer b_buff_work {
+  uint     n;
+  RayQuery data[];
+} buff_work;
+
+shared ObjectInfo s_objc_info[64];
+shared BVHInfo    s_bvhs_info[64];
+shared uint       s_stack[gl_WorkGroupSize.x][16];
+
+void load_shared() {
+  for (uint i = gl_LocalInvocationID.x; 
+            i < buff_objc_info.data.length();
+            i += gl_WorkGroupSize.x) {
+    s_objc_info[i] = buff_objc_info.data[i];
+  }
+  memoryBarrierShared();
+  barrier();
+
+  for (uint i = gl_LocalInvocationID.x; 
+            i < buff_objc_info.data.length();
+            i += gl_WorkGroupSize.x) {
+    s_bvhs_info[i] = buff_bvhs_info.data[i];
+  }
+  memoryBarrierShared();
+  barrier();
+}
+
+bool intersect_ray_bvh(inout Ray ray, in uint bvhs_i) {
+  BVHInfo bvh_info = s_bvhs_info[bvhs_i];
+
+  // Keep top off stack for now; root node
+  uint bvh_i         = bvh_info.nodes_offs; // Root
+  uint stack_counter = 0;
+
+  { // Handle root node specifically
+    BVHNode node = unpack(buff_bvhs_node.data[bvh_i]);
+    
+    float t_isct = FLT_MAX;
+    if (!intersect_ray_bbox_fast(ray, node.bbox, t_isct)) {
+      return false;
+    } else if (bvh_is_leaf(node)) {
+      // TODO; deal with later
+    } else {
+      // Push on stack
+      
+      stack_counter++;
+    }
+  }
+
+  // Begin traversal until stack is once again empty
+  do {
+
+    
+  } while (stack_counter > 0);
+  
+  return false;
+}
+
+bool intersect_ray_object(inout RayQuery query, in uint object_i) {
+  ObjectInfo object_info = s_objc_info[object_i];
+
+  // Transform world space query ray into local mesh scope
+  Ray ray;
+  ray.o = (object_info.trf_inv * vec4(query.o, 1)).xyz;
+  ray.d = normalize((object_info.trf_inv * vec4(query.d, 0)).xyz);
+  ray.t = query.t;
+
+  // Has to be a way to cheapen this;  maybe pre-square things? Blehhh
+  if (ray.t != FLT_MAX) {
+    ray.t = length((object_info.trf_inv * vec4(query.d * query.t, 0)).xyz);
+  }
+  
+  // On closest hit, transform local scope ray into world query space
+  bool hit = intersect_ray_bvh(ray, object_info.mesh_i);
+  if (hit) {
+    query.t        = length((object_info.trf * vec4(ray.d * ray.t, 0)).xyz);
+    query.object_i = object_i;
+  }
+  
+  return hit;
+}
+
+bool intersect_ray_scene(inout RayQuery query) {
+  bool hit = true;
+  for (uint i = 0; i < buff_objc_info.data.length(); ++i) {
+    hit = hit || intersect_ray_object(query, i);
+  }
+  return hit;
+}
+
+void main() {
+  load_shared();
+
+  const uint i = gl_GlobalInvocationID.x;
+  guard(i < buff_work.n);
+  RayQuery query = buff_work.data[i];
+  if (intersect_ray_scene(query));
+    buff_work.data[i] = query;
+}

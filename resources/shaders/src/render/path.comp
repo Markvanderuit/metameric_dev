@@ -1,0 +1,54 @@
+#version 460 core
+
+#include <guard.glsl>
+#include <gbuffer.glsl>
+#include <math.glsl>
+#include <random_uniform.glsl>
+#include <ray.glsl>
+#include <spectrum.glsl>
+#include <scene.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std140) uniform;
+layout(std430) buffer;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  uint n;
+} buff_unif;
+layout(binding = 1) uniform b_buff_sampler {
+  uint iter;
+  uint n_iters_per_dispatch;
+} buff_sampler;
+
+// Storage buffer declarations
+layout(binding = 0) restrict writeonly buffer b_buff_state {
+  uvec2 data[];
+} buff_state;
+layout(binding = 1) restrict readonly buffer b_buff_objects {
+  ObjectInfo[] data;
+} buff_objects;
+layout(binding = 2) restrict readonly buffer b_buff_textures {
+  TextureInfo[] data;
+} buff_textures;
+layout(binding = 3) restrict readonly buffer b_buff_uplifts {
+  UpliftInfo data[];
+} buff_uplifts;
+layout(binding = 4) restrict readonly buffer b_buff_weights {
+  AtlasLayout data[];
+} buff_weights;
+
+// Texture unit, ergo sampler declarations
+layout(binding = 0) uniform sampler2D      b_gbuffer; // G-buffer pack
+layout(binding = 1) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
+layout(binding = 2) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
+layout(binding = 3) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
+layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
+layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 7) uniform sampler1DArray b_csys_3f; // Color system spectra, 3 components
+
+void main() {
+  // ...
+}

@@ -91,4 +91,18 @@ float sdot(in vec2 v) { return dot(v, v); }
 float sdot(in vec3 v) { return dot(v, v); }
 float sdot(in vec4 v) { return dot(v, v); }
 
+// Swapping of vector objects
+
+#define SWAP_T(Ty)                        \
+  void swap(inout Ty a, inout Ty b) {     \
+    Ty t = a;                             \
+    a    = b;                             \
+    b    = t;                             \
+  }
+
+SWAP_T(float);
+SWAP_T(vec2);
+SWAP_T(vec3);
+SWAP_T(vec4);
+
 #endif // MATH_GLSL_GUARD

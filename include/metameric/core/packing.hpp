@@ -170,7 +170,6 @@ namespace met {
 		return (eig::Array2f(u.out[0], u.out[1]) * 3.0518509475997192297128208258309e-5f).max(-1.f).min(1.f);
   }
 
-
   // Octagonal encoding for normal vectors; 3x32f -> 2x32f
   eig::Array2f pack_snorm_2x32_octagonal(const eig::Array3f &n) {
     float l1 = n.abs().sum();

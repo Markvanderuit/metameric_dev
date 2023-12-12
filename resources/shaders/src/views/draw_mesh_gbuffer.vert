@@ -1,7 +1,7 @@
 #version 460 core
 
-#include <scene.glsl>
 #include <gbuffer.glsl>
+#include <scene.glsl>
 
 // Buffer layout declarations
 layout(std140) uniform;
