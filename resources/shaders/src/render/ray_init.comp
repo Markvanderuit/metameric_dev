@@ -1,0 +1,55 @@
+#version 460 core
+
+// General layout rule declarations
+layout(local_size_x_id = 0, local_size_y_id = 0) in;
+layout(std140)                                   uniform;
+layout(std430)                                   buffer;
+
+#include <guard.glsl>
+#include <math.glsl>
+#include <ray.glsl>
+
+// Uniform declarations
+layout(binding = 0) uniform b_buff_unif {
+  mat4  view_inv;  // inverse(view);
+  uvec2 view_size; // width, height of image
+  float fovy_tan;  // tan(fov_y * .5f);
+  float aspect;    // vec2(aspect, 1);
+} buff_unif;
+
+// Storage declaration
+layout(binding = 0) restrict writeonly buffer b_buff_work_head {
+  uint value;
+} buff_work_head;
+layout(binding = 1) restrict writeonly buffer b_buff_work {
+  RayQuery data[];
+} buff_work;
+
+Ray generate_ray(in vec2 xy) {
+  vec2 s = (xy - .5f) * 2.f * buff_unif.fovy_tan * vec2(buff_unif.aspect, 1);
+  Ray r;
+  r.o = (buff_unif.view_inv * vec4(0, 0, 0, 1)).xyz;
+  r.d = normalize((buff_unif.view_inv * vec4(s.xy, -1, 1)).xyz - r.o);
+  r.t = FLT_MAX;
+  return r;
+}
+
+void main() {
+  const uvec2 i = gl_GlobalInvocationID.xy;
+  guard(all(lessThan(i, buff_unif.view_size)));
+  
+  // Store ray and other stuff ...
+  Ray ray = generate_ray((vec2(i) + 0.5) / vec2(buff_unif.view_size));
+  
+  RayQuery work;
+  work.o        = ray.o;
+  work.d        = ray.d;
+  work.t        = ray.t;
+  work.object_i = 32768;
+  buff_work.data[i.y * buff_unif.view_size.x + i.x] = work;
+
+  // Set initial work count to n
+  // TODO do from mapped value instead
+  if (all(equal(i, vec2(0))))
+    buff_work_head.value = hprod(buff_unif.view_size);
+}

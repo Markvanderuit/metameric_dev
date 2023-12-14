@@ -4,14 +4,14 @@
 #include <math.glsl>
 
 struct Ray {
-  vec3 o;
-  vec3 d;
+  vec3  o;
+  vec3  d;
   float t;
 };
 
-struct BBox {
-  vec3 minb;
-  vec3 maxb;
+struct AABB {
+  vec3 minb; // Minimum of bounding box
+  vec3 maxb; // Maximum of bounding box
 };
 
 struct Hit {
@@ -22,6 +22,8 @@ struct Hit {
   uint uplf_i;
 };
 
+// Should be 32 bytes
+// NOTE: Needs resizing on other side as well
 struct RayQuery {
   vec3  o;
   float t;
@@ -29,12 +31,13 @@ struct RayQuery {
   uint  object_i;
 };
 
-// Shorter test; generally returns true if the ray is within the bbox
-bool intersect_ray_bbox_fast(in Ray ray, in BBox bbox, inout float t_isct) {
+// Shorter test; generally returns true if the ray is within the aabb
+bool intersect_ray_aabb_fast(in Ray ray, in AABB aabb, inout float t_isct) {
+  // Extract if you always need it!
   vec3 inv_ray_d = 1.f / ray.d;
 
-  vec3 t1 = (bbox.minb - ray.o) * inv_ray_d;
-  vec3 t2 = (bbox.maxb - ray.o) * inv_ray_d;
+  vec3 t1 = (aabb.minb - ray.o) * inv_ray_d;
+  vec3 t2 = (aabb.maxb - ray.o) * inv_ray_d;
 
   if (inv_ray_d.x < 0.f)
     swap(t1.x, t2.x);
@@ -51,11 +54,12 @@ bool intersect_ray_bbox_fast(in Ray ray, in BBox bbox, inout float t_isct) {
   return !(t_min > t_max || t_max < 0.f || t_min > ray.t);
 }
 
-bool intersect_ray_bbox(inout Ray ray, in BBox bbox) {
+bool intersect_ray_aabb(inout Ray ray, in AABB aabb) {
+  // Extract if you always need it!
   vec3 inv_ray_d = 1.f / ray.d;
 
-  vec3 t_min = bbox.minb - ray.o;
-  vec3 t_max = bbox.maxb - ray.o;
+  vec3 t_min = aabb.minb - ray.o;
+  vec3 t_max = aabb.maxb - ray.o;
 
   bvec3 degenerate = equal(ray.d, vec3(0));
   t_max = mix(t_max * inv_ray_d, vec3(FLT_MAX), degenerate);

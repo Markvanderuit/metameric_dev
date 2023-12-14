@@ -67,7 +67,7 @@ namespace met {
     // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
     bool restart_frame = arcball_handle.is_mutated() || object_handle.is_mutated() || weight_handle.is_mutated();
-
+    
     // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
       // Resize internal state buffer and target accordingly

@@ -12,6 +12,7 @@ namespace met {
 
   namespace detail {
     // Copied entirely from glm::detail::overflow
+    inline
     float overflow() {
       volatile float f = 1e10;
       for (int i = 0; i < 10; ++i)
@@ -30,6 +31,7 @@ namespace met {
     };
 
     // Copied entirely from glm::detail::toFloat32
+    inline
     float to_float32(short value) {
       int s = (value >> 15) & 0x00000001;
       int e = (value >> 10) & 0x0000001f;
@@ -71,6 +73,7 @@ namespace met {
     }
     
     // Copied entirely from glm::detail::toFloat16
+    inline
     short to_float16(float f) {
       uif32 entry;
       entry.f = f;
@@ -119,6 +122,7 @@ namespace met {
 
   // Pack a pair of floats to half precision floats in a single object
   // follows glm::packHalf2x16
+  inline
   uint pack_half_2x16(const eig::Array2f &v) {
     union { short in[2]; uint out; } u;
     u.in[0] = detail::to_float16(v.x());
@@ -128,6 +132,7 @@ namespace met {
 
   // Inverse of pack_half_2x16
   // follows glm::packHalf2x16
+  inline
   eig::Array2f unpack_half_2x16(uint i) {
     union { uint in; short out[2]; } u;
     u.in = i;
@@ -136,9 +141,32 @@ namespace met {
 
   // Pack a pair of floats to unsigned [0, 1] shorts in a single object
   // follows glm::packUnorm2x16
+  inline
   uint pack_unorm_2x16(const eig::Array2f &v) {
     union { ushort in[2]; uint out; } u;
-    eig::Array2us result = (v.max(0.f).min(1.f) * 65535.f).round().cast<ushort>();
+    auto result = (v.max(0.f).min(1.f) * 65535.f).round().cast<ushort>().eval();
+    u.in[0] = result[0];
+    u.in[1] = result[1];
+    return u.out;
+  }
+
+  // Pack a pair of floats to unsigned [0, 1] shorts in a single object, taking
+  // the higher nearest value
+  inline
+  uint pack_unorm_2x16_ceil(const eig::Array2f &v) {
+    union { ushort in[2]; uint out; } u;
+    auto result = (v.max(0.f).min(1.f) * 65535.f).ceil().cast<ushort>().eval();
+    u.in[0] = result[0];
+    u.in[1] = result[1];
+    return u.out;
+  }
+
+  // Pack a pair of floats to unsigned [0, 1] shorts in a single object, taking
+  // the lower nearest value
+  inline
+  uint pack_unorm_2x16_floor(const eig::Array2f &v) {
+    union { ushort in[2]; uint out; } u;
+    auto result = (v.max(0.f).min(1.f) * 65535.f).floor().cast<ushort>().eval();
     u.in[0] = result[0];
     u.in[1] = result[1];
     return u.out;
@@ -146,6 +174,7 @@ namespace met {
 
   // Inverse of unpack_unorm_2x16
   // follows glm::unpackUnorm2x16
+  inline
   eig::Array2f unpack_unorm_2x16(uint i) {
     union { uint in; ushort out[2]; } u;
     u.in = i;
@@ -154,9 +183,10 @@ namespace met {
 
   // Pack a pair of floats to [0, 1] shorts in a single object
   // follows glm::packSnorm2x16
+  inline
   uint pack_snorm_2x16(const eig::Array2f &v) {
     union { short in[2]; uint out; } u;
-    eig::Array2s result = (v.max(-1.f).min(1.f) * 32767.f).round().cast<short>();
+    auto result = (v.max(-1.f).min(1.f) * 32767.f).round().cast<short>().eval();
     u.in[0] = result[0];
     u.in[1] = result[1];
     return u.out;
@@ -164,13 +194,63 @@ namespace met {
 
   // Inverse of pack_snorm_2x16
   // follows glm::unpackSnorm2x16
+  inline
   eig::Array2f unpack_snorm_2x16(uint i) {
     union { uint in; short out[2]; } u;
     u.in = i;
 		return (eig::Array2f(u.out[0], u.out[1]) * 3.0518509475997192297128208258309e-5f).max(-1.f).min(1.f);
   }
 
+  // Pack a quad of floats to [0, 1] chars in a single object
+  // follows glm::packUnorm4x8
+  inline
+  uint pack_unorm_4x8(const eig::Array4f &v) {
+    union { uchar in[4]; uint out; } u;
+    auto result = (v.max(0.f).min(1.f) * 255.f).round().cast<uchar>().eval();
+		u.in[0] = result[0];
+		u.in[1] = result[1];
+		u.in[2] = result[2];
+		u.in[3] = result[3];
+    return u.out;
+  }
+
+  // Pack a quad of floats to [0, 1] chars in a single object, taking
+  // the nearest lower value
+  inline
+  uint pack_unorm_4x8_floor(const eig::Array4f &v) {
+    union { uchar in[4]; uint out; } u;
+    auto result = (v.max(0.f).min(1.f) * 255.f).floor().cast<uchar>().eval();
+		u.in[0] = result[0];
+		u.in[1] = result[1];
+		u.in[2] = result[2];
+		u.in[3] = result[3];
+    return u.out;
+  }
+
+  // Pack a quad of floats to [0, 1] chars in a single object, taking
+  // the nearest lower value
+  inline
+  uint pack_unorm_4x8_ceil(const eig::Array4f &v) {
+    union { uchar in[4]; uint out; } u;
+    auto result = (v.max(0.f).min(1.f) * 255.f).ceil().cast<uchar>().eval();
+		u.in[0] = result[0];
+		u.in[1] = result[1];
+		u.in[2] = result[2];
+		u.in[3] = result[3];
+    return u.out;
+  }
+
+  // Inverse of pack_unorm_4x8
+  // follows glm::unpackUnorm4x8
+  inline
+  eig::Array4f unpack_unorm_4x8(uint i) {
+    union { uint in; uchar out[4]; } u;
+		u.in = i;
+		return eig::Array4f(u.out[0], u.out[1], u.out[2], u.out[3]) * 0.0039215686274509803921568627451f;
+  }
+
   // Octagonal encoding for normal vectors; 3x32f -> 2x32f
+  inline
   eig::Array2f pack_snorm_2x32_octagonal(const eig::Array3f &n) {
     float l1 = n.abs().sum();
     eig::Array2f v = n.head<2>() * (1.f / l1);
@@ -181,6 +261,7 @@ namespace met {
   }
 
   // Octagonal decoding for normal vectors; 3x32f -> 2x32f
+  inline
   eig::Array3f unpack_snorm_3x32_octagonal(const eig::Array2f &v) {
     eig::Array3f n = { v.x(), v.y(), 1.f - v.abs().sum() };
     if (n.z() < 0.f)

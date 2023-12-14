@@ -10,6 +10,13 @@ struct MeshInfo {
   uint elems_size; // Extent of elem data range in elems buffer
 };
 
+struct BVHInfo {
+  uint nodes_offs;
+  uint nodes_size;
+  uint prims_offs;
+  uint prims_size;
+};
+
 // Info object for referred texture data
 struct TextureInfo {
   bool  is_3f; // Is in the atlas_3f texture sampler, else atlas_1f?

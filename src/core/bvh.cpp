@@ -1,12 +1,50 @@
-#include <metameric/core/detail/embree.hpp>
-#include <metameric/core/utility.hpp>
+#include <metameric/core/bvh.hpp>
 #include <embree4/rtcore.h>
 #include <algorithm>
 #include <execution>
 #include <memory>
+#include <optional>
+#include <ranges>
 #include <stack>
 
-namespace met::detail {
+namespace met {
+  struct BuildNode {
+    virtual float sah() const = 0;
+  };
+
+  template <uint K>
+  struct BuildNodeInner : public BuildNode {
+    std::array<BVH::AABB,   K> child_aabbs;
+    std::array<BuildNode *, K> child_nodes;
+    
+  public:
+    BuildNodeInner() {
+      rng::fill(child_nodes, nullptr);
+    }
+
+    float sah() const override {
+      return 0.f;
+    }
+  };
+
+  template <uint K>
+  struct BuildNodeLeaf : public BuildNode {
+    std::array<BVH::AABB *, K> children;
+    const RTCBuildPrimitive *prim_p;
+    size_t n_prims;
+
+  public:
+    BuildNodeLeaf(const RTCBuildPrimitive *prim_p, size_t n_prims) 
+    : prim_p(prim_p), n_prims(n_prims) {
+      for (size_t i = 0; i < n_prims; ++i)
+        std::memcpy(&children[i], &prim_p[i], sizeof(RTCBuildPrimitive));
+    }
+
+    float sah() const override {
+      return 1.0f;
+    }
+  };
+
   // Singleton rtc device; should be fine for now
   static std::optional<RTCDevice> rtc_device;
 
@@ -22,86 +60,45 @@ namespace met::detail {
     return rtc_device.value();
   }
 
-  BVHBBox merge(const BVHBBox &a, const BVHBBox &b) {
-    return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
-  }
-
-  // Base struct
-  struct RTCBVHNode {
-    BVHBBox bounds;
-
-    virtual bool is_inner() const = 0;
-  };
-
   template <uint K>
-  struct RTCBVHTreeNode : public RTCBVHNode {
-    std::array<RTCBVHNode *, K> children;
-
-    bool is_inner() const override { return true; }
-  };
-
-  struct RTCBVHLeafNode : public RTCBVHNode {
-    RTCBVHLeafNode(const RTCBuildPrimitive *prim_p, size_t size)
-    : prim_p(prim_p), size(size) { 
-      if (size == 0) {
-        bounds = { .minb = 0, .maxb = 0 };
-        return;
-      }
-
-      std::memcpy(&bounds, prim_p, sizeof(RTCBuildPrimitive));
-      for (size_t i = 1; i < size; ++i) {
-        BVHBBox merge_bounds;
-        std::memcpy(&merge_bounds, &prim_p[i], sizeof(RTCBounds));
-        bounds = merge(bounds, merge_bounds);
-      }
-    }
-
-    const RTCBuildPrimitive *prim_p;
-    size_t size;
-
-    bool is_inner() const override { return false; }
-  };
-
   void * bvh_init_leaf_node(RTCThreadLocalAllocator alloc, const RTCBuildPrimitive *prims_p, size_t n_prims, void *user_p) {
-    void* vptr = rtcThreadLocalAlloc(alloc, sizeof(RTCBVHLeafNode), 16);
-    return (void *) new (vptr) RTCBVHLeafNode(prims_p, n_prims);
+    void* vptr = rtcThreadLocalAlloc(alloc, sizeof(BuildNodeLeaf<K>), 16);
+    return (void *) new (vptr) BuildNodeLeaf<K>(prims_p, n_prims);
   }
-
+  
   template <uint K>
   void * bvh_init_tree_node(RTCThreadLocalAllocator alloc, uint n_children, void *user_p) {
-    void *ptr = rtcThreadLocalAlloc(alloc, sizeof(RTCBVHTreeNode<K>), 16);
-    return (void *) new (ptr) RTCBVHTreeNode<K>;
+    void *ptr = rtcThreadLocalAlloc(alloc, sizeof(BuildNodeInner<K>), 16);
+    return (void *) new (ptr) BuildNodeInner<K>;
   }
-
+  
   template <uint K>
   void bvh_set_children(void *node_p, void **child_p, uint n_children, void *user_p) {
-    auto &node = *static_cast<RTCBVHTreeNode<K> *>(node_p);
-    node.children.fill(nullptr);
+    auto &node = *static_cast<BuildNodeInner<K> *>(node_p);
     for (size_t i = 0; i < n_children; ++i)
-      node.children[i] = static_cast<RTCBVHNode *>(child_p[i]);
+      node.child_nodes[i] = static_cast<BuildNode *>(child_p[i]);
   }
-
+  
   template <uint K>
   void bvh_set_bounds(void *node_p, const RTCBounds **bounds, uint n_children, void *user_p) {
-    auto &node = *static_cast<RTCBVHTreeNode<K> *>(node_p);
-    std::memcpy(&node.bounds, bounds[0], sizeof(RTCBounds));
-    for (size_t i = 1; i < n_children; ++i) {
-      BVHBBox merge_bounds;
-      std::memcpy(&merge_bounds, bounds[i], sizeof(RTCBounds));
-      node.bounds = merge(node.bounds, merge_bounds);
-    }
+    static_assert(sizeof(BVH::AABB) == sizeof(RTCBounds));
+    auto &node = *static_cast<BuildNodeInner<K> *>(node_p);
+    for (size_t i = 0; i < n_children; ++i)
+      std::memcpy(&node.child_aabbs[i], bounds[i], sizeof(RTCBounds));
   }
-
+  
   struct BVHCreateInternalInfo {
     std::span<const RTCBuildPrimitive> data; // Range of bounding boxes to build BVH over
     uint n_node_children;                    // Maximum fan-out of BVH on each node
     uint n_leaf_children;                    // Maximum nr of primitives on each leaf
   };
-
+  
   template <uint K>
-  BVH create_bvh_template(BVHCreateInternalInfo info) {
+  BVH create_bvh_internal(BVHCreateInternalInfo info) {
     met_trace();
 
+    // Create modifiable copy of primitives; embree may re-order these freely
+    // Note; we don't reserve further space for embree's high quality build
     std::vector<RTCBuildPrimitive> prims(range_iter(info.data));
 
     // Initializie new BVH structure
@@ -120,7 +117,7 @@ namespace met::detail {
     args.maxLeafSize            = info.n_leaf_children; // TODO read docs on these?!
     args.traversalCost          = 1.f;
     args.intersectionCost       = 1.f;
-    args.createLeaf             = bvh_init_leaf_node;
+    args.createLeaf             = bvh_init_leaf_node<K>;
     args.createNode             = bvh_init_tree_node<K>;
     args.setNodeBounds          = bvh_set_bounds<K>;
     args.setNodeChildren        = bvh_set_children<K>;
@@ -130,49 +127,51 @@ namespace met::detail {
     args.splitPrimitive         = nullptr;
     args.buildProgress          = nullptr;
     args.userPtr                = nullptr;
-
+    
     // Construct BVH and acquire pointer to root node
-    auto root_p = static_cast<RTCBVHNode *>(rtcBuildBVH(&args));
+    auto root_p = static_cast<BuildNode *>(rtcBuildBVH(&args));
         
     // Prepare external BVH format and resize its blocks
     BVH bvh;
     bvh.nodes.reserve(prims.size() * 2 / K);
     bvh.prims.reserve(prims.size() / 4);
-    
+
     // Do a BF-traversal across embree's BVH, and convert nodes/leaves to the external format
-    std::deque<RTCBVHNode *> work_queue;
+    std::deque<BuildNode *> work_queue;
     work_queue.push_back(root_p);
     while (!work_queue.empty()) {
       // Get next node
       auto next_p = work_queue.front();
       work_queue.pop_front();
 
-      // Generate base node data; independent of leaf/inner presence for now
-      BVH::Node node = { .minb = next_p->bounds.minb, .maxb = next_p->bounds.maxb };
+      // Generate base node data; nodes/leaves overlap
+      BVH::Node node;
 
       // Dependent on node type, do...
-      if (auto node_p = dynamic_cast<RTCBVHTreeNode<K> *>(next_p)) {
+      if (auto node_p = dynamic_cast<BuildNodeInner<K> *>(next_p)) {
         // Get view over all non-nulled children
-        auto nodes = node_p->children
+        auto nodes = node_p->child_nodes
                    | vws::filter([](auto ptr) { return ptr != nullptr; })
                    | rng::to<std::vector>();
         
-        // Set node offset/count to children in memory
-        node.data0 = static_cast<uint>(bvh.nodes.size() + work_queue.size());
-        node.data1 = static_cast<uint>(nodes.size());
-        
+        node.child_aabb = node_p->child_aabbs;
+
+        // Store child node offset and count
+        node.offs_data  = static_cast<uint>(bvh.nodes.size() + work_queue.size());
+        node.size_data  = static_cast<uint>(nodes.size());
+
         // Push child pointers on back of queue for continued traversal
         rng::copy(nodes, std::back_inserter(work_queue));
-      } else if (auto leaf_p = dynamic_cast<RTCBVHLeafNode *>(next_p)) {
+      } else if (auto leaf_p = dynamic_cast<BuildNodeLeaf<K> *>(next_p)) {
         // Get view over all contained primitive indices
-        auto prims = std::span(leaf_p->prim_p, leaf_p->size)
+        auto prims = std::span(leaf_p->prim_p, leaf_p->n_prims)
                    | vws::transform(&RTCBuildPrimitive::primID);
         
-        // Set leaf offset/count to primitives in memory;
-        // and set flag bit to indicate that node is leaf
-        node.data0 = static_cast<uint>(bvh.prims.size()) | BVH::Node::leaf_flag_bit;
-        node.data1 = static_cast<uint>(prims.size()); 
-
+        // Store leaf offset and count
+        // and set flag bit to indicate that node is indeed a leaf
+        node.offs_data  = static_cast<uint>(bvh.prims.size()) | BVH::Node::leaf_flag_bit;
+        node.size_data  = static_cast<uint>(prims.size());
+        
         // Store processed primitives in BVH
         rng::copy(prims, std::back_inserter(bvh.prims));
       }
@@ -189,10 +188,11 @@ namespace met::detail {
 
   // Wrapper function to do templated generation with a runtime constant
   template <uint... Ks>
-  BVH create_bvh_template_wrapper(BVHCreateInternalInfo info) {
+  BVH create_bvh_internal_varargs(BVHCreateInternalInfo info) {
     using FTy = BVH(*)(BVHCreateInternalInfo);
-    constexpr FTy f[] = { create_bvh_template<Ks>... };
-    return f[std::min(info.n_node_children, 8u) >> 2](info);
+    constexpr FTy f[] = { create_bvh_internal<Ks>... };
+    return f[0](info);
+    // return f[std::min(info.n_node_children, 8u) >> 2](info);
   }
 
   BVH create_bvh(BVHCreateMeshInfo info) {
@@ -223,30 +223,32 @@ namespace met::detail {
       prims[i] = prim;
     } // for (int i)
 
-    return create_bvh_template_wrapper<2, 4, 8>({
+    // return create_bvh_internal_varargs<2, 4, 8>({
+    return create_bvh_internal_varargs<8>({
       .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
     });
   }
   
-  BVH create_bvh(BVHCreateBBoxInfo info) {
+  BVH create_bvh(BVHCreateAABBInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
     // elements because we need to assign indices to them
-    std::vector<RTCBuildPrimitive> prims(info.bbox.size());
+    std::vector<RTCBuildPrimitive> prims(info.aabb.size());
     #pragma omp parallel for
-    for (int i = 0; i < info.bbox.size(); ++i) {
-      auto bbox = info.bbox[i];
+    for (int i = 0; i < info.aabb.size(); ++i) {
+      auto aabb = info.aabb[i];
       RTCBuildPrimitive prim;
       prim.geomID = 0;
       prim.primID = static_cast<uint>(i);
-      std::tie(prim.lower_x, prim.lower_y, prim.lower_z) = { bbox.minb[0], bbox.minb[1], bbox.minb[2] };
-      std::tie(prim.upper_x, prim.upper_y, prim.upper_z) = { bbox.maxb[0], bbox.maxb[1], bbox.maxb[2] };
+      std::tie(prim.lower_x, prim.lower_y, prim.lower_z) = { aabb.minb[0], aabb.minb[1], aabb.minb[2] };
+      std::tie(prim.upper_x, prim.upper_y, prim.upper_z) = { aabb.maxb[0], aabb.maxb[1], aabb.maxb[2] };
       prims[i] = prim;
     } // for (int i)
 
-    return create_bvh_template_wrapper<2, 4, 8>({
+    // return create_bvh_internal_varargs<2, 4, 8>({
+    return create_bvh_internal_varargs<8>({
       .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
     });
   }
-} // met::detail
+} // namespace met

@@ -98,8 +98,8 @@ namespace met::detail {
     eig::Vector2f s = (screen_pos.array() - .5f) * 2.f;
     eig::Vector3f o = mat * eig::Vector3f::Zero();
     eig::Vector3f d = (mat * eig::Vector3f(s.x() * tan * m_aspect, 
-                                            s.y() * tan, 
-                                            -1) - o).normalized();
+                                           s.y() * tan, 
+                                           -1) - o).normalized();
     
     return { o, d };
   }

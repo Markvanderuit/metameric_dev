@@ -6,6 +6,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_direct.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw_gbuffer.hpp>
+#include <metameric/components/views/mesh_viewport/task_draw_raytrace.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
 
 namespace met {
@@ -17,6 +18,7 @@ namespace met {
       info.child_task("viewport_input").init<MeshViewportInputTask>();
       info.child_task("viewport_draw_gbuffer").init<MeshViewportDrawGBufferTask>();
       info.child_task("viewport_draw_direct").init<MeshViewportDrawDirectTask>();
+      info.child_task("viewport_draw_raytrace").init<MeshViewportDrawRaytraceTask>();
       info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();
       info.child_task("viewport_end").init<detail::ViewportEndTask>();
     }

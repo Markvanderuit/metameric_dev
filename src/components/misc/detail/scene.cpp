@@ -1,7 +1,7 @@
 #include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/core/bvh.hpp>
 #include <metameric/core/packing.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/embree.hpp>
 #include <bit>
 #include <algorithm>
 #include <deque>
@@ -110,18 +110,18 @@ namespace met::detail {
     };
     static_assert(sizeof(VertexPack) == 16);
 
-    // Packed node struct data
-    struct NodePack {
-      std::array<uint, 3> bbox; // bounding box
-      uint                data; // offset, size assume small trees with maximum 32K nodes nodes/prims
-    };
-    static_assert(sizeof(NodePack) == 16);
-
     // Packed primitive struct data
     struct PrimPack {
       VertexPack v0, v1, v2;
     };
     static_assert(sizeof(PrimPack) == 48);
+
+    /* // Packed node struct data
+    struct NodePack {
+      std::array<uint, 3> bbox; // bounding box
+      uint                data; // offset, size assume small trees with maximum 32K nodes nodes/prims
+    };
+    static_assert(sizeof(NodePack) == 16); */
 
   private:
     VertexPack pack(const eig::Array3f &p, const eig::Array3f &n, const eig::Array2f &tx) {
@@ -133,7 +133,7 @@ namespace met::detail {
       };
     }
 
-    NodePack pack(const BVH::Node &n) {
+    /* NodePack pack(const BVH::Node &n) {
       NodePack p;
 
       p.bbox[0] = pack_unorm_2x16({ n.minb.x(), n.minb.y() });
@@ -146,9 +146,9 @@ namespace met::detail {
                 | leaf_flag;
 
       return p;
-    }
+    } */
 
-    BVH::Node unpack(const NodePack &p) {
+    /* BVH::Node unpack(const NodePack &p) {
       BVH::Node n;
 
       auto v = p.bbox | vws::transform(unpack_unorm_2x16);
@@ -162,12 +162,12 @@ namespace met::detail {
       n.data1 = p.data & 0b1111;
 
       return n;
-    }
+    } */
 
   public:
-    std::vector<BVHInfo>  info;
-    std::vector<NodePack> nodes;
-    std::vector<PrimPack> prims;
+    std::vector<BVHInfo>       info;
+    std::vector<BVH::NodePack> nodes;
+    std::vector<PrimPack>      prims;
 
     BVHPacking() = default;
 
@@ -204,7 +204,7 @@ namespace met::detail {
         // Pack node data tightly and copy to the correctly offset range
         #pragma omp parallel for
         for (int j = 0; j < bvh.nodes.size(); ++j) {
-          nodes[info[i].nodes_offs + j] = pack(bvh.nodes[j]);
+          nodes[info[i].nodes_offs + j] = met::pack(bvh.nodes[j]);
         } // for (int i)
 
         // Pack primitive data tightly and copy to the correctly offset range
@@ -402,10 +402,23 @@ namespace met::detail {
     // Generate an acceleration structure over each scene mesh
     std::vector<BVH> bvhs(meshes.size());
     rng::transform(meshes, bvhs.begin(), [](const auto &mesh) { 
+      /* auto other_bvh = met::create_bvh({
+        .mesh            = mesh,
+        .n_node_children = 8, // 2, 4, 8
+        .n_leaf_children = 4,
+      });
+      for (uint i = 0; i < other_bvh.nodes.size(); ++i) {
+        // if (!other_bvh.nodes[i].is_leaf()) 
+        {
+          fmt::print("Going {}\n", i);
+          auto p = unpack(pack(other_bvh.nodes[i]));
+        }
+      } */
+      
       return create_bvh({ 
         .mesh            = mesh,
         .n_node_children = 8, // 2, 4, 8
-        .n_leaf_children = 8,
+        .n_leaf_children = 4,
       });
     });
     
