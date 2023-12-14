@@ -19,7 +19,7 @@ namespace met {
     
   public:
     BuildNodeInner() {
-      rng::fill(child_nodes, nullptr);
+      child_nodes.fill(nullptr);
     }
 
     float sah() const override {
@@ -29,15 +29,16 @@ namespace met {
 
   template <uint K>
   struct BuildNodeLeaf : public BuildNode {
-    std::array<BVH::AABB *, K> children;
+    std::array<BVH::AABB, K> child_aabbs;
     const RTCBuildPrimitive *prim_p;
     size_t n_prims;
 
   public:
     BuildNodeLeaf(const RTCBuildPrimitive *prim_p, size_t n_prims) 
-    : prim_p(prim_p), n_prims(n_prims) {
+    : prim_p(prim_p), 
+      n_prims(n_prims) {
       for (size_t i = 0; i < n_prims; ++i)
-        std::memcpy(&children[i], &prim_p[i], sizeof(RTCBuildPrimitive));
+        std::memcpy(&child_aabbs[i], &prim_p[i], sizeof(RTCBuildPrimitive));
     }
 
     float sah() const override {
@@ -134,7 +135,7 @@ namespace met {
     // Prepare external BVH format and resize its blocks
     BVH bvh;
     bvh.nodes.reserve(prims.size() * 2 / K);
-    bvh.prims.reserve(prims.size() / 4);
+    bvh.prims.reserve(prims.size());
 
     // Do a BF-traversal across embree's BVH, and convert nodes/leaves to the external format
     std::deque<BuildNode *> work_queue;
@@ -154,10 +155,11 @@ namespace met {
                    | vws::filter([](auto ptr) { return ptr != nullptr; })
                    | rng::to<std::vector>();
         
+        // Store AABBs of children, currently uncompressed
         node.child_aabb = node_p->child_aabbs;
 
         // Store child node offset and count
-        node.offs_data  = static_cast<uint>(bvh.nodes.size() + work_queue.size());
+        node.offs_data  = static_cast<uint>(bvh.nodes.size() + work_queue.size() + 1);
         node.size_data  = static_cast<uint>(nodes.size());
 
         // Push child pointers on back of queue for continued traversal
@@ -165,8 +167,12 @@ namespace met {
       } else if (auto leaf_p = dynamic_cast<BuildNodeLeaf<K> *>(next_p)) {
         // Get view over all contained primitive indices
         auto prims = std::span(leaf_p->prim_p, leaf_p->n_prims)
-                   | vws::transform(&RTCBuildPrimitive::primID);
+                   | vws::transform(&RTCBuildPrimitive::primID)
+                   | rng::to<std::vector>();
         
+        // Store AABBs of children, currently uncompressed
+        node.child_aabb = leaf_p->child_aabbs;
+
         // Store leaf offset and count
         // and set flag bit to indicate that node is indeed a leaf
         node.offs_data  = static_cast<uint>(bvh.prims.size()) | BVH::Node::leaf_flag_bit;
@@ -207,10 +213,8 @@ namespace met {
       using VTy = Mesh::vert_type;
       using ETy = Mesh::elem_type;
 
-      const ETy el = mesh.elems[i];
-      
       // Find the minimal/maximal components bounding the element
-      auto vts = el | vws::transform([&](uint i) { return mesh.verts[i]; }) | vws::take(3);
+      auto vts  = mesh.elems[i] | vws::transform([&](uint i) { return mesh.verts[i]; }) | vws::take(3);
       auto minb = rng::fold_left_first(vts, [](VTy a, VTy b) { return a.cwiseMin(b).eval(); }).value();
       auto maxb = rng::fold_left_first(vts, [](VTy a, VTy b) { return a.cwiseMax(b).eval(); }).value();
 

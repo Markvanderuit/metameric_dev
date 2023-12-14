@@ -9,6 +9,7 @@ project(Metameric LANGUAGES CXX)
 # Build options
 option(met_enable_exceptions "Enable exceptions on release" ON)
 option(met_enable_tracy      "Enable Tracy support"         ON)
+option(met_enable_tests      "Build tests"                  ON)
 
 # Define Metameric's spectral layout
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
@@ -20,6 +21,7 @@ set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supp
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")
 message(STATUS "Metameric : Enabling Tracy      = ${met_enable_tracy}")
+message(STATUS "Metameric : Building tests      = ${met_enable_tests}")
 message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
@@ -53,6 +55,7 @@ find_package(Threads REQUIRED)
 
 # Include third party libraries provided through vcpkg
 find_package(assimp    CONFIG REQUIRED)
+find_package(Catch2    CONFIG REQUIRED)
 find_package(CoinUtils CONFIG REQUIRED)
 find_package(Osi       CONFIG REQUIRED)
 find_package(Clp       CONFIG REQUIRED)
@@ -87,20 +90,22 @@ add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/small_gl_parser)
 
 # Include Intel Embree, compiled from scratch
-set(EMBREE_TUTORIAL             OFF CACHE BOOL " " FORCE)
-set(EMBREE_STATIC_LIB           OFF CACHE BOOL " " FORCE)
-set(EMBREE_ZIP_MODE             OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_QUAD        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_GRID        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_POINT       OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_SUBDIVISION OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_CURVE       OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_INSTANCE    ON  CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_USER        ON  CACHE BOOL " " FORCE)
-set(EMBREE_IGNORE_INVALID_RAYS  ON  CACHE BOOL " " FORCE)
-set(EMBREE_RAY_MASK             OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS        OFF CACHE BOOL " " FORCE)
+set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
+set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
+set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
+set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
+set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
+set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
+set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
+set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
+set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
 # TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
 add_subdirectory(third_party/embree)
 
@@ -296,3 +301,16 @@ add_executable_r(reflected_ocs_testing src/app/reflected_ocs_testing.cpp)
 target_link_libraries(reflected_ocs_testing PRIVATE core components)
 add_executable_r(noise_testing src/app/noise_testing.cpp)
 target_link_libraries(noise_testing PRIVATE core components)
+
+# Optionally setup Catch2 tests
+if (met_enable_tests)
+  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
+
+  add_executable(metameric_tests ${srcs})
+  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core components)
+  target_compile_features(metameric_tests PUBLIC cxx_std_23)
+  
+  include(CTest)
+  include(Catch)
+  catch_discover_tests(metameric_tests WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+endif()

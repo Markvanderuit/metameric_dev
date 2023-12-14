@@ -11,6 +11,7 @@ struct MeshInfo {
 };
 
 struct BVHInfo {
+  mat4 trf;        // Transform data
   uint nodes_offs;
   uint nodes_size;
   uint prims_offs;

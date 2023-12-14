@@ -57,8 +57,24 @@ bool intersect_ray_aabb_fast(in Ray ray, in AABB aabb, inout float t_isct) {
 bool intersect_ray_aabb(inout Ray ray, in AABB aabb) {
   // Extract if you always need it!
   vec3 inv_ray_d = 1.f / ray.d;
+  
+	const vec3 f = (aabb.maxb - ray.o) * inv_ray_d;
+	const vec3 n = (aabb.minb - ray.o) * inv_ray_d;
+	const vec3 t_max = max(f, n);
+	const vec3 t_min = min(f, n);
 
-  vec3 t_min = aabb.minb - ray.o;
+	const float t_out = hmin(t_max); // min(tmax.x, min(tmax.y, tmax.z));
+	const float t_in  = max(0.f, hmax(t_min)); // max(max(tmin.x, max(tmin.y, tmin.z)), 0.0f);
+  
+  // Entry/Exit/Ray distance test
+  if (t_in > t_out || t_in < 0.f || t_in > ray.t)
+    return false;
+
+  // Update closest-hit distance before return
+  ray.t = t_in;
+  return true;
+
+  /* vec3 t_min = aabb.minb - ray.o;
   vec3 t_max = aabb.maxb - ray.o;
 
   bvec3 degenerate = equal(ray.d, vec3(0));
@@ -73,36 +89,41 @@ bool intersect_ray_aabb(inout Ray ray, in AABB aabb) {
     t_out = FLT_MAX;
   }
 
+  // Entry/Exit/Ray distance test
   if (t_in > t_out || t_in < 0.f || t_in > ray.t)
     return false;
   
+  // Update closest-hit distance before return
   ray.t = t_in;
-  return true;
+  return true; */
 }
 
 bool intersect_ray_prim(inout Ray ray, in vec3 a, in vec3 b, in vec3 c) {
   vec3 ab = b - a;
   vec3 bc = c - b;
   vec3 ca = a - c;
-
-  // Plane normal
   vec3 n  = normalize(cross(bc, ab)); // TODO is normalize necessary?
 
   // Backface test
   float n_dot_d = dot(n, ray.d);
-  if (n_dot_d < 0.f)
-    return false;
+  /* if (n_dot_d < 0.f)
+    return false; */
   
-  // Plane distance test
+  // Ray/plane distance test
   float t = dot(((a + b + c) / 3.f - ray.o), n) / n_dot_d;
   if (t < 0.f || t > ray.t)
     return false;
   
   // Point-in-triangle test
   vec3 p = ray.o + t * ray.d;
-  return (dot(n, cross(p - a, ab)) >= 0.f) &&
-         (dot(n, cross(p - b, bc)) >= 0.f) &&
-         (dot(n, cross(p - c, ca)) >= 0.f);
+  if ((dot(n, cross(p - a, ab)) < 0.f) ||
+      (dot(n, cross(p - b, bc)) < 0.f) ||
+      (dot(n, cross(p - c, ca)) < 0.f))
+    return false;
+
+  // Update closest-hit distance before return
+  ray.t = t;
+  return true;
 }
 
 #endif // RAY_GLSL_GUARD

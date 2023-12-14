@@ -5,6 +5,7 @@
     "assimp",
     "clp",
     "cxxopts",
+    "catch2",
     "eigen3",
     "glslang",
     "spirv-cross",

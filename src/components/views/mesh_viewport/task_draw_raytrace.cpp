@@ -56,7 +56,7 @@ namespace met {
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
     const auto &e_bvhs_data = info("scene_handler", "bvhs_data").getr<detail::RTBVHData>();
-    // const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
+    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
     // const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
     // const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
     // const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();

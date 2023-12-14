@@ -95,10 +95,11 @@ namespace met::detail {
     // provides information for accessing parts of
     // bvh data from the packed buffers.
     struct BVHInfo {
-      alignas(4) uint nodes_offs;
-      alignas(4) uint nodes_size;
-      alignas(4) uint prims_offs;
-      alignas(4) uint prims_size;
+      alignas(16) eig::Matrix4f trf;
+      alignas(4)  uint nodes_offs;
+      alignas(4)  uint nodes_size;
+      alignas(4)  uint prims_offs;
+      alignas(4)  uint prims_size;
     };
 
   public:

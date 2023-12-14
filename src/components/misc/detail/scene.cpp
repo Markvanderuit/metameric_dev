@@ -36,6 +36,10 @@ namespace met::detail {
 
     // Constr. over a set of meshes
     MeshPacking(std::span<const Mesh> meshes) {
+      met_trace();
+      
+      info.resize(meshes.size());
+
       std::vector<uint> verts_size(meshes.size()), // Nr. of verts in mesh i
                         elems_size(meshes.size()), // Nr. of elems in mesh i
                         verts_offs(meshes.size()), // Nr. of verts prior to mesh i
@@ -48,7 +52,6 @@ namespace met::detail {
       std::exclusive_scan(range_iter(elems_size), elems_offs.begin(), 0u);
 
       // Assign sizes/offsets into info object
-      info.resize(meshes.size());
       for (int i = 0; i < meshes.size(); ++i)
         info[i] = { .verts_offs = verts_offs[i], .verts_size = verts_size[i],
                     .elems_offs = elems_offs[i], .elems_size = elems_size[i] };
@@ -116,13 +119,6 @@ namespace met::detail {
     };
     static_assert(sizeof(PrimPack) == 48);
 
-    /* // Packed node struct data
-    struct NodePack {
-      std::array<uint, 3> bbox; // bounding box
-      uint                data; // offset, size assume small trees with maximum 32K nodes nodes/prims
-    };
-    static_assert(sizeof(NodePack) == 16); */
-
   private:
     VertexPack pack(const eig::Array3f &p, const eig::Array3f &n, const eig::Array2f &tx) {
       return VertexPack {
@@ -133,37 +129,6 @@ namespace met::detail {
       };
     }
 
-    /* NodePack pack(const BVH::Node &n) {
-      NodePack p;
-
-      p.bbox[0] = pack_unorm_2x16({ n.minb.x(), n.minb.y() });
-      p.bbox[1] = pack_unorm_2x16({ n.maxb.x(), n.maxb.y() });
-      p.bbox[2] = pack_unorm_2x16({ n.minb.z(), n.maxb.z() });
-
-      auto leaf_flag = n.data0 & BVH::Node::leaf_flag_bit;
-      p.data    = (n.data1 & 0b1111) // 8    children/prims max
-                | (n.data0 << 4)     // 2^28 indices max... so a lot
-                | leaf_flag;
-
-      return p;
-    } */
-
-    /* BVH::Node unpack(const NodePack &p) {
-      BVH::Node n;
-
-      auto v = p.bbox | vws::transform(unpack_unorm_2x16);
-      n.minb.head<2>() = v[0];
-      n.maxb.head<2>() = v[1];
-      n.minb.z() = v[2][0];
-      n.maxb.z() = v[2][1];
-
-      auto leaf_flag = p.data & BVH::Node::leaf_flag_bit;
-      n.data0 = ((p.data & (~BVH::Node::leaf_flag_bit)) >> 4) | leaf_flag;
-      n.data1 = p.data & 0b1111;
-
-      return n;
-    } */
-
   public:
     std::vector<BVHInfo>       info;
     std::vector<BVH::NodePack> nodes;
@@ -171,8 +136,25 @@ namespace met::detail {
 
     BVHPacking() = default;
 
-    BVHPacking(std::span<const BVH> bvhs, std::span<const Mesh> meshes) {
+    BVHPacking(std::span<const Mesh> meshes_input) {
       met_trace();
+
+      std::vector<Mesh> meshes(meshes_input.size());
+      std::vector<BVH>  bvhs(meshes_input.size());
+      info.resize(meshes_input.size());
+
+      // Generate a BVH over each scene mesh
+      for (int i = 0; i < meshes.size(); ++i) {
+        // Fit mesh to [0, 1]
+        std::tie(meshes[i], info[i].trf) = unitized_mesh<Mesh>(meshes_input[i]);
+
+        // Next, generate the BVH
+        bvhs[i] = create_bvh({ 
+          .mesh            = meshes[i],
+          .n_node_children = 8, // 2, 4, 8
+          .n_leaf_children = 8, // keep small?
+        });
+      }
 
       std::vector<uint> nodes_size(bvhs.size()), // Nr. of nodes in bvh i
                         prims_size(bvhs.size()), // Nr. of prims in bvh i
@@ -186,9 +168,9 @@ namespace met::detail {
       std::exclusive_scan(range_iter(prims_size), prims_offs.begin(), 0u);
 
       // Assign sizes/offsets into info object
-      info.resize(bvhs.size());
       for (int i = 0; i < bvhs.size(); ++i)
-        info[i] = { .nodes_offs = nodes_offs[i], .nodes_size = nodes_size[i],
+        info[i] = { .trf        = info[i].trf,
+                    .nodes_offs = nodes_offs[i], .nodes_size = nodes_size[i],
                     .prims_offs = prims_offs[i], .prims_size = prims_size[i] };
 
       // Resize packed data buffers to total node/primitive lengths across all bvhs
@@ -196,21 +178,22 @@ namespace met::detail {
       prims.resize(info.back().prims_size + info.back().prims_offs);
 
       // Fill packed data buffers
-      #pragma omp parallel for
+      // #pragma omp parallel for
       for (int i = 0; i < bvhs.size(); ++i) {
         const auto &bvh = bvhs[i];
         const auto &mesh = meshes[i];
 
         // Pack node data tightly and copy to the correctly offset range
-        #pragma omp parallel for
+        // #pragma omp parallel for
         for (int j = 0; j < bvh.nodes.size(); ++j) {
           nodes[info[i].nodes_offs + j] = met::pack(bvh.nodes[j]);
         } // for (int i)
 
-        // Pack primitive data tightly and copy to the correctly offset range
+        // Pack primitive data tightly and copy to the correctly offset range,
+        // while scattering data into leaf node order
         #pragma omp parallel for
         for (int j = 0; j < bvh.prims.size(); ++j) {
-          auto el = mesh.elems[j];
+          auto el = mesh.elems[bvh.prims[j]];
           prims[info[i].prims_offs + j] = PrimPack {
             .v0 = pack(mesh.verts[el[0]], mesh.norms[el[0]], mesh.txuvs[el[0]]),
             .v1 = pack(mesh.verts[el[1]], mesh.norms[el[1]], mesh.txuvs[el[1]]),
@@ -391,44 +374,19 @@ namespace met::detail {
     // Generate a simplified representation of each scene mesh
     std::vector<Mesh> meshes(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
-        Mesh copy = m.value();
         // TODO reuse or combine with RTMeshData, or preprocess and store
-        // TODO this does not work because the mesh was not unitized fierst
-        auto inv = unitize_mesh<Mesh>(copy);
+        Mesh copy = m.value();
         simplify_mesh(copy, 128, 1e-2);
         return copy;
     });
-
-    // Generate an acceleration structure over each scene mesh
-    std::vector<BVH> bvhs(meshes.size());
-    rng::transform(meshes, bvhs.begin(), [](const auto &mesh) { 
-      /* auto other_bvh = met::create_bvh({
-        .mesh            = mesh,
-        .n_node_children = 8, // 2, 4, 8
-        .n_leaf_children = 4,
-      });
-      for (uint i = 0; i < other_bvh.nodes.size(); ++i) {
-        // if (!other_bvh.nodes[i].is_leaf()) 
-        {
-          fmt::print("Going {}\n", i);
-          auto p = unpack(pack(other_bvh.nodes[i]));
-        }
-      } */
-      
-      return create_bvh({ 
-        .mesh            = mesh,
-        .n_node_children = 8, // 2, 4, 8
-        .n_leaf_children = 4,
-      });
-    });
     
-    // Pack bvhs together into one object
-    auto bvh_pack = BVHPacking(bvhs, meshes);
+    // Generate and pack bvhs together into one object
+    auto bvh_pack = BVHPacking(meshes);
 
     // Push layout/data to GL buffers
-    info_gl  = {{ .data = cnt_span<const std::byte>(bvh_pack.info)     }};
-    nodes    = {{ .data = cnt_span<const std::byte>(bvh_pack.nodes)    }};
-    prims    = {{ .data = cnt_span<const std::byte>(bvh_pack.prims)    }};
+    info_gl  = {{ .data = cnt_span<const std::byte>(bvh_pack.info)  }};
+    nodes    = {{ .data = cnt_span<const std::byte>(bvh_pack.nodes) }};
+    prims    = {{ .data = cnt_span<const std::byte>(bvh_pack.prims) }};
 
     // Copy over info object for later access
     info = std::move(bvh_pack.info);
