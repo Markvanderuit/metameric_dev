@@ -1,15 +1,13 @@
-#version 460 core
+#include <preamble.glsl>
+#include <guard.glsl>
+#include <math.glsl>
+#include <bvh.glsl>
+#include <scene.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0) in;
 layout(std140)              uniform;
 layout(std430)              buffer;
-
-// Most includes
-#include <guard.glsl>
-#include <math.glsl>
-#include <bvh.glsl>
-#include <scene.glsl>
 
 // Uniform declarations
 layout(binding = 0) uniform b_buff_unif {

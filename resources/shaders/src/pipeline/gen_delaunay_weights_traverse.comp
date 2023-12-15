@@ -1,10 +1,11 @@
-#version 460 core
-
-#extension GL_KHR_shader_subgroup_clustered : require
-#extension GL_KHR_shader_subgroup_shuffle   : require
-
+#include <preamble.glsl>
 #include <guard.glsl>
 #include <math.glsl>
+
+// Enable necessary subgroup extensions
+extension(GL_KHR_shader_subgroup_basic,     require)
+extension(GL_KHR_shader_subgroup_shuffle,   require)
+extension(GL_KHR_shader_subgroup_clustered, require)
 
 // Delaunay search tree; node data structure
 struct Node { 

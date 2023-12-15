@@ -1,5 +1,4 @@
-#version 460 core
-
+#include <preamble.glsl>
 #include <math.glsl>
 #include <gbuffer.glsl>
 #include <scene.glsl>

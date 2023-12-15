@@ -1,4 +1,4 @@
-#version 460 core
+#include <preamble.glsl>
 
 // Fragment stage declarations
 // layout(location = 0) in vec3  in_value_vert;

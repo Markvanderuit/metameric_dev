@@ -1,4 +1,4 @@
-#version 460 core
+#include <preamble.glsl>
 
 // Triangle shape s.t. unculled fragments form an inquad of size [1, 1]
 const vec2 elem_data[3] = vec2[3](

@@ -1,4 +1,4 @@
-#version 460 core
+#include <preamble.glsl>
 
 // Vertex stage declaration
 layout (location = 0) in vec3  value_in;

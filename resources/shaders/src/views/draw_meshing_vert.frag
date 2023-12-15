@@ -1,5 +1,4 @@
-#version 460 core
-
+#include <preamble.glsl>
 #include <math.glsl>
 
 layout(location = 0) uniform vec4 u_value;

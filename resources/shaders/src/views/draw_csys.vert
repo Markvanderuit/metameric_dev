@@ -1,4 +1,4 @@
-#version 460 core
+#include <preamble.glsl>
 
 layout (location = 0) in vec3  value_in;
 layout (location = 0) out vec3 value_out;

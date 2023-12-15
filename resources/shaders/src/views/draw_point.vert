@@ -1,4 +1,4 @@
-#version 460 core
+#include <preamble.glsl>
 
 layout(location = 0) in vec2  in_value_vert;
 layout(location = 0) out vec2 out_value_vert;

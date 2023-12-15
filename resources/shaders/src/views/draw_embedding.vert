@@ -1,5 +1,4 @@
-#version 460 core
-
+#include <preamble.glsl>
 #include <math.glsl>
 
 // Triangle shape s.t. unculled fragments form an inquad of size [1, 1]

@@ -1,5 +1,4 @@
-#version 460 core
-
+#include <preamble.glsl>
 #include <scene.glsl>
 
 // Buffer layout declarations

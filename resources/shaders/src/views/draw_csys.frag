@@ -1,4 +1,4 @@
-#version 460 core
+#include <preamble.glsl>
 
 // Enable early-z for this fragment shader
 layout(early_fragment_tests) in;

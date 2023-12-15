@@ -1,12 +1,11 @@
-#version 460 core
-
-// Enable necessary subgroup extensions
-#extension GL_KHR_shader_subgroup_basic      : require
-#extension GL_KHR_shader_subgroup_clustered  : require
-
+#include <preamble.glsl>
 #include <guard.glsl>
 #include <bary.glsl>
 #include <color.glsl>
+
+// Enable necessary subgroup extensions
+extension(GL_KHR_shader_subgroup_basic, require)
+extension(GL_KHR_shader_subgroup_clustered, require)
 
 // General layout rule declarations
 layout(local_size_x = 256) in;

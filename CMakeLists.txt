@@ -110,12 +110,12 @@ set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
 add_subdirectory(third_party/embree)
 
 # Add together arguments to pass into small_gl_parser when processing shaders
-string(CONCAT small_gl_parser_args
-  "MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN},"
-  "MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX},"
-  "MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES},"
-  "MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES},"
-  "MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}"
+set(small_gl_parser_args
+  -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
+  -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
+  -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
+  -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
+  -DMET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}
 )
 
 # Recursively find all shader files
@@ -145,18 +145,18 @@ foreach(glsl_src ${glsl_srcs})
   
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
   # we reuse the local c++ compiler, because blargh I need varargs
-  # set(one_value_args TARGET SOURCE OUTPUT)
-  # set(multi_value_args EXTRA_C_FLAGS)
-  # cmake_parse_arguments(CPP "" "${one_value_args}" "${multi_value_args}" ${ARGN})
-  # string(TOUPPER ${CMAKE_BUILD_TYPE} build_type)
-  # string(REPLACE " " ";" c_flags "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${build_type}}")
+  # TODO; adapt dependent on compiler
+  message(INFO ${small_gl_parser_args})
   add_custom_command(
     OUTPUT  ${spirv_parse_fp}
     COMMAND ${CMAKE_C_COMPILER}
-            ${glsl_src}
-            -P 
-            -I "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
-            -Fi${spirv_parse_fp}
+            ${glsl_src}                                                # source file
+            ${small_gl_parser_args}                                    # embedded defines
+            -EP                                                        # override line directive
+            -P                                                         # preprocess to file
+            -C                                                         # preserve comments
+            -I "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include" # include directory
+            -Fi${spirv_parse_fp}                                       # preprocess file output name
     DEPENDS ${glsl_src} ${glsl_includes}
     VERBATIM
   )
