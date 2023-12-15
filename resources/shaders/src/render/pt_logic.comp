@@ -1,0 +1,76 @@
+#version 460 core
+
+#include <ray.glsl>
+#include <sampler_uniform.glsl>
+
+void path_info_to_soa(in PathInfo pi, in uint i) {
+  // ...
+}
+
+PathInfo path_info_from_soa(in uint i) {
+  PathInfo pi;
+  return pi;
+}
+
+void path_init(inout PathInfo pi) {
+  // Initialized externally
+  // pi.px = ...
+  // pi.state = ...
+  
+  pi.result     = 0.f;
+  pi.wavelength = next_1d(pi.state);
+
+  pi.depth       = 0;
+  pi.p          = 1.f;
+  pi.throughput = 1.f;
+  pi.eta        = 1.f;
+}
+
+void path_eval(inout PathInfo pi) {
+  // Check if no surface was hit, and terminate path
+  {
+    // Potentially evaluate environment light
+  }
+
+  // Check if hit surface is emitter, and add emitted energy
+  // if no scattering took place
+  {
+    
+  }
+
+  // if (pi.depth > buff_unif.max_depth)
+  {
+    // Terminate path due to max length being reached
+  }
+
+  // Direct emitter sampling
+  {
+
+  }
+
+  // Emitter sampling
+  {
+
+  }
+
+  // BxDF sampling
+  {
+
+  }
+
+  // Russian roulette
+  {
+
+  }
+}
+
+void main() {
+  uint i = gl_GlobalInvocationID.x;
+  // TODO Guard against i < n
+
+  PathInfo pi = path_info_from_soa(i);
+
+  // Operate on pi
+  
+  path_info_to_soa(pi);
+}

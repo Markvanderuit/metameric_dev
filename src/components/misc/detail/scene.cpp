@@ -152,7 +152,7 @@ namespace met::detail {
         bvhs[i] = create_bvh({ 
           .mesh            = meshes[i],
           .n_node_children = 8, // 2, 4, 8
-          .n_leaf_children = 8, // keep small?
+          .n_leaf_children = 3, // keep small?
         });
       }
 
@@ -327,7 +327,7 @@ namespace met::detail {
     std::vector<Mesh> meshes(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
       Mesh copy = m.value();
-      simplify_mesh(copy, 100'000, 1e-4);
+      simplify_mesh(copy, 65536, 1e-4);
       optimize_mesh(copy);
       return copy;
     });
@@ -376,7 +376,7 @@ namespace met::detail {
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
         // TODO reuse or combine with RTMeshData, or preprocess and store
         Mesh copy = m.value();
-        simplify_mesh(copy, 4096, 1e-4);
+        simplify_mesh(copy, 65536, 1e-4);
         return copy;
     });
     
