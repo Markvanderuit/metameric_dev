@@ -143,21 +143,42 @@ foreach(glsl_src ${glsl_srcs})
   set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv")
   set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
   
-  # Preprocess shader includes and preprocess strings using small_gl_parser
+  # Add preprocessor stage to handle #include as well as > c98 preprocessing
+  # we reuse the local c++ compiler, because blargh I need varargs
+  # set(one_value_args TARGET SOURCE OUTPUT)
+  # set(multi_value_args EXTRA_C_FLAGS)
+  # cmake_parse_arguments(CPP "" "${one_value_args}" "${multi_value_args}" ${ARGN})
+  # string(TOUPPER ${CMAKE_BUILD_TYPE} build_type)
+  # string(REPLACE " " ";" c_flags "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${build_type}}")
   add_custom_command(
     OUTPUT  ${spirv_parse_fp}
-    COMMAND small_gl_parser_exec ${glsl_src} ${spirv_parse_fp} 
-            -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
-            -s "${small_gl_parser_args}"
-    DEPENDS small_gl_parser_exec ${glsl_src} ${glsl_includes}
+    COMMAND ${CMAKE_C_COMPILER}
+            ${glsl_src}
+            -P 
+            -I "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
+            -Fi${spirv_parse_fp}
+    DEPENDS ${glsl_src} ${glsl_includes}
     VERBATIM
   )
+
+  # # Preprocess shader includes and preprocess strings using small_gl_parser
+  # add_custom_command(
+  #   OUTPUT  ${spirv_parse_fp}
+  #   COMMAND small_gl_parser_exec ${glsl_src} ${spirv_parse_fp} 
+  #           -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
+  #           -s "${small_gl_parser_args}"
+  #   DEPENDS small_gl_parser_exec ${glsl_src} ${glsl_includes}
+  #   VERBATIM
+  # )
 
   # Generate spir-v binary using glslangValidator, store in .temp file
   add_custom_command(
     OUTPUT  ${spirv_temp_fp}
     COMMAND ${glslangValidator} ${spirv_parse_fp} 
-            -o ${spirv_temp_fp} --client opengl100 --target-env spirv1.5 -l
+            -o ${spirv_temp_fp} 
+            --client opengl100 
+            --target-env spirv1.5 -l
+            --glsl-version 460
     DEPENDS ${spirv_parse_fp}
     VERBATIM
   )

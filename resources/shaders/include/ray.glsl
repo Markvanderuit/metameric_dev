@@ -91,4 +91,9 @@ struct PathShadingInfo {
   vec3 p;           // World-space position at which to evaluate shading
   uint padding1;
 };
+
+// Variadic macro to take a Type and N buffers, and to generate
+//  a function that loads the type from a SOA to a AOS format
+#define SOA(...) print(__VA_ARGS__)
+
 #endif // RAY_GLSL_GUARD
