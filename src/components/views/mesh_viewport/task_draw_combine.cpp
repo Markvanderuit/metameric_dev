@@ -51,8 +51,8 @@ namespace met {
 
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif", m_unif_buffer);
-    m_program.bind("b_direct_4f", e_raytrace);
-    // m_program.bind("b_direct_4f", e_direct);
+    // m_program.bind("b_direct_4f", e_raytrace);
+    m_program.bind("b_direct_4f", e_direct);
     // m_program.bind("b_indrct_4f", e_indrct);
     m_program.bind("b_target_4f", e_target);
 

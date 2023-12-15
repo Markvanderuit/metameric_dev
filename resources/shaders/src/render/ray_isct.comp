@@ -5,9 +5,10 @@ layout(local_size_x_id = 0) in;
 layout(std140)              uniform;
 layout(std430)              buffer;
 
-#include <bvh.glsl>
+// Most includes
 #include <guard.glsl>
 #include <math.glsl>
+#include <bvh.glsl>
 #include <scene.glsl>
 
 // Uniform declarations
@@ -15,9 +16,7 @@ layout(binding = 0) uniform b_buff_unif {
   mat4  view_inv;  // inverse(view);
   uvec2 view_size; // width, height of image
   float fovy_tan;  // tan(fov_y * .5f);
-  float aspect;    // vec2(aspect, 1);
-  uint  node_i;
-  uint  child_i;
+  float aspect;    // vec2(aspect, 1); 
 } buff_unif;
 
 // Storage declarations
@@ -37,16 +36,27 @@ layout(binding = 4) restrict coherent buffer b_buff_work_head {
   uint value;
 } buff_work_head;
 layout(binding = 5) restrict coherent buffer b_buff_work {
-  RayQuery data[];
+  Ray data[];
 } buff_work;
 
 // Image unit, output declaration
 // TODO remove
 layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
+// Shared memory declarations
 shared ObjectInfo s_objc_info[8];
 shared BVHInfo    s_bvhs_info[8];
 shared uint       s_stack[gl_WorkGroupSize.x][16];
+
+// Define names of scene buffers to replace preproc in intersect.glsl
+// to work around glsl's lack of ssbo argument passing
+#define isct_n_objects      buff_objc_info.data.length()
+#define isct_stack          s_stack[gl_LocalInvocationID.x]
+#define isct_buff_objc_info s_objc_info
+#define isct_buff_bvhs_info s_bvhs_info
+#define isct_buff_bvhs_node buff_bvhs_node.data
+#define isct_buff_bvhs_prim buff_bvhs_prim.data
+#include <intersect.glsl>
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; 
@@ -58,115 +68,12 @@ void load_shared() {
   barrier();
 
   for (uint i = gl_LocalInvocationID.x; 
-            i < buff_objc_info.data.length();
+            i < buff_bvhs_info.data.length();
             i += gl_WorkGroupSize.x) {
     s_bvhs_info[i] = buff_bvhs_info.data[i];
   }
   memoryBarrierShared();
   barrier();
-}
-
-const uint stack_mask_offset = 24;
-
-bool intersect_ray_bvh(inout Ray ray, in uint bvhs_i) {
-  // Initiate stack for traversal from root node
-  // Stack values use 8 bits to flag nodes of interest, 
-  // and 24 bits to store the offset to these nodes
-  s_stack[gl_LocalInvocationID.x][0] = 1u << stack_mask_offset;
-
-  // Traversal values
-  uint stackc = 1;  // There is one value on the stack
-  bool hit    = false;
-
-  // Continue traversal until stack is once again empty
-  while (stackc > 0) {   
-    // Read offset and bitmask from stack
-    uint stack_value = s_stack[gl_LocalInvocationID.x][stackc - 1];
-    uint node_first  = stack_value & 0x00FFFFFF;
-    int  node_bit    = findMSB(stack_value >> stack_mask_offset);
-
-    // Remove bit from mask on stack
-    stack_value &= (~(1u << (stack_mask_offset + node_bit)));
-    s_stack[gl_LocalInvocationID.x][stackc - 1] = stack_value;
-    
-    // If this was the last flagged bit, decrease stack count
-    if ((stack_value & 0xFF000000) == 0)
-      stackc--;
-
-    // Offset to next node in buffer
-    uint node_i = s_bvhs_info[bvhs_i].nodes_offs + node_first + node_bit;
-    BVHNode node = unpack(buff_bvhs_node.data[node_i]);
-    
-    if (bvh_is_leaf(node) || bvh_size(node) == 0) {
-      // Iterate the node's primitives
-      for (uint i = 0; i < bvh_size(node); ++i) {
-        uint prim_i = s_bvhs_info[bvhs_i].prims_offs + bvh_offs(node) + i;
-        BVHPrim prim = unpack(buff_bvhs_prim.data[prim_i]);
-        hit = hit || intersect_ray_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p);
-
-        // hit = hit || intersect_ray_aabb(ray, bvh_child_aabb(node, i));
-      }
-    } else {
-      // Iterate the node's children, test against each AABB, and
-      // on a hit flag the index of the child in a bitmask
-      uint mask = 0;
-      for (uint i = 0; i < bvh_size(node); ++i) {
-        Ray ray_copy = ray;
-        if (intersect_ray_aabb(ray_copy, bvh_child_aabb(node, i)))
-          mask |= (1u << i);
-
-        /* float t_aabb = ray.t;
-        if (intersect_ray_aabb_fast(ray, bvh_child_aabb(node, i), t_aabb))
-          mask |= (1u << i); */
-      } // for (uint i)
-
-      // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
-      if (mask != 0) {
-        stackc++;
-        s_stack[gl_LocalInvocationID.x][stackc - 1] 
-          = (mask << stack_mask_offset) | bvh_offs(node);
-      }
-    }
-  } // while (stackc > 0);
-
-  return hit;
-}
-
-bool intersect_ray_object(inout RayQuery query, in uint object_i) {
-  // TODO streamline transformation matrices into object info!
-  ObjectInfo object_info = s_objc_info[object_i];
-  BVHInfo    bvh_info    = s_bvhs_info[object_info.mesh_i];
-
-  mat4 trf = object_info.trf * bvh_info.trf;
-  mat4 inv = inverse(trf);
-
-  // Transform world space query ray into local mesh scope
-  Ray ray;
-  ray.o = (inv * vec4(query.o, 1)).xyz;
-  ray.d = normalize((inv * vec4(query.d, 0)).xyz);
-  ray.t = FLT_MAX; // query.t;
-
-  /* // Has to be a way to cheapen this;  maybe pre-square things? Blehhh
-  if (ray.t != FLT_MAX) {
-    ray.t = length((inv * vec4(query.d * query.t, 0)).xyz);
-  } */
-  
-  // On closest hit, transform local scope ray into world query space
-  bool hit = intersect_ray_bvh(ray, object_info.mesh_i);
-  if (hit) {
-    // TODO other info should be stored instead, methinks
-    query.t        = length((trf * vec4(ray.d * ray.t, 0)).xyz);
-    query.object_i = object_i;
-  }
-  return hit;
-}
-
-bool intersect_ray_scene(inout RayQuery query) {
-  bool hit = false;
-  hit = hit || intersect_ray_object(query, 0);
-  // for (uint i = 0; i < buff_objc_info.data.length(); ++i) {
-  // }
-  return hit;
 }
 
 void main() {
@@ -175,14 +82,12 @@ void main() {
   const uint i = gl_GlobalInvocationID.x;
   guard(i < buff_work_head.value);
 
-  RayQuery query = buff_work.data[i];
-
-  uvec2 xy = uvec2(i % buff_unif.view_size.x, i / buff_unif.view_size.x);
+  // Grab ray, do ray-scene intersection, get surface info
+  SurfaceInfo si = ray_intersect(buff_work.data[i]);
 
   // For now, set a pixel to a specific color based on the query
-  if (intersect_ray_scene(query)) {
-    vec3 t = vec3(1.f - clamp(0.1 * query.t, 0.f, 1.f));
-    vec3 p = query.o + query.d * query.t;
-    imageStore(b_target_4f, ivec2(xy), vec4(p, 1));
+  if (si.object_i != OBJECT_INVALID) {
+    uvec2 xy = uvec2(i % buff_unif.view_size.x, i / buff_unif.view_size.x);
+    imageStore(b_target_4f, ivec2(xy), vec4(si.n, 1));
   }
 }

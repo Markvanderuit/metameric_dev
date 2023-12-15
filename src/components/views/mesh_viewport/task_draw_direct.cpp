@@ -58,6 +58,7 @@ namespace met {
     const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
     const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
     const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
+    const auto &e_bvhs_data = info("scene_handler", "bvhs_data").getr<detail::RTBVHData>();
     const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
     const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
 
@@ -81,7 +82,7 @@ namespace met {
       // Push fresh camera matrix to uniform data
       const auto &e_arcball = arcball_handle.getr<detail::Arcball>();
       m_unif_buffer_map->trf = e_arcball.full().matrix();
-      m_unif_buffer_map->inv = e_arcball.full().matrix().inverse();
+      m_unif_buffer_map->inv = e_arcball.full().inverse().matrix().eval();
 
       // Set cumulative frame to 0
       i_target.clear();
@@ -117,6 +118,11 @@ namespace met {
     m_program.bind("b_csys_3f",      e_csys_data.csys_gl_texture);
     m_program.bind("b_gbuffer",      e_gbuffer);
     m_program.bind("b_target_4f",    i_target);
+
+    // TODO remove
+    m_program.bind("b_buff_bvhs_info", e_bvhs_data.info_gl);
+    m_program.bind("b_buff_bvhs_node", e_bvhs_data.nodes);
+    m_program.bind("b_buff_bvhs_prim", e_bvhs_data.prims);
 
     // Bind atlas resources that may not yet be initialized
     if (e_txtr_data.info_gl.is_init())

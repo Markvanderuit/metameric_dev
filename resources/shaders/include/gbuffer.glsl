@@ -84,7 +84,8 @@ GBuffer decode_gbuffer(in uvec4 v, in vec2 xy, in mat4 d_inv) {
   gb.object_i = v.w;
 
   // Recover world-space position from depth
-  vec4 invp = d_inv * vec4(vec3(xy, v.z) * 2.f - 1.f, 1);
+  // There's def. cheaper ways to do this
+  vec4 invp = d_inv * vec4(vec3(xy, uintBitsToFloat(v.z)) * 2.f - 1.f, 1);
   gb.p = invp.xyz / invp.w;
 
   return gb;

@@ -11,8 +11,6 @@ namespace met {
       alignas(8)  eig::Vector2u view_size; // width, height of image
       alignas(4)  float         fovy_tan;  // tan(fov_y * .5f);
       alignas(4)  float         aspect;    // vec2(aspect, 1);
-      alignas(4)  uint          node_i;
-      alignas(4)  uint          child_i;
     };
 
     gl::Buffer  m_buffer_sampler_state;

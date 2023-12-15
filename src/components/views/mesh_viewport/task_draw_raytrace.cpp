@@ -100,17 +100,6 @@ namespace met {
       i_target.clear();
     }
 
-    if (ImGui::Begin("Raytrace debug settings")) {
-      uint node_max = e_bvhs_data.info[0].nodes_size;
-      uint node_min = 0;
-      uint child_min = 0;
-      uint child_max = 8;
-      ImGui::SliderScalar("Node index", ImGuiDataType_U32, &m_buffer_unif_map->node_i, &node_min, &node_max);
-      ImGui::SliderScalar("Child index", ImGuiDataType_U32, &m_buffer_unif_map->child_i, &child_min, &child_max);
-      m_buffer_unif.flush();
-    }
-    ImGui::End();
-
     // First stage; initial ray generation
     {
       // Specify dispatch size

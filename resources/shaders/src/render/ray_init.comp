@@ -22,7 +22,7 @@ layout(binding = 0) restrict writeonly buffer b_buff_work_head {
   uint value;
 } buff_work_head;
 layout(binding = 1) restrict writeonly buffer b_buff_work {
-  RayQuery data[];
+  Ray data[];
 } buff_work;
 
 Ray generate_ray(in vec2 xy) {
@@ -40,13 +40,7 @@ void main() {
   
   // Store ray and other stuff ...
   Ray ray = generate_ray((vec2(i) + 0.5) / vec2(buff_unif.view_size));
-  
-  RayQuery work;
-  work.o        = ray.o;
-  work.d        = ray.d;
-  work.t        = ray.t;
-  work.object_i = 32768;
-  buff_work.data[i.y * buff_unif.view_size.x + i.x] = work;
+  buff_work.data[i.y * buff_unif.view_size.x + i.x] = ray;
 
   // Set initial work count to n
   // TODO do from mapped value instead

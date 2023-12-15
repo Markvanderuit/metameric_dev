@@ -376,7 +376,7 @@ namespace met::detail {
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
         // TODO reuse or combine with RTMeshData, or preprocess and store
         Mesh copy = m.value();
-        simplify_mesh(copy, 128, 1e-2);
+        simplify_mesh(copy, 4096, 1e-3);
         return copy;
     });
     

@@ -2,7 +2,7 @@
 #define MATH_GLSL_GUARD
 
 // Define max/min single precision float constants
-#define UINT_MAX 4294967295U
+#define UINT_MAX 4294967295u
 #define UINT_MIN 0
 #define FLT_MAX  3.402823466e+38
 #define FLT_MIN  1.175494351e-38
