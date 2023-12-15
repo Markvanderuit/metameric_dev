@@ -50,9 +50,9 @@ namespace met {
     };
     auto aabb = rng::fold_left_first(node.child_aabb.begin(), 
                                      node.child_aabb.begin() + node.size(), merge).value();
-    static uint bvh_print_i = 0;
-    fmt::print("{} - {}, minb = {}, maxb = {}, offs = {}, size = {}\n", 
-      bvh_print_i++, node.is_leaf() ? "leaf" : "node", aabb.minb, aabb.maxb, node.offs(), node.size());
+    // static uint bvh_print_i = 0;
+    // fmt::print("{} - {}, minb = {}, maxb = {}, offs = {}, size = {}\n", 
+    //   bvh_print_i++, node.is_leaf() ? "leaf" : "node", aabb.minb, aabb.maxb, node.offs(), node.size());
 
     BVH::NodePack p;
 

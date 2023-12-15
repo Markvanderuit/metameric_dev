@@ -327,7 +327,7 @@ namespace met::detail {
     std::vector<Mesh> meshes(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
       Mesh copy = m.value();
-      simplify_mesh(copy, 100'000, 1e-2);
+      simplify_mesh(copy, 100'000, 1e-4);
       optimize_mesh(copy);
       return copy;
     });
@@ -376,7 +376,7 @@ namespace met::detail {
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
         // TODO reuse or combine with RTMeshData, or preprocess and store
         Mesh copy = m.value();
-        simplify_mesh(copy, 4096, 1e-3);
+        simplify_mesh(copy, 4096, 1e-4);
         return copy;
     });
     

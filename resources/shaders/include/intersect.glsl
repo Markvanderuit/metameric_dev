@@ -59,8 +59,13 @@ bool ray_isct_prim_any(in Ray ray, in vec3 a, in vec3 b, in vec3 c) {
   vec3 bc = c - b;
   vec3 n  = normalize(cross(bc, ab)); // TODO is normalize necessary?
 
+  // Backface test, if enabled
+  float n_dot_d = dot(n, ray.d);
+  if (n_dot_d < 0.f)
+    return false;
+
   // Ray/plane distance test
-  float t = dot(((a + b + c) / 3.f - ray.o), n) / dot(n, ray.d);
+  float t = dot(((a + b + c) / 3.f - ray.o), n) / n_dot_d;
   if (t < 0.f || t > ray.t)
     return false;
   
@@ -235,6 +240,9 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
   ObjectInfo object_info = s_objc_info[object_i];
   BVHInfo    bvh_info    = s_bvhs_info[object_info.mesh_i];
   
+  if (!object_info.is_active)
+    return false;
+
   // TODO streamline this stuff
   // Setup transformation to take world space ray into local space
   mat4 trf = object_info.trf * bvh_info.trf;
@@ -257,6 +265,8 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
 void ray_isct_object(inout SurfaceInfoIntermediate si, inout Ray ray, uint object_i) {
   ObjectInfo object_info = s_objc_info[object_i];
   BVHInfo    bvh_info    = s_bvhs_info[object_info.mesh_i];
+
+  guard(object_info.is_active);
   
   // TODO streamline this stuff
   // Setup transformation to take world space ray into local space

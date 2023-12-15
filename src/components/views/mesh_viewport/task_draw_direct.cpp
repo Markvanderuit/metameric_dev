@@ -9,7 +9,7 @@
 
 namespace met {
   constexpr uint n_iters_per_dispatch = 64u;
-  constexpr uint n_iters_max          = 4096u;
+  constexpr uint n_iters_max          = 16384u; // 4096u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 

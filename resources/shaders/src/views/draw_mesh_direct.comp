@@ -69,12 +69,12 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 // TODO remove
 shared ObjectInfo s_objc_info[8];
 shared BVHInfo    s_bvhs_info[8];
-shared uint       s_stack[gl_WorkGroupSize.x][16];
+shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // Define names of scene buffers to replace preproc in intersect.glsl
 // to work around glsl's lack of ssbo argument passing
 #define isct_n_objects      buff_objects.data.length()
-#define isct_stack          s_stack[gl_LocalInvocationID.x]
+#define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
 #define isct_buff_objc_info s_objc_info
 #define isct_buff_bvhs_info s_bvhs_info
 #define isct_buff_bvhs_node buff_bvhs_node.data
@@ -82,8 +82,7 @@ shared uint       s_stack[gl_WorkGroupSize.x][16];
 #include <intersect.glsl>
 
 // Hardcoded value for now
-vec3 hardcoded_lpos = 10 * vec3(-1, 1, 1);
-vec3 hardcoded_ldir = normalize(vec3(-1, 1, 1));
+vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; 
@@ -194,12 +193,17 @@ vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_bary,
   return value * float(wavelength_samples) * cos_theta;
 }
 
-bool test_visibility(in GBuffer gb) {
+bool test_visibility(inout uvec3 state, in GBuffer gb) {
+  vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
+  
   Ray ray;
-  ray.o = gb.p + gb.n * 0.0001f; //M_EPS;
-  ray.d = hardcoded_lpos - ray.o;
+
+  ray.o = gb.p + gb.n * 0.00001f;
+  ray.d = lpos - ray.o;
+  
   ray.t = length(ray.d);
   ray.d /= ray.t;
+
   return !ray_intersect_any(ray);
 }
 
@@ -241,7 +245,7 @@ void main() {
   if (buff_sampler.iter != 0)
     value = imageLoad(b_target_4f, ivec2(i)).xyz * float(buff_sampler.iter);
 
-  if (test_visibility(gb)) {
+  if (test_visibility(state, gb)) {
     uvec4 indices = sample_uplift_bary_indices(object_info, tx_uv, gb);
     if (all(equal(indices, uvec4(indices.x)))) {
       // Hot path; all element indices are the same, we can do a texture gather
