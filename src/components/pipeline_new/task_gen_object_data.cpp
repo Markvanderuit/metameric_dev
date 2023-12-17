@@ -1,6 +1,6 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/pipeline_new/task_gen_object_data.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/texture.hpp>
 #include <format>
 
@@ -50,10 +50,10 @@ namespace met {
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_object    = e_scene.components.objects[m_object_i];
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
-    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-    const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
-    const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
+    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
+    const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<UpliftingData>();
+    const auto &e_objc_data = info("scene_handler", "objc_data").getr<ObjectData>();
+    const auto &e_bary_data = info("gen_objects", "bary_data").getr<TextureAtlas<float, 4>>();
     const auto &e_objc_info = e_objc_data.info[m_object_i];
 
     // Get external resources from object's selected uplifting

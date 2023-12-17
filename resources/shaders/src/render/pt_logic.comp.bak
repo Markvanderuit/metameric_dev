@@ -1,6 +1,7 @@
 #version 460 core
 
 #include <ray.glsl>
+#include <gbuffer.glsl>
 #include <sampler_uniform.glsl>
 
 void path_info_to_soa(in PathInfo pi, in uint i) {

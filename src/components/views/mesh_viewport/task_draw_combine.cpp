@@ -2,7 +2,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>

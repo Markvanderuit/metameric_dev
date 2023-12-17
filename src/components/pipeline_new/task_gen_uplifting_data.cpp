@@ -4,7 +4,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
 #include <omp.h>
@@ -252,7 +252,7 @@ namespace met {
     // 4. Modify uplifting data on the gl-side
     // if (csys_stale) 
     {
-      auto &e_uplifting = info("scene_handler", "uplf_data").getw<detail::RTUpliftingData>();
+      auto &e_uplifting = info("scene_handler", "uplf_data").getw<UpliftingData>();
       auto &info = e_uplifting.info[m_uplifting_i];
 
       // Assemble packed spectra into mapped buffer for fast access during rendering
@@ -261,7 +261,7 @@ namespace met {
               auto &es = e_uplifting.spectra_gl_mapping[info.elem_offs + i];
         
         // Data is transposed and reshaped into a [wvls, 4]-shaped object for gpu-side layout
-        detail::RTUpliftingData::SpecPack pack;
+        UpliftingData::SpecPack pack;
         for (uint i = 0; i < 4; ++i) {
           pack.col(i) = i_spectra[el[i]];
         }
@@ -271,12 +271,12 @@ namespace met {
       // Copy affected info data to buffer
       info.elem_size = i_tesselation.elems.size();
       e_uplifting.info_gl.set(obj_span<const std::byte>(info), 
-                              sizeof(detail::RTUpliftingData::UpliftingInfo), 
-                              sizeof(detail::RTUpliftingData::UpliftingInfo) * m_uplifting_i);
+                              sizeof(UpliftingData::UpliftingInfo), 
+                              sizeof(UpliftingData::UpliftingInfo) * m_uplifting_i);
 
       // Flush affected region of mapped spectrum buffer
-      e_uplifting.spectra_gl.flush(info.elem_size * sizeof(detail::RTUpliftingData::SpecPack),
-                                   info.elem_offs * sizeof(detail::RTUpliftingData::SpecPack));
+      e_uplifting.spectra_gl.flush(info.elem_size * sizeof(UpliftingData::SpecPack),
+                                   info.elem_offs * sizeof(UpliftingData::SpecPack));
 
       // Copy affected region of spectrum buffer to sampleable texture
       e_uplifting.spectra_gl_texture.set(e_uplifting.spectra_gl, 0, { wavelength_samples, info.elem_size },

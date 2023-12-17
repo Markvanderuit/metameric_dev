@@ -4,7 +4,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <format>
 
 namespace met {
@@ -14,8 +14,8 @@ namespace met {
       met_trace_full();
 
       // Get external resources
-      const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-      const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
+      const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
+      const auto &e_bary_data = info("gen_objects", "bary_data").getr<TextureAtlas<float, 4>>();
 
       // Spawn view of texture atlas interiors
       if (ImGui::Begin("Texture atlas")) {
@@ -43,7 +43,7 @@ namespace met {
       if (ImGui::Begin("Scene resources")) {
         // Get external resources
         const auto &e_scene     = info.global("scene").getr<Scene>();
-        const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
+        const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
 
         if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
           for (const auto &mesh : e_scene.resources.meshes) {

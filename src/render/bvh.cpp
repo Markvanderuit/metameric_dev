@@ -1,4 +1,4 @@
-#include <metameric/core/bvh.hpp>
+#include <metameric/render/bvh.hpp>
 #include <embree4/rtcore.h>
 #include <algorithm>
 #include <execution>

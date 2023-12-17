@@ -1,36 +1,37 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
-#include <metameric/core/spectrum.hpp>
 #include <metameric/core/scene.hpp>
-#include <metameric/components/misc/detail/texture_atlas.hpp>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/render/texture_atlas.hpp>
 #include <small_gl/array.hpp>
-#include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/sampler.hpp>
-#include <small_gl/texture.hpp>
-#include <memory>
 
-namespace gl {
-  using Texture2d3fArray = gl::Texture2d<float, 3, gl::TextureType::eImageArray>;
-  using Texture2d1fArray = gl::Texture2d<float, 1, gl::TextureType::eImageArray>;
-} // namespace gl
-
-namespace met::detail {
-  inline
-  eig::Array2u clamp_size_by_setting(Settings::TextureSize setting, eig::Array2u size) {
-    switch (setting) {
-      case Settings::TextureSize::eHigh: return size.cwiseMin(2048u);
-      case Settings::TextureSize::eMed:  return size.cwiseMin(1024u);
-      case Settings::TextureSize::eLow:  return size.cwiseMin(512u);
-      default:                           return size;
+namespace met {
+  namespace detail {
+    inline
+    eig::Array2u clamp_size_by_setting(Settings::TextureSize setting, eig::Array2u size) {
+      switch (setting) {
+        case Settings::TextureSize::eHigh: return size.cwiseMin(2048u);
+        case Settings::TextureSize::eMed:  return size.cwiseMin(1024u);
+        case Settings::TextureSize::eLow:  return size.cwiseMin(512u);
+        default:                           return size;
+      }
     }
-  }
+
+    // Base object overriden by scene data structs
+    // Non-virtual so it can be queried as a resource handle in the scheduler
+    struct SceneDataBase {
+      virtual bool is_stale(const Scene &) const { return false; } 
+      virtual void update(const Scene &) { }
+    };
+  } // namespace detail
 
   // Texture data structure
   // Holds gl-side packed image data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct RTTextureData {
+  struct TextureData : detail::SceneDataBase {
     // Uniform object layout;
     // provides information for accessing parts of
     // texture data from the texture atlases.
@@ -50,17 +51,16 @@ namespace met::detail {
     TextureAtlas<float, 1>   atlas_1f;
   
   public:
-    RTTextureData() = default;
-    RTTextureData(const Scene &);
+    TextureData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
   
   // Mesh data structure
   // Holds gl-side packed mesh data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct RTMeshData {
+  struct MeshData : detail::SceneDataBase {
     // Uniform object layout;
     // provides information for accessing parts of
     // mesh data from the packed buffer.
@@ -80,17 +80,16 @@ namespace met::detail {
     gl::Array             array;
     
   public:
-    RTMeshData() = default;
-    RTMeshData(const Scene &);
+    MeshData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
 
   // Scene BVH data structure
   // Holds both cpu/gl-side bottom-level BVH over each mesh, and
   // a top-level BVH over the set of objects in scene.
-  struct RTBVHData {
+  struct BVHData : detail::SceneDataBase {
     // Uniform object layout;
     // provides information for accessing parts of
     // bvh data from the packed buffers.
@@ -109,17 +108,16 @@ namespace met::detail {
     gl::Buffer           prims;
 
   public:
-    RTBVHData() = default;
-    RTBVHData(const Scene &);
+    BVHData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
 
   // Object data structure
   // Holds gl-side packed object data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct RTObjectData {
+  struct ObjectData : detail::SceneDataBase {
     // Uniform object layout;
     // provides information for a single object, and how to access
     // its mesh surface and material textures from other buffers.
@@ -142,11 +140,10 @@ namespace met::detail {
     gl::Buffer              info_gl;
 
   public:
-    RTObjectData() = default;
-    RTObjectData(const Scene &);
+    ObjectData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
   
   // Uplifting data structure
@@ -154,7 +151,7 @@ namespace met::detail {
   // accompanying info blocks to read said data gl-side. Stores data
   // on a per-uplifting and per-object basis. Allocated but not filled
   // in, as content is generated in the rest of the uplifting pipeline.
-  struct RTUpliftingData {
+  struct UpliftingData : detail::SceneDataBase {
     using Texture1d4fArray = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
     using SpecPack         = eig::Array<float, wavelength_samples, 4>;
 
@@ -178,16 +175,15 @@ namespace met::detail {
     Texture1d4fArray             spectra_gl_texture; // Texture array layout for all spectra
     
   public:
-    RTUpliftingData() = default;
-    RTUpliftingData(const Scene &);
+    UpliftingData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
 
   // CMFS spectra data structure
   // Holds gl-side packed cmfs data in the scene.
-  struct RTObserverData {
+  struct ObserverData : detail::SceneDataBase {
     using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
 
     gl::Buffer       cmfs_gl;         // Mapped buffer for pixel buffer copy
@@ -195,16 +191,15 @@ namespace met::detail {
     Texture1d3fArray cmfs_gl_texture; // Texture array layout for interpolated lookups
 
   public:
-    RTObserverData() = default;
-    RTObserverData(const Scene &);
+    ObserverData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
 
   // Illuminant spectra data structure
   // Holds gl-side packed illm data in the scene.
-  struct RTIlluminantData {
+  struct IlluminantData : detail::SceneDataBase {
     using Texture1d1fArray = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
 
     gl::Buffer       illm_gl;         // Mapped buffer for pixel buffer copy
@@ -212,16 +207,15 @@ namespace met::detail {
     Texture1d1fArray illm_gl_texture; // Texture array layout for interpolated lookups
 
   public:
-    RTIlluminantData() = default;
-    RTIlluminantData(const Scene &);
+    IlluminantData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
 
   // Color system spectra data structure
   // Holds gl-side packed csys data in the scene.
-  struct RTColorSystemData {
+  struct ColorSystemData : detail::SceneDataBase {
     using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
 
     gl::Buffer       csys_gl;         // Mapped buffer for pixel buffer copy
@@ -229,10 +223,9 @@ namespace met::detail {
     Texture1d3fArray csys_gl_texture; // Texture array layout for interpolated lookups
 
   public:
-    RTColorSystemData() = default;
-    RTColorSystemData(const Scene &);
+    ColorSystemData(const Scene &);
 
-    bool is_stale(const Scene &scene) const;
-    void update(const Scene &scene);
+    bool is_stale(const Scene &scene) const override;
+    void update(const Scene &scene) override;
   };
-} // namespace met::detail
+} // namespace met

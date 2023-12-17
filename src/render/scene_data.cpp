@@ -1,5 +1,5 @@
-#include <metameric/components/misc/detail/scene.hpp>
-#include <metameric/core/bvh.hpp>
+#include <metameric/render/scene_data.hpp>
+#include <metameric/render/bvh.hpp>
 #include <metameric/core/packing.hpp>
 #include <metameric/core/utility.hpp>
 #include <bit>
@@ -9,12 +9,12 @@
 #include <ranges>
 #include <vector>
 
-namespace met::detail {
+namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
   struct MeshPacking {
-    using MeshInfo = RTMeshData::MeshInfo;
+    using MeshInfo = MeshData::MeshInfo;
 
     // Packed vertex struct data
     struct VertexPack {
@@ -102,7 +102,7 @@ namespace met::detail {
   };
 
   struct BVHPacking {
-    using BVHInfo = RTBVHData::BVHInfo;
+    using BVHInfo = BVHData::BVHInfo;
 
     // Packed vertex struct data
     struct VertexPack {
@@ -204,18 +204,18 @@ namespace met::detail {
     }
   };
 
-  RTTextureData::RTTextureData(const Scene &scene) {
+  TextureData::TextureData(const Scene &scene) {
     met_trace();
     // Initialize on first run
     // update(scene);
   }
 
-  bool RTTextureData::is_stale(const Scene &scene) const {
+  bool TextureData::is_stale(const Scene &scene) const {
     met_trace();
     return scene.resources.images.is_mutated() || scene.components.settings.state.texture_size;
   }
 
-  void RTTextureData::update(const Scene &scene) {
+  void TextureData::update(const Scene &scene) {
     met_trace_full();
 
     // Get external resources
@@ -244,8 +244,8 @@ namespace met::detail {
       [](auto a, auto b) { return a.cwiseMax(b).eval(); });
     eig::Array2u maximal_1f = rng::fold_left(inputs_1f, eig::Array2u(0), 
       [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u clamped_3f = clamp_size_by_setting(e_settings, maximal_3f);
-    eig::Array2u clamped_1f = clamp_size_by_setting(e_settings, maximal_1f);
+    eig::Array2u clamped_3f = detail::clamp_size_by_setting(e_settings, maximal_3f);
+    eig::Array2u clamped_1f = detail::clamp_size_by_setting(e_settings, maximal_1f);
     eig::Array2f scaled_3f  = clamped_3f.cast<float>() / maximal_3f.cast<float>();
     eig::Array2f scaled_1f  = clamped_1f.cast<float>() / maximal_1f.cast<float>();
 
@@ -305,18 +305,18 @@ namespace met::detail {
     info_gl = {{ .data = cnt_span<const std::byte>(info) }};
   }
 
-  RTMeshData::RTMeshData(const Scene &scene) {
+  MeshData::MeshData(const Scene &scene) {
     met_trace();
     // Initialize on first run
     // update(scene);
   }
 
-  bool RTMeshData::is_stale(const Scene &scene) const {
+  bool MeshData::is_stale(const Scene &scene) const {
     met_trace();
     return scene.resources.meshes.is_mutated();
   }
 
-  void RTMeshData::update(const Scene &scene) {
+  void MeshData::update(const Scene &scene) {
     met_trace_full();
 
     // Get external resources
@@ -353,18 +353,18 @@ namespace met::detail {
   }
 
   
-  RTBVHData::RTBVHData(const Scene &) {
+  BVHData::BVHData(const Scene &) {
     met_trace();
     // Initialize on first run
     // update(scene);
   }
 
-  bool RTBVHData::is_stale(const Scene &scene) const {
+  bool BVHData::is_stale(const Scene &scene) const {
     met_trace();
     return scene.resources.meshes.is_mutated();
   }
 
-  void RTBVHData::update(const Scene &scene) {
+  void BVHData::update(const Scene &scene) {
     met_trace_full();
 
     // Get external resources
@@ -374,7 +374,7 @@ namespace met::detail {
     // Generate a simplified representation of each scene mesh
     std::vector<Mesh> meshes(e_meshes.size());
     std::transform(std::execution::par_unseq, range_iter(e_meshes), meshes.begin(), [](const auto &m) { 
-        // TODO reuse or combine with RTMeshData, or preprocess and store
+        // TODO reuse or combine with MeshData, or preprocess and store
         Mesh copy = m.value();
         simplify_mesh(copy, 65536, 1e-4);
         return copy;
@@ -392,13 +392,13 @@ namespace met::detail {
     info = std::move(bvh_pack.info);
   }
 
-  RTObjectData::RTObjectData(const Scene &scene) {
+  ObjectData::ObjectData(const Scene &scene) {
     met_trace();
     // Initialize on first run
     // update(scene);
   }
 
-  bool RTObjectData::is_stale(const Scene &scene) const {
+  bool ObjectData::is_stale(const Scene &scene) const {
     met_trace();
 
     // Get shared resources
@@ -410,7 +410,7 @@ namespace met::detail {
     return !info_gl.is_init() || e_objects.is_mutated();
   }
   
-  void RTObjectData::update(const Scene &scene) {
+  void ObjectData::update(const Scene &scene) {
       met_trace_full();
             
       // Get external resources
@@ -460,7 +460,7 @@ namespace met::detail {
       } // for (uint i)
   }
 
-  RTUpliftingData::RTUpliftingData(const Scene &scene) {
+  UpliftingData::UpliftingData(const Scene &scene) {
     met_trace_full();
 
     // Fixed settings 
@@ -497,17 +497,17 @@ namespace met::detail {
     }
   }
 
-  bool RTUpliftingData::is_stale(const Scene &scene) const {
+  bool UpliftingData::is_stale(const Scene &scene) const {
     met_trace();
     return false;
   }
 
-  void RTUpliftingData::update(const Scene &scene) {
+  void UpliftingData::update(const Scene &scene) {
     met_trace();
     // Never runs; is instead filled in by subsequent uplifting pipeline
   }
 
-  RTObserverData::RTObserverData(const Scene &scene) {
+  ObserverData::ObserverData(const Scene &scene) {
     met_trace_full();
     
     constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
@@ -521,12 +521,12 @@ namespace met::detail {
     cmfs_gl_mapping = cmfs_gl.map_as<CMFS>(buffer_access_flags);
   }
 
-  bool RTObserverData::is_stale(const Scene &scene) const {
+  bool ObserverData::is_stale(const Scene &scene) const {
     met_trace();
     return scene.resources.observers.is_mutated();
   }
 
-  void RTObserverData::update(const Scene &scene) {
+  void ObserverData::update(const Scene &scene) {
     met_trace_full();
 
     uint i = 0;
@@ -539,7 +539,7 @@ namespace met::detail {
     cmfs_gl_texture.set(cmfs_gl);
   }
 
-  RTIlluminantData::RTIlluminantData(const Scene &scene) {
+  IlluminantData::IlluminantData(const Scene &scene) {
     met_trace_full();
     
     constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
@@ -553,12 +553,12 @@ namespace met::detail {
     illm_gl_mapping = illm_gl.map_as<Spec>(buffer_access_flags);
   }
 
-  bool RTIlluminantData::is_stale(const Scene &scene) const {
+  bool IlluminantData::is_stale(const Scene &scene) const {
     met_trace();
     return scene.resources.illuminants.is_mutated();
   }
 
-  void RTIlluminantData::update(const Scene &scene) {
+  void IlluminantData::update(const Scene &scene) {
     met_trace_full();
 
     uint i = 0;
@@ -571,7 +571,7 @@ namespace met::detail {
     illm_gl_texture.set(illm_gl);
   }
 
-  RTColorSystemData::RTColorSystemData(const Scene &scene) {
+  ColorSystemData::ColorSystemData(const Scene &scene) {
     met_trace_full();
     
     constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
@@ -585,14 +585,14 @@ namespace met::detail {
     csys_gl_mapping = csys_gl.map_as<CMFS>(buffer_access_flags);
   }
 
-  bool RTColorSystemData::is_stale(const Scene &scene) const {
+  bool ColorSystemData::is_stale(const Scene &scene) const {
     met_trace();
     return scene.resources.illuminants.is_mutated()
         || scene.resources.observers.is_mutated()
         || scene.components.colr_systems.is_mutated();
   }
 
-  void RTColorSystemData::update(const Scene &scene) {
+  void ColorSystemData::update(const Scene &scene) {
     met_trace_full();
 
     uint i = 0;
@@ -605,4 +605,4 @@ namespace met::detail {
     csys_gl.flush();
     csys_gl_texture.set(csys_gl);
   }
-} // namespace met::detail
+} // namespace met

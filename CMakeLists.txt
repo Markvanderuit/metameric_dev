@@ -144,19 +144,21 @@ foreach(glsl_src ${glsl_srcs})
   set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
   
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
-  # we reuse the local c++ compiler, because blargh I need varargs
+  # we reuse the local c++ compiler, because wow do I need me some varargs
   # TODO; adapt dependent on compiler
-  message(INFO ${small_gl_parser_args})
   add_custom_command(
     OUTPUT  ${spirv_parse_fp}
-    COMMAND ${CMAKE_C_COMPILER}
+    COMMAND ${CMAKE_CXX_COMPILER}
+            -Tp                                                        # treat this as a c++ source file
             ${glsl_src}                                                # source file
-            ${small_gl_parser_args}                                    # embedded defines
             -EP                                                        # override line directive
             -P                                                         # preprocess to file
             -C                                                         # preserve comments
             -I "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include" # include directory
+            -Zc:preprocessor                                           # make nice recent c++ macro expansions available
+            -std:c++20                                                 # make nice recent c++ macro expansions available
             -Fi${spirv_parse_fp}                                       # preprocess file output name
+            ${small_gl_parser_args}                                    # embedded defines
     DEPENDS ${glsl_src} ${glsl_includes}
     VERBATIM
   )
@@ -177,7 +179,7 @@ foreach(glsl_src ${glsl_srcs})
     COMMAND ${glslangValidator} ${spirv_parse_fp} 
             -o ${spirv_temp_fp} 
             --client opengl100 
-            --target-env spirv1.5 -l
+            --target-env spirv1.5 
             --glsl-version 460
     DEPENDS ${spirv_parse_fp}
     VERBATIM
@@ -187,7 +189,10 @@ foreach(glsl_src ${glsl_srcs})
   add_custom_command(
     OUTPUT  ${spirv_bin_fp}
     COMMAND ${spirv-opt} ${spirv_temp_fp} 
-            -o ${spirv_bin_fp} -O --strength-reduction --combine-access-chains
+            -o ${spirv_bin_fp} 
+            -O 
+            --strength-reduction 
+            --combine-access-chains
     DEPENDS ${spirv_temp_fp}
     VERBATIM
   )
@@ -299,11 +304,19 @@ target_compile_definitions(core PUBLIC
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
 
+# Set up render library
+add_library_r(render render)
+target_link_libraries(render PUBLIC
+  core
+  imgui::imgui
+)
+add_dependencies(render shaders misc_copy)
+
 # Set up components library
 add_library_r(components components)
 target_link_libraries(components PUBLIC
   core
-  small_gl
+  render
   imgui::imgui
   imguizmo::imguizmo
   implot::implot
@@ -315,7 +328,7 @@ add_dependencies(components shaders misc_copy)
 add_executable_r(metameric src/app/metameric.cpp)
 target_link_libraries(metameric PRIVATE core components)
 add_executable_r(metameric_editor src/app/metameric_editor.cpp)
-target_link_libraries(metameric_editor PRIVATE core components)
+target_link_libraries(metameric_editor PRIVATE core render components)
 add_executable_r(ocs_testing src/app/ocs_testing.cpp)
 target_link_libraries(ocs_testing PRIVATE core components)
 add_executable_r(reflected_ocs_testing src/app/reflected_ocs_testing.cpp)

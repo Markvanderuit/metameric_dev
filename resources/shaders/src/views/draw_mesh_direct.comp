@@ -192,16 +192,24 @@ vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_bary,
   return value * float(wavelength_samples) * cos_theta;
 }
 
+// Offset epsilon copied from mitsuba3
+vec3 gen_offset_p(in GBuffer gb, in vec3 d) {
+  float mag = 1.f + hmax(abs(gb.p)) + 1500.f * M_EPS;
+  mag = dot(gb.n, d) >= 0 ? mag : -mag;
+  return fma(vec3(mag), gb.n, gb.p);
+}
+
 bool test_visibility(inout uvec3 state, in GBuffer gb) {
   vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
   
   Ray ray;
-
-  ray.o = gb.p + gb.n * 0.00001f;
-  ray.d = lpos - ray.o;
-  
+  ray.d = lpos - gb.p;
   ray.t = length(ray.d);
   ray.d /= ray.t;
+  ray.o = gb.p + 0.0001f * gb.n;
+
+  // Mistake; gbuffer normal is not geometric normal!
+  // ray.o = gen_offset_p(gb, ray.d);
 
   return !ray_intersect_any(ray);
 }

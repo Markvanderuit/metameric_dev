@@ -3,42 +3,44 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 
-namespace met::detail {
-  // TextureAtlasBase
-  // Common base of TextureAtlas<T, D> objects, defining related types and enums
-  struct TextureAtlasBase {
-    using vec2 = eig::Array2u;
-    using vec3 = eig::Array3u;
+namespace met {
+  namespace detail {
+    // TextureAtlasBase
+    // Common base of TextureAtlas<T, D> objects, defining related types and enums
+    struct TextureAtlasBase {
+      using vec2 = eig::Array2u;
+      using vec3 = eig::Array3u;
 
-    // Build methods; either prefer adding extra layers, or grow the texture
-    // horizontally/vertically if capacity is insufficient
-    enum BuildMethod {
-      eLayered, eSpread
-    };
+      // Build methods; either prefer adding extra layers, or grow the texture
+      // horizontally/vertically if capacity is insufficient
+      enum BuildMethod {
+        eLayered, eSpread
+      };
 
-    // Object describing a single texture patch reserved inside the atlas,
-    // fit for std140/std430 buffer layout
-    struct PatchLayout {
-      alignas(4) uint layer_i;
-      alignas(8) eig::Array2u offs, size;
-      alignas(8) eig::Array2f uv0, uv1;
-    };
+      // Object describing a single texture patch reserved inside the atlas,
+      // fit for std140/std430 buffer layout
+      struct PatchLayout {
+        alignas(4) uint layer_i;
+        alignas(8) eig::Array2u offs, size;
+        alignas(8) eig::Array2f uv0, uv1;
+      };
 
-    // Helper object for initializing TextureAtlas
-    struct CreateInfo {
-      std::vector<vec2> sizes;
-      uint              levels  = 1u;
-      uint              padding = 0u;
-      BuildMethod       method  = BuildMethod::eSpread;
+      // Helper object for initializing TextureAtlas
+      struct CreateInfo {
+        std::vector<vec2> sizes;
+        uint              levels  = 1u;
+        uint              padding = 0u;
+        BuildMethod       method  = BuildMethod::eSpread;
+      };
     };
-  };
+  } // namespace detail
 
   /* TextureAtlas
      Simple wrapper around OpenGL-side array texture for handling of a number
      of similarly-sized textures.
    */
   template <typename T, uint D>
-  struct TextureAtlas : TextureAtlasBase {
+  struct TextureAtlas : detail::TextureAtlasBase {
     using InfoType    = TextureAtlasBase::CreateInfo;
     using Texture     = gl::Texture2d<T, D, gl::TextureType::eImageArray>;
     using TextureView = gl::TextureView2d<T, D>;
@@ -118,4 +120,4 @@ namespace met::detail {
 
     met_declare_noncopyable(TextureAtlas);
   };
-} // namespace met::detail
+} // namespace met

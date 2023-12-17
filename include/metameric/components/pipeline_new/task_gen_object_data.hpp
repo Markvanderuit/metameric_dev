@@ -3,7 +3,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/dispatch.hpp>
@@ -48,7 +48,7 @@ namespace met {
       const auto &e_objects = e_scene.components.objects;
 
       // Add texture atlas object, non-initialized
-      info("bary_data").init<detail::TextureAtlas<float, 4>>({
+      info("bary_data").init<TextureAtlas<float, 4>>({
         .levels  = 1,
         .padding = 0u,
         .method  = detail::TextureAtlasBase::BuildMethod::eSpread,
@@ -78,7 +78,7 @@ namespace met {
 
         // Get weight atlas handle and value
         auto i_bary_handle = info("bary_data");
-        const auto &i_bary_data = i_bary_handle.getr<detail::TextureAtlas<float, 4>>();
+        const auto &i_bary_data = i_bary_handle.getr<TextureAtlas<float, 4>>();
 
         // Gather necessary texture sizes for each object
         std::vector<eig::Array2u> inputs(e_objects.size());
@@ -109,7 +109,7 @@ namespace met {
 
         // Internally refit atlas if inputs don't match the atlas' current layout
         if (!is_exact_fit) {
-          i_bary_handle.getw<detail::TextureAtlas<float, 4>>().resize(inputs);
+          i_bary_handle.getw<TextureAtlas<float, 4>>().resize(inputs);
 
           fmt::print("Rebuilt atlas\n");
           for (const auto &patch : i_bary_data.patches()) {

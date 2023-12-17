@@ -60,9 +60,9 @@ namespace met {
     LinearScheduler &m_scheduler;
 
     // Friend private members
-    LinearSchedulerHandleFlags return_flags;
-    std::list<detail::TaskInfo>        add_task_info;
-    std::list<detail::TaskInfo>        rem_task_info;
+    LinearSchedulerHandleFlags  return_flags;
+    std::list<detail::TaskInfo> add_task_info;
+    std::list<detail::TaskInfo> rem_task_info;
 
     // Virtual method implementations for SchedulerHandle
     detail::TaskNode *add_task_impl(detail::TaskInfo &&)       override; // nullable return value

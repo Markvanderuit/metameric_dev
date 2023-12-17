@@ -1,7 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 
@@ -48,9 +48,9 @@ namespace met {
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_objects   = e_scene.components.objects;
     const auto &e_arcball   = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
-    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
-    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
+    const auto &e_objc_data = info("scene_handler", "objc_data").getr<ObjectData>();
+    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<MeshData>();
+    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
 
     // Push camera matrix to uniform data
     m_unif_camera_buffer_map->camera_matrix = e_arcball.full().matrix();

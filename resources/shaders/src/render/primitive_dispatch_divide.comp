@@ -1,0 +1,18 @@
+#include <preamble.glsl>
+#include <math.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 1) in;
+layout(std430)           buffer;
+
+// Storage buffer declarations; scene intersection data
+layout(binding = 0) restrict readonly  buffer b_input  { uint  value_in;  };
+layout(binding = 1) restrict writeonly buffer b_output { uvec3 value_out; };
+
+// Divide constant declaration
+layout(constant_id = 0) const uint value_divide = 256u;
+
+void main() {
+  if (gl_LocalInvocationID.x == 0)
+    value_out = uvec3(ceil_div(value_in, value_divide), 1, 1);
+}

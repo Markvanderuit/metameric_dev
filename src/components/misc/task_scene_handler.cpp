@@ -1,5 +1,5 @@
 #include <metameric/components/misc/task_scene_handler.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <algorithm>
 #include <deque>
 
@@ -11,14 +11,14 @@ namespace met {
     const auto &e_scene = info.global("scene").getr<Scene>();
     
     // Initialize holder objects for gpu-side resources for newly loaded scene
-    info("txtr_data").init<detail::RTTextureData>(e_scene);
-    info("mesh_data").init<detail::RTMeshData>(e_scene);
-    info("uplf_data").init<detail::RTUpliftingData>(e_scene);
-    info("objc_data").init<detail::RTObjectData>(e_scene);
-    info("cmfs_data").init<detail::RTObserverData>(e_scene);
-    info("illm_data").init<detail::RTIlluminantData>(e_scene);
-    info("csys_data").init<detail::RTColorSystemData>(e_scene);
-    info("bvhs_data").init<detail::RTBVHData>(e_scene);
+    info("txtr_data").init<TextureData>(e_scene);
+    info("mesh_data").init<MeshData>(e_scene);
+    info("uplf_data").init<UpliftingData>(e_scene);
+    info("objc_data").init<ObjectData>(e_scene);
+    info("cmfs_data").init<ObserverData>(e_scene);
+    info("illm_data").init<IlluminantData>(e_scene);
+    info("csys_data").init<ColorSystemData>(e_scene);
+    info("bvhs_data").init<BVHData>(e_scene);
     
     { // Pre-load bookkeeping on resources
       auto &e_scene = info.global("scene").getw<Scene>();
@@ -46,40 +46,16 @@ namespace met {
       e_scene.components.objects.update();
     }
 
-    // Process updates to gpu-side illuminant components
-    if (auto handle = info("illm_data"); handle.getr<detail::RTIlluminantData>().is_stale(e_scene))
-      handle.getw<detail::RTIlluminantData>().update(e_scene);
-
-    // Process updates to gpu-side observer components
-    if (auto handle = info("cmfs_data"); handle.getr<detail::RTObserverData>().is_stale(e_scene))
-      handle.getw<detail::RTObserverData>().update(e_scene);
-
-    // Process updates to gpu-side object components
-    if (auto handle = info("csys_data"); handle.getr<detail::RTColorSystemData>().is_stale(e_scene))
-      handle.getw<detail::RTColorSystemData>().update(e_scene);
-      
-    // Process updates to gpu-side image resources
-    if (auto handle = info("txtr_data"); handle.getr<detail::RTTextureData>().is_stale(e_scene))
-      handle.getw<detail::RTTextureData>().update(e_scene);
-
-    // Process updates to gpu-side mesh resources
-    if (auto handle = info("mesh_data"); handle.getr<detail::RTMeshData>().is_stale(e_scene))
-      handle.getw<detail::RTMeshData>().update(e_scene);
-
-    // Process updates to gpu-side uplifting resources
-    if (auto handle = info("uplf_data"); handle.getr<detail::RTUpliftingData>().is_stale(e_scene))
-      handle.getw<detail::RTUpliftingData>().update(e_scene);
-
-    // Process updates to gpu-side object components
-    if (auto handle = info("objc_data"); handle.getr<detail::RTObjectData>().is_stale(e_scene))
-      handle.getw<detail::RTObjectData>().update(e_scene);
-
-    // Process updates to gpu-side bvh acceleration data
-    if (auto handle = info("bvhs_data"); handle.getr<detail::RTBVHData>().is_stale(e_scene))
-      handle.getw<detail::RTBVHData>().update(e_scene);
+    // Process updates to gpu-side resources, if they are stale
+    for (auto key : { "illm_data", "cmfs_data", "csys_data", "txtr_data", "uplf_data", "objc_data", "mesh_data", "bvhs_data" }) {
+      auto handle = info(key); 
+      if (handle.getr<detail::SceneDataBase>().is_stale(e_scene)) {
+        handle.getw<detail::SceneDataBase>().update(e_scene);
+      }
+    }
 
     { // Post-load bookkeeping on resources; assume no further changes as gpu-side
-      // All resources should be up-to-date now
+      // all the resources should be updatednow
       auto &e_scene = info.global("scene").getw<Scene>();
       e_scene.resources.meshes.set_mutated(false);
       e_scene.resources.images.set_mutated(false);

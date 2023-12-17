@@ -54,28 +54,6 @@ bool ray_isct_aabb(inout Ray ray, in vec3 d_inv, in AABB aabb) {
   return true;
 }
 
-bool ray_isct_prim_any(in Ray ray, in vec3 a, in vec3 b, in vec3 c) {
-  vec3 ab = b - a;
-  vec3 bc = c - b;
-  vec3 n  = normalize(cross(bc, ab)); // TODO is normalize necessary?
-
-  // Backface test, if enabled
-  float n_dot_d = dot(n, ray.d);
-  if (n_dot_d < 0.f)
-    return false;
-
-  // Ray/plane distance test
-  float t = dot(((a + b + c) / 3.f - ray.o), n) / n_dot_d;
-  if (t < 0.f || t > ray.t)
-    return false;
-  
-  // Point-in-triangle test
-  vec3 p = ray.o + t * ray.d;
-  return ((dot(n, cross(p - a, ab))    >= 0.f) &&
-          (dot(n, cross(p - b, bc))    >= 0.f) &&
-          (dot(n, cross(p - c, a - c)) >= 0.f));
-}
-
 bool ray_isct_prim(inout Ray ray, in vec3 a, in vec3 b, in vec3 c) {
   vec3 ab = b - a;
   vec3 bc = c - b;
@@ -142,7 +120,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
         BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
 
         // Test against primitive; store primitive index on hit
-        if (ray_isct_prim_any(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
+        if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
           return true;
         }
       }
@@ -166,7 +144,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
   return false;
 }
 
-bool ray_isct_bvh(inout SurfaceInfoIntermediate si, inout Ray ray, in uint bvh_i) {
+bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
   // Initiate stack for traversal from root node
@@ -212,7 +190,7 @@ bool ray_isct_bvh(inout SurfaceInfoIntermediate si, inout Ray ray, in uint bvh_i
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
-          si.prim_i = prim_i; // Store scene-wide packed primitive index
+          set_ray_data_prim(ray, prim_i);
           hit       = true;
         }
       }
@@ -262,11 +240,12 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
   return ray_isct_bvh_any(ray_object, object_info.mesh_i);
 }
 
-void ray_isct_object(inout SurfaceInfoIntermediate si, inout Ray ray, uint object_i) {
+void ray_isct_object(inout Ray ray, uint object_i) {
   ObjectInfo object_info = s_objc_info[object_i];
   BVHInfo    bvh_info    = s_bvhs_info[object_info.mesh_i];
 
-  guard(object_info.is_active);
+  if (!object_info.is_active)
+    return;
   
   // TODO streamline this stuff
   // Setup transformation to take world space ray into local space
@@ -284,56 +263,49 @@ void ray_isct_object(inout SurfaceInfoIntermediate si, inout Ray ray, uint objec
   ray_object.d /= dt;
   ray_object.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
 
-  // Run intersection; on a hit, store intersected object index
-  // and recover world-space distance of ray
-  if (ray_isct_bvh(si, ray_object, object_info.mesh_i)) {
-    si.object_i = object_i;
-    ray.t       = length((trf * vec4(ray_object.d * ray_object.t, 0)).xyz);
+  // Run intersection; on a hit, recover world-space distance,
+  // and store intersection data in ray
+  if (ray_isct_bvh(ray_object, object_info.mesh_i)) {
+    ray.t    = length((trf * vec4(ray_object.d * ray_object.t, 0)).xyz);
+    ray.data = ray_object.data;
+    set_ray_data_objc(ray, object_i);
   }
 }
 
-SurfaceInfoIntermediate ray_isct_scene(inout Ray ray) {
-  SurfaceInfoIntermediate si;
-  si.object_i = OBJECT_INVALID;
-  for (uint i = 0; i < isct_n_objects; ++i) {
-    ray_isct_object(si, ray, i);
-  }
-  return si;
-}
-
-vec3 gen_barycentric_coords(in vec3 p, in vec3 a, in vec3 b, in vec3 c) {
-    vec3 ab = b - a;
-    vec3 ac = c - a;
-
-    float a_tri = abs(.5f * length(cross(ac, ab)));
-    float a_ab  = abs(.5f * length(cross(p - a, ab)));
-    float a_ac  = abs(.5f * length(cross(ac, p - a)));
-    float a_bc  = abs(.5f * length(cross(c - p, b - p)));
-    
-    return vec3(a_bc, a_ac, a_ab) / a_tri;
-}
-
-bool ray_intersect_any(in Ray ray) {
+bool ray_intersect_scene_any(inout Ray ray) {
+  set_ray_data_anyh(ray, false);
   for (uint i = 0; i < isct_n_objects; ++i) {
     if (ray_isct_object_any(ray, i)) {
+      set_ray_data_anyh(ray, true);
       return true;
     }
   }
   return false;
 }
 
-SurfaceInfo ray_intersect(in Ray ray) {
-  // First, handle ray-scene intersection, updating ray length
-  // and returning an intermediate object containing object id and primitive id
-  SurfaceInfoIntermediate sim = ray_isct_scene(ray);
+bool ray_intersect_scene(inout Ray ray) {
+  set_ray_data_objc(ray, OBJECT_INVALID);
+  for (uint i = 0; i < isct_n_objects; ++i) {
+    ray_isct_object(ray, i);
+  }
+  return get_ray_data_objc(ray) != OBJECT_INVALID;
+}
+
+bool ray_intersect_any(inout Ray ray) {
+  return ray_intersect_scene_any(ray);
+}
+
+/* SurfaceInfo ray_intersect(in Ray ray) {
+  // First, handle ray-scene intersection
+  ray_intersect_scene(ray);
 
   SurfaceInfo si;
-  si.object_i = sim.object_i;
+  si.object_i = get_ray_data_objc(ray);
 
   // On a hit, generate surface info
   if (si.object_i != OBJECT_INVALID) {
     // Obtain and unpack intersected primitive
-    BVHPrim prim = unpack(isct_buff_bvhs_prim[sim.prim_i]);
+    BVHPrim prim = unpack(isct_buff_bvhs_prim[get_ray_data_prim(ray)]);
 
     // Fill in surface point from intersection
     si.t = ray.t;
@@ -347,6 +319,6 @@ SurfaceInfo ray_intersect(in Ray ray) {
   }
 
   return si;
-}
+} */
 
 #endif // INTERSECT_GLSL_GUARD

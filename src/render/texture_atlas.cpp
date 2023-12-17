@@ -1,8 +1,8 @@
-#include <metameric/components/misc/detail/texture_atlas.hpp>
+#include <metameric/render/texture_atlas.hpp>
 #include <algorithm>
 #include <deque>
 
-namespace met::detail {
+namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -265,4 +265,4 @@ namespace met::detail {
     met_explicit_atlas_components(float)
 
   met_explicit_atlas_types()
-} // namespace met::detail
+} // namespace met

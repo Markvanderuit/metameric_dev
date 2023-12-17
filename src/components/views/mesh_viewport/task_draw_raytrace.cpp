@@ -2,7 +2,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_raytrace.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/misc/detail/scene.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>
@@ -54,14 +54,14 @@ namespace met {
 
     // Get shared resources 
     const auto &e_scene     = info.global("scene").getr<Scene>();
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<detail::RTObjectData>();
-    const auto &e_bvhs_data = info("scene_handler", "bvhs_data").getr<detail::RTBVHData>();
-    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<detail::RTMeshData>();
-    // const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::RTTextureData>();
-    // const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::RTUpliftingData>();
-    // const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::RTObserverData>();
-    // const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::RTIlluminantData>();
-    // const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::RTColorSystemData>();
+    const auto &e_objc_data = info("scene_handler", "objc_data").getr<ObjectData>();
+    const auto &e_bvhs_data = info("scene_handler", "bvhs_data").getr<BVHData>();
+    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<MeshData>();
+    // const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::TextureData>();
+    // const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::UpliftingData>();
+    // const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::ObserverData>();
+    // const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::IlluminantData>();
+    // const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::ColorSystemData>();
     // const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
     // const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
 

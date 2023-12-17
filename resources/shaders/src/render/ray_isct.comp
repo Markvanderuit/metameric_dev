@@ -56,6 +56,9 @@ shared uint       s_stack[gl_WorkGroupSize.x][16];
 #define isct_buff_bvhs_prim buff_bvhs_prim.data
 #include <intersect.glsl>
 
+#define srfc_buff_prim buff_bvhs_prim.data
+#include <surface.glsl>
+
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; 
             i < buff_objc_info.data.length();
@@ -81,7 +84,9 @@ void main() {
   guard(i < buff_work_head.value);
 
   // Grab ray, do ray-scene intersection, get surface info
-  SurfaceInfo si = ray_intersect(buff_work.data[i]);
+  Ray ray = buff_work.data[i];
+  ray_intersect_scene(buff_work.data[i]);
+  SurfaceInfo si = get_surface_info(ray);
 
   // For now, set a pixel to a specific color based on the query
   if (si.object_i != OBJECT_INVALID) {

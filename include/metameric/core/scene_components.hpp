@@ -147,7 +147,8 @@ namespace met {
       detail::ComponentState<decltype(Base::trf)>          trf;
 
     public:
-      virtual bool update(const Base &o) override {
+      virtual
+      bool update(const Base &o) override {
         return m_mutated = (
           is_active.update(o.is_active)     |
           mesh_i.update(o.mesh_i)           |
