@@ -2,6 +2,7 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/render/scene_data.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 
@@ -132,7 +133,8 @@ namespace met {
     
   public:
     RayIntersectPrimitive();
-    // RayIntersectPrimitive(const ObjectData &objects, const BVHData &bvh);
+    // RayIntersectPrimitive(const ObjectData &objects, 
+    //                       const BVHData    &bvh);
     
     virtual void invoke(
       const gl::Buffer &input, 
@@ -158,7 +160,8 @@ namespace met {
 
   public:
     RayIntersectAnyPrimitive();
-    // RayIntersectAnyPrimitive(const ObjectData &objects, const BVHData &bvh);
+    // RayIntersectAnyPrimitive(const ObjectData &objects, 
+    //                          const BVHData    &bvh);
     
     virtual void invoke(
       const gl::Buffer &input, 

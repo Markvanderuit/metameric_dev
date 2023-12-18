@@ -22,7 +22,7 @@ namespace met {
 
     // Base object overriden by scene data structs
     // Non-virtual so it can be queried as a resource handle in the scheduler
-    struct SceneDataBase {
+    struct SceneBufferBase {
       virtual bool is_stale(const Scene &) const { return false; } 
       virtual void update(const Scene &) { }
     };
@@ -31,7 +31,7 @@ namespace met {
   // Texture data structure
   // Holds gl-side packed image data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct TextureData : detail::SceneDataBase {
+  struct TextureData : detail::SceneBufferBase {
     // Uniform object layout;
     // provides information for accessing parts of
     // texture data from the texture atlases.
@@ -60,7 +60,7 @@ namespace met {
   // Mesh data structure
   // Holds gl-side packed mesh data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct MeshData : detail::SceneDataBase {
+  struct MeshData : detail::SceneBufferBase {
     // Uniform object layout;
     // provides information for accessing parts of
     // mesh data from the packed buffer.
@@ -89,7 +89,7 @@ namespace met {
   // Scene BVH data structure
   // Holds both cpu/gl-side bottom-level BVH over each mesh, and
   // a top-level BVH over the set of objects in scene.
-  struct BVHData : detail::SceneDataBase {
+  struct BVHData : detail::SceneBufferBase {
     // Uniform object layout;
     // provides information for accessing parts of
     // bvh data from the packed buffers.
@@ -117,7 +117,7 @@ namespace met {
   // Object data structure
   // Holds gl-side packed object data in the scene, as well as
   // accompanying info blocks to read said data gl-side
-  struct ObjectData : detail::SceneDataBase {
+  struct ObjectData : detail::SceneBufferBase {
     // Uniform object layout;
     // provides information for a single object, and how to access
     // its mesh surface and material textures from other buffers.
@@ -151,7 +151,7 @@ namespace met {
   // accompanying info blocks to read said data gl-side. Stores data
   // on a per-uplifting and per-object basis. Allocated but not filled
   // in, as content is generated in the rest of the uplifting pipeline.
-  struct UpliftingData : detail::SceneDataBase {
+  struct UpliftingData : detail::SceneBufferBase {
     using Texture1d4fArray = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
     using SpecPack         = eig::Array<float, wavelength_samples, 4>;
 
@@ -183,7 +183,7 @@ namespace met {
 
   // CMFS spectra data structure
   // Holds gl-side packed cmfs data in the scene.
-  struct ObserverData : detail::SceneDataBase {
+  struct ObserverData : detail::SceneBufferBase {
     using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
 
     gl::Buffer       cmfs_gl;         // Mapped buffer for pixel buffer copy
@@ -199,7 +199,7 @@ namespace met {
 
   // Illuminant spectra data structure
   // Holds gl-side packed illm data in the scene.
-  struct IlluminantData : detail::SceneDataBase {
+  struct IlluminantData : detail::SceneBufferBase {
     using Texture1d1fArray = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
 
     gl::Buffer       illm_gl;         // Mapped buffer for pixel buffer copy
@@ -215,7 +215,7 @@ namespace met {
 
   // Color system spectra data structure
   // Holds gl-side packed csys data in the scene.
-  struct ColorSystemData : detail::SceneDataBase {
+  struct ColorSystemData : detail::SceneBufferBase {
     using Texture1d3fArray = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
 
     gl::Buffer       csys_gl;         // Mapped buffer for pixel buffer copy
