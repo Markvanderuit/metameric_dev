@@ -1,0 +1,222 @@
+#include <preamble.glsl>
+#include <guard.glsl>
+#include <math.glsl>
+#include <random_uniform.glsl>
+#include <ray.glsl>
+#include <bvh.glsl>
+#include <scene.glsl>
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std140)             uniform;
+layout(std430)             buffer;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  mat4  view_inv;  // inverse(view);
+  uvec2 view_size; // width, height of image
+  float fovy_tan;  // tan(fov_y * .5f);
+  float aspect;    // vec2(aspect, 1);
+
+  // TODO; newly added, not yet defined on other side
+  uint max_depth;
+} buff_unif;
+
+// Storage buffer declarations
+layout(binding = 0) restrict readonly  buffer b_buff_path_head   { uint        n;      } buff_path_head;   // Size of work queue
+layout(binding = 1) restrict           buffer b_buff_path_data   { PathInfo    data[]; } buff_path_data;   // Work path data
+layout(binding = 2) restrict readonly  buffer b_buff_extend_inpt { Ray         data[]; } buff_extend_inpt; // Work ray data
+layout(binding = 3) restrict coherent  buffer b_buff_extend_head { uint        n;      } buff_extend_head; // Size of work queue
+layout(binding = 4) restrict writeonly buffer b_buff_extend_oupt { Ray         data[]; } buff_extend_oupt; // Work ray data
+layout(binding = 5) restrict readonly  buffer b_buff_shadow_inpt { Ray         data[]; } buff_shadow_inpt; // Work ray data
+layout(binding = 6) restrict coherent  buffer b_buff_shadow_head { uint        n;      } buff_shadow_head; // Size of work queue
+layout(binding = 7) restrict writeonly buffer b_buff_shadow_oupt { Ray         data[]; } buff_shadow_oupt; // Work ray data
+layout(binding = 8) restrict readonly  buffer b_buff_bvhs_prim   { BVHPrimPack data[]; } buff_bvhs_prim;   // Packed surface primitives
+
+// Sampler/texture declarations
+layout(binding = 1) uniform usampler2D b_gbuffer; // G-buffer texture used for initial ray hits
+
+// Image unit, output declaration
+layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
+
+// Set name of surface primitive buffer, and include surface.glsl
+#define srfc_buff_prim buff_bvhs_prim.data
+#include <surface.glsl>
+
+// Hardcoded value for now
+vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
+
+Ray get_gbuffer_ray(in PathInfo pi) {
+  // Unpack current pixel from packed PathInfo
+  const ivec2 xy = get_path_pixel(pi);
+  const  vec2 uv = (vec2(xy) + .5f) / vec2(buff_unif.view_size);
+
+  const GBufferRay gb = unpack_gbuffer_ray(texture(b_gbuffer, uv));
+
+  // Get NDC pixel coordinate
+  vec2 s = (uv - .5f) * 2.f * buff_unif.fovy_tan * vec2(buff_unif.aspect, 1);
+  
+  // Generate camera ray; 
+  // use GBuffer to fill ray distance as if an intersect already took place
+  Ray r;
+  r.o = (buff_unif.view_inv * vec4(0, 0, 0, 1)).xyz;
+  r.d = gb.p - r.o;
+  r.t = length(r.d);
+  r.d /= r.t;
+
+  // If the GBuffer did not identify an object id, we actually missed
+  if (get_gbuffer_data_objc(gb) == OBJECT_INVALID) {
+    r.t = FLT_MAX;
+  }
+
+  return r;
+}
+
+Ray get_extend_ray(in PathInfo pi) {
+  if (pi.depth > 0) {
+    return get_gbuffer_ray(pi);
+  } else {
+    // If path has restarted, we extract first hit from GBuffer data
+    return buff_extend_inpt.data[pi.ray_extend_i];
+  }
+}
+
+Ray get_shadow_ray(in PathInfo pi) {
+  if (pi.depth > 0) {
+    return buff_shadow_inpt.data[pi.ray_shadow_i];
+  } else {
+    // If path has restarted, first shadow ray does not exist
+    return Ray(vec3(0), FLT_MAX, vec3(0), 0xFFFFFFFFu);
+  }
+}
+
+uint push_extend_ray(in Ray ray) {
+  // Get next index in work queue, then submit the ray
+  uint next_i = atomicAdd(buff_extend_head.n, 1);
+  buff_extend_oupt.data[next_i] = ray;
+  return next_i;
+}
+
+uint push_shadow_ray(in Ray ray) {
+  // Get next index in work queue, then submit the ray
+  uint next_i = atomicAdd(buff_shadow_head.n, 1);
+  buff_shadow_oupt.data[next_i] = ray;
+  return next_i;
+}
+
+// Offset epsilon copied from mitsuba3
+vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
+  float mag = 1.f + hmax(abs(si.p)) + 1500.f * M_EPS;
+  mag = dot(si.n, d) >= 0 ? mag : -mag;
+  return fma(vec3(mag), si.n, si.p);
+}
+
+void main() {
+  // Thread index is work index
+  const uint i = gl_GlobalInvocationID.x;
+  guard(i < buff_path_head.n);
+  
+  // Load path info from work buffer
+  PathInfo pi = buff_path_data.data[i];
+  
+  // If the path is newly started, we initialize necessary parameters
+  if (pi.depth == 0) {
+    pi.did_scatter  = false;
+    pi.radiance     = 0.f;
+    pi.wavelength   = next_1d(pi.state);
+    pi.throughput   = 1.f;
+    pi.p            = 1.f;
+    pi.eta          = 1.f;
+  }
+
+  // Get surface info at next hit
+  Ray extend_ray = get_extend_ray(pi);
+  SurfaceInfo si = get_surface_info(extend_ray);
+
+  // Emitter sampling; handle last step's shadow ray
+  if (!bool(get_shadow_ray(pi).data)) {
+    // TODO MIS
+    pi.radiance += pi.throughput * (pi.ray_shadow_e / (pi.p * pi.ray_shadow_p));
+  }
+  
+  // Next ray; handle last step's extend ray
+  // If no object was hit, we reset the path and return early
+  // Note that the first (gbuffer) ray is guaranteed to hit, as the path is
+  // otherwise never scheduled
+  if (si.object_i == OBJECT_INVALID) {
+    // TODO; write stored radiance to output pixel
+    // ...
+    pi.depth               = 0;
+    buff_path_data.data[i] = pi;
+    return;
+  }
+
+  // Modify throughput, probability based on last extend ray
+  pi.throughput *= pi.ray_extend_t;
+  pi.p          *= pi.ray_extend_p;
+
+  // TODO test if object is emissive, or a light source
+  //      to end path and return early
+  {
+    
+  }
+
+  // Increment path depth
+  pi.depth++;
+
+  // Terminate path at maximum path length and return early
+  if (pi.depth >= buff_unif.max_depth) {
+    // TODO; write stored radiance to output pixel
+    // ...
+    pi.depth               = 0;
+    buff_path_data.data[i] = pi;
+    return;
+  }
+
+  // Weird quirk; gather BSDF's underlying data once
+  // TODO; instead construct surface BSDF object here
+  //       it's going to be used anyways
+  float r = 0.5f; // TOOD evaluate instead of hardcoding you pancake
+
+  // Emitter sampling; generate next shadow ray from surface
+  {
+    // Sample position in cube
+    vec3 lpos = hardcoded_lpos + next_3d(pi.state) * 4.f - 2.f;
+
+    // Generate shadow ray
+    Ray ray;
+    ray.d = lpos - si.p;
+    ray.t = length(ray.d);
+    ray.d /= ray.t;
+    ray.o = si.p + gen_offset_p(si, ray.d);
+    ray.data = 0xFFFFFFFFu;
+
+    // Store throughput, probability for next iteration, and push shadow test
+    // TODO eval() on the bsdf
+    pi.ray_shadow_e = r * dot(si.ns, ray.d);
+    pi.ray_shadow_p = 1.f; // Wrong!
+    pi.ray_shadow_i = push_shadow_ray(ray);    
+  }
+  
+  // BSDF sampling; generate next extend ray from surface
+  {
+    // Generate extend ray
+    Ray ray;
+    ray.d    = reflect(extend_ray.d, si.ns);
+    ray.o    = si.p + gen_offset_p(si, ray.d);
+    ray.t    = FLT_MAX;
+    ray.data = 0xFFFFFFFFu;
+
+    pi.ray_extend_t = r * dot(si.ns, ray.d);
+    pi.ray_extend_p = 1.f;
+    pi.ray_extend_i = push_extend_ray(ray);
+  }
+  
+  // Russian roulette; potentially reset/terminate ray
+  {
+    
+  }
+
+  // Write a dummy value to the output pixel for now
+  // imageStore(b_target_4f, get_path_pixel(pi), vec4(si.p, 1));
+}

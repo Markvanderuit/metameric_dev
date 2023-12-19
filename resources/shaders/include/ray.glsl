@@ -84,10 +84,9 @@ struct PathInfoSOAPack  {
 //   // ... Assign or unpack values 
 // }
 
-
 // The PathInfo object stores the general state for a path that is in-flight.
 // If a path is terminated, values are reset, but pixel/state are preserved.
-// Size: 60 by
+// Size: 64 by
 struct PathInfo {
   // 12 by
   uint  pixel;       // Packed pixel position,      Retained for new paths
@@ -113,27 +112,9 @@ struct PathInfo {
   float ray_shadow_e; // Throughput along shadow ray, multiplied by energy
   float ray_shadow_p; // Probability along path with shadow ray
   uint  ray_shadow_i; // Index of last submitted shadow ray in work queu
-};
 
-// Info object for querying an extension ray cast.
-// Size: 40 bytes
-struct PathIndirectRayInfo {
-  vec3  o;          // Ray origin
-  vec3  d;          // Ray direction;
-  float t;          // Ray extent, initialized to FLT_MAX 
-
-  uint  i;          // Index of path for which raycast is performed
-  uint  object_i;   // Index of intersected object, not mesh
-  uint  prim_i;     // Index of intersected primitive
-};
-
-// Request for a raycast operation, be it shadow or extension ray
-// Size: 16by
-struct PathRayRequest {
-  vec3  o; // Ray origin
-  uint  i; // Index of path for which raycast was requested
-  vec3  d; // Ray direction;
-  float t; // Ray extent, initialized to distance to emitter 
+  // 4 by, to get it to 64 bytes
+  uint padd;
 };
 
 // Extract packed pixel data from PathInfo

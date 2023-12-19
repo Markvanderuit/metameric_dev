@@ -49,8 +49,8 @@ namespace met {
     // Process updates to gpu-side resources, if they are stale
     for (auto key : { "illm_data", "cmfs_data", "csys_data", "txtr_data", "uplf_data", "objc_data", "mesh_data", "bvhs_data" }) {
       auto handle = info(key); 
-      if (handle.getr<detail::SceneBufferBase>().is_stale(e_scene)) {
-        handle.getw<detail::SceneBufferBase>().update(e_scene);
+      if (handle.getr<detail::BaseSceneData>().is_stale(e_scene)) {
+        handle.getw<detail::BaseSceneData>().update(e_scene);
       }
     }
 

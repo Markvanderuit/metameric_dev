@@ -130,11 +130,12 @@ namespace met {
     DispatchDividePrimitive m_prim_ddiv;
     gl::Buffer              m_buffer_count;
     BufferLayout           *m_buffer_count_map;
+    const ObjectData       &m_object_data;
+    const BVHData          &m_bvh_data;
     
   public:
-    RayIntersectPrimitive();
-    // RayIntersectPrimitive(const ObjectData &objects, 
-    //                       const BVHData    &bvh);
+    RayIntersectPrimitive(const ObjectData &object_data, 
+                          const BVHData    &bvh_data);
     
     virtual void invoke(
       const gl::Buffer &input, 
@@ -157,11 +158,12 @@ namespace met {
     DispatchDividePrimitive m_prim_ddiv;
     gl::Buffer              m_buffer_count;
     BufferLayout           *m_buffer_count_map;
+    const ObjectData       &m_object_data;
+    const BVHData          &m_bvh_data;
 
   public:
-    RayIntersectAnyPrimitive();
-    // RayIntersectAnyPrimitive(const ObjectData &objects, 
-    //                          const BVHData    &bvh);
+    RayIntersectAnyPrimitive(const ObjectData &object_data, 
+                             const BVHData    &bvh_data);
     
     virtual void invoke(
       const gl::Buffer &input, 

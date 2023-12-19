@@ -22,15 +22,18 @@ layout(binding = 0) uniform b_buff_unif {
 // Storage buffer declarations
 layout(binding = 0) restrict coherent  buffer b_buff_path_head   { uint n;          } buff_path_head;        // Size of work queue
 layout(binding = 1) restrict writeonly buffer b_buff_path_data   { PathInfo data[]; } buff_path_data;        // Work path data
-layout(binding = 2) restrict coherent  buffer b_buff_extend_head { uint n;          } buff_extend_work_head; // Size of work queue
-layout(binding = 3) restrict writeonly buffer b_buff_extend_data { Ray  data[];     } buff_extend_work_data; // Work ray data
 
 // Sampler/texture declarations
 layout(binding = 0) uniform usampler2D b_gbuffer; // G-buffer texture pack
 
-Ray generate_ray(in vec2 xy, in GBufferRay gb) {
+Ray get_gbuffer_ray(in uvec2 xy) {
+  // Unpack current pixel from packed PathInfo
+  const vec2 uv = (vec2(xy) + .5f) / vec2(buff_unif.view_size);
+
+  const GBufferRay gb = unpack_gbuffer_ray(texture(b_gbuffer, uv));
+
   // Get NDC pixel coordinate
-  vec2 s = (xy - .5f) * 2.f * buff_unif.fovy_tan * vec2(buff_unif.aspect, 1);
+  vec2 s = (uv - .5f) * 2.f * buff_unif.fovy_tan * vec2(buff_unif.aspect, 1);
   
   // Generate camera ray; 
   // use GBuffer to fill ray distance as if an intersect already took place
@@ -51,35 +54,20 @@ Ray generate_ray(in vec2 xy, in GBufferRay gb) {
 void main() {
   // 2D/1D image/buffer coordinates
   const uvec2 xy = gl_GlobalInvocationID.xy;
-  const vec2  uv = (vec2(xy) + 0.5) / vec2(buff_unif.view_size);
   const uint  i  = xy.y * buff_unif.view_size.x + xy.x;
-
-  // Discard overflow invocations
   guard(all(lessThan(xy, buff_unif.view_size)));
 
-  // Read and unpack GBuffer data at current pixel
-  GBufferRay gb = unpack_gbuffer_ray(texture(b_gbuffer, uv));
-
-  // Set up a new PathInfo object fill in per-pixel data
+  // Set up a new PathInfo object, fill in per-pixel data
   PathInfo pi;
   pi.pixel = (xy.x & 0x0000FFFF) | (xy.y << 16); // Pixels are not going to exceed 2^16, so pack em
   pi.state = i; // Pixel index forms initial rng state
-  pi.depth = 0; // New path recognizable by depth of 0
+  pi.depth = 0; // New path is recognizable by depth of 0
 
-  // Generate camera ray; use GBuffer to fill data as if an intersect took place
-  Ray ray = generate_ray(uv, gb);
-
-  // On a ray miss, we do not submit ray or path for any further computation
-  if (ray.t != FLT_MAX) {
-    // Get index for a new path/ray on work queue
+  // Test the GBuffer's initial camera ray for a hit
+  // Ona miss, we do not even submit the path for work
+  if (get_gbuffer_ray(xy).t != FLT_MAX) {
+    // Get next index in work queue, then submit the path
     uint path_i = atomicAdd(buff_path_head.n, 1);
-    
-    // Fill in ray flags on PathInfo s.t. a previous extension ray exists
-    pi.ray_extend_i = path_i;
-    pi.ray_shadow_i = 0;
-    
-    // Store results
     buff_path_data.data[path_i] = pi;
-    buff_extend_work_data.data[path_i] = ray;
   }
 }

@@ -40,9 +40,10 @@ void load_isct_shared() {
   barrier();
 }
 
-// Storage buffer declarations; ray shadow test work queue
-layout(binding = 4) restrict readonly buffer b_buff_shadow_head { uint n;      } buff_shadow_work_head; // Size of work queue
-layout(binding = 5) restrict          buffer b_buff_shadow_data { Ray  data[]; } buff_shadow_work_data; // Work ray data
+// Storage buffer declarations; ray test work queue
+layout(binding = 4) restrict readonly  buffer b_buff_input_head  { uint n;      } buff_input_head;  // Size of work queue
+layout(binding = 5)          readonly  buffer b_buff_input_data  { Ray  data[]; } buff_input_data;  // Work ray data, input queue
+layout(binding = 6)          writeonly buffer b_buff_output_data { Ray  data[]; } buff_output_data; // Work ray data, output queue, may be input queue bound twice
 
 // Shadow ray test entry point
 void main() {
@@ -51,13 +52,13 @@ void main() {
   
   // Thread index is work index
   const uint i = gl_GlobalInvocationID.x;
-  guard(i < buff_shadow_work_head.n);
+  guard(i < buff_input_head.n);
 
   // Load ray data from buffer
-  Ray ray = buff_shadow_work_data.data[i];
+  Ray ray = buff_input_data.data[i];
   
   // Intersect scene, and store updated result on hit
   if (ray_intersect_scene_any(ray)) {
-    buff_shadow_work_data.data[i] = ray;
+    buff_output_data.data[i] = ray;
   }
 }

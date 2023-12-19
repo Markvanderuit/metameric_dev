@@ -34,9 +34,12 @@ namespace met {
     // Forward to other function, ignore count
     invoke(input, output, 0, 0);
   }
-
-  RayIntersectPrimitive::RayIntersectPrimitive()
-  : m_prim_ddiv(isct_wg_size) {
+  
+  RayIntersectPrimitive::RayIntersectPrimitive(const ObjectData &object_data, 
+                                               const BVHData    &bvh_data)
+  : m_prim_ddiv(isct_wg_size),
+    m_object_data(object_data),
+    m_bvh_data(bvh_data) {
     met_trace_full();
     m_program = {{ .type       = gl::ShaderType::eCompute,
                    .spirv_path = "resources/shaders/render/primitive_ray_intersect.comp.spv",
@@ -68,14 +71,24 @@ namespace met {
     const gl::Buffer &count) {
     met_trace_full();
 
-    // ...
+    // Bind relevant buffers
+    m_program.bind("b_buff_bvhs_info", m_bvh_data.info_gl);
+    m_program.bind("b_buff_bvhs_node", m_bvh_data.nodes);
+    m_program.bind("b_buff_bvhs_prim", m_bvh_data.prims);
+    m_program.bind("b_buff_objc_info", m_object_data.info_gl);
+    m_program.bind("b_buff_input_head",  count);
+    m_program.bind("b_buff_input_data",  input);
+    m_program.bind("b_buff_output_data", output);
     
     // Forward provided work count buffer and use for indirect dispatch
     gl::dispatch_compute({ .buffer = &m_prim_ddiv(count), .bindable_program = &m_program });
   }
-
-  RayIntersectAnyPrimitive::RayIntersectAnyPrimitive()
-  : m_prim_ddiv(isct_wg_size) {
+  
+  RayIntersectAnyPrimitive::RayIntersectAnyPrimitive(const ObjectData &object_data, 
+                                                     const BVHData    &bvh_data)
+  : m_prim_ddiv(isct_wg_size),
+    m_object_data(object_data),
+    m_bvh_data(bvh_data) {
     met_trace_full();
     m_program = {{ .type       = gl::ShaderType::eCompute,
                    .spirv_path = "resources/shaders/render/primitive_ray_intersect_any.comp.spv",
@@ -106,6 +119,17 @@ namespace met {
           gl::Buffer &output,
     const gl::Buffer &count) {
     met_trace_full();
-    // ...
+
+    // Bind relevant buffers
+    m_program.bind("b_buff_bvhs_info",   m_bvh_data.info_gl);
+    m_program.bind("b_buff_bvhs_node",   m_bvh_data.nodes);
+    m_program.bind("b_buff_bvhs_prim",   m_bvh_data.prims);
+    m_program.bind("b_buff_objc_info",   m_object_data.info_gl);
+    m_program.bind("b_buff_input_head",  count);
+    m_program.bind("b_buff_input_data",  input);
+    m_program.bind("b_buff_output_data", output);
+    
+    // Forward provided work count buffer and use for indirect dispatch
+    gl::dispatch_compute({ .buffer = &m_prim_ddiv(count), .bindable_program = &m_program });
   }
 } // namespace met
