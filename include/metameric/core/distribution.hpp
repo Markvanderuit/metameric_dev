@@ -6,7 +6,6 @@
 #include <functional>
 #include <numeric>
 #include <random>
-#include <ranges>
 
 namespace met {
   class UniformSampler {
@@ -37,15 +36,72 @@ namespace met {
     template <uint N>
     eig::Array<float, N, 1> next_nd() {
       eig::Array<float, N, 1> v;
-      std::ranges::generate(v, std::bind(&UniformSampler::next_1d, this));
+      rng::generate(v, std::bind(&UniformSampler::next_1d, this));
       return v;
     }
 
     eig::Array<float, -1, 1> next_nd(uint n) {
       eig::Array<float, -1, 1> v(n);
-      std::ranges::generate(v, std::bind(&UniformSampler::next_1d, this));
+      rng::generate(v, std::bind(&UniformSampler::next_1d, this));
       return v;
     }
+  };
+
+  class PCGSampler {
+    using Distr = std::uniform_real_distribution<float>;
+
+    uint  m_state;
+    Distr m_distr;
+
+    uint pcg_hash() {
+        m_state = m_state * 747796405u + 2891336453u;
+        uint v = m_state;
+        v ^= v >> ((v >> 28u) + 4u);
+        v *= 277803737u;
+        v ^= v >> 22u;
+        return v;
+    }
+
+  public:
+    PCGSampler()
+    : m_state(std::random_device()()),
+      m_distr(0.f, 1.f) { }
+
+    PCGSampler(uint seed)
+    : m_state(seed),
+      m_distr(0.f, 1.f) { }
+
+    PCGSampler(float min_v, float max_v)
+    : m_state(std::random_device()()),
+      m_distr(min_v, max_v) { }
+
+    PCGSampler(float min_v, float max_v, uint seed)
+    : m_state(seed),
+      m_distr(min_v, max_v) { }
+    
+    float next_1d() {
+      return m_distr(*this);
+    }
+
+    template <uint N>
+    eig::Array<float, N, 1> next_nd() {
+      eig::Array<float, N, 1> v;
+      rng::generate(v, std::bind(&PCGSampler::next_1d, this));
+      return v;
+    }
+
+    eig::Array<float, -1, 1> next_nd(uint n) {
+      eig::Array<float, -1, 1> v(n);
+      rng::generate(v, std::bind(&PCGSampler::next_1d, this));
+      return v;
+    }
+    
+  // Implement conformance to std::uniform_random_bit_generator<Sampler>
+  public:
+    constexpr static uint32_t min() { return 0; }
+    constexpr static uint32_t max() { return 4294967295; }
+    uint32_t g() { return pcg_hash(); }
+    uint32_t operator()() { return pcg_hash(); }
   };
 
   class Distribution {
