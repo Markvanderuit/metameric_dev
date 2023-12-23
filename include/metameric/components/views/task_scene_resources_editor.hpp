@@ -4,7 +4,6 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
-#include <metameric/render/scene_data.hpp>
 #include <format>
 
 namespace met {
@@ -14,12 +13,11 @@ namespace met {
       met_trace_full();
 
       // Get external resources
-      const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
-      const auto &e_bary_data = info("gen_objects", "bary_data").getr<TextureAtlas<float, 4>>();
+      const auto &e_scene = info.global("scene").getr<Scene>();
 
       // Spawn view of texture atlas interiors
       if (ImGui::Begin("Texture atlas")) {
-        const auto &e_atlas = e_txtr_data.atlas_3f;
+        const auto &e_atlas = e_scene.resources.images.gl.texture_atlas_3f;
         // Spawn views
         for (uint i = 0; i < e_atlas.capacity().z(); ++i) {
           for (uint j = 0; j < e_atlas.levels(); ++j) {
@@ -33,17 +31,17 @@ namespace met {
 
       // Spawn view of weight atlas interiors
       if (ImGui::Begin("Bary atlas")) {
-        for (uint i = 0; i < e_bary_data.capacity().z(); ++i) {
-          const auto &view = e_bary_data.view(i, 0);
-          ImGui::Image(ImGui::to_ptr(view.object()), { 512, 512 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+        const auto &e_bary_data = e_scene.components.upliftings.gl;
+        for (uint i = 0; i < e_bary_data.texture_weights.capacity().z(); ++i) {
+          const auto &view = e_bary_data.texture_weights.view(i, 0);
+          ImGui::Image(ImGui::to_ptr(view.object()), { 256, 256 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
         }
       }
       ImGui::End();
 
       if (ImGui::Begin("Scene resources")) {
         // Get external resources
-        const auto &e_scene     = info.global("scene").getr<Scene>();
-        const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
+        const auto &e_scene = info.global("scene").getr<Scene>();
 
         if (ImGui::CollapsingHeader(std::format("Meshes ({})", e_scene.resources.meshes.size()).c_str())) {
           for (const auto &mesh : e_scene.resources.meshes) {

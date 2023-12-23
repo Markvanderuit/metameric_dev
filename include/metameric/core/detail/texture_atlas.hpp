@@ -1,4 +1,6 @@
-#include <metameric/core/scene.hpp>
+#pragma once
+
+#include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
@@ -46,15 +48,22 @@ namespace met {
     using TextureView = gl::TextureView2d<T, D>;
 
   private:
+    // Current reserved spaces and remainder spaces
+    std::vector<PatchLayout> m_patches, m_free;
+    bool                     m_is_invalitated;
+    
+    // Texture/construction information
     BuildMethod              m_method  = BuildMethod::eLayered;
     uint                     m_levels  = 1u;
     uint                     m_padding = 0u;
-    std::vector<TextureView> m_texture_views;
-    std::vector<PatchLayout> m_patches, m_free;
+
+    // GL-side objects
     Texture                  m_texture;
+    std::vector<TextureView> m_texture_views;
     gl::Buffer               m_buffer;
     std::span<PatchLayout>   m_buffer_map;
 
+    // Helper private methods
     void init_views();
     void dstr_views();
     void reserve_buffer(size_t size);
@@ -66,7 +75,7 @@ namespace met {
 
   public: // Texture space management
     // Given a range of sizes, ensure all sizes have a reserved space available.
-    // Potentially grows the underlying texture
+    // Potentially grows the underlying texture, invalidating its contents
     void resize(vec2 size, uint count);
     void resize(std::span<vec2> sizes);
 
@@ -79,18 +88,24 @@ namespace met {
     // Reduce the underlying texture's capacity to tightly fit the current patch sizes
     void shrink_to_fit();
 
-    vec3 capacity() const { 
-      return m_texture.is_init() ? m_texture.size() : 0;
-    }
+    // Return the current underlying texture's capacity, ergo its full size
+    vec3 capacity() const;
 
-  public: // General accessors
-          auto   levels()    const { return m_levels;         }
-          auto   padding()   const { return m_padding;        }
-    const auto & texture()   const { return m_texture;        }
-          auto & texture()         { return m_texture;        }
-    const auto & buffer()    const { return m_buffer;         }
-          auto & buffer()          { return m_buffer;         }
+  public:
+    // Test if the last call to texture.resize()/reserve() invalidated
+    // the texture's contents, necessitating a rebuild of said contents
+    bool is_invalitated() const { return m_is_invalitated; }
+    void set_invalitated(bool b) { m_is_invalitated = b; }
 
+    // General accessors
+    const auto & texture()    const { return m_texture;    }
+          auto & texture()          { return m_texture;    }
+    const auto & buffer()     const { return m_buffer;     }
+          auto & buffer()           { return m_buffer;     }
+          auto   levels()     const { return m_levels;     }
+          auto   padding()    const { return m_padding;    }
+
+    // View textures to the texture's levels
     const auto & view(uint layer = 0, uint level = 0) const { 
       return m_texture_views[layer * m_texture.levels() + level]; 
     }
@@ -98,6 +113,7 @@ namespace met {
       return m_texture_views[layer * m_texture.levels() + level]; 
     }
 
+    // Return information regarding the available spaces in the texture
     const auto &patch(uint i) const { return m_patches[i]; }
     const auto &patches()     const { return m_patches;    }
 

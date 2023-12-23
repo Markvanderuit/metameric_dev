@@ -30,7 +30,6 @@
 #include <metameric/components/dev/task_random_mapping_viewer.hpp>
 #include <metameric/components/views/task_scene_resources_editor.hpp>
 #include <metameric/components/views/task_scene_components_editor.hpp>
-#include <metameric/components/misc/task_scene_handler.hpp>
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
@@ -186,9 +185,17 @@ namespace met {
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
 
-    scheduler.task("scene_handler").init<SceneHandlerTask>();
+    // Simple task triggers scene update at start of frame
+    scheduler.task("scene_handler").init<LambdaTask>([](SchedulerHandle &info) {
+      met_trace_full();
+      info.global("scene").getw<Scene>().update();
+    });
+
+    // Pipeline tasks generate uplifting data per object
     scheduler.task("gen_upliftings").init<GenUpliftingsTask>();
     scheduler.task("gen_objects").init<GenObjectsTask>();
+
+    // View tasks handle UI components
     scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
     scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
     scheduler.task("mesh_viewport").init<MeshViewportTask>();

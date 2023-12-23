@@ -31,10 +31,7 @@ layout(binding = 1) restrict readonly buffer b_buff_objects {
 layout(binding = 2) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
-layout(binding = 3) restrict readonly buffer b_buff_uplifts {
-  UpliftInfo data[];
-} buff_uplifts;
-layout(binding = 4) restrict readonly buffer b_buff_weights {
+layout(binding = 3) restrict readonly buffer b_buff_weights {
   AtlasLayout data[];
 } buff_weights;
 

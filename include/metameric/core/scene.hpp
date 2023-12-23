@@ -6,9 +6,20 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene_components.hpp>
+#include <metameric/core/detail/scene_components_gl.hpp>
+#include <metameric/core/detail/scene_components_state.hpp>
 #include <variant>
 
 namespace met {
+  /* 
+    Define maximum nr. of supported components for some types
+    These aren't device limits, but mostly exist so some arrays
+    can be hardcoded shader-side
+  */
+  constexpr static uint max_supported_meshes     = MET_SUPPORTED_MESHES;
+  constexpr static uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
+  constexpr static uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
+
   /* Scene data layout.
      Simple indexed scene; no graph, just a library of objects and 
      their dependencies; responsible for most program data, as well
@@ -17,24 +28,46 @@ namespace met {
   public: // Scene data
     // Scene components, directly visible or influential in the scene
     // On-disk, these are stored in json format
-    struct {
+    struct SceneComponents {
       detail::Components<ColorSystem> colr_systems;
       detail::Components<Emitter>     emitters;
       detail::Components<Object>      objects;
       detail::Components<Uplifting>   upliftings;
       detail::Component<Settings>     settings;   // Miscellaneous settings; e.g. texture size
       detail::Component<uint>         observer_i; // Primary observer index; simple enough for now
+
+      void update(const Scene &scene) {
+        settings.state.update(settings.value);
+        observer_i.state.update(observer_i.value);
+        colr_systems.update(scene);
+        emitters.update(scene);
+        objects.update(scene);
+        upliftings.update(scene);
+      }
     } components;
 
     // Scene resources, primarily referred to by components in the scene
     // On-disk, these are stored in zlib-compressed binary format
-    struct {
+    struct SceneResources {
       detail::Resources<Mesh>  meshes;
       detail::Resources<Image> images;
       detail::Resources<Spec>  illuminants;
       detail::Resources<CMFS>  observers;
       detail::Resources<Basis> bases;
+
+      void update(const Scene &scene) {
+        meshes.update(scene);
+        images.update(scene);
+        illuminants.update(scene);
+        observers.update(scene);
+        bases.update(scene);
+      }
     } resources;
+
+    void update() {
+      components.update(*this);
+      resources.update(*this);
+    }
     
   public: // Save state and IO handling
     enum class SaveState {

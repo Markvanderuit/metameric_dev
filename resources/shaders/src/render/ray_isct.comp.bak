@@ -19,7 +19,8 @@ layout(binding = 0) uniform b_buff_unif {
 
 // Storage declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_info {
-  BVHInfo data[];
+  uint n;
+  MeshInfo data[];
 } buff_bvhs_info;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
@@ -43,7 +44,7 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
 // Shared memory declarations
 shared ObjectInfo s_objc_info[8];
-shared BVHInfo    s_bvhs_info[8];
+shared MeshInfo    s_bvhs_info[8];
 shared uint       s_stack[gl_WorkGroupSize.x][16];
 
 // Define names of scene buffers to replace preproc in intersect.glsl
@@ -69,7 +70,7 @@ void load_shared() {
   barrier();
 
   for (uint i = gl_LocalInvocationID.x; 
-            i < buff_bvhs_info.data.length();
+            i < buff_bvhs_info.n;
             i += gl_WorkGroupSize.x) {
     s_bvhs_info[i] = buff_bvhs_info.data[i];
   }

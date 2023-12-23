@@ -2,6 +2,7 @@
 #define RAY_GLSL_GUARD
 
 #include <math.glsl>
+#include <random_uniform.glsl>
 
 struct AABB {
   vec3 minb; // Minimum of bounding box
@@ -101,17 +102,17 @@ struct PathInfo {
   // 12 by
   float throughput; // Current throughput of path,  initialized to 1 for new paths
   float p;          // Current probability of path, initialized to 1 for new paths
-  float eta;        // Current refractive index,    initialized to 1 for new paths
+  float eta;        // Multiplied refractive index, initialized to 1 for new paths
 
   // 12 by
-  float ray_extend_t; // Throughput along extend ray
-  float ray_extend_p; // Probability along path with extend ray
-  uint  ray_extend_i; // Index of last submitted extend ray in work queue
+  uint  ray_extend_i;   // Index of last submitted extend ray in work queue
+  float ray_extend_t;   // Throughput along extend ray
+  float ray_extend_pdf; // Probability along path with extend ray
 
   // 12 by
-  float ray_shadow_e; // Throughput along shadow ray, multiplied by energy
-  float ray_shadow_p; // Probability along path with shadow ray
-  uint  ray_shadow_i; // Index of last submitted shadow ray in work queu
+  uint  ray_shadow_i;   // Index of last submitted shadow ray in work queu
+  float ray_shadow_e;   // Throughput along shadow ray, multiplied by energy
+  float ray_shadow_pdf; // Probability along path with shadow ray
 
   // 4 by, to get it to 64 bytes
   uint padd;
@@ -120,6 +121,17 @@ struct PathInfo {
 // Extract packed pixel data from PathInfo
 ivec2 get_path_pixel(in PathInfo pi) {
   return ivec2(pi.pixel & 0xFFFF, pi.pixel >> 16);
+}
+
+void reset(inout PathInfo pi) {
+  pi.did_scatter  = false;
+  pi.radiance     = 0.f;
+  pi.wavelength   = next_1d(pi.state); // TODO: Sample vec4, and sample by cdf of CMFS * avg(Le)
+  pi.throughput   = 1.f;
+  pi.p            = 1.f;
+  pi.eta          = 1.f;
+  pi.ray_extend_i = UINT_MAX;
+  pi.ray_shadow_i = UINT_MAX;
 }
 
 #endif // RAY_GLSL_GUARD

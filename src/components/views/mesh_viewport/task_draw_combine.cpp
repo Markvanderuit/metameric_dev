@@ -2,7 +2,6 @@
 #include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>
@@ -37,7 +36,7 @@ namespace met {
     // Get shared resources 
     const auto &e_scene  = info.global("scene").getr<Scene>();
     const auto &e_direct = info.relative("viewport_draw_direct")("target").getr<gl::Texture2d4f>();
-    const auto &e_raytrace = info.relative("viewport_draw_raytrace")("target").getr<gl::Texture2d4f>();
+    // const auto &e_raytrace = info.relative("viewport_draw_raytrace")("target").getr<gl::Texture2d4f>();
     // const auto &e_indrct = info.relative("viewport_draw_indrct")("target").getr<gl::Texture2d4f>();
     const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
 

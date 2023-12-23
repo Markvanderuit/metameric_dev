@@ -14,30 +14,34 @@ layout(local_size_x = 16, local_size_y = 16) in;
 layout(std430) buffer;
 layout(std140) uniform;
 
-// Buffer declarations
-layout(binding = 0) uniform b_buff_unif {
-  uint object_i;
-  uvec2 dispatch_n;
-} unif;
-layout(binding = 0) restrict readonly buffer b_buff_objects {
-  ObjectInfo[] data;
-} buff_objects;
-layout(binding = 1) restrict readonly buffer b_buff_textures {
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
-layout(binding = 2) restrict readonly buffer b_buff_uplifts {
-  UpliftInfo data[];
-} buff_uplifts;
-layout(binding = 3) restrict readonly buffer b_buff_weights {
+layout(binding = 1) restrict readonly buffer b_buff_weights {
   AtlasLayout data[];
 } buff_weights;
-layout(binding = 4) restrict readonly buffer b_buff_pack { 
+layout(binding = 2) restrict readonly buffer b_buff_uplift_pack { 
   Elem data[]; 
-} pack_buffer;
+} buff_uplift_pack;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  uint  object_i;
+  uvec2 dispatch_n;
+} unif;
+layout(binding = 1) uniform b_buff_uplift_data {
+  uint offs;
+  uint size;
+} buff_uplift_data;
+layout(binding = 2) uniform b_buff_objects {
+  uint n;
+  ObjectInfo data[32];
+} buff_objects;
 
 // Image/sampler declarations
-layout(binding = 1) uniform sampler2DArray b_txtr_3f;
-layout(binding = 2, rgba32f) uniform restrict writeonly image2DArray b_bary_4f;
+layout(binding = 0)          uniform                    sampler2DArray b_txtr_3f;
+layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray   b_bary_4f;
 
 vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
   if (object_info.is_albedo_sampled) {
@@ -57,11 +61,11 @@ void store_weight(in AtlasLayout info, in uvec2 tx_in, in vec4 bary) {
 }
 
 // Shared memory declarations
-shared Elem s_pack_in[512];
+shared Elem s_pack_in[256];
 
-void load_shared(uint n) {
-  for (uint i = gl_LocalInvocationID.x; i < n; i += gl_WorkGroupSize.x)
-    s_pack_in[i] = pack_buffer.data[i];
+void load_shared() {
+  for (uint i = gl_LocalInvocationID.x;  i < buff_uplift_data.size; i += gl_WorkGroupSize.x)
+    s_pack_in[i] = buff_uplift_pack.data[i];
   memoryBarrierShared();
   barrier();
 }
@@ -70,23 +74,22 @@ void main() {
   // Load relevant object/uplifting/atlas data
   AtlasLayout bary_layout = buff_weights.data[unif.object_i];
   ObjectInfo  object_info = buff_objects.data[unif.object_i];
-  UpliftInfo  uplift_info = buff_uplifts.data[object_info.uplifting_i];
 
   // Cram pack data into shared memory
-  load_shared(uplift_info.elem_size);
+  load_shared();
 
   // Cut off unused invocations
   const uvec2 i = gl_GlobalInvocationID.xy;
   guard(all(lessThan(i, unif.dispatch_n)));
 
   // Fetch the current texel
-  vec3 p = fetch_texel(object_info, i).xyz;
+  const vec3 p = fetch_texel(object_info, i).xyz;
 
   float result_err = FLT_MAX;
   vec4 result_bary;
   uint result_indx;
 
-  for (uint j = 0; j < uplift_info.elem_size; ++j) {
+  for (uint j = 0; j < buff_uplift_data.size; ++j) {
     // Compute barycentric weights using packed element data
     vec3 xyz = s_pack_in[j].inv * (p - s_pack_in[j].sub);
     vec4 bary = vec4(xyz, 1.f - hsum(xyz));
@@ -98,7 +101,7 @@ void main() {
     guard_continue(err < result_err);
     result_err  = err;
     result_bary = bary;
-    result_indx = j;
+    result_indx = j + buff_uplift_data.offs;
   } // for (uint j)
 
   // Store result, packing 3/4th of weights, together with the tetrahedron's index

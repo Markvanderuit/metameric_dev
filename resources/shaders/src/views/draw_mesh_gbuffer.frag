@@ -22,9 +22,14 @@ layout(location = 0) out vec4 out_value; // G-Buffer encoding
 layout(binding = 0) uniform b_buff_unif {
   mat4  trf;
 } buff_unif;
-layout(binding = 0) restrict readonly buffer b_buff_objects {
-  ObjectInfo[] data;
+layout(binding = 1) uniform b_buff_objects {
+  uint n;
+  ObjectInfo data[32];
 } buff_objects;
+layout(binding = 2) uniform b_buff_meshes {
+  uint n;
+  MeshInfo data[32];
+} buff_meshes;
 
 void main() {
   out_value = uintBitsToFloat(encode_gbuffer(gl_FragCoord.z, in_value_n, in_value_tx, in_value_id));

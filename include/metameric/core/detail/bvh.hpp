@@ -1,6 +1,6 @@
 #pragma once
 
-#include "metameric/core/mesh.hpp"
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/packing.hpp>
 #include <metameric/core/utility.hpp>
 #include <array>
@@ -43,7 +43,7 @@ namespace met {
   };
 
   inline
-  BVH::NodePack pack(const BVH::Node &node) {
+  BVH::NodePack bvhpack(const BVH::Node &node) {
     // Obtain a merger of the child bounding boxes
     constexpr auto merge = [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
       return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
@@ -84,7 +84,7 @@ namespace met {
     return p;
   }
 
-  inline
+  /* inline
   BVH::Node unpack(const BVH::NodePack &p) {
     BVH::Node n;
 
@@ -109,7 +109,7 @@ namespace met {
     }
 
     return n;
-  }
+  } */
 
   // BVH helper struct
   struct BVHCreateMeshInfo {

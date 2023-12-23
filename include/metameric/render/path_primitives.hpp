@@ -6,7 +6,7 @@ namespace met {
   class PathLogicPrimitive : public detail::BaseInplaceBufferPrimitive {
     gl::Program             m_program;
     DispatchDividePrimitive m_prim_ddiv;
-
+    
   public:
     PathLogicPrimitive();
 

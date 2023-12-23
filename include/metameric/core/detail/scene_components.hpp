@@ -3,6 +3,7 @@
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/scene_state.hpp>
+#include <metameric/core/detail/scene_components_fwd.hpp>
 #include <functional>
 #include <type_traits>
 
@@ -15,6 +16,9 @@ namespace met::detail {
     typename Ty::state_type;
   };
 
+  // Default, empty struct if a GL-side type is not specified for a component or resource
+  struct SceneGLDefault { };
+
   // Define component_state_t<Ty> to deduce required state object
   template <typename Ty> struct ComponentStateSelector;
   template <typename Ty> requires (!has_state_ty<Ty>)
@@ -23,6 +27,18 @@ namespace met::detail {
   struct ComponentStateSelector<Ty> { using type = typename Ty::state_type; };
   template <typename Ty> using component_state_t = ComponentStateSelector<Ty>::type;
 
+  // Base template for gl-side packing of components/resources
+  // If not explicitly specialized, no gl-side packing occurs 
+  template <typename Ty>
+  struct GLPacking { /* ... */ };
+
+  // Concept to determine if GLPacking supplies specializable update() function,
+  // in which case gpu-side data is pushed each frame on component update
+  template <typename Ty, typename Tc>
+  concept is_gl_packing_implemented = requires(Ty ty, std::span<const Tc> tc, const Scene &scene) {
+    ty.update(tc, scene);
+  };
+  
   /* Scene component.
      Wrapper around objects/emitters/etc present in the scene, to handle component name, active flag,
      and specializable state tracking to detect internal changes for e.g. the Uplifting object. */
@@ -32,9 +48,9 @@ namespace met::detail {
     using state_type = component_state_t<value_type>;
 
   public:
-    std::string name  = "";
-    value_type  value = { };
-    state_type  state = { };
+    std::string name  = "";  // Loaded name of component
+    value_type  value = { }; // Underlying component value
+    state_type  state = { }; // State tracking object to detect internal changes
     
     constexpr friend 
     auto operator<=>(const Component &, const Component &) = default;
@@ -79,12 +95,12 @@ namespace met::detail {
     using value_type = Ty;
 
   private:
-    bool       m_mutated;
-    value_type m_value;
+    bool       m_mutated;             // Simplified state tracking; modified or not
+    value_type m_value;               // Underlying resource value, access with .value()
 
   public:
-    std::string name         = "";
-    bool        is_deletable = false;
+    std::string name         = "";    // Loaded name of resource
+    bool        is_deletable = false; // Safeguard program-loaded resources from deletion, e.g. D65
 
     Resource() = default;
     Resource(std::string_view name, const value_type &value, bool deletable = true) 
@@ -135,12 +151,13 @@ namespace met::detail {
   };
 
   /* Scene component vector.
-     Encapsulates std::vector<Component<Ty>> to handle named component lookups and s
+     Encapsulates std::vector<Component<Ty>> to handle named component lookups and
      and state tracking. */
   template <typename Ty>
   struct Components {
     using value_type = Ty;
     using cmpnt_type = Component<value_type>;
+    using gl_type    = GLPacking<value_type>;
 
   private:
     mutable bool            m_mutated = true;
@@ -149,7 +166,9 @@ namespace met::detail {
     std::vector<cmpnt_type> m_data;
 
   public: // State handling
-    bool update() {
+    // Test each internal component for an update and, if component state is changed,
+    // update the gl-side packed data
+    bool update(const met::Scene &scene) {
       met_trace();
 
       if (m_data.size() == m_size) {
@@ -163,11 +182,21 @@ namespace met::detail {
         m_size    = m_data.size();
       }
 
+      // If a gl packing type is specialized for the component type, update gl packing data
+      if constexpr (is_gl_packing_implemented<gl_type, cmpnt_type>) {
+        gl.update(m_data, scene);          
+      }
+
       return m_mutated;
     }
-
+    
+    constexpr void set_mutated(bool b) {
+      met_trace();
+      rng::for_each(m_data, [b](auto &comp) { comp.state.set_mutated(b); });
+    }
     constexpr bool is_mutated() const { return m_mutated; }
     constexpr bool is_resized() const { return m_resized; }
+    constexpr operator bool()   const { return m_mutated; };
 
   public: // Vector overloads
     constexpr void push(std::string_view name, const value_type &value) {
@@ -206,8 +235,10 @@ namespace met::detail {
     constexpr       auto & data()       { return m_data; }
 
     // Bookkeeping; expose miscellaneous std::vector member functions
+    constexpr void insert(size_t i, const cmpnt_type& v) 
+                                    { m_data.insert(m_data.begin() + i, v); }
     constexpr void resize(size_t i) { m_data.resize(i);      }
-    constexpr void erase(uint i)    { m_data.erase(m_data.begin() + i); }
+    constexpr void erase(size_t i)  { m_data.erase(m_data.begin() + i); }
     constexpr void clear()          { m_data.clear();        }
     constexpr auto empty()    const { return m_data.empty(); }
     constexpr auto size()     const { return m_data.size();  }
@@ -215,7 +246,10 @@ namespace met::detail {
     constexpr auto end()      const { return m_data.end();   }
     constexpr auto begin()          { return m_data.begin(); }
     constexpr auto end()            { return m_data.end();   }
-    
+  
+  public: // GL-side packing; always accessible to the underlying pipeline
+    mutable gl_type gl;
+
   public: // Serialization
     void to_stream(std::ostream &str) const {
       met_trace();
@@ -235,11 +269,31 @@ namespace met::detail {
   struct Resources {
     using value_type = Ty;
     using resrc_type = Resource<value_type>;
+    using gl_type    = GLPacking<value_type>;
 
   private:
     std::vector<resrc_type> m_data;
 
   public: // State handling
+    // Reset each internal resource's state and, if state was changed, updated
+    // the gl-side packed data
+    bool update(const met::Scene &scene) {
+      met_trace();
+      
+      // Get current state as return value
+      bool mutated = is_mutated();
+
+      // If a gl packing type is specialized for the component type, update gl packing data
+      if constexpr (is_gl_packing_implemented<gl_type, resrc_type>) {
+        gl.update(m_data, scene);          
+      }
+
+      // Reset state for next iteration
+      set_mutated(false);
+
+      return mutated;
+    }
+
     constexpr void set_mutated(bool b) {
       met_trace();
       rng::for_each(m_data, [b](auto &rsrc) { rsrc.set_mutated(b); });
@@ -249,6 +303,10 @@ namespace met::detail {
       met_trace();
       return rng::any_of(m_data, [](const auto &rsrc) { return rsrc.is_mutated(); });
     }
+
+    constexpr operator bool() const { 
+      return is_mutated();
+    };
 
   public: // Vector overloads
     constexpr void push(std::string_view name, const value_type &value, bool deletable = true) {
@@ -303,6 +361,9 @@ namespace met::detail {
     constexpr auto begin()          { return m_data.begin(); }
     constexpr auto end()            { return m_data.end();   }
     
+  public: // GL-side packing; always accessible to the underlying pipeline
+    mutable gl_type gl;
+
   public: // Serialization
     void to_stream(std::ostream &str) const {
       met_trace();

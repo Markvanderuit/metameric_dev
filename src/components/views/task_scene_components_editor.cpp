@@ -73,8 +73,8 @@ namespace met {
       if (ImGui::SmallButton("X")) {
         info.global("scene").getw<Scene>().touch({
           .name = "Delete object",
-          .redo = [i = i]        (auto &scene) { scene.components.objects.erase(i); },
-          .undo = [o = e_objects](auto &scene) { scene.components.objects = o;      }
+          .redo = [i = i]               (auto &scene) { scene.components.objects.erase(i);     },
+          .undo = [i = i, o = component](auto &scene) { scene.components.objects.insert(i, o); }
         });
         break;
       }
@@ -264,8 +264,8 @@ namespace met {
       if (ImGui::SmallButton("X")) {
         info.global("scene").getw<Scene>().touch({
           .name = "Delete uplifting",
-          .redo = [i = i]           (auto &scene) { scene.components.upliftings.erase(i); },
-          .undo = [o = e_upliftings](auto &scene) { scene.components.upliftings = o;      }
+          .redo = [i = i]               (auto &scene) { scene.components.upliftings.erase(i);     },
+          .undo = [i = i, o = component](auto &scene) { scene.components.upliftings.insert(i, o); }
         });
         break;
       }

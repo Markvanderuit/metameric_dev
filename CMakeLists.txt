@@ -16,7 +16,12 @@ set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
 set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
-set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported
+set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported TODO remove
+
+# Define some constants as available on both shader and program side
+set(MET_SUPPORTED_MESHES    32)
+set(MET_SUPPORTED_OBJECTS   32)
+set(MET_SUPPORTED_UPLIFTINGS 8)
 
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")
@@ -110,12 +115,15 @@ set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
 add_subdirectory(third_party/embree)
 
 # Add together arguments to pass into small_gl_parser when processing shaders
-set(small_gl_parser_args
+set(glsl_defines
   -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
   -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
   -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
   -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
   -DMET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}
+  -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
+  -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
+  -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
 )
 
 # Recursively find all shader files
@@ -158,7 +166,7 @@ foreach(glsl_src ${glsl_srcs})
             -Zc:preprocessor                                           # make nice recent c++ macro expansions available
             -std:c++20                                                 # make nice recent c++ macro expansions available
             -Fi${spirv_parse_fp}                                       # preprocess file output name
-            ${small_gl_parser_args}                                    # embedded defines
+            ${glsl_defines}                                            # embedded defines
     DEPENDS ${glsl_src} ${glsl_includes}
     VERBATIM
   )
@@ -168,7 +176,7 @@ foreach(glsl_src ${glsl_srcs})
   #   OUTPUT  ${spirv_parse_fp}
   #   COMMAND small_gl_parser_exec ${glsl_src} ${spirv_parse_fp} 
   #           -p "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include"
-  #           -s "${small_gl_parser_args}"
+  #           -s "${glsl_defines}"
   #   DEPENDS small_gl_parser_exec ${glsl_src} ${glsl_includes}
   #   VERBATIM
   # )
@@ -301,6 +309,9 @@ target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
   MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES}
   MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}
+  MET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
+  MET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
+  MET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
 

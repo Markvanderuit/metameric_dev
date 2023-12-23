@@ -6,7 +6,7 @@
 
 // This header requires the following defines to point to SSBOs or shared memory
 // to work around glsl's lack of ssbo argument passing
-// #define isct_n_objects      buff_objc_info.data.length()
+// #define isct_n_objects      buff_objc_info.n
 // #define isct_stack          s_stack[gl_LocalInvocationID.x]
 // #define isct_buff_objc_info s_objc_info
 // #define isct_buff_bvhs_info s_bvhs_info
@@ -215,15 +215,15 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
 }
 
 bool ray_isct_object_any(in Ray ray, uint object_i) {
-  ObjectInfo object_info = s_objc_info[object_i];
-  BVHInfo    bvh_info    = s_bvhs_info[object_info.mesh_i];
+  ObjectInfo object_info = isct_buff_objc_info[object_i];
+  MeshInfo   mesh_info   = isct_buff_bvhs_info[object_info.mesh_i];
   
   if (!object_info.is_active)
     return false;
 
   // TODO streamline this stuff
   // Setup transformation to take world space ray into local space
-  mat4 trf = object_info.trf * bvh_info.trf;
+  mat4 trf = object_info.trf * mesh_info.trf;
   mat4 inv = inverse(trf);
   
   // Generate object space ray
@@ -241,15 +241,15 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
 }
 
 void ray_isct_object(inout Ray ray, uint object_i) {
-  ObjectInfo object_info = s_objc_info[object_i];
-  BVHInfo    bvh_info    = s_bvhs_info[object_info.mesh_i];
-
+  ObjectInfo object_info = isct_buff_objc_info[object_i];
+  MeshInfo   mesh_info   = isct_buff_bvhs_info[object_info.mesh_i];
+  
   if (!object_info.is_active)
     return;
   
   // TODO streamline this stuff
   // Setup transformation to take world space ray into local space
-  mat4 trf = object_info.trf * bvh_info.trf;
+  mat4 trf = object_info.trf * mesh_info.trf;
   mat4 inv = inverse(trf);
 
   // Generate object space ray

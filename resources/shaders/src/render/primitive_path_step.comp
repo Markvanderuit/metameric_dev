@@ -34,7 +34,8 @@ layout(binding = 7) restrict writeonly buffer b_buff_shadow_oupt { Ray         d
 layout(binding = 8) restrict readonly  buffer b_buff_bvhs_prim   { BVHPrimPack data[]; } buff_bvhs_prim;   // Packed surface primitives
 
 // Sampler/texture declarations
-layout(binding = 1) uniform usampler2D b_gbuffer; // G-buffer texture used for initial ray hits
+layout(binding = 1) uniform usampler2D     b_gbuffer; // G-buffer texture used for initial ray hits
+layout(binding = 2) uniform sampler1DArray b_csys_3f; // Color system spectra, 3 components // TODO Should extract
 
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
@@ -82,7 +83,7 @@ Ray get_extend_ray(in PathInfo pi) {
 }
 
 Ray get_shadow_ray(in PathInfo pi) {
-  if (pi.depth > 0) {
+  if (pi.depth > 0 && pi.ray_shadow_i != UINT_MAX) {
     return buff_shadow_inpt.data[pi.ray_shadow_i];
   } else {
     // If path has restarted, first shadow ray does not exist
@@ -111,74 +112,90 @@ vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
   return fma(vec3(mag), si.n, si.p);
 }
 
+vec3 sample_colsys(in uint colsys_i, in float wvl) {
+  return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
+}
+
+void write_path_radiance(in PathInfo pi) {
+  ivec2 px = get_path_pixel(pi);
+  vec3 colr = imageLoad(b_target_4f, px).xyz;
+  colr += sample_colsys(0, pi.wavelength) * pi.radiance;
+  imageStore(b_target_4f, px, vec4(colr, 1));
+}
+
 void main() {
   // Thread index is work index
   const uint i = gl_GlobalInvocationID.x;
   guard(i < buff_path_head.n);
   
-  // Load path info from work buffer
+  // Load path info from work buffer. New paths are set to default
   PathInfo pi = buff_path_data.data[i];
-  
-  // If the path is newly started, we initialize necessary parameters
-  if (pi.depth == 0) {
-    pi.did_scatter  = false;
-    pi.radiance     = 0.f;
-    pi.wavelength   = next_1d(pi.state);
-    pi.throughput   = 1.f;
-    pi.p            = 1.f;
-    pi.eta          = 1.f;
+  if (pi.depth == 0)
+    reset(pi);
+
+  // Emitter sampling; handle last bounce's shadow ray to incorporate
+  // direct illumination
+  if (pi.depth > 0 && !bool(get_shadow_ray(pi).data)) {
+    // TODO MIS
+    pi.radiance += pi.throughput * (pi.ray_shadow_e / (pi.p * pi.ray_shadow_pdf));
   }
 
   // Get surface info at next hit
   Ray extend_ray = get_extend_ray(pi);
   SurfaceInfo si = get_surface_info(extend_ray);
-
-  // Emitter sampling; handle last step's shadow ray
-  if (!bool(get_shadow_ray(pi).data)) {
-    // TODO MIS
-    pi.radiance += pi.throughput * (pi.ray_shadow_e / (pi.p * pi.ray_shadow_p));
-  }
   
-  // Next ray; handle last step's extend ray
-  // If no object was hit, we reset the path and return early
   // Note that the first (gbuffer) ray is guaranteed to hit, as the path is
   // otherwise never scheduled
   if (si.object_i == OBJECT_INVALID) {
-    // TODO; write stored radiance to output pixel
-    // ...
+    write_path_radiance(pi);
     pi.depth               = 0;
     buff_path_data.data[i] = pi;
     return;
   }
 
-  // Modify throughput, probability based on last extend ray
+  // Incorporate BSDF throughput from the last iteration
   pi.throughput *= pi.ray_extend_t;
-  pi.p          *= pi.ray_extend_p;
+  pi.p          *= pi.ray_extend_pdf;
 
+  // Incorporate emission from a surface hit directly by the path
   // TODO test if object is emissive, or a light source
   //      to end path and return early
-  {
-    
-  }
+  /* if (Le) {
+    if (pi.depth == 0 || !pi.did_scatter) {
+      // ...
+    } else {
+      // ...
+    }
+  } */
 
-  // Increment path depth
-  pi.depth++;
-
-  // Terminate path at maximum path length and return early
-  if (pi.depth >= buff_unif.max_depth) {
-    // TODO; write stored radiance to output pixel
-    // ...
+  // Increment path length and terminate if maximum is reached, returingn early
+  if (pi.depth++ >= buff_unif.max_depth) {
+    write_path_radiance(pi);
     pi.depth               = 0;
     buff_path_data.data[i] = pi;
     return;
   }
 
+  // Russian roulette; potentially terminate path
+  float rr_throughput = pi.throughput * pi.eta;
+  if (rr_throughput < 1.f && pi.depth > 1) {
+    float q = max(0.f, 1.f - rr_throughput);
+    if (next_1d(pi.state) < q) {
+      write_path_radiance(pi);
+      pi.depth               = 0;
+      buff_path_data.data[i] = pi;
+      return;
+    }
+    pi.throughput /= (1.f - q);
+  }
+
+  // Get BSDF
   // Weird quirk; gather BSDF's underlying data once
   // TODO; instead construct surface BSDF object here
   //       it's going to be used anyways
-  float r = 0.5f; // TOOD evaluate instead of hardcoding you pancake
+  float r = .5f; // TOOD evaluate instead of hardcoding you pancake
 
-  // Emitter sampling; generate next shadow ray from surface
+  // Emitter sampling; generate sample/ray for next iteration
   {
     // Sample position in cube
     vec3 lpos = hardcoded_lpos + next_3d(pi.state) * 4.f - 2.f;
@@ -193,12 +210,12 @@ void main() {
 
     // Store throughput, probability for next iteration, and push shadow test
     // TODO eval() on the bsdf
-    pi.ray_shadow_e = r * dot(si.ns, ray.d);
-    pi.ray_shadow_p = 1.f; // Wrong!
-    pi.ray_shadow_i = push_shadow_ray(ray);    
+    pi.ray_shadow_i   = push_shadow_ray(ray);    
+    pi.ray_shadow_e   = r * dot(si.ns, ray.d);
+    pi.ray_shadow_pdf = 1.f; // Wrong, but correct for now
   }
   
-  // BSDF sampling; generate next extend ray from surface
+  // BSDF sampling; generate sample/ray for next iteration
   {
     // Generate extend ray
     Ray ray;
@@ -207,16 +224,8 @@ void main() {
     ray.t    = FLT_MAX;
     ray.data = 0xFFFFFFFFu;
 
-    pi.ray_extend_t = r * dot(si.ns, ray.d);
-    pi.ray_extend_p = 1.f;
-    pi.ray_extend_i = push_extend_ray(ray);
+    pi.ray_extend_i   = push_extend_ray(ray);
+    pi.ray_extend_t   = r * dot(si.ns, ray.d);
+    pi.ray_extend_pdf = 1.f;
   }
-  
-  // Russian roulette; potentially reset/terminate ray
-  {
-    
-  }
-
-  // Write a dummy value to the output pixel for now
-  // imageStore(b_target_4f, get_path_pixel(pi), vec4(si.p, 1));
 }

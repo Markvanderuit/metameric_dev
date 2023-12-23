@@ -1,31 +1,17 @@
 #ifndef SCENE_GLSL_GUARD
 #define SCENE_GLSL_GUARD
 
-// Info object for referred mesh data
+// Info object for referred mesh.bvh data
 struct MeshInfo {
-  mat4 trf;        // Transform data
-  uint verts_offs; // Offset to vert data range in verts buffer
-  uint verts_size; // Extent of vert data range in verts buffer
-  uint elems_offs; // Offset to elem data range in elems buffer
-  uint elems_size; // Extent of elem data range in elems buffer
-};
+  mat4 trf;
+  uint verts_offs;
+  uint verts_size;
 
-struct BVHInfo {
-  mat4 trf;        // Transform data
-  uint nodes_offs;
-  uint nodes_size;
   uint prims_offs;
   uint prims_size;
-};
-
-// Info object for referred texture data
-struct TextureInfo {
-  bool  is_3f; // Is in the atlas_3f texture sampler, else atlas_1f?
-  uint  layer; // layer in texture array in which the texture is located
-  uvec2 offs;  // offset in pixels to layer's region storing this texture
-  uvec2 size;  // size in pixels of layer's region storing this
-  vec2  uv0;   // Minimum uv value, at region's pixel offset
-  vec2  uv1;   // Maximum uv value, at region's pixel offset + size
+  
+  uint nodes_offs;
+  uint nodes_size;
 };
 
 // Info object to gather Scene::Object data
@@ -47,6 +33,16 @@ struct ObjectInfo {
   vec3 albedo_v;          // Direct value
 };
 
+// Info object for referred texture data
+struct TextureInfo {
+  bool  is_3f; // Is in the atlas_3f texture sampler, else atlas_1f?
+  uint  layer; // layer in texture array in which the texture is located
+  uvec2 offs;  // offset in pixels to layer's region storing this texture
+  uvec2 size;  // size in pixels of layer's region storing this
+  vec2  uv0;   // Minimum uv value, at region's pixel offset
+  vec2  uv1;   // Maximum uv value, at region's pixel offset + size
+};
+
 // Atlas access info
 struct AtlasLayout {
   uint layer;  // layer in texture array in which the patch is located
@@ -54,12 +50,6 @@ struct AtlasLayout {
   uvec2 size;  // size in pixels of texture's region storing this patch
   vec2  uv0;   // Minimum uv value, at region's offset
   vec2  uv1;   // Maximum uv value, at region's offset + size
-};
-
-// Info object to gather Scene::Uplifting relevant data
-struct UpliftInfo {
-  uint elem_offs;
-  uint elem_size;
 };
 
 #endif // SCENE_GLSL_GUARD

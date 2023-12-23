@@ -35,7 +35,7 @@ namespace met {
     invoke(input, output, 0, 0);
   }
   
-  RayIntersectPrimitive::RayIntersectPrimitive(const ObjectData &object_data, 
+  /* RayIntersectPrimitive::RayIntersectPrimitive(const ObjectData &object_data, 
                                                const BVHData    &bvh_data)
   : m_prim_ddiv(isct_wg_size),
     m_object_data(object_data),
@@ -47,7 +47,7 @@ namespace met {
                    .spec_const = {{ 0, isct_wg_size   }} }};
     m_buffer_count     = {{ .size = sizeof(uint), .flags = buffer_create_flags }};
     m_buffer_count_map = m_buffer_count.map_as<BufferLayout>(buffer_access_flags).data();
-  }
+  } */
 
   void RayIntersectPrimitive::invoke(
     const gl::Buffer &input, 
@@ -72,10 +72,10 @@ namespace met {
     met_trace_full();
 
     // Bind relevant buffers
-    m_program.bind("b_buff_bvhs_info", m_bvh_data.info_gl);
-    m_program.bind("b_buff_bvhs_node", m_bvh_data.nodes);
-    m_program.bind("b_buff_bvhs_prim", m_bvh_data.prims);
-    m_program.bind("b_buff_objc_info", m_object_data.info_gl);
+    // m_program.bind("b_buff_bvhs_info", m_bvh_data.info_gl);
+    // m_program.bind("b_buff_bvhs_node", m_bvh_data.nodes);
+    // m_program.bind("b_buff_bvhs_prim", m_bvh_data.prims);
+    // m_program.bind("b_buff_objc_info", m_object_data.info_gl);
     m_program.bind("b_buff_input_head",  count);
     m_program.bind("b_buff_input_data",  input);
     m_program.bind("b_buff_output_data", output);
@@ -84,7 +84,7 @@ namespace met {
     gl::dispatch_compute({ .buffer = &m_prim_ddiv(count), .bindable_program = &m_program });
   }
   
-  RayIntersectAnyPrimitive::RayIntersectAnyPrimitive(const ObjectData &object_data, 
+  /* RayIntersectAnyPrimitive::RayIntersectAnyPrimitive(const ObjectData &object_data, 
                                                      const BVHData    &bvh_data)
   : m_prim_ddiv(isct_wg_size),
     m_object_data(object_data),
@@ -96,7 +96,7 @@ namespace met {
                    .spec_const = {{ 0, isct_wg_size   }} }};
     m_buffer_count     = {{ .size = sizeof(eig::Array4u), .flags = buffer_create_flags }};
     m_buffer_count_map = m_buffer_count.map_as<BufferLayout>(buffer_access_flags, 1u).data();
-  }
+  } */
 
   void RayIntersectAnyPrimitive::invoke(
     const gl::Buffer &input, 
@@ -121,10 +121,10 @@ namespace met {
     met_trace_full();
 
     // Bind relevant buffers
-    m_program.bind("b_buff_bvhs_info",   m_bvh_data.info_gl);
-    m_program.bind("b_buff_bvhs_node",   m_bvh_data.nodes);
-    m_program.bind("b_buff_bvhs_prim",   m_bvh_data.prims);
-    m_program.bind("b_buff_objc_info",   m_object_data.info_gl);
+    // m_program.bind("b_buff_bvhs_info",   m_bvh_data.info_gl);
+    // m_program.bind("b_buff_bvhs_node",   m_bvh_data.nodes);
+    // m_program.bind("b_buff_bvhs_prim",   m_bvh_data.prims);
+    // m_program.bind("b_buff_objc_info",   m_object_data.info_gl);
     m_program.bind("b_buff_input_head",  count);
     m_program.bind("b_buff_input_data",  input);
     m_program.bind("b_buff_output_data", output);

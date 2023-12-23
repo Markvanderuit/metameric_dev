@@ -22,32 +22,29 @@ layout(binding = 1) uniform b_buff_sampler {
   uint iter;
   uint n_iters_per_dispatch;
 } buff_sampler;
+layout(binding = 2) uniform /* readonly buffer */ b_buff_objects {
+  uint n;
+  ObjectInfo data[32];
+} buff_objects;
+layout(binding = 3) uniform /* readonly buffer */ b_buff_bvhs_info {
+  uint n;
+  MeshInfo data[32]; // TODO change to meshinfo
+} buff_bvhs_info;
 
 // Storage buffer declarations
 layout(binding = 0) restrict writeonly buffer b_buff_state {
   uvec2 data[];
 } buff_state;
-layout(binding = 1) restrict readonly buffer b_buff_objects {
-  ObjectInfo[] data;
-} buff_objects;
-layout(binding = 2) restrict readonly buffer b_buff_textures {
+layout(binding = 1) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
-layout(binding = 3) restrict readonly buffer b_buff_uplifts {
-  UpliftInfo data[];
-} buff_uplifts;
-layout(binding = 4) restrict readonly buffer b_buff_weights {
+layout(binding = 2) restrict readonly buffer b_buff_weights {
   AtlasLayout data[];
 } buff_weights;
-
-// TODO remove
-layout(binding = 5) restrict readonly buffer b_buff_bvhs_info {
-  BVHInfo data[];
-} buff_bvhs_info;
-layout(binding = 6) restrict readonly buffer b_buff_bvhs_node {
+layout(binding = 3) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
 } buff_bvhs_node;
-layout(binding = 7) restrict readonly buffer b_buff_bvhs_prim {
+layout(binding = 4) restrict readonly buffer b_buff_bvhs_prim {
   BVHPrimPack data[];
 } buff_bvhs_prim;
 
@@ -59,20 +56,19 @@ layout(binding = 3) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
 layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
 layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 7) uniform sampler1DArray b_csys_3f; // Color system spectra, 3 components
 
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
 // Shared memory declarations
 // TODO remove
-shared ObjectInfo s_objc_info[8];
-shared BVHInfo    s_bvhs_info[8];
+shared ObjectInfo s_objc_info[16];
+shared MeshInfo    s_bvhs_info[16];
 shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // Define names of scene buffers to replace preproc in intersect.glsl
 // to work around glsl's lack of ssbo argument passing
-#define isct_n_objects      buff_objects.data.length()
+#define isct_n_objects      buff_objects.n
 #define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
 #define isct_buff_objc_info s_objc_info
 #define isct_buff_bvhs_info s_bvhs_info
@@ -84,17 +80,10 @@ shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
 
 void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; 
-            i < buff_objects.data.length();
-            i += gl_WorkGroupSize.x) {
+  for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
   }
-  memoryBarrierShared();
-  barrier();
-
-  for (uint i = gl_LocalInvocationID.x; 
-            i < buff_bvhs_info.data.length();
-            i += gl_WorkGroupSize.x) {
+  for (uint i = gl_LocalInvocationID.x; i < buff_bvhs_info.n; i += gl_WorkGroupSize.x) {
     s_bvhs_info[i] = buff_bvhs_info.data[i];
   }
   memoryBarrierShared();
@@ -107,23 +96,26 @@ GBuffer sample_gbuffer(in vec2 xy) {
 }
 
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
-  return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
+  // TODO sample by observer data instead
+  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz *
+         texture(b_illm_1f, vec2(wvl, colsys_i)).x   * .01f; // TODO fix integration through exposure
+  // return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
 }
 
 uvec4 sample_uplift_bary_indices(in ObjectInfo object_info, in vec3 tx_bary, in GBuffer gb) {
   return uvec4(textureGather(b_bary_4f, tx_bary, 3)); // fourth channel is non-variant :D
 }
 
-float sample_uplift_refl(in UpliftInfo uplift_info, in vec4 bary, in float wvl) {
+float sample_uplift_refl(in vec4 bary, in float wvl) {
   // Extract tesselation index from packing, and replace with correct weight w
-  uint elem_i = uint(bary.w) + uplift_info.elem_offs;
+  uint elem_i = uint(bary.w);
   bary.w = 1.f - hsum(bary.xyz);
   
   // Recover recovered surface reflectance for given wavelength as a dot product
   return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
 }
 
-vec3 fetch_color_part(inout uvec3 state, in UpliftInfo uplift_info, in GBuffer gb, in uvec3 px) {
+vec3 fetch_color_part(inout uvec3 state, in GBuffer gb, in uvec3 px) {
   vec3 value = vec3(0);
   
   // Element indices differ, so sample weights separately
@@ -136,7 +128,7 @@ vec3 fetch_color_part(inout uvec3 state, in UpliftInfo uplift_info, in GBuffer g
     
     // Evaluate surface reflectance and color system spectra at wavelength,
     // then add to direct lighting estiamte
-    float r = sample_uplift_refl(uplift_info, bary, wvl);
+    float r = sample_uplift_refl(bary, wvl);
     vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
 
     // Apply result
@@ -147,7 +139,7 @@ vec3 fetch_color_part(inout uvec3 state, in UpliftInfo uplift_info, in GBuffer g
   return value * float(wavelength_samples) * cos_theta;
 }
 
-vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_full, in UpliftInfo uplift_info, in GBuffer gb) {
+vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_full, in GBuffer gb) {
   const uvec2 texel_offsets[4] = uvec2[4](uvec2(0, 0), uvec2(1, 0), uvec2(0, 1), uvec2(1, 1));
   
   // Scale up to full texture size
@@ -162,14 +154,14 @@ vec3 fetch_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_full, 
   for (uint i = 0; i < 4; ++i) {
     // Reuse random state for every fetch so it samples the same wavelength
     state_ = state;
-    values[i] = fetch_color_part(state_, uplift_info, gb, tx_floor + uvec3(texel_offsets[i], 0));
+    values[i] = fetch_color_part(state_, gb, tx_floor + uvec3(texel_offsets[i], 0));
   }
   state = state_;
 
   return mix(mix(values[0], values[1], alpha.x), mix(values[2], values[3], alpha.x), alpha.y);
 }
 
-vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_bary, in UpliftInfo uplift_info, in GBuffer gb) {
+vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_bary, in GBuffer gb) {
   vec3 value = vec3(0);
 
   // All element indices are the same, so sample barycentric weights directly
@@ -182,7 +174,7 @@ vec3 sample_color(inout uvec3 state, in ObjectInfo object_info, in vec3 tx_bary,
     
     // Evaluate surface reflectance and color system spectra at wavelength,
     // then add to direct lighting estiamte
-    float r = sample_uplift_refl(uplift_info, bary, wvl);
+    float r = sample_uplift_refl(bary, wvl);
     vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
 
     value += csys * r;
@@ -206,7 +198,7 @@ bool test_visibility(inout uvec3 state, in GBuffer gb) {
   ray.d = lpos - gb.p;
   ray.t = length(ray.d);
   ray.d /= ray.t;
-  ray.o = gb.p + 0.0001f * gb.n;
+  ray.o = gb.p + 0.01f * gb.n;
 
   // Mistake; gbuffer normal is not geometric normal!
   // ray.o = gen_offset_p(gb, ray.d);
@@ -240,7 +232,6 @@ void main() {
   // Load relevant info objects
   AtlasLayout bary_layout = buff_weights.data[gb.object_i];
   ObjectInfo  object_info = buff_objects.data[gb.object_i];
-  UpliftInfo  uplift_info = buff_uplifts.data[object_info.uplifting_i];
 
   // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
   // also handle single-color objects by sampling the center of their patch
@@ -256,16 +247,16 @@ void main() {
     uvec4 indices = sample_uplift_bary_indices(object_info, tx_uv, gb);
     if (all(equal(indices, uvec4(indices.x)))) {
       // Hot path; all element indices are the same, we can do a texture gather
-      value += sample_color(state, object_info, tx_uv, uplift_info, gb);
+      value += sample_color(state, object_info, tx_uv, gb);
     } else {
       // Cold path; border region, indices differ, manually combine samples, very very frightening
-      value += fetch_color(state, object_info, tx_uv, uplift_info, gb);
+      value += fetch_color(state, object_info, tx_uv, gb);
     }
   }
 
   // Reweight image value by actual nr. of samples
   value /= float(buff_sampler.iter + buff_sampler.n_iters_per_dispatch);
-
+  
   // Store updated image value and sampler state
   imageStore(b_target_4f, ivec2(i), vec4(value, 1));
   buff_state.data[j] = state.xy;

@@ -2,7 +2,6 @@
 #include <metameric/components/views/mesh_viewport/task_draw_raytrace.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>
@@ -53,18 +52,8 @@ namespace met {
     auto weight_handle  = info("gen_objects", "bary_data");
 
     // Get shared resources 
-    const auto &e_scene     = info.global("scene").getr<Scene>();
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<ObjectData>();
-    const auto &e_bvhs_data = info("scene_handler", "bvhs_data").getr<BVHData>();
-    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<MeshData>();
-    // const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<detail::TextureData>();
-    // const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<detail::UpliftingData>();
-    // const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<detail::ObserverData>();
-    // const auto &e_illm_data = info("scene_handler", "illm_data").getr<detail::IlluminantData>();
-    // const auto &e_csys_data = info("scene_handler", "csys_data").getr<detail::ColorSystemData>();
-    // const auto &e_bary_data = info("gen_objects", "bary_data").getr<detail::TextureAtlas<float, 4>>();
-    // const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
-
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    
     // Get modified resources
     auto &i_target = info("target").getw<gl::Texture2d4f>();
 
@@ -127,10 +116,10 @@ namespace met {
       m_program_ray_isct.bind("b_buff_unif",      m_buffer_unif);
       m_program_ray_isct.bind("b_buff_work_head", m_buffer_work_head);
       m_program_ray_isct.bind("b_buff_work",      m_buffer_work);
-      m_program_ray_isct.bind("b_buff_objc_info", e_objc_data.info_gl);
-      m_program_ray_isct.bind("b_buff_bvhs_info", e_bvhs_data.info_gl);
-      m_program_ray_isct.bind("b_buff_bvhs_node", e_bvhs_data.nodes);
-      m_program_ray_isct.bind("b_buff_bvhs_prim", e_bvhs_data.prims);
+      m_program_ray_isct.bind("b_buff_objc_info", e_scene.components.objects.gl.object_info);
+      m_program_ray_isct.bind("b_buff_bvhs_info", e_scene.resources.meshes.gl.mesh_info);
+      m_program_ray_isct.bind("b_buff_bvhs_node", e_scene.resources.meshes.gl.bvh_nodes);
+      m_program_ray_isct.bind("b_buff_bvhs_prim", e_scene.resources.meshes.gl.bvh_prims);
       m_program_ray_isct.bind("b_target_4f",      i_target);
       
       // Dispatch compute shader

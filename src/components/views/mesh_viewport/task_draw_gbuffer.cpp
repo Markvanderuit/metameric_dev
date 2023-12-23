@@ -2,7 +2,6 @@
 #include <metameric/components/views/mesh_viewport/task_draw_gbuffer.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 
@@ -13,9 +12,11 @@ namespace met {
   bool MeshViewportDrawGBufferTask::is_active(SchedulerHandle &info) {
     met_trace();
 
-    auto is_objc_present = !info.global("scene").getr<Scene>().components.objects.empty();
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+
+    auto is_objc_present = !e_scene.components.objects.empty();
+    auto is_objc_updated = e_scene.components.objects.is_mutated();
     auto is_view_present = info.relative("viewport_begin")("is_active").getr<bool>();
-    auto is_objc_updated = info("scene_handler", "objc_data").is_mutated();
     auto is_view_updated = info.relative("viewport_begin")("lrgb_target").is_mutated()
                        ||  info.relative("viewport_input")("arcball").is_mutated();
 
@@ -57,16 +58,11 @@ namespace met {
     auto arcball_handle = info.relative("viewport_input")("arcball");
 
     // Get shared resources 
-    const auto &e_scene     = info.global("scene").getr<Scene>();
-    const auto &e_objects   = e_scene.components.objects;
-    const auto &e_arcball   = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<ObjectData>();
-    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<MeshData>();
-    const auto &e_target    = target_handle.getr<gl::Texture2d4f>();
-
-    // TODO: this violates EVERYTHING in terms of state, but test it
-    // if (!target_handle.is_mutated() && !arcball_handle.is_mutated())
-    //   return;
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_objects = e_scene.components.objects;
+    const auto &e_meshes  = e_scene.resources.meshes;
+    const auto &e_arcball = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
+    const auto &e_target  = target_handle.getr<gl::Texture2d4f>();
 
     // Rebuild framebuffer and g-buffer textures if necessary
     if (!m_fbo.is_init() || (m_fbo_depth.size() != e_target.size()).any()) {
@@ -88,22 +84,13 @@ namespace met {
       m_unif_buffer.flush();
     }
     
-    // Set fresh vertex array for draw data if it was updated
-    if (is_first_eval() || info("scene_handler", "mesh_data").is_mutated())
-      m_draw.bindable_array = &e_mesh_data.array;
-
     // Assemble appropriate draw data for each object in the scene
-    if (is_first_eval() || info("scene_handler", "objc_data").is_mutated()) {
-      m_draw.commands.resize(e_objects.size());
-      rng::transform(e_objects, m_draw.commands.begin(), [&](const auto &comp) {
-        guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
-        const auto &e_mesh_info = e_mesh_data.info.at(comp.value.mesh_i);
-        return gl::MultiDrawInfo::DrawCommand {
-          .vertex_count = e_mesh_info.elems_size * 3,
-          .vertex_first = e_mesh_info.elems_offs * 3
-        };
-      });
-    }
+    m_draw.bindable_array = &e_scene.resources.meshes.gl.array;
+    m_draw.commands.resize(e_objects.size());
+    rng::transform(e_objects, m_draw.commands.begin(), [&](const auto &comp) {
+      guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
+      return e_meshes.gl.draw_commands[comp.value.mesh_i];
+    });
 
     // Prepare framebuffer state
     m_fbo.bind();
@@ -112,8 +99,8 @@ namespace met {
     
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif",    m_unif_buffer);
-    m_program.bind("b_buff_objects", e_objc_data.info_gl);
-    m_program.bind("b_buff_meshes",  e_mesh_data.info_gl);
+    m_program.bind("b_buff_objects", e_objects.gl.object_info);
+    m_program.bind("b_buff_meshes",  e_meshes.gl.mesh_info);
 
     // Dispatch draw call to handle entire scene
     gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 

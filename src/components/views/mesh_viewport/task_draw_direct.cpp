@@ -2,14 +2,13 @@
 #include <metameric/components/views/mesh_viewport/task_draw_direct.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/scene_data.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>
 
 namespace met {
   constexpr uint n_iters_per_dispatch = 64u;
-  constexpr uint n_iters_max          = 16384u; // 4096u;
+  constexpr uint n_iters_max          = 4096u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -46,28 +45,17 @@ namespace met {
     auto begin_handle   = info.relative("viewport_begin");
     auto target_handle  = begin_handle("lrgb_target");
     auto arcball_handle = info.relative("viewport_input")("arcball");
-    auto object_handle  = info("scene_handler", "objc_data");
-    auto weight_handle  = info("gen_objects", "bary_data");
 
     // Get shared resources 
-    const auto &e_scene     = info.global("scene").getr<Scene>();
-    const auto &e_objc_data = info("scene_handler", "objc_data").getr<ObjectData>();
-    const auto &e_mesh_data = info("scene_handler", "mesh_data").getr<MeshData>();
-    const auto &e_txtr_data = info("scene_handler", "txtr_data").getr<TextureData>();
-    const auto &e_uplf_data = info("scene_handler", "uplf_data").getr<UpliftingData>();
-    const auto &e_cmfs_data = info("scene_handler", "cmfs_data").getr<ObserverData>();
-    const auto &e_illm_data = info("scene_handler", "illm_data").getr<IlluminantData>();
-    const auto &e_csys_data = info("scene_handler", "csys_data").getr<ColorSystemData>();
-    const auto &e_bvhs_data = info("scene_handler", "bvhs_data").getr<BVHData>();
-    const auto &e_bary_data = info("gen_objects", "bary_data").getr<TextureAtlas<float, 4>>();
-    const auto &e_gbuffer   = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
 
     // Get modified resources
     auto &i_target = info("target").getw<gl::Texture2d4f>();
 
     // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
-    bool restart_frame = arcball_handle.is_mutated() || object_handle.is_mutated() || weight_handle.is_mutated();
+    bool restart_frame = arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings;
     
     // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
@@ -106,33 +94,23 @@ namespace met {
     m_unif_buffer.flush();
 
     // Bind required resources to their corresponding targets
-    m_program.bind("b_buff_unif",    m_unif_buffer);
-    m_program.bind("b_buff_sampler", m_sampler_buffer);
-    m_program.bind("b_buff_state",   m_state_buffer);
-    m_program.bind("b_buff_objects", e_objc_data.info_gl);
-    m_program.bind("b_buff_uplifts", e_uplf_data.info_gl);
-    m_program.bind("b_buff_weights", e_bary_data.buffer());
-    m_program.bind("b_spec_4f",      e_uplf_data.spectra_gl_texture);
-    m_program.bind("b_cmfs_3f",      e_cmfs_data.cmfs_gl_texture);
-    m_program.bind("b_illm_1f",      e_illm_data.illm_gl_texture);
-    m_program.bind("b_csys_3f",      e_csys_data.csys_gl_texture);
-    m_program.bind("b_gbuffer",      e_gbuffer);
-    m_program.bind("b_target_4f",    i_target);
-
-    // TODO remove
-    m_program.bind("b_buff_bvhs_info", e_bvhs_data.info_gl);
-    m_program.bind("b_buff_bvhs_node", e_bvhs_data.nodes);
-    m_program.bind("b_buff_bvhs_prim", e_bvhs_data.prims);
-
-    // Bind atlas resources that may not yet be initialized
-    if (e_txtr_data.info_gl.is_init())
-      m_program.bind("b_buff_textures", e_txtr_data.info_gl);
-    if (e_txtr_data.atlas_1f.texture().is_init())
-      m_program.bind("b_txtr_1f", e_txtr_data.atlas_1f.texture());
-    if (e_txtr_data.atlas_3f.texture().is_init())
-      m_program.bind("b_txtr_3f", e_txtr_data.atlas_3f.texture());
-    if (e_bary_data.texture().is_init())
-      m_program.bind("b_bary_4f", e_bary_data.texture());
+    m_program.bind("b_buff_unif",      m_unif_buffer);
+    m_program.bind("b_buff_sampler",   m_sampler_buffer);
+    m_program.bind("b_buff_state",     m_state_buffer);
+    m_program.bind("b_target_4f",      i_target);
+    m_program.bind("b_gbuffer",        e_gbuffer);
+    m_program.bind("b_buff_weights",   e_scene.components.upliftings.gl.texture_weights.buffer());
+    m_program.bind("b_bary_4f",        e_scene.components.upliftings.gl.texture_weights.texture());
+    m_program.bind("b_spec_4f",        e_scene.components.upliftings.gl.texture_spectra);
+    m_program.bind("b_buff_objects",   e_scene.components.objects.gl.object_info);
+    m_program.bind("b_cmfs_3f",        e_scene.resources.observers.gl.cmfs_texture);
+    m_program.bind("b_buff_bvhs_info", e_scene.resources.meshes.gl.mesh_info);
+    m_program.bind("b_buff_bvhs_node", e_scene.resources.meshes.gl.bvh_nodes);
+    m_program.bind("b_buff_bvhs_prim", e_scene.resources.meshes.gl.bvh_prims);
+    m_program.bind("b_buff_textures",  e_scene.resources.images.gl.texture_info);
+    m_program.bind("b_txtr_1f",        e_scene.resources.images.gl.texture_atlas_1f.texture());
+    m_program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());
+    m_program.bind("b_illm_1f",        e_scene.resources.illuminants.gl.spec_texture);
 
     // Dispatch compute shader
     gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |
