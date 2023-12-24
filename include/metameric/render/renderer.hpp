@@ -1,5 +1,7 @@
 #pragma once
 
+#include <metameric/core/scene.hpp>
+#include <metameric/render/sensor.hpp>
 #include <metameric/render/ray_primitives.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
@@ -8,8 +10,8 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  // Virtual base class
   namespace detail {
+    // Renderer base class
     class BaseRenderer {
     protected:
       gl::Texture2d4f m_output;
@@ -23,6 +25,22 @@ namespace met {
         m_output = {{ .size = size }};
       }
     };
+
+    // Render target base class; a render target can be anything
+    // the renderer may wish to write to, such as a film, texture, or other image type. In our
+    // case, it might also be path storage buffers for building cached raytracing kernels.
+    struct BaseRenderTarget {
+
+    };
+
+    struct TextureRenderTarget : BaseRenderTarget {
+
+    };
+
+    struct PathKernelRenderTarget : BaseRenderTarget {
+
+    };
+
 
     struct BaseIntegrationRenderer : public BaseRenderer {
       // Reset internal state so the output image is blank
@@ -46,12 +64,24 @@ namespace met {
       gl::MultiDrawInfo m_draw;
 
     public:
+      // GBufferRenderer(const Scene &scene, const Sensor &sensor);
+      
       // void render(SceneResourceHandles scene_handles);
     };
   } // namespace detail
 
   struct DirectRendererCreateInfo {
-    // ...
+    // Relevant scene data
+    const Scene  &scene;
+    const Sensor &sensor;
+
+    // Number of samples taken on calls of renderer.sample().
+    uint samples_per_iter = 1;
+
+    // The renderer will only render up to 'max_samples' on calls of renderer.sample(). Afterwards,
+    // the current rendered image will simply be returned immediately. If set to 0, this does not
+    // occur.
+    uint max_samples = 0;
   };
 
   struct PathRendererCreateInfo {
@@ -67,6 +97,7 @@ namespace met {
 
   public:
     DirectRenderer(DirectRendererCreateInfo info);
+
 
     void reset() override;
     // void sample(SceneResourceHandles scene_handles) override;
