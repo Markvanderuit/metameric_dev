@@ -32,9 +32,6 @@ layout(binding = 3) uniform b_buff_meshes {
 layout(binding = 4) uniform b_buff_textures {
   TextureInfo data[max_supported_textures];
 } buff_textures;
-layout(binding = 5) uniform b_buff_weights {
-  AtlasLayout data[max_supported_objects];
-} buff_weights;
 
 // Storage buffer declarations
 layout(binding = 0) restrict buffer b_buff_sampler_data {
@@ -52,6 +49,9 @@ layout(binding = 3) restrict readonly buffer b_buff_mesh_vert {
 layout(binding = 4) restrict readonly buffer b_buff_mesh_elem {
   uvec3 data[];
 } buff_mesh_elem;
+layout(binding = 5) restrict readonly buffer b_buff_weights {
+  AtlasLayout data[max_supported_objects];
+} buff_weights;
 
 // Texture unit, ergo sampler declarations
 layout(binding = 0) uniform usampler2D     b_gbuffer; // G-buffer pack

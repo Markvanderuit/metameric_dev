@@ -139,6 +139,8 @@ namespace met {
     const auto &gbuffer = m_sampler_state_map->spp_curr == 0
                         ? m_gbuffer.render(sensor, scene)
                         : m_gbuffer.film();
+    
+    m_sampler_state.flush();
 
     // Bind required resources to their corresponding targets
     m_program.bind();
@@ -168,7 +170,8 @@ namespace met {
     gl::dispatch_compute(m_dispatch);
 
     // Advance sampler state for next iteration
-    next_sampler_state();
+    // next_sampler_state();
+    m_sampler_state_map->spp_curr += m_sampler_state_map->spp_per_iter;
 
     return m_film;
   }
