@@ -2,13 +2,15 @@
 #include <metameric/components/views/mesh_viewport/task_draw_direct.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/render/renderer.hpp>
+#include <metameric/render/sensor.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>
 
 namespace met {
   constexpr uint n_iters_per_dispatch = 64u;
-  constexpr uint n_iters_max          = 4096u;
+  constexpr uint n_iters_max          = 65536;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -36,6 +38,8 @@ namespace met {
 
     // Internal target texture; can be differently sized
     info("target").set<gl::Texture2d4f>({ });
+    info("direct_renderer").init<DirectRenderer>({ .spp_per_iter = n_iters_per_dispatch,
+                                                   .spp_max      = n_iters_max });
   }
     
   void MeshViewportDrawDirectTask::eval(SchedulerHandle &info) {
@@ -48,20 +52,28 @@ namespace met {
 
     // Get shared resources 
     const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
+    // const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
+    const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer_renderer").getr<detail::GBuffer>();
+    const auto &e_sensor  = info.relative("viewport_draw_gbuffer")("gbuffer_sensor").getr<Sensor>();
 
     // Get modified resources
     auto &i_target = info("target").getw<gl::Texture2d4f>();
+    auto &i_renderer = info("direct_renderer").getw<DirectRenderer>();
 
     // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
     bool restart_frame = arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings;
     
+    // Offload rendering
+    if (rebuild_frame || restart_frame)
+      i_renderer.reset(e_sensor, e_scene);
+    i_renderer.render(e_sensor, e_scene);
+
     // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
       // Resize internal state buffer and target accordingly
       const auto &e_target = target_handle.getr<gl::Texture2d4f>();
-      m_state_buffer = {{ .size = e_target.size().prod() * sizeof(eig::Array2u) }};
+      m_state_buffer = {{ .size = e_target.size().prod() * sizeof(uint) }};
       i_target       = {{ .size = e_target.size() }};
     }
 
@@ -70,7 +82,6 @@ namespace met {
       // Push fresh camera matrix to uniform data
       const auto &e_arcball = arcball_handle.getr<detail::Arcball>();
       m_unif_buffer_map->trf = e_arcball.full().matrix();
-      m_unif_buffer_map->inv = e_arcball.full().inverse().matrix().eval();
 
       // Set cumulative frame to 0
       i_target.clear();
@@ -94,11 +105,11 @@ namespace met {
     m_unif_buffer.flush();
 
     // Bind required resources to their corresponding targets
-    m_program.bind("b_buff_unif",      m_unif_buffer);
+    m_program.bind("b_buff_sensor",    e_sensor.buffer());
     m_program.bind("b_buff_sampler",   m_sampler_buffer);
     m_program.bind("b_buff_state",     m_state_buffer);
     m_program.bind("b_target_4f",      i_target);
-    m_program.bind("b_gbuffer",        e_gbuffer);
+    m_program.bind("b_gbuffer",        e_gbuffer.film());
     m_program.bind("b_buff_weights",   e_scene.components.upliftings.gl.texture_weights.buffer());
     m_program.bind("b_bary_4f",        e_scene.components.upliftings.gl.texture_weights.texture());
     m_program.bind("b_spec_4f",        e_scene.components.upliftings.gl.texture_spectra);
@@ -107,6 +118,8 @@ namespace met {
     m_program.bind("b_buff_bvhs_info", e_scene.resources.meshes.gl.mesh_info);
     m_program.bind("b_buff_bvhs_node", e_scene.resources.meshes.gl.bvh_nodes);
     m_program.bind("b_buff_bvhs_prim", e_scene.resources.meshes.gl.bvh_prims);
+    m_program.bind("b_buff_mesh_vert", e_scene.resources.meshes.gl.mesh_verts);
+    m_program.bind("b_buff_mesh_elem", e_scene.resources.meshes.gl.mesh_elems_al);
     m_program.bind("b_buff_textures",  e_scene.resources.images.gl.texture_info);
     m_program.bind("b_txtr_1f",        e_scene.resources.images.gl.texture_atlas_1f.texture());
     m_program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());

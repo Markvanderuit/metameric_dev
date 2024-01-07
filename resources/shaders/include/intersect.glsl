@@ -183,15 +183,16 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
       for (uint i = 0; i < bvh_size(node); ++i) {
         // Index of next prim in buffer
         uint prim_i = isct_buff_bvhs_info[bvh_i].prims_offs 
-                    + bvh_offs(node) + i;
+                    + bvh_offs(node) 
+                    + i;
 
         // Obtain and unpack next prim
         BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
-          set_ray_data_prim(ray, prim_i);
-          hit       = true;
+          set_ray_data_prim(ray, prim_i - isct_buff_bvhs_info[bvh_i].prims_offs);
+          hit = true;
         }
       }
     } else {
@@ -220,16 +221,11 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
   
   if (!object_info.is_active)
     return false;
-
-  // TODO streamline this stuff
-  // Setup transformation to take world space ray into local space
-  mat4 trf = object_info.trf * mesh_info.trf;
-  mat4 inv = inverse(trf);
   
   // Generate object space ray
   Ray ray_object;
-  ray_object.o = (inv * vec4(ray.o, 1)).xyz;
-  ray_object.d = (inv * vec4(ray.d, 0)).xyz;
+  ray_object.o = (object_info.trf_inv * vec4(ray.o, 1)).xyz;
+  ray_object.d = (object_info.trf_inv * vec4(ray.d, 0)).xyz;
   
   // Get length and normalize direction
   // Reuse length to adjust ray_object.t if ray.t is not at infty
@@ -246,16 +242,11 @@ void ray_isct_object(inout Ray ray, uint object_i) {
   
   if (!object_info.is_active)
     return;
-  
-  // TODO streamline this stuff
-  // Setup transformation to take world space ray into local space
-  mat4 trf = object_info.trf * mesh_info.trf;
-  mat4 inv = inverse(trf);
 
   // Generate object space ray
   Ray ray_object;
-  ray_object.o = (inv * vec4(ray.o, 1)).xyz;
-  ray_object.d = (inv * vec4(ray.d, 0)).xyz;
+  ray_object.o = (object_info.trf_inv * vec4(ray.o, 1)).xyz;
+  ray_object.d = (object_info.trf_inv * vec4(ray.d, 0)).xyz;
   
   // Get length and normalize direction
   // Reuse length to adjust ray_object.t if ray.t is not at infty
@@ -266,7 +257,7 @@ void ray_isct_object(inout Ray ray, uint object_i) {
   // Run intersection; on a hit, recover world-space distance,
   // and store intersection data in ray
   if (ray_isct_bvh(ray_object, object_info.mesh_i)) {
-    ray.t    = length((trf * vec4(ray_object.d * ray_object.t, 0)).xyz);
+    ray.t    = length((object_info.trf * vec4(ray_object.d * ray_object.t, 0)).xyz);
     ray.data = ray_object.data;
     set_ray_data_objc(ray, object_i);
   }

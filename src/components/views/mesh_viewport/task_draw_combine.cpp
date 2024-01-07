@@ -2,6 +2,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/render/renderer.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>
@@ -35,10 +36,11 @@ namespace met {
 
     // Get shared resources 
     const auto &e_scene  = info.global("scene").getr<Scene>();
-    const auto &e_direct = info.relative("viewport_draw_direct")("target").getr<gl::Texture2d4f>();
+    // const auto &e_direct = info.relative("viewport_draw_direct")("target").getr<gl::Texture2d4f>();
     // const auto &e_raytrace = info.relative("viewport_draw_raytrace")("target").getr<gl::Texture2d4f>();
     // const auto &e_indrct = info.relative("viewport_draw_indrct")("target").getr<gl::Texture2d4f>();
     const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_direct = info.relative("viewport_draw_direct")("direct_renderer").getr<DirectRenderer>();
 
     // Specify dispatch size
     auto dispatch_n    = e_target.size();
@@ -51,7 +53,8 @@ namespace met {
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif", m_unif_buffer);
     // m_program.bind("b_direct_4f", e_raytrace);
-    m_program.bind("b_direct_4f", e_direct);
+    // m_program.bind("b_direct_4f", e_direct);
+    m_program.bind("b_direct_4f", e_direct.film());
     // m_program.bind("b_indrct_4f", e_indrct);
     m_program.bind("b_target_4f", e_target);
 

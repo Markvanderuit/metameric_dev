@@ -20,30 +20,30 @@ layout(binding = 0) uniform b_unif {
 layout(binding = 1, rgba32f) restrict uniform image2D i_target;
 
 void main() {  
-  const uvec2 i = gl_GlobalInvocationID.xy;
-  const uint  j = i.y * unif_in.dims.x + i.x;
-  guard(all(lessThan(i, unif_in.dims)));
+  // const uvec2 i = gl_GlobalInvocationID.xy;
+  // const uint  j = i.y * unif_in.dims.x + i.x;
+  // guard(all(lessThan(i, unif_in.dims)));
 
-  uint iter = unif_in.iter;
+  // uint iter = unif_in.iter;
 
-  uvec3 state = uvec3(i, 0);
-  vec3 value = vec3(0);
-  if (iter != 0) {
-    state = uvec3(state_buffer.data[j], unif_in.iter);
-    value = imageLoad(i_target, ivec2(i)).xyz;
-  }
+  // uvec3 state = uvec3(i, 0);
+  // vec3 value = vec3(0);
+  // if (iter != 0) {
+  //   state = uvec3(state_buffer.data[j], unif_in.iter);
+  //   value = imageLoad(i_target, ivec2(i)).xyz;
+  // }
 
-  for (uint k = 0; k < unif_in.n_iters; ++k) {
-    vec3 next = next_3d(state);
-    if (iter == 0) {
-      value = next;
-    } else {
-      value = ((value * vec3(iter)) + next) / vec3(iter + 1);
-    }
-    iter++;
-  } // for (uint k)
+  // for (uint k = 0; k < unif_in.n_iters; ++k) {
+  //   vec3 next = next_3d(state);
+  //   if (iter == 0) {
+  //     value = next;
+  //   } else {
+  //     value = ((value * vec3(iter)) + next) / vec3(iter + 1);
+  //   }
+  //   iter++;
+  // } // for (uint k)
 
-  // Store current sampler state and result
-  state_buffer.data[j] = state.xy;
-  imageStore(i_target, ivec2(i), vec4(vec3(value), 1));
+  // // Store current sampler state and result
+  // state_buffer.data[j] = state.xy;
+  // imageStore(i_target, ivec2(i), vec4(vec3(value), 1));
 }

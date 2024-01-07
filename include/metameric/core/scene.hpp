@@ -19,6 +19,7 @@ namespace met {
   constexpr static uint max_supported_meshes     = MET_SUPPORTED_MESHES;
   constexpr static uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
   constexpr static uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
+  constexpr static uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
 
   /* Scene data layout.
      Simple indexed scene; no graph, just a library of objects and 
@@ -65,8 +66,8 @@ namespace met {
     } resources;
 
     void update() {
-      components.update(*this);
       resources.update(*this);
+      components.update(*this);
     }
     
   public: // Save state and IO handling

@@ -111,7 +111,7 @@ namespace met::detail {
     std::vector<met::BVH>  m_bvhs;
 
     // Mapped buffer accessors
-    uint*                      m_buffer_layout_map_size;
+    uint*                     m_buffer_layout_map_size;
     std::span<MeshInfoLayout> m_buffer_layout_map_data;
 
   public:
@@ -135,6 +135,8 @@ namespace met::detail {
     gl::Array array;
     std::vector<gl::MultiDrawInfo::DrawCommand> draw_commands;
     
+    // Cache of mesh transforms, pre-applied to object transforms
+    std::vector<eig::Matrix4f> transforms;
   public:
     GLPacking();
     void update(std::span<const detail::Resource<met::Mesh>>, const Scene &);

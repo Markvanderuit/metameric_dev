@@ -7,26 +7,42 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/renderbuffer.hpp>
-#include <small_gl/texture.hpp>
 
 namespace met {
   namespace detail {
     // Renderer base class
     class BaseRenderer {
     protected:
-      gl::Texture2d4f m_output;
+      gl::Texture2d4f m_film; // Color render target
 
-    public: // Output target management
-      const gl::Texture2d4f &output() const {
-        return m_output;
-      }
+    public:
+      const gl::Texture2d4f &film() const { return m_film; }
 
-      void resize_output(const eig::Array2u &size) {
-        m_output = {{ .size = size }};
-      }
+      virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) = 0;
+      virtual void reset(const Sensor &sensor, const Scene &scene) = 0;
     };
 
-    // Render target base class; a render target can be anything
+    class BaseIntegrationRenderer : public BaseRenderer {
+      struct SamplerState {
+        alignas(4) uint spp_per_iter;
+        alignas(4) uint spp_curr;
+      };
+      
+    protected:
+      uint          m_spp_max;
+      gl::Buffer    m_sampler_data;
+      gl::Buffer    m_sampler_state;
+      SamplerState *m_sampler_state_map;
+
+      void init_sampler_state(uint num_pixels);
+      bool has_next_sampler_state() const;
+      void next_sampler_state();
+
+    public:
+      BaseIntegrationRenderer();
+    };
+
+    /* // Render target base class; a render target can be anything
     // the renderer may wish to write to, such as a film, texture, or other image type. In our
     // case, it might also be path storage buffers for building cached raytracing kernels.
     struct BaseRenderTarget {
@@ -39,82 +55,74 @@ namespace met {
 
     struct PathKernelRenderTarget : BaseRenderTarget {
 
-    };
+    }; */
 
-
-    struct BaseIntegrationRenderer : public BaseRenderer {
-      // Reset internal state so the output image is blank
-      // and the next sample is the first to be taken
-      virtual void reset() = 0;
-
-      // Take a sample and add it into the output image
-      // virtual void sample(SceneResourceHandles scene_handles) = 0;
-    };
     
-    class GBufferRenderer : public BaseRenderer {
+    // Helper class to build a quick first-intersection gbuffer
+    class GBuffer : public BaseRenderer {
       using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
-      
-      struct UnifLayout { eig::Matrix4f trf; };
 
-      UnifLayout       *m_unif_buffer_map;
-      gl::Buffer        m_unif_buffer;
       Depthbuffer       m_fbo_depth;
       gl::Framebuffer   m_fbo;
       gl::Program       m_program;
       gl::MultiDrawInfo m_draw;
 
     public:
-      // GBufferRenderer(const Scene &scene, const Sensor &sensor);
-      
-      // void render(SceneResourceHandles scene_handles);
+      GBuffer();
+
+      const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
+      void reset(const Sensor &sensor, const Scene &scene) override;
     };
   } // namespace detail
 
   struct DirectRendererCreateInfo {
-    // Relevant scene data
-    const Scene  &scene;
-    const Sensor &sensor;
+    // Number of samples per pixel when a renderer primitive is invoked
+    uint spp_per_iter = 1;
 
-    // Number of samples taken on calls of renderer.sample().
-    uint samples_per_iter = 1;
-
-    // The renderer will only render up to 'max_samples' on calls of renderer.sample(). Afterwards,
-    // the current rendered image will simply be returned immediately. If set to 0, this does not
-    // occur.
-    uint max_samples = 0;
+    // Renderer primitives will accumulate up to this number. Afterwards
+    // the target is left unmodified. If set to 0, no limit is imposed.
+    uint spp_max = std::numeric_limits<uint>::max();
   };
 
-  struct PathRendererCreateInfo {
-    uint max_depth = 10;
-    // ...
-  };
-
-  struct DirectRenderer : public detail::BaseIntegrationRenderer {
-    detail::GBufferRenderer m_gbuffer;
-
+  class DirectRenderer : public detail::BaseIntegrationRenderer {
+    detail::GBuffer m_gbuffer;
+    
   public:
     using InfoType = DirectRendererCreateInfo;
+    
+    gl::Program     m_program;
+    gl::ComputeInfo m_dispatch;
 
   public:
     DirectRenderer(DirectRendererCreateInfo info);
 
-
-    void reset() override;
-    // void sample(SceneResourceHandles scene_handles) override;
+    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
+    void reset(const Sensor &sensor, const Scene &scene) override;
   };
 
-  struct PathRenderer : public detail::BaseIntegrationRenderer {
-    detail::GBufferRenderer  m_gbuffer;
+  /* struct PathRendererCreateInfo {
+    // Number of samples per pixel when a renderer primitive is invoked
+    uint spp = 1;
+
+    // Renderer primitives will accumulate up to this number. Afterwards
+    // the target is left unmodified. If set to 0, no limit is imposed.
+    uint spp_max = std::numeric_limits<uint>::max();
+
+    // ...
+    uint path_depth = 10;
+  }; */
+
+  /* class PathRenderer {
+    detail::GBuffer  m_gbuffer;
     // RayIntersectAnyPrimitive m_ray_intersect_any;
     // RayIntersectPrimitive    m_ray_intersect;
 
   public:
     using InfoType = PathRendererCreateInfo;
 
-  public:
     PathRenderer(PathRendererCreateInfo info);
-    
-    void reset() override;
-    // void sample(SceneResourceHandles scene_handles) override;
-  };
+
+    void render(Sensor    &sensor, const Scene &scene) const;
+    void render(PathCache &paths,  const Scene &scene) const;
+  }; */
 } // namespace met

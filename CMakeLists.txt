@@ -22,6 +22,7 @@ set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supp
 set(MET_SUPPORTED_MESHES    32)
 set(MET_SUPPORTED_OBJECTS   32)
 set(MET_SUPPORTED_UPLIFTINGS 8)
+set(MET_SUPPORTED_TEXTURES   256)
 
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")
@@ -124,6 +125,7 @@ set(glsl_defines
   -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
   -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
+  -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
 
 # Recursively find all shader files
@@ -312,6 +314,7 @@ target_compile_definitions(core PUBLIC
   MET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
   MET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   MET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
+  MET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
 

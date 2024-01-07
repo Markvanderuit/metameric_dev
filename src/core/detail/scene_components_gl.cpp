@@ -134,9 +134,12 @@ namespace met::detail {
       // Get relevant texture info
       bool is_albedo_sampled = object.diffuse.index() != 0;
 
+      // Get mesh transform, incorporate into gl-side object transform
+      auto mesh_trf = scene.resources.meshes.gl.transforms[object.mesh_i];
+
       m_buffer_map_data[i] = {
-        .trf         = object.trf.matrix(),
-        .trf_inv     = object.trf.inverse().matrix(),
+        .trf         = (object.trf.matrix() * mesh_trf).eval(),
+        .trf_inv     = (object.trf.matrix() * mesh_trf).inverse().eval(),
 
         // Fill shape data
         .is_active   = object.is_active,
@@ -287,6 +290,7 @@ namespace met::detail {
     // Resize cache vectors, which keep cleaned, simplified mesh data around 
     m_meshes.resize(meshes.size());
     m_bvhs.resize(meshes.size());
+    transforms.resize(meshes.size());
 
     // Generate cleaned, simplified mesh data
     #pragma omp parallel for
@@ -295,13 +299,14 @@ namespace met::detail {
       guard_continue(state);
 
       // Simplified copy of mesh, inverse matrix to undo [0, 1] packing, and acceleration structure
-      auto [copy, inv] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-4));
+      auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-4));
       auto bvh         = create_bvh({ .mesh = copy, .n_node_children = 8, .n_leaf_children = 3 });
 
       // Store both processed mesh and bvh
-      m_meshes[i]                = copy;
-      m_bvhs[i]                  = bvh;
-      m_buffer_layout_map_data[i].trf = inv;
+      m_meshes[i]   = copy;
+      m_bvhs[i]     = bvh;
+      transforms[i] = trf;
+      m_buffer_layout_map_data[i].trf = trf;
     }
 
     // Set appropriate mesh count in buffer
@@ -364,7 +369,9 @@ namespace met::detail {
         // Pack primitive data tightly and copy to the correctly offset range
         // while scattering data into leaf node order for the BVH
         // #pragma omp parallel for
+        #pragma omp parallel for
         for (int j = 0; j < bvh.prims.size(); ++j) {
+          // BVH primitives are packed in bvh order
           auto el = mesh.elems[bvh.prims[j]];
           prims_packed[elems_offs[i] + j] = {
             .v0 = pack(mesh.verts[el[0]], mesh.norms[el[0]], mesh.txuvs[el[0]]),
@@ -372,7 +379,7 @@ namespace met::detail {
             .v2 = pack(mesh.verts[el[2]], mesh.norms[el[2]], mesh.txuvs[el[2]])
           };
         }
-
+        
         // Copy element indices and adjust to refer to the correctly offset range
         rng::transform(mesh.elems, elems_packed.begin() + elems_offs[i], 
           [o = verts_offs[i]](const auto &v) -> eig::AlArray3u { return v + o; });
@@ -383,8 +390,8 @@ namespace met::detail {
 
       // Copy data to buffers
       mesh_verts    = {{ .data = cnt_span<const std::byte>(verts_packed)    }};
-      bvh_prims    = {{ .data = cnt_span<const std::byte>(prims_packed)    }};
-      bvh_nodes    = {{ .data = cnt_span<const std::byte>(nodes_packed)    }};
+      bvh_prims     = {{ .data = cnt_span<const std::byte>(prims_packed)    }};
+      bvh_nodes     = {{ .data = cnt_span<const std::byte>(nodes_packed)    }};
       mesh_elems    = {{ .data = cnt_span<const std::byte>(elems_packed)    }};
       mesh_elems_al = {{ .data = cnt_span<const std::byte>(elems_packed_al) }};
     }

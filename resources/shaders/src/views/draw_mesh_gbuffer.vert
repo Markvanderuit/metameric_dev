@@ -43,6 +43,5 @@ void main() {
   // Vertex output is view * world * model * vertex input
   gl_Position = buff_unif.trf 
               * buff_objects.data[object_i].trf
-              * buff_meshes.data[mesh_i].trf
               * vec4(value_p, 1);
 }

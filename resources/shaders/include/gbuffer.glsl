@@ -4,8 +4,9 @@
 #include <math.glsl>
 
 struct GBufferRay {
-  vec3 p;    // World-space hit
-  uint data; // Data stores hit object/primitive ID
+  vec3 p;           // World-space hit
+  uint object_i;    // Index of hit object
+  uint primitive_i; // Index of hit primitive in object
 };
 
 // Basic G-Buffer representation
@@ -97,16 +98,19 @@ GBuffer decode_gbuffer(in uvec4 v, in vec2 xy, in mat4 d_inv) {
 }
 
 uvec4 pack_gbuffer_ray(in GBufferRay gb) {
-  return uvec4(floatBitsToUint(gb.p), gb.data);
+  return uvec4(
+    floatBitsToUint(gb.p),
+    (gb.object_i & 0x000000FF) << 24 | (gb.primitive_i & 0x00FFFFFF)
+  );
 }
 
 GBufferRay unpack_gbuffer_ray(in uvec4 v) {
-  GBufferRay gb = { uintBitsToFloat(v.xyz), v.y };
+  GBufferRay gb = { 
+    uintBitsToFloat(v.xyz), 
+    (v.w & 0xFF000000) >> 24,
+    (v.w & 0x00FFFFFF)
+  };
   return gb;
 }
-
-// Helper funtions to extract minor hit data from gbuffer
-uint get_gbuffer_data_prim(in GBufferRay gb) { return bitfieldExtract(gb.data, 0, 24); }
-uint get_gbuffer_data_objc(in GBufferRay gb) { return bitfieldExtract(gb.data, 24, 8); }
 
 #endif // GLSL_GBUFFER_GUARD

@@ -44,7 +44,7 @@ Ray get_gbuffer_ray(in uvec2 xy) {
   r.d /= r.t;
 
   // If the GBuffer did not identify an object id, we actually missed
-  if (get_gbuffer_data_objc(gb) == OBJECT_INVALID) {
+  if (gb.object_i == OBJECT_INVALID) {
     r.t = FLT_MAX;
   }
 

@@ -7,7 +7,7 @@
 namespace met {
   class MeshViewportDrawDirectTask : public detail::TaskNode {
     struct UnifLayout {
-      eig::Matrix4f trf, inv;
+      eig::Matrix4f trf;
       eig::Vector2u viewport_size;
     };
 

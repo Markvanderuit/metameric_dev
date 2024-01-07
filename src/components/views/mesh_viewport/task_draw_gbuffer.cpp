@@ -2,6 +2,8 @@
 #include <metameric/components/views/mesh_viewport/task_draw_gbuffer.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/render/renderer.hpp>
+#include <metameric/render/sensor.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 
@@ -47,7 +49,9 @@ namespace met {
       .bindable_program = &m_program,
     };
 
-    info("gbuffer").set<gl::Texture2d4f>({ }); // packed gbuffer texture
+    info("gbuffer").set<gl::Texture2d4f>({ });       // packed gbuffer texture
+    info("gbuffer_renderer").set<detail::GBuffer>({}); // packed gbuffer texture
+    info("gbuffer_sensor").set<Sensor>({}); // packed gbuffer texture
   }
     
   void MeshViewportDrawGBufferTask::eval(SchedulerHandle &info) {
@@ -59,12 +63,12 @@ namespace met {
 
     // Get shared resources 
     const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_objects = e_scene.components.objects;
-    const auto &e_meshes  = e_scene.resources.meshes;
+    // const auto &e_objects = e_scene.components.objects;
+    // const auto &e_meshes  = e_scene.resources.meshes;
     const auto &e_arcball = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
     const auto &e_target  = target_handle.getr<gl::Texture2d4f>();
 
-    // Rebuild framebuffer and g-buffer textures if necessary
+    /* // Rebuild framebuffer and g-buffer textures if necessary
     if (!m_fbo.is_init() || (m_fbo_depth.size() != e_target.size()).any()) {
       // Get write-handles to g-buffer textures
       auto &i_gbuffer = info("gbuffer").getw<gl::Texture2d4f>();
@@ -76,15 +80,28 @@ namespace met {
       // Rebuild framebuffer
       m_fbo = {{ .type = gl::FramebufferType::eColor, .attachment = &i_gbuffer   },
                { .type = gl::FramebufferType::eDepth, .attachment = &m_fbo_depth }};
-    }
+    } */
+
+
 
     // Push camera matrix to uniform data
     if (target_handle.is_mutated() || arcball_handle.is_mutated()) {
-      m_unif_buffer_map->trf = e_arcball.full().matrix();
-      m_unif_buffer.flush();
+      /* m_unif_buffer_map->trf = e_arcball.full().matrix();
+      m_unif_buffer.flush(); */
     }
+
     
-    // Assemble appropriate draw data for each object in the scene
+    auto &i_sensor  = info("gbuffer_sensor").getw<Sensor>();
+    auto &i_gbuffer = info("gbuffer_renderer").getw<detail::GBuffer>();
+
+    i_sensor.film_size = e_target.size();
+    i_sensor.transform = e_arcball.full().matrix();
+    i_sensor.flush();
+    
+    // Forward to gbuffer draw
+    i_gbuffer.render(i_sensor, e_scene);
+
+    /* // Assemble appropriate draw data for each object in the scene
     m_draw.bindable_array = &e_scene.resources.meshes.gl.array;
     m_draw.commands.resize(e_objects.size());
     rng::transform(e_objects, m_draw.commands.begin(), [&](const auto &comp) {
@@ -107,6 +124,6 @@ namespace met {
                              gl::BarrierFlags::eTextureFetch       |
                              gl::BarrierFlags::eClientMappedBuffer |
                              gl::BarrierFlags::eUniformBuffer      );
-    gl::dispatch_multidraw(m_draw);
+    gl::dispatch_multidraw(m_draw); */
   }
 } // namespace met

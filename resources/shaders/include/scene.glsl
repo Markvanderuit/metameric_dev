@@ -1,6 +1,12 @@
 #ifndef SCENE_GLSL_GUARD
 #define SCENE_GLSL_GUARD
 
+// Define metameric's scene layout
+const uint max_supported_meshes     = MET_SUPPORTED_MESHES;
+const uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
+const uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
+const uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
+
 // Info object for referred mesh.bvh data
 struct MeshInfo {
   mat4 trf;

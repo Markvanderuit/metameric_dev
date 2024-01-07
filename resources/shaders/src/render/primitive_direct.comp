@@ -1,6 +1,7 @@
 #include <preamble.glsl>
 #include <guard.glsl>
 #include <bvh.glsl>
+#include <gbuffer.glsl>
 #include <math.glsl>
 #include <random_uniform.glsl>
 #include <spectrum.glsl>
@@ -13,42 +14,42 @@ layout(std430) buffer;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
-  mat4  sensor_trf; 
+  mat4  sensor_trf;
   uvec2 film_size; 
 } buff_sensor;
-layout(binding = 1) uniform b_buff_sampler {
-  uint iter;
-  uint n_iters_per_dispatch;
-} buff_sampler;
+layout(binding = 1) uniform b_buff_sampler_state {
+  uint spp_per_iter;
+  uint spp_curr;
+} buff_sampler_state;
 layout(binding = 2) uniform b_buff_objects {
   uint n;
   ObjectInfo data[max_supported_objects];
 } buff_objects;
-layout(binding = 3) uniform b_buff_bvhs_info {
+layout(binding = 3) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
-} buff_bvhs_info;
+} buff_meshes;
 layout(binding = 4) uniform b_buff_textures {
-  TextureInfo[max_supported_textures] data;
+  TextureInfo data[max_supported_textures];
 } buff_textures;
+layout(binding = 5) uniform b_buff_weights {
+  AtlasLayout data[max_supported_objects];
+} buff_weights;
 
 // Storage buffer declarations
-layout(binding = 0) restrict buffer b_buff_state {
+layout(binding = 0) restrict buffer b_buff_sampler_data {
   uint data[];
-} buff_state;
-layout(binding = 1) restrict readonly buffer b_buff_weights {
-  AtlasLayout data[];
-} buff_weights;
-layout(binding = 2) restrict readonly buffer b_buff_bvhs_node {
+} buff_sampler_data;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
 } buff_bvhs_node;
-layout(binding = 3) restrict readonly buffer b_buff_bvhs_prim {
+layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim {
   BVHPrimPack data[];
 } buff_bvhs_prim;
-layout(binding = 4) restrict readonly buffer b_buff_mesh_vert {
+layout(binding = 3) restrict readonly buffer b_buff_mesh_vert {
   BVHVertPack data[];
 } buff_mesh_vert;
-layout(binding = 5) restrict readonly buffer b_buff_mesh_elem {
+layout(binding = 4) restrict readonly buffer b_buff_mesh_elem {
   uvec3 data[];
 } buff_mesh_elem;
 
@@ -60,14 +61,13 @@ layout(binding = 3) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
 layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
 layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
- 
+
 // Image unit, output declaration
-layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
+layout(binding = 0, rgba32f) uniform restrict image2D b_film;
 
 // Shared memory declarations
-// TODO remove
 shared ObjectInfo s_objc_info[max_supported_objects];
-shared MeshInfo   s_bvhs_info[max_supported_meshes];
+shared MeshInfo   s_mesh_info[max_supported_meshes];
 shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // Define names of scene buffers to replace preproc in intersect.glsl
@@ -75,16 +75,18 @@ shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define isct_n_objects      buff_objects.n
 #define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
 #define isct_buff_objc_info s_objc_info
-#define isct_buff_bvhs_info s_bvhs_info
+#define isct_buff_bvhs_info s_mesh_info
 #define isct_buff_bvhs_node buff_bvhs_node.data
 #define isct_buff_bvhs_prim buff_bvhs_prim.data
+#include <intersect.glsl>
+
+// Define names of scene buffers to replace preproc in surface.glsl
+// to work around glsl's lack of ssbo argument passing
 #define srfc_buff_prim      buff_bvhs_prim.data
 #define srfc_buff_vert      buff_mesh_vert.data
 #define srfc_buff_elem      buff_mesh_elem.data
-#define srfc_buff_mesh_info s_bvhs_info
 #define srfc_buff_objc_info s_objc_info
-#include <intersect.glsl>
-#include <surface.glsl>
+#define srfc_buff_mesh_info s_mesh_info
 #include <surface_from_gbuffer.glsl>
 
 // Hardcoded value for now
@@ -94,8 +96,8 @@ void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
   }
-  for (uint i = gl_LocalInvocationID.x; i < buff_bvhs_info.n; i += gl_WorkGroupSize.x) {
-    s_bvhs_info[i] = buff_bvhs_info.data[i];
+  for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
+    s_mesh_info[i] = buff_meshes.data[i];
   }
   memoryBarrierShared();
   barrier();
@@ -133,7 +135,7 @@ vec3 fetch_color_part(inout uint state, in SurfaceInfo si, in uvec3 px) {
   vec4 bary = texelFetch(b_bary_4f, ivec3(px), 0);
   
   // Take direct light samples
-  for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+  for (uint i = 0; i < buff_sampler_state.spp_per_iter; ++i) {
     // Sample next wavelength
     float wvl = next_1d(state); 
     
@@ -179,7 +181,7 @@ vec3 sample_color(inout uint state, in ObjectInfo object_info, in vec3 tx_bary, 
   vec4 bary = textureLod(b_bary_4f, tx_bary, 0);
   
   // Take direct light samples
-  for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+  for (uint i = 0; i < buff_sampler_state.spp_per_iter; ++i) {
     // Sample next wavelength
     float wvl = next_1d(state); 
     
@@ -212,7 +214,7 @@ bool test_visibility(inout uint state, in SurfaceInfo si) {
   ray.o = si.p + 0.001f * si.n;
 
   // Mistake; gbuffer normal is not geometric normal!
-  // ray.o = si.p + gen_offset_p(si, ray.d);
+  // ray.o = gen_offset_p(si, ray.d);
 
   return !ray_intersect_any(ray);
 }
@@ -226,16 +228,16 @@ void main() {
   guard(all(lessThan(i, buff_sensor.film_size)));
 
   // Initialize sampler state, or load it if the frame is cumulative
-  uint state = j;
-  if (buff_sampler.iter != 0)
-    state = buff_state.data[j];
+  uint state = buff_sampler_state.spp_curr == 0
+             ? j                          // Initial sample state is pixel index
+             : buff_sampler_data.data[j]; // Initial sample state is from previous frame
 
   // Obtain surface information from a first ray hit, by extracting data from a gbuffer
   SurfaceInfo si = sample_gbuffer(i);
 
   // If no object is visible, set to black and early-out
   if (si.object_i == OBJECT_INVALID) {
-    imageStore(b_target_4f, ivec2(i), vec4(0, 0, 0, 1));
+    imageStore(b_film, ivec2(i), vec4(0, 0, 0, 1));
     return;
   }
 
@@ -249,9 +251,9 @@ void main() {
   vec3 tx_uv = vec3(bary_layout.uv0 + bary_layout.uv1 * tx_si, bary_layout.layer);
 
   // Initialize image value, or load prior if the frame is cumulative
-  vec3 value = vec3(0);
-  if (buff_sampler.iter != 0)
-    value = imageLoad(b_target_4f, ivec2(i)).xyz * float(buff_sampler.iter);
+  vec3 value = buff_sampler_state.spp_curr == 0 
+             ? vec3(0)
+             : imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
 
   if (test_visibility(state, si)) {
     uvec4 indices = sample_uplift_bary_indices(object_info, tx_uv);
@@ -265,9 +267,9 @@ void main() {
   }
 
   // Reweight image value by actual nr. of samples
-  value /= float(buff_sampler.iter + buff_sampler.n_iters_per_dispatch);
-
+  value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+  
   // Store updated image value and sampler state
-  imageStore(b_target_4f, ivec2(i), vec4(value, 1));
-  buff_state.data[j] = state;
+  imageStore(b_film, ivec2(i), vec4(value, 1));
+  buff_sampler_data.data[j] = state;
 }
