@@ -7,6 +7,7 @@
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/renderbuffer.hpp>
+#include <small_gl/utility.hpp>
 
 namespace met {
   namespace detail {
@@ -28,34 +29,26 @@ namespace met {
         alignas(4) uint spp_curr;
       };
       
-    protected:
-      uint          m_spp_max;
-      gl::Buffer    m_sampler_data;
-      gl::Buffer    m_sampler_state;
-      SamplerState *m_sampler_state_map;
+      // Rolling set of mapped buffers that track incrementing sampler state over several frames
+      std::array<gl::Buffer,      6> m_sampler_state_buffs;
+      std::array<SamplerState *,  6> m_sampler_state_mapps;
+      std::array<gl::sync::Fence, 6> m_sampler_state_syncs;
+      uint                           m_sampler_state_i;
 
-      void init_sampler_state(uint num_pixels);
-      bool has_next_sampler_state() const;
-      void next_sampler_state();
+    protected:
+      virtual void reset(const Sensor &sensor, const Scene &scene) override;
+
+      void advance_sampler_state();
+      const gl::Buffer &get_sampler_state();
+
+      uint          m_spp_max;
+      uint          m_spp_curr;
+      uint          m_spp_per_iter;
+      gl::Buffer    m_sampler_data;
 
     public:
       BaseIntegrationRenderer();
     };
-
-    /* // Render target base class; a render target can be anything
-    // the renderer may wish to write to, such as a film, texture, or other image type. In our
-    // case, it might also be path storage buffers for building cached raytracing kernels.
-    struct BaseRenderTarget {
-
-    };
-
-    struct TextureRenderTarget : BaseRenderTarget {
-
-    };
-
-    struct PathKernelRenderTarget : BaseRenderTarget {
-
-    }; */
 
     
     // Helper class to build a quick first-intersection gbuffer
@@ -96,33 +89,34 @@ namespace met {
   public:
     DirectRenderer(DirectRendererCreateInfo info);
 
-    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
     void reset(const Sensor &sensor, const Scene &scene) override;
+    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
   };
 
-  /* struct PathRendererCreateInfo {
+  struct PathRendererCreateInfo {
     // Number of samples per pixel when a renderer primitive is invoked
-    uint spp = 1;
+    uint spp_per_iter = 1;
 
     // Renderer primitives will accumulate up to this number. Afterwards
     // the target is left unmodified. If set to 0, no limit is imposed.
     uint spp_max = std::numeric_limits<uint>::max();
+  };
 
-    // ...
-    uint path_depth = 10;
-  }; */
-
-  /* class PathRenderer {
-    detail::GBuffer  m_gbuffer;
-    // RayIntersectAnyPrimitive m_ray_intersect_any;
-    // RayIntersectPrimitive    m_ray_intersect;
-
+  class PathRenderer : public detail::BaseIntegrationRenderer {
+    detail::GBuffer m_gbuffer;
+    
   public:
     using InfoType = PathRendererCreateInfo;
+    
+    gl::Program     m_program;
+    gl::ComputeInfo m_dispatch;
 
+  public:
     PathRenderer(PathRendererCreateInfo info);
 
-    void render(Sensor    &sensor, const Scene &scene) const;
-    void render(PathCache &paths,  const Scene &scene) const;
-  }; */
+    void reset(const Sensor &sensor, const Scene &scene) override;
+    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
+  };
+
+
 } // namespace met

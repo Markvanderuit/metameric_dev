@@ -9,10 +9,10 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  constexpr uint n_iters_per_dispatch = 64u;
+  constexpr uint n_iters_per_dispatch = 1u;
   constexpr uint n_iters_max          = 65536;
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+  constexpr auto buffer_create_flags  = gl::BufferCreateFlags::eMapWritePersistent;
+  constexpr auto buffer_access_flags  = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
   bool MeshViewportDrawDirectTask::is_active(SchedulerHandle &info) {
     met_trace();
@@ -24,7 +24,7 @@ namespace met {
   void MeshViewportDrawDirectTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Initialize program object
+    /* // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eCompute,
                    .spirv_path = "resources/shaders/views/draw_mesh_direct.comp.spv",
                    .cross_path = "resources/shaders/views/draw_mesh_direct.comp.json" }};
@@ -37,9 +37,9 @@ namespace met {
     m_sampler_buffer_map->n_iters_per_dispatch = n_iters_per_dispatch;
 
     // Internal target texture; can be differently sized
-    info("target").set<gl::Texture2d4f>({ });
-    info("direct_renderer").init<DirectRenderer>({ .spp_per_iter = n_iters_per_dispatch,
-                                                   .spp_max      = n_iters_max });
+    info("target").set<gl::Texture2d4f>({ }); */
+
+    info("direct_renderer").init<PathRenderer>({ .spp_per_iter = n_iters_per_dispatch,  .spp_max = n_iters_max });
   }
     
   void MeshViewportDrawDirectTask::eval(SchedulerHandle &info) {
@@ -53,23 +53,25 @@ namespace met {
     // Get shared resources 
     const auto &e_scene   = info.global("scene").getr<Scene>();
     // const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer").getr<gl::Texture2d4f>();
-    const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer_renderer").getr<detail::GBuffer>();
+    // const auto &e_gbuffer = info.relative("viewport_draw_gbuffer")("gbuffer_renderer").getr<detail::GBuffer>();
     const auto &e_sensor  = info.relative("viewport_draw_gbuffer")("gbuffer_sensor").getr<Sensor>();
 
     // Get modified resources
-    auto &i_target = info("target").getw<gl::Texture2d4f>();
-    auto &i_renderer = info("direct_renderer").getw<DirectRenderer>();
+    // auto &i_target = info("target").getw<gl::Texture2d4f>();
+    auto &i_renderer = info("direct_renderer").getw<PathRenderer>();
 
-    // Some state flags to test when to restart sampling
+   /*  // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
-    bool restart_frame = arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings;
-    
+    bool restart_frame = arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings; */
+
     // Offload rendering
-    if (rebuild_frame || restart_frame)
+    bool rerender = target_handle.is_mutated() || arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings;
+    if (rerender) {
       i_renderer.reset(e_sensor, e_scene);
+    }
     i_renderer.render(e_sensor, e_scene);
 
-    // Re-initialize state if target viewport is resized or needs initializing
+    /* // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
       // Resize internal state buffer and target accordingly
       const auto &e_target = target_handle.getr<gl::Texture2d4f>();
@@ -126,7 +128,7 @@ namespace met {
     m_program.bind("b_illm_1f",        e_scene.resources.illuminants.gl.spec_texture);
 
     // Dispatch compute shader
-    gl::sync::memory_barrier(gl::BarrierFlags::eShaderImageAccess  |
+    gl::sync::memory_barrier(gl::BarrierFlags::eImageAccess  |
                              gl::BarrierFlags::eTextureFetch       |
                              gl::BarrierFlags::eClientMappedBuffer |
                              gl::BarrierFlags::eUniformBuffer      );
@@ -134,6 +136,6 @@ namespace met {
                            .groups_y         = dispatch_ndiv.y(),
                            .bindable_program = &m_program      });
 
-    m_iter += n_iters_per_dispatch;
+    m_iter += n_iters_per_dispatch; */
   }
 } // namespace met

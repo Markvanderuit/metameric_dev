@@ -71,7 +71,7 @@ SurfaceInfo get_surface_info(in Ray ray) {
   SurfaceInfo si;
   si.object_i = get_ray_data_objc(ray);
   
-  /* // On a valid surface, fill in surface info
+  // On a valid surface, fill in surface info
   if (si.object_i != OBJECT_INVALID) {
     ObjectInfo object_info = srfc_buff_objc_info[si.object_i];
     MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
@@ -95,7 +95,7 @@ SurfaceInfo get_surface_info(in Ray ray) {
     si.p  = (object_info.trf * vec4(si.p, 1)).xyz;
     si.n  = normalize((object_info.trf * vec4(si.n,  0)).xyz);
     si.ns = normalize((object_info.trf * vec4(si.ns, 0)).xyz);
-  } */
+  }
 
   return si;
 }

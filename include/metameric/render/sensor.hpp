@@ -5,11 +5,11 @@
 
 namespace met {
   struct Sensor {
-    // Target film resolution
-    eig::Array2u  film_size = { 1, 1 };
-
     // Underlying camera transform
     eig::Matrix4f transform = eig::Matrix4f::Identity();
+
+    // Target film resolution
+    eig::Array2u  film_size = { 1, 1 };
     
   private:
     struct UnifLayout { 
