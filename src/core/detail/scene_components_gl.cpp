@@ -299,7 +299,7 @@ namespace met::detail {
       guard_continue(state);
 
       // Simplified copy of mesh, inverse matrix to undo [0, 1] packing, and acceleration structure
-      auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-4));
+      auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-3));
       auto bvh         = create_bvh({ .mesh = copy, .n_node_children = 8, .n_leaf_children = 3 });
 
       // Store both processed mesh and bvh

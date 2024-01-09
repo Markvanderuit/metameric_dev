@@ -222,8 +222,8 @@ namespace met {
 
     // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/render/primitive_test.comp.spv",
-                   .cross_path = "resources/shaders/render/primitive_test.comp.json" }};
+                   .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
+                   .cross_path = "resources/shaders/render/primitive_path.comp.json" }};
 
     // Assign sampler configuration
     m_spp_curr     = 0;

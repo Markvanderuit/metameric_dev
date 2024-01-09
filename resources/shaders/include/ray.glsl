@@ -23,11 +23,16 @@ struct Ray {
 #define OBJECT_INVALID 0x000000FFu // 8 bits specifically, as we pack the index this precision
 
 // Helper funtions to embed minor hit data in ray padding
-void set_ray_data_prim(inout Ray ray, in uint i) { bitfieldInsert(ray.data, i, 0, 24); }
-void set_ray_data_objc(inout Ray ray, in uint i) { bitfieldInsert(ray.data, i, 24, 8); }
-uint get_ray_data_prim(in    Ray ray)            { return bitfieldExtract(ray.data, 0, 24); }
-uint get_ray_data_objc(in    Ray ray)            { return bitfieldExtract(ray.data, 24, 8); }
+// void set_ray_data_objc(inout Ray ray, in uint i) { bitfieldInsert(ray.data, i, 24, 8); }
+void set_ray_data_objc(inout Ray ray, in uint i) { ray.data = (ray.data & 0x00FFFFFF) | (i << 24);        }
+void set_ray_data_prim(inout Ray ray, in uint i) { ray.data = (ray.data & 0xFF000000) | (i & 0x00FFFFFF); }
+uint get_ray_data_objc(in    Ray ray)            { return (ray.data >> 24) & 0x000000FF; }
+uint get_ray_data_prim(in    Ray ray)            { return (ray.data & 0x00FFFFFF);       }
 void set_ray_data_anyh(inout Ray ray, in bool b) { ray.data = uint(b); }
+                  
+// uint get_ray_data_objc(in    Ray ray)            { return bitfieldExtract(ray.data, 24, 8); }
+// void set_ray_data_prim(inout Ray ray, in uint i) { bitfieldInsert(ray.data, i, 0, 24); }
+// uint get_ray_data_prim(in    Ray ray)            { return bitfieldExtract(ray.data, 0, 24); }
 
 // #define PARENS ()
 // #define EXPAND(...)  EXPAND4(EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__))))

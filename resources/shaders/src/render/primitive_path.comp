@@ -37,7 +37,7 @@ layout(binding = 4) uniform b_buff_textures {
 
 // Storage buffer declarations
 layout(binding = 0) restrict buffer b_buff_sampler_data {
-  uvec2 data[];
+  uint data[];
 } buff_sampler_data;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
@@ -100,7 +100,7 @@ shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #include <brdf.glsl>
 
 // Hardcoded value for now
-vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
+vec3 hardcoded_lpos = vec3(6, 4, 2);
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
@@ -113,18 +113,28 @@ void load_shared() {
   barrier();
 }
 
-uvec2 load_state() {
+uint load_state() {
   // Initial sample state is seeded from pixel index
   // Initialize sampler state, or load it if the frame is cumulative
-  uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
-  if (buff_sampler_state.spp_curr != 0)
-    return buff_sampler_data.data[i];
-  else
-    return (gl_GlobalInvocationID.xy % 256) /* * (buff_sampler_state.spp_curr + 1) */;
+  // uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
+  
+  
+  uvec2 block = gl_GlobalInvocationID.xy % 64;
+  uint  state = block.y * 64 + block.x;
+  state *= (buff_sampler_state.spp_curr + 1);
+  return state;
+
+  // if (buff_sampler_state.spp_curr != 0)
+  //   return buff_sampler_data.data[i];
+  // else
+  //   return i;
+
+    // return (gl_GlobalInvocationID.xy % 64) * (buff_sampler_state.spp_curr + 1);
+    // return i;
   //   return gl_GlobalInvocationID.xy;
 }
 
-void store_state(in uvec2 state) {
+void store_state(in uint state) {
   uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
   buff_sampler_data.data[i] = state;
 }
@@ -173,7 +183,7 @@ void main() {
   guard(all(lessThan(i, buff_sensor.film_size)));
 
   // Sampler state is based on 2d invocation index
-  uvec2 state = load_state();
+  uint state = load_state();
 
   // Path throughput information
   // bool did_scatter = false; // TODO unused until emitters are added
@@ -185,11 +195,9 @@ void main() {
   // Next path ray
   Ray ray;
 
-  const uint max_depth = 1;
-
   // Iterate up to maximum depth
-  uint depth = 0;
-  while (depth < max_depth) {
+  const uint max_depth = 8;
+  for (uint depth = 0; depth < max_depth; ++depth) {
     // Obtain surface information, either from gbuffer or ray hit
     SurfaceInfo si;
     if (depth == 0) {
@@ -224,7 +232,6 @@ void main() {
 
       // If no hit, add contribution
       if (!ray_intersect_any(shadow_ray)) {
-      // if (!ray_intersect_scene(shadow_ray)) {
         vec4 Le         = sample_emitter(0, wavelengths);
         float cos_theta = dot(si.ns, shadow_ray.d);
         if (cos_theta > 0)
@@ -235,24 +242,20 @@ void main() {
     // BSDF sampling
     {
       // Generate new ray // TODO sample brdf and not this junk
-      float cos_theta = -1.f;
-      while (cos_theta <= 0.f) {
-        Ray next_ray;
-        next_ray.d = normalize(2.f * next_3d(state) - 1.f);
-        next_ray.o = si.p + 0.01f * si.n;
-        next_ray.t = FLT_MAX;
-        cos_theta = dot(si.ns, next_ray.d);
-        ray = next_ray;
-      }
+      ray.d = normalize(2.f * next_3d(state) - 1.f);
+      ray.o = si.p + 0.001f * si.n;
+      ray.t = FLT_MAX;
+
+      float cos_theta = dot(si.ns, ray.d);
+      if (cos_theta <= 0.f)
+        break;
 
       throughput *= brdf.r * cos_theta;
     }
-    
-    depth++;
-  } // while (depth)
+  } // for (uint depth)
 
   // Integrate radiance over color system to get color
-  mat4x3 csys = sample_colsys(0, wavelengths) * 0.005f;
+  mat4x3 csys = sample_colsys(0, wavelengths) * 0.01f;
   vec3 value = csys * radiance;
 
   // Reweight with prior accumulated radiance
@@ -261,9 +264,7 @@ void main() {
     value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
   }
 
-  // value = vec3(float(depth) / float(max_depth));
-
   // Store updated image value and sample state
   imageStore(b_film, i, vec4(value, 1));
-  store_state(state);
+  // store_state(state);
 }
