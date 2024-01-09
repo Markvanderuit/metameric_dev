@@ -78,17 +78,11 @@ SurfaceInfo get_surface_info(in Ray ray) {
     ObjectInfo object_info = srfc_buff_objc_info[si.object_i];
     MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
 
-    // Obtain and unpack intersected primitive data
-    uvec3 el = srfc_buff_elem[mesh_info.prims_offs + get_ray_data_prim(ray)];
-    BVHPrim prim = { unpack(srfc_buff_vert[el[0]]), 
-                     unpack(srfc_buff_vert[el[1]]), 
-                     unpack(srfc_buff_vert[el[2]]) };
-
-    // // Obtain and unpack intersected primitive data
-    // BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + get_ray_data_prim(ray)]);
-
     // Compute model-space surface position
     vec3 p = (object_info.trf_inv * vec4(ray.o + ray.d * ray.t, 1)).xyz;
+
+    // Obtain and unpack intersected primitive data
+    BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + get_ray_data_prim(ray)]);
 
     // Compute geometric normal
     si.n = normalize(cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p));

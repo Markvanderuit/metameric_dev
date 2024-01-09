@@ -92,6 +92,23 @@ float sdot(in vec2 v) { return dot(v, v); }
 float sdot(in vec3 v) { return dot(v, v); }
 float sdot(in vec4 v) { return dot(v, v); }
 
+// iszero(...) for short, fast zero check
+
+#define IS_ZERO(type, n)                      \
+  bvec ## n iszero(in type ## vec ## n v) {   \
+    return equal(v, type ## vec ## n ##(0)); \
+  }
+
+#define IS_ZERO_ALL_N(type) \
+  IS_ZERO(type, 2)          \
+  IS_ZERO(type, 3)          \
+  IS_ZERO(type, 4)
+
+IS_ZERO_ALL_N( )
+IS_ZERO_ALL_N(d)
+IS_ZERO_ALL_N(i)
+IS_ZERO_ALL_N(u)
+
 // Swapping of vector objects
 
 #define SWAP_T(Ty)                        \

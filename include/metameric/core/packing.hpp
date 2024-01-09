@@ -248,12 +248,23 @@ namespace met {
 		u.in = i;
 		return eig::Array4f(u.out[0], u.out[1], u.out[2], u.out[3]) * 0.0039215686274509803921568627451f;
   }
+  
+  // Octagonal encoding for normal vectors; 3x32f -> 2x32f
+  inline
+  eig::Array2f pack_unorm_2x32_octagonal(eig::Array3f n) {
+    float l1 = n.abs().sum();
+    eig::Array2f v = n.head<2>() / n.abs().sum();
+    if (n.z() < 0.f)
+      v = (1.f - n.head<2>().reverse())
+        * (v.head<2>().unaryExpr([](float f) { return f >= 0.f ? 1.f : -1.f; }));
+    v = v * 0.5f + 0.5f;
+    return v;
+  }
 
   // Octagonal encoding for normal vectors; 3x32f -> 2x32f
   inline
-  eig::Array2f pack_snorm_2x32_octagonal(const eig::Array3f &n) {
-    float l1 = n.abs().sum();
-    eig::Array2f v = n.head<2>() * (1.f / l1);
+  eig::Array2f pack_snorm_2x32_octagonal(eig::Array3f n) {
+    eig::Array2f v = n.head<2>() / n.abs().sum();
     if (n.z() < 0.f)
       v = (1.f - n.head<2>().reverse())
         * (v.head<2>().unaryExpr([](float f) { return f >= 0.f ? 1.f : -1.f; }));
@@ -262,7 +273,18 @@ namespace met {
 
   // Octagonal decoding for normal vectors; 3x32f -> 2x32f
   inline
-  eig::Array3f unpack_snorm_3x32_octagonal(const eig::Array2f &v) {
+  eig::Array3f unpack_unorm_3x32_octagonal(eig::Array2f v) {
+    v = v * 2.f - 1.f;
+    eig::Array3f n = { v.x(), v.y(), 1.f - v.abs().sum() };
+    if (n.z() < 0.f)
+      n.head<2>() = (1.f - n.head<2>().reverse().abs())
+                  * (n.head<2>().unaryExpr([](float f) { return f >= 0.f ? 1.f : -1.f; }));
+    return n.matrix().normalized().eval();
+  }
+
+  // Octagonal decoding for normal vectors; 3x32f -> 2x32f
+  inline
+  eig::Array3f unpack_snorm_3x32_octagonal(eig::Array2f v) {
     eig::Array3f n = { v.x(), v.y(), 1.f - v.abs().sum() };
     if (n.z() < 0.f)
       n.head<2>() = (1.f - n.head<2>().reverse().abs())

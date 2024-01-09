@@ -26,20 +26,38 @@ vec2 signNotZero(vec2 v) {
 }
 
 // Octagonal encoding for normal vectors; 3x32f -> 2x32f
-vec2 encode_normal(vec3 n) {
-  float l1 = hsum(abs(n));
-  vec2 v = n.xy * (1.f / l1);
-  if (n.z < 0.0) {
-    v = (1.0 - abs(v.yx)) * signNotZero(v.xy);
+vec2 pack_snorm_2x32_octagonal(vec3 n) {
+  vec2 v = n.xy  / hsum(abs(n));
+  if (n.z < 0.f) {
+    v = (1.f - abs(v.yx)) * signNotZero(v.xy);
   }
   return v;
 }
 
+// Octagonal encoding for normal vectors; 3x32f -> 2x32f
+vec2 pack_unorm_2x32_octagonal(vec3 n) {
+  vec2 v = n.xy  / hsum(abs(n));
+  if (n.z < 0.f) {
+    v = (1.f - abs(v.yx)) * signNotZero(v.xy);
+  }
+  return v * 0.5f + 0.5f;
+}
+
 // Octagonal decoding for normal vectors; 3x32f -> 2x32f
-vec3 decode_normal(in vec2 v) {
-  vec3 n = vec3(v.x, v.y, 1.0 - abs(v.x) - abs(v.y));
-  if (n.z < 0) {
-    n.xy = (1.0 - abs(n.yx)) * signNotZero(n.xy);
+vec3 unpack_snorm_3x32_octagonal(in vec2 v) {
+  vec3 n = vec3(v.xy, 1.f - hsum(abs(v.xy)));
+  if (n.z < 0.f) {
+    n.xy = (1.f - abs(n.yx)) * signNotZero(n.xy);
+  }
+  return normalize(n);
+}
+
+// Octagonal decoding for normal vectors; 3x32f -> 2x32f
+vec3 unpack_unorm_3x32_octagonal(in vec2 v) {
+  v = v * 2.f - 1.f;
+  vec3 n = vec3(v.xy, 1.f - hsum(abs(v.xy)));
+  if (n.z < 0.f) {
+    n.xy = (1.f - abs(n.yx)) * signNotZero(n.xy);
   }
   return normalize(n);
 }
@@ -64,7 +82,7 @@ uvec4 encode_gbuffer(in float d, in vec3 n, in vec2 tx, in uint object_i) {
   uvec4 pack = uvec4(0);
 
   // 4 bytes, normal packs
-  pack.x = packSnorm2x16(encode_normal(n));
+  pack.x = packSnorm2x16(pack_unorm_2x32_octagonal(n));
 
   // 4 bytes, uv packing
   pack.y = packSnorm2x16(mod(tx, 1));
@@ -85,7 +103,7 @@ GBuffer decode_gbuffer(in uvec4 v, in vec2 xy, in mat4 d_inv) {
     return GBuffer(vec3(0), vec3(0), vec2(0), UINT_MAX);
 
   // Unpack encoded values and assign directly stored values
-  gb.n  = decode_normal(unpackSnorm2x16(v.x));
+  gb.n  = unpack_unorm_3x32_octagonal(unpackUnorm2x16(v.x));
   gb.tx = unpackSnorm2x16(v.y);
   gb.object_i = v.w;
 

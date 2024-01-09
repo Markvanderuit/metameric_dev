@@ -43,7 +43,7 @@ namespace met::detail {
     return VertexPack {
       .p0 = pack_unorm_2x16({ p.x(), p.y() }),
       .p1 = pack_unorm_2x16({ p.z(), 0.f   }),
-      .n  = pack_snorm_2x16(pack_snorm_2x32_octagonal(n)),
+      .n  = pack_unorm_2x16(pack_unorm_2x32_octagonal(n)),
       .tx = pack_unorm_2x16(tx_)
     };
   }

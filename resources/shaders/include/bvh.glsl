@@ -73,7 +73,7 @@ uint bvh_size(in BVHNode node) {
 BVHVert unpack(in BVHVertPack p) {
   BVHVert o;
   o.p  = vec3(unpackUnorm2x16(p.p0), unpackUnorm2x16(p.p1).x);
-  o.n  = decode_normal(unpackSnorm2x16(p.n));
+  o.n  = unpack_unorm_3x32_octagonal(unpackUnorm2x16(p.n));
   o.tx = unpackUnorm2x16(p.tx);
   return o;
 }

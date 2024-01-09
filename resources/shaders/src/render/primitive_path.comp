@@ -114,24 +114,11 @@ void load_shared() {
 }
 
 uint load_state() {
-  // Initial sample state is seeded from pixel index
-  // Initialize sampler state, or load it if the frame is cumulative
-  // uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
-  
-  
-  uvec2 block = gl_GlobalInvocationID.xy % 64;
-  uint  state = block.y * 64 + block.x;
-  state *= (buff_sampler_state.spp_curr + 1);
-  return state;
-
-  // if (buff_sampler_state.spp_curr != 0)
-  //   return buff_sampler_data.data[i];
-  // else
-  //   return i;
-
-    // return (gl_GlobalInvocationID.xy % 64) * (buff_sampler_state.spp_curr + 1);
-    // return i;
-  //   return gl_GlobalInvocationID.xy;
+  // Initial sample state is seeded from pixel index, and rotated by multiplication
+  uint invoc_state = 1 
+                   + gl_GlobalInvocationID.x 
+                   + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+  return invoc_state * (1 + buff_sampler_state.spp_curr);
 }
 
 void store_state(in uint state) {
@@ -157,14 +144,14 @@ mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
   return csys;
 }
 
-float sample_emitter(in uint emitter_i, in float wvl) {
+float eval_emitter(in uint emitter_i, in float wvl) {
   return texture(b_illm_1f, vec2(wvl, emitter_i)).x;
 }
 
-vec4 sample_emitter(in uint emitter_i, in vec4 wvl) {
+vec4 eval_emitter(in uint emitter_i, in vec4 wvl) {
   vec4 v;
   for (uint i = 0; i < 4; ++i)
-    v[i] = sample_emitter(emitter_i, wvl[i]);
+    v[i] = eval_emitter(emitter_i, wvl[i]);
   return v;
 }
 
@@ -174,6 +161,133 @@ vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
   mag = dot(si.n, d) >= 0 ? mag : -mag;
   return fma(vec3(mag), si.n, si.p);
 } */
+
+vec3 sample_emitter_position(inout uint state) {
+  return hardcoded_lpos + next_3d(state) * 4.f - 2.f;
+}
+
+vec3 sample_brdf(inout uint state, in SurfaceInfo si, in BRDF brdf, in vec3 wi) {
+  // return reflect(-wi, si.ns);
+  return normalize(2.f * next_3d(state) - 1.f);
+}
+
+vec4 eval_brdf(in SurfaceInfo si, in BRDF brdf, in vec3 wi, in vec3 wo) {
+  float cos_theta = dot(si.ns, wo);
+  if (cos_theta <= 0.f)
+    return vec4(0.f);
+  else
+    return brdf.r * cos_theta;
+}
+
+float pdf_brdf(in SurfaceInfo si, in BRDF brdf, in vec3 wi, in vec3 wo) {
+  return 1.f;
+}
+
+Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
+  Ray ray;
+
+  ray.o = si.p + 0.001f * si.n;
+  ray.d = p - si.p;
+  ray.t = length(ray.d);
+  ray.d /= ray.t;
+  
+  return ray;
+}
+
+Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
+  Ray ray;
+
+  ray.o = si.p + 0.001f * si.n;
+  ray.d = d;
+  ray.t = FLT_MAX;
+  
+  return ray;
+}
+
+Ray ray_from_sensor(in ivec2 i) {
+  // Get necessary sensor information
+  float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
+  float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
+  mat4  view_inv = inverse(buff_sensor.view_trf);
+
+  // Get pixel center in [-1, 1]
+  vec2 xy = (vec2(i) + 0.5) / vec2(buff_sensor.film_size);
+  xy = (xy - .5f) * 2.f;
+  
+  // Generate camera ray
+  Ray ray;
+  ray.o = (view_inv * vec4(0, 0, 0, 1)).xyz;
+  ray.d = normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz);
+  ray.t = FLT_MAX;
+
+  return ray;
+}
+
+const float exposure  = 0.008f;
+const uint  max_depth = 4;
+
+// Sample radiance along ray and wavelengths
+vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
+  // Path throughput information; we track 4 wavelengths simultaneously
+  // bool did_scatter = false; // TODO unused until emitters are added
+  vec4  radiance   = vec4(0.f);
+  vec4  throughput = vec4(1.f);
+  float p          = 1.f;
+
+  // Iterate up to maximum depth
+  for (uint depth = 0; depth < max_depth; ++depth) {
+    SurfaceInfo si;
+    if (depth == 0) {
+      si = sample_gbuffer(ivec2(gl_GlobalInvocationID.xy));
+    } else {
+      ray_intersect_scene(ray);
+      si = get_surface_info(ray);
+    }
+
+    // If no object is visible, terminate current path
+    if (si.object_i == OBJECT_INVALID)
+      break;
+
+    // Sample BRDF at position
+    BRDF brdf = get_surface_brdf(si, wvls);
+    
+    // Emitter sampling
+    {
+      // Generate emitter sample position, and ray twards position
+      vec3 lpos = sample_emitter_position(state);
+      Ray lray  = ray_towards_point(si, lpos);
+
+      // If ray evaluates no hit, evaluate brdf
+      if (!ray_intersect_any(lray)) {
+        vec4  f  = eval_brdf(si, brdf, -ray.d, lray.d);
+        float fp = pdf_brdf(si, brdf, -ray.d, lray.d);
+
+        // If brdf has throughput, add contribution of path
+        if (!all(iszero(f))) {
+          vec4 Le = eval_emitter(0, wvls);
+          radiance += Le * throughput * f / (p * fp);
+        }
+      }
+    }
+
+    // BSDF sampling
+    vec3  rdir = sample_brdf(state, si, brdf, -ray.d);
+    vec4  f    = eval_brdf(si, brdf, -ray.d, rdir);
+    float fp   = pdf_brdf(si, brdf, -ray.d, rdir);
+
+    // If BRDF has no throughput, terminate path
+    if (all(iszero(f)))
+      break;
+
+    // Otherwise, update throughput
+    throughput *= (f / fp);
+
+    // Intersect next scene ray 
+    ray = ray_towards_direction(si, rdir);
+  } // for (uint depth)
+
+  return radiance;
+}
 
 void main() {
   load_shared();
@@ -185,79 +299,18 @@ void main() {
   // Sampler state is based on 2d invocation index
   uint state = load_state();
 
-  // Path throughput information
-  // bool did_scatter = false; // TODO unused until emitters are added
-  vec4 wavelengths = next_4d(state);
-  vec4 radiance    = vec4(0.f);
-  vec4 throughput  = vec4(1.f);
-  vec4 p           = vec4(1.f / float(wavelength_samples));
-  
-  // Next path ray
-  Ray ray;
+  // Generate initial wavelength samples
+  vec4 wvls = next_4d(state);
 
-  // Iterate up to maximum depth
-  const uint max_depth = 8;
-  for (uint depth = 0; depth < max_depth; ++depth) {
-    // Obtain surface information, either from gbuffer or ray hit
-    SurfaceInfo si;
-    if (depth == 0) {
-      si = sample_gbuffer(i);
-    } else {
-      ray_intersect_scene(ray);
-      si = get_surface_info(ray);
-    }
+  // Generate initial camera ray
+  Ray ray   = ray_from_sensor(i);
 
-    // If no object is visible, terminate current path
-    if (si.object_i == OBJECT_INVALID)
-      break;
-
-    // Sample BRDF at position
-    BRDF brdf = get_surface_brdf(si, wavelengths);
-    
-    // If no throughput, terminate current path
-    if (all(equal(brdf.r, vec4(0))))
-      break;
-
-    // Emitter sampling
-    {
-      // Generate emiter sample // TODO sample emitter
-      vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
-
-      // Generate shadow ray
-      Ray shadow_ray;
-      shadow_ray.d = lpos - si.p;
-      shadow_ray.t = length(shadow_ray.d);
-      shadow_ray.d /= shadow_ray.t;
-      shadow_ray.o = si.p + 0.001f * si.n;
-
-      // If no hit, add contribution
-      if (!ray_intersect_any(shadow_ray)) {
-        vec4 Le         = sample_emitter(0, wavelengths);
-        float cos_theta = dot(si.ns, shadow_ray.d);
-        if (cos_theta > 0)
-          radiance += Le * throughput * brdf.r * cos_theta / p;
-      }
-    }
-
-    // BSDF sampling
-    {
-      // Generate new ray // TODO sample brdf and not this junk
-      ray.d = normalize(2.f * next_3d(state) - 1.f);
-      ray.o = si.p + 0.001f * si.n;
-      ray.t = FLT_MAX;
-
-      float cos_theta = dot(si.ns, ray.d);
-      if (cos_theta <= 0.f)
-        break;
-
-      throughput *= brdf.r * cos_theta;
-    }
-  } // for (uint depth)
+  // Evaluate ray/wavelength pair
+  vec4 L = Li(ray, wvls, state) / vec4(1.f / wavelength_samples);
 
   // Integrate radiance over color system to get color
-  mat4x3 csys = sample_colsys(0, wavelengths) * 0.01f;
-  vec3 value = csys * radiance;
-
+  vec3 value = sample_colsys(0, wvls) * exposure * L;
+  
   // Reweight with prior accumulated radiance
   if (buff_sampler_state.spp_curr != 0) {
     value += imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
@@ -266,5 +319,4 @@ void main() {
 
   // Store updated image value and sample state
   imageStore(b_film, i, vec4(value, 1));
-  // store_state(state);
 }

@@ -36,7 +36,7 @@ void main() {
   // and specify vertex outputs
   vec3 value_p = vec3(unpackUnorm2x16(in_vert_pack.x).xy,
                       unpackUnorm2x16(in_vert_pack.y).x);
-  out_value_n  = decode_normal(unpackSnorm2x16(in_vert_pack.z));
+  out_value_n  = unpack_unorm_3x32_octagonal(unpackUnorm2x16(in_vert_pack.z));
   out_value_tx = unpackUnorm2x16(in_vert_pack.w);
   out_value_id = object_i;
   
