@@ -12,7 +12,9 @@ layout(location = 0) out uvec4     out_value;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
-  mat4  sensor_trf; 
+  mat4  full_trf; 
+  mat4  proj_trf;
+  mat4  view_trf;
   uvec2 film_size; 
 } buff_sensor;
 layout(binding = 1) uniform b_buff_objects {

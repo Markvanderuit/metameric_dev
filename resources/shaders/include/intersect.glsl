@@ -183,15 +183,14 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
       for (uint i = 0; i < bvh_size(node); ++i) {
         // Index of next prim in buffer
         uint prim_i = isct_buff_bvhs_info[bvh_i].prims_offs 
-                    + bvh_offs(node) 
-                    + i;
+                    + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
         BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
-          set_ray_data_prim(ray, prim_i - isct_buff_bvhs_info[bvh_i].prims_offs);
+          set_ray_data_prim(ray, bvh_offs(node) + i);
           hit = true;
         }
       }
@@ -217,7 +216,6 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
 
 bool ray_isct_object_any(in Ray ray, uint object_i) {
   ObjectInfo object_info = isct_buff_objc_info[object_i];
-  MeshInfo   mesh_info   = isct_buff_bvhs_info[object_info.mesh_i];
   
   if (!object_info.is_active)
     return false;
@@ -238,7 +236,6 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
 
 void ray_isct_object(inout Ray ray, uint object_i) {
   ObjectInfo object_info = isct_buff_objc_info[object_i];
-  MeshInfo   mesh_info   = isct_buff_bvhs_info[object_info.mesh_i];
   
   if (!object_info.is_active)
     return;
@@ -285,31 +282,5 @@ bool ray_intersect_scene(inout Ray ray) {
 bool ray_intersect_any(inout Ray ray) {
   return ray_intersect_scene_any(ray);
 }
-
-/* SurfaceInfo ray_intersect(in Ray ray) {
-  // First, handle ray-scene intersection
-  ray_intersect_scene(ray);
-
-  SurfaceInfo si;
-  si.object_i = get_ray_data_objc(ray);
-
-  // On a hit, generate surface info
-  if (si.object_i != OBJECT_INVALID) {
-    // Obtain and unpack intersected primitive
-    BVHPrim prim = unpack(isct_buff_bvhs_prim[get_ray_data_prim(ray)]);
-
-    // Fill in surface point from intersection
-    si.t = ray.t;
-    si.p = ray.o + ray.d * ray.t;
-
-    // Fill rest of surface info object
-    vec3 b = gen_barycentric_coords(si.p, prim.v0.p, prim.v1.p, prim.v2.p);
-    si.tx  = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
-    si.n   = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
-    si.n   = normalize(si.n); // Why necessary? Grug find bug!
-  }
-
-  return si;
-} */
 
 #endif // INTERSECT_GLSL_GUARD

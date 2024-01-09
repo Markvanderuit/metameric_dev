@@ -29,43 +29,43 @@ uint get_ray_data_prim(in    Ray ray)            { return bitfieldExtract(ray.da
 uint get_ray_data_objc(in    Ray ray)            { return bitfieldExtract(ray.data, 24, 8); }
 void set_ray_data_anyh(inout Ray ray, in bool b) { ray.data = uint(b); }
 
-#define PARENS ()
-#define EXPAND(...)  EXPAND4(EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__))))
-#define EXPAND4(...) EXPAND3(EXPAND3(EXPAND3(EXPAND3(__VA_ARGS__))))
-#define EXPAND3(...) EXPAND2(EXPAND2(EXPAND2(EXPAND2(__VA_ARGS__))))
-#define EXPAND2(...) EXPAND1(EXPAND1(EXPAND1(EXPAND1(__VA_ARGS__))))
-#define EXPAND1(...) __VA_ARGS__
+// #define PARENS ()
+// #define EXPAND(...)  EXPAND4(EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__))))
+// #define EXPAND4(...) EXPAND3(EXPAND3(EXPAND3(EXPAND3(__VA_ARGS__))))
+// #define EXPAND3(...) EXPAND2(EXPAND2(EXPAND2(EXPAND2(__VA_ARGS__))))
+// #define EXPAND2(...) EXPAND1(EXPAND1(EXPAND1(EXPAND1(__VA_ARGS__))))
+// #define EXPAND1(...) __VA_ARGS__
 
-#define FOR_EACH(macro, ...)                                    \
-  __VA_OPT__(EXPAND(FOR_EACH_HELPER(macro, __VA_ARGS__)))
-#define FOR_EACH_HELPER(macro, a1, ...)                         \
-  macro(a1)                                                     \
-  __VA_OPT__(FOR_EACH_AGAIN PARENS (macro, __VA_ARGS__))
-#define FOR_EACH_AGAIN() FOR_EACH_HELPER
+// #define FOR_EACH(macro, ...)                                    \
+//   __VA_OPT__(EXPAND(FOR_EACH_HELPER(macro, __VA_ARGS__)))
+// #define FOR_EACH_HELPER(macro, a1, ...)                         \
+//   macro(a1)                                                     \
+//   __VA_OPT__(FOR_EACH_AGAIN PARENS (macro, __VA_ARGS__))
+// #define FOR_EACH_AGAIN() FOR_EACH_HELPER
 
-struct PathInfoAOSPack0 { vec4 data; };
-struct PathInfoAOSPack1 { vec4 data; };
-struct PathInfoAOSPack2 { vec4 data; };
-struct PathInfoSOAPack  {
-  vec4 data_0;
-  vec4 data_1;
-  vec4 data_2;
-};
+// struct PathInfoAOSPack0 { vec4 data; };
+// struct PathInfoAOSPack1 { vec4 data; };
+// struct PathInfoAOSPack2 { vec4 data; };
+// struct PathInfoSOAPack  {
+//   vec4 data_0;
+//   vec4 data_1;
+//   vec4 data_2;
+// };
 
-#define SOA_ARG(dst, src, i) \
-  dst = src[i];
-#define SOA_ARG_PAIR(pair) \
-  SOA_ARG pair
+// #define SOA_ARG(dst, src, i) \
+//   dst = src[i];
+// #define SOA_ARG_PAIR(pair) \
+//   SOA_ARG pair
 
-// Variadic macro to take a Type and N buffers, and to generate
-// a function that loads the type from a SOA to a AOS format
-#define ApplySOA(Ty, ...)               \
-  void soa(inout Ty ty, in uint i) {    \
-    FOR_EACH(SOA_ARG_PAIR, __VA_ARGS__) \
-  }
+// // Variadic macro to take a Type and N buffers, and to generate
+// // a function that loads the type from a SOA to a AOS format
+// #define ApplySOA(Ty, ...)               \
+//   void soa(inout Ty ty, in uint i) {    \
+//     FOR_EACH(SOA_ARG_PAIR, __VA_ARGS__) \
+//   }
 
-#define ApplySOAInline(...) \
-  FOR_EACH(SOA_ARG_PAIR, __VA_ARGS__)
+// #define ApplySOAInline(...) \
+//   FOR_EACH(SOA_ARG_PAIR, __VA_ARGS__)
 
 // // ApplySOA(PathInfoSOAPack, 
 // //         (data_0, buffer_path_pack_0, i), 

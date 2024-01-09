@@ -95,7 +95,8 @@ namespace met {
     auto &i_gbuffer = info("gbuffer_renderer").getw<detail::GBuffer>();
 
     i_sensor.film_size = e_target.size();
-    i_sensor.transform = e_arcball.full().matrix();
+    i_sensor.proj_trf  = e_arcball.proj().matrix();
+    i_sensor.view_trf  = e_arcball.view().matrix();
     i_sensor.flush();
     
     // Forward to gbuffer draw

@@ -13,8 +13,10 @@ namespace met {
       m_unif_map = m_unif.map_as<UnifLayout>(buffer_access_flags).data();
     }
 
-    m_unif_map->sensor_trf = transform;
-    m_unif_map->film_size  = film_size;
+    m_unif_map->full_trf  = proj_trf * view_trf;
+    m_unif_map->proj_trf  = proj_trf;
+    m_unif_map->view_trf  = view_trf;
+    m_unif_map->film_size = film_size;
 
     m_unif.flush();
   }

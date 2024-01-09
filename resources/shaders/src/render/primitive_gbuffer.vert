@@ -12,7 +12,9 @@ layout(location = 1) out flat uint out_value_i;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
-  mat4  sensor_trf; 
+  mat4  full_trf; 
+  mat4  proj_trf;
+  mat4  view_trf;
   uvec2 film_size; 
 } buff_sensor;
 layout(binding = 1) uniform b_buff_objects {
@@ -33,7 +35,7 @@ void main() {
   out_value_i = gl_DrawID; // The index in glMultiDraw* matches the index of a specific object
 
   // Apply camera transformation for vertex position output
-  gl_Position = buff_sensor.sensor_trf 
+  gl_Position = buff_sensor.full_trf 
               * buff_objects.data[gl_DrawID].trf
               * value_p;
 }

@@ -37,7 +37,7 @@ layout(binding = 4) uniform b_buff_textures {
 
 // Storage buffer declarations
 layout(binding = 0) restrict buffer b_buff_sampler_data {
-  uint data[];
+  uvec2 data[];
 } buff_sampler_data;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
@@ -113,17 +113,18 @@ void load_shared() {
   barrier();
 }
 
-uint load_state() {
+uvec2 load_state() {
   // Initial sample state is seeded from pixel index
   // Initialize sampler state, or load it if the frame is cumulative
   uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
   if (buff_sampler_state.spp_curr != 0)
     return buff_sampler_data.data[i];
   else
-    return i;
+    return (gl_GlobalInvocationID.xy % 256) /* * (buff_sampler_state.spp_curr + 1) */;
+  //   return gl_GlobalInvocationID.xy;
 }
 
-void store_state(in uint state) {
+void store_state(in uvec2 state) {
   uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
   buff_sampler_data.data[i] = state;
 }
@@ -135,8 +136,8 @@ SurfaceInfo sample_gbuffer(in uvec2 i) {
 
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
   // TODO sample by observer data instead
-  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz *
-         texture(b_illm_1f, vec2(wvl, colsys_i)).x   * .01f; // TODO fix integration through exposure
+  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz/*  *
+         texture(b_illm_1f, vec2(wvl, colsys_i)).x   * .01f */; // TODO fix integration through exposure
 }
 
 mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
@@ -146,27 +147,23 @@ mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
   return csys;
 }
 
-// Offset epsilon copied from mitsuba3
+float sample_emitter(in uint emitter_i, in float wvl) {
+  return texture(b_illm_1f, vec2(wvl, emitter_i)).x;
+}
+
+vec4 sample_emitter(in uint emitter_i, in vec4 wvl) {
+  vec4 v;
+  for (uint i = 0; i < 4; ++i)
+    v[i] = sample_emitter(emitter_i, wvl[i]);
+  return v;
+}
+
+/* // Offset epsilon copied from mitsuba3
 vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
   float mag = 1.f + hmax(abs(si.p)) + 1500.f * M_EPS;
   mag = dot(si.n, d) >= 0 ? mag : -mag;
   return fma(vec3(mag), si.n, si.p);
-}
-
-bool test_visibility(inout uint state, in SurfaceInfo si) {
-  vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
-  
-  Ray ray;
-  ray.d = lpos - si.p;
-  ray.t = length(ray.d);
-  ray.d /= ray.t;
-  ray.o = si.p + 0.001f * si.n;
-
-  // Mistake; gbuffer normal is not geometric normal!
-  // ray.o = gen_offset_p(si, ray.d);
-
-  return !ray_intersect_any(ray);
-}
+} */
 
 void main() {
   load_shared();
@@ -175,44 +172,114 @@ void main() {
   const ivec2 i = ivec2(gl_GlobalInvocationID.xy);
   guard(all(lessThan(i, buff_sensor.film_size)));
 
-  // Initialize sampler state, or load it if the frame is cumulative
-  uint state = load_state();
+  // Sampler state is based on 2d invocation index
+  uvec2 state = load_state();
 
-  // Obtain surface information from a first ray hit, by extracting data from a gbuffer
-  SurfaceInfo si = sample_gbuffer(i);
-
-  // If no object is visible, set to black and early-out
-  if (si.object_i == OBJECT_INVALID) {
-    imageStore(b_film, i, vec4(0, 0, 0, 1));
-    return;
-  }
-
-  // Load relevant info objects
-  AtlasLayout bary_layout = buff_weights.data[si.object_i];
-  ObjectInfo  object_info = buff_objects.data[si.object_i];
-
-  // Initialize image value, or load prior if the frame is cumulative
-  vec3 value = buff_sampler_state.spp_curr == 0 
-             ? vec3(0)
-             : imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
-
-  if (test_visibility(state, si)) {
-    PreliminaryBRDF pr = get_surface_brdf_preliminary(si);
-    
-    // Sample reflectance n times
-    for (uint i = 0; i < buff_sampler_state.spp_per_iter; i ++) {
-      vec4   wavelength = next_4d(state);
-      BRDF   brdf       = get_surface_brdf(pr, wavelength);
-      mat4x3 csys       = sample_colsys(0, wavelength);
-
-      value += csys * brdf.r * float(wavelength_samples) / 4.f;
-    }
-  }
-
-  // Reweight image value by actual nr. of samples
-  value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+  // // Path throughput information
+  // // bool did_scatter = false; // TODO unused until emitters are added
+  // vec4 wavelengths = next_4d(state);
+  // vec4 radiance    = vec4(0.f);
+  // vec4 throughput  = vec4(1.f);
+  // vec4 p           = vec4(1.f / float(wavelength_samples));
   
+  float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
+  float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
+  mat4  view_inv = inverse(buff_sensor.view_trf);
+
+  // Pixel center, rescaled to [-1, 1]
+  vec2 xy = (vec2(gl_GlobalInvocationID.xy) + 0.5) / vec2(buff_sensor.film_size);
+  xy = (xy - .5f) * 2.f;
+  
+  // Next path ray
+  Ray ray;
+  ray.o = (view_inv * vec4(0, 0, 0, 1)).xyz;
+  ray.d = normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz);
+  ray.t = FLT_MAX;
+  
+  // const uint max_depth = 1;
+
+  // // Iterate up to maximum depth
+  // uint depth = 0;
+  // while (depth < max_depth) {
+  //   // Obtain surface information, either from gbuffer or ray hit
+  //   SurfaceInfo si;
+  //   if (depth == 0) {
+  //     si = sample_gbuffer(i);
+  //   } else {
+  //     ray_intersect_scene(ray);
+  //     si = get_surface_info(ray);
+  //   }
+
+  //   // If no object is visible, terminate current path
+  //   if (si.object_i == OBJECT_INVALID)
+  //     break;
+
+  //   // Sample BRDF at position
+  //   BRDF brdf = get_surface_brdf(si, wavelengths);
+    
+  //   // If no throughput, terminate current path
+  //   if (all(equal(brdf.r, vec4(0))))
+  //     break;
+
+  //   // Emitter sampling
+  //   {
+  //     // Generate emiter sample // TODO sample emitter
+  //     vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
+
+  //     // Generate shadow ray
+  //     Ray shadow_ray;
+  //     shadow_ray.d = lpos - si.p;
+  //     shadow_ray.t = length(shadow_ray.d);
+  //     shadow_ray.d /= shadow_ray.t;
+  //     shadow_ray.o = si.p + 0.001f * si.n;
+
+  //     // If no hit, add contribution
+  //     if (!ray_intersect_any(shadow_ray)) {
+  //     // if (!ray_intersect_scene(shadow_ray)) {
+  //       vec4 Le         = sample_emitter(0, wavelengths);
+  //       float cos_theta = dot(si.ns, shadow_ray.d);
+  //       if (cos_theta > 0)
+  //         radiance += Le * throughput * brdf.r * cos_theta / p;
+  //     }
+  //   }
+
+  //   // BSDF sampling
+  //   {
+  //     // Generate new ray // TODO sample brdf and not this junk
+  //     float cos_theta = -1.f;
+  //     while (cos_theta <= 0.f) {
+  //       Ray next_ray;
+  //       next_ray.d = normalize(2.f * next_3d(state) - 1.f);
+  //       next_ray.o = si.p + 0.01f * si.n;
+  //       next_ray.t = FLT_MAX;
+  //       cos_theta = dot(si.ns, next_ray.d);
+  //       ray = next_ray;
+  //     }
+
+  //     throughput *= brdf.r * cos_theta;
+  //   }
+    
+  //   depth++;
+  // } // while (depth)
+
+  // // Integrate radiance over color system to get color
+  // mat4x3 csys = sample_colsys(0, wavelengths) * 0.005f;
+  // vec3 value = csys * radiance;
+
+  // // Reweight with prior accumulated radiance
+  // if (buff_sampler_state.spp_curr != 0) {
+  //   value += imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
+  //   value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+  // }
+
+  // value = vec3(float(depth) / float(max_depth));
+
+  vec3 value = vec3(0);
+  if (ray_intersect_scene(ray))
+    value = vec3(1);
+
   // Store updated image value and sample state
   imageStore(b_film, i, vec4(value, 1));
-  store_state(state);
+  
+  // store_state(state);
 }

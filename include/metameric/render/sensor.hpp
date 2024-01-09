@@ -5,15 +5,18 @@
 
 namespace met {
   struct Sensor {
-    // Underlying camera transform
-    eig::Matrix4f transform = eig::Matrix4f::Identity();
+    // Underlying camera transforms
+    eig::Matrix4f proj_trf = eig::Matrix4f::Identity();
+    eig::Matrix4f view_trf = eig::Matrix4f::Identity();
 
     // Target film resolution
     eig::Array2u  film_size = { 1, 1 };
     
   private:
     struct UnifLayout { 
-      alignas(16) eig::Matrix4f sensor_trf; 
+      alignas(16) eig::Matrix4f full_trf; 
+      alignas(16) eig::Matrix4f proj_trf; 
+      alignas(16) eig::Matrix4f view_trf; 
       alignas(8)  eig::Array2u  film_size; 
     };
 

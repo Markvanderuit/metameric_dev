@@ -14,7 +14,9 @@ layout(std430) buffer;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
-  mat4  sensor_trf;
+  mat4  full_trf;
+  mat4  proj_trf;
+  mat4  view_trf;
   uvec2 film_size; 
 } buff_sensor;
 layout(binding = 1) uniform b_buff_sampler_state {
@@ -35,7 +37,7 @@ layout(binding = 4) uniform b_buff_textures {
 
 // Storage buffer declarations
 layout(binding = 0) restrict buffer b_buff_sampler_data {
-  uint data[];
+  uvec2 data[];
 } buff_sampler_data;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
@@ -111,17 +113,18 @@ void load_shared() {
   barrier();
 }
 
-uint load_state() {
+uvec2 load_state() {
   // Initial sample state is seeded from pixel index
   // Initialize sampler state, or load it if the frame is cumulative
   uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
   if (buff_sampler_state.spp_curr != 0)
     return buff_sampler_data.data[i];
   else
-    return i;
+    return (gl_GlobalInvocationID.xy % 256) /* * (buff_sampler_state.spp_curr + 1) */;
+  //   return gl_GlobalInvocationID.xy;
 }
 
-void store_state(in uint state) {
+void store_state(in uvec2 state) {
   uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
   buff_sampler_data.data[i] = state;
 }
@@ -155,27 +158,12 @@ vec4 sample_emitter(in uint emitter_i, in vec4 wvl) {
   return v;
 }
 
-// Offset epsilon copied from mitsuba3
+/* // Offset epsilon copied from mitsuba3
 vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
   float mag = 1.f + hmax(abs(si.p)) + 1500.f * M_EPS;
   mag = dot(si.n, d) >= 0 ? mag : -mag;
   return fma(vec3(mag), si.n, si.p);
-}
-
-bool test_visibility(inout uint state, in SurfaceInfo si) {
-  vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
-  
-  Ray ray;
-  ray.d = lpos - si.p;
-  ray.t = length(ray.d);
-  ray.d /= ray.t;
-  ray.o = si.p + 0.001f * si.n;
-
-  // Mistake; gbuffer normal is not geometric normal!
-  // ray.o = gen_offset_p(si, ray.d);
-
-  return !ray_intersect_any(ray);
-}
+} */
 
 void main() {
   load_shared();
@@ -184,19 +172,24 @@ void main() {
   const ivec2 i = ivec2(gl_GlobalInvocationID.xy);
   guard(all(lessThan(i, buff_sensor.film_size)));
 
+  // Sampler state is based on 2d invocation index
+  uvec2 state = load_state();
+
   // Path throughput information
-  bool did_scatter = false; // TODO unused until emitters are added
-  uint state       = load_state();
+  // bool did_scatter = false; // TODO unused until emitters are added
   vec4 wavelengths = next_4d(state);
   vec4 radiance    = vec4(0.f);
   vec4 throughput  = vec4(1.f);
   vec4 p           = vec4(1.f / float(wavelength_samples));
   
-  // Last path ray
+  // Next path ray
   Ray ray;
 
+  const uint max_depth = 1;
+
   // Iterate up to maximum depth
-  for (uint depth = 0; depth < 3; ++depth) {
+  uint depth = 0;
+  while (depth < max_depth) {
     // Obtain surface information, either from gbuffer or ray hit
     SurfaceInfo si;
     if (depth == 0) {
@@ -218,8 +211,10 @@ void main() {
       break;
 
     // Emitter sampling
-    vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
     {
+      // Generate emiter sample // TODO sample emitter
+      vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
+
       // Generate shadow ray
       Ray shadow_ray;
       shadow_ray.d = lpos - si.p;
@@ -229,30 +224,35 @@ void main() {
 
       // If no hit, add contribution
       if (!ray_intersect_any(shadow_ray)) {
+      // if (!ray_intersect_scene(shadow_ray)) {
         vec4 Le         = sample_emitter(0, wavelengths);
         float cos_theta = dot(si.ns, shadow_ray.d);
-        radiance += Le * throughput * brdf.r * cos_theta / p;
+        if (cos_theta > 0)
+          radiance += Le * throughput * brdf.r * cos_theta / p;
       }
     }
 
-    // BSDF sampling hack for now
+    // BSDF sampling
     {
-      // Generate new ray
-      ray.o    = si.p + 0.001f * si.n;
-      ray.d    = normalize(2.f * next_3d(state) - 1.f);
-      ray.t    = FLT_MAX;
-      ray.data = 0;
+      // Generate new ray // TODO sample brdf and not this junk
+      float cos_theta = -1.f;
+      while (cos_theta <= 0.f) {
+        Ray next_ray;
+        next_ray.d = normalize(2.f * next_3d(state) - 1.f);
+        next_ray.o = si.p + 0.01f * si.n;
+        next_ray.t = FLT_MAX;
+        cos_theta = dot(si.ns, next_ray.d);
+        ray = next_ray;
+      }
 
-      float cos_theta = dot(si.ns, ray.d);
-      if (cos_theta < 0)
-        break;
-        
       throughput *= brdf.r * cos_theta;
     }
-  } // for (uint depth)
+    
+    depth++;
+  } // while (depth)
 
   // Integrate radiance over color system to get color
-  mat4x3 csys = sample_colsys(0, wavelengths) * 0.01f;
+  mat4x3 csys = sample_colsys(0, wavelengths) * 0.005f;
   vec3 value = csys * radiance;
 
   // Reweight with prior accumulated radiance
@@ -260,7 +260,9 @@ void main() {
     value += imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
     value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
   }
-  
+
+  // value = vec3(float(depth) / float(max_depth));
+
   // Store updated image value and sample state
   imageStore(b_film, i, vec4(value, 1));
   store_state(state);

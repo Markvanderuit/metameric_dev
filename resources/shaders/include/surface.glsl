@@ -7,6 +7,8 @@
 // This header requires the following defines to point to SSBOs or shared memory
 // to work around glsl's lack of ssbo argument passing
 // #define srfc_buff_prim      buff_bvhs_prim.data
+// #define srfc_buff_objc_info buff_objc_info.data
+// #define srfc_buff_mesh_info buff_mesh_info.data
 
 // Local vector frame
 struct Frame {
@@ -45,11 +47,11 @@ float local_cos_theta(in vec3 v) {
 // An object defining a potential surface intersection in the scene.
 // Is generally the output of ray_intersect(...).
 struct SurfaceInfo {
-  vec3  p;        // Surface position in world space
-  vec3  n;        // Surface geometric normal
-  vec3  ns;       // Surface shading normal
-  vec2  tx;       // Surface texture coordinates
-  uint  object_i; // Index of intersected object, set to OBJECT_INVALID if the intersection is invalid
+  vec3 p;        // Surface position in world space
+  vec3 n;        // Surface geometric normal
+  vec3 ns;       // Surface shading normal
+  vec2 tx;       // Surface texture coordinates
+  uint object_i; // Index of intersected object, set to OBJECT_INVALID if the intersection is invalid
 };
 
 // Given a triangle and a primitive, obtain barycentric coordiantes
@@ -77,7 +79,13 @@ SurfaceInfo get_surface_info(in Ray ray) {
     MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
 
     // Obtain and unpack intersected primitive data
-    BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + get_ray_data_prim(ray)]);
+    uvec3 el = srfc_buff_elem[mesh_info.prims_offs + get_ray_data_prim(ray)];
+    BVHPrim prim = { unpack(srfc_buff_vert[el[0]]), 
+                     unpack(srfc_buff_vert[el[1]]), 
+                     unpack(srfc_buff_vert[el[2]]) };
+
+    // // Obtain and unpack intersected primitive data
+    // BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + get_ray_data_prim(ray)]);
 
     // Compute model-space surface position
     vec3 p = (object_info.trf_inv * vec4(ray.o + ray.d * ray.t, 1)).xyz;

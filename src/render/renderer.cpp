@@ -22,8 +22,8 @@ namespace met {
       met_trace_full();
 
       // Initialize or resize sampler data buffer; one value per pixel
-      if (uint n = sensor.film_size.prod(); !m_sampler_data.is_init() || m_sampler_data.size() != n * sizeof(uint)) {
-        m_sampler_data = {{ .size = n * sizeof(uint) }};
+      if (uint n = sensor.film_size.prod(); !m_sampler_data.is_init() || m_sampler_data.size() != n * sizeof(eig::Array2u)) {
+        m_sampler_data = {{ .size = n * sizeof(eig::Array2u) }};
       }
 
       // Reset current sample count
@@ -222,8 +222,8 @@ namespace met {
 
     // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
-                   .cross_path = "resources/shaders/render/primitive_path.comp.json" }};
+                   .spirv_path = "resources/shaders/render/primitive_test.comp.spv",
+                   .cross_path = "resources/shaders/render/primitive_test.comp.json" }};
 
     // Assign sampler configuration
     m_spp_curr     = 0;
