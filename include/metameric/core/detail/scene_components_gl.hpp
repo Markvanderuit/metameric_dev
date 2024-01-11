@@ -19,6 +19,8 @@ namespace met::detail {
     struct alignas(16) ObjectInfoLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
+      alignas(16) eig::Matrix4f trf_mesh;
+      alignas(16) eig::Matrix4f trf_mesh_inv;
 
       alignas(4)  bool          is_active;
 
@@ -43,13 +45,30 @@ namespace met::detail {
     void update(std::span<const detail::Component<met::Object>>, const Scene &);
   };
   
-  /* template <>
+  template <>
   class GLPacking<met::Emitter> {
+    struct alignas(16) EmitterInfoLayout {
+      alignas(16) eig::Matrix4f trf;
+      alignas(16) eig::Matrix4f trf_inv;
+
+      alignas(4)  uint          type;
+      alignas(4)  bool          is_active;
+
+      alignas(4)  uint          illuminant_i;
+      alignas(4)  float         illuminant_scale;
+    };
+
+    // Mapped buffer accessors
+    uint*                        m_buffer_map_size;
+    std::span<EmitterInfoLayout> m_buffer_map_data;
 
   public:
-  
+    // This buffer stores one instance of EmitterInfoLayout per emitter component
+    gl::Buffer emitter_info;
+
+    GLPacking();
     void update(std::span<const detail::Component<met::Emitter>>, const Scene &);
-  }; */
+  };
 
   // GL-side uplifting data
   // Handles gl-side uplifted texture data, though on a per-object basis. Most

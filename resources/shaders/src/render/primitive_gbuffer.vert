@@ -36,6 +36,6 @@ void main() {
 
   // Apply camera transformation for vertex position output
   gl_Position = buff_sensor.full_trf 
-              * buff_objects.data[gl_DrawID].trf
+              * buff_objects.data[gl_DrawID].trf_mesh
               * value_p;
 }

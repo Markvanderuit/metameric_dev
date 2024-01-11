@@ -148,18 +148,20 @@ namespace met {
 
   void to_json(json &js, const Emitter &emitter) {
     met_trace();
-    js = {{ "is_active",    emitter.is_active   },
-          { "p",            emitter.p            },
-          { "multiplier",   emitter.multiplier   },
-          { "illuminant_i", emitter.illuminant_i }};
+    js = {{ "type",             emitter.type             },
+          { "is_active",        emitter.is_active        },
+          { "trf",              emitter.trf              },
+          { "illuminant_i",     emitter.illuminant_i     },
+          { "illuminant_scale", emitter.illuminant_scale }};
   }
 
   void from_json(const json &js, Emitter &emitter) {
     met_trace();
+    js.at("type").get_to(emitter.type);
     js.at("is_active").get_to(emitter.is_active);
-    js.at("p").get_to(emitter.p);
-    js.at("multiplier").get_to(emitter.multiplier);
+    js.at("trf").get_to(emitter.trf);
     js.at("illuminant_i").get_to(emitter.illuminant_i);
+    js.at("illuminant_scale").get_to(emitter.illuminant_scale);
   }
 
   void to_json(json &js, const ColorSystem &csys) {
@@ -220,8 +222,13 @@ namespace met {
       { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     components.colr_systems.push(get_csys_name(csys), csys);
+
     components.emitters.push("Default D65 emitter", {
-      .p = { 0, 1, 0 }, .multiplier = 1.f, .illuminant_i = 0 });
+      .type             = Emitter::Type::eSphere,
+      .trf              = eig::Affine3f::Identity(),
+      .illuminant_i     = 0,
+      .illuminant_scale = 1.f
+    });
     
     // Set state to fresh create
     save_path  = "";
@@ -612,7 +619,7 @@ namespace met {
 
   met::Spec Scene::get_emitter_spd(Emitter e) const {
     met_trace();
-    return (resources.illuminants[e.illuminant_i].value() * e.multiplier).eval();
+    return (resources.illuminants[e.illuminant_i].value() * e.illuminant_scale).eval();
   }
 
   std::string Scene::get_csys_name(uint i) const {

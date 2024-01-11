@@ -143,7 +143,7 @@ BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
 
   vec3 wo = square_to_cos_hemisphere(sample_2d);
 
-  bs.f   = vec4(1); // brdf.r;
+  bs.f   = brdf.r;
   bs.pdf = square_to_cos_hemisphere_pdf(wo);
   bs.wo  = frame_to_world(si.sh, wo);
 
@@ -159,7 +159,7 @@ vec4 eval_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
     return vec4(0.f); */
     
-  return /* brdf.r */ vec4(1) * M_PI_INV * abs(frame_cos_theta(wo));
+  return brdf.r * M_PI_INV * abs(frame_cos_theta(wo));
 }
 
 float pdf_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {

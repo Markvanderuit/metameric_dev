@@ -47,8 +47,6 @@ Ray ray_from_sensor() {
 }
 
 void main() {
-  // ObjectInfo object_info = buff_objects.data[in_value_i];
-  // MeshInfo   mesh_info   = buff_meshes.data[object_info.mesh_i];
   GBufferRay gb = { 
     in_value_p, 
     in_value_i, /* << 24 | */

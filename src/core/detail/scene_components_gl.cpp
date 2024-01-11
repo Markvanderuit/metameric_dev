@@ -43,7 +43,7 @@ namespace met::detail {
     return VertexPack {
       .p0 = pack_unorm_2x16({ p.x(), p.y() }),
       .p1 = pack_unorm_2x16({ p.z(), 0.f   }),
-      .n  = pack_unorm_2x16(pack_unorm_2x32_octagonal(n)),
+      .n  = pack_snorm_2x16(pack_snorm_2x32_octagonal(n)),
       .tx = pack_unorm_2x16(tx_)
     };
   }
@@ -99,7 +99,7 @@ namespace met::detail {
   GLPacking<met::Object>::GLPacking() {
     met_trace_full();
 
-    // Mesh uniform layout which includes nr. of active meshes
+    // Uniform layout which includes nr. of active components
     struct ObjectUniformBufferLayout {
       alignas(4) uint n;
       ObjectInfoLayout data[max_supported_objects];
@@ -138,8 +138,11 @@ namespace met::detail {
       auto mesh_trf = scene.resources.meshes.gl.transforms[object.mesh_i];
 
       m_buffer_map_data[i] = {
-        .trf         = (object.trf.matrix() * mesh_trf).eval(),
-        .trf_inv     = (object.trf.matrix() * mesh_trf).inverse().eval(),
+        // Fill transform data
+        .trf          = object.trf.matrix(),
+        .trf_inv      = object.trf.matrix().inverse().eval(),
+        .trf_mesh     = (object.trf.matrix() * mesh_trf).eval(),
+        .trf_mesh_inv = (object.trf.matrix() * mesh_trf).inverse().eval(),
 
         // Fill shape data
         .is_active   = object.is_active,
@@ -253,9 +256,58 @@ namespace met::detail {
     }
   }
 
-  /* void GLPacking<met::Emitter>::update(std::span<const detail::Component<met::Emitter>>, const Scene &scene) {
-    // TODO 
-  } */
+  GLPacking<met::Emitter>::GLPacking() {
+    met_trace_full();
+
+    // Uniform layout which includes nr. of active components
+    struct EmitterUniformBufferLayout {
+      alignas(4) uint n;
+      EmitterInfoLayout data[max_supported_objects];
+    };
+    
+    // Preallocate up to a number of meshes
+    emitter_info = {{ .size  = sizeof(EmitterUniformBufferLayout),
+                      .flags = buffer_create_flags }};
+
+    // Obtain writeable, flushable mapping of nr. of components and individual data
+    auto *map = emitter_info.map_as<EmitterUniformBufferLayout>(buffer_access_flags).data();
+    m_buffer_map_size = &map->n;
+    m_buffer_map_data = map->data;
+  }
+
+  void GLPacking<met::Emitter>::update(std::span<const detail::Component<met::Emitter>> emitters, const Scene &scene) {
+    met_trace_full();
+
+    guard(!emitters.empty());
+    guard(scene.components.emitters);
+
+    // Set appropriate component count, then flush change to buffer
+    *m_buffer_map_size = static_cast<uint>(emitters.size());
+    emitter_info.flush(sizeof(uint));
+
+    
+    // Write updated components to mapping
+    for (uint i = 0; i < emitters.size(); ++i) {
+      const auto &[emitter, state] = emitters[i];
+      guard_continue(state);
+
+      m_buffer_map_data[i] = {
+        .trf              = emitter.trf.matrix(),
+        .trf_inv          = emitter.trf.matrix().inverse().eval(),
+        
+        .type             = static_cast<uint>(emitter.type),
+        .is_active        = emitter.is_active,
+
+        .illuminant_i     = emitter.illuminant_i,
+        .illuminant_scale = emitter.illuminant_scale
+      };
+
+      // Flush change to buffer; most changes to objects are local,
+      // so we flush specific regions instead of the whole
+      emitter_info.flush(sizeof(EmitterInfoLayout), 
+                         sizeof(EmitterInfoLayout) * i + sizeof(uint) * 4);
+    } // for (uint i)
+  }
 
   /* void GLPacking<met::ColorSystem>::update(std::span<const detail::Component<met::ColorSystem>>, const Scene &scene) {
     // TODO

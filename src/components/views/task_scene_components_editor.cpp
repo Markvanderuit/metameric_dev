@@ -24,6 +24,17 @@ namespace met {
         default:                 return "Unknown";
       };
     }
+
+    std::string str_from_emitter_type(Emitter::Type type) {
+      using Type = Emitter::Type;
+      switch (type) {
+        case Type::eConstant: return "Constant";
+        case Type::ePoint:    return "Point";
+        case Type::eRect:     return "Rectangle";
+        case Type::eSphere:   return "Spherical";
+        default:              return "Unknown";
+      };
+    }
   } // namespace detail
 
   void SceneComponentsEditorTask::eval(SchedulerHandle &info) {
@@ -205,16 +216,30 @@ namespace met {
       if (ImGui::SmallButton("X")) {
         info.global("scene").getw<Scene>().touch({
           .name = "Delete emitter",
-          .redo = [i = i]         (auto &scene) { scene.components.emitters.erase(i); },
-          .undo = [o = e_emitters](auto &scene) { scene.components.emitters = o;      }
+          .redo = [i = i]               (auto &scene) { scene.components.emitters.erase(i);     },
+          .undo = [i = i, o = component](auto &scene) { scene.components.emitters.insert(i, o); }
         });
         break;
       }
 
       if (open_section) {
+        // Type selector
+        {
+          auto curr_name = detail::str_from_emitter_type(emitter.type);
+          if (ImGui::BeginCombo("Type", curr_name.c_str())) {
+            for (uint i = 0; i < 4; ++i) {
+              auto select_type = static_cast<Emitter::Type>(i);
+              auto select_name = detail::str_from_emitter_type(select_type);
+              if (ImGui::Selectable(select_name.c_str(), select_type == emitter.type))
+                emitter.type = select_type;
+            } // for (uint i)
+            ImGui::EndCombo();
+          } // if (BeginCombo)
+        }
+        
         detail::fun_resource_selector("Illuminant", e_illuminants, emitter.illuminant_i);
-        ImGui::SliderFloat("Power", &emitter.multiplier, 0.f, 10.f);
-        ImGui::InputFloat3("Position", emitter.p.data());
+        ImGui::SliderFloat("Power", &emitter.illuminant_scale, 0.f, 10.f);
+        // ImGui::InputFloat3("Position", emitter.p.data());
         
         ImGui::TreePop();
       } // if (open_section)
@@ -280,8 +305,7 @@ namespace met {
 
           auto type_str = detail::str_from_constraint_type(vert.type);
           ImGui::LabelText("Type", type_str.c_str());
-
-          
+        
 
           ImGui::Unindent();
         } // for (vert)       

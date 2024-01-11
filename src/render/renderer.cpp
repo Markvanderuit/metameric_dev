@@ -252,6 +252,7 @@ namespace met {
     m_program.bind("b_buff_sampler_state", get_sampler_state());
     m_program.bind("b_buff_sampler_data",  m_sampler_data);
     m_program.bind("b_buff_objects",       scene.components.objects.gl.object_info);
+    m_program.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
     m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
     m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
     m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);

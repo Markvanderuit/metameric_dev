@@ -3,18 +3,60 @@
 
 #include <ray.glsl>
 #include <bvh.glsl>
+#include <scene.glsl>
 
 // This header requires the following defines to point to SSBOs or shared memory
 // to work around glsl's lack of ssbo argument passing
 // #define isct_n_objects      buff_objc_info.n
+// #define isct_n_emitters     buff_emtr_info.n
 // #define isct_stack          s_stack[gl_LocalInvocationID.x]
 // #define isct_buff_objc_info s_objc_info
+// #define isct_buff_emtr_info s_emtr_info
 // #define isct_buff_bvhs_info s_bvhs_info
 // #define isct_buff_bvhs_node buff_bvhs_node.data
 // #define isct_buff_bvhs_prim buff_bvhs_prim.data
 
 // Hardcoded constants
 #define bvh_stck_offset 24
+
+bool ray_intersect_unit_rect(inout Ray ray) {
+  // Plane distance test
+  float t = -ray.o.z / ray.d.z;
+  if (t < 0.f || t > ray.t)
+    return false;
+
+  // Plane boundary test
+  vec3 p = ray.o + ray.d * t;
+  if (any(greaterThan(abs(p.xy), vec2(1))))
+    return false;
+  
+  ray.t = t;
+  return true;
+}
+
+bool ray_intersect_unit_sphere(inout Ray ray) {
+  float b = dot(ray.o, ray.d) * 2.f;
+  float c = sdot(ray.o) - 1.f;
+
+  float discrim = b * b - 4.f * c;
+  if (discrim < 0)
+    return false;
+  
+  float t_near = -.5f * (b + sqrt(discrim) * (b >= 0 ? 1.f : -1.f));
+  float t_far  = c / t_near;
+
+  if (t_near > t_far)
+    swap(t_near, t_far);
+
+  if (t_far < 0.f || t_near > ray.t)
+    return false;
+
+  if (t_far > ray.t && t_near < 0.f)
+    return false;
+
+  ray.t = t_near;
+  return true;
+}
 
 bool ray_isct_aabb_any(inout Ray ray, in vec3 d_inv, in AABB aabb) {
   vec3 t_max = (aabb.maxb - ray.o) * d_inv;
@@ -57,10 +99,15 @@ bool ray_isct_aabb(inout Ray ray, in vec3 d_inv, in AABB aabb) {
 bool ray_isct_prim(inout Ray ray, in vec3 a, in vec3 b, in vec3 c) {
   vec3 ab = b - a;
   vec3 bc = c - b;
-  vec3 n  = normalize(cross(bc, ab)); // TODO is normalize necessary?
+  vec3 n  = normalize(cross(bc, ab));
+  
+  // Backface test
+  float cos_theta = dot(n, ray.d);
+  /* if (cos_theta <= 0)
+    return false; */
 
   // Ray/plane distance test
-  float t = dot(((a + b + c) / 3.f - ray.o), n) / dot(n, ray.d);
+  float t = dot(((a + b + c) / 3.f - ray.o), n) / cos_theta;
   if (t < 0.f || t > ray.t)
     return false;
   
@@ -186,7 +233,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
-          ray_set_data_prim(ray, bvh_offs(node) + i);
+          ray_set_data_object_primitive(ray, bvh_offs(node) + i);
           hit = true;
         }
       }
@@ -217,51 +264,83 @@ bool ray_isct_object_any(in Ray ray, uint object_i) {
     return false;
   
   // Generate object space ray
-  Ray ray_object;
-  ray_object.o = (object_info.trf_inv * vec4(ray.o, 1)).xyz;
-  ray_object.d = (object_info.trf_inv * vec4(ray.d, 0)).xyz;
+  Ray ray_local;
+  ray_local.o = (object_info.trf_mesh_inv * vec4(ray.o, 1)).xyz;
+  ray_local.d = (object_info.trf_mesh_inv * vec4(ray.d, 0)).xyz;
   
   // Get length and normalize direction
-  // Reuse length to adjust ray_object.t if ray.t is not at infty
-  float dt = length(ray_object.d);
-  ray_object.d /= dt;
-  ray_object.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
+  // Reuse length to adjust ray_local.t if ray.t is not at infty
+  float dt = length(ray_local.d);
+  ray_local.d /= dt;
+  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
   
-  return ray_isct_bvh_any(ray_object, object_info.mesh_i);
+  return ray_isct_bvh_any(ray_local, object_info.mesh_i);
 }
 
-void ray_isct_object(inout Ray ray, uint object_i) {
+void ray_intersect_object(inout Ray ray, uint object_i) {
   ObjectInfo object_info = isct_buff_objc_info[object_i];
   
   if (!object_info.is_active)
     return;
 
-  // Generate object space ray
-  Ray ray_object;
-  ray_object.o = (object_info.trf_inv * vec4(ray.o, 1)).xyz;
-  ray_object.d = (object_info.trf_inv * vec4(ray.d, 0)).xyz;
+  // Generate local ray
+  Ray ray_local;
+  ray_local.o = (object_info.trf_mesh_inv * vec4(ray.o, 1)).xyz;
+  ray_local.d = (object_info.trf_mesh_inv * vec4(ray.d, 0)).xyz;
   
   // Get length and normalize direction
-  // Reuse length to adjust ray_object.t if ray.t is not at infty
-  float dt = length(ray_object.d);
-  ray_object.d /= dt;
-  ray_object.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
+  // Reuse length to adjust ray_local.t if ray.t is not at infty
+  float dt = length(ray_local.d);
+  ray_local.d /= dt;
+  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
 
   // Run intersection; on a hit, recover world-space distance,
   // and store intersection data in ray
-  if (ray_isct_bvh(ray_object, object_info.mesh_i)) {
-    ray.t    = length((object_info.trf * vec4(ray_object.d * ray_object.t, 0)).xyz);
-    ray.data = ray_object.data;
-    ray_set_data_objc(ray, object_i);
+  if (ray_isct_bvh(ray_local, object_info.mesh_i)) {
+    ray.t    = length((object_info.trf_mesh * vec4(ray_local.d * ray_local.t, 0)).xyz);
+    ray.data = ray_local.data;
+    ray_set_data_object(ray, object_i);
   }
 }
 
+bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
+  EmitterInfo em = isct_buff_emtr_info[emitter_i];
+  
+  if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
+    return false;
+
+  // Generate local ray
+  Ray ray_local;
+  ray_local.o = (em.trf_inv * vec4(ray.o, 1)).xyz;
+  ray_local.d = (em.trf_inv * vec4(ray.d, 0)).xyz;
+  
+  // Get length and normalize direction
+  // Reuse length to adjust ray_local.t if ray.t is not at infty
+  float dt = length(ray_local.d);
+  ray_local.d /= dt;
+  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
+
+  bool hit = false;
+  if (em.type == EmitterTypeSphere) {
+    hit = ray_intersect_unit_sphere(ray_local);
+  } else if (em.type == EmitterTypeRect) {
+    hit = ray_intersect_unit_rect(ray_local);
+  }
+
+  if (hit) {
+    ray.t = length((em.trf * vec4(ray_local.d * ray_local.t, 0)).xyz);
+    ray_set_data_emitter(ray, emitter_i);
+  }
+
+  return hit;
+}
+
 bool ray_intersect_scene_any(inout Ray ray) {
-  ray_set_data_anyh(ray, false);
+  ray_set_data_anyhit(ray, false);
 
   for (uint i = 0; i < isct_n_objects; ++i) {
     if (ray_isct_object_any(ray, i)) {
-      ray_set_data_anyh(ray, true);
+      ray_set_data_anyhit(ray, true);
       return true;
     }
   }
@@ -277,17 +356,17 @@ bool ray_intersect_scene_any(inout Ray ray) {
 }
 
 bool ray_intersect_scene(inout Ray ray) {
-  ray_set_data_objc(ray, OBJECT_INVALID);
+  ray_clear(ray);
   
   for (uint i = 0; i < isct_n_objects; ++i) {
-    ray_isct_object(ray, i);
+    ray_intersect_object(ray, i);
+  }
+  
+  for (uint i = 0; i < isct_n_emitters; ++i) {
+    ray_intersect_emitter(ray, i);
   }
 
-  /* for (uint i = 0; i < isct_n_emitters; ++i) {
-    ray_isct_emitter(ray, i);
-  } */
-
-  return ray_get_data_objc(ray) != OBJECT_INVALID;
+  return is_valid(ray);
 }
 
 bool ray_intersect_any(inout Ray ray) {

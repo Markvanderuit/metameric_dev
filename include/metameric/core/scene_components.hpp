@@ -80,20 +80,29 @@ namespace met {
 
   /* Emitter representation; just a simple point light for now */
   struct Emitter {
-    enum class Type { eConstant, ePoint, eArea };
+    // Emitter type; only very basic primitives are supported
+    enum class Type { 
+      eConstant = 0, 
+      ePoint    = 1, 
+      eSphere   = 2, 
+      eRect     = 3
+    } type = Type::eConstant;
 
-    // Is drawn in viewport
+    // Is drawn in viewport?
     bool         is_active    = true;
 
-    eig::Array3f p            = 1.f;  // point light position
-    float        multiplier   = 1.f;  // power multiplier
-    uint         illuminant_i = 0;    // index to spectral illuminant
+    // Position/rotation/scaling are captured in an affine transform
+    eig::Affine3f trf;
+
+    // Spectral data references a scene resource 
+    uint         illuminant_i     = 0;    // index to spectral illuminant
+    float        illuminant_scale = 1.f;  // power multiplier
 
     inline 
     bool operator==(const Emitter &o) const {
-      guard(std::tie(is_active, multiplier, illuminant_i) 
-         == std::tie(o.is_active, o.multiplier, o.illuminant_i), false);
-      return p.isApprox(o.p);
+      guard(std::tie(type, is_active, illuminant_i, illuminant_scale) 
+         == std::tie(o.type, o.is_active, o.illuminant_i, o.illuminant_scale), false);
+      return trf.isApprox(o.trf);
     }
   };
 

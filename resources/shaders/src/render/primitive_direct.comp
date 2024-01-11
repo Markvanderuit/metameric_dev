@@ -34,6 +34,10 @@ layout(binding = 3) uniform b_buff_meshes {
 layout(binding = 4) uniform b_buff_textures {
   TextureInfo data[max_supported_textures];
 } buff_textures;
+layout(binding = 5) uniform b_buff_emitters {
+  uint n;
+  EmitterInfo data[max_supported_objects];
+} buff_emitters;
 
 // Storage buffer declarations
 layout(binding = 0) restrict buffer b_buff_sampler_data {
@@ -68,15 +72,18 @@ layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data,
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;
 
 // Shared memory declarations
-shared ObjectInfo s_objc_info[max_supported_objects];
-shared MeshInfo   s_mesh_info[max_supported_meshes];
-shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
+shared ObjectInfo  s_objc_info[max_supported_objects];
+shared EmitterInfo s_emtr_info[max_supported_objects];
+shared MeshInfo    s_mesh_info[max_supported_meshes];
+shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // Define names of scene buffers to replace preproc in intersect.glsl
 // to work around glsl's lack of ssbo argument passing
+#define isct_n_emitters     buff_emitters.n
 #define isct_n_objects      buff_objects.n
 #define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
 #define isct_buff_objc_info s_objc_info
+#define isct_buff_emtr_info s_emtr_info
 #define isct_buff_bvhs_info s_mesh_info
 #define isct_buff_bvhs_node buff_bvhs_node.data
 #define isct_buff_bvhs_prim buff_bvhs_prim.data
@@ -105,6 +112,9 @@ vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
+  }
+  for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
+    s_mesh_info[i] = buff_meshes.data[i];
   }
   for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
     s_mesh_info[i] = buff_meshes.data[i];
@@ -197,7 +207,7 @@ void main() {
   SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray_from_sensor(ivec2(i)));
 
   // If no object is visible, set to black and early-out
-  if (si.object_i == OBJECT_INVALID) {
+  if (!is_valid(si)) {
     imageStore(b_film, i, vec4(0, 0, 0, 1));
     return;
   }

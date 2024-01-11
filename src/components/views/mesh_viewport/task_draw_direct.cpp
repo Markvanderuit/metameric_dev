@@ -65,7 +65,12 @@ namespace met {
     bool restart_frame = arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings; */
 
     // Offload rendering
-    bool rerender = target_handle.is_mutated() || arcball_handle.is_mutated() || e_scene.components.objects || e_scene.components.settings;
+    bool rerender = target_handle.is_mutated() 
+      || arcball_handle.is_mutated() 
+      || e_scene.components.objects 
+      || e_scene.components.emitters 
+      || e_scene.components.settings;    
+    
     if (rerender) {
       i_renderer.reset(e_sensor, e_scene);
     }

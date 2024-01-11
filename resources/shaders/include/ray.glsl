@@ -27,16 +27,16 @@ struct Ray {
 // Flag value to indicate no object was hit
 #define RAY_INVALID_DATA 0xFFFFFFFF
 #define RAY_OBJECT_FLAG  0x00000000
-#define RAY_EMITTER_FLAG 0x10000000
+#define RAY_EMITTER_FLAG 0x80000000
 
 #define OBJECT_INVALID   0x000000FFu // 8 bits specifically, as we pack the index with this precision
 
 // Helper funtions to embed minor hit data in ray padding
-void ray_set_data_objc(inout Ray ray, in uint i) { ray.data = (ray.data & 0x00FFFFFF) | (i << 24);        }
+/* void ray_set_data_objc(inout Ray ray, in uint i) { ray.data = (ray.data & 0x00FFFFFF) | (i << 24);        }
 void ray_set_data_prim(inout Ray ray, in uint i) { ray.data = (ray.data & 0xFF000000) | (i & 0x00FFFFFF); }
 uint ray_get_data_objc(in    Ray ray)            { return (ray.data >> 24) & 0x000000FF; }
 uint ray_get_data_prim(in    Ray ray)            { return (ray.data & 0x00FFFFFF);       }
-void ray_set_data_anyh(inout Ray ray, in bool b) { ray.data = uint(b); }
+void ray_set_data_anyh(inout Ray ray, in bool b) { ray.data = uint(b); } */
 
 Ray init_ray(vec3 d) {
   Ray ray;
@@ -74,7 +74,7 @@ Ray init_ray(vec3 o, vec3 d, float t_max) {
   return ray;
 }
 
-void clear(inout Ray ray) {
+void ray_clear(inout Ray ray) {
   ray.data = RAY_INVALID_DATA;
 }
 
@@ -84,13 +84,13 @@ void ray_set_data_anyhit(inout Ray ray, in bool hit) {
 
 void ray_set_data_object(inout Ray ray, in uint object_i) {
   ray.data = RAY_OBJECT_FLAG
-           | (object_i & 0x7F << 24)
+           | ((object_i & 0x7F) << 24)
            | (ray.data & 0x00FFFFFF);
 }
 
 void ray_set_data_emitter(inout Ray ray, in uint emitter_i) {
   ray.data = RAY_EMITTER_FLAG
-           | (emitter_i & 0x7F << 24)
+           | ((emitter_i & 0x7F) << 24)
            | (ray.data & 0x00FFFFFF);
 }
 
@@ -114,6 +114,18 @@ bool hit_object(in Ray ray) {
 
 bool hit_emitter(in Ray ray) {
   return (ray.data & RAY_EMITTER_FLAG) != 0;
+}
+
+uint ray_get_object(in Ray ray) {
+  return (ray.data >> 24) & 0x0000007F;
+}
+
+uint ray_get_emitter(in Ray ray) {
+  return (ray.data >> 24) & 0x0000007F;
+}
+
+uint ray_get_object_primitive(in Ray ray) {
+  return ray.data & 0x00FFFFFF;
 }
 
 /* // #define PARENS ()

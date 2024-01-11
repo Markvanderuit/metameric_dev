@@ -34,6 +34,10 @@ layout(binding = 3) uniform b_buff_meshes {
 layout(binding = 4) uniform b_buff_textures {
   TextureInfo data[max_supported_textures];
 } buff_textures;
+layout(binding = 5) uniform b_buff_emitters {
+  uint n;
+  EmitterInfo data[max_supported_objects];
+} buff_emitters;
 
 // Storage buffer declarations
 layout(binding = 0) restrict buffer b_buff_sampler_data {
@@ -68,19 +72,23 @@ layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data,
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;
 
 // Shared memory declarations
-shared ObjectInfo s_objc_info[max_supported_objects];
-shared MeshInfo   s_mesh_info[max_supported_meshes];
-shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
+shared ObjectInfo  s_objc_info[max_supported_objects];
+shared EmitterInfo s_emtr_info[max_supported_objects];
+shared MeshInfo    s_mesh_info[max_supported_meshes];
+shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // Define names of scene buffers to replace preproc in intersect.glsl
 // to work around glsl's lack of ssbo argument passing
 #define isct_n_objects      buff_objects.n
+#define isct_n_emitters     buff_emitters.n
 #define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
 #define isct_buff_objc_info s_objc_info
+#define isct_buff_emtr_info s_emtr_info
 #define isct_buff_bvhs_info s_mesh_info
 #define isct_buff_bvhs_node buff_bvhs_node.data
 #define isct_buff_bvhs_prim buff_bvhs_prim.data
 #include <intersect.glsl>
+#include <emitter.glsl>
 
 // Define names of scene buffers to replace preproc in surface.glsl
 // to work around glsl's lack of ssbo argument passing
@@ -108,6 +116,9 @@ void load_shared() {
   }
   for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
     s_mesh_info[i] = buff_meshes.data[i];
+  }
+  for (uint i = gl_LocalInvocationID.x; i < buff_emitters.n; i += gl_WorkGroupSize.x) {
+    s_emtr_info[i] = buff_emitters.data[i];
   }
   memoryBarrierShared();
   barrier();
@@ -139,7 +150,7 @@ mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
   return csys;
 }
 
-float eval_emitter(in uint emitter_i, in float wvl) {
+/* float eval_emitter(in uint emitter_i, in float wvl) {
   return texture(b_illm_1f, vec2(wvl, emitter_i)).x;
 }
 
@@ -148,7 +159,7 @@ vec4 eval_emitter(in uint emitter_i, in vec4 wvl) {
   for (uint i = 0; i < 4; ++i)
     v[i] = eval_emitter(emitter_i, wvl[i]);
   return v;
-}
+} */
 
 /* // Offset epsilon copied from mitsuba3
 vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
@@ -162,38 +173,40 @@ vec3 sample_emitter_position(inout uint state) {
 }
 
 vec4 eval_env(in vec3 dir, in vec4 wvls) {
-  return vec4(max(0.f, dot(dir, normalize(vec3(0, 1, 0))))) * eval_emitter(0, wvls);
-}
-
-Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
-  Ray ray;
-
-  ray.d = p - si.p;
-  ray.t = length(ray.d);
-  ray.d /= ray.t;
-  ray.o = si.p + 0.0005f * si.n;
-
-  return ray;
+  return vec4(0); // vec4(max(0.f, dot(dir, normalize(vec3(0, 1, 0))))) * eval_emitter(0, wvls);
 }
 
 Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
   Ray ray;
 
-  ray.t = FLT_MAX;
+  ray.o = surface_offset(si, d);
   ray.d = d;
-  ray.o = si.p + 0.0005f * si.n;
+  ray.t = FLT_MAX;
   
   return ray;
 }
 
-Ray ray_from_sensor(in ivec2 i) {
+Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
+  Ray ray;
+
+  ray.o = surface_offset(si, p - si.p);
+  ray.d = p - ray.o;
+  ray.t = length(ray.d);
+  ray.d /= ray.t;
+  // ray.t *= (1.f - M_RAY_EPS * 10.f);
+
+  return ray;
+}
+
+Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
   // Get necessary sensor information
   float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
   float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
   mat4  view_inv = inverse(buff_sensor.view_trf);
 
   // Get pixel center in [-1, 1]
-  vec2 xy = (vec2(i) + 0.5) / vec2(buff_sensor.film_size);
+  // vec2 xy = (vec2(i) + 0.5) / vec2(buff_sensor.film_size);
+  vec2 xy = (vec2(i) + sample_2d) / vec2(buff_sensor.film_size);
   xy = (xy - .5f) * 2.f;
   
   // Generate camera ray
@@ -227,19 +240,31 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
 
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
-    SurfaceInfo si;
+    /*  si;
     if (depth == 0) {
       uvec4 v = texelFetch(b_gbuffer, ivec2(gl_GlobalInvocationID.xy), 0);
       si = get_surface_info(unpack_gbuffer_ray(v), ray);
-    } else {
-      ray_intersect_scene(ray);
-      si = get_surface_info(ray);
-    }
+    } else { */
+      
+    // }
 
-    // If no object is visible, terminate current path
-    if (si.object_i == OBJECT_INVALID) {
+    // If the ray misses, terminate current path
+    if (!ray_intersect_scene(ray)) {
       // if (depth > 0)
       //   radiance += throughput * eval_env(ray.d, wvls);
+      break;
+    }
+
+    // If an emissive object is hit, terminate current path
+    if (hit_emitter(ray)) {
+      EmitterInfo em = s_emtr_info[ray_get_emitter(ray)];
+      radiance = eval_emitter(em, wvls, vec3(0));
+      break;
+    }
+
+    // If no surface object is visible, terminate current path
+    SurfaceInfo si = get_surface_info(ray);
+    if (!is_valid(si)) {
       break;
     }
 
@@ -253,16 +278,17 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
     // Emitter sampling
     {
       // Generate emitter sample position, and ray twards position
+      EmitterInfo em = s_emtr_info[0];
+
       vec3  lpos = sample_emitter_position(state);
       Ray   lray = ray_towards_point(si, lpos);
 
-      // If brdf has throughput, evaluate hit
+      // If brdf has throughput and we are on the same side of a shading normal, evaluate hit
       vec4 f = eval_brdf(brdf, si, lray.d);
-      if (!all(iszero(f)) /* && dot(lray.d, si.n) > 0.f */) {
+      if (!all(iszero(f)) && dot(lray.d, si.sh.n) > 0.f) {
         // If ray evaluates no hit, add contribution to path
         if (!ray_intersect_any(lray)) {
-          vec4 Le    = eval_emitter(0, wvls);
-
+          vec4  Le   = eval_emitter(em, wvls, vec3(0));
           float lpdf = 1.f;
           float bpdf = pdf_brdf(brdf, si, lray.d);
           
@@ -278,8 +304,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
       if (bs.pdf == 0.f)
         break;
       
-      /* if (dot(si.sh.n, bs.wo) <= 0)
-        break; */
+      if (dot(si.sh.n, bs.wo) <= 0)
+        break;
       
       // Update throughput
       throughput *= bs.f/*  / bs.pdf */;
@@ -288,6 +314,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
       ray = ray_towards_direction(si, bs.wo);
     }
 
+    // TODO RR goes here
     // ...
   } // for (uint depth)
 
@@ -305,8 +332,27 @@ void main() {
   uint state = load_state();
 
   // Generate initial camera ray, sample ray's wavelengths
-  Ray ray   = ray_from_sensor(i);
+  Ray ray   = ray_from_sensor(i, next_2d(state));
   vec4 wvls = next_4d(state);
+
+  /* { // TODO remove
+    // ray_intersect_unit_sphere(ray);
+    vec3 v = vec3(0);
+    if (ray_intersect_scene(ray)) {
+      v = ray.o + ray.d * ray.t; // Pos
+    }
+
+    // ray_intersect_scene(ray);
+    // vec3 value = vec3(0);
+    // if (is_valid(ray)) {
+    //   uvec4 v = texelFetch(b_gbuffer, ivec2(gl_GlobalInvocationID.xy), 0);
+    //   SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray);
+    //   // SurfaceInfo si = get_surface_info(ray);
+    //   value = vec3((si.sh.n));
+    // }
+    imageStore(b_film, i, vec4(v, 1));
+    return;
+  } // TODO remove */
 
   // Evaluate ray/wavelength pair
   vec4 L = Li(ray, wvls, state) / vec4(1.f / wavelength_samples);
