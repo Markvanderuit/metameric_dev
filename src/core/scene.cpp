@@ -215,13 +215,14 @@ namespace met {
     resources.illuminants.push("FL11",     models::emitter_cie_fl11,    false);
     resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1, false);
     resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
+    resources.meshes.push("Rectangle",     models::unit_rect, false);
     components.upliftings.emplace("Default uplifting",
       { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     components.colr_systems.push(get_csys_name(csys), csys);
     components.emitters.push("Default D65 emitter", {
       .p = { 0, 1, 0 }, .multiplier = 1.f, .illuminant_i = 0 });
-      
+    
     // Set state to fresh create
     save_path  = "";
     save_state = SaveState::eNew;

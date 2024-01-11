@@ -89,7 +89,7 @@ shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define srfc_buff_elem      buff_mesh_elem.data
 #define srfc_buff_objc_info s_objc_info
 #define srfc_buff_mesh_info s_mesh_info
-#include <surface_from_gbuffer.glsl>
+#include <surface.glsl>
 
 // Define names of scene buffers to replace preproc in brdf.glsl
 // to work around glsl's lack of ssbo argument passing
@@ -129,10 +129,10 @@ void store_state(in uvec2 state) {
   buff_sampler_data.data[i] = state;
 }
 
-SurfaceInfo sample_gbuffer(in uvec2 i) {
+/* SurfaceInfo sample_gbuffer(in uvec2 i) {
   uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
   return get_surface_info(unpack_gbuffer_ray(v));
-}
+} */
 
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
   // TODO sample by observer data instead

@@ -1,7 +1,9 @@
 #ifndef BRDF_GLSL_GUARD
 #define BRDF_GLSL_GUARD
 
+#include <math.glsl>
 #include <scene.glsl>
+#include <surface.glsl>
 
 // This header requires the following defines to point to SSBOs or shared memory
 // to work around glsl's lack of ssbo argument passing
@@ -10,13 +12,40 @@
 // #define brdf_txtr_bary      b_bary_4f
 // #define brdf_txtr_spec      b_spec_4f
 
+vec2 square_to_unif_disk_concentric(in vec2 sample_2d) {
+  sample_2d = 2.f * sample_2d - 1.f;
+
+  bool is_zero     = all(iszero(sample_2d));
+  bool quad_1_or_3 = abs(sample_2d.x) < abs(sample_2d.y);
+
+  float r  = quad_1_or_3 ? sample_2d.y : sample_2d.x,
+        rp = quad_1_or_3 ? sample_2d.x : sample_2d.y;
+  
+  float phi = 0.25f * M_PI * rp / r;
+  if (quad_1_or_3)
+    phi = .5f * M_PI - phi;
+  if (all(iszero(sample_2d)))
+    phi = 0.f;
+
+  return vec2(r * cos(phi), r * sin(phi));
+}
+
+vec3 square_to_cos_hemisphere(in vec2 sample_2d) {
+  vec2 p = square_to_unif_disk_concentric(sample_2d);
+  return vec3(p, sqrt(max(1.f - sdot(p), 0.f)));
+}
+
+float square_to_cos_hemisphere_pdf(in vec3 v) {
+  return M_PI_INV * v.z;
+}
+
+// Partial BRDF data, used to front-load some intermediary work
 struct PreliminaryBRDF {
   int   index; // -1 if they differ, index otherwise
   vec3  tx;    // Barycentric texture coordinate
 };
 
-// Simple diffuse BRDF whose albedo underlies
-// a spectral material
+// Simple diffuse BRDF data whose albedo underlies a spectral material
 struct BRDF {
   vec4 r; // Surface albedo for four wavelengths
 };
@@ -96,6 +125,53 @@ BRDF get_surface_brdf(in SurfaceInfo si, vec4 wavelength) {
   BRDF brdf;
   PreliminaryBRDF pr = get_surface_brdf_preliminary(si);
   return get_surface_brdf(pr, wavelength);
+}
+
+struct BRDFSample {
+  vec3  wo;  // Sampled exitant direction in world frame
+  vec4  f;   // Evaluated throughput for sample
+  float pdf; // Sample pdf
+};
+
+BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
+  BRDFSample bs;
+
+ /*  if (frame_cos_theta(si.wi) <= 0.f) {
+    bs.pdf = 0.f;
+    return bs;
+  } */
+
+  vec3 wo = square_to_cos_hemisphere(sample_2d);
+
+  bs.f   = vec4(1); // brdf.r;
+  bs.pdf = square_to_cos_hemisphere_pdf(wo);
+  bs.wo  = frame_to_world(si.sh, wo);
+
+  return bs;
+}
+
+vec4 eval_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
+  wo = frame_to_local(si.sh, wo);
+
+  /* float cos_theta_i = frame_cos_theta(si.wi), 
+        cos_theta_o = frame_cos_theta(wo);
+  
+  if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
+    return vec4(0.f); */
+    
+  return /* brdf.r */ vec4(1) * M_PI_INV * abs(frame_cos_theta(wo));
+}
+
+float pdf_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
+  wo = frame_to_local(si.sh, wo);
+
+  /* float cos_theta_i = frame_cos_theta(si.wi), 
+        cos_theta_o = frame_cos_theta(wo);
+
+  if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
+    return 0.f; */
+  
+  return square_to_cos_hemisphere_pdf(wo);
 }
 
 #endif // BRDF_GLSL_GUARD

@@ -89,7 +89,7 @@ shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define srfc_buff_elem      buff_mesh_elem.data
 #define srfc_buff_objc_info s_objc_info
 #define srfc_buff_mesh_info s_mesh_info
-#include <surface_from_gbuffer.glsl>
+#include <surface.glsl>
 
 // Define names of scene buffers to replace preproc in brdf.glsl
 // to work around glsl's lack of ssbo argument passing
@@ -128,11 +128,6 @@ void store_state(in uint state) {
   buff_sampler_data.data[i] = state;
 }
 
-SurfaceInfo sample_gbuffer(in uvec2 i) {
-  uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
-  return get_surface_info(unpack_gbuffer_ray(v));
-}
-
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
   // TODO sample by observer data instead
   return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz *
@@ -168,6 +163,25 @@ bool test_visibility(inout uint state, in SurfaceInfo si) {
   return !ray_intersect_any(ray);
 }
 
+Ray ray_from_sensor(in ivec2 i) {
+  // Get necessary sensor information
+  float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
+  float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
+  mat4  view_inv = inverse(buff_sensor.view_trf);
+
+  // Get pixel center in [-1, 1]
+  vec2 xy = (vec2(i) + 0.5) / vec2(buff_sensor.film_size);
+  xy = (xy - .5f) * 2.f;
+  
+  // Generate camera ray
+  Ray ray;
+  ray.o = (view_inv * vec4(0, 0, 0, 1)).xyz;
+  ray.d = normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz);
+  ray.t = FLT_MAX;
+
+  return ray;
+}
+
 void main() {
   load_shared();
 
@@ -179,7 +193,8 @@ void main() {
   uint state = load_state();
 
   // Obtain surface information from a first ray hit, by extracting data from a gbuffer
-  SurfaceInfo si = sample_gbuffer(i);
+  uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
+  SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray_from_sensor(ivec2(i)));
 
   // If no object is visible, set to black and early-out
   if (si.object_i == OBJECT_INVALID) {

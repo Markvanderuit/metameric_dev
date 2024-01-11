@@ -8,8 +8,10 @@
 #define FLT_MIN  1.175494351e-38
 
 // Define math constants
-#define M_PI  3.14159265358979f
-#define M_EPS 1.192092896e-07f // 0.0000000001f
+#define M_PI     3.14159265358979323846f
+#define M_PI_INV 0.31830988618379067154f
+#define M_EPS    5.9604645e-8f
+// #define M_EPS    1.192092896e-07f // 0.0000000001f
 // #define M_EPS 0x1p-24
 
 // Rounded-up division functions
@@ -95,8 +97,8 @@ float sdot(in vec4 v) { return dot(v, v); }
 // iszero(...) for short, fast zero check
 
 #define IS_ZERO(type, n)                      \
-  bvec ## n iszero(in type ## vec ## n v) {   \
-    return equal(v, type ## vec ## n ##(0)); \
+  bvec##n iszero(in type##vec##n v) {   \
+    return equal(v, type##vec##n(0));  \
   }
 
 #define IS_ZERO_ALL_N(type) \

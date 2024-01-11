@@ -1,5 +1,6 @@
 #include <preamble.glsl>
 #include <gbuffer.glsl>
+#include <ray.glsl>
 #include <scene.glsl>
 
 // Fragment early-Z declaration
@@ -25,6 +26,25 @@ layout(binding = 2) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
+
+
+Ray ray_from_sensor() {
+  // Get necessary sensor information
+  float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
+  float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
+  mat4  view_inv = inverse(buff_sensor.view_trf);
+
+  // Get pixel center in [-1, 1]
+  vec2 xy = (vec2(gl_FragCoord.xy) / vec2(buff_sensor.film_size) - .5f) * 2.f;
+  
+  // Generate camera ray
+  Ray ray;
+  ray.o = (view_inv * vec4(0, 0, 0, 1)).xyz;
+  ray.d = normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz);
+  ray.t = FLT_MAX;
+
+  return ray;
+}
 
 void main() {
   // ObjectInfo object_info = buff_objects.data[in_value_i];

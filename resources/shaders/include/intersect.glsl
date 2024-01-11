@@ -79,13 +79,13 @@ bool ray_isct_prim(inout Ray ray, in vec3 a, in vec3 b, in vec3 c) {
 bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
+  MeshInfo mesh_info = isct_buff_bvhs_info[bvh_i];
+
   // Initiate stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes
   isct_stack[0] = 1u << bvh_stck_offset;
-
-  // Traversal values; there is one value on the stack
-  uint stckc = 1;
+  uint stckc    = 1;
 
   // Continue traversal until stack is once again empty
   while (stckc > 0) {
@@ -103,8 +103,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
       stckc--;
     
     // Index of next node in buffer
-    uint node_i = isct_buff_bvhs_info[bvh_i].nodes_offs 
-                + node_first + node_bit;
+    uint node_i = mesh_info.nodes_offs + node_first + node_bit;
 
     // Obtain and unpack next node
     BVHNode node = unpack(isct_buff_bvhs_node[node_i]);
@@ -113,8 +112,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
       // Iterate the node's primitives
       for (uint i = 0; i < bvh_size(node); ++i) {
         // Index of next prim in buffer
-        uint prim_i = isct_buff_bvhs_info[bvh_i].prims_offs 
-                    + bvh_offs(node) + i;
+        uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
         BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
@@ -147,14 +145,14 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
 bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
+  MeshInfo mesh_info = isct_buff_bvhs_info[bvh_i];
+
   // Initiate stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes
   isct_stack[0] = 1u << bvh_stck_offset;
-
-  // Traversal values; there is one value on the stack
-  uint stckc = 1; 
-  bool hit    = false;
+  uint stckc    = 1; 
+  bool hit      = false;
 
   // Continue traversal until stack is once again empty
   while (stckc > 0) {
@@ -172,8 +170,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
       stckc--;
     
     // Index of next node in buffer
-    uint node_i = isct_buff_bvhs_info[bvh_i].nodes_offs 
-                + node_first + node_bit;
+    uint node_i = mesh_info.nodes_offs + node_first + node_bit;
 
     // Obtain and unpack next node
     BVHNode node = unpack(isct_buff_bvhs_node[node_i]);
@@ -182,15 +179,14 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
       // Iterate the node's primitives
       for (uint i = 0; i < bvh_size(node); ++i) {
         // Index of next prim in buffer
-        uint prim_i = isct_buff_bvhs_info[bvh_i].prims_offs 
-                    + bvh_offs(node) + i;
+        uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
         BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
-          set_ray_data_prim(ray, bvh_offs(node) + i);
+          ray_set_data_prim(ray, bvh_offs(node) + i);
           hit = true;
         }
       }
@@ -256,27 +252,42 @@ void ray_isct_object(inout Ray ray, uint object_i) {
   if (ray_isct_bvh(ray_object, object_info.mesh_i)) {
     ray.t    = length((object_info.trf * vec4(ray_object.d * ray_object.t, 0)).xyz);
     ray.data = ray_object.data;
-    set_ray_data_objc(ray, object_i);
+    ray_set_data_objc(ray, object_i);
   }
 }
 
 bool ray_intersect_scene_any(inout Ray ray) {
-  set_ray_data_anyh(ray, false);
+  ray_set_data_anyh(ray, false);
+
   for (uint i = 0; i < isct_n_objects; ++i) {
     if (ray_isct_object_any(ray, i)) {
-      set_ray_data_anyh(ray, true);
+      ray_set_data_anyh(ray, true);
       return true;
     }
   }
+  
+  /* for (uint i = 0; i < isct_n_emitters; ++i) {
+    if (ray_isct_emitter_any(ray, i)) {
+      ray_set_data_anyh(ray, true);
+      return true;
+    }
+  } */
+
   return false;
 }
 
 bool ray_intersect_scene(inout Ray ray) {
-  set_ray_data_objc(ray, OBJECT_INVALID);
+  ray_set_data_objc(ray, OBJECT_INVALID);
+  
   for (uint i = 0; i < isct_n_objects; ++i) {
     ray_isct_object(ray, i);
   }
-  return get_ray_data_objc(ray) != OBJECT_INVALID;
+
+  /* for (uint i = 0; i < isct_n_emitters; ++i) {
+    ray_isct_emitter(ray, i);
+  } */
+
+  return ray_get_data_objc(ray) != OBJECT_INVALID;
 }
 
 bool ray_intersect_any(inout Ray ray) {

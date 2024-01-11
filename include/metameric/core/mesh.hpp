@@ -164,4 +164,9 @@ namespace met {
     auto trnf = unitize_mesh(copy);
     return { copy, trnf };
   }
+
+  /* Define pre-included mesh data */
+  namespace models {
+    extern Mesh unit_rect;
+  } // namespace models
 } // namespace met

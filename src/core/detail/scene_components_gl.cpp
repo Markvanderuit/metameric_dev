@@ -120,7 +120,7 @@ namespace met::detail {
 
     guard(!objects.empty());
     guard(scene.components.objects);
-    fmt::print("Type updated: {}\n", typeid(decltype(objects)::value_type).name());
+    // fmt::print("Type updated: {}\n", typeid(decltype(objects)::value_type).name());
 
     // Set appropriate object count, then flush change to buffer
     *m_buffer_map_size = static_cast<uint>(objects.size());
@@ -205,7 +205,7 @@ namespace met::detail {
     guard(scene.components.upliftings                || 
           scene.components.objects                   ||
           scene.components.settings.state.texture_size);
-    fmt::print("Type updated: {}\n", typeid(decltype(upliftings)::value_type).name());
+    // fmt::print("Type updated: {}\n", typeid(decltype(upliftings)::value_type).name());
     
     // Gather necessary texture sizes for each object
     std::vector<eig::Array2u> inputs(e_objects.size());
@@ -285,7 +285,7 @@ namespace met::detail {
 
     guard(!meshes.empty());
     guard(scene.resources.meshes);
-    fmt::print("Type updated: {}\n", typeid(decltype(meshes)::value_type).name());
+    // fmt::print("Type updated: {}\n", typeid(decltype(meshes)::value_type).name());
 
     // Resize cache vectors, which keep cleaned, simplified mesh data around 
     m_meshes.resize(meshes.size());
@@ -417,7 +417,7 @@ namespace met::detail {
     
     guard(!images.empty());
     guard(scene.resources.images || scene.components.settings.state.texture_size);
-    fmt::print("Type updated: {}\n", typeid(decltype(images)::value_type).name());
+    // fmt::print("Type updated: {}\n", typeid(decltype(images)::value_type).name());
 
     // Get texture settings, which are relevant
     const auto &e_settings = scene.components.settings.value;
@@ -516,7 +516,7 @@ namespace met::detail {
     met_trace_full();
 
     guard(scene.resources.illuminants);
-    fmt::print("Type updated: {}\n", typeid(decltype(illm)::value_type).name());
+    // fmt::print("Type updated: {}\n", typeid(decltype(illm)::value_type).name());
     
     for (uint i = 0; i < illm.size(); ++i) {
       const auto &[value, state] = illm[i];
@@ -540,7 +540,7 @@ namespace met::detail {
     met_trace_full();
 
     guard(scene.resources.observers);
-    fmt::print("Type updated: {}\n", typeid( decltype(cmfs)::value_type).name());
+    // fmt::print("Type updated: {}\n", typeid( decltype(cmfs)::value_type).name());
     
     for (uint i = 0; i < cmfs.size(); ++i) {
       const auto &[value, state] = cmfs[i];

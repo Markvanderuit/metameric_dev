@@ -70,155 +70,169 @@ shared ObjectInfo s_objc_info[max_supported_objects];
 shared MeshInfo   s_bvhs_info[max_supported_meshes];
 shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
-// Define names of scene buffers to replace preproc in intersect.glsl
-// to work around glsl's lack of ssbo argument passing
-#define isct_n_objects      buff_objects.n
-#define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
-#define isct_buff_objc_info s_objc_info
-#define isct_buff_bvhs_info s_bvhs_info
-#define isct_buff_bvhs_node buff_bvhs_node.data
-#define isct_buff_bvhs_prim buff_bvhs_prim.data
-#define srfc_buff_prim      buff_bvhs_prim.data
-#define srfc_buff_vert      buff_mesh_vert.data
-#define srfc_buff_elem      buff_mesh_elem.data
-#define srfc_buff_mesh_info s_bvhs_info
-#define srfc_buff_objc_info s_objc_info
-#include <intersect.glsl>
-#include <surface.glsl>
-#include <surface_from_gbuffer.glsl>
+// // Define names of scene buffers to replace preproc in intersect.glsl
+// // to work around glsl's lack of ssbo argument passing
+// #define isct_n_objects      buff_objects.n
+// #define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
+// #define isct_buff_objc_info s_objc_info
+// #define isct_buff_bvhs_info s_bvhs_info
+// #define isct_buff_bvhs_node buff_bvhs_node.data
+// #define isct_buff_bvhs_prim buff_bvhs_prim.data
+// #include <intersect.glsl>
 
-// Hardcoded value for now
-vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
+// #define srfc_buff_prim      buff_bvhs_prim.data
+// #define srfc_buff_vert      buff_mesh_vert.data
+// #define srfc_buff_elem      buff_mesh_elem.data
+// #define srfc_buff_mesh_info s_bvhs_info
+// #define srfc_buff_objc_info s_objc_info
+// #include <surface.glsl>
 
-void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
-    s_objc_info[i] = buff_objects.data[i];
-  }
-  for (uint i = gl_LocalInvocationID.x; i < buff_bvhs_info.n; i += gl_WorkGroupSize.x) {
-    s_bvhs_info[i] = buff_bvhs_info.data[i];
-  }
-  memoryBarrierShared();
-  barrier();
-}
+// // Hardcoded value for now
+// vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
 
-SurfaceInfo sample_gbuffer(in uvec2 i) {
-  uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
-  return get_surface_info(unpack_gbuffer_ray(v));
-}
+// void load_shared() {
+//   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
+//     s_objc_info[i] = buff_objects.data[i];
+//   }
+//   for (uint i = gl_LocalInvocationID.x; i < buff_bvhs_info.n; i += gl_WorkGroupSize.x) {
+//     s_bvhs_info[i] = buff_bvhs_info.data[i];
+//   }
+//   memoryBarrierShared();
+//   barrier();
+// }
 
-vec3 sample_colsys(in uint colsys_i, in float wvl) {
-  // TODO sample by observer data instead
-  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz *
-         texture(b_illm_1f, vec2(wvl, colsys_i)).x   * .01f; // TODO fix integration through exposure
-  // return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
-}
+// vec3 sample_colsys(in uint colsys_i, in float wvl) {
+//   // TODO sample by observer data instead
+//   return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz *
+//          texture(b_illm_1f, vec2(wvl, colsys_i)).x   * .01f; // TODO fix integration through exposure
+//   // return texture(b_csys_3f, vec2(wvl, colsys_i)).xyz;
+// }
 
-uvec4 sample_uplift_bary_indices(in ObjectInfo object_info, in vec3 tx_bary) {
-  return uvec4(textureGather(b_bary_4f, tx_bary, 3)); // fourth channel is non-variant :D
-}
+// uvec4 sample_uplift_bary_indices(in ObjectInfo object_info, in vec3 tx_bary) {
+//   return uvec4(textureGather(b_bary_4f, tx_bary, 3)); // fourth channel is non-variant :D
+// }
 
-float sample_uplift_refl(in vec4 bary, in float wvl) {
-  // Extract tesselation index from packing, and replace with correct weight w
-  uint elem_i = uint(bary.w);
-  bary.w = 1.f - hsum(bary.xyz);
+// float sample_uplift_refl(in vec4 bary, in float wvl) {
+//   // Extract tesselation index from packing, and replace with correct weight w
+//   uint elem_i = uint(bary.w);
+//   bary.w = 1.f - hsum(bary.xyz);
   
-  // Recover recovered surface reflectance for given wavelength as a dot product
-  return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
-}
+//   // Recover recovered surface reflectance for given wavelength as a dot product
+//   return dot(bary, texture(b_spec_4f, vec2(wvl, elem_i)));
+// }
 
-vec3 fetch_color_part(inout uint state, in SurfaceInfo si, in uvec3 px) {
-  vec3 value = vec3(0);
+// vec3 fetch_color_part(inout uint state, in SurfaceInfo si, in uvec3 px) {
+//   vec3 value = vec3(0);
   
-  // Element indices differ, so sample weights separately
-  vec4 bary = texelFetch(b_bary_4f, ivec3(px), 0);
+//   // Element indices differ, so sample weights separately
+//   vec4 bary = texelFetch(b_bary_4f, ivec3(px), 0);
   
-  // Take direct light samples
-  for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
-    // Sample next wavelength
-    float wvl = next_1d(state); 
+//   // Take direct light samples
+//   for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+//     // Sample next wavelength
+//     float wvl = next_1d(state); 
     
-    // Evaluate surface reflectance and color system spectra at wavelength,
-    // then add to direct lighting estiamte
-    float r = sample_uplift_refl(bary, wvl);
-    vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
+//     // Evaluate surface reflectance and color system spectra at wavelength,
+//     // then add to direct lighting estiamte
+//     float r = sample_uplift_refl(bary, wvl);
+//     vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
 
-    // Apply result
-    value += csys * r;
-  } // for (uint i)
+//     // Apply result
+//     value += csys * r;
+//   } // for (uint i)
 
-  float cos_theta = dot(si.ns, normalize(hardcoded_lpos - si.p));
-  return value * float(wavelength_samples) * cos_theta;
-}
+//   float cos_theta = dot(si.sh.n, normalize(hardcoded_lpos - si.p));
+//   return value * float(wavelength_samples) * cos_theta;
+// }
 
-vec3 fetch_color(inout uint state, in ObjectInfo object_info, in vec3 tx_full, in SurfaceInfo si) {
-  const uvec2 texel_offsets[4] = uvec2[4](uvec2(0, 0), uvec2(1, 0), uvec2(0, 1), uvec2(1, 1));
+// vec3 fetch_color(inout uint state, in ObjectInfo object_info, in vec3 tx_full, in SurfaceInfo si) {
+//   const uvec2 texel_offsets[4] = uvec2[4](uvec2(0, 0), uvec2(1, 0), uvec2(0, 1), uvec2(1, 1));
   
-  // Scale up to full texture size
-  tx_full *= vec3(textureSize(b_bary_4f, 0).xy, 1);
-  tx_full -= vec3(0.5, 0.5, 0);
+//   // Scale up to full texture size
+//   tx_full *= vec3(textureSize(b_bary_4f, 0).xy, 1);
+//   tx_full -= vec3(0.5, 0.5, 0);
 
-  uvec3 tx_floor = uvec3(tx_full);
-  vec2  alpha    = mod(tx_full.xy, 1.f);
+//   uvec3 tx_floor = uvec3(tx_full);
+//   vec2  alpha    = mod(tx_full.xy, 1.f);
 
-  vec3[4] values;
-  uint    state_;
-  for (uint i = 0; i < 4; ++i) {
-    // Reuse random state for every fetch so it samples the same wavelength
-    state_ = state;
-    values[i] = fetch_color_part(state_, si, tx_floor + uvec3(texel_offsets[i], 0));
-  }
-  state = state_;
+//   vec3[4] values;
+//   uint    state_;
+//   for (uint i = 0; i < 4; ++i) {
+//     // Reuse random state for every fetch so it samples the same wavelength
+//     state_ = state;
+//     values[i] = fetch_color_part(state_, si, tx_floor + uvec3(texel_offsets[i], 0));
+//   }
+//   state = state_;
 
-  return mix(mix(values[0], values[1], alpha.x), mix(values[2], values[3], alpha.x), alpha.y);
-}
+//   return mix(mix(values[0], values[1], alpha.x), mix(values[2], values[3], alpha.x), alpha.y);
+// }
 
-vec3 sample_color(inout uint state, in ObjectInfo object_info, in vec3 tx_bary, in SurfaceInfo si) {
-  vec3 value = vec3(0);
+// vec3 sample_color(inout uint state, in ObjectInfo object_info, in vec3 tx_bary, in SurfaceInfo si) {
+//   vec3 value = vec3(0);
 
-  // All element indices are the same, so sample barycentric weights directly
-  vec4 bary = textureLod(b_bary_4f, tx_bary, 0);
+//   // All element indices are the same, so sample barycentric weights directly
+//   vec4 bary = textureLod(b_bary_4f, tx_bary, 0);
   
-  // Take direct light samples
-  for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
-    // Sample next wavelength
-    float wvl = next_1d(state); 
+//   // Take direct light samples
+//   for (uint i = 0; i < buff_sampler.n_iters_per_dispatch; ++i) {
+//     // Sample next wavelength
+//     float wvl = next_1d(state); 
     
-    // Evaluate surface reflectance and color system spectra at wavelength,
-    // then add to direct lighting estiamte
-    float r = sample_uplift_refl(bary, wvl);
-    vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
+//     // Evaluate surface reflectance and color system spectra at wavelength,
+//     // then add to direct lighting estiamte
+//     float r = sample_uplift_refl(bary, wvl);
+//     vec3 csys = sample_colsys(0, wvl); // TODO should be observer?
 
-    value += csys * r;
-  } // for (uint i)
+//     value += csys * r;
+//   } // for (uint i)
 
-  float cos_theta = dot(si.ns, normalize(hardcoded_lpos - si.p));
-  return value * float(wavelength_samples) * cos_theta;
-}
+//   float cos_theta = dot(si.sh.n, normalize(hardcoded_lpos - si.p));
+//   return value * float(wavelength_samples) * cos_theta;
+// }
 
-// Offset epsilon copied from mitsuba3
-vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
-  float mag = 1.f + hmax(abs(si.p)) + 1500.f * M_EPS;
-  mag = dot(si.n, d) >= 0 ? mag : -mag;
-  return fma(vec3(mag), si.n, si.p);
-}
+// // Offset epsilon copied from mitsuba3
+// vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
+//   float mag = 1.f + hmax(abs(si.p)) + 1500.f * M_EPS;
+//   mag = dot(si.n, d) >= 0 ? mag : -mag;
+//   return fma(vec3(mag), si.n, si.p);
+// }
 
-bool test_visibility(inout uint state, in SurfaceInfo si) {
-  vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
+// bool test_visibility(inout uint state, in SurfaceInfo si) {
+//   vec3 lpos = hardcoded_lpos + next_3d(state) * 4.f - 2.f;
   
-  Ray ray;
-  ray.d = lpos - si.p;
-  ray.t = length(ray.d);
-  ray.d /= ray.t;
-  ray.o = si.p + 0.001f * si.n;
+//   Ray ray;
+//   ray.d = lpos - si.p;
+//   ray.t = length(ray.d);
+//   ray.d /= ray.t;
+//   ray.o = si.p + 0.001f * si.n;
 
-  // Mistake; gbuffer normal is not geometric normal!
-  // ray.o = si.p + gen_offset_p(si, ray.d);
+//   // Mistake; gbuffer normal is not geometric normal!
+//   // ray.o = si.p + gen_offset_p(si, ray.d);
 
-  return !ray_intersect_any(ray);
-}
+//   return !ray_intersect_any(ray);
+// }
+
+// Ray ray_from_sensor(in ivec2 i) {
+//   // Get necessary sensor information
+//   float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
+//   float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
+//   mat4  view_inv = inverse(buff_sensor.view_trf);
+
+//   // Get pixel center in [-1, 1]
+//   vec2 xy = (vec2(i) + 0.5) / vec2(buff_sensor.film_size);
+//   xy = (xy - .5f) * 2.f;
+  
+//   // Generate camera ray
+//   Ray ray;
+//   ray.o = (view_inv * vec4(0, 0, 0, 1)).xyz;
+//   ray.d = normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz);
+//   ray.t = FLT_MAX;
+
+//   return ray;
+// }
 
 void main() {
-  load_shared();
+  /* load_shared();
 
   // 2D/1D image/buffer coordinates
   const uvec2 i = gl_GlobalInvocationID.xy;
@@ -231,7 +245,8 @@ void main() {
     state = buff_state.data[j];
 
   // Obtain surface information from a first ray hit, by extracting data from a gbuffer
-  SurfaceInfo si = sample_gbuffer(i);
+  uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
+  SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray_from_sensor(ivec2(i)));
 
   // If no object is visible, set to black and early-out
   if (si.object_i == OBJECT_INVALID) {
@@ -269,5 +284,5 @@ void main() {
 
   // Store updated image value and sampler state
   imageStore(b_target_4f, ivec2(i), vec4(value, 1));
-  buff_state.data[j] = state;
+  buff_state.data[j] = state; */
 }

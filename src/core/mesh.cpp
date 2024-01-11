@@ -37,6 +37,33 @@ namespace met {
     }
   }
 
+  namespace models {
+    Mesh unit_rect = {
+      .verts = {
+        eig::Array3f(0, 0, 0),
+        eig::Array3f(1, 0, 0),
+        eig::Array3f(0, 1, 0),
+        eig::Array3f(1, 1, 0)
+      },
+      .elems = {
+        eig::Array3u(0, 1, 2),
+        eig::Array3u(1, 3, 2)
+      },
+      .norms = {
+        eig::Array3f(0, 0, 1),
+        eig::Array3f(0, 0, 1),
+        eig::Array3f(0, 0, 1),
+        eig::Array3f(0, 0, 1)
+      },
+      .txuvs = {
+        eig::Array2f(0, 0),
+        eig::Array2f(1, 0),
+        eig::Array2f(0, 1),
+        eig::Array2f(1, 1)
+      }
+    };
+  } // namespace models
+
   template <typename OutputMesh, typename InputMesh>
   OutputMesh convert_mesh(const InputMesh &mesh) requires std::same_as<OutputMesh, InputMesh> {
     met_trace_n("Passthrough");
@@ -382,15 +409,17 @@ namespace met {
     // Establish bounding box around mesh's vertices
     eig::Array3f minb = std::reduce(std::execution::par_unseq,
                                     range_iter(mesh.verts),
-                                    eig::Array3f(std::numeric_limits<float>::max()),
+                                    mesh.verts[0],
                                     [](auto a, auto b) { return a.cwiseMin(b).eval(); });
     eig::Array3f maxb = std::reduce(std::execution::par_unseq,
                                     range_iter(mesh.verts),
-                                    eig::Array3f(std::numeric_limits<float>::min()),
+                                    mesh.verts[0],
                                     [](auto a, auto b) { return a.cwiseMax(b).eval(); });
     
     // Generate transformation to move vertices to a [0, 1] bbox
-    auto trf = (eig::Scaling((1.f / (maxb - minb)).matrix().eval()) 
+    auto scale = (maxb - minb).eval();
+    scale = (scale.array().abs() != 0.f).select(1.f / scale, eig::Array3f(1));
+    auto trf = (eig::Scaling((scale).matrix().eval()) 
              *  eig::Translation3f(-minb)).matrix();
     
     // Apply transformation to each point

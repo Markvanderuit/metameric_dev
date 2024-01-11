@@ -94,13 +94,13 @@ namespace met {
     auto &i_sensor  = info("gbuffer_sensor").getw<Sensor>();
     auto &i_gbuffer = info("gbuffer_renderer").getw<detail::GBuffer>();
 
-    i_sensor.film_size = e_target.size();
+    i_sensor.film_size = e_target.size() / 2;
     i_sensor.proj_trf  = e_arcball.proj().matrix();
     i_sensor.view_trf  = e_arcball.view().matrix();
     i_sensor.flush();
     
     // Forward to gbuffer draw
-    i_gbuffer.render(i_sensor, e_scene);
+    // i_gbuffer.render(i_sensor, e_scene);
 
     /* // Assemble appropriate draw data for each object in the scene
     m_draw.bindable_array = &e_scene.resources.meshes.gl.array;

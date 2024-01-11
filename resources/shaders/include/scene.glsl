@@ -20,6 +20,10 @@ struct MeshInfo {
   uint nodes_size;
 };
 
+
+#define ObjectTypeSurface 0x01
+#define ObjectTypeEmitter 0x02
+
 // Info object to gather Scene::Object data
 struct ObjectInfo {
   // Transform and inverse transform data
@@ -49,13 +53,39 @@ struct TextureInfo {
   vec2  uv1;   // Maximum uv value, at region's pixel offset + size
 };
 
+#define EmitterTypeConstant 0x01
+#define EmitterTypePoint    0x02
+#define EmitterTypeArea     0x04
+
+// Info object to gather Scene::Emitter data
+// Given the lack of unions, emitters store additional data
+struct EmitterInfo {
+  // Type of emitter; constant, point, area
+  uint type;
+
+  // Should the emitter be interacted with?
+  bool is_active;    
+
+  // General data
+  uint  illuminant_i;     // Index of spd data
+  float illuminant_scale; // Scalar multiplier applied to spd samples
+
+  // Point light data
+  vec3 point_p;
+
+  // Area light data
+  mat4 area_trf;
+  mat4 area_trf_inv; 
+  uint area_mesh_i; // Index of attached surface              
+};
+
 // Atlas access info
 struct AtlasLayout {
-  uint layer;  // layer in texture array in which the patch is located
-  uvec2 offs;  // offset in pixels to texture's region storing this patch
-  uvec2 size;  // size in pixels of texture's region storing this patch
-  vec2  uv0;   // Minimum uv value, at region's offset
-  vec2  uv1;   // Maximum uv value, at region's offset + size
+  uint  layer;  // layer in texture array in which the patch is located
+  uvec2 offs;   // offset in pixels to texture's region storing this patch
+  uvec2 size;   // size in pixels of texture's region storing this patch
+  vec2  uv0;    // Minimum uv value, at region's offset
+  vec2  uv1;    // Maximum uv value, at region's offset + size
 };
 
 #endif // SCENE_GLSL_GUARD

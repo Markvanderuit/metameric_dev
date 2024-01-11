@@ -38,21 +38,6 @@ namespace met {
     auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
   };
 
-  /* Emitter representation; just a simple point light for now */
-  struct Emitter {
-    bool         is_active    = true; // Is drawn in viewport
-    eig::Array3f p            = 1.f; // point light position
-    float        multiplier   = 1.f; // power multiplier
-    uint         illuminant_i = 0;   // index to spectral illuminant
-
-    inline 
-    bool operator==(const Emitter &o) const {
-      guard(std::tie(is_active, multiplier, illuminant_i) 
-         == std::tie(o.is_active, o.multiplier, o.illuminant_i), false);
-      return p.isApprox(o.p);
-    }
-  };
-
   /* Object representation; 
      A shape represented by a surface mesh, material data, 
      and an accompanying uplifting to handle spectral data. */
@@ -74,7 +59,8 @@ namespace met {
 
     // Position/rotation/scale are captured in an affine transform
     eig::Affine3f trf;
-
+    
+  public:
     inline 
     bool operator==(const Object &o) const {
       guard(std::tie(is_active, mesh_i, uplifting_i) == std::tie(o.is_active, o.mesh_i, o.uplifting_i), false);
@@ -89,6 +75,25 @@ namespace met {
         case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
       }
       return trf.isApprox(o.trf);
+    }
+  };
+
+  /* Emitter representation; just a simple point light for now */
+  struct Emitter {
+    enum class Type { eConstant, ePoint, eArea };
+
+    // Is drawn in viewport
+    bool         is_active    = true;
+
+    eig::Array3f p            = 1.f;  // point light position
+    float        multiplier   = 1.f;  // power multiplier
+    uint         illuminant_i = 0;    // index to spectral illuminant
+
+    inline 
+    bool operator==(const Emitter &o) const {
+      guard(std::tie(is_active, multiplier, illuminant_i) 
+         == std::tie(o.is_active, o.multiplier, o.illuminant_i), false);
+      return p.isApprox(o.p);
     }
   };
 
