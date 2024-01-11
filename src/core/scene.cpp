@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <execution>
 #include <format>
+#include <numbers>
 #include <queue>
 #include <unordered_map>
 
@@ -223,9 +224,14 @@ namespace met {
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     components.colr_systems.push(get_csys_name(csys), csys);
 
+    eig::Affine3f trf(eig::AngleAxisf(std::numbers::pi_v<float> * -.25,  eig::Vector3f(0, 1, 0))
+                    * eig::Translation3f({ 1, 2, 0 })
+                    * eig::AngleAxisf(std::numbers::pi_v<float> * -.25, eig::Vector3f(0, 0, 1))
+                    * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
+                    * eig::Scaling(0.2f));
     components.emitters.push("Default D65 emitter", {
-      .type             = Emitter::Type::eSphere,
-      .trf              = eig::Affine3f::Identity(),
+      .type             = Emitter::Type::eRect,
+      .trf              = trf,
       .illuminant_i     = 0,
       .illuminant_scale = 1.f
     });

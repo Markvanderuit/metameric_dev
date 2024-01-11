@@ -77,6 +77,15 @@ shared EmitterInfo s_emtr_info[max_supported_objects];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
 shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
+// Define names of scene buffers to replace preproc in surface.glsl
+// to work around glsl's lack of ssbo argument passing
+#define srfc_buff_prim      buff_bvhs_prim.data
+#define srfc_buff_vert      buff_mesh_vert.data
+#define srfc_buff_elem      buff_mesh_elem.data
+#define srfc_buff_objc_info s_objc_info
+#define srfc_buff_mesh_info s_mesh_info
+#include <surface.glsl>
+
 // Define names of scene buffers to replace preproc in intersect.glsl
 // to work around glsl's lack of ssbo argument passing
 #define isct_n_objects      buff_objects.n
@@ -89,15 +98,6 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define isct_buff_bvhs_prim buff_bvhs_prim.data
 #include <intersect.glsl>
 #include <emitter.glsl>
-
-// Define names of scene buffers to replace preproc in surface.glsl
-// to work around glsl's lack of ssbo argument passing
-#define srfc_buff_prim      buff_bvhs_prim.data
-#define srfc_buff_vert      buff_mesh_vert.data
-#define srfc_buff_elem      buff_mesh_elem.data
-#define srfc_buff_objc_info s_objc_info
-#define srfc_buff_mesh_info s_mesh_info
-#include <surface.glsl>
 
 // Define names of scene buffers to replace preproc in brdf.glsl
 // to work around glsl's lack of ssbo argument passing
@@ -149,24 +149,6 @@ mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
     csys[i] = sample_colsys(colsys_i, wvl[i]);
   return csys;
 }
-
-/* float eval_emitter(in uint emitter_i, in float wvl) {
-  return texture(b_illm_1f, vec2(wvl, emitter_i)).x;
-}
-
-vec4 eval_emitter(in uint emitter_i, in vec4 wvl) {
-  vec4 v;
-  for (uint i = 0; i < 4; ++i)
-    v[i] = eval_emitter(emitter_i, wvl[i]);
-  return v;
-} */
-
-/* // Offset epsilon copied from mitsuba3
-vec3 gen_offset_p(in SurfaceInfo si, in vec3 d) {
-  float mag = 1.f + hmax(abs(si.p)) + 1500.f * M_EPS;
-  mag = dot(si.n, d) >= 0 ? mag : -mag;
-  return fma(vec3(mag), si.n, si.p);
-} */
 
 vec3 sample_emitter_position(inout uint state) {
   return hardcoded_lpos + next_3d(state) * 4.f - 2.f;
@@ -237,16 +219,14 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
   // bool did_scatter = false; // TODO unused until emitters are added
   vec4 radiance   = vec4(0.f);
   vec4 throughput = vec4(1.f);
+  float bsdf_pdf  = 1.f;
 
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
-    /*  si;
-    if (depth == 0) {
+    /* if (depth == 0) {
       uvec4 v = texelFetch(b_gbuffer, ivec2(gl_GlobalInvocationID.xy), 0);
       si = get_surface_info(unpack_gbuffer_ray(v), ray);
-    } else { */
-      
-    // }
+    } else { } */
 
     // If the ray misses, terminate current path
     if (!ray_intersect_scene(ray)) {
@@ -255,10 +235,19 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
       break;
     }
 
-    // If an emissive object is hit, terminate current path
+    // If an emissive object is hit directly, terminate current path
     if (hit_emitter(ray)) {
       EmitterInfo em = s_emtr_info[ray_get_emitter(ray)];
-      radiance = eval_emitter(em, wvls, vec3(0));
+      vec4 em_value = eval_emitter(em, wvls, vec3(0));
+      if (depth == 0) {
+        // On direct hit, return emissive value
+        radiance = em_value;
+      } else {
+        // On secondary hit, apply mis
+        float em_pdf = pdf_emitter(em, ray.o + ray.d * ray.t);
+        float weight = mis_power(bsdf_pdf, em_pdf);
+        radiance += throughput * em_value * weight;
+      }
       break;
     }
 
@@ -275,24 +264,19 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
     // Sample BRDF at position
     BRDF brdf = get_surface_brdf(si, wvls);
     
-    // Emitter sampling
+    // Direct illumination sampling;
     {
       // Generate emitter sample position, and ray twards position
-      EmitterInfo em = s_emtr_info[0];
-
-      vec3  lpos = sample_emitter_position(state);
-      Ray   lray = ray_towards_point(si, lpos);
-
-      // If brdf has throughput and we are on the same side of a shading normal, evaluate hit
-      vec4 f = eval_brdf(brdf, si, lray.d);
-      if (!all(iszero(f)) && dot(lray.d, si.sh.n) > 0.f) {
+      EmitterInfo   em = s_emtr_info[0]; // Pick emitter from cdf instead
+      EmitterSample es = sample_emitter(em, si, wvls, next_2d(state));
+      Ray        e_ray = ray_towards_point(si, es.p);
+      vec4      f      = eval_brdf(brdf, si, e_ray.d);
+      
+      if (es.pdf != 0.f && !all(iszero(f)) && dot(e_ray.d, si.sh.n) > 0.f) {
         // If ray evaluates no hit, add contribution to path
-        if (!ray_intersect_any(lray)) {
-          vec4  Le   = eval_emitter(em, wvls, vec3(0));
-          float lpdf = 1.f;
-          float bpdf = pdf_brdf(brdf, si, lray.d);
-          
-          radiance += throughput * f * Le; // * mis_power(lpdf, bpdf);
+        if (!ray_intersect_any(e_ray)) {
+          float weight = mis_power(es.pdf, bsdf_pdf * pdf_brdf(brdf, si, e_ray.d));
+          radiance += throughput * f * es.value * weight;
         }
       }
     }
@@ -308,7 +292,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
         break;
       
       // Update throughput
-      throughput *= bs.f/*  / bs.pdf */;
+      throughput *= bs.f;
+      bsdf_pdf   *= bs.pdf;
 
       // Generate next scene ray
       ray = ray_towards_direction(si, bs.wo);
