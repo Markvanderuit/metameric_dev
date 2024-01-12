@@ -93,18 +93,21 @@ namespace met::detail {
     void update(std::span<const detail::Component<met::Uplifting>>, const Scene &);
   };
   
-  /* template <>
+  template <>
   class GLPacking<met::ColorSystem> {
-    struct alignas(16) ColorSystemUniformLayout {
+    /* struct alignas(16) ColorSystemUniformLayout {
       alignas(4) uint cmfs_i;
       alignas(4) uint illuminant_i;
       alignas(4) uint n_scatters;
-    };
+    }; */
     
   public:
-  
+    gl::Buffer wavelength_distr;
+
+  public:
+    GLPacking();
     void update(std::span<const detail::Component<met::ColorSystem>>, const Scene &);
-  }; */
+  };
 
   // GL-side mesh data
   // Handles packed mesh buffers, bvh buffers, and info to unpack

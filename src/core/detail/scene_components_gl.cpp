@@ -1,6 +1,8 @@
 #include <metameric/core/detail/scene_components_gl.hpp>
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene.hpp>
+#include <ranges>
 
 namespace met::detail {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
@@ -309,10 +311,6 @@ namespace met::detail {
     } // for (uint i)
   }
 
-  /* void GLPacking<met::ColorSystem>::update(std::span<const detail::Component<met::ColorSystem>>, const Scene &scene) {
-    // TODO
-  } */
-
   GLPacking<met::Mesh>::GLPacking() {
     met_trace_full();
 
@@ -609,4 +607,39 @@ namespace met::detail {
     cmfs_buffer.flush();
     cmfs_texture.set(cmfs_buffer);
   }
-}
+
+  GLPacking<met::ColorSystem>::GLPacking() {
+    met_trace_full();
+    // ...
+  }
+
+  void GLPacking<met::ColorSystem>::update(std::span<const detail::Component<met::ColorSystem>>, const Scene &scene) {
+    met_trace_full();
+
+    guard(scene.components.colr_systems ||
+          scene.components.emitters     ||
+          scene.resources.observers     || 
+          scene.resources.illuminants   );
+    
+    // Get indices of active emitter data
+    auto active_emitters = scene.components.emitters
+                         | vws::filter([](const auto &comp) { return comp.value.is_active; });
+    auto illuminants = active_emitters
+                     | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i;      })
+                     | vws::transform([&](uint i) { return scene.resources.illuminants[i].value(); })
+                     | rng::to<std::vector>();
+    auto illuminant_s = active_emitters
+                      | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
+                      | rng::to<std::vector>();
+    
+    Spec d = 1.f;
+    if (!illuminants.empty()) {
+      d = 0.f;
+      for (uint i = 0; i < illuminants.size(); ++i)
+        d += illuminants[i] * illuminant_s[i];
+    }
+
+    Distribution distr(cnt_span<float>(d));
+    wavelength_distr = distr.to_buffer_std140();
+  }
+} // namespace met::detail

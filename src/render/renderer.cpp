@@ -181,6 +181,7 @@ namespace met {
     m_program.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
     m_program.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
     m_program.bind("b_buff_textures",      scene.resources.images.gl.texture_info);
+    m_program.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr);
     m_program.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
     m_program.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
     m_program.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);

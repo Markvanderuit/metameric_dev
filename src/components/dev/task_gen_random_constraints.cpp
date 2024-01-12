@@ -183,7 +183,7 @@ namespace met {
 
         // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
         std::array<eig::Vector3f, 4> p;
-        std::ranges::transform(del_elems[volume_distr.sample(sampler.next_1d())], p.begin(), 
+        rng::transform(del_elems[volume_distr.sample_discrete(sampler.next_1d())], p.begin(), 
           [&](uint i) { return del_verts[i]; });
 
         // Then, recover sample position using the generated barycentric coordinates

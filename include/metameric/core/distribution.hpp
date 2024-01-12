@@ -2,10 +2,13 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
+#include <small_gl/fwd.hpp>
 #include <algorithm>
 #include <functional>
 #include <numeric>
 #include <random>
+#include <fmt/core.h>
+#include <fmt/ranges.h>
 
 namespace met {
   class UniformSampler {
@@ -45,6 +48,12 @@ namespace met {
       rng::generate(v, std::bind(&UniformSampler::next_1d, this));
       return v;
     }
+
+  public:
+    constexpr static uint32_t min() { return std::mt19937::min(); }
+    constexpr static uint32_t max() { return std::mt19937::max(); }
+    uint32_t g() { return m_rng(); }
+    uint32_t operator()() { return m_rng(); }
   };
 
   class PCGSampler {
@@ -104,21 +113,30 @@ namespace met {
     uint32_t operator()() { return pcg_hash(); }
   };
 
+  // Simple 1d sampling distribution
   class Distribution {
+    std::vector<float> m_pdf;
     std::vector<float> m_cdf;
-    std::vector<float> m_pmf;
 
   public:
     Distribution() = default;
 
-    Distribution(std::span<const float> values)
-    : m_pmf(range_iter(values)) {
-      m_cdf.resize(m_pmf.size());
-      std::inclusive_scan(range_iter(m_pmf), m_cdf.begin());
-    }
+    Distribution(std::span<const float> values) {
+      m_pdf.resize(values.size());
+      m_cdf.resize(values.size() + 1);
 
-    float pmf(uint i) const {
-      return m_pmf[i];
+      // Scan values to build cdf
+      m_cdf.front() = 0.f;
+      for (uint i = 1; i < m_cdf.size(); ++i)
+        m_cdf[i] = m_cdf[i - 1] + values[i - 1];      
+
+      // Normalize both pdf and cdf
+      float norm = inv_sum();
+      for (uint i = 1; i < m_cdf.size(); ++i) {
+        m_pdf[i - 1] = values[i - 1] * norm * static_cast<float>(m_pdf.size());
+        m_cdf[i] *= norm;
+      }
+      m_cdf.back() = 1.f; // Finally, distribution sums to 1
     }
 
     float cdf(uint i) const {
@@ -129,16 +147,50 @@ namespace met {
       return m_cdf.back();  
     }
 
-    float norm() const {
-      return 1.f / sum();
+    float inv_sum() const {
+      return sum() == 0.f ? 0.f : 1.f / sum();
     }
 
     size_t size() const {
-      return m_pmf.size();
+      return m_pdf.size();
     }
 
-    uint sample(float value) const {
-      return std::distance(m_cdf.begin(), rng::lower_bound(m_cdf, value * sum()));
+    uint sample_discrete(float u) const {
+      // Find iterator to first element greater than u
+      // ergo std::upper_bound
+      int i = 0;
+      while (u > m_cdf[i] && i < m_cdf.size() - 1) 
+        i++;
+      i -= 1;
+      return static_cast<uint>(rng::clamp(i, 0, static_cast<int>(m_pdf.size()) - 1));
     }
+
+    float sample(float u) const {
+      uint index = sample_discrete(u);
+      float d_cdf = m_cdf[index + 1] - m_cdf[index];
+      if (d_cdf == 0.f) {
+        return static_cast<float>(index);
+      } else {
+        float a = (u - m_cdf[index]) / d_cdf;
+        return static_cast<float>(index) + a;
+      }
+    }
+
+    float pdf_discrete(uint i) const {
+      return m_pdf[i];
+    }
+
+    float pdf(float sample) const {
+      uint  i = static_cast<uint>(sample);
+      float a = sample - static_cast<float>(i);
+      if (a == 0.f) {
+        return m_pdf[i];
+      } else {
+        return m_pdf[i] + m_pdf[i + 1] * a;
+      }
+    }
+
+    gl::Buffer to_buffer_std140() const;
+    gl::Buffer to_buffer_std430() const;
   };
 } // namespace met
