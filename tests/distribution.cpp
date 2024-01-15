@@ -71,7 +71,7 @@ TEST_CASE("Distribution 1D") {
 
     // We test for weighted uniformity, so discard the initial value
     // to improve precision
-    s = 1.f;
+    // s = 1.f;
 
     float value = 0.f;
     for (uint i = 0; i < n_samples; ++i) {
@@ -81,14 +81,14 @@ TEST_CASE("Distribution 1D") {
       uint  index     = static_cast<uint>(sample);
       float new_value = s[index];
       if (float a = sample - static_cast<float>(index); a != 0.f && index < s.size() - 1)
-        new_value += s[index + 1] * a;
+        new_value = (1.f - a) * new_value + a * s[index + 1];
       new_value = pdf == 0.f ? 0.f : new_value / pdf;
       
       // Incremental average to avoid precision problems
       value = (value * static_cast<float>(i) + new_value) / static_cast<float>(i + 1);
     }
     
-    float expected = 1.f; // s.sum() / static_cast<float>(s.size());
+    float expected = s.sum() / static_cast<float>(s.size());
     REQUIRE_THAT(value, Catch::Matchers::WithinAbs(expected, eps));
   } // SECTION
 

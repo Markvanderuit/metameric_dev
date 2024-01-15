@@ -9,11 +9,6 @@ struct DistributionSample {
   float pdf;
 };
 
-layout(binding = 0) uniform b_buff_distr {
-  float pdf[wavelength_samples];
-  float cdf[wavelength_samples + 1];
-} buff_distr;
-
 #define declare_distr_sampler(name, distr)                 \
   uint sample_##name##_discrete(in float u) {              \
     int i = 0;                                             \
@@ -28,8 +23,8 @@ float pdf_##name(in float sample_1d) {                     \
   float pdf = distr.pdf[i];                                \
                                                            \
   float a = sample_1d - float(i);                          \
-  if (a != 0.f && a < distr.pdf.length() - 1)              \
-    pdf += a * distr.pdf[i + 1];                           \
+  if (a != 0.f && i < distr.pdf.length() - 1)              \
+    pdf = mix(pdf, distr.pdf[i + 1], a);                   \
                                                            \
   return pdf;                                              \
 }                                                          \

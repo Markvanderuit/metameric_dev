@@ -115,6 +115,8 @@ namespace met {
 
   // Simple 1d sampling distribution
   class Distribution {
+    float              m_func_sum;
+    std::vector<float> m_func;
     std::vector<float> m_pdf;
     std::vector<float> m_cdf;
 
@@ -122,21 +124,30 @@ namespace met {
     Distribution() = default;
 
     Distribution(std::span<const float> values) {
+      m_func.assign_range(values);
       m_pdf.resize(values.size());
       m_cdf.resize(values.size() + 1);
-
+      
       // Scan values to build cdf
       m_cdf.front() = 0.f;
       for (uint i = 1; i < m_cdf.size(); ++i)
-        m_cdf[i] = m_cdf[i - 1] + values[i - 1];      
+        m_cdf[i] = m_cdf[i - 1] + m_func[i - 1] / static_cast<float>(m_func.size());    
 
-      // Normalize both pdf and cdf
+      // Keep sum around
+      m_func_sum = m_cdf.back();
+
+      // Normalize cdf
+      for (uint i = 1; i < m_cdf.size(); ++i) {
+        m_cdf[i] /= m_func_sum;
+      }
+
+      /* // Normalize both pdf and cdf
       float norm = inv_sum();
       for (uint i = 1; i < m_cdf.size(); ++i) {
         m_pdf[i - 1] = values[i - 1] * norm * static_cast<float>(m_pdf.size());
         m_cdf[i] *= norm;
       }
-      m_cdf.back() = 1.f; // Finally, distribution sums to 1
+      m_cdf.back() = 1.f; // Finally, distribution sums to 1 */
     }
 
     float cdf(uint i) const {
@@ -144,7 +155,7 @@ namespace met {
     }
 
     float sum() const {
-      return m_cdf.back();  
+      return m_func_sum;  
     }
 
     float inv_sum() const {
@@ -162,31 +173,38 @@ namespace met {
       while (u > m_cdf[i] && i < m_cdf.size() - 1) 
         i++;
       i -= 1;
-      return static_cast<uint>(rng::clamp(i, 0, static_cast<int>(m_pdf.size()) - 1));
+      return static_cast<uint>(rng::clamp(i, 0, static_cast<int>(m_func.size()) - 1));
     }
 
     float sample(float u) const {
-      uint index = sample_discrete(u);
-      float d_cdf = m_cdf[index + 1] - m_cdf[index];
+      uint i = sample_discrete(u);
+      float d_cdf = m_cdf[i + 1] - m_cdf[i];
       if (d_cdf == 0.f) {
-        return static_cast<float>(index);
+        return static_cast<float>(i);
       } else {
-        float a = (u - m_cdf[index]) / d_cdf;
-        return static_cast<float>(index) + a;
+        float a = (u - m_cdf[i]) / d_cdf;
+        return static_cast<float>(i) + a;
       }
     }
 
     float pdf_discrete(uint i) const {
-      return m_pdf[i];
+      return m_func[i] / m_func_sum;
     }
 
     float pdf(float sample) const {
+      // return pdf_discrete(static_cast<uint>(sample));
+      // return m_pdf[static_cast<uint>(sample)];
+
       uint  i = static_cast<uint>(sample);
       float a = sample - static_cast<float>(i);
+
       if (a == 0.f) {
-        return m_pdf[i];
+        return pdf_discrete(i);
       } else {
-        return m_pdf[i] + m_pdf[i + 1] * a;
+      //   return m_pdf[i] + m_pdf[i + 1] * a;
+
+        // return m_cdf[i + 1] - m_cdf[i];
+        return (1.f - a) * pdf_discrete(i) + a * pdf_discrete(i + 1);
       }
     }
 

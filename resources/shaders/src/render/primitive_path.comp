@@ -323,9 +323,20 @@ void main() {
   // Sampler state is based on 2d invocation index
   uint state = load_state();
 
+  // Generate wavelength sample
+  vec4 sample_4d = next_4d(state);
+  vec4 wvls, wvl_pdfs;
+  for (uint i = 0; i < 4; ++i) {
+    DistributionSample ds = sample_wavelength(sample_4d[i]);
+    wvls[i]     = ds.f / float(wavelength_samples);
+    wvl_pdfs[i] = ds.pdf;
+    // wvls[i]     = sample_4d[i];
+    // wvl_pdfs[i] = 1.f;
+  }
+
   // Generate initial camera ray, sample ray's wavelengths
   Ray ray   = ray_from_sensor(i, next_2d(state));
-  vec4 wvls = next_4d(state);
+  // vec4 wvls = next_4d(state);
 
   /* { // TODO remove
     // ray_intersect_unit_sphere(ray);
@@ -347,11 +358,11 @@ void main() {
   } // TODO remove */
 
   // Evaluate ray/wavelength pair
-  vec4 L = Li(ray, wvls, state) / vec4(1.f / wavelength_samples);
+  vec4 L = Li(ray, wvls, state) / wvl_pdfs * vec4(wavelength_samples) /* vec4(1.f / wavelength_samples) */;
 
   // Integrate radiance over color system to get color
   vec3 value = sample_colsys(0, wvls) * exposure * L;
-    
+
   // Reweight with prior accumulated radiance
   if (buff_sampler_state.spp_curr != 0) {
     value += imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
