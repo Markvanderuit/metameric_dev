@@ -102,7 +102,8 @@ namespace met::detail {
     }; */
     
   public:
-    gl::Buffer wavelength_distr;
+    Spec       wavelength_distr;
+    gl::Buffer wavelength_distr_buffer;
 
   public:
     GLPacking();

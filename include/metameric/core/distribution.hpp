@@ -137,17 +137,8 @@ namespace met {
       m_func_sum = m_cdf.back();
 
       // Normalize cdf
-      for (uint i = 1; i < m_cdf.size(); ++i) {
+      for (uint i = 1; i < m_cdf.size(); ++i)
         m_cdf[i] /= m_func_sum;
-      }
-
-      /* // Normalize both pdf and cdf
-      float norm = inv_sum();
-      for (uint i = 1; i < m_cdf.size(); ++i) {
-        m_pdf[i - 1] = values[i - 1] * norm * static_cast<float>(m_pdf.size());
-        m_cdf[i] *= norm;
-      }
-      m_cdf.back() = 1.f; // Finally, distribution sums to 1 */
     }
 
     float cdf(uint i) const {
@@ -167,8 +158,7 @@ namespace met {
     }
 
     uint sample_discrete(float u) const {
-      // Find iterator to first element greater than u
-      // ergo std::upper_bound
+      // Find iterator to first element greater than u; ergo std::upper_bound
       int i = 0;
       while (u > m_cdf[i] && i < m_cdf.size() - 1) 
         i++;
@@ -176,14 +166,16 @@ namespace met {
       return static_cast<uint>(rng::clamp(i, 0, static_cast<int>(m_func.size()) - 1));
     }
 
+    // Returns between 0 and 1
     float sample(float u) const {
-      uint i = sample_discrete(u);
+      uint  i     = sample_discrete(u);
       float d_cdf = m_cdf[i + 1] - m_cdf[i];
+
       if (d_cdf == 0.f) {
-        return static_cast<float>(i);
+        return static_cast<float>(i) / m_func.size();
       } else {
         float a = (u - m_cdf[i]) / d_cdf;
-        return static_cast<float>(i) + a;
+        return (static_cast<float>(i) + a) / m_func.size();
       }
     }
 
@@ -192,19 +184,13 @@ namespace met {
     }
 
     float pdf(float sample) const {
-      // return pdf_discrete(static_cast<uint>(sample));
-      // return m_pdf[static_cast<uint>(sample)];
-
-      uint  i = static_cast<uint>(sample);
-      float a = sample - static_cast<float>(i);
-
+      uint  i = static_cast<uint>(sample * (m_func.size() - 1));
+      float a = sample * (m_func.size() - 1) - static_cast<float>(i);
+      
       if (a == 0.f) {
         return pdf_discrete(i);
       } else {
-      //   return m_pdf[i] + m_pdf[i + 1] * a;
-
-        // return m_cdf[i + 1] - m_cdf[i];
-        return (1.f - a) * pdf_discrete(i) + a * pdf_discrete(i + 1);
+        return std::lerp(pdf_discrete(i), pdf_discrete(i + 1), a);
       }
     }
 

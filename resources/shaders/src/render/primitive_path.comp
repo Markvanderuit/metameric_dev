@@ -40,7 +40,8 @@ layout(binding = 5) uniform b_buff_emitters {
   EmitterInfo data[max_supported_objects];
 } buff_emitters;
 layout(binding = 6) uniform b_buff_wvls_distr {
-  float pdf[wavelength_samples];
+  float func_sum;
+  float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
 
@@ -114,9 +115,6 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define brdf_txtr_spec      b_spec_4f
 #include <brdf.glsl>
 
-// Hardcoded value for now
-vec3 hardcoded_lpos = vec3(6, 4, 2);
-
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
@@ -139,15 +137,9 @@ uint load_state() {
   return invoc_state * (1 + buff_sampler_state.spp_curr);
 }
 
-void store_state(in uint state) {
-  uint i = gl_GlobalInvocationID.y * buff_sensor.film_size.x + gl_GlobalInvocationID.x;
-  buff_sampler_data.data[i] = state;
-}
-
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
   // TODO sample by observer data instead
-  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz/*  *
-         texture(b_illm_1f, vec2(wvl, colsys_i)).x   * .01f */; // TODO fix integration through exposure
+  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz; // TODO fix integration through exposure
 }
 
 mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
@@ -155,10 +147,6 @@ mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
   for (uint i = 0; i < 4; ++i)
     csys[i] = sample_colsys(colsys_i, wvl[i]);
   return csys;
-}
-
-vec3 sample_emitter_position(inout uint state) {
-  return hardcoded_lpos + next_3d(state) * 4.f - 2.f;
 }
 
 vec4 eval_env(in vec3 dir, in vec4 wvls) {
@@ -207,8 +195,12 @@ Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
   return ray;
 }
 
-const float exposure  = 0.008f;
+const float exposure  = 1.f;
 const uint  max_depth = 4;
+
+float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
+  return mod(sample_1d + float(i) / float(n), 1.f);
+}
 
 float mis_balance(in float pdf_a, in float pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
@@ -320,53 +312,39 @@ void main() {
   const ivec2 i = ivec2(gl_GlobalInvocationID.xy);
   guard(all(lessThan(i, buff_sensor.film_size)));
 
-  // Sampler state is based on 2d invocation index
+  // Initialize sampler state
   uint state = load_state();
 
-  // Generate wavelength sample
-  vec4 sample_4d = next_4d(state);
+  // Generate initial sensor ray
+  Ray ray = ray_from_sensor(i, next_2d(state));
+
+  // Generate path wavelengths
+  float wvl_sample = next_1d(state);
   vec4 wvls, wvl_pdfs;
   for (uint i = 0; i < 4; ++i) {
-    DistributionSample ds = sample_wavelength(sample_4d[i]);
-    wvls[i]     = ds.f / float(wavelength_samples);
+    // Pass stratified wavelength sample through inverse cdf
+    float wvl_rotated = rotate_sample_1d(wvl_sample, i, 4);
+    DistributionSample ds = sample_wavelength(wvl_rotated);
+    wvls[i]     = ds.f;
     wvl_pdfs[i] = ds.pdf;
-    // wvls[i]     = sample_4d[i];
+
+    // Naive alternative
+    // wvls[i]     = next_1d(state);
     // wvl_pdfs[i] = 1.f;
   }
 
-  // Generate initial camera ray, sample ray's wavelengths
-  Ray ray   = ray_from_sensor(i, next_2d(state));
-  // vec4 wvls = next_4d(state);
-
-  /* { // TODO remove
-    // ray_intersect_unit_sphere(ray);
-    vec3 v = vec3(0);
-    if (ray_intersect_scene(ray)) {
-      v = ray.o + ray.d * ray.t; // Pos
-    }
-
-    // ray_intersect_scene(ray);
-    // vec3 value = vec3(0);
-    // if (is_valid(ray)) {
-    //   uvec4 v = texelFetch(b_gbuffer, ivec2(gl_GlobalInvocationID.xy), 0);
-    //   SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray);
-    //   // SurfaceInfo si = get_surface_info(ray);
-    //   value = vec3((si.sh.n));
-    // }
-    imageStore(b_film, i, vec4(v, 1));
-    return;
-  } // TODO remove */
-
   // Evaluate ray/wavelength pair
-  vec4 L = Li(ray, wvls, state) / wvl_pdfs * vec4(wavelength_samples) /* vec4(1.f / wavelength_samples) */;
+  vec4 L = Li(ray, wvls, state) / wvl_pdfs;
 
   // Integrate radiance over color system to get color
   vec3 value = sample_colsys(0, wvls) * exposure * L;
 
-  // Reweight with prior accumulated radiance
-  if (buff_sampler_state.spp_curr != 0) {
-    value += imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
-    value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+  // Add prior accumulated average
+  if (buff_sampler_state.spp_curr > 0) {
+    vec3 prev = imageLoad(b_film, ivec2(i)).xyz;
+    value = prev
+          + (value - prev)
+          / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
   }
 
   // Store updated image value and sample state

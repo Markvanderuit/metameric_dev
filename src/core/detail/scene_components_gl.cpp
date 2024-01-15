@@ -632,14 +632,25 @@ namespace met::detail {
                       | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
                       | rng::to<std::vector>();
     
+    // Generate sampling distribution over emitters
     Spec d = 1.f;
-    if (!illuminants.empty()) {
-      d = 0.f;
-      for (uint i = 0; i < illuminants.size(); ++i)
-        d += illuminants[i] * illuminant_s[i];
+    {
+      if (!illuminants.empty()) {
+        d = 0.f;
+        for (uint i = 0; i < illuminants.size(); ++i)
+          d += illuminants[i] * illuminant_s[i];
+      }
+      d /= d.maxCoeff();
     }
 
-    Distribution distr(cnt_span<float>(d));
-    wavelength_distr = distr.to_buffer_std140();
+    // Multiply by sensor response distribution's Y-curve
+    // which we'll generate first
+    {
+      CMFS cmfs = scene.resources.observers[scene.components.observer_i].value();
+      d *= cmfs.array().rowwise().sum();
+    }
+
+    wavelength_distr        = d;
+    wavelength_distr_buffer = Distribution(cnt_span<float>(wavelength_distr)).to_buffer_std140();
   }
 } // namespace met::detail
