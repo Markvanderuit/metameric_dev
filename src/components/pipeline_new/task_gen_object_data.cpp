@@ -76,10 +76,12 @@ namespace met {
     m_program.bind("b_buff_uplift_data", e_tesselation_data);
     m_program.bind("b_buff_uplift_pack", e_tesselation_pack);
     m_program.bind("b_buff_objects",     e_scene.components.objects.gl.object_info);
-    m_program.bind("b_buff_textures",    e_scene.resources.images.gl.texture_info);
     m_program.bind("b_buff_weights",     e_barycentrics.buffer());
     m_program.bind("b_bary_4f",          e_barycentrics.texture());
-    m_program.bind("b_txtr_3f",          e_scene.resources.images.gl.texture_atlas_3f.texture());
+    if (!e_scene.resources.images.empty()) {
+      m_program.bind("b_txtr_3f",          e_scene.resources.images.gl.texture_atlas_3f.texture());
+      m_program.bind("b_buff_textures",    e_scene.resources.images.gl.texture_info);
+    }
 
     gl::dispatch_compute(m_dispatch);
   }

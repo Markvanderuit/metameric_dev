@@ -259,6 +259,7 @@ namespace met::detail {
     void fr_stream(std::istream &str) {
       met_trace();
       io::fr_stream(m_data, str);
+      set_mutated(true);
     }
   };
 
@@ -373,6 +374,7 @@ namespace met::detail {
     void fr_stream(std::istream &str) {
       met_trace();
       io::fr_stream(m_data, str);
+      set_mutated(true);
     }
   };
 } // namespace met::detail

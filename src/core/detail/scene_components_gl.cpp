@@ -407,7 +407,9 @@ namespace met::detail {
         // Pack vertex data tightly and copy to the correctly offset range
         // #pragma omp parallel for
         for (int j = 0; j < mesh.verts.size(); ++j) {
-          verts_packed[verts_offs[i] + j] = pack(mesh.verts[j], mesh.norms[j], mesh.txuvs[j]);
+          auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
+          auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
+          verts_packed[verts_offs[i] + j] = pack(mesh.verts[j], norm, txuv);
         }
 
         // Pack node data tightly and copy to the correctly offset range
@@ -424,9 +426,15 @@ namespace met::detail {
           // BVH primitives are packed in bvh order
           auto el = mesh.elems[bvh.prims[j]];
           prims_packed[elems_offs[i] + j] = {
-            .v0 = pack(mesh.verts[el[0]], mesh.norms[el[0]], mesh.txuvs[el[0]]),
-            .v1 = pack(mesh.verts[el[1]], mesh.norms[el[1]], mesh.txuvs[el[1]]),
-            .v2 = pack(mesh.verts[el[2]], mesh.norms[el[2]], mesh.txuvs[el[2]])
+            .v0 = pack(mesh.verts[el[0]], 
+                       mesh.has_norms() ? mesh.norms[el[0]] : eig::Array3f(0, 0, 1), 
+                       mesh.has_txuvs() ? mesh.txuvs[el[0]] : eig::Array2f(0.5)    ),
+            .v1 = pack(mesh.verts[el[1]], 
+                       mesh.has_norms() ? mesh.norms[el[1]] : eig::Array3f(0, 0, 1), 
+                       mesh.has_txuvs() ? mesh.txuvs[el[1]] : eig::Array2f(0.5)    ),
+            .v2 = pack(mesh.verts[el[2]], 
+                       mesh.has_norms() ? mesh.norms[el[2]] : eig::Array3f(0, 0, 1), 
+                       mesh.has_txuvs() ? mesh.txuvs[el[2]] : eig::Array2f(0.5)    ),
           };
         }
         
@@ -592,13 +600,16 @@ namespace met::detail {
     guard(scene.resources.observers);
     // fmt::print("Type updated: {}\n", typeid( decltype(cmfs)::value_type).name());
     
+    // Whitepoint for normalization
+    Spec illuminant = models::emitter_cie_d65;
+
     for (uint i = 0; i < cmfs.size(); ++i) {
       const auto &[value, state] = cmfs[i];
       guard_continue(state);
 
       // Premultiply with RGB
-      CMFS to_xyz = (value.array()           /* * illuminant */ * wavelength_ssize)
-                  / (value.array().col(1)    /* * illuminant */ * wavelength_ssize).sum();
+      CMFS to_xyz = (value.array() /* * illuminant *//*  * wavelength_ssize */)
+                  / (value.array().col(1)  /* * illuminant */ * wavelength_ssize).sum();
       CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
       
       cmfs_buffer_map[i] = to_rgb.transpose().reshaped(wavelength_samples, 3);

@@ -254,20 +254,24 @@ namespace met {
     m_program.bind("b_buff_sampler_data",  m_sampler_data);
     m_program.bind("b_buff_objects",       scene.components.objects.gl.object_info);
     m_program.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
-    m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-    m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-    m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
-    m_program.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
-    m_program.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
-    m_program.bind("b_buff_textures",      scene.resources.images.gl.texture_info);
     m_program.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
     m_program.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
     m_program.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
     m_program.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
     m_program.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
-    m_program.bind("b_txtr_1f",            scene.resources.images.gl.texture_atlas_1f.texture());
-    m_program.bind("b_txtr_3f",            scene.resources.images.gl.texture_atlas_3f.texture());
     m_program.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
+    if (!scene.resources.images.empty()) {
+      m_program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      m_program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      m_program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+    }
+    if (!scene.resources.meshes.empty()) {
+      m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
+      m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
+      m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      m_program.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
+      m_program.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
+    }
 
     // Dispatch compute shader
     gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |

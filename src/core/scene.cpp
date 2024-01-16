@@ -229,6 +229,12 @@ namespace met {
                     * eig::AngleAxisf(std::numbers::pi_v<float> * -.25, eig::Vector3f(0, 0, 1))
                     * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
                     * eig::Scaling(0.2f));
+
+    // Cornell box light
+    // eig::Affine3f trf(eig::Translation3f({ -0.5, 0.985, -0.5 })
+    //                 * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
+    //                 * eig::Scaling(0.1f));
+    
     components.emitters.push("Default D65 emitter", {
       .type             = Emitter::Type::eRect,
       .trf              = trf,
