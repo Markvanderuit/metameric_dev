@@ -170,7 +170,7 @@ Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
   ray.d = p - ray.o;
   ray.t = length(ray.d);
   ray.d /= ray.t;
-  // ray.t *= (1.f - M_RAY_EPS * 10.f);
+  ray.t *= (1.f - M_RAY_EPS * 2.f);
 
   return ray;
 }
@@ -220,6 +220,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
   vec4 throughput = vec4(1.f);
   float bsdf_pdf  = 1.f;
 
+  SurfaceInfo si;
+
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
     /* if (depth == 0) {
@@ -243,18 +245,24 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
         radiance = em_value;
       } else {
         // On secondary hit, apply mis
-        float em_pdf = pdf_emitter(em, ray.o + ray.d * ray.t);
+        float em_pdf = pdf_emitter(em, si, ray.o + ray.d * ray.t);
         float weight = mis_power(bsdf_pdf, em_pdf);
+        // radiance += throughput * vec4(1);
         radiance += throughput * em_value * weight;
+        // radiance += throughput * em_value / bsdf_pdf;
       }
       break;
     }
 
     // If no surface object is visible, terminate current path
-    SurfaceInfo si = get_surface_info(ray);
+    si = get_surface_info(ray);
     if (!is_valid(si)) {
       break;
     }
+
+    // If object back was hit, terminate current path
+    /* if (frame_cos_theta(si.wi) < 0)
+      break; */
 
     // Test if geometric/shading normals are aligned
     /* if (dot(ray.d, si.sh.n) * frame_cos_theta(si.wi) >= 0)
@@ -269,13 +277,13 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
       EmitterInfo   em = s_emtr_info[0]; // Pick emitter from cdf instead
       EmitterSample es = sample_emitter(em, si, wvls, next_2d(state));
       Ray        e_ray = ray_towards_point(si, es.p);
-      vec4      f      = eval_brdf(brdf, si, e_ray.d);
+      vec4           f = eval_brdf(brdf, si, e_ray.d);
       
       if (es.pdf != 0.f && !all(iszero(f)) && dot(e_ray.d, si.sh.n) > 0.f) {
         // If ray evaluates no hit, add contribution to path
         if (!ray_intersect_any(e_ray)) {
           float weight = mis_power(es.pdf, bsdf_pdf * pdf_brdf(brdf, si, e_ray.d));
-          radiance += throughput * f * es.value * weight;
+          radiance += throughput * f * es.L * weight;
         }
       }
     }
@@ -292,7 +300,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
       
       // Update throughput
       throughput *= bs.f;
-      bsdf_pdf   *= bs.pdf;
+      bsdf_pdf    = bs.pdf; // store previous brdf in case emitter is hit
 
       // Generate next scene ray
       ray = ray_towards_direction(si, bs.wo);

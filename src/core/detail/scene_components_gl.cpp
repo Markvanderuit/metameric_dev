@@ -3,6 +3,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene.hpp>
 #include <ranges>
+#include <numbers>
 
 namespace met::detail {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
@@ -293,6 +294,19 @@ namespace met::detail {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
 
+      eig::Vector3f c;
+      float srfc_area;
+
+      c = emitter.trf * eig::Vector3f(0, 0, 0);
+      float r = (emitter.trf.linear() * eig::Vector3f(1, 0, 0)).x();
+      // c = (emitter.trf * eig::Vector4f(0, 0, 0, 1)).head<3>().eval();
+      // float r = (emitter.trf * eig::Vector4f(1, 0, 0, 0)).x();
+      fmt::print("{} -> r = {}\n", i, r);
+      fmt::print("{} -> c = {}\n", i, c);
+
+      // TODO recompute based on type
+      srfc_area = 4.f * std::numbers::pi_v<float> * r * r;
+      
       m_buffer_map_data[i] = {
         .trf              = emitter.trf.matrix(),
         .trf_inv          = emitter.trf.matrix().inverse().eval(),
@@ -301,7 +315,12 @@ namespace met::detail {
         .is_active        = emitter.is_active,
 
         .illuminant_i     = emitter.illuminant_i,
-        .illuminant_scale = emitter.illuminant_scale
+        .illuminant_scale = emitter.illuminant_scale,
+
+        .c             = c,
+        .r             = r,
+        .srfc_area     = srfc_area,
+        .srfc_area_inv = 1.f / srfc_area
       };
 
       // Flush change to buffer; most changes to objects are local,

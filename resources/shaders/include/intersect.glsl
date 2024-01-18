@@ -257,7 +257,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
   return hit;
 }
 
-bool ray_isct_object_any(in Ray ray, uint object_i) {
+bool ray_intersect_object_any(in Ray ray, uint object_i) {
   ObjectInfo object_info = isct_buff_objc_info[object_i];
   
   if (!object_info.is_active)
@@ -303,6 +303,31 @@ void ray_intersect_object(inout Ray ray, uint object_i) {
   }
 }
 
+bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
+  EmitterInfo em = isct_buff_emtr_info[emitter_i];
+  
+  if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
+    return false;
+
+  // Generate local ray
+  Ray ray_local;
+  ray_local.o = (em.trf_inv * vec4(ray.o, 1)).xyz;
+  ray_local.d = (em.trf_inv * vec4(ray.d, 0)).xyz;
+  
+  // Get length and normalize direction
+  // Reuse length to adjust ray_local.t if ray.t is not at infty
+  float dt = length(ray_local.d);
+  ray_local.d /= dt;
+  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
+  
+  // Run intersection; on a hit, simply return
+  if (em.type == EmitterTypeSphere) {
+    return ray_intersect_unit_sphere(ray_local);
+  } else if (em.type == EmitterTypeRect) {
+    return ray_intersect_unit_rect(ray_local);
+  }
+}
+
 bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   EmitterInfo em = isct_buff_emtr_info[emitter_i];
   
@@ -339,18 +364,18 @@ bool ray_intersect_scene_any(inout Ray ray) {
   ray_set_data_anyhit(ray, false);
 
   for (uint i = 0; i < isct_n_objects; ++i) {
-    if (ray_isct_object_any(ray, i)) {
+    if (ray_intersect_object_any(ray, i)) {
       ray_set_data_anyhit(ray, true);
       return true;
     }
   }
   
-  /* for (uint i = 0; i < isct_n_emitters; ++i) {
-    if (ray_isct_emitter_any(ray, i)) {
-      ray_set_data_anyh(ray, true);
+  for (uint i = 0; i < isct_n_emitters; ++i) {
+    if (ray_intersect_emitter_any(ray, i)) {
+      ray_set_data_anyhit(ray, true);
       return true;
     }
-  } */
+  }
 
   return false;
 }

@@ -4,6 +4,7 @@
 #include <math.glsl>
 #include <scene.glsl>
 #include <surface.glsl>
+#include <warp.glsl>
 
 // This header requires the following defines to point to SSBOs or shared memory
 // to work around glsl's lack of ssbo argument passing
@@ -11,33 +12,6 @@
 // #define brdf_buff_bary_info buff_weights.data1
 // #define brdf_txtr_bary      b_bary_4f
 // #define brdf_txtr_spec      b_spec_4f
-
-vec2 square_to_unif_disk_concentric(in vec2 sample_2d) {
-  sample_2d = 2.f * sample_2d - 1.f;
-
-  bool is_zero     = all(iszero(sample_2d));
-  bool quad_1_or_3 = abs(sample_2d.x) < abs(sample_2d.y);
-
-  float r  = quad_1_or_3 ? sample_2d.y : sample_2d.x,
-        rp = quad_1_or_3 ? sample_2d.x : sample_2d.y;
-  
-  float phi = 0.25f * M_PI * rp / r;
-  if (quad_1_or_3)
-    phi = .5f * M_PI - phi;
-  if (all(iszero(sample_2d)))
-    phi = 0.f;
-
-  return vec2(r * cos(phi), r * sin(phi));
-}
-
-vec3 square_to_cos_hemisphere(in vec2 sample_2d) {
-  vec2 p = square_to_unif_disk_concentric(sample_2d);
-  return vec3(p, sqrt(max(1.f - sdot(p), 0.f)));
-}
-
-float square_to_cos_hemisphere_pdf(in vec3 v) {
-  return M_PI_INV * v.z;
-}
 
 // Partial BRDF data, used to front-load some intermediary work
 struct PreliminaryBRDF {
@@ -143,7 +117,7 @@ BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
 
   vec3 wo = square_to_cos_hemisphere(sample_2d);
 
-  bs.f   = brdf.r;
+  bs.f   = vec4(1);//brdf.r;
   bs.pdf = square_to_cos_hemisphere_pdf(wo);
   bs.wo  = frame_to_world(si.sh, wo);
 
@@ -159,7 +133,7 @@ vec4 eval_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
     return vec4(0.f); */
     
-  return brdf.r * M_PI_INV * abs(frame_cos_theta(wo));
+  return vec4(1)/*  brdf.r */ * M_PI_INV * abs(frame_cos_theta(wo));
 }
 
 float pdf_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {

@@ -79,6 +79,12 @@ struct EmitterInfo {
   // Spectral data
   uint  illuminant_i;     // Index of spd
   float illuminant_scale; // Scalar multiplier applied to values  
+
+  // Precomputed data
+  vec3  center;
+  float r;
+  float srfc_area;
+  float srfc_area_inv;
 };
 
 #endif // SCENE_GLSL_GUARD

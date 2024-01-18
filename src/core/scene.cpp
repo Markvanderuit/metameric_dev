@@ -218,29 +218,56 @@ namespace met {
     resources.illuminants.push("FL11",     models::emitter_cie_fl11,    false);
     resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1, false);
     resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
-    resources.meshes.push("Rectangle",     models::unit_rect, false);
-    components.upliftings.emplace("Default uplifting",
-      { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
+    resources.meshes.push("Rectangle",     models::unit_rect,           false);
+
+    // Default color system
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
     components.colr_systems.push(get_csys_name(csys), csys);
+    
+    // Default uplifting
+    components.upliftings.emplace("Default uplifting",
+      { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
 
-    eig::Affine3f trf(eig::AngleAxisf(std::numbers::pi_v<float> * -.25,  eig::Vector3f(0, 1, 0))
+    /* eig::Affine3f trf(eig::AngleAxisf(std::numbers::pi_v<float> * -.25,  eig::Vector3f(0, 1, 0))
                     * eig::Translation3f({ 1, 2, 0 })
                     * eig::AngleAxisf(std::numbers::pi_v<float> * -.25, eig::Vector3f(0, 0, 1))
                     * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
                     * eig::Scaling(0.2f));
+    components.emitters.push("Default D65 emitter", {
+      .type             = Emitter::Type::eRect,
+      .trf              = trf,
+      .illuminant_i     = 0,
+      .illuminant_scale = 1.f
+    }); */
+
+    // Default object
+    components.objects.push("Default object", {
+      .mesh_i      = 0,
+      .uplifting_i = 0,
+      .diffuse     = Colr(1),
+      .trf         = eig::Affine3f(eig::Translation3f({ 0.f, 0.f, 0.f }))
+    });
+    components.objects.push("Blocker object", {
+      .mesh_i      = 0,
+      .uplifting_i = 0,
+      .diffuse     = Colr(1),
+      .trf         = eig::Affine3f(eig::Translation3f({ 0.25f, 0.25f, 0.25f }) *
+                                   eig::Scaling(0.5f))
+    });
+
+    // Default emitter
+    components.emitters.push("Default D65 emitter", {
+      .type             = Emitter::Type::eSphere,
+      .trf              = eig::Affine3f(eig::Translation3f({ .5, .5, 1 }) * eig::Scaling(0.2f)),
+      .illuminant_i     = 0,
+      .illuminant_scale = 1.f
+    });
 
     // Cornell box light
     // eig::Affine3f trf(eig::Translation3f({ -0.5, 0.985, -0.5 })
     //                 * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
     //                 * eig::Scaling(0.1f));
     
-    components.emitters.push("Default D65 emitter", {
-      .type             = Emitter::Type::eRect,
-      .trf              = trf,
-      .illuminant_i     = 0,
-      .illuminant_scale = 1.f
-    });
     
     // Set state to fresh create
     save_path  = "";

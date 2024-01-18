@@ -92,9 +92,10 @@ float hmax(in vec4 v)  { return HMAX_4(v); }
 
 // Horizontal component self-dot functions
 
-float sdot(in vec2 v) { return dot(v, v); }
-float sdot(in vec3 v) { return dot(v, v); }
-float sdot(in vec4 v) { return dot(v, v); }
+float sdot(in float f) { return f * f;     }
+float sdot(in vec2  v) { return dot(v, v); }
+float sdot(in vec3  v) { return dot(v, v); }
+float sdot(in vec4  v) { return dot(v, v); }
 
 // iszero(...) for short, fast zero check
 

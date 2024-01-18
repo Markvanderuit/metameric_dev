@@ -16,12 +16,12 @@ namespace met {
       met_trace();
       
       info.resource("arcball").init<detail::Arcball>({ 
-        .dist            = 1.f,
-        .e_eye           = 1.f,
-        .e_center        = 0.f,
+        .dist            = 3.f,
+        .e_eye           = { 1.5f, 1.5f, 1.0f },
+        .e_center        = { 0.5f, 0.5f, 0.f },
         .zoom_delta_mult = 0.1f
       });
-    }
+    } 
 
     // TODO remove after experimentation
     void eval_rt(SchedulerHandle &info) {
