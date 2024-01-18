@@ -128,6 +128,10 @@ uint ray_get_object_primitive(in Ray ray) {
   return ray.data & 0x00FFFFFF;
 }
 
+vec3 ray_get_position(in Ray ray) {
+  return ray.t == FLT_MAX ? vec3(FLT_MAX) : ray.o + ray.d * ray.t;
+}
+
 /* // #define PARENS ()
 // #define EXPAND(...)  EXPAND4(EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__))))
 // #define EXPAND4(...) EXPAND3(EXPAND3(EXPAND3(EXPAND3(__VA_ARGS__))))

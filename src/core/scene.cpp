@@ -241,6 +241,13 @@ namespace met {
     }); */
 
     // Default object
+    components.objects.push("Backwall object", {
+      .mesh_i      = 0,
+      .uplifting_i = 0,
+      .diffuse     = Colr(1),
+      .trf         = eig::Affine3f(eig::Translation3f({ -.25f, -.25f, -.25f }) *
+                                   eig::Scaling(1.5f))
+    });
     components.objects.push("Default object", {
       .mesh_i      = 0,
       .uplifting_i = 0,

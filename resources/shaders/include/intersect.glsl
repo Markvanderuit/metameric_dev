@@ -34,6 +34,37 @@ bool ray_intersect_unit_rect(inout Ray ray) {
   return true;
 }
 
+bool ray_intersect_sphere(inout Ray ray, in vec3 center, in float r) {
+  vec3  o = ray.o - center;
+  float b = 2.f * dot(o, ray.d);
+  float c = sdot(o) - sdot(r);
+  float d = b * b - 4.f * c;
+
+  float t_near, t_far;
+
+  if (d < 0) {
+    return false;
+  } else if (d == 0.f) {
+    t_near = t_far = -b * 0.5f;
+  } else {
+    d = sqrt(d);
+    t_near = (-b + d) * 0.5f;
+    t_far  = (-b - d) * 0.5f;
+  }
+
+  if (t_near < 0.f)
+    t_near = FLT_MAX;
+  if (t_far < 0.f)
+    t_far = FLT_MAX;
+  
+  float t = min(t_near, t_far);
+  if (t > ray.t || t < 0.f)
+    return false;
+
+  ray.t = t;
+  return true;
+}
+
 bool ray_intersect_unit_sphere(inout Ray ray) {
   float b = dot(ray.o, ray.d) * 2.f;
   float c = sdot(ray.o) - 1.f;
@@ -322,7 +353,8 @@ bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
   
   // Run intersection; on a hit, simply return
   if (em.type == EmitterTypeSphere) {
-    return ray_intersect_unit_sphere(ray_local);
+    return ray_intersect_sphere(ray, em.center, em.r);
+    // return ray_intersect_unit_sphere(ray_local);
   } else if (em.type == EmitterTypeRect) {
     return ray_intersect_unit_rect(ray_local);
   }
@@ -347,14 +379,19 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
 
   bool hit = false;
   if (em.type == EmitterTypeSphere) {
-    hit = ray_intersect_unit_sphere(ray_local);
+    hit = ray_intersect_sphere(ray, em.center, em.r);
+    // hit = ray_intersect_unit_sphere(ray_local);
   } else if (em.type == EmitterTypeRect) {
     hit = ray_intersect_unit_rect(ray_local);
   }
 
   if (hit) {
-    ray.t = length((em.trf * vec4(ray_local.d * ray_local.t, 0)).xyz);
-    ray_set_data_emitter(ray, emitter_i);
+    if (em.type == EmitterTypeSphere) {
+      ray_set_data_emitter(ray, emitter_i);
+    } else if (em.type == EmitterTypeRect) {
+      ray.t = length((em.trf * vec4(ray_local.d * ray_local.t, 0)).xyz);
+      ray_set_data_emitter(ray, emitter_i);
+    }
   }
 
   return hit;

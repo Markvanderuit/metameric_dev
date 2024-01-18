@@ -196,7 +196,7 @@ Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
 }
 
 const float exposure  = 1.f;
-const uint  max_depth = 4;
+const uint  max_depth = 1;
 
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
   return mod(sample_1d + float(i) / float(n), 1.f);
@@ -213,28 +213,19 @@ float mis_power(in float pdf_a, in float pdf_b) {
 }
 
 // Sample radiance along ray and wavelengths
-vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
+vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
   // Path throughput information; we track 4 wavelengths simultaneously
-  // bool did_scatter = false; // TODO unused until emitters are added
-  vec4 radiance   = vec4(0.f);
-  vec4 throughput = vec4(1.f);
-  float bsdf_pdf  = 1.f;
+  vec4  radiance   = vec4(0.f);
+  vec4  throughput = vec4(1.f);
+  float bsdf_pdf   = 1.f;
 
   SurfaceInfo si;
 
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
-    /* if (depth == 0) {
-      uvec4 v = texelFetch(b_gbuffer, ivec2(gl_GlobalInvocationID.xy), 0);
-      si = get_surface_info(unpack_gbuffer_ray(v), ray);
-    } else { } */
-
     // If the ray misses, terminate current path
-    if (!ray_intersect_scene(ray)) {
-      // if (depth > 0)
-      //   radiance += throughput * eval_env(ray.d, wvls);
+    if (!ray_intersect_scene(ray))
       break;
-    }
 
     // If an emissive object is hit directly, terminate current path
     if (hit_emitter(ray)) {
@@ -245,23 +236,24 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
         radiance = em_value;
       } else {
         // On secondary hit, apply mis
-        float em_pdf = pdf_emitter(em, si, ray.o + ray.d * ray.t);
+        float em_pdf = pdf_emitter(em, si, ray_get_position(ray));
         float weight = mis_power(bsdf_pdf, em_pdf);
-        // radiance += throughput * vec4(1);
-        radiance += throughput * em_value * weight;
-        // radiance += throughput * em_value / bsdf_pdf;
+        // radiance += throughput * em_value * weight / bsdf_pdf;
       }
+
+      // Is this not necessary?
       break;
     }
 
     // If no surface object is visible, terminate current path
     si = get_surface_info(ray);
-    if (!is_valid(si)) {
+    if (!is_valid(si))
       break;
-    }
 
-    // If object back was hit, terminate current path
-    /* if (frame_cos_theta(si.wi) < 0)
+    debug_color = si.sh.n;
+    
+    /* // If object back was hit, terminate current path
+    if (frame_cos_theta(si.wi) < 0)
       break; */
 
     // Test if geometric/shading normals are aligned
@@ -339,13 +331,20 @@ void main() {
     // Naive alternative
     // wvls[i]     = next_1d(state);
     // wvl_pdfs[i] = 1.f;
+
+    // Fixed wavelength
+    // wvls[i]     = 0.5;
+    // wvl_pdfs[i] = 1.f;
   }
 
+  vec3 debug_color = vec3(0);
+
   // Evaluate ray/wavelength pair
-  vec4 L = Li(ray, wvls, state) / wvl_pdfs;
+  vec4 L = Li(ray, wvls, state, debug_color) / wvl_pdfs;
 
   // Integrate radiance over color system to get color
   vec3 value = sample_colsys(0, wvls) * exposure * L;
+       value = debug_color;
 
   // Add prior accumulated average
   if (buff_sampler_state.spp_curr > 0) {

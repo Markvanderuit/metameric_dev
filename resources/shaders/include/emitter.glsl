@@ -27,6 +27,38 @@
   return 1.f;
 } */
 
+bool _ray_intersect_sphere(inout Ray ray, in vec3 center, in float r) {
+  vec3  o = ray.o - center;
+  float a = 1.f;  
+  float b = 2.f * dot(o, ray.d);
+  float c = sdot(o) - sdot(r);
+  float d = b * b - 4.f * a * c;
+
+  float t_near, t_far;
+
+  if (d < 0) {
+    return false;
+  } else if (d == 0.f) {
+    t_near = t_far = -b / 2.f * a;
+  } else {
+    d = sqrt(d);
+    t_near = (-b + d) * 0.5f * a;
+    t_far  = (-b - d) * 0.5f * a;
+  }
+
+  if (t_near < 0.f)
+    t_near = FLT_MAX;
+  if (t_far < 0.f)
+    t_far = FLT_MAX;
+  
+  float t = min(t_near, t_far);
+  if (t > ray.t || t < 0.f)
+    return false;
+
+  ray.t = t;
+  return true;
+}
+
 bool _ray_intersect_unit_sphere(inout Ray ray) {
   float b = dot(ray.o, ray.d) * 2.f;
   float c = sdot(ray.o) - 1.f;
@@ -58,65 +90,49 @@ struct EmitterSample {
   float pdf;
 };
 
+
+vec4 eval_emitter(in EmitterInfo em, in vec4 wvls, in vec3 p) {
+  // TODO refer to texture outside include
+  vec4 v;
+  for (uint i = 0; i < 4; ++i)
+    v[i] = texture(b_illm_1f, vec2(wvls[i], em.illuminant_i)).x;
+  return v * em.illuminant_scale;
+}
+
 void _sample_emitter_sphere(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
-  // Slightly better method; sample aligned hemisphere
-
-  // vec3 o = (em.trf_inv * vec4(si.p, 1)).xyz;
-  // vec3 p = square_to_unif_hemisphere(sample_2d);
-
-  // // TODO debug that the frame is actually correct
-  // Frame frm = get_frame(normalize(o));
-  // p = frame_to_world(frm, p);
-
-  // // Run intersect to find closest matching point
-  // Ray ray = init_ray(o, normalize(p - o));
-  // if (_ray_intersect_unit_sphere(ray)) { 
-  //   p = ray.o + ray.t * ray.d;
-  // }
-
-  // float r = (em.trf * vec4(1, 0, 0, 0)).x;
-  // es.p    = (em.trf * vec4(p, 1)).xyz;
-  // es.pdf  = 1.f / (4.f * M_PI * r * r); // TODO precompute in em.surface_area_inv
-
   // Bad method; pick a point on sphere, then find nearest intersection to point
   
-  vec3 o = (em.trf_inv * vec4(si.p, 1)).xyz;
-  vec3 p = square_to_unif_sphere(sample_2d);
-
-  Ray ray = init_ray(o, normalize(p - o));
-  if (_ray_intersect_unit_sphere(ray)) { 
-    p = ray.o + ray.t * ray.d;
-  }
+  // Pick point on surface-facing hemisphere
+  // vec3 p_ = square_to_unif_hemisphere(sample_2d);
+  //      p_ = frame_to_world(get_frame(normalize(si.p - em.center)), p_);
+  // vec3 p = em.center + em.r * p_;
   
-  vec3  d  = p - o;
-  float t2 = sdot(p - o);
+  vec3 p = em.center + em.r * square_to_unif_sphere(sample_2d);
+  
+  // Intersect against sphere to find nearest actually visible point
+  Ray ray = init_ray(si.p, normalize(p - si.p));
+  if (_ray_intersect_sphere(ray, em.center, em.r))
+    p = ray_get_position(ray);
+  
+  // Find direction to point and keep squared dist
+  vec3  d  = p - si.p;
+  float t2 = sdot(d);
   d *= inversesqrt(t2);
 
-  float r = (em.trf * vec4(1, 0, 0, 0)).x;
-  es.p    = (em.trf * vec4(p, 1)).xyz;
-  // es.pdf  = 1.f / (4.f * M_PI * r * r);
-  es.pdf  = t2  / abs(dot(d, p))
-          * 1.f / (4.f * M_PI * r * r);
-          
-  // Worse method; pick a point on sphere
-
-  // float r = (em.trf * vec4(1, 0, 0, 0)).x;
-  // es.p    = (em.trf * vec4(square_to_unif_sphere(sample_2d), 1)).xyz;
-  // es.pdf  = 1.f / (4.f * M_PI * r * r);
+  es.p   = p;
+  es.n   = normalize(p - em.center);
+  es.pdf = em.srfc_area_inv * t2 / abs(dot(d, es.n));
+  es.L   = eval_emitter(em, wvls, es.p) / es.pdf;
 }
 
 float _pdf_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
-  float r = (em.trf * vec4(1, 0, 0, 0)).x;
-  vec3  o = (em.trf_inv * vec4(si.p, 1)).xyz; 
-  
-  vec3  p_ = (em.trf_inv * vec4(p, 1)).xyz;
-  vec3  d  =  p_ - o;
-  float t2 = sdot(p - o);
+  vec3  n  =  normalize(p - em.center);
+  vec3  d  =  p - si.p;
+  float t2 = sdot(d);
   d *= inversesqrt(t2);
   
-  // return 1.f / (4.f * M_PI * r * r);
-  return t2 / abs(dot(d, p))
-       * 1.f / (4.f * M_PI * r * r);
+  return em.srfc_area_inv * t2 / abs(dot(d, n));
+  // return 2.f * em.srfc_area_inv * t2;
 }
 
 void _sample_emitter_sphere_solid_angle(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
@@ -125,7 +141,7 @@ void _sample_emitter_sphere_solid_angle(inout EmitterSample es, in EmitterInfo e
   vec3 dc_v  = em.center - si.p;
   float dc_2 = sdot(dc_v);
 
-  if (dc_2 > sdot(em.r * (1.f - M_RAY_EPS))) {
+  if (dc_2 > sdot(em.r * (1.f + M_RAY_EPS))) {
     float inv_dc          = inversesqrt(dc_2);
     float sin_theta_max   = em.r * inv_dc;
     float sin_theta_max_2 = sdot(sin_theta_max);
@@ -139,14 +155,14 @@ void _sample_emitter_sphere_solid_angle(inout EmitterSample es, in EmitterInfo e
 
     float cos_alpha = sin_theta_2 * inv_sin_theta_max 
                     + cos_theta * sqrt(max(0.f, fma(-sin_theta_2, sdot(inv_sin_theta_max), 1.f)));
-    float sin_alpha = sqrt(max(0.00001f, fma(-cos_alpha, cos_alpha, 1.f)));
+    float sin_alpha = sqrt(max(0.f, fma(-cos_alpha, cos_alpha, 1.f)));
 
     float cos_phi = cos(sample_2d.y * (2.f * M_PI));
     float sin_phi = sin(sample_2d.y * (2.f * M_PI));
 
     vec3 d = frame_to_world(get_frame(dc_v * -inv_dc), vec3(cos_phi * sin_alpha,
-                                                                       sin_phi * sin_alpha,
-                                                                       cos_alpha));
+                                                            sin_phi * sin_alpha,
+                                                            cos_alpha));
     es.n   = d;  
     es.p   = fma(d, vec3(em.r), em.center);
     es.pdf = square_to_unif_cone_pdf(vec2(0), cos_theta_max);
@@ -159,7 +175,9 @@ void _sample_emitter_sphere_solid_angle(inout EmitterSample es, in EmitterInfo e
     float t2 = sdot(es.p - si.p);
     si_d *= inversesqrt(t2);
     
-    es.pdf = (t2 / abs(dot(si_d, es.n))) * em.srfc_area_inv;
+    es.pdf = em.srfc_area_inv 
+           * t2 
+           / abs(dot(si_d, es.n));
   }
 }
 
@@ -176,7 +194,7 @@ float _pdf_emitter_sphere_solid_angle(in EmitterInfo em, in SurfaceInfo si, in v
   float cos_alpha = sqrt(max(0.f, 1.f - sin_alpha * sin_alpha));
 
   return sin_alpha < (1.f - M_EPS) ? square_to_unif_cone_pdf(vec2(0), cos_alpha)
-                                   : (t2 / abs(dot(d, n))) * em.srfc_area_inv;
+                                   : em.srfc_area_inv * t2 / abs(dot(d, n));
 
   ////
 
@@ -199,50 +217,65 @@ float _pdf_emitter_sphere_solid_angle(in EmitterInfo em, in SurfaceInfo si, in v
 }
 
 void _sample_emitter_rect(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
-  es.p   = (em.trf * vec4(2.f * sample_2d - 1.f, 0, 1)).xyz;
-  es.pdf = 1.f / hprod((em.trf * vec4(2, 2, 0, 1)).xyz);
+  vec3 p = (em.trf * vec4(2.f * sample_2d - 1.f, 0, 1)).xyz;
+  
+  // Find direction to point and keep squared dist
+  vec3  d  = p - si.p;
+  float t2 = sdot(d);
+  d *= inversesqrt(t2);
+  
+  // es.pdf = 1.f / hprod((em.trf * vec4(2, 2, 0, 1)).xyz);
+
+  es.p   = p;  
+  es.n   = normalize((em.trf * vec4(0, 0, -1, 0)).xyz); // TODO use normal for once
+  es.pdf = em.srfc_area_inv * t2 / abs(dot(d, es.n));
+  es.L   = eval_emitter(em, wvls, es.p) / es.pdf;
 }
 
 float _pdf_emitter_rect(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
-    // float t2 = sdot(si.p - p);
+  // Find direction to point and keep squared dist
+  vec3  d  = p - si.p;
+  float t2 = sdot(d);
+  d *= inversesqrt(t2);
 
-    return 1.f / hprod((em.trf * vec4(2, 2, 0, 1)).xyz);
+  vec3 n = normalize((em.trf * vec4(0, 0, -1, 0)).xyz); // TODO store normal instead
+
+  return em.srfc_area_inv * t2 / abs(dot(d, n));
 }
 
 void _sample_emitter_point(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
-  es.p   = (em.trf * vec4(0, 0, 0, 1)).xyz;
+  es.p = (em.trf * vec4(0, 0, 0, 1)).xyz;
+  es.n = vec3(0, 0, 1); // Indeterminate?
+
+  // Find direction to point and keep squared dist
+  vec3  d  = es.p - si.p;
+  float t2 = sdot(d);
+
   es.pdf = 1.f;
+  es.L   = eval_emitter(em, wvls, es.p) / t2;
 }
 
 float _pdf_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
-  return 1.f;
+  return 0.f;
 }
 
 void _sample_emitter_constant(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   es.p   = vec3(0);
   es.pdf = 0.f;
+  es.L   = eval_emitter(em, wvls, es.p);
 }
 
 float _pdf_emitter_constant(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
   return 0.f;
 }
 
-vec4 eval_emitter(in EmitterInfo em, in vec4 wvls, in vec3 p) {
-  // TODO refer to texture outside include
-  vec4 v;
-  for (uint i = 0; i < 4; ++i)
-    v[i] = texture(b_illm_1f, vec2(wvls[i], em.illuminant_i)).x;
-  return v * em.illuminant_scale;
-}
-
 EmitterSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   EmitterSample es;
-  es.L = eval_emitter(em, wvls, es.p);
   
   // Forward to specific type sample
   if (em.type == EmitterTypeSphere) {
-    // _sample_emitter_sphere(es, em, si, wvls, sample_2d);
-    _sample_emitter_sphere_solid_angle(es, em, si, wvls, sample_2d);
+    _sample_emitter_sphere(es, em, si, wvls, sample_2d);
+    // _sample_emitter_sphere_solid_angle(es, em, si, wvls, sample_2d);
   } else if (em.type == EmitterTypeRect) {
     _sample_emitter_rect(es, em, si, wvls, sample_2d);
   } else if (em.type == EmitterTypePoint) {
@@ -256,8 +289,8 @@ EmitterSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec4 wvls,
 
 float pdf_emitter(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
   if (em.type == EmitterTypeSphere) {
-    // return _pdf_emitter_sphere(em, si, p);
-    return _pdf_emitter_sphere_solid_angle(em, si, p);
+    return _pdf_emitter_sphere(em, si, p);
+    // return _pdf_emitter_sphere_solid_angle(em, si, p);
   } else if (em.type == EmitterTypeRect) {
     return _pdf_emitter_rect(em, si, p);
   } else if (em.type == EmitterTypePoint) {

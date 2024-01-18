@@ -294,18 +294,25 @@ namespace met::detail {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
 
-      eig::Vector3f c;
-      float srfc_area;
+      // Precompute some data based on type
+      eig::Vector3f c = emitter.trf * eig::Vector3f(0, 0, 0);
+      float srfc_area, srfc_area_inv, r;
+      if (emitter.type == Emitter::Type::eSphere) {
+        r             = (emitter.trf.linear() * eig::Vector3f(1, 0, 0)).x();
+        srfc_area     = 4.f * std::numbers::pi_v<float> * r * r;
+        srfc_area_inv = 1.f / srfc_area;
+      } else if (emitter.type == Emitter::Type::eRect) {
+        r             = 0.f;
+        srfc_area     = (emitter.trf.linear() * eig::Vector3f(2, 2, 0)).head<2>().prod();
+        srfc_area_inv = 1.f / srfc_area;
+      } else { // constant, point
+        r             = 0.f;
+        srfc_area     = 0.f;
+        srfc_area_inv = 1.f;
+      }
 
-      c = emitter.trf * eig::Vector3f(0, 0, 0);
-      float r = (emitter.trf.linear() * eig::Vector3f(1, 0, 0)).x();
-      // c = (emitter.trf * eig::Vector4f(0, 0, 0, 1)).head<3>().eval();
-      // float r = (emitter.trf * eig::Vector4f(1, 0, 0, 0)).x();
       fmt::print("{} -> r = {}\n", i, r);
       fmt::print("{} -> c = {}\n", i, c);
-
-      // TODO recompute based on type
-      srfc_area = 4.f * std::numbers::pi_v<float> * r * r;
       
       m_buffer_map_data[i] = {
         .trf              = emitter.trf.matrix(),
@@ -320,7 +327,7 @@ namespace met::detail {
         .c             = c,
         .r             = r,
         .srfc_area     = srfc_area,
-        .srfc_area_inv = 1.f / srfc_area
+        .srfc_area_inv = srfc_area_inv
       };
 
       // Flush change to buffer; most changes to objects are local,
