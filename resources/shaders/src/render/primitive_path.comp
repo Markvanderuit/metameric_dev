@@ -170,7 +170,7 @@ Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
   ray.d = p - ray.o;
   ray.t = length(ray.d);
   ray.d /= ray.t;
-  ray.t *= (1.f - M_RAY_EPS * 2.f);
+  ray.t *= (1.f - M_RAY_EPS * 10.f);
 
   return ray;
 }
@@ -196,7 +196,7 @@ Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
 }
 
 const float exposure  = 1.f;
-const uint  max_depth = 4;
+const uint  max_depth = 2;
 
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
   return mod(sample_1d + float(i) / float(n), 1.f);
@@ -238,7 +238,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
         // On secondary hit, apply mis
         float em_pdf = pdf_emitter(em, si, ray_get_position(ray));
         float weight = mis_power(bsdf_pdf, em_pdf);
-        radiance += throughput * em_value * weight;
+        if (em_pdf != 0.f)
+          radiance += throughput * em_value * weight;
       }
 
       // Is this not necessary?
@@ -262,7 +263,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
       // if (dot(n, ray.d) >= 0) {
       //   n = -n;
       // }
-      debug_color = si.sh.t;
+      // debug_color = si.p;
     }
     
     /* // If object back was hit, terminate current path
@@ -291,6 +292,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
           radiance += throughput * f * es.L * weight;
         }
       }
+
+      debug_color = vec3(1.f / sdot(es.p - si.p));
     }
 
     // BRDF sampling; 
@@ -336,18 +339,18 @@ void main() {
   vec4 wvls, wvl_pdfs;
   for (uint i = 0; i < 4; ++i) {
     // Pass stratified wavelength sample through inverse cdf
-    float wvl_rotated = rotate_sample_1d(wvl_sample, i, 4);
-    DistributionSample ds = sample_wavelength(wvl_rotated);
-    wvls[i]     = ds.f;
-    wvl_pdfs[i] = ds.pdf;
+    // float wvl_rotated = rotate_sample_1d(wvl_sample, i, 4);
+    // DistributionSample ds = sample_wavelength(wvl_rotated);
+    // wvls[i]     = ds.f;
+    // wvl_pdfs[i] = ds.pdf;
 
     // Naive alternative
     // wvls[i]     = next_1d(state);
     // wvl_pdfs[i] = 1.f;
 
     // Fixed wavelength
-    // wvls[i]     = 0.5;
-    // wvl_pdfs[i] = 1.f;
+    wvls[i]     = 0.5;
+    wvl_pdfs[i] = 1.f;
   }
 
   vec3 debug_color = vec3(0);

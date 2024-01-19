@@ -216,16 +216,19 @@ float _pdf_emitter_sphere_solid_angle(in EmitterInfo em, in SurfaceInfo si, in v
 }
 
 void _sample_emitter_rect(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
+  // Sample point on rectangle
   vec3 p = (em.trf * vec4(2.f * sample_2d - 1.f, 0, 1)).xyz;
   
   // Find direction to point and keep squared dist
   vec3  d  = p - si.p;
   float t2 = sdot(d);
-  d *= inversesqrt(t2);
+  d /= sqrt(t2);
   
+  float dp = abs(dot(d, em.rect_n));
+
   es.p   = p;  
   es.n   = em.rect_n;
-  es.pdf = em.srfc_area_inv * t2 / abs(dot(d, es.n));
+  es.pdf = dp != 0.f ? (em.srfc_area_inv * t2 / dp) : 0.f;
   es.L   = eval_emitter(em, wvls, es.p) / es.pdf;
 }
 
@@ -233,9 +236,10 @@ float _pdf_emitter_rect(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
   // Find direction to point and keep squared dist
   vec3  d  = p - si.p;
   float t2 = sdot(d);
-  d *= inversesqrt(t2);
+  d /= sqrt(t2);
 
-  return em.srfc_area_inv * t2 / abs(dot(d, em.rect_n));
+  float dp = abs(dot(d, em.rect_n));
+  return dp != 0.f ? (em.srfc_area_inv * t2 / dp) : 0.f;
 }
 
 void _sample_emitter_point(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
@@ -256,7 +260,7 @@ float _pdf_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
 
 void _sample_emitter_constant(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {
   es.p   = vec3(0);
-  es.pdf = 0.f;
+  es.pdf = 1.f;
   es.L   = eval_emitter(em, wvls, es.p);
 }
 
