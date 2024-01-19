@@ -294,25 +294,29 @@ namespace met::detail {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
 
+      // Extract rotation, scale from transform
+      eig::Matrix3f rot, scale;
+      emitter.trf.computeRotationScaling(&rot, &scale);
+
       // Precompute some data based on type
-      eig::Vector3f c = emitter.trf * eig::Vector3f(0, 0, 0);
-      float srfc_area, srfc_area_inv, r;
+      eig::Vector3f point  = 0.f,
+                    rect_n = 0.f;
+      float srfc_area_inv  = 0.f, 
+            sphere_r       = 0.f;
+            
       if (emitter.type == Emitter::Type::eSphere) {
-        r             = (emitter.trf.linear() * eig::Vector3f(1, 0, 0)).x();
-        srfc_area     = 4.f * std::numbers::pi_v<float> * r * r;
-        srfc_area_inv = 1.f / srfc_area;
+        point         = (emitter.trf * eig::Vector4f(0, 0, 0, 1)).head<3>();
+        sphere_r      = (scale * eig::Vector3f(1, 0, 0)).x();
+        srfc_area_inv = 1.f / (4.f * std::numbers::pi_v<float> * sphere_r * sphere_r);
       } else if (emitter.type == Emitter::Type::eRect) {
-        r             = 0.f;
-        srfc_area     = (emitter.trf.linear() * eig::Vector3f(2, 2, 0)).head<2>().prod();
-        srfc_area_inv = 1.f / srfc_area;
-      } else { // constant, point
-        r             = 0.f;
-        srfc_area     = 0.f;
-        srfc_area_inv = 1.f;
+        point         = (emitter.trf * eig::Vector4f(0, 0, 0, 1)).head<3>();
+        rect_n        = (emitter.trf * eig::Vector4f(0, 0, 1, 0)).head<3>().normalized();
+        srfc_area_inv = 1.f / ((scale * eig::Vector3f(2, 2, 0)).head<2>().prod());
       }
 
-      fmt::print("{} -> r = {}\n", i, r);
-      fmt::print("{} -> c = {}\n", i, c);
+      fmt::print("{} -> r              = {}\n", i, sphere_r);
+      fmt::print("{} -> c              = {}\n", i, point);
+      fmt::print("{} -> surfc_area_inv = {}\n", i, srfc_area_inv);
       
       m_buffer_map_data[i] = {
         .trf              = emitter.trf.matrix(),
@@ -320,14 +324,13 @@ namespace met::detail {
         
         .type             = static_cast<uint>(emitter.type),
         .is_active        = emitter.is_active,
-
         .illuminant_i     = emitter.illuminant_i,
         .illuminant_scale = emitter.illuminant_scale,
 
-        .c             = c,
-        .r             = r,
-        .srfc_area     = srfc_area,
-        .srfc_area_inv = srfc_area_inv
+        .point         = point,
+        .srfc_area_inv = srfc_area_inv,
+        .rect_n        = rect_n,
+        .sphere_r      = sphere_r,
       };
 
       // Flush change to buffer; most changes to objects are local,
@@ -373,7 +376,7 @@ namespace met::detail {
     for (int i = 0; i < meshes.size(); ++i) {
       const auto &[value, state] = meshes[i];
       guard_continue(state);
-
+      
       // Simplified copy of mesh, inverse matrix to undo [0, 1] packing, and acceleration structure
       auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-3));
       auto bvh         = create_bvh({ .mesh = copy, .n_node_children = 8, .n_leaf_children = 3 });

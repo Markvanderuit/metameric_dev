@@ -196,7 +196,7 @@ Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
 }
 
 const float exposure  = 1.f;
-const uint  max_depth = 1;
+const uint  max_depth = 4;
 
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
   return mod(sample_1d + float(i) / float(n), 1.f);
@@ -238,7 +238,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
         // On secondary hit, apply mis
         float em_pdf = pdf_emitter(em, si, ray_get_position(ray));
         float weight = mis_power(bsdf_pdf, em_pdf);
-        // radiance += throughput * em_value * weight / bsdf_pdf;
+        radiance += throughput * em_value * weight;
       }
 
       // Is this not necessary?
@@ -250,7 +250,20 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
     if (!is_valid(si))
       break;
 
-    debug_color = si.sh.n;
+    {
+      // ObjectInfo object_info = srfc_buff_objc_info[si.object_i];
+      // MeshInfo mesh_info     = srfc_buff_mesh_info[object_info.mesh_i];
+      // BVHPrim prim           = unpack(srfc_buff_prim[mesh_info.prims_offs + si.prim_i]);
+      // // debug_color = vec3(float(si.prim_i) / float(mesh_info.prims_size));
+      // vec3 n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
+      // n = (object_info.trf_mesh * vec4(n, 0)).xyz;
+      // n = normalize(n);
+      // ray.d = normalize(ray.d);
+      // if (dot(n, ray.d) >= 0) {
+      //   n = -n;
+      // }
+      debug_color = si.sh.t;
+    }
     
     /* // If object back was hit, terminate current path
     if (frame_cos_theta(si.wi) < 0)
@@ -344,7 +357,7 @@ void main() {
 
   // Integrate radiance over color system to get color
   vec3 value = sample_colsys(0, wvls) * exposure * L;
-       value = debug_color;
+      //  value = debug_color;
 
   // Add prior accumulated average
   if (buff_sampler_state.spp_curr > 0) {

@@ -208,9 +208,9 @@ namespace met {
     // Pre-supply some data for an initial scene
     auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
     components.settings   = { .name  = "Settings", 
-                                    .value = { .texture_size = Settings::TextureSize::eHigh }};
+                              .value = { .texture_size = Settings::TextureSize::eHigh }};
     components.observer_i = { .name  = "Default observer", 
-                                    .value = 0 };
+                              .value = 0 };
     resources.bases.push("Default basis",  loaded_tree.basis,           false);
     resources.illuminants.push("D65",      models::emitter_cie_d65,     false);
     resources.illuminants.push("E",        models::emitter_cie_e,       false);
@@ -241,31 +241,26 @@ namespace met {
     }); */
 
     // Default object
-    components.objects.push("Backwall object", {
+    components.objects.push("Back object", {
       .mesh_i      = 0,
       .uplifting_i = 0,
       .diffuse     = Colr(1),
-      .trf         = eig::Affine3f(eig::Translation3f({ -.25f, -.25f, -.25f }) *
-                                   eig::Scaling(1.5f))
+      .trf         = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, 0.0 }) *
+                                   eig::Scaling(0.75f))
     });
-    components.objects.push("Default object", {
+    components.objects.push("Middle object", {
       .mesh_i      = 0,
       .uplifting_i = 0,
       .diffuse     = Colr(1),
-      .trf         = eig::Affine3f(eig::Translation3f({ 0.f, 0.f, 0.f }))
-    });
-    components.objects.push("Blocker object", {
-      .mesh_i      = 0,
-      .uplifting_i = 0,
-      .diffuse     = Colr(1),
-      .trf         = eig::Affine3f(eig::Translation3f({ 0.25f, 0.25f, 0.25f }) *
+      .trf         = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, 0.25 }) *
                                    eig::Scaling(0.5f))
     });
 
     // Default emitter
     components.emitters.push("Default D65 emitter", {
-      .type             = Emitter::Type::eSphere,
-      .trf              = eig::Affine3f(eig::Translation3f({ .5, .5, 1 }) * eig::Scaling(0.2f)),
+      .type             = Emitter::Type::eRect,
+      .trf              = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, .75f }) * 
+                                        eig::Scaling(0.25f)),
       .illuminant_i     = 0,
       .illuminant_scale = 1.f
     });

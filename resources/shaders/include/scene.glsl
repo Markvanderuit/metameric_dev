@@ -82,9 +82,9 @@ struct EmitterInfo {
 
   // Precomputed data
   vec3  center;
-  float r;
-  float srfc_area;
   float srfc_area_inv;
+  vec3  rect_n;       // Specific to rectangle area emitters
+  float sphere_r;     // Specific to sphere area emitters
 };
 
 #endif // SCENE_GLSL_GUARD

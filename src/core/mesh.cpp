@@ -40,10 +40,10 @@ namespace met {
   namespace models {
     Mesh unit_rect = {
       .verts = {
-        eig::Array3f(0, 0, 0),
-        eig::Array3f(1, 0, 0),
-        eig::Array3f(0, 1, 0),
-        eig::Array3f(1, 1, 0)
+        eig::Array3f(-1, -1, 0),
+        eig::Array3f( 1, -1, 0),
+        eig::Array3f(-1,  1, 0),
+        eig::Array3f( 1,  1, 0)
       },
       .elems = {
         eig::Array3u(0, 1, 2),
@@ -418,7 +418,7 @@ namespace met {
     
     // Generate transformation to move vertices to a [0, 1] bbox
     auto scale = (maxb - minb).eval();
-    scale = (scale.array().abs() != 0.f).select(1.f / scale, eig::Array3f(1));
+    scale = (scale.array().abs() > 0.1f).select(1.f / scale, eig::Array3f(1));
     auto trf = (eig::Scaling((scale).matrix().eval()) 
              *  eig::Translation3f(-minb)).matrix();
     

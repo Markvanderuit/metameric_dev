@@ -40,6 +40,7 @@ struct SurfaceInfo {
 
   // Intersected object index
   uint object_i; // Set to RAY_INVALID_DATA if the surface is invalid
+  uint prim_i;
 };
 
 #define SURFACE_INVALID_DATA 0xFFFFFFFF
@@ -65,13 +66,14 @@ SurfaceInfo get_surface_info(in Ray ray) {
 
   // On a valid surface, fill in surface info
   si.object_i = ray_get_object(ray);
+  si.prim_i   = ray_get_object_primitive(ray);
   
   ObjectInfo object_info = srfc_buff_objc_info[si.object_i];
   MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
   
   // Obtain and unpack intersected primitive data
-  BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + ray_get_object_primitive(ray)]);
-
+  BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + si.prim_i]);
+  
   // Compute geometric normal
   si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
 
@@ -88,15 +90,16 @@ SurfaceInfo get_surface_info(in Ray ray) {
   ns   = (object_info.trf_mesh * vec4(ns, 0)).xyz;
   si.p = (object_info.trf_mesh * vec4(si.p, 1)).xyz;
   si.n = (object_info.trf_mesh * vec4(si.n, 0)).xyz;
+
+  // Normalize vectors as transformations don't preserve this :/
+  si.n = normalize(si.n);
+  ns   = normalize(ns);
   
   // Flip normals on back hit
-  if (dot(si.n, ray.d) > 0) {
-    si.n = -si.n;
-    ns   = -ns;
-  }
+  if (dot(si.n, ray.d) > 0) si.n = -si.n;
+  if (dot(ns,   ray.d) > 0)   ns = -ns;
 
-  // Normalize and generate shading frame
-  si.n  = normalize(si.n);
+  // Generate shading frame
   si.sh = get_frame(normalize(ns));
   si.wi = frame_to_local(si.sh, -ray.d);
 
@@ -138,15 +141,16 @@ SurfaceInfo get_surface_info(in GBufferRay gb, in Ray ray) {
   si.p = (object_info.trf_mesh * vec4(si.p, 1)).xyz;
   si.n = (object_info.trf_mesh * vec4(si.n, 0)).xyz;
 
+  // Normalize vectors as transformations don't preserve this :/
+  ns   = normalize(ns);
+  si.n = normalize(si.n);
+  
   // Flip normals on back hit
-  if (dot(si.n, ray.d) > 0) {
-    si.n = -si.n;
-    ns   = -ns;
-  }
+  if (dot(ns,   ray.d) > 0)   ns = -ns;
+  if (dot(si.n, ray.d) > 0) si.n = -si.n;
 
-  // Normalize and generate shading frame
-  si.n  = normalize(si.n);
-  si.sh = get_frame(normalize(ns));
+  // Generate shading frame
+  si.sh = get_frame(ns);
   si.wi = frame_to_local(si.sh, -ray.d);
   
   return si;

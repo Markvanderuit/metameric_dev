@@ -90,7 +90,6 @@ struct EmitterSample {
   float pdf;
 };
 
-
 vec4 eval_emitter(in EmitterInfo em, in vec4 wvls, in vec3 p) {
   // TODO refer to texture outside include
   vec4 v;
@@ -107,11 +106,11 @@ void _sample_emitter_sphere(inout EmitterSample es, in EmitterInfo em, in Surfac
   //      p_ = frame_to_world(get_frame(normalize(si.p - em.center)), p_);
   // vec3 p = em.center + em.r * p_;
   
-  vec3 p = em.center + em.r * square_to_unif_sphere(sample_2d);
+  vec3 p = em.center + em.sphere_r * square_to_unif_sphere(sample_2d);
   
   // Intersect against sphere to find nearest actually visible point
   Ray ray = init_ray(si.p, normalize(p - si.p));
-  if (_ray_intersect_sphere(ray, em.center, em.r))
+  if (_ray_intersect_sphere(ray, em.center, em.sphere_r))
     p = ray_get_position(ray);
   
   // Find direction to point and keep squared dist
@@ -141,9 +140,9 @@ void _sample_emitter_sphere_solid_angle(inout EmitterSample es, in EmitterInfo e
   vec3 dc_v  = em.center - si.p;
   float dc_2 = sdot(dc_v);
 
-  if (dc_2 > sdot(em.r * (1.f + M_RAY_EPS))) {
+  if (dc_2 > sdot(em.sphere_r * (1.f + M_RAY_EPS))) {
     float inv_dc          = inversesqrt(dc_2);
-    float sin_theta_max   = em.r * inv_dc;
+    float sin_theta_max   = em.sphere_r * inv_dc;
     float sin_theta_max_2 = sdot(sin_theta_max);
     float inv_sin_theta_max = 1.f / sin_theta_max;
     float cos_theta_max     = sqrt(max(0.f, 1.f - sin_theta_max_2));
@@ -164,11 +163,11 @@ void _sample_emitter_sphere_solid_angle(inout EmitterSample es, in EmitterInfo e
                                                             sin_phi * sin_alpha,
                                                             cos_alpha));
     es.n   = d;  
-    es.p   = fma(d, vec3(em.r), em.center);
+    es.p   = fma(d, vec3(em.sphere_r), em.center);
     es.pdf = square_to_unif_cone_pdf(vec2(0), cos_theta_max);
   } else {
     vec3 d = square_to_unif_sphere(sample_2d);
-    es.p   = fma(d, vec3(em.r), em.center);
+    es.p   = fma(d, vec3(em.sphere_r), em.center);
     es.n   = d;
 
     vec3  si_d = es.p - si.p;
@@ -190,7 +189,7 @@ float _pdf_emitter_sphere_solid_angle(in EmitterInfo em, in SurfaceInfo si, in v
   // TODO precomp in surface object
   vec3 n = normalize(p - em.center.xyz);
   
-  float sin_alpha = em.r / length(em.center.xyz - si.p);
+  float sin_alpha = em.sphere_r / length(em.center.xyz - si.p);
   float cos_alpha = sqrt(max(0.f, 1.f - sin_alpha * sin_alpha));
 
   return sin_alpha < (1.f - M_EPS) ? square_to_unif_cone_pdf(vec2(0), cos_alpha)
@@ -224,10 +223,8 @@ void _sample_emitter_rect(inout EmitterSample es, in EmitterInfo em, in SurfaceI
   float t2 = sdot(d);
   d *= inversesqrt(t2);
   
-  // es.pdf = 1.f / hprod((em.trf * vec4(2, 2, 0, 1)).xyz);
-
   es.p   = p;  
-  es.n   = normalize((em.trf * vec4(0, 0, -1, 0)).xyz); // TODO use normal for once
+  es.n   = em.rect_n;
   es.pdf = em.srfc_area_inv * t2 / abs(dot(d, es.n));
   es.L   = eval_emitter(em, wvls, es.p) / es.pdf;
 }
@@ -238,9 +235,7 @@ float _pdf_emitter_rect(in EmitterInfo em, in SurfaceInfo si, in vec3 p) {
   float t2 = sdot(d);
   d *= inversesqrt(t2);
 
-  vec3 n = normalize((em.trf * vec4(0, 0, -1, 0)).xyz); // TODO store normal instead
-
-  return em.srfc_area_inv * t2 / abs(dot(d, n));
+  return em.srfc_area_inv * t2 / abs(dot(d, em.rect_n));
 }
 
 void _sample_emitter_point(inout EmitterSample es, in EmitterInfo em, in SurfaceInfo si, in vec4 wvls, in vec2 sample_2d) {

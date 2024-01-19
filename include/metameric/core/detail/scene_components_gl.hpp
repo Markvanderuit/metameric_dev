@@ -56,11 +56,11 @@ namespace met::detail {
       alignas(4)  uint          illuminant_i;
       alignas(4)  float         illuminant_scale;
       
-      alignas(4)  eig::Array3f  c;
-      alignas(4)  float         r;
-      
-      alignas(4)  float         srfc_area;
+      alignas(4)  eig::Array3f  point; // center for sphere/point, corner for rect
       alignas(4)  float         srfc_area_inv;
+
+      alignas(4)  eig::Array3f  rect_n;
+      alignas(4)  float         sphere_r;
     };
 
     // Mapped buffer accessors

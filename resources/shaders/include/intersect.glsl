@@ -34,6 +34,21 @@ bool ray_intersect_unit_rect(inout Ray ray) {
   return true;
 }
 
+bool ray_intersect_rect(inout Ray ray, in vec3 c, in vec3 n, in mat4 trf_inv) {
+  // Plane distance test
+  float t = (dot(c, n) - dot(ray.o, n)) / dot(ray.d, n);
+  if (t < 0.f || t > ray.t)
+    return false;
+
+  // Plane boundary test, clamp to [-1, 1]
+  vec2 p_local = (trf_inv * vec4(ray.o + ray.d * t, 1)).xy;
+  if (clamp(p_local, vec2(-1), vec2(1)) != p_local)
+    return false;
+    
+  ray.t = t;
+  return true;
+}
+
 bool ray_intersect_sphere(inout Ray ray, in vec3 center, in float r) {
   vec3  o = ray.o - center;
   float b = 2.f * dot(o, ray.d);
@@ -339,24 +354,12 @@ bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
   
   if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
     return false;
-
-  // Generate local ray
-  Ray ray_local;
-  ray_local.o = (em.trf_inv * vec4(ray.o, 1)).xyz;
-  ray_local.d = (em.trf_inv * vec4(ray.d, 0)).xyz;
-  
-  // Get length and normalize direction
-  // Reuse length to adjust ray_local.t if ray.t is not at infty
-  float dt = length(ray_local.d);
-  ray_local.d /= dt;
-  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
   
   // Run intersection; on a hit, simply return
   if (em.type == EmitterTypeSphere) {
-    return ray_intersect_sphere(ray, em.center, em.r);
-    // return ray_intersect_unit_sphere(ray_local);
+    return ray_intersect_sphere(ray, em.center, em.sphere_r);
   } else if (em.type == EmitterTypeRect) {
-    return ray_intersect_unit_rect(ray_local);
+    return ray_intersect_rect(ray, em.center, em.rect_n, em.trf_inv);
   }
 }
 
@@ -366,33 +369,15 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
     return false;
 
-  // Generate local ray
-  Ray ray_local;
-  ray_local.o = (em.trf_inv * vec4(ray.o, 1)).xyz;
-  ray_local.d = (em.trf_inv * vec4(ray.d, 0)).xyz;
-  
-  // Get length and normalize direction
-  // Reuse length to adjust ray_local.t if ray.t is not at infty
-  float dt = length(ray_local.d);
-  ray_local.d /= dt;
-  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
-
   bool hit = false;
   if (em.type == EmitterTypeSphere) {
-    hit = ray_intersect_sphere(ray, em.center, em.r);
-    // hit = ray_intersect_unit_sphere(ray_local);
+    hit = ray_intersect_sphere(ray, em.center, em.sphere_r);
   } else if (em.type == EmitterTypeRect) {
-    hit = ray_intersect_unit_rect(ray_local);
+    hit = ray_intersect_rect(ray, em.center, em.rect_n, em.trf_inv);
   }
 
-  if (hit) {
-    if (em.type == EmitterTypeSphere) {
-      ray_set_data_emitter(ray, emitter_i);
-    } else if (em.type == EmitterTypeRect) {
-      ray.t = length((em.trf * vec4(ray_local.d * ray_local.t, 0)).xyz);
-      ray_set_data_emitter(ray, emitter_i);
-    }
-  }
+  if (hit)
+    ray_set_data_emitter(ray, emitter_i);
 
   return hit;
 }
