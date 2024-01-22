@@ -187,6 +187,21 @@ vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
   return fma(vec3(M_RAY_EPS), si.n, si.p);
 }
 
+Ray surface_ray_towards_direction(in SurfaceInfo si, in vec3 d) {
+  return init_ray(surface_offset(si, d), d);
+}
+
+Ray surface_ray_towards_point(in SurfaceInfo si, in vec3 p) {
+  Ray ray;
+  ray.o = surface_offset(si, p - si.p);
+  ray.d = p - ray.o;
+  ray.t = length(ray.d);
+  ray.d /= ray.t;
+  ray.t *= (1.f - M_RAY_EPS * 10.f);
+  ray.data = RECORD_INVALID_DATA;
+  return ray;
+}
+
 PositionSample get_position_sample(in SurfaceInfo si) {
   PositionSample ps;
 

@@ -137,7 +137,7 @@ vec3 ray_get_position(in Ray ray) {
 // The PathInfo object stores the general state for a path that is in-flight.
 // If a path is terminated, values are reset, but pixel/state are preserved.
 // Size: 64 by
-struct PathInfo {
+/* struct PathInfo {
   // 12 by
   uint  pixel;       // Packed pixel position,      Retained for new paths
   uint  depth;       // Current path length,        initialized to 0 for new paths
@@ -165,14 +165,14 @@ struct PathInfo {
 
   // 4 by, to get it to 64 bytes
   uint padd;
-};
+}; */
 
 // Extract packed pixel data from PathInfo
-ivec2 get_path_pixel(in PathInfo pi) {
+/* ivec2 get_path_pixel(in PathInfo pi) {
   return ivec2(pi.pixel & 0xFFFF, pi.pixel >> 16);
-}
+} */
 
-void reset(inout PathInfo pi) {
+/* void reset(inout PathInfo pi) {
   pi.did_scatter  = false;
   pi.radiance     = 0.f;
   pi.wavelength   = next_1d(pi.state); // TODO: Sample vec4, and sample by cdf of CMFS * avg(Le)
@@ -181,6 +181,6 @@ void reset(inout PathInfo pi) {
   pi.eta          = 1.f;
   pi.ray_extend_i = UINT_MAX;
   pi.ray_shadow_i = UINT_MAX;
-}
+} */
 
 #endif // RAY_GLSL_GUARD

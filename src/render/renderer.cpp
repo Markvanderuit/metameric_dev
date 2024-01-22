@@ -21,11 +21,6 @@ namespace met {
     void BaseIntegrationRenderer::reset(const Sensor &sensor, const Scene &scene) {
       met_trace_full();
 
-      // Initialize or resize sampler data buffer; one value per pixel
-      if (uint n = sensor.film_size.prod(); !m_sampler_data.is_init() || m_sampler_data.size() != n * sizeof(eig::Array2u)) {
-        m_sampler_data = {{ .size = n * sizeof(eig::Array2u) }};
-      }
-
       // Reset current sample count
       m_spp_curr = 0;
       
@@ -173,7 +168,6 @@ namespace met {
     m_program.bind("b_gbuffer",            gbuffer);
     m_program.bind("b_buff_sensor",        sensor.buffer());
     m_program.bind("b_buff_sampler_state", get_sampler_state());
-    m_program.bind("b_buff_sampler_data",  m_sampler_data);
     m_program.bind("b_buff_objects",       scene.components.objects.gl.object_info);
     m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
     m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
@@ -222,9 +216,20 @@ namespace met {
     met_trace_full();
 
     // Initialize program object
-    m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
-                   .cross_path = "resources/shaders/render/primitive_path.comp.json" }};
+    m_program_render = {{ .type       = gl::ShaderType::eCompute,
+                          .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
+                          .cross_path = "resources/shaders/render/primitive_path.comp.json",
+                          .spec_const = {{ 0u, 16u        },
+                                         { 1u, 16u        },
+                                         { 2u, info.depth },
+                                         { 3u, false      }} }};
+    m_program_query  = {{ .type       = gl::ShaderType::eCompute,
+                          .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
+                          .cross_path = "resources/shaders/render/primitive_path.comp.json",
+                          .spec_const = {{ 0u, 256u       },
+                                         { 1u, 1u         },
+                                         { 2u, info.depth },
+                                         { 3u, true       }} }};
 
     // Assign sampler configuration
     m_spp_curr     = 0;
@@ -246,38 +251,36 @@ namespace met {
     const auto &gbuffer = m_spp_curr ? m_gbuffer.film() : m_gbuffer.render(sensor, scene);
 
     // Bind required resources to their corresponding targets
-    m_program.bind();
-    m_program.bind("b_film",               m_film);
-    m_program.bind("b_gbuffer",            gbuffer);
-    m_program.bind("b_buff_sensor",        sensor.buffer());
-    m_program.bind("b_buff_sampler_state", get_sampler_state());
-    m_program.bind("b_buff_sampler_data",  m_sampler_data);
-    m_program.bind("b_buff_objects",       scene.components.objects.gl.object_info);
-    m_program.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
-    m_program.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
-    m_program.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
-    m_program.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
-    m_program.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
-    m_program.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
-    m_program.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
+    m_program_render.bind();
+    m_program_render.bind("b_film",               m_film);
+    m_program_render.bind("b_buff_sensor",        sensor.buffer());
+    m_program_render.bind("b_buff_sampler_state", get_sampler_state());
+    m_program_render.bind("b_buff_objects",       scene.components.objects.gl.object_info);
+    m_program_render.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
+    m_program_render.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
+    m_program_render.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
+    m_program_render.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
+    m_program_render.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
+    m_program_render.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
+    m_program_render.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
     if (!scene.resources.images.empty()) {
-      m_program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      m_program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      m_program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+      m_program_render.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      m_program_render.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      m_program_render.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
     }
     if (!scene.resources.meshes.empty()) {
-      m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-      m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-      m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
-      m_program.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
-      m_program.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
+      m_program_render.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
+      m_program_render.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
+      m_program_render.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      m_program_render.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
+      m_program_render.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
     }
 
     // Dispatch compute shader
     gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
                               gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
                               gl::BarrierFlags::eBufferUpdate                                     );
-    gl::dispatch_compute(m_dispatch);
+    gl::dispatch_compute(m_dispatch_render);
 
     // Advance sampler state for next render() call
     advance_sampler_state();
@@ -294,9 +297,45 @@ namespace met {
     if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
       m_film = {{ .size = sensor.film_size.max(1).eval() }};
       auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
-      m_dispatch.groups_x = dispatch_ndiv.x();
-      m_dispatch.groups_y = dispatch_ndiv.y();
+      m_dispatch_render.groups_x = dispatch_ndiv.x();
+      m_dispatch_render.groups_y = dispatch_ndiv.y();
     }
     m_film.clear();
+  }
+
+  const gl::Buffer &PathRenderer::query(const PathQuery &sensor, const Scene &scene) {
+    met_trace_full();
+
+    if (!m_paths.is_init() || m_paths.size() != sensor.n_paths * sizeof(uint)) {
+      m_paths = {{ .size = sensor.n_paths * sizeof(uint) }};
+    }
+
+    // Bind required resources to their corresponding targets
+    m_program_query.bind();
+    m_program_query.bind("b_film",               m_film);
+    m_program_query.bind("b_buff_query",         sensor.buffer());
+    m_program_query.bind("b_buff_sampler_state", get_sampler_state());
+    m_program_query.bind("b_buff_objects",       scene.components.objects.gl.object_info);
+    m_program_query.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
+    m_program_query.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
+    m_program_query.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
+    m_program_query.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
+    m_program_query.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
+    m_program_query.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
+    m_program_query.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
+    if (!scene.resources.images.empty()) {
+      m_program_query.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      m_program_query.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      m_program_query.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+    }
+    if (!scene.resources.meshes.empty()) {
+      m_program_query.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
+      m_program_query.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
+      m_program_query.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
+      m_program_query.bind("b_buff_mesh_vert", scene.resources.meshes.gl.mesh_verts);
+      m_program_query.bind("b_buff_mesh_elem", scene.resources.meshes.gl.mesh_elems_al);
+    }
+
+    return m_paths;
   }
 } // namespace met

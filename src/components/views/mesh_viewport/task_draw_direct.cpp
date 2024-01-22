@@ -39,7 +39,9 @@ namespace met {
     // Internal target texture; can be differently sized
     info("target").set<gl::Texture2d4f>({ }); */
 
-    info("direct_renderer").init<PathRenderer>({ .spp_per_iter = n_iters_per_dispatch,  .spp_max = n_iters_max });
+    info("direct_renderer").init<PathRenderer>({ .spp_per_iter = n_iters_per_dispatch,  
+                                                 .spp_max = n_iters_max,
+                                                 .depth   = 4 });
   }
     
   void MeshViewportDrawDirectTask::eval(SchedulerHandle &info) {

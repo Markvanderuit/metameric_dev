@@ -690,6 +690,11 @@ namespace met::detail {
       d *= cmfs.array().rowwise().sum();
     }
 
+    // Add defensive sampling for very small wavelength values
+    {
+      d += (Spec(1) - d) * 0.01f;
+    }
+
     wavelength_distr        = d;
     wavelength_distr_buffer = Distribution(cnt_span<float>(wavelength_distr)).to_buffer_std140();
   }

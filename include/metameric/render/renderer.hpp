@@ -23,6 +23,16 @@ namespace met {
       virtual void reset(const Sensor &sensor, const Scene &scene) = 0;
     };
 
+    class QueriableRenderer {
+    protected:
+      gl::Buffer m_paths; // Query render target
+
+    public:
+      const gl::Buffer &paths() const { return m_paths; }
+
+      virtual const gl::Buffer &query(const PathQuery &sensor, const Scene &scene) = 0;
+    };
+
     class BaseIntegrationRenderer : public BaseRenderer {
       struct SamplerState {
         alignas(4) uint spp_per_iter;
@@ -44,12 +54,10 @@ namespace met {
       uint          m_spp_max;
       uint          m_spp_curr;
       uint          m_spp_per_iter;
-      gl::Buffer    m_sampler_data;
 
     public:
       BaseIntegrationRenderer();
     };
-
     
     // Helper class to build a quick first-intersection gbuffer
     class GBuffer : public BaseRenderer {
@@ -100,23 +108,27 @@ namespace met {
     // Renderer primitives will accumulate up to this number. Afterwards
     // the target is left unmodified. If set to 0, no limit is imposed.
     uint spp_max = std::numeric_limits<uint>::max();
+
+    // Max path depth
+    uint depth = 4;
   };
 
-  class PathRenderer : public detail::BaseIntegrationRenderer {
+  class PathRenderer : public detail::BaseIntegrationRenderer,
+                       public detail::QueriableRenderer {
     detail::GBuffer m_gbuffer;
-    
+
   public:
     using InfoType = PathRendererCreateInfo;
     
-    gl::Program     m_program;
-    gl::ComputeInfo m_dispatch;
+    gl::ComputeInfo m_dispatch_render;
+    gl::Program     m_program_render;
+    gl::Program     m_program_query;
 
   public:
     PathRenderer(PathRendererCreateInfo info);
 
     void reset(const Sensor &sensor, const Scene &scene) override;
     const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
+    const gl::Buffer      &query(const PathQuery &sensor, const Scene &scene) override;
   };
-
-
 } // namespace met

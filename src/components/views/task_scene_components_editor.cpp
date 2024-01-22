@@ -240,16 +240,14 @@ namespace met {
         detail::fun_resource_selector("Illuminant", e_illuminants, emitter.illuminant_i);
         ImGui::SliderFloat("Power", &emitter.illuminant_scale, 0.f, 10.f);
 
-        /* {
+        {
           // Extract rotation, translation, and scale from matrix
           // auto rot = emitter.trf.rotation();
           eig::Matrix3f rotation, scaling;
           eig::Vector3f translation = emitter.trf.translation();
           
           emitter.trf.computeRotationScaling(&rotation, &scaling);
-
-        } */
-
+        }
 
         ImGui::TreePop();
       } // if (open_section)

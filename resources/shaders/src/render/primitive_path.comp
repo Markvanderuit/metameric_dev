@@ -9,9 +9,13 @@
 #include <distribution.glsl>
 
 // General layout rule declarations
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x_id = 0, local_size_y_id = 1) in;
 layout(std140) uniform;
 layout(std430) buffer;
+
+// Specialization constant declarations
+layout(constant_id = 2) const uint max_depth = 4;     // Maximum path depth
+layout(constant_id = 3) const bool is_query  = false; // Whether path query mode is eanbled
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
@@ -20,26 +24,31 @@ layout(binding = 0) uniform b_buff_sensor {
   mat4  view_trf;
   uvec2 film_size; 
 } buff_sensor;
-layout(binding = 1) uniform b_buff_sampler_state {
+layout(binding = 1) uniform b_buff_query {
+  vec3 origin;    uint p0;
+  vec3 direction; uint p1;
+  uint n_paths; 
+} buff_query;
+layout(binding = 2) uniform b_buff_sampler_state {
   uint spp_per_iter;
   uint spp_curr;
 } buff_sampler_state;
-layout(binding = 2) uniform b_buff_objects {
+layout(binding = 3) uniform b_buff_objects {
   uint n;
   ObjectInfo data[max_supported_objects];
 } buff_objects;
-layout(binding = 3) uniform b_buff_meshes {
+layout(binding = 4) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
-layout(binding = 4) uniform b_buff_textures {
+layout(binding = 5) uniform b_buff_textures {
   TextureInfo data[max_supported_textures];
 } buff_textures;
-layout(binding = 5) uniform b_buff_emitters {
+layout(binding = 6) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[max_supported_objects];
 } buff_emitters;
-layout(binding = 6) uniform b_buff_wvls_distr {
+layout(binding = 7) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
@@ -48,33 +57,29 @@ layout(binding = 6) uniform b_buff_wvls_distr {
 declare_distr_sampler(wavelength, buff_wvls_distr)
 
 // Storage buffer declarations
-layout(binding = 0) restrict buffer b_buff_sampler_data {
-  uint data[];
-} buff_sampler_data;
-layout(binding = 1) restrict readonly buffer b_buff_bvhs_node {
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_node {
   BVHNodePack data[];
 } buff_bvhs_node;
-layout(binding = 2) restrict readonly buffer b_buff_bvhs_prim {
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim {
   BVHPrimPack data[];
 } buff_bvhs_prim;
-layout(binding = 3) restrict readonly buffer b_buff_mesh_vert {
+layout(binding = 2) restrict readonly buffer b_buff_mesh_vert {
   BVHVertPack data[];
 } buff_mesh_vert;
-layout(binding = 4) restrict readonly buffer b_buff_mesh_elem {
+layout(binding = 3) restrict readonly buffer b_buff_mesh_elem {
   uvec3 data[];
 } buff_mesh_elem;
-layout(binding = 5) restrict readonly buffer b_buff_weights {
+layout(binding = 4) restrict readonly buffer b_buff_weights {
   AtlasLayout data[max_supported_objects];
 } buff_weights;
 
 // Texture unit, ergo sampler declarations
-layout(binding = 0) uniform usampler2D     b_gbuffer; // G-buffer pack
-layout(binding = 1) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
-layout(binding = 2) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
-layout(binding = 3) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
-layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
-layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 0) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
+layout(binding = 1) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
+layout(binding = 2) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
+layout(binding = 3) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
+layout(binding = 4) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 5) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
 
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;
@@ -116,6 +121,21 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define brdf_txtr_spec      b_spec_4f
 #include <brdf.glsl>
 
+// Helper struct to cache path vertex information
+struct PathVertexInfo {
+  // Reflectance info here
+  // TODO ...
+  uint data; // Record storing object/emitter/primitive id, see record.glsl
+};
+
+// Helper struct to cache full path information
+struct PathInfo {
+  vec4 wvls;
+  vec4 throughput; // Geometric attenuation over probability density, without reflectances
+  uint path_length;
+  PathVertexInfo data[max_depth];
+};
+
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
@@ -150,32 +170,6 @@ mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
   return csys;
 }
 
-vec4 eval_env(in vec3 dir, in vec4 wvls) {
-  return vec4(0); // vec4(max(0.f, dot(dir, normalize(vec3(0, 1, 0))))) * eval_emitter(0, wvls);
-}
-
-Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
-  Ray ray;
-
-  ray.o = surface_offset(si, d);
-  ray.d = d;
-  ray.t = FLT_MAX;
-  
-  return ray;
-}
-
-Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
-  Ray ray;
-
-  ray.o = surface_offset(si, p - si.p);
-  ray.d = p - ray.o;
-  ray.t = length(ray.d);
-  ray.d /= ray.t;
-  ray.t *= (1.f - M_RAY_EPS * 10.f);
-
-  return ray;
-}
-
 Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
   // Get necessary sensor information
   float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
@@ -196,7 +190,9 @@ Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
   return ray;
 }
 
-const uint max_depth = 3;
+Ray ray_from_query() {
+  return init_ray(buff_query.origin, buff_query.direction);
+}
 
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
   return mod(sample_1d + float(i) / float(n), 1.f);
@@ -207,14 +203,13 @@ float mis_balance(in float pdf_a, in float pdf_b) {
 }
 
 float mis_power(in float pdf_a, in float pdf_b) {
-  // return 1.f;
   pdf_a *= pdf_a;
   pdf_b *= pdf_b;
   return pdf_a / (pdf_a + pdf_b);
 }
 
 // Sample radiance along ray and wavelengths
-vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
+vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
   // Path throughput information; we track 4 wavelengths simultaneously
   vec4  radiance   = vec4(0.f);
   vec4  throughput = vec4(1.f);
@@ -269,7 +264,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
       // If the sample position has potential throughput, evaluate a ray towards
       // the position  
       if (ps.pdf != 0.f && !all(iszero(f)) && dot(ps.d, si.sh.n) > 0.f) {
-        Ray ray = ray_towards_point(si, ps.p);
+        Ray ray = surface_ray_towards_point(si, ps.p);
         if (!ray_intersect_any(ray)) {
           // On a success, add contribution to path
           vec4  L      = eval_emitter_position(ps, wvls) / ps.pdf;
@@ -294,7 +289,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
       bsdf_pdf    = bs.pdf; // store previous brdf for when emitting surface is hit next
 
       // Generate next scene ray
-      ray = ray_towards_direction(si, bs.wo);
+      ray = surface_ray_towards_direction(si, bs.wo);
     }
 
     // TODO RR goes here
@@ -307,15 +302,20 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
 void main() {
   load_shared();
 
-  // 2D image coordinates; clamp invocations to image size
-  const ivec2 i = ivec2(gl_GlobalInvocationID.xy);
-  guard(all(lessThan(i, buff_sensor.film_size)));
+  // Clamp invocations to requested size
+  if (is_query) {
+    guard(gl_GlobalInvocationID.x < buff_query.n_paths);
+  } else {
+    guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
+  }
 
   // Initialize sampler state
   uint state = load_state();
 
-  // Generate initial sensor ray
-  Ray ray = ray_from_sensor(i, next_2d(state));
+  // Generate initial sensor/query ray
+  Ray ray = is_query
+          ? ray_from_query()
+          : ray_from_sensor(ivec2(gl_GlobalInvocationID.xy), next_2d(state));
 
   // Generate path wavelengths
   float wvl_sample = next_1d(state);
@@ -336,23 +336,25 @@ void main() {
     // wvl_pdfs[i] = 1.f;
   }
 
-  vec3 debug_color = vec3(0);
-
   // Evaluate ray/wavelength pair
-  vec4 L = Li(ray, wvls, state, debug_color) / wvl_pdfs;
+  vec4 L = Li(ray, wvls, state) / wvl_pdfs;
 
-  // Integrate radiance over color system to get color
-  vec3 value = sample_colsys(0, wvls) * L;
-      //  value = debug_color;
+  // Store output
+  if (is_query) {
+    // ...
+  } else {
+    // Integrate radiance over color system to get color
+    vec3 value = sample_colsys(0, wvls) * L;
 
-  // Add prior accumulated average
-  if (buff_sampler_state.spp_curr > 0) {
-    vec3 prev = imageLoad(b_film, ivec2(i)).xyz;
-    value = prev
-          + (value - prev)
-          / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+    // Add prior accumulated average from image
+    if (buff_sampler_state.spp_curr > 0) {
+      vec3 prev = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
+      value = prev
+            + (value - prev)
+            / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+    }
+    
+    // Store updated image value and sample state
+    imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(value, 1));
   }
-
-  // Store updated image value and sample state
-  imageStore(b_film, i, vec4(value, 1));
 }
