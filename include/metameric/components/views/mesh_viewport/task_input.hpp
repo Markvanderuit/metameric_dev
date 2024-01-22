@@ -15,10 +15,17 @@ namespace met {
     void init(SchedulerHandle &info) override {
       met_trace();
       
-      info.resource("arcball").init<detail::Arcball>({ 
+      /* info.resource("arcball").init<detail::Arcball>({ 
         .dist            = 2.5f,
         .e_eye           = { 1.f, 0.f, 1.0f },
         .e_center        = { 0.0f, 0.f, 0.25f },
+        .zoom_delta_mult = 0.1f
+      }); */
+
+      info.resource("arcball").init<detail::Arcball>({ 
+        .dist            = 2.f,
+        .e_eye           = { -.5f, .5f, 1.f },
+        .e_center        = { -.5f, .5f, .0f },
         .zoom_delta_mult = 0.1f
       });
     } 

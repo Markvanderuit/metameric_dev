@@ -2,6 +2,7 @@
 #define BRDF_GLSL_GUARD
 
 #include <math.glsl>
+#include <record.glsl>
 #include <scene.glsl>
 #include <surface.glsl>
 #include <warp.glsl>
@@ -28,8 +29,8 @@ PreliminaryBRDF get_surface_brdf_preliminary(in SurfaceInfo si) {
   PreliminaryBRDF brdf;
 
   // Load relevant info objects
-  ObjectInfo  object_info = brdf_buff_objc_info[si.object_i];
-  AtlasLayout weight_info = brdf_buff_bary_info[si.object_i];
+  ObjectInfo  object_info = brdf_buff_objc_info[record_get_object(si.data)];
+  AtlasLayout weight_info = brdf_buff_bary_info[record_get_object(si.data)];
 
   // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
   // also handle single-color objects by sampling the center of their patch
@@ -101,12 +102,6 @@ BRDF get_surface_brdf(in SurfaceInfo si, vec4 wavelength) {
   return get_surface_brdf(pr, wavelength);
 }
 
-struct BRDFSample {
-  vec3  wo;  // Sampled exitant direction in world frame
-  vec4  f;   // Evaluated throughput for sample
-  float pdf; // Sample pdf
-};
-
 BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
   BRDFSample bs;
 
@@ -117,7 +112,7 @@ BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
 
   vec3 wo = square_to_cos_hemisphere(sample_2d);
 
-  bs.f   = vec4(1) /* brdf.r */;
+  bs.f   = brdf.r;
   bs.pdf = square_to_cos_hemisphere_pdf(wo);
   bs.wo  = frame_to_world(si.sh, wo);
 
@@ -133,7 +128,7 @@ vec4 eval_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
   if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
     return vec4(0.f); */
     
-  return vec4(1) /* brdf.r */ * M_PI_INV * abs(frame_cos_theta(wo));
+  return brdf.r * M_PI_INV * abs(frame_cos_theta(wo));
 }
 
 float pdf_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {

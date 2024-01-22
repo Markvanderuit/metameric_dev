@@ -279,7 +279,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
-          ray_set_data_object_primitive(ray, bvh_offs(node) + i);
+          record_set_object_primitive(ray.data, bvh_offs(node) + i);
           hit = true;
         }
       }
@@ -345,7 +345,7 @@ void ray_intersect_object(inout Ray ray, uint object_i) {
   if (ray_isct_bvh(ray_local, object_info.mesh_i)) {
     ray.t    = length((object_info.trf_mesh * vec4(ray_local.d * ray_local.t, 0)).xyz);
     ray.data = ray_local.data;
-    ray_set_data_object(ray, object_i);
+    record_set_object(ray.data, object_i);
   }
 }
 
@@ -377,24 +377,24 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   }
 
   if (hit)
-    ray_set_data_emitter(ray, emitter_i);
+    record_set_emitter(ray.data, emitter_i);
 
   return hit;
 }
 
 bool ray_intersect_scene_any(inout Ray ray) {
-  ray_set_data_anyhit(ray, false);
+  record_set_anyhit(ray.data, false);
 
   for (uint i = 0; i < isct_n_objects; ++i) {
     if (ray_intersect_object_any(ray, i)) {
-      ray_set_data_anyhit(ray, true);
+      record_set_anyhit(ray.data, true);
       return true;
     }
   }
   
   for (uint i = 0; i < isct_n_emitters; ++i) {
     if (ray_intersect_emitter_any(ray, i)) {
-      ray_set_data_anyhit(ray, true);
+      record_set_anyhit(ray.data, true);
       return true;
     }
   }
@@ -403,8 +403,6 @@ bool ray_intersect_scene_any(inout Ray ray) {
 }
 
 bool ray_intersect_scene(inout Ray ray) {
-  ray_clear(ray);
-  
   for (uint i = 0; i < isct_n_objects; ++i) {
     ray_intersect_object(ray, i);
   }

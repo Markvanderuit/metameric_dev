@@ -257,13 +257,28 @@ namespace met {
     });
 
     // Default emitter
+    // components.emitters.push("Default D65 emitter", {
+    //   .type             = Emitter::Type::eRect,
+    //   .trf              = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, .75f }) * 
+    //                                     eig::Scaling(0.25f)),
+    //   .illuminant_i     = 0,
+    //   .illuminant_scale = 1.f
+    // });
+
     components.emitters.push("Default D65 emitter", {
       .type             = Emitter::Type::eRect,
-      .trf              = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, .75f }) * 
-                                        eig::Scaling(0.25f)),
+      .trf              = eig::Affine3f(eig::Translation3f({ -0.5f, 0.75f, -0.5f }) *
+                                        eig::Scaling(0.2f) *
+                                        eig::AngleAxis(90.f * std::numbers::pi_v<float> / 180.f, eig::Vector3f::UnitX())),
       .illuminant_i     = 0,
       .illuminant_scale = 1.f
     });
+    /* components.emitters.push("Default D65 emitter", {
+      .type             = Emitter::Type::ePoint,
+      .trf              = eig::Affine3f(eig::Translation3f({ -0.5f, 0.75f, -0.5f })),
+      .illuminant_i     = 0,
+      .illuminant_scale = 1.f
+    }); */
 
     // Cornell box light
     // eig::Affine3f trf(eig::Translation3f({ -0.5, 0.985, -0.5 })

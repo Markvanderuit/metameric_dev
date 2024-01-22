@@ -2,6 +2,7 @@
 #define RAY_GLSL_GUARD
 
 #include <math.glsl>
+#include <record.glsl>
 #include <random_uniform.glsl>
 
 struct AABB {
@@ -17,33 +18,16 @@ struct Ray {
   float t;
   vec3  d;
 
-  // Padded data embeds hit information
-  // - for generic rays; | 1 bit, object/emitter flag | 7 bits, object/emitter id | 24 bits, object primitive id |
-  //                                                    so 127 objects/emitters     so 16M primitives per obj
-  // - for shadow rays:  1 bit flags hit/miss
+  // Intersected object record, or anyhit information
   uint data;
 };
-
-// Flag value to indicate no object was hit
-#define RAY_INVALID_DATA 0xFFFFFFFF
-#define RAY_OBJECT_FLAG  0x00000000
-#define RAY_EMITTER_FLAG 0x80000000
-
-#define OBJECT_INVALID   0x000000FFu // 8 bits specifically, as we pack the index with this precision
-
-// Helper funtions to embed minor hit data in ray padding
-/* void ray_set_data_objc(inout Ray ray, in uint i) { ray.data = (ray.data & 0x00FFFFFF) | (i << 24);        }
-void ray_set_data_prim(inout Ray ray, in uint i) { ray.data = (ray.data & 0xFF000000) | (i & 0x00FFFFFF); }
-uint ray_get_data_objc(in    Ray ray)            { return (ray.data >> 24) & 0x000000FF; }
-uint ray_get_data_prim(in    Ray ray)            { return (ray.data & 0x00FFFFFF);       }
-void ray_set_data_anyh(inout Ray ray, in bool b) { ray.data = uint(b); } */
 
 Ray init_ray(vec3 d) {
   Ray ray;
   ray.o    = vec3(0);
   ray.d    = d;
   ray.t    = FLT_MAX;
-  ray.data = RAY_INVALID_DATA;
+  record_clear(ray.data);
   return ray;
 }
 
@@ -52,7 +36,7 @@ Ray init_ray(vec3 d, float t_max) {
   ray.o    = vec3(0);
   ray.d    = d;
   ray.t    = t_max;
-  ray.data = RAY_INVALID_DATA;
+  record_clear(ray.data);
   return ray;
 }
 
@@ -61,7 +45,7 @@ Ray init_ray(vec3 o, vec3 d) {
   ray.o    = o;
   ray.d    = d;
   ray.t    = FLT_MAX;
-  ray.data = RAY_INVALID_DATA;
+  record_clear(ray.data);
   return ray;
 }
 
@@ -70,62 +54,24 @@ Ray init_ray(vec3 o, vec3 d, float t_max) {
   ray.o    = o;
   ray.d    = d;
   ray.t    = t_max;
-  ray.data = RAY_INVALID_DATA;
+  record_clear(ray.data);
   return ray;
 }
 
-void ray_clear(inout Ray ray) {
-  ray.data = RAY_INVALID_DATA;
-}
-
-void ray_set_data_anyhit(inout Ray ray, in bool hit) { 
-  ray.data = uint(hit); 
-}
-
-void ray_set_data_object(inout Ray ray, in uint object_i) {
-  ray.data = RAY_OBJECT_FLAG
-           | ((object_i & 0x7F) << 24)
-           | (ray.data & 0x00FFFFFF);
-}
-
-void ray_set_data_emitter(inout Ray ray, in uint emitter_i) {
-  ray.data = RAY_EMITTER_FLAG
-           | ((emitter_i & 0x7F) << 24)
-           | (ray.data & 0x00FFFFFF);
-}
-
-void ray_set_data_object_primitive(inout Ray ray, in uint primitive_i) {
-  ray.data = RAY_OBJECT_FLAG
-           | (ray.data & 0x7F000000)
-           | (primitive_i & 0x00FFFFFF);
-}
-
 bool is_valid(in Ray ray) {
-  return ray.t != FLT_MAX && ray.data != RAY_INVALID_DATA;
+  return ray.t != FLT_MAX && record_is_valid(ray.data);
 }
 
 bool is_anyhit(in Ray ray) {
-  return ray.data == 0x1;
+  return record_get_anyhit(ray.data);
 }
 
 bool hit_object(in Ray ray) {
-  return (ray.data & RAY_EMITTER_FLAG) == 0;
+  return record_is_object(ray.data);
 }
 
 bool hit_emitter(in Ray ray) {
-  return (ray.data & RAY_EMITTER_FLAG) != 0;
-}
-
-uint ray_get_object(in Ray ray) {
-  return (ray.data >> 24) & 0x0000007F;
-}
-
-uint ray_get_emitter(in Ray ray) {
-  return (ray.data >> 24) & 0x0000007F;
-}
-
-uint ray_get_object_primitive(in Ray ray) {
-  return ray.data & 0x00FFFFFF;
+  return record_is_emitter(ray.data);
 }
 
 vec3 ray_get_position(in Ray ray) {

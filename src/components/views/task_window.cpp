@@ -80,6 +80,17 @@ namespace met {
       return true;
     }
 
+    void handle_reload(SchedulerHandle &info) {
+      met_trace_full();
+
+      // Clear OpenGL state
+      ImGui::CloseAnyPopupIfOpen();
+      gl::Program::unbind_all();
+      
+      // Signal schedule re-creation and submit new schedule for main view
+      submit_metameric_editor_schedule_loaded(info);
+    }
+
     void handle_close(SchedulerHandle &info) {
       met_trace_full();
       
@@ -233,10 +244,11 @@ namespace met {
       if (ImGui::BeginMenu("File")) {
         /* Main section follows */
 
-        if (ImGui::MenuItem("New..."))                             { detail::handle_new(info); }
-        // if (ImGui::MenuItem("New..."))                             { m_open_create_modal = true; }
-        if (ImGui::MenuItem("Open..."))                            { detail::handle_open(info);  }
-        if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded)) { handle_close_safe(info);    }
+        if (ImGui::MenuItem("New..."))                              { detail::handle_new(info);    }
+        // if (ImGui::MenuItem("New..."))                              { m_open_create_modal = true; }
+        if (ImGui::MenuItem("Open..."))                             { detail::handle_open(info);   }
+        if (ImGui::MenuItem("Reload", nullptr, nullptr, is_loaded)) { detail::handle_reload(info); }
+        if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded))  { handle_close_safe(info);     }
 
         ImGui::Separator(); 
 

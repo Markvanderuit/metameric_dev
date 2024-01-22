@@ -90,6 +90,7 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define srfc_buff_prim      buff_bvhs_prim.data
 #define srfc_buff_vert      buff_mesh_vert.data
 #define srfc_buff_elem      buff_mesh_elem.data
+#define srfc_buff_emtr_info s_emtr_info
 #define srfc_buff_objc_info s_objc_info
 #define srfc_buff_mesh_info s_mesh_info
 #include <surface.glsl>
@@ -195,8 +196,7 @@ Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
   return ray;
 }
 
-const float exposure  = 1.f;
-const uint  max_depth = 2;
+const uint max_depth = 3;
 
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
   return mod(sample_1d + float(i) / float(n), 1.f);
@@ -207,6 +207,7 @@ float mis_balance(in float pdf_a, in float pdf_b) {
 }
 
 float mis_power(in float pdf_a, in float pdf_b) {
+  // return 1.f;
   pdf_a *= pdf_a;
   pdf_b *= pdf_b;
   return pdf_a / (pdf_a + pdf_b);
@@ -219,51 +220,33 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
   vec4  throughput = vec4(1.f);
   float bsdf_pdf   = 1.f;
 
-  SurfaceInfo si;
-
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
     // If the ray misses, terminate current path
     if (!ray_intersect_scene(ray))
       break;
 
-    // If an emissive object is hit directly, terminate current path
-    if (hit_emitter(ray)) {
-      EmitterInfo em = s_emtr_info[ray_get_emitter(ray)];
-      vec4 em_value = eval_emitter(em, wvls, vec3(0));
-      if (depth == 0) {
-        // On direct hit, return emissive value
-        radiance = em_value;
-      } else {
-        // On secondary hit, apply mis
-        float em_pdf = pdf_emitter(em, si, ray_get_position(ray));
-        float weight = mis_power(bsdf_pdf, em_pdf);
-        if (em_pdf != 0.f)
-          radiance += throughput * em_value * weight;
-      }
-
-      // Is this not necessary?
-      break;
-    }
-
     // If no surface object is visible, terminate current path
-    si = get_surface_info(ray);
+    SurfaceInfo si = get_surface_info(ray);
     if (!is_valid(si))
       break;
 
-    {
-      // ObjectInfo object_info = srfc_buff_objc_info[si.object_i];
-      // MeshInfo mesh_info     = srfc_buff_mesh_info[object_info.mesh_i];
-      // BVHPrim prim           = unpack(srfc_buff_prim[mesh_info.prims_offs + si.prim_i]);
-      // // debug_color = vec3(float(si.prim_i) / float(mesh_info.prims_size));
-      // vec3 n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
-      // n = (object_info.trf_mesh * vec4(n, 0)).xyz;
-      // n = normalize(n);
-      // ray.d = normalize(ray.d);
-      // if (dot(n, ray.d) >= 0) {
-      //   n = -n;
-      // }
-      // debug_color = si.p;
+    // If an emissive object is hit directly, 
+    // add contribution and terminate current path
+    if (is_emitter(si)) {
+      PositionSample ps = get_position_sample(si);
+      vec4           L  = eval_emitter_position(ps, wvls);
+
+      if (depth == 0) {
+        radiance = L;
+      } else {
+        float emtr_pdf = pdf_emitters_position(ps);
+        float weight   = mis_power(bsdf_pdf, emtr_pdf);
+        if (emtr_pdf != 0.f)
+          radiance += throughput * L * weight;
+      }
+      
+      break;
     }
     
     /* // If object back was hit, terminate current path
@@ -278,22 +261,22 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
     BRDF brdf = get_surface_brdf(si, wvls);
     
     // Direct illumination sampling;
-    {
-      // Generate emitter sample position, and ray twards position
-      EmitterInfo   em = s_emtr_info[0]; // Pick emitter from cdf instead
-      EmitterSample es = sample_emitter(em, si, wvls, next_2d(state));
-      Ray        e_ray = ray_towards_point(si, es.p);
-      vec4           f = eval_brdf(brdf, si, e_ray.d);
+   {
+      // Generate emitter sample position, and ray towards position
+      PositionSample ps = sample_emitters_position(si, next_3d(state));
+      vec4           f  = eval_brdf(brdf, si, ps.d);
       
-      if (es.pdf != 0.f && !all(iszero(f)) && dot(e_ray.d, si.sh.n) > 0.f) {
-        // If ray evaluates no hit, add contribution to path
-        if (!ray_intersect_any(e_ray)) {
-          float weight = mis_power(es.pdf, bsdf_pdf * pdf_brdf(brdf, si, e_ray.d));
-          radiance += throughput * f * es.L * weight;
+      // If the sample position has potential throughput, evaluate a ray towards
+      // the position  
+      if (ps.pdf != 0.f && !all(iszero(f)) && dot(ps.d, si.sh.n) > 0.f) {
+        Ray ray = ray_towards_point(si, ps.p);
+        if (!ray_intersect_any(ray)) {
+          // On a success, add contribution to path
+          vec4  L      = eval_emitter_position(ps, wvls) / ps.pdf;
+          float weight = mis_power(ps.pdf, bsdf_pdf * pdf_brdf(brdf, si, ps.d));
+          radiance    += throughput * f * L * weight;
         }
       }
-
-      debug_color = vec3(1.f / sdot(es.p - si.p));
     }
 
     // BRDF sampling; 
@@ -308,7 +291,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
       
       // Update throughput
       throughput *= bs.f;
-      bsdf_pdf    = bs.pdf; // store previous brdf in case emitter is hit
+      bsdf_pdf    = bs.pdf; // store previous brdf for when emitting surface is hit next
 
       // Generate next scene ray
       ray = ray_towards_direction(si, bs.wo);
@@ -339,18 +322,18 @@ void main() {
   vec4 wvls, wvl_pdfs;
   for (uint i = 0; i < 4; ++i) {
     // Pass stratified wavelength sample through inverse cdf
-    // float wvl_rotated = rotate_sample_1d(wvl_sample, i, 4);
-    // DistributionSample ds = sample_wavelength(wvl_rotated);
-    // wvls[i]     = ds.f;
-    // wvl_pdfs[i] = ds.pdf;
+    float wvl_rotated = rotate_sample_1d(wvl_sample, i, 4);
+    DistributionSample ds = sample_wavelength(wvl_rotated);
+    wvls[i]     = ds.f;
+    wvl_pdfs[i] = ds.pdf;
 
     // Naive alternative
     // wvls[i]     = next_1d(state);
     // wvl_pdfs[i] = 1.f;
 
     // Fixed wavelength
-    wvls[i]     = 0.5;
-    wvl_pdfs[i] = 1.f;
+    // wvls[i]     = 0.5;
+    // wvl_pdfs[i] = 1.f;
   }
 
   vec3 debug_color = vec3(0);
@@ -359,7 +342,7 @@ void main() {
   vec4 L = Li(ray, wvls, state, debug_color) / wvl_pdfs;
 
   // Integrate radiance over color system to get color
-  vec3 value = sample_colsys(0, wvls) * exposure * L;
+  vec3 value = sample_colsys(0, wvls) * L;
       //  value = debug_color;
 
   // Add prior accumulated average

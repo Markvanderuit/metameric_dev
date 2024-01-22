@@ -94,6 +94,7 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define srfc_buff_prim      buff_bvhs_prim.data
 #define srfc_buff_vert      buff_mesh_vert.data
 #define srfc_buff_elem      buff_mesh_elem.data
+#define srfc_buff_emtr_info s_emtr_info
 #define srfc_buff_objc_info s_objc_info
 #define srfc_buff_mesh_info s_mesh_info
 #include <surface.glsl>
@@ -193,51 +194,51 @@ Ray ray_from_sensor(in ivec2 i) {
 }
 
 void main() {
-  load_shared();
+  // load_shared();
 
-  // 2D image coordinates; clamp invocations to image size
-  const ivec2 i = ivec2(gl_GlobalInvocationID.xy);
-  guard(all(lessThan(i, buff_sensor.film_size)));
+  // // 2D image coordinates; clamp invocations to image size
+  // const ivec2 i = ivec2(gl_GlobalInvocationID.xy);
+  // guard(all(lessThan(i, buff_sensor.film_size)));
 
-  // Initialize sampler state, or load it if the frame is cumulative
-  uint state = load_state();
+  // // Initialize sampler state, or load it if the frame is cumulative
+  // uint state = load_state();
 
-  // Obtain surface information from a first ray hit, by extracting data from a gbuffer
-  uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
-  SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray_from_sensor(ivec2(i)));
+  // // Obtain surface information from a first ray hit, by extracting data from a gbuffer
+  // uvec4 v = texelFetch(b_gbuffer, ivec2(i), 0);
+  // SurfaceInfo si = get_surface_info(unpack_gbuffer_ray(v), ray_from_sensor(ivec2(i)));
 
-  // If no object is visible, set to black and early-out
-  if (!is_valid(si)) {
-    imageStore(b_film, i, vec4(0, 0, 0, 1));
-    return;
-  }
+  // // If no object is visible, set to black and early-out
+  // if (!is_valid(si)) {
+  //   imageStore(b_film, i, vec4(0, 0, 0, 1));
+  //   return;
+  // }
 
-  // Load relevant info objects
-  AtlasLayout bary_layout = buff_weights.data[si.object_i];
-  ObjectInfo  object_info = buff_objects.data[si.object_i];
+  // // Load relevant info objects
+  // AtlasLayout bary_layout = buff_weights.data[si.object_i];
+  // ObjectInfo  object_info = buff_objects.data[si.object_i];
 
-  // Initialize image value, or load prior if the frame is cumulative
-  vec3 value = buff_sampler_state.spp_curr == 0 
-             ? vec3(0)
-             : imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
+  // // Initialize image value, or load prior if the frame is cumulative
+  // vec3 value = buff_sampler_state.spp_curr == 0 
+  //            ? vec3(0)
+  //            : imageLoad(b_film, ivec2(i)).xyz * float(buff_sampler_state.spp_curr);
 
-  if (test_visibility(state, si)) {
-    PreliminaryBRDF pr = get_surface_brdf_preliminary(si);
+  // if (test_visibility(state, si)) {
+  //   PreliminaryBRDF pr = get_surface_brdf_preliminary(si);
     
-    // Sample reflectance n times
-    for (uint i = 0; i < buff_sampler_state.spp_per_iter; i ++) {
-      vec4   wavelength = next_4d(state);
-      BRDF   brdf       = get_surface_brdf(pr, wavelength);
-      mat4x3 csys       = sample_colsys(0, wavelength);
+  //   // Sample reflectance n times
+  //   for (uint i = 0; i < buff_sampler_state.spp_per_iter; i ++) {
+  //     vec4   wavelength = next_4d(state);
+  //     BRDF   brdf       = get_surface_brdf(pr, wavelength);
+  //     mat4x3 csys       = sample_colsys(0, wavelength);
 
-      value += csys * brdf.r * float(wavelength_samples) / 4.f;
-    }
-  }
+  //     value += csys * brdf.r * float(wavelength_samples) / 4.f;
+  //   }
+  // }
 
-  // Reweight image value by actual nr. of samples
-  value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+  // // Reweight image value by actual nr. of samples
+  // value /= float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
   
-  // Store updated image value and sample state
-  imageStore(b_film, i, vec4(value, 1));
-  store_state(state);
+  // // Store updated image value and sample state
+  // imageStore(b_film, i, vec4(value, 1));
+  // store_state(state);
 }
