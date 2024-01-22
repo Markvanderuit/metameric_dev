@@ -42,28 +42,86 @@ bool _ray_intersect_sphere(inout Ray ray, in vec3 center, in float r) {
   return true;
 }
 
-void impl_sample_emitter_position_sphere(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
+/* void _impl_sample_emitter_position_sphere(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   ps.is_delta = em.sphere_r == 0.f;
 
-  // Sample visible position on sphere
+  vec3  ref_to_center = em.center - si.p;
+  float ref_dist_2    = sdot(ref_to_center);
+  float inv_ref_dist  = inversesqrt(ref_t2);
+
+  float sin_alpha = em.sphere_r * inv_ref_dist;
+
+  if (sin_alpha < 1.f - 1e-4) {
+    float cos_alpha = sqrt(max(0.f, 1.f - sdot(sin_alpha)));
+    ps.d = frame_to_world(get_frame(ref_to_center * inv_ref_dist), 
+                          square_to_unif_cone(sample_2d, cos_alpha));
+    ps.pdf = square_to_unif_cone_pdf(sample_2d, cos_alpha);
+    
+    float proj_dist = dot(ref_to_center, ps.d);
+    float base_t    = ref_dist_2 / proj_dist;
+    vec3  query     = si.p + ps.d * base_t;
+
+    vec3 query_to_center = em.center - query;
+    float query_dist_2   = sdot(query_to_center);
+    float query_proj_dist = sdot(query_to_center, ps.d);
+
+    float A = 1.f,
+          B = -2.f * query_proj_dist,
+          C = query_dist_2 - sdot(em.sphere_r);
+    
+    float near_t, far_t;
+
+
+  } else {
+
+  }
+
+  // Sample position on sphere
   ps.p = em.center + em.sphere_r * square_to_unif_sphere(sample_2d);
-  Ray ray = init_ray(si.p, normalize(ps.p - si.p));
+  ps.d = ps.p - si.p;
+  ps.t = length(ps.d);
+  pd.d /= ps.t;
+
+  // Intersect to find closest visible position on sphere
+  Ray ray = init_ray(ps.p, ps.d);
   if (_ray_intersect_sphere(ray, em.center, em.sphere_r)) {
     ps.p = ray_get_position(ray);
     ps.t = ray.t;
-  } else {
-    ps.t = length(ps.p - si.p);
   }
-  ps.n = normalize(ps.p - em.center);
-  
-  // Store direction to point and keep distance
-  ps.d = ray.d;
-  
+
+  ps.n   = normalize(ps.p - em.center);
   ps.pdf = em.srfc_area_inv * sdot(ps.t) / abs(dot(ps.d, ps.n));
 }
 
-float impl_pdf_emitter_position_sphere(in PositionSample ps, in EmitterInfo em) {
+float _impl_pdf_emitter_position_sphere(in PositionSample ps, in EmitterInfo em) {
   return em.srfc_area_inv * sdot(ps.t) / abs(dot(ps.d, ps.n));
+} */
+
+void impl_sample_emitter_position_sphere(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
+  ps.is_delta = em.sphere_r == 0.f;
+
+  Frame frm = get_frame(normalize(si.p - em.center));
+  ps.p = em.center + em.sphere_r * frame_to_world(frm, square_to_unif_hemisphere(sample_2d));
+
+  // Sample position on sphere
+  // ps.p = em.center + em.sphere_r * square_to_unif_sphere(sample_2d);
+  ps.d = ps.p - si.p;
+  ps.t = length(ps.d);
+  ps.d /= ps.t;
+
+  /* // Intersect to find closest visible position on sphere
+  Ray ray = init_ray(si.p, ps.d);
+  if (_ray_intersect_sphere(ray, em.center, em.sphere_r)) {
+    ps.p = ray_get_position(ray);
+    ps.t = ray.t;
+  } */
+
+  ps.n   = normalize(ps.p - em.center);
+  ps.pdf = (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
+}
+
+float impl_pdf_emitter_position_sphere(in PositionSample ps, in EmitterInfo em) {
+  return (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
 }
 
 void impl_sample_emitter_position_rect(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
