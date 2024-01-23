@@ -1,6 +1,8 @@
 #pragma once
 
 #include <metameric/core/detail/eigen.hpp>
+#include <fmt/core.h>
+#include <fmt/ranges.h>
 
 namespace met {
   // Shorthand unsigned types
@@ -8,6 +10,54 @@ namespace met {
   using uint   = unsigned int;
   using uchar  = unsigned char;
   using ushort = unsigned short;
+
+  struct Transform {
+    eig::Vector3f position = 0.f; // Object central location
+    eig::Vector3f rotation = 0.f; // X/Y/Z euler angles
+    eig::Vector3f scaling  = 1.f;
+
+  public:
+    static Transform from_affine(const eig::Affine3f &aff) {
+      Transform trf;
+
+      // Obtain translation directly
+      trf.position = aff.translation();
+      
+      // Separate rotation/scaling matrices
+      eig::Matrix3f rot = eig::Matrix3f::Identity(), 
+                    scl = eig::Matrix3f::Identity();
+      aff.computeRotationScaling(&rot, &scl);
+
+      // Obtain euler rotation and scaling from separated matrices
+      trf.rotation.x() = std::acos((rot * eig::Vector3f::UnitX()).dot(eig::Vector3f::UnitX()));
+      trf.rotation.y() = std::acos((rot * eig::Vector3f::UnitY()).dot(eig::Vector3f::UnitY()));
+      trf.rotation.z() = std::acos((rot * eig::Vector3f::UnitZ()).dot(eig::Vector3f::UnitZ()));
+      trf.scaling      = scl * eig::Vector3f(1.f);
+
+      // fmt::print("rotmat = {}\n", rot.reshaped());
+      // fmt::print("sclmat = {}\n", scl.reshaped());
+      // fmt::print("pos {}, rot {}, scl {}\n",
+      //   trf.position, trf.rotation, trf.scaling);
+            
+      return trf;
+    }
+
+    eig::Affine3f affine() const {
+      eig::Affine3f aff = eig::Affine3f::Identity();
+      aff *= eig::Translation3f(position);
+      aff *= eig::AngleAxisf(rotation.x(), eig::Vector3f::UnitX());
+      aff *= eig::AngleAxisf(rotation.y(), eig::Vector3f::UnitY());
+      aff *= eig::AngleAxisf(rotation.z(), eig::Vector3f::UnitZ());
+      aff *= eig::Scaling(scaling.x(), scaling.y(), scaling.z());
+      return aff;
+    }
+
+    auto operator==(const Transform &o) const {
+      return position.isApprox(o.position) &&
+             rotation.isApprox(o.rotation) &&
+             scaling.isApprox(o.scaling);
+    }
+  };
 } // namespace met
 
 namespace Eigen {

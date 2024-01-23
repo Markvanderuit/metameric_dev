@@ -9,6 +9,7 @@ namespace met::detail {
     using ComponentStateBase<Base>::m_mutated;
     
     detail::ComponentState<decltype(Base::is_active)>    is_active;
+    detail::ComponentState<decltype(Base::transform)>    transform;
     detail::ComponentState<decltype(Base::mesh_i)>       mesh_i;
     detail::ComponentState<decltype(Base::uplifting_i)>  uplifting_i;
     detail::ComponentState<decltype(Base::diffuse)>      diffuse;
@@ -16,21 +17,20 @@ namespace met::detail {
     detail::ComponentState<decltype(Base::roughness)>    roughness;
     detail::ComponentState<decltype(Base::metallic)>     metallic;
     detail::ComponentState<decltype(Base::opacity)>      opacity;
-    detail::ComponentState<decltype(Base::trf)>          trf;
 
   public:
     virtual
     bool update(const Base &o) override {
       return m_mutated = (
         is_active.update(o.is_active)     |
+        transform.update(o.transform)     |
         mesh_i.update(o.mesh_i)           |
         uplifting_i.update(o.uplifting_i) |
         diffuse.update(o.diffuse)         |
         roughness.update(o.roughness)     |
         metallic.update(o.metallic)       |
         opacity.update(o.opacity)         |
-        normals.update(o.normals)         |
-        trf.update(o.trf)
+        normals.update(o.normals)
       );
     }
   };

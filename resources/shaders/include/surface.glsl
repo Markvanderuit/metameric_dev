@@ -98,14 +98,17 @@ SurfaceInfo get_surface_info(in Ray ray) {
     si.n = normalize(si.n);
     ns   = normalize(ns);
 
-    // Flip normals on back hit
-    if (dot(si.n, ray.d) > 0) si.n = -si.n;
-    if (dot(ns,   ray.d) > 0)   ns = -ns;
-
     // Generate shading frame
-    si.sh = get_frame(normalize(ns));
+    si.sh = get_frame(ns);
     si.wi = frame_to_local(si.sh, -ray.d);
     si.t  = ray.t;
+
+    /* // Flip normals on back hit
+    if (frame_cos_theta(si.wi) < 0.f) {
+      si.n = -si.n;
+      si.sh = get_frame(-si.sh.n);
+      si.wi = frame_to_local(si.sh, -ray.d);
+    } */
   } else if (record_is_emitter(si.data)) {
     // On a valid emitter, fill in surface info
     EmitterInfo em = srfc_buff_emtr_info[record_get_emitter(si.data)];
@@ -185,6 +188,7 @@ SurfaceInfo get_surface_info(in Ray ray) {
 
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
   return fma(vec3(M_RAY_EPS), si.n, si.p);
+  // return fma(vec3(M_RAY_EPS) * 10.f, si.sh.n, si.p);
 }
 
 Ray surface_ray_towards_direction(in SurfaceInfo si, in vec3 d) {

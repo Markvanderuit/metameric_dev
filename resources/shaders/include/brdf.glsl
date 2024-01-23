@@ -105,10 +105,10 @@ BRDF get_surface_brdf(in SurfaceInfo si, vec4 wavelength) {
 BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
   BRDFSample bs;
 
- /*  if (frame_cos_theta(si.wi) <= 0.f) {
+  if (frame_cos_theta(si.wi) <= 0.f) {
     bs.pdf = 0.f;
     return bs;
-  } */
+  }
 
   vec3 wo = square_to_cos_hemisphere(sample_2d);
 
@@ -116,17 +116,22 @@ BRDFSample sample_brdf(in BRDF brdf, in vec2 sample_2d, in SurfaceInfo si) {
   bs.pdf = square_to_cos_hemisphere_pdf(wo);
   bs.wo  = frame_to_world(si.sh, wo);
 
+  // Reproject to surface if clipping
+  if (dot(si.n, wo) < 0.f) {
+    
+  } 
+
   return bs;
 }
 
 vec4 eval_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
   wo = frame_to_local(si.sh, wo);
 
-  /* float cos_theta_i = frame_cos_theta(si.wi), 
+  float cos_theta_i = frame_cos_theta(si.wi), 
         cos_theta_o = frame_cos_theta(wo);
   
   if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
-    return vec4(0.f); */
+    return vec4(0.f);
     
   return brdf.r * M_PI_INV * abs(frame_cos_theta(wo));
 }
@@ -134,11 +139,11 @@ vec4 eval_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
 float pdf_brdf(in BRDF brdf, in SurfaceInfo si, in vec3 wo) {
   wo = frame_to_local(si.sh, wo);
 
-  /* float cos_theta_i = frame_cos_theta(si.wi), 
+  float cos_theta_i = frame_cos_theta(si.wi), 
         cos_theta_o = frame_cos_theta(wo);
 
   if (cos_theta_i <= 0.f || cos_theta_o <= 0.f)
-    return 0.f; */
+    return 0.f;
   
   return square_to_cos_hemisphere_pdf(wo);
 }

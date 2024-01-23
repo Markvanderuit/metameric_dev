@@ -97,6 +97,13 @@ namespace met {
 
         ImGui::Separator();
 
+        // Object transforms
+        ImGui::DragFloat3("Position", object.transform.position.data(), 0.01f, -100.f, 100.f);
+        ImGui::DragFloat3("Rotation", object.transform.rotation.data(), 0.01f, -10.f, 10.f);
+        ImGui::DragFloat3("Scaling",  object.transform.scaling.data(),  0.01f, 0.001f, 100.f);
+
+        ImGui::Separator();
+
         // Diffuse section
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25);
         if (ImGui::BeginCombo("##diffuse_data", "Diffuse")) {
@@ -236,18 +243,18 @@ namespace met {
             ImGui::EndCombo();
           } // if (BeginCombo)
         }
+
+        ImGui::Separator();
         
+        // Object transforms
+        ImGui::DragFloat3("Position", emitter.transform.position.data(), 0.01f, -100.f, 100.f);
+        ImGui::DragFloat3("Rotation", emitter.transform.rotation.data(), 0.01f, -10.f, 10.f);
+        ImGui::DragFloat3("Scaling",  emitter.transform.scaling.data(),  0.01f, 0.001f, 100.f);
+
+        ImGui::Separator();
+
         detail::fun_resource_selector("Illuminant", e_illuminants, emitter.illuminant_i);
         ImGui::SliderFloat("Power", &emitter.illuminant_scale, 0.f, 10.f);
-
-        {
-          // Extract rotation, translation, and scale from matrix
-          // auto rot = emitter.trf.rotation();
-          eig::Matrix3f rotation, scaling;
-          eig::Vector3f translation = emitter.trf.translation();
-          
-          emitter.trf.computeRotationScaling(&rotation, &scaling);
-        }
 
         ImGui::TreePop();
       } // if (open_section)

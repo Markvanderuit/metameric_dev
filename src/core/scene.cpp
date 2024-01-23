@@ -104,9 +104,10 @@ namespace met {
   void to_json(json &js, const Object &object) {
     met_trace();
     js = {{ "is_active",   object.is_active   },
+          { "transform",   object.transform   },
           { "mesh_i",      object.mesh_i      },
-          { "uplifting_i", object.uplifting_i },
-          { "trf",         object.trf         }};
+          { "uplifting_i", object.uplifting_i }};
+      
     js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse }};
     js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
     js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic }};
@@ -117,9 +118,9 @@ namespace met {
   void from_json(const json &js, Object &object) {
     met_trace();
     js.at("is_active").get_to(object.is_active);
+    js.at("transform").get_to(object.transform);
     js.at("mesh_i").get_to(object.mesh_i);
     js.at("uplifting_i").get_to(object.uplifting_i);
-    js.at("trf").get_to(object.trf);
     switch (js.at("diffuse").at("index").get<size_t>()) {
       case 0: object.diffuse = js.at("diffuse").at("variant").get<Colr>(); break;
       case 1: object.diffuse = js.at("diffuse").at("variant").get<uint>(); break;
@@ -150,8 +151,8 @@ namespace met {
   void to_json(json &js, const Emitter &emitter) {
     met_trace();
     js = {{ "type",             emitter.type             },
+          { "transform",        emitter.transform        },
           { "is_active",        emitter.is_active        },
-          { "trf",              emitter.trf              },
           { "illuminant_i",     emitter.illuminant_i     },
           { "illuminant_scale", emitter.illuminant_scale }};
   }
@@ -160,14 +161,14 @@ namespace met {
     met_trace();
     js.at("type").get_to(emitter.type);
     js.at("is_active").get_to(emitter.is_active);
-    js.at("trf").get_to(emitter.trf);
+    js.at("transform").get_to(emitter.transform);
     js.at("illuminant_i").get_to(emitter.illuminant_i);
     js.at("illuminant_scale").get_to(emitter.illuminant_scale);
   }
 
   void to_json(json &js, const ColorSystem &csys) {
     met_trace();
-    js = {{ "observer_i",   csys.observer_i       },
+    js = {{ "observer_i",   csys.observer_i   },
           { "illuminant_i", csys.illuminant_i },
           { "n_scatters",   csys.n_scatters   }};
   }
@@ -217,6 +218,7 @@ namespace met {
     resources.illuminants.push("FL2",      models::emitter_cie_fl2,     false);
     resources.illuminants.push("FL11",     models::emitter_cie_fl11,    false);
     resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1, false);
+    resources.illuminants.push("LED-B1",   models::emitter_cie_ledb1,   false);
     resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
     resources.meshes.push("Rectangle",     models::unit_rect,           false);
 
@@ -228,63 +230,15 @@ namespace met {
     components.upliftings.emplace("Default uplifting",
       { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
 
-    /* eig::Affine3f trf(eig::AngleAxisf(std::numbers::pi_v<float> * -.25,  eig::Vector3f(0, 1, 0))
-                    * eig::Translation3f({ 1, 2, 0 })
-                    * eig::AngleAxisf(std::numbers::pi_v<float> * -.25, eig::Vector3f(0, 0, 1))
-                    * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
-                    * eig::Scaling(0.2f));
-    components.emitters.push("Default D65 emitter", {
-      .type             = Emitter::Type::eRect,
-      .trf              = trf,
-      .illuminant_i     = 0,
-      .illuminant_scale = 1.f
-    }); */
-
-    // Default object
-    components.objects.push("Back object", {
-      .mesh_i      = 0,
-      .uplifting_i = 0,
-      .diffuse     = Colr(1),
-      .trf         = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, 0.0 }) *
-                                   eig::Scaling(0.75f))
-    });
-    components.objects.push("Middle object", {
-      .mesh_i      = 0,
-      .uplifting_i = 0,
-      .diffuse     = Colr(1),
-      .trf         = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, 0.25 }) *
-                                   eig::Scaling(0.5f))
-    });
-
     // Default emitter
-    // components.emitters.push("Default D65 emitter", {
-    //   .type             = Emitter::Type::eRect,
-    //   .trf              = eig::Affine3f(eig::Translation3f({ 0.0, 0.0, .75f }) * 
-    //                                     eig::Scaling(0.25f)),
-    //   .illuminant_i     = 0,
-    //   .illuminant_scale = 1.f
-    // });
-
     components.emitters.push("Default D65 emitter", {
       .type             = Emitter::Type::eRect,
-      .trf              = eig::Affine3f(eig::Translation3f({ -0.5f, 0.75f, -0.5f }) *
-                                        eig::Scaling(0.2f) *
-                                        eig::AngleAxis(90.f * std::numbers::pi_v<float> / 180.f, eig::Vector3f::UnitX())),
+      .transform        = { .position = { -0.5f, 0.98f, -0.5f },
+                            .rotation = { 90.f * std::numbers::pi_v<float> / 180.f, 0.f, 0.f },
+                            .scaling  = 0.2f },
       .illuminant_i     = 0,
       .illuminant_scale = 1.f
     });
-    /* components.emitters.push("Default D65 emitter", {
-      .type             = Emitter::Type::ePoint,
-      .trf              = eig::Affine3f(eig::Translation3f({ -0.5f, 0.75f, -0.5f })),
-      .illuminant_i     = 0,
-      .illuminant_scale = 1.f
-    }); */
-
-    // Cornell box light
-    // eig::Affine3f trf(eig::Translation3f({ -0.5, 0.985, -0.5 })
-    //                 * eig::AngleAxisf(std::numbers::pi_v<float> * .5,   eig::Vector3f(1, 0, 0))
-    //                 * eig::Scaling(0.1f));
-    
     
     // Set state to fresh create
     save_path  = "";
@@ -475,6 +429,7 @@ namespace met {
         eig::Matrix4f trf;
         std::memcpy(trf.data(), (const void *) &(node->mTransformation), sizeof(aiMatrix4x4));
         trf = parent_trf * trf;
+        eig::Affine3f aff(trf);
 
         // If current node has meshes attached, register object(s)
         for (uint i : std::span { node->mMeshes, node->mNumMeshes }) {
@@ -485,9 +440,9 @@ namespace met {
           material_i = material_uuid[material_i];
 
           scene.components.objects.emplace(node->mName.C_Str(), {
+            .transform   = Transform::from_affine(aff),
             .mesh_i      = i,
-            .uplifting_i = 0 ,
-            .trf         = eig::Affine3f(trf)
+            .uplifting_i = 0,
           });
         }
         

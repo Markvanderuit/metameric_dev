@@ -123,16 +123,26 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // Helper struct to cache path vertex information
 struct PathVertexInfo {
-  // Reflectance info here
-  // TODO ...
-  uint data; // Record storing object/emitter/primitive id, see record.glsl
+  // World hit position
+  vec3 p;
+
+  // Record storing object/emitter/primitive id, see record.glsl
+  uint data;
 };
 
 // Helper struct to cache full path information
 struct PathInfo {
+  // Sampled path wavelengths
   vec4 wvls;
-  vec4 throughput; // Geometric attenuation over probability density, without reflectances
-  uint path_length;
+
+  // Energy times geometric attenuation over probability density, 
+  // without reflectances which are separated out
+  vec4 L; 
+
+  // Total length of path before termination
+  uint path_depth;
+
+  // Path vertex information, up to path_depth
   PathVertexInfo data[max_depth];
 };
 
@@ -209,7 +219,7 @@ float mis_power(in float pdf_a, in float pdf_b) {
 }
 
 // Sample radiance along ray and wavelengths
-vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
+vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
   // Path throughput information; we track 4 wavelengths simultaneously
   vec4  radiance   = vec4(0.f);
   vec4  throughput = vec4(1.f);
@@ -226,6 +236,9 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
     if (!is_valid(si))
       break;
 
+    debug_color = vec3(dot(si.n, -ray.d));
+    break;
+    
     // If an emissive object is hit directly, 
     // add contribution and terminate current path
     if (is_emitter(si)) {
@@ -248,8 +261,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
     if (frame_cos_theta(si.wi) < 0)
       break; */
 
-    // Test if geometric/shading normals are aligned
-    /* if (dot(ray.d, si.sh.n) * frame_cos_theta(si.wi) >= 0)
+   /*  // Test if geometric/shading normals are aligned
+    if (dot(ray.d, si.sh.n) * frame_cos_theta(si.wi) >= 0)
       break; */
 
     // Sample BRDF at position
@@ -276,12 +289,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state) {
 
     // BRDF sampling; 
     {
-      // If BRDF goes dark, terminate path
       BRDFSample bs = sample_brdf(brdf, next_2d(state), si);
       if (bs.pdf == 0.f)
-        break;
-      
-      if (dot(si.sh.n, bs.wo) <= 0)
         break;
       
       // Update throughput
@@ -332,12 +341,13 @@ void main() {
     // wvl_pdfs[i] = 1.f;
 
     // Fixed wavelength
-    // wvls[i]     = 0.5;
+    // wvls[i]     = 0.2;
     // wvl_pdfs[i] = 1.f;
   }
 
   // Evaluate ray/wavelength pair
-  vec4 L = Li(ray, wvls, state) / wvl_pdfs;
+  vec3 debug_color = vec3(0);
+  vec4 L = Li(ray, wvls, state, debug_color) / wvl_pdfs;
 
   // Store output
   if (is_query) {
@@ -345,7 +355,7 @@ void main() {
   } else {
     // Integrate radiance over color system to get color
     vec3 value = sample_colsys(0, wvls) * L;
-
+    
     // Add prior accumulated average from image
     if (buff_sampler_state.spp_curr > 0) {
       vec3 prev = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
@@ -353,6 +363,7 @@ void main() {
             + (value - prev)
             / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
     }
+    value = debug_color;
     
     // Store updated image value and sample state
     imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(value, 1));

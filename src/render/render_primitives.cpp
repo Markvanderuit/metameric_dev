@@ -1,6 +1,5 @@
 #include <metameric/core/utility.hpp>
-#include <metameric/render/renderer.hpp>
-#include <small_gl/program.hpp>
+#include <metameric/render/render_primitives.hpp>
 
 constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
 constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
@@ -134,7 +133,7 @@ namespace met {
     }
   } // namespace detail
 
-  DirectRenderer::DirectRenderer(DirectRendererCreateInfo info)
+  DirectRenderPrimitive::DirectRenderPrimitive(DirectRenderPrimitiveCreateInfo info)
   : detail::BaseIntegrationRenderer() {
     met_trace_full();
 
@@ -149,7 +148,7 @@ namespace met {
     m_spp_per_iter = info.spp_per_iter;
   }
 
-  const gl::Texture2d4f &DirectRenderer::render(const Sensor &sensor, const Scene &scene) {
+  const gl::Texture2d4f &DirectRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
     
     // If the film object is stale, run a reset()
@@ -196,7 +195,7 @@ namespace met {
     return m_film;
   }
 
-  void DirectRenderer::reset(const Sensor &sensor, const Scene &scene) {
+  void DirectRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
     BaseIntegrationRenderer::reset(sensor, scene);
     m_gbuffer.reset(sensor, scene);
@@ -211,25 +210,18 @@ namespace met {
     m_film.clear();
   }
 
-  PathRenderer::PathRenderer(PathRendererCreateInfo info)
+  PathRenderPrimitive::PathRenderPrimitive(PathRenderPrimitiveCreateInfo info)
   : detail::BaseIntegrationRenderer() {
     met_trace_full();
 
     // Initialize program object
-    m_program_render = {{ .type       = gl::ShaderType::eCompute,
-                          .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
-                          .cross_path = "resources/shaders/render/primitive_path.comp.json",
-                          .spec_const = {{ 0u, 16u        },
-                                         { 1u, 16u        },
-                                         { 2u, info.depth },
-                                         { 3u, false      }} }};
-    m_program_query  = {{ .type       = gl::ShaderType::eCompute,
-                          .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
-                          .cross_path = "resources/shaders/render/primitive_path.comp.json",
-                          .spec_const = {{ 0u, 256u       },
-                                         { 1u, 1u         },
-                                         { 2u, info.depth },
-                                         { 3u, true       }} }};
+    m_program = {{ .type       = gl::ShaderType::eCompute,
+                   .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
+                   .cross_path = "resources/shaders/render/primitive_path.comp.json",
+                   .spec_const = {{ 0u, 16u            },
+                                  { 1u, 16u            },
+                                  { 2u, info.max_depth },
+                                  { 3u, false          }} }};
 
     // Assign sampler configuration
     m_spp_curr     = 0;
@@ -237,7 +229,7 @@ namespace met {
     m_spp_per_iter = info.spp_per_iter;
   }
 
-  const gl::Texture2d4f &PathRenderer::render(const Sensor &sensor, const Scene &scene) {
+  const gl::Texture2d4f &PathRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
     
     // If the film object is stale, run a reset()
@@ -247,40 +239,37 @@ namespace met {
     // Return early if sample count has reached specified maximum
     guard(m_spp_max == 0 || m_spp_curr < m_spp_max, m_film);
 
-    // Either render or reuse the current gbuffer frame as an initial hit
-    const auto &gbuffer = m_spp_curr ? m_gbuffer.film() : m_gbuffer.render(sensor, scene);
-
     // Bind required resources to their corresponding targets
-    m_program_render.bind();
-    m_program_render.bind("b_film",               m_film);
-    m_program_render.bind("b_buff_sensor",        sensor.buffer());
-    m_program_render.bind("b_buff_sampler_state", get_sampler_state());
-    m_program_render.bind("b_buff_objects",       scene.components.objects.gl.object_info);
-    m_program_render.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
-    m_program_render.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
-    m_program_render.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
-    m_program_render.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
-    m_program_render.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
-    m_program_render.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
-    m_program_render.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
+    m_program.bind();
+    m_program.bind("b_film",               m_film);
+    m_program.bind("b_buff_sensor",        sensor.buffer());
+    m_program.bind("b_buff_sampler_state", get_sampler_state());
+    m_program.bind("b_buff_objects",       scene.components.objects.gl.object_info);
+    m_program.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
+    m_program.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
+    m_program.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
+    m_program.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
+    m_program.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
+    m_program.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
+    m_program.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
     if (!scene.resources.images.empty()) {
-      m_program_render.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      m_program_render.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      m_program_render.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+      m_program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      m_program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      m_program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
     }
     if (!scene.resources.meshes.empty()) {
-      m_program_render.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-      m_program_render.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-      m_program_render.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
-      m_program_render.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
-      m_program_render.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
+      m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
+      m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
+      m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      m_program.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
+      m_program.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
     }
 
     // Dispatch compute shader
     gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
                               gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
                               gl::BarrierFlags::eBufferUpdate                                     );
-    gl::dispatch_compute(m_dispatch_render);
+    gl::dispatch_compute(m_dispatch);
 
     // Advance sampler state for next render() call
     advance_sampler_state();
@@ -288,54 +277,18 @@ namespace met {
     return m_film;
   }
 
-  void PathRenderer::reset(const Sensor &sensor, const Scene &scene) {
+  void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
     BaseIntegrationRenderer::reset(sensor, scene);
-    m_gbuffer.reset(sensor, scene);
 
     // Rebuild target texture if necessary
     if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
       m_film = {{ .size = sensor.film_size.max(1).eval() }};
       auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
-      m_dispatch_render.groups_x = dispatch_ndiv.x();
-      m_dispatch_render.groups_y = dispatch_ndiv.y();
+      m_dispatch.groups_x = dispatch_ndiv.x();
+      m_dispatch.groups_y = dispatch_ndiv.y();
     }
+
     m_film.clear();
-  }
-
-  const gl::Buffer &PathRenderer::query(const PathQuery &sensor, const Scene &scene) {
-    met_trace_full();
-
-    if (!m_paths.is_init() || m_paths.size() != sensor.n_paths * sizeof(uint)) {
-      m_paths = {{ .size = sensor.n_paths * sizeof(uint) }};
-    }
-
-    // Bind required resources to their corresponding targets
-    m_program_query.bind();
-    m_program_query.bind("b_film",               m_film);
-    m_program_query.bind("b_buff_query",         sensor.buffer());
-    m_program_query.bind("b_buff_sampler_state", get_sampler_state());
-    m_program_query.bind("b_buff_objects",       scene.components.objects.gl.object_info);
-    m_program_query.bind("b_buff_emitters",      scene.components.emitters.gl.emitter_info);
-    m_program_query.bind("b_buff_weights",       scene.components.upliftings.gl.texture_weights.buffer());
-    m_program_query.bind("b_buff_wvls_distr",    scene.components.colr_systems.gl.wavelength_distr_buffer);
-    m_program_query.bind("b_bary_4f",            scene.components.upliftings.gl.texture_weights.texture());
-    m_program_query.bind("b_spec_4f",            scene.components.upliftings.gl.texture_spectra);
-    m_program_query.bind("b_cmfs_3f",            scene.resources.observers.gl.cmfs_texture);
-    m_program_query.bind("b_illm_1f",            scene.resources.illuminants.gl.spec_texture);
-    if (!scene.resources.images.empty()) {
-      m_program_query.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      m_program_query.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      m_program_query.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
-    }
-    if (!scene.resources.meshes.empty()) {
-      m_program_query.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
-      m_program_query.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
-      m_program_query.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
-      m_program_query.bind("b_buff_mesh_vert", scene.resources.meshes.gl.mesh_verts);
-      m_program_query.bind("b_buff_mesh_elem", scene.resources.meshes.gl.mesh_elems_al);
-    }
-
-    return m_paths;
   }
 } // namespace met

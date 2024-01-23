@@ -1,8 +1,8 @@
 #pragma once
 
 #include <metameric/core/scene.hpp>
+#include <metameric/render/path.hpp>
 #include <metameric/render/sensor.hpp>
-#include <metameric/render/ray_primitives.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/program.hpp>
@@ -21,16 +21,6 @@ namespace met {
 
       virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) = 0;
       virtual void reset(const Sensor &sensor, const Scene &scene) = 0;
-    };
-
-    class QueriableRenderer {
-    protected:
-      gl::Buffer m_paths; // Query render target
-
-    public:
-      const gl::Buffer &paths() const { return m_paths; }
-
-      virtual const gl::Buffer &query(const PathQuery &sensor, const Scene &scene) = 0;
     };
 
     class BaseIntegrationRenderer : public BaseRenderer {
@@ -76,7 +66,7 @@ namespace met {
     };
   } // namespace detail
 
-  struct DirectRendererCreateInfo {
+  struct DirectRenderPrimitiveCreateInfo {
     // Number of samples per pixel when a renderer primitive is invoked
     uint spp_per_iter = 1;
 
@@ -85,23 +75,23 @@ namespace met {
     uint spp_max = std::numeric_limits<uint>::max();
   };
 
-  class DirectRenderer : public detail::BaseIntegrationRenderer {
+  class DirectRenderPrimitive : public detail::BaseIntegrationRenderer {
     detail::GBuffer m_gbuffer;
     
   public:
-    using InfoType = DirectRendererCreateInfo;
+    using InfoType = DirectRenderPrimitiveCreateInfo;
     
     gl::Program     m_program;
     gl::ComputeInfo m_dispatch;
 
   public:
-    DirectRenderer(DirectRendererCreateInfo info);
+    DirectRenderPrimitive(DirectRenderPrimitiveCreateInfo info);
 
     void reset(const Sensor &sensor, const Scene &scene) override;
     const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
   };
 
-  struct PathRendererCreateInfo {
+  struct PathRenderPrimitiveCreateInfo {
     // Number of samples per pixel when a renderer primitive is invoked
     uint spp_per_iter = 1;
 
@@ -109,26 +99,20 @@ namespace met {
     // the target is left unmodified. If set to 0, no limit is imposed.
     uint spp_max = std::numeric_limits<uint>::max();
 
-    // Max path depth
-    uint depth = 4;
+    // Maximum path length
+    uint max_depth = path_max_depth;
   };
 
-  class PathRenderer : public detail::BaseIntegrationRenderer,
-                       public detail::QueriableRenderer {
-    detail::GBuffer m_gbuffer;
+  class PathRenderPrimitive : public detail::BaseIntegrationRenderer {
+    gl::ComputeInfo m_dispatch;
+    gl::Program     m_program;
 
   public:
-    using InfoType = PathRendererCreateInfo;
+    using InfoType = PathRenderPrimitiveCreateInfo;
     
-    gl::ComputeInfo m_dispatch_render;
-    gl::Program     m_program_render;
-    gl::Program     m_program_query;
-
-  public:
-    PathRenderer(PathRendererCreateInfo info);
+    PathRenderPrimitive(PathRenderPrimitiveCreateInfo info);
 
     void reset(const Sensor &sensor, const Scene &scene) override;
     const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
-    const gl::Buffer      &query(const PathQuery &sensor, const Scene &scene) override;
   };
 } // namespace met

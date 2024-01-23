@@ -44,11 +44,13 @@ namespace met {
   struct Object {
     using state_type = detail::ObjectState;
 
-    // Is drawn in viewport
-    bool is_active = true;
+    // Scene properties
+    bool      is_active = true;
+    Transform transform;
 
-    // Indices to underlying mesh, and applied spectral uplifting
-    uint mesh_i, uplifting_i;
+    // Indices to underlying mesh/surface
+    uint mesh_i;
+    uint uplifting_i;
 
     // Material data, packed with object; either a specified value, or a texture index
     std::variant<Colr,  uint> diffuse;
@@ -56,16 +58,16 @@ namespace met {
     std::variant<float, uint> roughness;
     std::variant<float, uint> metallic;
     std::variant<float, uint> opacity;
-
-    // Position/rotation/scale are captured in an affine transform
-    eig::Affine3f trf;
     
   public:
     inline 
     bool operator==(const Object &o) const {
-      guard(std::tie(is_active, mesh_i, uplifting_i) == std::tie(o.is_active, o.mesh_i, o.uplifting_i), false);
-      guard(std::tie(roughness, metallic, opacity) == std::tie(o.roughness, o.metallic, o.opacity), false);
-      guard(diffuse.index() == o.diffuse.index() && normals.index() == o.normals.index(), false);
+      guard(std::tie(is_active, transform, mesh_i, uplifting_i) == 
+            std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i), false);
+      guard(std::tie(roughness, metallic, opacity) == 
+            std::tie(o.roughness, o.metallic, o.opacity), false);
+      guard(diffuse.index() == o.diffuse.index() && 
+            normals.index() == o.normals.index(), false);
       switch (diffuse.index()) {
         case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
         case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
@@ -74,7 +76,7 @@ namespace met {
         case 0: guard(std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)), false); break;
         case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
       }
-      return trf.isApprox(o.trf);
+      return true;
     }
   };
 
@@ -88,11 +90,9 @@ namespace met {
       eRect     = 3
     } type = Type::eConstant;
 
-    // Is drawn in viewport?
-    bool         is_active    = true;
-
-    // Position/rotation/scaling are captured in an affine transform
-    eig::Affine3f trf;
+    // Scene properties
+    bool      is_active = true;
+    Transform transform;
 
     // Spectral data references a scene resource 
     uint         illuminant_i     = 0;    // index to spectral illuminant
@@ -100,9 +100,8 @@ namespace met {
 
     inline 
     bool operator==(const Emitter &o) const {
-      guard(std::tie(type, is_active, illuminant_i, illuminant_scale) 
-         == std::tie(o.type, o.is_active, o.illuminant_i, o.illuminant_scale), false);
-      return trf.isApprox(o.trf);
+      return std::tie(type, is_active, transform, illuminant_i, illuminant_scale) 
+          == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale);
     }
   };
 

@@ -9,7 +9,7 @@ uint BVHLeafFlagBit = 1u << 31;
 struct BVHVertPack {
   uint p0; // unorm, 2x16
   uint p1; // unorm, 1x16 + padding 1x16
-  uint n;  // snorm, 2x16, octagohedral encoding
+  uint n;  // snorm, 2x16, octagonal encoding
   uint tx; // unorm, 2x16
 };
 
@@ -17,6 +17,7 @@ struct BVHPrimPack {
   BVHVertPack v0;
   BVHVertPack v1;
   BVHVertPack v2;
+  uint padding[4]; // Brings alignment to 64 bytes
 };
 
 // Packed BVH node with compressed 8-child bounding boxes
@@ -72,8 +73,8 @@ uint bvh_size(in BVHNode node) {
 
 BVHVert unpack(in BVHVertPack p) {
   BVHVert o;
-  o.p  = vec3(unpackUnorm2x16(p.p0), unpackUnorm2x16(p.p1).x);
-  o.n  = unpack_snorm_3x32_octagonal(unpackSnorm2x16(p.n));
+  o.p  = vec3(unpackUnorm2x16(p.p0),   unpackSnorm2x16(p.p1).x);
+  o.n  = vec3(unpackSnorm2x16(p.p1).y, unpackSnorm2x16(p.n));
   o.tx = unpackUnorm2x16(p.tx);
   return o;
 }

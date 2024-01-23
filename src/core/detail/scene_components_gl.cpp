@@ -19,10 +19,10 @@ namespace met::detail {
   static_assert(sizeof(VertexPack) == 16);
 
   // Packed primitive struct data
-  struct PrimPack {
+  struct alignas(64) PrimPack {
     VertexPack v0, v1, v2;
   };
-  static_assert(sizeof(PrimPack) == 48);
+  static_assert(sizeof(PrimPack) == 64);
 
   // Packed BVH struct data
   struct NodePack {
@@ -43,10 +43,11 @@ namespace met::detail {
       else       f = f - i;
       return f;
     }).eval();
+
     return VertexPack {
       .p0 = pack_unorm_2x16({ p.x(), p.y() }),
-      .p1 = pack_unorm_2x16({ p.z(), 0.f   }),
-      .n  = pack_snorm_2x16(pack_snorm_2x32_octagonal(n)),
+      .p1 = pack_snorm_2x16({ p.z(), n.x() }),
+      .n  = pack_snorm_2x16({ n.y(), n.z() }),
       .tx = pack_unorm_2x16(tx_)
     };
   }
@@ -138,14 +139,15 @@ namespace met::detail {
       bool is_albedo_sampled = object.diffuse.index() != 0;
 
       // Get mesh transform, incorporate into gl-side object transform
-      auto mesh_trf = scene.resources.meshes.gl.transforms[object.mesh_i];
+      auto object_trf = object.transform.affine();
+      auto mesh_trf   = scene.resources.meshes.gl.transforms[object.mesh_i];
 
       m_buffer_map_data[i] = {
         // Fill transform data
-        .trf          = object.trf.matrix(),
-        .trf_inv      = object.trf.matrix().inverse().eval(),
-        .trf_mesh     = (object.trf.matrix() * mesh_trf).eval(),
-        .trf_mesh_inv = (object.trf.matrix() * mesh_trf).inverse().eval(),
+        .trf          = object_trf.matrix(),
+        .trf_inv      = object_trf.matrix().inverse().eval(),
+        .trf_mesh     = (object_trf.matrix() * mesh_trf).eval(),
+        .trf_mesh_inv = (object_trf.matrix() * mesh_trf).inverse().eval(),
 
         // Fill shape data
         .is_active   = object.is_active,
@@ -288,46 +290,35 @@ namespace met::detail {
     *m_buffer_map_size = static_cast<uint>(emitters.size());
     emitter_info.flush(sizeof(uint));
 
-    
     // Write updated components to mapping
     for (uint i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
 
-      // Extract rotation, scale from transform
-      eig::Matrix3f rot, scale;
-      emitter.trf.computeRotationScaling(&rot, &scale);
-
       // Precompute some data based on type
-      eig::Vector3f point  = 0.f,
-                    rect_n = 0.f;
+      auto trf = emitter.transform.affine();
+      eig::Vector3f rect_n = 0.f;
       float srfc_area_inv  = 0.f, 
             sphere_r       = 0.f;
-            
+      
       if (emitter.type == Emitter::Type::eSphere) {
-        point         = (emitter.trf * eig::Vector4f(0, 0, 0, 1)).head<3>();
-        sphere_r      = (scale * eig::Vector3f(1, 0, 0)).x();
+        sphere_r      = emitter.transform.scaling.x();
         srfc_area_inv = 1.f / (4.f * std::numbers::pi_v<float> * sphere_r * sphere_r);
       } else if (emitter.type == Emitter::Type::eRect) {
-        point         = (emitter.trf * eig::Vector4f(0, 0, 0, 1)).head<3>();
-        rect_n        = (emitter.trf * eig::Vector4f(0, 0, 1, 0)).head<3>().normalized();
-        srfc_area_inv = 1.f / ((scale * eig::Vector3f(2, 2, 0)).head<2>().prod());
+        rect_n        = (trf * eig::Vector4f(0, 0, 1, 0)).head<3>().normalized();
+        srfc_area_inv = 1.f / emitter.transform.scaling.head<2>().prod();
       }
-
-      fmt::print("{} -> r              = {}\n", i, sphere_r);
-      fmt::print("{} -> c              = {}\n", i, point);
-      fmt::print("{} -> surfc_area_inv = {}\n", i, srfc_area_inv);
       
       m_buffer_map_data[i] = {
-        .trf              = emitter.trf.matrix(),
-        .trf_inv          = emitter.trf.matrix().inverse().eval(),
+        .trf              = trf.matrix(),
+        .trf_inv          = trf.matrix().inverse().eval(),
         
         .type             = static_cast<uint>(emitter.type),
         .is_active        = emitter.is_active,
         .illuminant_i     = emitter.illuminant_i,
         .illuminant_scale = emitter.illuminant_scale,
 
-        .point         = point,
+        .center        = (trf * eig::Vector4f(0, 0, 0, 1)).head<3>().eval(),
         .srfc_area_inv = srfc_area_inv,
         .rect_n        = rect_n,
         .sphere_r      = sphere_r,

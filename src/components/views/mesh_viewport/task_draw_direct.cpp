@@ -2,7 +2,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_direct.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/renderer.hpp>
+#include <metameric/render/render_primitives.hpp>
 #include <metameric/render/sensor.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
@@ -39,9 +39,9 @@ namespace met {
     // Internal target texture; can be differently sized
     info("target").set<gl::Texture2d4f>({ }); */
 
-    info("direct_renderer").init<PathRenderer>({ .spp_per_iter = n_iters_per_dispatch,  
+    info("direct_renderer").init<PathRenderPrimitive>({ .spp_per_iter = n_iters_per_dispatch,  
                                                  .spp_max = n_iters_max,
-                                                 .depth   = 4 });
+                                                 .max_depth   = 4 });
   }
     
   void MeshViewportDrawDirectTask::eval(SchedulerHandle &info) {
@@ -60,7 +60,7 @@ namespace met {
 
     // Get modified resources
     // auto &i_target = info("target").getw<gl::Texture2d4f>();
-    auto &i_renderer = info("direct_renderer").getw<PathRenderer>();
+    auto &i_renderer = info("direct_renderer").getw<PathRenderPrimitive>();
 
    /*  // Some state flags to test when to restart sampling
     bool rebuild_frame = !m_state_buffer.is_init() || target_handle.is_mutated();
@@ -77,7 +77,7 @@ namespace met {
       i_renderer.reset(e_sensor, e_scene);
     }
     i_renderer.render(e_sensor, e_scene);
-
+    
     /* // Re-initialize state if target viewport is resized or needs initializing
     if (rebuild_frame) {
       // Resize internal state buffer and target accordingly

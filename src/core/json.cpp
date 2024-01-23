@@ -110,6 +110,18 @@ namespace met {
     js["illuminants"]   = v.illuminants;
     js["cmfs"]          = v.cmfs;
   }
+  
+  void from_json(const met::json &js, met::Transform &trf) {
+    trf.position = js.at("position").get<Colr>();
+    trf.rotation = js.at("rotation").get<Colr>();
+    trf.scaling  = js.at("scaling").get<Colr>();
+  }
+
+  void to_json(met::json &js, const met::Transform &trf) {
+    js["position"] = trf.position;
+    js["rotation"] = trf.rotation;
+    js["scaling"]  = trf.scaling;
+  }
 } // namespace met
 
 namespace Eigen {
