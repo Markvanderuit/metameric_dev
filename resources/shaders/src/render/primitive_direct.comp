@@ -75,28 +75,23 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_film;
 shared ObjectInfo  s_objc_info[max_supported_objects];
 shared EmitterInfo s_emtr_info[max_supported_objects];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
-shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
-// Define names of scene buffers to replace preproc in intersect.glsl
-// to work around glsl's lack of ssbo argument passing
-#define isct_n_emitters     buff_emitters.n
-#define isct_n_objects      buff_objects.n
-#define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
-#define isct_buff_objc_info s_objc_info
-#define isct_buff_emtr_info s_emtr_info
-#define isct_buff_bvhs_info s_mesh_info
-#define isct_buff_bvhs_node buff_bvhs_node.data
-#define isct_buff_bvhs_prim buff_bvhs_prim.data
+// Part of mesh data comes from storage buffers, part
+// comes from shared memory
+declare_scene_mesh_data(buff_mesh_vert.data, 
+                        buff_mesh_elem.data, 
+                        buff_bvhs_prim.data, 
+                        buff_bvhs_node.data,
+                        s_mesh_info, buff_meshes.n);
+
+// Traversal stack lives in shared memory, depth 16
+declare_scene_traversal_stack(16);
+
+// Object and emitter data come from shared memory
+declare_scene_object_data(s_objc_info, buff_objects.n);
+declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+
 #include <intersect.glsl>
-
-// Define names of scene buffers to replace preproc in surface.glsl
-// to work around glsl's lack of ssbo argument passing
-#define srfc_buff_prim      buff_bvhs_prim.data
-#define srfc_buff_vert      buff_mesh_vert.data
-#define srfc_buff_elem      buff_mesh_elem.data
-#define srfc_buff_emtr_info s_emtr_info
-#define srfc_buff_objc_info s_objc_info
-#define srfc_buff_mesh_info s_mesh_info
 #include <surface.glsl>
 
 // Define names of scene buffers to replace preproc in brdf.glsl

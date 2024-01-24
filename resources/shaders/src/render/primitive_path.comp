@@ -2,11 +2,11 @@
 #include <guard.glsl>
 #include <bvh.glsl>
 #include <gbuffer.glsl>
+#include <distribution.glsl>
 #include <math.glsl>
 #include <random_uniform.glsl>
 #include <spectrum.glsl>
 #include <scene.glsl>
-#include <distribution.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
@@ -54,7 +54,6 @@ layout(binding = 7) uniform b_buff_wvls_distr {
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
 
-declare_distr_sampler(wavelength, buff_wvls_distr)
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node {
@@ -81,6 +80,12 @@ layout(binding = 3) uniform sampler1DArray b_spec_4f; // Uplifting spectral atla
 layout(binding = 4) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 5) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
 
+// TODO wait this is allowed?!?!?!
+// Shiiiiiit
+sampler2DArray test_func(in sampler2DArray txtr) {
+  return txtr;
+}
+
 // Image unit, output declaration
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;
 
@@ -88,28 +93,26 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_film;
 shared ObjectInfo  s_objc_info[max_supported_objects];
 shared EmitterInfo s_emtr_info[max_supported_objects];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
-shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
-// Define names of scene buffers to replace preproc in surface.glsl
-// to work around glsl's lack of ssbo argument passing
-#define srfc_buff_prim      buff_bvhs_prim.data
-#define srfc_buff_vert      buff_mesh_vert.data
-#define srfc_buff_elem      buff_mesh_elem.data
-#define srfc_buff_emtr_info s_emtr_info
-#define srfc_buff_objc_info s_objc_info
-#define srfc_buff_mesh_info s_mesh_info
+// Declare wavelength sampling distribution
+declare_distr_sampler(wavelength, buff_wvls_distr)
+
+// Part of mesh data comes from storage buffers, part
+// comes from shared memory
+declare_scene_mesh_data(buff_mesh_vert.data, 
+                        buff_mesh_elem.data, 
+                        buff_bvhs_prim.data, 
+                        buff_bvhs_node.data,
+                        s_mesh_info, buff_meshes.n);
+
+// Traversal stack lives in shared memory, depth 16
+declare_scene_traversal_stack(16);
+
+// Object and emitter data come from shared memory
+declare_scene_object_data(s_objc_info, buff_objects.n);
+declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+
 #include <surface.glsl>
-
-// Define names of scene buffers to replace preproc in intersect.glsl
-// to work around glsl's lack of ssbo argument passing
-#define isct_n_objects      buff_objects.n
-#define isct_n_emitters     buff_emitters.n
-#define isct_stack          s_stack[gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x]
-#define isct_buff_objc_info s_objc_info
-#define isct_buff_emtr_info s_emtr_info
-#define isct_buff_bvhs_info s_mesh_info
-#define isct_buff_bvhs_node buff_bvhs_node.data
-#define isct_buff_bvhs_prim buff_bvhs_prim.data
 #include <intersect.glsl>
 #include <emitter.glsl>
 
@@ -120,6 +123,28 @@ shared uint        s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 #define brdf_txtr_bary      b_bary_4f
 #define brdf_txtr_spec      b_spec_4f
 #include <brdf.glsl>
+
+// ////
+
+#define scene_buff_mesh_vert  buff_mesh_vert.data
+#define scene_buff_mesh_elem  buff_mesh_elem.data
+#define scene_buff_mesh_prim  buff_bvhs_prim.data
+#define scene_buff_mesh_node  buff_bvhs_node.data
+
+#define scene_buff_mesh_info  s_mesh_info
+#define scene_buff_mesh_count buff_meshes.n
+
+#define scene_buff_emtr_info  s_emtr_info
+#define scene_buff_emtr_count buff_emitters.n
+
+#define scene_buff_objc_info  s_objc_info
+#define scene_buff_objc_count buff_objects.n
+
+#define scene_buff_bary_info  buff_weights.data
+#define scene_buff_bary_txtr  b_bary_4f
+#define scene_buff_wvls_distr b_spec_4f
+#define scene_buff_spec_txtr  b_spec_4f
+// #define scene_buff_emtr_distr  b_spec_4f
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {

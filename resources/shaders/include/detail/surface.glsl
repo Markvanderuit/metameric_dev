@@ -17,11 +17,12 @@ vec3 detail_gen_barycentric_coords(in vec3 p, in vec3 a, in vec3 b, in vec3 c) {
 
 void detail_get_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   // On a valid surface, fill in surface info
-  ObjectInfo object_info = srfc_buff_objc_info[record_get_object(si.data)];
-  MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
+  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+  MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
 
   // Obtain and unpack intersected primitive data
-  BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + record_get_object_primitive(ray.data)]);
+  uint prim_i = mesh_info.prims_offs + record_get_object_primitive(ray.data);
+  BVHPrim prim = unpack(scene_mesh_prim(prim_i));
     
   // Compute geometric normal
   si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
@@ -67,7 +68,7 @@ void detail_get_surface_info_object(inout SurfaceInfo si, in Ray ray) {
 
 void detail_get_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
   // On a valid emitter, fill in surface info
-  EmitterInfo em = srfc_buff_emtr_info[record_get_emitter(si.data)];
+  EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
   
   // Fill positional data from ray hit
   si.p = ray_get_position(ray);

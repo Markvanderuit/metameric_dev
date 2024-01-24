@@ -6,15 +6,6 @@
 #include <frame.glsl>
 #include <record.glsl>
 
-// This header requires the following defines to point to SSBOs or shared memory
-// to work around glsl's lack of ssbo argument passing
-// #define srfc_buff_prim      buff_bvhs_prim.data
-// #define srfc_buff_vert      buff_mesh_vert.data
-// #define srfc_buff_elem      buff_mesh_elem.data
-// #define srfc_buff_objc_info buff_objc_info.data
-// #define srfc_buff_emtr_info buff_emtr_info.data
-// #define srfc_buff_mesh_info buff_mesh_info.data
-
 // An object defining a potential surface intersection in the scene.
 // Is generally the output of ray_intersect(...).
 struct SurfaceInfo {
@@ -44,9 +35,10 @@ bool is_emitter(in SurfaceInfo si) {
   return record_is_emitter(si.data);
 }
 
+#include <detail/surface.glsl>
+
 // Given a ray, and access to the scene's underlying primitive data,
 // generate a SurfaceInfo object
-#include <detail/surface.glsl>
 SurfaceInfo get_surface_info(in Ray ray) {
   SurfaceInfo si;
   si.data = ray.data;

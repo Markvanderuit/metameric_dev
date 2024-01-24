@@ -24,7 +24,7 @@ PositionSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec2 samp
 }
 
 PositionSample sample_emitter(in SurfaceInfo si, in uint emitter_i, in vec2 sample_2d) {
-  return sample_emitter(s_emtr_info[emitter_i], si, sample_2d);
+  return sample_emitter(scene_emitter_info(emitter_i), si, sample_2d);
 }
 
 vec4 eval_emitter(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
@@ -42,7 +42,7 @@ vec4 eval_emitter(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
 vec4 eval_emitter(in PositionSample ps, in vec4 wvls) {
   if (!record_is_emitter(ps.data))
     return vec4(0);
-  return eval_emitter(s_emtr_info[record_get_emitter(ps.data)], ps, wvls);
+  return eval_emitter(scene_emitter_info(record_get_emitter(ps.data)), ps, wvls);
 }
 
 float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
@@ -60,7 +60,7 @@ float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
 float pdf_emitter(in PositionSample ps) {
   if (!record_is_emitter(ps.data))
     return 0.f;
-  return pdf_emitter(s_emtr_info[record_get_emitter(ps.data)], ps);
+  return pdf_emitter(scene_emitter_info(record_get_emitter(ps.data)), ps);
 }
 
 PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {

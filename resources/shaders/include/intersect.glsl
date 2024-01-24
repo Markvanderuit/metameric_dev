@@ -5,17 +5,6 @@
 #include <bvh.glsl>
 #include <scene.glsl>
 
-// This header requires the following defines to point to SSBOs or shared memory
-// to work around glsl's lack of ssbo argument passing
-// #define isct_n_objects      buff_objc_info.n
-// #define isct_n_emitters     buff_emtr_info.n
-// #define isct_stack          s_stack[gl_LocalInvocationID.x]
-// #define isct_buff_objc_info s_objc_info
-// #define isct_buff_emtr_info s_emtr_info
-// #define isct_buff_bvhs_info s_bvhs_info
-// #define isct_buff_bvhs_node buff_bvhs_node.data
-// #define isct_buff_bvhs_prim buff_bvhs_prim.data
-
 // Hardcoded constants
 #define bvh_stck_offset 24
 
@@ -172,24 +161,24 @@ bool ray_isct_prim(inout Ray ray, in vec3 a, in vec3 b, in vec3 c) {
 bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
-  MeshInfo mesh_info = isct_buff_bvhs_info[bvh_i];
+  MeshInfo mesh_info = scene_mesh_info(bvh_i);
 
   // Initiate stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes
-  isct_stack[0] = 1u << bvh_stck_offset;
+  scene_set_stack_value(0u, 1u << bvh_stck_offset);
   uint stckc    = 1;
 
   // Continue traversal until stack is once again empty
   while (stckc > 0) {
     // Read offset and bitmask from stack
-    uint stck_value = isct_stack[stckc - 1];
+    uint stck_value = scene_get_stack_value(stckc - 1);
     uint node_first = stck_value & 0x00FFFFFF;
     int  node_bit   = findMSB(stck_value >> bvh_stck_offset);
 
     // Remove bit from mask on stack
     stck_value &= (~(1u << (bvh_stck_offset + node_bit)));
-    isct_stack[stckc - 1] = stck_value;
+    scene_set_stack_value(stckc - 1, stck_value);
 
     // If this was the last flagged bit, decrease stack count
     if ((stck_value & 0xFF000000) == 0)
@@ -199,7 +188,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
     uint node_i = mesh_info.nodes_offs + node_first + node_bit;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(isct_buff_bvhs_node[node_i]);
+    BVHNode node = unpack(scene_mesh_node(node_i));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
       // Iterate the node's primitives
@@ -208,7 +197,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
         uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
-        BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
+        BVHPrim prim = unpack(scene_mesh_prim(prim_i));
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
@@ -227,7 +216,7 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
       // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
       if (mask != 0) {
         stckc++;
-        isct_stack[stckc - 1] = (mask << bvh_stck_offset) | bvh_offs(node);
+        scene_set_stack_value(stckc - 1, (mask << bvh_stck_offset) | bvh_offs(node));
       }
     }
   } // while (stckc > 0)
@@ -238,25 +227,25 @@ bool ray_isct_bvh_any(in Ray ray, in uint bvh_i) {
 bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
-  MeshInfo mesh_info = isct_buff_bvhs_info[bvh_i];
+  MeshInfo mesh_info = scene_mesh_info(bvh_i);
 
   // Initiate stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes
-  isct_stack[0] = 1u << bvh_stck_offset;
+  scene_set_stack_value(0u, 1u << bvh_stck_offset);
   uint stckc    = 1; 
   bool hit      = false;
 
   // Continue traversal until stack is once again empty
   while (stckc > 0) {
     // Read offset and bitmask from stack
-    uint stck_value = isct_stack[stckc - 1];
+    uint stck_value = scene_get_stack_value(stckc - 1);
     uint node_first = stck_value & 0x00FFFFFF;
     int  node_bit   = findMSB(stck_value >> bvh_stck_offset);
 
     // Remove bit from mask on stack
     stck_value &= (~(1u << (bvh_stck_offset + node_bit)));
-    isct_stack[stckc - 1] = stck_value;
+    scene_set_stack_value(stckc - 1, stck_value);
 
     // If this was the last flagged bit, decrease stack count
     if ((stck_value & 0xFF000000) == 0)
@@ -266,7 +255,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
     uint node_i = mesh_info.nodes_offs + node_first + node_bit;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(isct_buff_bvhs_node[node_i]);
+    BVHNode node = unpack(scene_mesh_node(node_i));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
       // Iterate the node's primitives
@@ -275,7 +264,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
         uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
-        BVHPrim prim = unpack(isct_buff_bvhs_prim[prim_i]);
+        BVHPrim prim = unpack(scene_mesh_prim(prim_i));
 
         // Test against primitive; store primitive index on hit
         if (ray_isct_prim(ray, prim.v0.p, prim.v1.p, prim.v2.p)) {
@@ -295,7 +284,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
       // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
       if (mask != 0) {
         stckc++;
-        isct_stack[stckc - 1] = (mask << bvh_stck_offset) | bvh_offs(node);
+        scene_set_stack_value(stckc - 1, (mask << bvh_stck_offset) | bvh_offs(node));
       }
     }
   } // while (stckc > 0)
@@ -304,7 +293,7 @@ bool ray_isct_bvh(inout Ray ray, in uint bvh_i) {
 }
 
 bool ray_intersect_object_any(in Ray ray, uint object_i) {
-  ObjectInfo object_info = isct_buff_objc_info[object_i];
+  ObjectInfo object_info = scene_object_info(object_i);
   
   if (!object_info.is_active)
     return false;
@@ -324,7 +313,7 @@ bool ray_intersect_object_any(in Ray ray, uint object_i) {
 }
 
 void ray_intersect_object(inout Ray ray, uint object_i) {
-  ObjectInfo object_info = isct_buff_objc_info[object_i];
+  ObjectInfo object_info = scene_object_info(object_i);
   
   if (!object_info.is_active)
     return;
@@ -350,7 +339,7 @@ void ray_intersect_object(inout Ray ray, uint object_i) {
 }
 
 bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
-  EmitterInfo em = isct_buff_emtr_info[emitter_i];
+  EmitterInfo em = scene_emitter_info(emitter_i);
   
   if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
     return false;
@@ -364,7 +353,7 @@ bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
 }
 
 bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
-  EmitterInfo em = isct_buff_emtr_info[emitter_i];
+  EmitterInfo em = scene_emitter_info(emitter_i);
   
   if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
     return false;
@@ -383,13 +372,13 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
 }
 
 bool ray_intersect_scene_any(in Ray ray) {
-  for (uint i = 0; i < isct_n_objects; ++i) {
+  for (uint i = 0; i < scene_object_count(); ++i) {
     if (ray_intersect_object_any(ray, i)) {
       return true;
     }
   }
   
-  for (uint i = 0; i < isct_n_emitters; ++i) {
+  for (uint i = 0; i < scene_emitter_count(); ++i) {
     if (ray_intersect_emitter_any(ray, i)) {
       return true;
     }
@@ -398,11 +387,11 @@ bool ray_intersect_scene_any(in Ray ray) {
 }
 
 bool ray_intersect_scene(inout Ray ray) {
-  for (uint i = 0; i < isct_n_objects; ++i) {
+  for (uint i = 0; i < scene_object_count(); ++i) {
     ray_intersect_object(ray, i);
   }
   
-  for (uint i = 0; i < isct_n_emitters; ++i) {
+  for (uint i = 0; i < scene_emitter_count(); ++i) {
     ray_intersect_emitter(ray, i);
   }
 

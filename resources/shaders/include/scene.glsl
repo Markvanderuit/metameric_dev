@@ -95,4 +95,7 @@ struct BRDFInfo {
   vec4 r;    // Surface albedo for four wavelengths
 };
 
+// Loader code
+#include <detail/scene.glsl>
+
 #endif // SCENE_GLSL_GUARD
