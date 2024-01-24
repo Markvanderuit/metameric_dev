@@ -236,7 +236,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
     if (!is_valid(si))
       break;
 
-    debug_color = vec3(dot(si.n, -ray.d));
+    debug_color = si.p;
     break;
     
     // If an emissive object is hit directly, 
@@ -257,13 +257,13 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
       break;
     }
     
-    /* // If object back was hit, terminate current path
-    if (frame_cos_theta(si.wi) < 0)
-      break; */
+    // If object back was hit on first intersect, terminate current path
+    // if (depth == 0 && dot(si.n, ray.d) > 0)
+    //   break;
 
-   /*  // Test if geometric/shading normals are aligned
-    if (dot(ray.d, si.sh.n) * frame_cos_theta(si.wi) >= 0)
-      break; */
+    // Test if geometric/shading normals are aligned
+    // if (depth == 0 && dot(ray.d, si.sh.n) * frame_cos_theta(si.wi) >= 0)
+    //   break;
 
     // Sample BRDF at position
     BRDF brdf = get_surface_brdf(si, wvls);
@@ -363,6 +363,8 @@ void main() {
             + (value - prev)
             / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
     }
+
+    // TODO remove
     value = debug_color;
     
     // Store updated image value and sample state

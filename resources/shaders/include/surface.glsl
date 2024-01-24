@@ -82,12 +82,30 @@ SurfaceInfo get_surface_info(in Ray ray) {
     
     // Compute object-space surface position
     vec3 p = (object_info.trf_mesh_inv * vec4(ray.o + ray.d * ray.t, 1)).xyz;
-    
+
     // Reinterpolate surface position, texture coordinates, shading normal using barycentrics
     vec3 b  = gen_barycentric_coords(p, prim.v0.p, prim.v1.p, prim.v2.p);
     vec3 ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
     si.p    = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
     si.tx   = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
+    
+    // Offset surface position as shading point, as per
+    // "Hacking the Shadow Terminator, J. Hanika, 2021"
+    {
+      vec3 tmp_u = si.p - prim.v0.p,
+           tmp_v = si.p - prim.v1.p,
+           tmp_w = si.p - prim.v2.p;
+
+      float dot_u = min(0.f, dot(tmp_u, prim.v0.n)),
+            dot_v = min(0.f, dot(tmp_v, prim.v1.n)),
+            dot_w = min(0.f, dot(tmp_w, prim.v2.n));
+            
+      tmp_u -= dot_u * prim.v0.n;
+      tmp_v -= dot_v * prim.v1.n;
+      tmp_w -= dot_w * prim.v2.n;
+
+      si.p += (b.x * tmp_u + b.y * tmp_v + b.z * tmp_w);
+    }
 
     // Transform relevant data to world-space
     ns   = (object_info.trf_mesh * vec4(ns, 0)).xyz;
