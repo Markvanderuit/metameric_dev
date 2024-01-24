@@ -302,7 +302,7 @@ namespace met::detail {
             sphere_r       = 0.f;
       
       if (emitter.type == Emitter::Type::eSphere) {
-        sphere_r      = emitter.transform.scaling.x();
+        sphere_r      = 0.5 * emitter.transform.scaling.x();
         srfc_area_inv = 1.f / (4.f * std::numbers::pi_v<float> * sphere_r * sphere_r);
       } else if (emitter.type == Emitter::Type::eRect) {
         rect_n        = (trf * eig::Vector4f(0, 0, 1, 0)).head<3>().normalized();

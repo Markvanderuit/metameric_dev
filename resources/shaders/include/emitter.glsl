@@ -5,237 +5,79 @@
 #include <ray.glsl>
 #include <frame.glsl>
 #include <warp.glsl>
+#include <scene.glsl>
+#include <emitter/sphere.glsl>
+#include <emitter/rect.glsl>
+#include <emitter/point.glsl>
+#include <emitter/constant.glsl>
 
-// This header requires the following defines to point to SSBOs or shared memory
-// to work around glsl's lack of ssbo argument passing
-// ...
-
-bool _ray_intersect_sphere(inout Ray ray, in vec3 center, in float r) {
-  vec3  o = ray.o - center;
-  float a = 1.f;  
-  float b = 2.f * dot(o, ray.d);
-  float c = sdot(o) - sdot(r);
-  float d = b * b - 4.f * a * c;
-
-  float t_near, t_far;
-
-  if (d < 0) {
-    return false;
-  } else if (d == 0.f) {
-    t_near = t_far = -b / 2.f * a;
-  } else {
-    d = sqrt(d);
-    t_near = (-b + d) * 0.5f * a;
-    t_far  = (-b - d) * 0.5f * a;
-  }
-
-  if (t_near < 0.f)
-    t_near = FLT_MAX;
-  if (t_far < 0.f)
-    t_far = FLT_MAX;
-  
-  float t = min(t_near, t_far);
-  if (t > ray.t || t < 0.f)
-    return false;
-
-  ray.t = t;
-  return true;
-}
-
-/* void _impl_sample_emitter_position_sphere(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  ps.is_delta = em.sphere_r == 0.f;
-
-  vec3  ref_to_center = em.center - si.p;
-  float ref_dist_2    = sdot(ref_to_center);
-  float inv_ref_dist  = inversesqrt(ref_t2);
-
-  float sin_alpha = em.sphere_r * inv_ref_dist;
-
-  if (sin_alpha < 1.f - 1e-4) {
-    float cos_alpha = sqrt(max(0.f, 1.f - sdot(sin_alpha)));
-    ps.d = frame_to_world(get_frame(ref_to_center * inv_ref_dist), 
-                          square_to_unif_cone(sample_2d, cos_alpha));
-    ps.pdf = square_to_unif_cone_pdf(sample_2d, cos_alpha);
-    
-    float proj_dist = dot(ref_to_center, ps.d);
-    float base_t    = ref_dist_2 / proj_dist;
-    vec3  query     = si.p + ps.d * base_t;
-
-    vec3 query_to_center = em.center - query;
-    float query_dist_2   = sdot(query_to_center);
-    float query_proj_dist = sdot(query_to_center, ps.d);
-
-    float A = 1.f,
-          B = -2.f * query_proj_dist,
-          C = query_dist_2 - sdot(em.sphere_r);
-    
-    float near_t, far_t;
-
-
-  } else {
-
-  }
-
-  // Sample position on sphere
-  ps.p = em.center + em.sphere_r * square_to_unif_sphere(sample_2d);
-  ps.d = ps.p - si.p;
-  ps.t = length(ps.d);
-  pd.d /= ps.t;
-
-  // Intersect to find closest visible position on sphere
-  Ray ray = init_ray(ps.p, ps.d);
-  if (_ray_intersect_sphere(ray, em.center, em.sphere_r)) {
-    ps.p = ray_get_position(ray);
-    ps.t = ray.t;
-  }
-
-  ps.n   = normalize(ps.p - em.center);
-  ps.pdf = em.srfc_area_inv * sdot(ps.t) / abs(dot(ps.d, ps.n));
-}
-
-float _impl_pdf_emitter_position_sphere(in PositionSample ps, in EmitterInfo em) {
-  return em.srfc_area_inv * sdot(ps.t) / abs(dot(ps.d, ps.n));
-} */
-
-void impl_sample_emitter_position_sphere(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  ps.is_delta = em.sphere_r == 0.f;
-
-  Frame frm = get_frame(normalize(si.p - em.center));
-  ps.p = em.center + em.sphere_r * frame_to_world(frm, square_to_unif_hemisphere(sample_2d));
-
-  // Sample position on sphere
-  // ps.p = em.center + em.sphere_r * square_to_unif_sphere(sample_2d);
-  ps.d = ps.p - si.p;
-  ps.t = length(ps.d);
-  ps.d /= ps.t;
-
-  /* // Intersect to find closest visible position on sphere
-  Ray ray = init_ray(si.p, ps.d);
-  if (_ray_intersect_sphere(ray, em.center, em.sphere_r)) {
-    ps.p = ray_get_position(ray);
-    ps.t = ray.t;
-  } */
-
-  ps.n   = normalize(ps.p - em.center);
-  ps.pdf = (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
-}
-
-float impl_pdf_emitter_position_sphere(in PositionSample ps, in EmitterInfo em) {
-  return (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
-}
-
-void impl_sample_emitter_position_rect(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  ps.is_delta = false;
-  
-  // Sample point on rectangle
-  ps.p = (em.trf * vec4(2.f * sample_2d - 1.f, 0, 1)).xyz;
-  ps.n = em.rect_n;
-
-  // Store direction to point, normalize, and keep distance
-  ps.d = ps.p - si.p;
-  ps.t = length(ps.d);
-  ps.d /= ps.t;
-
-  // Set pdf to non-zero if we are not approaching from a back-face
-  float dp = max(0.f, dot(ps.d, -ps.n));
-  ps.pdf = dp > 0.f ? em.srfc_area_inv * sdot(ps.t) / dp : 0.f;
-}
-
-float impl_pdf_emitter_position_rect(in PositionSample ps, in EmitterInfo em) {
-  float dp = max(0.f, dot(ps.d, -ps.n));
-  return dp > 0.f ? em.srfc_area_inv * sdot(ps.t) / dp : 0.f;
-}
-
-void impl_sample_emitter_position_point(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  ps.is_delta = true;
-
-  ps.p = (em.trf * vec4(0, 0, 0, 1)).xyz;
-  ps.n = vec3(0, 0, 1); // Indeterminate?
-  
-  ps.d = ps.p - si.p;
-  ps.t = length(ps.d);
-  ps.d /= ps.t;
-  
-  ps.pdf = 1.f;
-}
-
-float impl_pdf_emitter_position_point(in PositionSample ps, in EmitterInfo em) {
-  return 1.f;
-}
-
-void impl_sample_emitter_position_constant(inout PositionSample ps, in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
-  ps.is_delta = true;
-
-  // ...
-}
-
-float impl_pdf_emitter_position_constant(in PositionSample ps, in EmitterInfo em) {
-  return 0.f;
-}
-
-PositionSample sample_emitter_position(in SurfaceInfo si, in uint emitter_i, in vec2 sample_2d) {
-  PositionSample ps;
-  record_set_emitter(ps.data, emitter_i);
-
-  EmitterInfo em = s_emtr_info[emitter_i];
+PositionSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   if (em.type == EmitterTypeSphere) {
-    impl_sample_emitter_position_sphere(ps, em, si, sample_2d);
+    return sample_emitter_sphere(em, si, sample_2d);
   } else if (em.type == EmitterTypeRect) {
-    impl_sample_emitter_position_rect(ps, em, si, sample_2d);
+    return sample_emitter_rect(em, si, sample_2d);
   } else if (em.type == EmitterTypePoint) {
-    impl_sample_emitter_position_point(ps, em, si, sample_2d);
+    return sample_emitter_point(em, si, sample_2d);
   } else if (em.type == EmitterTypeConstant) {
-    impl_sample_emitter_position_constant(ps, em, si, sample_2d);
+    return sample_emitter_constant(em, si, sample_2d);
   }
-
-  return ps;
 }
 
-PositionSample sample_emitters_position(in SurfaceInfo si, in vec3 sample_3d) {
+PositionSample sample_emitter(in SurfaceInfo si, in uint emitter_i, in vec2 sample_2d) {
+  return sample_emitter(s_emtr_info[emitter_i], si, sample_2d);
+}
+
+vec4 eval_emitter(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
+  if (em.type == EmitterTypeSphere) {
+    return eval_emitter_sphere(em, ps, wvls);
+  } else if (em.type == EmitterTypeRect) {
+    return eval_emitter_rect(em, ps, wvls);
+  } else if (em.type == EmitterTypePoint) {
+    return eval_emitter_point(em, ps, wvls);
+  } else if (em.type == EmitterTypeConstant) {
+    return eval_emitter_constant(em, ps, wvls);
+  }
+}
+
+vec4 eval_emitter(in PositionSample ps, in vec4 wvls) {
+  if (!record_is_emitter(ps.data))
+    return vec4(0);
+  return eval_emitter(s_emtr_info[record_get_emitter(ps.data)], ps, wvls);
+}
+
+float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
+  if (em.type == EmitterTypeSphere) {
+    return pdf_emitter_sphere(em, ps);
+  } else if (em.type == EmitterTypeRect) {
+    return pdf_emitter_rect(em, ps);
+  } else if (em.type == EmitterTypePoint) {
+    return pdf_emitter_point(em, ps);
+  } else {
+    return pdf_emitter_constant(em, ps);
+  }
+}
+
+float pdf_emitter(in PositionSample ps) {
+  if (!record_is_emitter(ps.data))
+    return 0.f;
+  return pdf_emitter(s_emtr_info[record_get_emitter(ps.data)], ps);
+}
+
+PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {
   // TODO pick emitter from distribution
   float emitter_sample = sample_3d.z;
   uint  emitter_i      = 0;
   float emitter_pdf    = 1.f;
   
-  PositionSample ps = sample_emitter_position(si, emitter_i, sample_3d.xy);
+  PositionSample ps = sample_emitter(s_emtr_info[emitter_i], si, sample_3d.xy);
+  record_set_emitter(ps.data, emitter_i);
   ps.pdf *= emitter_pdf;
   return ps;
 }
 
-float pdf_emitter_position(in PositionSample ps) {
-  EmitterInfo em = s_emtr_info[record_get_emitter(ps.data)];
-  if (em.type == EmitterTypeSphere) {
-    return impl_pdf_emitter_position_sphere(ps, em);
-  } else if (em.type == EmitterTypeRect) {
-    return impl_pdf_emitter_position_rect(ps, em);
-  } else if (em.type == EmitterTypePoint) {
-    return impl_pdf_emitter_position_point(ps, em);
-  } else {
-    return impl_pdf_emitter_position_constant(ps, em);
-  }
-}
-
-float pdf_emitters_position(in PositionSample ps) {
+float pdf_emitters(in PositionSample ps) {
   // TODO Multiply against emitter pdf from distribution
-  return pdf_emitter_position(ps) * 1.f;
-}
-
-vec4 eval_emitter_position(in PositionSample ps, in vec4 wvls) {
-  // If no emitter is hit, or the normal is not inclined along the ray, return nothing
-  vec4 v = vec4(0);
-  if ((!ps.is_delta && dot(ps.d, ps.n) >= 0) || !record_is_emitter(ps.data))
-    return v;
-
-  // Evaluate emitter throughput
-  EmitterInfo em = s_emtr_info[record_get_emitter(ps.data)];
-  for (uint i = 0; i < 4; ++i)
-    v[i] = texture(b_illm_1f, vec2(wvls[i], em.illuminant_i)).x;
-  
-  // Attenuate point light
-  if (em.type == EmitterTypePoint)
-    v /= sdot(ps.t);
-    
-  return v * em.illuminant_scale;
+  return pdf_emitter(ps) * 1.f;
 }
 
 #endif // EMITTER_GLSL_GUARD

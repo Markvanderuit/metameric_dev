@@ -40,9 +40,9 @@ bool ray_intersect_rect(inout Ray ray, in vec3 c, in vec3 n, in mat4 trf_inv) {
   if (t < 0.f || t > ray.t)
     return false;
 
-  // Plane boundary test, clamp to [-1, 1]
+  // Plane boundary test, clamp to rectangle of size 1 with (0, 0) at its center
   vec2 p_local = (trf_inv * vec4(ray.o + ray.d * t, 1)).xy;
-  if (clamp(p_local, vec2(-1), vec2(1)) != p_local)
+  if (clamp(p_local, vec2(-.5), vec2(.5)) != p_local)
     return false;
     
   ray.t = t;
@@ -382,23 +382,18 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   return hit;
 }
 
-bool ray_intersect_scene_any(inout Ray ray) {
-  record_set_anyhit(ray.data, false);
-
+bool ray_intersect_scene_any(in Ray ray) {
   for (uint i = 0; i < isct_n_objects; ++i) {
     if (ray_intersect_object_any(ray, i)) {
-      record_set_anyhit(ray.data, true);
       return true;
     }
   }
   
   for (uint i = 0; i < isct_n_emitters; ++i) {
     if (ray_intersect_emitter_any(ray, i)) {
-      record_set_anyhit(ray.data, true);
       return true;
     }
   }
-
   return false;
 }
 
@@ -414,7 +409,11 @@ bool ray_intersect_scene(inout Ray ray) {
   return is_valid(ray);
 }
 
-bool ray_intersect_any(inout Ray ray) {
+bool ray_intersect(inout Ray ray) {
+  return ray_intersect_scene(ray);
+}
+
+bool ray_intersect_any(in Ray ray) {
   return ray_intersect_scene_any(ray);
 }
 

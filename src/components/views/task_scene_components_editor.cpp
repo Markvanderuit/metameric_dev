@@ -247,10 +247,16 @@ namespace met {
         ImGui::Separator();
         
         // Object transforms
+        // Some parts are only available in part dependent on emitter type
         ImGui::DragFloat3("Position", emitter.transform.position.data(), 0.01f, -100.f, 100.f);
-        ImGui::DragFloat3("Rotation", emitter.transform.rotation.data(), 0.01f, -10.f, 10.f);
-        ImGui::DragFloat3("Scaling",  emitter.transform.scaling.data(),  0.01f, 0.001f, 100.f);
-
+        if (emitter.type == Emitter::Type::eSphere) {
+          ImGui::DragFloat("Scaling", emitter.transform.scaling.data(), 0.01f, 0.001f, 100.f);
+          emitter.transform.scaling = eig::Vector3f(emitter.transform.scaling.x());
+        } else if (emitter.type == Emitter::Type::eRect) {
+          ImGui::DragFloat3("Rotation", emitter.transform.rotation.data(), 0.01f, -10.f, 10.f);
+          ImGui::DragFloat2("Scaling", emitter.transform.scaling.data(), 0.01f, 0.001f, 100.f);
+        }
+        
         ImGui::Separator();
 
         detail::fun_resource_selector("Illuminant", e_illuminants, emitter.illuminant_i);

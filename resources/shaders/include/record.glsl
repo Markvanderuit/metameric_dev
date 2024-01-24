@@ -73,6 +73,9 @@ struct BRDFSample {
   // BSDF value divided by (probability x cosine foreshortening)
   vec4  f;
 
+  // Is the sample some weird dirac
+  bool is_delta;
+
   // Sampling density
   float pdf;
 };

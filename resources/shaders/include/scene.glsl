@@ -87,4 +87,12 @@ struct EmitterInfo {
   float sphere_r;     // Specific to sphere area emitters
 };
 
+#define BRDFTypeNull    0
+#define BRDFTypeDiffuse 1
+
+struct BRDFInfo {
+  uint type; // Type of BRDF: null, diffuse for now
+  vec4 r;    // Surface albedo for four wavelengths
+};
+
 #endif // SCENE_GLSL_GUARD

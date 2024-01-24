@@ -15,19 +15,6 @@
 // #define srfc_buff_emtr_info buff_emtr_info.data
 // #define srfc_buff_mesh_info buff_mesh_info.data
 
-// Given a triangle and a primitive, obtain barycentric coordiantes
-vec3 gen_barycentric_coords(in vec3 p, in vec3 a, in vec3 b, in vec3 c) {
-    vec3 ab = b - a;
-    vec3 ac = c - a;
-
-    float a_tri = abs(.5f * length(cross(ac, ab)));
-    float a_ab  = abs(.5f * length(cross(p - a, ab)));
-    float a_ac  = abs(.5f * length(cross(ac, p - a)));
-    float a_bc  = abs(.5f * length(cross(c - p, b - p)));
-    
-    return vec3(a_bc, a_ac, a_ab) / a_tri;
-}
-
 // An object defining a potential surface intersection in the scene.
 // Is generally the output of ray_intersect(...).
 struct SurfaceInfo {
@@ -45,14 +32,12 @@ struct SurfaceInfo {
   uint data;
 };
 
-SurfaceInfo init_surface() {
-  SurfaceInfo si;
-  si.data = RECORD_INVALID_DATA;
-  return si;
-}
-
 bool is_valid(in SurfaceInfo si) {
   return record_is_valid(si.data);
+}
+
+bool is_object(in SurfaceInfo si) {
+  return record_is_object(si.data);
 }
 
 bool is_emitter(in SurfaceInfo si) {
@@ -61,166 +46,43 @@ bool is_emitter(in SurfaceInfo si) {
 
 // Given a ray, and access to the scene's underlying primitive data,
 // generate a SurfaceInfo object
+#include <detail/surface.glsl>
 SurfaceInfo get_surface_info(in Ray ray) {
   SurfaceInfo si;
   si.data = ray.data;
   
-  // Early out if no hit data is present
-  if (!record_is_valid(si.data))
-    return si;
-
-  if (record_is_object(si.data)) {
-    // On a valid surface, fill in surface info
-    ObjectInfo object_info = srfc_buff_objc_info[record_get_object(si.data)];
-    MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
-
-    // Obtain and unpack intersected primitive data
-    BVHPrim prim = unpack(srfc_buff_prim[mesh_info.prims_offs + record_get_object_primitive(ray.data)]);
-      
-    // Compute geometric normal
-    si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
-    
-    // Compute object-space surface position
-    vec3 p = (object_info.trf_mesh_inv * vec4(ray.o + ray.d * ray.t, 1)).xyz;
-
-    // Reinterpolate surface position, texture coordinates, shading normal using barycentrics
-    vec3 b  = gen_barycentric_coords(p, prim.v0.p, prim.v1.p, prim.v2.p);
-    vec3 ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
-    si.p    = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
-    si.tx   = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
-    
-    // Offset surface position as shading point, as per
-    // "Hacking the Shadow Terminator, J. Hanika, 2021"
-    {
-      vec3 tmp_u = si.p - prim.v0.p,
-           tmp_v = si.p - prim.v1.p,
-           tmp_w = si.p - prim.v2.p;
-
-      float dot_u = min(0.f, dot(tmp_u, prim.v0.n)),
-            dot_v = min(0.f, dot(tmp_v, prim.v1.n)),
-            dot_w = min(0.f, dot(tmp_w, prim.v2.n));
-            
-      tmp_u -= dot_u * prim.v0.n;
-      tmp_v -= dot_v * prim.v1.n;
-      tmp_w -= dot_w * prim.v2.n;
-
-      si.p += (b.x * tmp_u + b.y * tmp_v + b.z * tmp_w);
-    }
-
-    // Transform relevant data to world-space
-    ns   = (object_info.trf_mesh * vec4(ns, 0)).xyz;
-    si.p = (object_info.trf_mesh * vec4(si.p, 1)).xyz;
-    si.n = (object_info.trf_mesh * vec4(si.n, 0)).xyz;
-
-    // Normalize vectors as transformations don't preserve this :/
-    si.n = normalize(si.n);
-    ns   = normalize(ns);
-
-    // Generate shading frame
-    si.sh = get_frame(ns);
-    si.wi = frame_to_local(si.sh, -ray.d);
-    si.t  = ray.t;
-
-    /* // Flip normals on back hit
-    if (frame_cos_theta(si.wi) < 0.f) {
-      si.n = -si.n;
-      si.sh = get_frame(-si.sh.n);
-      si.wi = frame_to_local(si.sh, -ray.d);
+  // If hit data is present, forward to underlying surface type: object or emitter
+  if (is_valid(si)) {
+    if (is_object(si)) {
+      detail_get_surface_info_object(si, ray);
+    } else if (is_emitter(si)) {
+      detail_get_surface_info_emitter(si, ray);
+    } /* else {
+      // ...
     } */
-  } else if (record_is_emitter(si.data)) {
-    // On a valid emitter, fill in surface info
-    EmitterInfo em = srfc_buff_emtr_info[record_get_emitter(si.data)];
-    
-    // Fill positional data from ray hit
-    si.p = ray_get_position(ray);
-
-    // Fill normal data based on type of area emitters
-    if (em.type == EmitterTypeSphere) {
-      si.n = normalize(si.p - em.center);
-    } else if (em.type == EmitterTypeRect) {
-      si.n = em.rect_n;
-    }
-    
-    // Flip normals on back hit
-    // TODO maybe don't?
-    // if (dot(si.n, ray.d) > 0) si.n = -si.n;
-
-    // Generate shading frame
-    si.sh = get_frame(si.n);
-    si.wi = frame_to_local(si.sh, -ray.d);
-    si.t  = ray.t;
   }
 
   return si;
 }
 
-// Given a ray, and access to the scene's underlying primitive data,
-// generate a SurfaceInfo object
-/* SurfaceInfo get_surface_info(in GBufferRay gb, in Ray ray) {
-  SurfaceInfo si = init_surface();
-
-  // Ensure the ray actually hit something
-  if (gb.object_i == OBJECT_INVALID)
-    return si;
-
-  // On a valid surface, fill in surface info
-  si.object_i = gb.object_i;
-  
-  ObjectInfo object_info = srfc_buff_objc_info[si.object_i];
-  MeshInfo   mesh_info   = srfc_buff_mesh_info[object_info.mesh_i];
-
-  // Obtain and unpack intersected primitive data
-  uvec3 el = srfc_buff_elem[mesh_info.prims_offs + gb.primitive_i];
-  BVHPrim prim = { unpack(srfc_buff_vert[el[0]]), 
-                   unpack(srfc_buff_vert[el[1]]), 
-                   unpack(srfc_buff_vert[el[2]]) };
-
-  // Compute geometric normal
-  si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
-
-  // Reinterpolate surface position, texture coordinates, shading normal using barycentrics
-  vec3 b  = gen_barycentric_coords(gb.p, prim.v0.p, prim.v1.p, prim.v2.p);
-  vec3 ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
-  si.p    = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;
-  si.tx   = b.x * prim.v0.tx + b.y * prim.v1.tx + b.z * prim.v2.tx;
-
-  // Transform relevant data to world-space
-  ns   = (object_info.trf_mesh * vec4(ns, 0)).xyz;
-  si.p = (object_info.trf_mesh * vec4(si.p, 1)).xyz;
-  si.n = (object_info.trf_mesh * vec4(si.n, 0)).xyz;
-
-  // Normalize vectors as transformations don't preserve this :/
-  ns   = normalize(ns);
-  si.n = normalize(si.n);
-  
-  // Flip normals on back hit
-  if (dot(ns,   ray.d) > 0)   ns = -ns;
-  if (dot(si.n, ray.d) > 0) si.n = -si.n;
-
-  // Generate shading frame
-  si.sh = get_frame(ns);
-  si.wi = frame_to_local(si.sh, -ray.d);
-  
-  return si;
-} */
-
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
   return fma(vec3(M_RAY_EPS), si.n, si.p);
-  // return fma(vec3(M_RAY_EPS) * 10.f, si.sh.n, si.p);
 }
 
-Ray surface_ray_towards_direction(in SurfaceInfo si, in vec3 d) {
+Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
   return init_ray(surface_offset(si, d), d);
 }
 
-Ray surface_ray_towards_point(in SurfaceInfo si, in vec3 p) {
+Ray ray_towards_point(in SurfaceInfo si, in vec3 p) {
   Ray ray;
+  
   ray.o = surface_offset(si, p - si.p);
   ray.d = p - ray.o;
   ray.t = length(ray.d);
   ray.d /= ray.t;
   ray.t *= (1.f - M_RAY_EPS * 10.f);
   ray.data = RECORD_INVALID_DATA;
+
   return ray;
 }
 
@@ -230,7 +92,7 @@ PositionSample get_position_sample(in SurfaceInfo si) {
   ps.is_delta = false;
   ps.p        = si.p;
   ps.n        = si.n;
-  ps.d        = frame_to_world(si.sh, -si.wi);
+  ps.d        = -frame_to_world(si.sh, si.wi);
   ps.data     = si.data;
   ps.t        = si.t;
 
