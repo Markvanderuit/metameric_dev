@@ -1,5 +1,5 @@
 #include <preamble.glsl>
-#include <scene.glsl>
+#include <render/scene.glsl>
 
 // Buffer layout declarations
 layout(std140) uniform;

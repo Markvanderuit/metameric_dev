@@ -1,7 +1,8 @@
 #ifndef GLSL_SURFACE_DETAIL_GUARD
 #define GLSL_SURFACE_DETAIL_GUARD
 
-#include <emitter.glsl>
+#include <render/emitter.glsl>
+#include <render/scene.glsl>
 
 vec3 detail_gen_barycentric_coords(in vec3 p, in vec3 a, in vec3 b, in vec3 c) {
     vec3 ab = b - a;
@@ -22,7 +23,7 @@ void detail_get_surface_info_object(inout SurfaceInfo si, in Ray ray) {
 
   // Obtain and unpack intersected primitive data
   uint prim_i = mesh_info.prims_offs + record_get_object_primitive(ray.data);
-  BVHPrim prim = unpack(scene_mesh_prim(prim_i));
+  MeshPrim prim = unpack(scene_mesh_prim(prim_i));
     
   // Compute geometric normal
   si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
@@ -76,7 +77,7 @@ void detail_get_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
   // Fill normal data based on type of area emitters
   if (em.type == EmitterTypeSphere) {
     si.n = normalize(si.p - em.center);
-  } else if (em.type == EmitterTypeRect) {
+  } else if (em.type == EmitterTypeRectangle) {
     si.n = em.rect_n;
   }
 

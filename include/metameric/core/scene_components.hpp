@@ -88,7 +88,7 @@ namespace met {
       ePoint    = 1, 
       eSphere   = 2, 
       eRect     = 3
-    } type = Type::eConstant;
+    } type = Type::eSphere;
 
     // Scene properties
     bool      is_active = true;

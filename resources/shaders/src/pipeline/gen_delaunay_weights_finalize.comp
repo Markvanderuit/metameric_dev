@@ -1,5 +1,4 @@
 #include <preamble.glsl>
-#include <guard.glsl>
 #include <math.glsl>
 
 // Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430

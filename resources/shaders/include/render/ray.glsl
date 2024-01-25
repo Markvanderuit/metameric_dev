@@ -2,13 +2,8 @@
 #define RAY_GLSL_GUARD
 
 #include <math.glsl>
-#include <record.glsl>
-#include <random_uniform.glsl>
-
-struct AABB {
-  vec3 minb; // Minimum of bounding box
-  vec3 maxb; // Maximum of bounding box
-};
+#include <render/record.glsl>
+#include <sampler/uniform.glsl>
 
 // An object defining a 3-dimensional ray.
 // Is generally the input of ray_intersect(...)

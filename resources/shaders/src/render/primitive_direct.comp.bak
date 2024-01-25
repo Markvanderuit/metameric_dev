@@ -1,11 +1,10 @@
 #include <preamble.glsl>
-#include <guard.glsl>
 #include <bvh.glsl>
 #include <gbuffer.glsl>
 #include <math.glsl>
-#include <random_uniform.glsl>
+#include <sampler/uniform.glsl>
 #include <spectrum.glsl>
-#include <scene.glsl>
+#include <render/scene.glsl>
 
 // General layout rule declarations
 layout(local_size_x = 16, local_size_y = 16) in;
@@ -55,25 +54,24 @@ layout(binding = 3) restrict readonly buffer b_buff_mesh_vert {
 layout(binding = 4) restrict readonly buffer b_buff_mesh_elem {
   uvec3 data[];
 } buff_mesh_elem;
-layout(binding = 5) restrict readonly buffer b_buff_weights {
-  AtlasLayout data[max_supported_objects];
-} buff_weights;
+layout(binding = 5) restrict readonly buffer b_buff_barycentrics {
+  BarycentricInfo data[max_supported_objects];
+} buff_barycentrics;
 
-// Texture unit, ergo sampler declarations
-layout(binding = 0) uniform usampler2D     b_gbuffer; // G-buffer pack
-layout(binding = 1) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
-layout(binding = 2) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
-layout(binding = 3) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
-layout(binding = 4) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
-layout(binding = 5) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 6) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
-
-// Image unit, output declaration
-layout(binding = 0, rgba32f) uniform restrict image2D b_film;
+// Texture/image units, ergo samplers and output images
+layout(binding = 0)          uniform usampler2D       b_gbuffer; // G-buffer pack
+layout(binding = 1)          uniform sampler2DArray   b_txtr_1f; // Alpha texture atlas
+layout(binding = 2)          uniform sampler2DArray   b_txtr_3f; // RGB texture atlas
+layout(binding = 3)          uniform sampler2DArray   b_bary_4f; // Uplifting weight atlas
+layout(binding = 4)          uniform sampler1DArray   b_spec_4f; // Uplifting spectral atlas
+layout(binding = 5)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 6)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
 // Shared memory declarations
 shared ObjectInfo  s_objc_info[max_supported_objects];
 shared EmitterInfo s_emtr_info[max_supported_objects];
+shared BarycentricInfo s_bary_info[max_supported_objects];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
 
 // Part of mesh data comes from storage buffers, part
@@ -90,16 +88,10 @@ declare_scene_traversal_stack(16);
 // Object and emitter data come from shared memory
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f);
 
 #include <intersect.glsl>
 #include <surface.glsl>
-
-// Define names of scene buffers to replace preproc in brdf.glsl
-// to work around glsl's lack of ssbo argument passing
-#define brdf_buff_objc_info s_objc_info
-#define brdf_buff_bary_info buff_weights.data
-#define brdf_txtr_bary      b_bary_4f
-#define brdf_txtr_spec      b_spec_4f
 #include <brdf.glsl>
 
 // Hardcoded value for now
@@ -108,6 +100,9 @@ vec3 hardcoded_lpos = vec3(10, 10, 10); // 10 * vec3(-1, 1, 1);
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
+  }
+  for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
+    s_bary_info[i] = buff_barycentrics.data[i];
   }
   for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
     s_mesh_info[i] = buff_meshes.data[i];
@@ -166,7 +161,7 @@ bool test_visibility(inout uint state, in SurfaceInfo si) {
   // Mistake; gbuffer normal is not geometric normal!
   // ray.o = gen_offset_p(si, ray.d);
 
-  return !ray_intersect_any(ray);
+  return !scene_intersect_any(ray);
 }
 
 Ray ray_from_sensor(in ivec2 i) {

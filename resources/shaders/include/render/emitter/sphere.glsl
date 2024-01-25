@@ -1,5 +1,5 @@
-#ifndef EMITTER_SPHERE_GLSL_GUARD
-#define EMITTER_SPHERE_GLSL_GUARD
+#ifndef RENDER_EMITTER_SPHERE_GLSL_GUARD
+#define RENDER_EMITTER_SPHERE_GLSL_GUARD
 
 PositionSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   PositionSample ps;
@@ -37,4 +37,4 @@ float pdf_emitter_sphere(in EmitterInfo em, in PositionSample ps) {
   return (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
 }
 
-#endif // EMITTER_SPHERE_GLSL_GUARD
+#endif // RENDER_EMITTER_SPHERE_GLSL_GUARD

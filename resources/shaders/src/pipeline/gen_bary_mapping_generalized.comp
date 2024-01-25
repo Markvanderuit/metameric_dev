@@ -1,5 +1,4 @@
 #include <preamble.glsl>
-#include <guard.glsl>
 #include <bary.glsl>
 #include <color.glsl>
 

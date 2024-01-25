@@ -117,7 +117,6 @@ namespace met {
   class Distribution {
     float              m_func_sum;
     std::vector<float> m_func;
-    std::vector<float> m_pdf;
     std::vector<float> m_cdf;
 
   public:
@@ -125,7 +124,6 @@ namespace met {
 
     Distribution(std::span<const float> values) {
       m_func.assign_range(values);
-      m_pdf.resize(values.size());
       m_cdf.resize(values.size() + 1);
       
       // Scan values to build cdf
@@ -136,9 +134,13 @@ namespace met {
       // Keep sum around
       m_func_sum = m_cdf.back();
 
-      // Normalize cdf
+      // Normalize
+      for (uint i = 0; i < m_func.size(); ++i)
+        m_func[i] /= m_func_sum;
       for (uint i = 1; i < m_cdf.size(); ++i)
-        m_cdf[i] /= m_func_sum;
+        m_cdf[i]  /= m_func_sum;
+
+      fmt::print("func {}\ncdf {}\n", m_func, m_cdf);
     }
 
     float cdf(uint i) const {
@@ -146,7 +148,7 @@ namespace met {
     }
 
     float sum() const {
-      return m_func_sum;  
+      return 1.f / m_func_sum;  
     }
 
     float inv_sum() const {
@@ -154,7 +156,7 @@ namespace met {
     }
 
     size_t size() const {
-      return m_pdf.size();
+      return m_func.size();
     }
 
     uint sample_discrete(float u) const {
@@ -180,7 +182,7 @@ namespace met {
     }
 
     float pdf_discrete(uint i) const {
-      return m_func[i] / m_func_sum;
+      return m_func[i] / static_cast<float>(m_func.size());
     }
 
     float pdf(float sample) const {
@@ -188,9 +190,9 @@ namespace met {
       float a = sample * (m_func.size() - 1) - static_cast<float>(i);
       
       if (a == 0.f) {
-        return pdf_discrete(i);
+        return m_func[i];
       } else {
-        return std::lerp(pdf_discrete(i), pdf_discrete(i + 1), a);
+        return std::lerp(m_func[i], m_func[i + 1], a);
       }
     }
 

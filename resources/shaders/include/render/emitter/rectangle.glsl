@@ -1,7 +1,7 @@
-#ifndef EMITTER_RECT_GLSL_GUARD
-#define EMITTER_RECT_GLSL_GUARD
+#ifndef RENDER_EMITTER_RECTANGLE_GLSL_GUARD
+#define RENDER_EMITTER_RECTANGLE_GLSL_GUARD
 
-PositionSample sample_emitter_rect(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
+PositionSample sample_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   PositionSample ps;
   
   // Sample point on rectangle, with (0, 0) at its center
@@ -21,7 +21,7 @@ PositionSample sample_emitter_rect(in EmitterInfo em, in SurfaceInfo si, in vec2
   return ps;
 }
 
-vec4 eval_emitter_rect(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
+vec4 eval_emitter_rectangle(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
   // If normal is not inclined along the ray, return nothing
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
@@ -33,9 +33,9 @@ vec4 eval_emitter_rect(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
   return v * em.illuminant_scale;
 }
 
-float pdf_emitter_rect(in EmitterInfo em, in PositionSample ps) {
+float pdf_emitter_rectangle(in EmitterInfo em, in PositionSample ps) {
   float dp = max(0.f, dot(ps.d, -ps.n));
   return dp > 0.f ? em.srfc_area_inv * sdot(ps.t) / dp : 0.f;
 }
 
-#endif // EMITTER_RECT_GLSL_GUARD
+#endif // RENDER_EMITTER_RECTANGLE_GLSL_GUARD

@@ -18,6 +18,7 @@ namespace met {
   */
   constexpr static uint max_supported_meshes     = MET_SUPPORTED_MESHES;
   constexpr static uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
+  constexpr static uint max_supported_emitters   = MET_SUPPORTED_EMITTERS;
   constexpr static uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
   constexpr static uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
 

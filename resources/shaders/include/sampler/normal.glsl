@@ -1,7 +1,7 @@
-#ifndef RANDOM_NORMAL_GLSL_GUARD
-#define RANDOM_NORMAL_GLSL_GUARD
+#ifndef SAMPLER_NORMAL_GLSL_GUARD
+#define SAMPLER_NORMAL_GLSL_GUARD
 
-#include <random_uniform.glsl>
+#include <sampler/uniform.glsl>
 
 const float PI                 = 3.1415926538f;
 const float GAUSSIAN_EPSILON   = .0001f;
@@ -33,20 +33,20 @@ vec4 inv_gaussian_cdf(in vec4 x) {
 	return sqrt(sqrt(z * z - y * GAUSSIAN_INV_ALPHA) - z) * sign(x);
 }
 
-float next_1d_normal(inout uint state) {
+float next_1d_normal(inout SamplerState state) {
   return inv_gaussian_cdf(next_1d(state) * 2.f - 1.f);
 }
 
-vec2 next_2d_normal(inout uint state) {
+vec2 next_2d_normal(inout SamplerState state) {
   return inv_gaussian_cdf(next_2d(state) * 2.f - 1.f);
 }
 
-vec3 next_3d_normal(inout uint state) {
+vec3 next_3d_normal(inout SamplerState state) {
   return inv_gaussian_cdf(next_3d(state) * 2.f - 1.f);
 }
 
-vec4 next_4d_normal(inout uint state) {
+vec4 next_4d_normal(inout SamplerState state) {
   return inv_gaussian_cdf(next_4d(state) * 2.f - 1.f);
 }
 
-#endif // RANDOM_NORMAL_GLSL_GUARD
+#endif // SAMPLER_NORMAL_GLSL_GUARD

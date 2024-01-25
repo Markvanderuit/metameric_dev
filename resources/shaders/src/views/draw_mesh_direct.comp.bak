@@ -1,10 +1,9 @@
 #include <preamble.glsl>
-#include <guard.glsl>
 #include <bvh.glsl>
 #include <math.glsl>
-#include <random_uniform.glsl>
+#include <sampler/uniform.glsl>
 #include <spectrum.glsl>
-#include <scene.glsl>
+#include <render/scene.glsl>
 
 // General layout rule declarations
 layout(local_size_x = 16, local_size_y = 16) in;

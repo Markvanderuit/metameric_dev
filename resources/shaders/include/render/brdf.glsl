@@ -1,28 +1,25 @@
 #ifndef BRDF_GLSL_GUARD
 #define BRDF_GLSL_GUARD
 
-// This header requires the following defines to point to SSBOs or shared memory
-// to work around glsl's lack of ssbo argument passing
-// #define brdf_buff_objc_info buff_objc_info.data
-// #define brdf_buff_bary_info buff_weights.data1
-// #define brdf_txtr_bary      b_bary_4f
-// #define brdf_txtr_spec      b_spec_4f
-
 #include <math.glsl>
-#include <record.glsl>
-#include <scene.glsl>
-#include <surface.glsl>
-#include <brdf/null.glsl>
-#include <brdf/diffuse.glsl>
+#include <render/record.glsl>
+#include <render/scene.glsl>
+#include <render/surface.glsl>
+#include <render/brdf/null.glsl>
+#include <render/brdf/diffuse.glsl>
 
 BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls) {
   BRDFInfo brdf;
-  brdf.type = is_object(si) ? BRDFTypeDiffuse : BRDFTypeNull;
+  brdf.type = is_object(si) 
+            ? BRDFTypeDiffuse 
+            : BRDFTypeNull;
 
   if (brdf.type == BRDFTypeDiffuse) {
     init_brdf_diffuse(brdf, si, wvls);
   } else if (brdf.type == BRDFTypeNull) {
-    init_brdf_null(brdf, si, wvls);
+    brdf.type = BRDFTypeDiffuse;
+    brdf.r    = vec4(1);
+    // init_brdf_null(brdf, si, wvls);
   } /* else if (...) {
     // ...
   } */

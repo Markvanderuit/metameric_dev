@@ -196,7 +196,7 @@ namespace met::detail {
 
     // Initialize texture atlas to hold per-object barycentric weights, for
     // fast access during rendering; this is resized when necessary in update()
-    texture_weights = {{ .levels  = 1, .padding = 0 }};
+    texture_barycentrics = {{ .levels  = 1, .padding = 0 }};
   }
 
   void GLPacking<met::Uplifting>::update(std::span<const detail::Component<met::Uplifting>> upliftings, const Scene &scene) {
@@ -206,7 +206,7 @@ namespace met::detail {
     const auto &e_settings = scene.components.settings.value;
     
     // Barycentric texture has not been touched yet
-    scene.components.upliftings.gl.texture_weights.set_invalitated(false);
+    scene.components.upliftings.gl.texture_barycentrics.set_invalitated(false);
 
     // Only rebuild if there are upliftings and objects
     guard(!upliftings.empty() && !e_objects.empty());
@@ -240,14 +240,14 @@ namespace met::detail {
       input = (input.cast<float>() * scaled_4f).max(2.f).cast<uint>().eval();
 
     // Test if the necessitated inputs match exactly to the atlas' reserved patches
-    bool is_exact_fit = rng::equal(inputs, texture_weights.patches(),
+    bool is_exact_fit = rng::equal(inputs, texture_barycentrics.patches(),
       eig::safe_approx_compare<eig::Array2u>, {}, &detail::TextureAtlasBase::PatchLayout::size);
 
     // Regenerate atlas if inputs don't match the atlas' current layout
     // Note; barycentric weights will need a full rebuild, which is detected
     //       by the nr. of objects changing or the texture setting changing. A bit spaghetti.
-    texture_weights.resize(inputs);
-    if (texture_weights.is_invalitated()) {
+    texture_barycentrics.resize(inputs);
+    if (texture_barycentrics.is_invalitated()) {
       // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
       // So in a case of really bad spaghetti-code, we force object-dependent parts of the pipeline 
       // to rerun here. But uhh, code smell much?
@@ -255,7 +255,7 @@ namespace met::detail {
       e_scene.components.objects.set_mutated(true);
 
       fmt::print("Rebuilt texture weights atlas\n");
-      for (const auto &patch : texture_weights.patches()) {
+      for (const auto &patch : texture_barycentrics.patches()) {
         fmt::print("\toffs = {}, size = {}, uv0 = {}, uv1 = {}\n", patch.offs, patch.size, patch.uv0, patch.uv1);
       }
     }
@@ -329,6 +329,26 @@ namespace met::detail {
       emitter_info.flush(sizeof(EmitterInfoLayout), 
                          sizeof(EmitterInfoLayout) * i + sizeof(uint) * 4);
     } // for (uint i)
+
+    // Build sampling distribution over emitter's powers
+    std::vector<float> emitter_distr(max_supported_emitters, 0.f);
+    #pragma omp parallel for
+    for (int i = 0; i < emitters.size(); ++i) {
+      const auto &[emitter, state] = emitters[i];
+      guard_continue(emitter.is_active);
+      Spec s  = scene.resources.illuminants[emitter.illuminant_i].value();
+      emitter_distr[i] = s.sum() * emitter.illuminant_scale;
+    }
+
+    auto distr = Distribution(cnt_span<float>(emitter_distr));
+    auto sampler = PCGSampler(4);
+    for (uint i = 0; i < 10; ++i) {
+      auto sample = distr.sample_discrete(sampler.next_1d());
+      auto pdf    = distr.pdf_discrete(sample);
+      fmt::print("{} -> ({}, {})\n", i, sample, pdf);
+    }
+    
+    emitter_distr_buffer = distr.to_buffer_std140();
   }
 
   GLPacking<met::Mesh>::GLPacking() {
@@ -419,13 +439,13 @@ namespace met::detail {
       std::vector<eig::AlArray3u> elems_packed_al(elems_packed.size());                // Not packed
 
       // Pack mesh/bvh data tightly into pack data vectors
-      // #pragma omp parallel for
+      #pragma omp parallel for
       for (int i = 0; i < meshes.size(); ++i) {
         const auto &bvh  = m_bvhs[i];
         const auto &mesh = m_meshes[i];
 
         // Pack vertex data tightly and copy to the correctly offset range
-        // #pragma omp parallel for
+        #pragma omp parallel for
         for (int j = 0; j < mesh.verts.size(); ++j) {
           auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
           auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
@@ -433,14 +453,13 @@ namespace met::detail {
         }
 
         // Pack node data tightly and copy to the correctly offset range
-        // #pragma omp parallel for
+        #pragma omp parallel for
         for (int j = 0; j < bvh.nodes.size(); ++j) {
           nodes_packed[nodes_offs[i] + j] = pack(bvh.nodes[j]);
         }
 
         // Pack primitive data tightly and copy to the correctly offset range
         // while scattering data into leaf node order for the BVH
-        // #pragma omp parallel for
         #pragma omp parallel for
         for (int j = 0; j < bvh.prims.size(); ++j) {
           // BVH primitives are packed in bvh order

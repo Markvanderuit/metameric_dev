@@ -1,7 +1,7 @@
 #include <preamble.glsl>
-#include <gbuffer.glsl>
-#include <ray.glsl>
-#include <scene.glsl>
+#include <render/gbuffer.glsl>
+#include <render/ray.glsl>
+#include <render/scene.glsl>
 
 // Fragment early-Z declaration
 layout(early_fragment_tests) in;

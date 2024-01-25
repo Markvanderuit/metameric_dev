@@ -1,10 +1,9 @@
 #ifndef GLSL_SURFACE_GUARD
 #define GLSL_SURFACE_GUARD
 
-#include <ray.glsl>
-#include <gbuffer.glsl>
-#include <frame.glsl>
-#include <record.glsl>
+#include <render/ray.glsl>
+#include <render/frame.glsl>
+#include <render/record.glsl>
 
 // An object defining a potential surface intersection in the scene.
 // Is generally the output of ray_intersect(...).
@@ -23,19 +22,12 @@ struct SurfaceInfo {
   uint data;
 };
 
-bool is_valid(in SurfaceInfo si) {
-  return record_is_valid(si.data);
-}
+// Surface type queries
+bool is_valid(in SurfaceInfo si)   { return record_is_valid(si.data); }
+bool is_object(in SurfaceInfo si)  { return record_is_object(si.data); }
+bool is_emitter(in SurfaceInfo si) { return record_is_emitter(si.data); }
 
-bool is_object(in SurfaceInfo si) {
-  return record_is_object(si.data);
-}
-
-bool is_emitter(in SurfaceInfo si) {
-  return record_is_emitter(si.data);
-}
-
-#include <detail/surface.glsl>
+#include <render/detail/surface.glsl>
 
 // Given a ray, and access to the scene's underlying primitive data,
 // generate a SurfaceInfo object

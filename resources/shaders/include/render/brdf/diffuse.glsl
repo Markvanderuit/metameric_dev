@@ -1,7 +1,7 @@
 #ifndef BRDF_DIFFUSE_GLSL_GUARD
 #define BRDF_DIFFUSE_GLSL_GUARD
 
-#include <warp.glsl>
+#include <render/warp.glsl>
 
 // Partial BRDFInfo data, used to front-load some intermediary work
 // for the spectral reflectance data
@@ -14,18 +14,18 @@ PreliminaryDiffuseBRDF init_brdf_diffuse_preliminary(in SurfaceInfo si) {
   PreliminaryDiffuseBRDF pr;
 
   // Load relevant info objects
-  ObjectInfo  object_info = brdf_buff_objc_info[record_get_object(si.data)];
-  AtlasLayout weight_info = brdf_buff_bary_info[record_get_object(si.data)];
+  ObjectInfo      object_info       = scene_object_info(record_get_object(si.data));
+  BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(record_get_object(si.data));
 
   // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
   // also handle single-color objects by sampling the center of their patch
   vec2 tx_si = object_info.is_albedo_sampled ? si.tx : vec2(0.5f);
-  vec3 tx_uv = vec3(weight_info.uv0 + weight_info.uv1 * tx_si, weight_info.layer);
+  vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
 
   pr.index = -1;
-  pr.tx    = vec3(weight_info.uv0 + weight_info.uv1 * tx_si, weight_info.layer);
+  pr.tx    = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
 
-  ivec4 indices = ivec4(textureGather(brdf_txtr_bary, pr.tx, 3));
+  ivec4 indices = ivec4(textureGather(scene_reflectance_barycentrics(), pr.tx, 3));
   if (all(equal(indices, ivec4(indices[0])))) {
     pr.index = indices[0];
   }
@@ -41,13 +41,13 @@ void init_brdf_diffuse(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
     // Hot path; all element indices are the same, so use the one index for texture lookups
 
     // Sample barycentric weights
-    vec4 bary = textureLod(brdf_txtr_bary, pr.tx, 0);
+    vec4 bary = textureLod(scene_reflectance_barycentrics(), pr.tx, 0);
     bary.w    = 1.f - hsum(bary.xyz);
 
     // For each wvls, sample and compute reflectance
     // Reflectance is dot product of barycentrics and reflectances
     for (uint i = 0; i < 4; ++i) {
-      vec4 refl = texture(brdf_txtr_spec, vec2(wvls[i], pr.index));
+      vec4 refl = texture(scene_reflectance_spectra(), vec2(wvls[i], pr.index));
       brdf.r[i] = dot(bary, refl);
     } // for (uint i)
   } else {
@@ -56,21 +56,21 @@ void init_brdf_diffuse(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
     // Cold path; element indices differ. Do costly interpolation manually :(
 
     // Scale up to full texture size
-    vec3  tx       = pr.tx * vec3(textureSize(brdf_txtr_bary, 0).xy, 1) - vec3(0.5, 0.5, 0);
+    vec3  tx       = pr.tx * vec3(textureSize(scene_reflectance_barycentrics(), 0).xy, 1) - vec3(0.5, 0.5, 0);
     ivec3 tx_floor = ivec3(tx);
     vec2  alpha    = mod(tx.xy, 1.f);
     
     mat4 r;
     for (uint i = 0; i < 4; ++i) {
       // Sample barycentric weights
-      vec4 bary   = texelFetch(brdf_txtr_bary, tx_floor + ivec3(tx_offsets[i], 0), 0);
+      vec4 bary   = texelFetch(scene_reflectance_barycentrics(), tx_floor + ivec3(tx_offsets[i], 0), 0);
       uint elem_i = uint(bary.w);
       bary.w      = 1.f - hsum(bary.xyz);
 
       // For each wvls, sample and compute reflectance
       // Reflectance is dot product of barycentrics and reflectances
       for (uint j = 0; j < 4; ++j) {
-        vec4 refl = texture(brdf_txtr_spec, vec2(wvls[j], elem_i));
+        vec4 refl = texture(scene_reflectance_spectra(), vec2(wvls[j], elem_i));
         r[i][j] = dot(bary, refl);
       } // for (uint j)
     } // for (uint i)

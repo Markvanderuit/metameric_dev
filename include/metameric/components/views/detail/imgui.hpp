@@ -57,7 +57,6 @@ namespace ImGui {
   /* Useful shorthands */
 
   void SpacedSeparator();
-
   void CloseAnyPopupIfOpen();
   void CloseAllPopupsIfOpen();
 

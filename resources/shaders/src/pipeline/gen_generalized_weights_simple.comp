@@ -1,5 +1,4 @@
 #include <preamble.glsl>
-#include <guard.glsl>
 #include <math.glsl>
 #include <bary.glsl>
 

@@ -32,8 +32,8 @@ namespace met {
       // Spawn view of weight atlas interiors
       if (ImGui::Begin("Bary atlas")) {
         const auto &e_bary_data = e_scene.components.upliftings.gl;
-        for (uint i = 0; i < e_bary_data.texture_weights.capacity().z(); ++i) {
-          const auto &view = e_bary_data.texture_weights.view(i, 0);
+        for (uint i = 0; i < e_bary_data.texture_barycentrics.capacity().z(); ++i) {
+          const auto &view = e_bary_data.texture_barycentrics.view(i, 0);
           ImGui::Image(ImGui::to_ptr(view.object()), { 256, 256 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
         }
       }

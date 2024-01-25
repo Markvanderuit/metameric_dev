@@ -119,8 +119,8 @@ namespace met {
     m_program.bind("b_buff_state",     m_state_buffer);
     m_program.bind("b_target_4f",      i_target);
     m_program.bind("b_gbuffer",        e_gbuffer.film());
-    m_program.bind("b_buff_weights",   e_scene.components.upliftings.gl.texture_weights.buffer());
-    m_program.bind("b_bary_4f",        e_scene.components.upliftings.gl.texture_weights.texture());
+    m_program.bind("b_buff_weights",   e_scene.components.upliftings.gl.texture_barycentrics.buffer());
+    m_program.bind("b_bary_4f",        e_scene.components.upliftings.gl.texture_barycentrics.texture());
     m_program.bind("b_spec_4f",        e_scene.components.upliftings.gl.texture_spectra);
     m_program.bind("b_buff_objects",   e_scene.components.objects.gl.object_info);
     m_program.bind("b_cmfs_3f",        e_scene.resources.observers.gl.cmfs_texture);

@@ -2,20 +2,20 @@
 #define EMITTER_GLSL_GUARD
 
 #include <math.glsl>
-#include <ray.glsl>
-#include <frame.glsl>
-#include <warp.glsl>
-#include <scene.glsl>
-#include <emitter/sphere.glsl>
-#include <emitter/rect.glsl>
-#include <emitter/point.glsl>
-#include <emitter/constant.glsl>
+#include <render/ray.glsl>
+#include <render/frame.glsl>
+#include <render/warp.glsl>
+#include <render/scene.glsl>
+#include <render/emitter/sphere.glsl>
+#include <render/emitter/rectangle.glsl>
+#include <render/emitter/point.glsl>
+#include <render/emitter/constant.glsl>
 
 PositionSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   if (em.type == EmitterTypeSphere) {
     return sample_emitter_sphere(em, si, sample_2d);
-  } else if (em.type == EmitterTypeRect) {
-    return sample_emitter_rect(em, si, sample_2d);
+  } else if (em.type == EmitterTypeRectangle) {
+    return sample_emitter_rectangle(em, si, sample_2d);
   } else if (em.type == EmitterTypePoint) {
     return sample_emitter_point(em, si, sample_2d);
   } else if (em.type == EmitterTypeConstant) {
@@ -30,8 +30,8 @@ PositionSample sample_emitter(in SurfaceInfo si, in uint emitter_i, in vec2 samp
 vec4 eval_emitter(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
   if (em.type == EmitterTypeSphere) {
     return eval_emitter_sphere(em, ps, wvls);
-  } else if (em.type == EmitterTypeRect) {
-    return eval_emitter_rect(em, ps, wvls);
+  } else if (em.type == EmitterTypeRectangle) {
+    return eval_emitter_rectangle(em, ps, wvls);
   } else if (em.type == EmitterTypePoint) {
     return eval_emitter_point(em, ps, wvls);
   } else if (em.type == EmitterTypeConstant) {
@@ -48,8 +48,8 @@ vec4 eval_emitter(in PositionSample ps, in vec4 wvls) {
 float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
   if (em.type == EmitterTypeSphere) {
     return pdf_emitter_sphere(em, ps);
-  } else if (em.type == EmitterTypeRect) {
-    return pdf_emitter_rect(em, ps);
+  } else if (em.type == EmitterTypeRectangle) {
+    return pdf_emitter_rectangle(em, ps);
   } else if (em.type == EmitterTypePoint) {
     return pdf_emitter_point(em, ps);
   } else {
@@ -64,20 +64,22 @@ float pdf_emitter(in PositionSample ps) {
 }
 
 PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {
-  // TODO pick emitter from distribution
-  float emitter_sample = sample_3d.z;
-  uint  emitter_i      = 0;
-  float emitter_pdf    = 1.f;
+  // Sample emitter from power distribution
+  DistributionSampleDiscrete ds = sample_emitters_discrete(sample_3d.z);
+  ds.pdf /= float(max_supported_emitters);
+
+  // Sample position on emitter surface
+  PositionSample ps = sample_emitter(s_emtr_info[ds.i], si, sample_3d.xy);
+  record_set_emitter(ps.data, ds.i);
+  ps.pdf *= ds.pdf;
   
-  PositionSample ps = sample_emitter(s_emtr_info[emitter_i], si, sample_3d.xy);
-  record_set_emitter(ps.data, emitter_i);
-  ps.pdf *= emitter_pdf;
   return ps;
 }
 
 float pdf_emitters(in PositionSample ps) {
-  // TODO Multiply against emitter pdf from distribution
-  return pdf_emitter(ps) * 1.f;
+  float pdf = pdf_emitter(ps);
+  pdf *= pdf_emitters_discrete(record_get_emitter(ps.data)) / float(max_supported_emitters);
+  return pdf;
 }
 
 #endif // EMITTER_GLSL_GUARD

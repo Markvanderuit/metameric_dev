@@ -7,6 +7,10 @@
 #define version(num, type)   wrap_symbol(hash_symbol)version num type
 #define include(file_path)   wrap_symbol(hash_symbol)include file_path
 
+#define guard(expr)          if (!(expr)) { return; }
+#define guard_continue(expr) if (!(expr)) { continue; }
+#define guard_break(expr)    if (!(expr)) { break; }
+
 version(460, core)
 
 #endif // PREAMBLE_GLSL_GUARD

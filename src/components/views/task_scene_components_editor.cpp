@@ -91,6 +91,17 @@ namespace met {
       }
 
       if (open_section) {
+        // Name editor
+        std::string str = component.name;
+        constexpr auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue;
+        if (ImGui::InputText("Name", &str, str_edit_flags)) {
+          info.global("scene").getw<Scene>().touch({
+            .name = "Modify emitter name",
+            .redo = [i = i, str = str           ](auto &scene) { scene.components.emitters[i].name = str; },
+            .undo = [i = i, str = component.name](auto &scene) { scene.components.emitters[i].name = str; }
+          });
+        }
+        
         // Object mesh/uplifting selection
         detail::fun_resource_selector("Uplifting", e_upliftings, object.uplifting_i);
         detail::fun_resource_selector("Mesh", e_meshes, object.mesh_i);
@@ -105,7 +116,14 @@ namespace met {
         ImGui::Separator();
 
         // Diffuse section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+        if (object.diffuse.index() == 0) {
+          ImGui::ColorEdit3("##diffuse_value", std::get<0>(object.diffuse).data());
+        } else {
+          detail::fun_resource_selector("##diffuse_texture", e_images, std::get<1>(object.diffuse));
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
         if (ImGui::BeginCombo("##diffuse_data", "Diffuse")) {
           if (ImGui::Selectable("Value", object.diffuse.index() == 0))
             object.diffuse.emplace<0>(Colr(1));
@@ -113,64 +131,57 @@ namespace met {
             object.diffuse.emplace<1>(0u);
           ImGui::EndCombo();
         } // If (BeginCombo)
+        
+        /* // Roughess section
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+        if (object.roughness.index() == 0) {
+          ImGui::SliderFloat("##roughness_value", &std::get<0>(object.roughness), 0.f, 1.f);
+        } else {
+          detail::fun_resource_selector("##roughness_texture", e_images, std::get<1>(object.roughness));
+        }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (object.diffuse.index() == 0) {
-          ImGui::ColorEdit3("##diffuse_value", std::get<0>(object.diffuse).data());
-        } else {
-          detail::fun_resource_selector("##diffuse_texture", e_images, std::get<1>(object.diffuse));
-        }
-        
-        // Roughess section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25);
         if (ImGui::BeginCombo("##roughness_data", "Roughness")) {
           if (ImGui::Selectable("Value", object.roughness.index() == 0))
             object.roughness.emplace<0>(0.f);
           if (ImGui::Selectable("Texture", object.roughness.index() == 1))
             object.roughness.emplace<1>(0u);
           ImGui::EndCombo();
-        } // If (BeginCombo)
+        } // If (BeginCombo) */
+
+        /* // Metallic section
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+        if (object.metallic.index() == 0) {
+          ImGui::SliderFloat("##metallic_value", &std::get<0>(object.metallic), 0.f, 1.f);
+        } else {
+          detail::fun_resource_selector("##metallic_texture", e_images, std::get<1>(object.metallic));
+        }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (object.roughness.index() == 0) {
-          ImGui::SliderFloat("##roughness_value", &std::get<0>(object.roughness), 0.f, 1.f);
-        } else {
-          detail::fun_resource_selector("##roughness_texture", e_images, std::get<1>(object.roughness));
-        }
-        
-        // Metallic section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25);
         if (ImGui::BeginCombo("##metallic_data", "Metallic")) {
           if (ImGui::Selectable("Value", object.metallic.index() == 0))
             object.roughness.emplace<0>(0.f);
           if (ImGui::Selectable("Texture", object.metallic.index() == 1))
             object.metallic.emplace<1>(0u);
           ImGui::EndCombo();
-        } // If (BeginCombo)
+        } // If (BeginCombo) */
+
+       /*  // Opacity section
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+        if (object.opacity.index() == 0) {
+          ImGui::SliderFloat("##opacity_value", &std::get<0>(object.opacity), 0.f, 1.f);
+        } else {
+          detail::fun_resource_selector("##opacity_texture", e_images, std::get<1>(object.opacity));
+        }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (object.metallic.index() == 0) {
-          ImGui::SliderFloat("##metallic_value", &std::get<0>(object.metallic), 0.f, 1.f);
-        } else {
-          detail::fun_resource_selector("##metallic_texture", e_images, std::get<1>(object.metallic));
-        }
-        
-        // Opacity section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25);
         if (ImGui::BeginCombo("##opacity_data", "Opacity")) {
           if (ImGui::Selectable("Value", object.opacity.index() == 0))
             object.roughness.emplace<0>(0.f);
           if (ImGui::Selectable("Texture", object.opacity.index() == 1))
             object.opacity.emplace<1>(0u);
           ImGui::EndCombo();
-        } // If (BeginCombo)
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (object.opacity.index() == 0) {
-          ImGui::SliderFloat("##opacity_value", &std::get<0>(object.opacity), 0.f, 1.f);
-        } else {
-          detail::fun_resource_selector("##opacity_texture", e_images, std::get<1>(object.opacity));
-        }
+        } // If (BeginCombo) */
         
         ImGui::TreePop();
       } // if (open_section)
@@ -186,6 +197,21 @@ namespace met {
 
       ImGui::PopID();
     } // for (uint i)
+
+    // Handle additions to emitters
+    {
+      if (!e_objects.empty())
+        ImGui::Separator();
+      ImGui::NewLine();
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
+      if (ImGui::SmallButton("Add")) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Add object",
+          .redo = [](auto &scene) { scene.components.objects.push("Object", { });                        },
+          .undo = [](auto &scene) { scene.components.objects.erase(scene.components.objects.size() - 1); }
+        });
+      }
+    }
     
     ImGui::PopID();
   }
@@ -230,6 +256,17 @@ namespace met {
       }
 
       if (open_section) {
+        // Name editor
+        std::string str = component.name;
+        constexpr auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue;
+        if (ImGui::InputText("Name", &str, str_edit_flags)) {
+          info.global("scene").getw<Scene>().touch({
+            .name = "Modify emitter name",
+            .redo = [i = i, str = str           ](auto &scene) { scene.components.emitters[i].name = str; },
+            .undo = [i = i, str = component.name](auto &scene) { scene.components.emitters[i].name = str; }
+          });
+        }
+
         // Type selector
         {
           auto curr_name = detail::str_from_emitter_type(emitter.type);
@@ -260,7 +297,7 @@ namespace met {
         ImGui::Separator();
 
         detail::fun_resource_selector("Illuminant", e_illuminants, emitter.illuminant_i);
-        ImGui::SliderFloat("Power", &emitter.illuminant_scale, 0.f, 10.f);
+        ImGui::DragFloat("Power", &emitter.illuminant_scale, 0.1f, 0.0f, 100.f);
 
         ImGui::TreePop();
       } // if (open_section)
@@ -276,7 +313,22 @@ namespace met {
 
       ImGui::PopID();
     } // for (uint i)
-    
+
+    // Handle additions to emitters
+    {
+      if (!e_emitters.empty())
+        ImGui::Separator();
+      ImGui::NewLine();
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
+      if (ImGui::SmallButton("Add")) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Add emitter",
+          .redo = [](auto &scene) { scene.components.emitters.push("Emitter, D65", { });                    },
+          .undo = [](auto &scene) { scene.components.emitters.erase(scene.components.emitters.size() - 1); }
+        });
+      }
+    }
+
     ImGui::PopID();
   }
     

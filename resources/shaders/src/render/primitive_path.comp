@@ -1,12 +1,9 @@
 #include <preamble.glsl>
-#include <guard.glsl>
-#include <bvh.glsl>
-#include <gbuffer.glsl>
 #include <distribution.glsl>
-#include <math.glsl>
-#include <random_uniform.glsl>
 #include <spectrum.glsl>
-#include <scene.glsl>
+#include <math.glsl>
+#include <sampler/uniform.glsl>
+#include <render/scene.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
@@ -25,8 +22,8 @@ layout(binding = 0) uniform b_buff_sensor {
   uvec2 film_size; 
 } buff_sensor;
 layout(binding = 1) uniform b_buff_query {
-  vec3 origin;    uint p0;
-  vec3 direction; uint p1;
+  vec3 origin;    /* padd to 16 bytes */ uint p0;
+  vec3 direction; /* padd to 16 bytes */ uint p1;
   uint n_paths; 
 } buff_query;
 layout(binding = 2) uniform b_buff_sampler_state {
@@ -48,107 +45,68 @@ layout(binding = 6) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[max_supported_objects];
 } buff_emitters;
-layout(binding = 7) uniform b_buff_wvls_distr {
+layout(binding = 7) restrict readonly buffer b_buff_barycentrics {
+  BarycentricInfo data[max_supported_objects];
+} buff_barycentrics;
+layout(binding = 8) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
-
+layout(binding = 9) uniform b_buff_emitters_distr {
+  float func_sum;
+  float func[max_supported_emitters];
+  float cdf[max_supported_emitters + 1];
+} buff_emitters_distr;
 
 // Storage buffer declarations
-layout(binding = 0) restrict readonly buffer b_buff_bvhs_node {
-  BVHNodePack data[];
-} buff_bvhs_node;
-layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim {
-  BVHPrimPack data[];
-} buff_bvhs_prim;
-layout(binding = 2) restrict readonly buffer b_buff_mesh_vert {
-  BVHVertPack data[];
-} buff_mesh_vert;
-layout(binding = 3) restrict readonly buffer b_buff_mesh_elem {
-  uvec3 data[];
-} buff_mesh_elem;
-layout(binding = 4) restrict readonly buffer b_buff_weights {
-  AtlasLayout data[max_supported_objects];
-} buff_weights;
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 2) restrict readonly buffer b_buff_mesh_vert { MeshVertPack data[]; } buff_mesh_vert;
+layout(binding = 3) restrict readonly buffer b_buff_mesh_elem { uvec3        data[]; } buff_mesh_elem;
 
-// Texture unit, ergo sampler declarations
-layout(binding = 0) uniform sampler2DArray b_txtr_1f; // Alpha texture atlas
-layout(binding = 1) uniform sampler2DArray b_txtr_3f; // RGB texture atlas
-layout(binding = 2) uniform sampler2DArray b_bary_4f; // Uplifting weight atlas
-layout(binding = 3) uniform sampler1DArray b_spec_4f; // Uplifting spectral atlas
-layout(binding = 4) uniform sampler1DArray b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 5) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
-
-// TODO wait this is allowed?!?!?!
-// Shiiiiiit
-sampler2DArray test_func(in sampler2DArray txtr) {
-  return txtr;
-}
-
-// Image unit, output declaration
-layout(binding = 0, rgba32f) uniform restrict image2D b_film;
+// Texture/image units, ergo samplers and output images
+layout(binding = 0)          uniform sampler2DArray   b_txtr_1f; // Alpha texture atlas
+layout(binding = 1)          uniform sampler2DArray   b_txtr_3f; // RGB texture atlas
+layout(binding = 2)          uniform sampler2DArray   b_bary_4f; // Uplifting weight atlas
+layout(binding = 3)          uniform sampler1DArray   b_spec_4f; // Uplifting spectral atlas
+layout(binding = 4)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 5)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
 // Shared memory declarations
-shared ObjectInfo  s_objc_info[max_supported_objects];
-shared EmitterInfo s_emtr_info[max_supported_objects];
-shared MeshInfo    s_mesh_info[max_supported_meshes];
+shared ObjectInfo      s_objc_info[max_supported_objects];
+shared EmitterInfo     s_emtr_info[max_supported_objects];
+shared BarycentricInfo s_bary_info[max_supported_objects];
+shared MeshInfo        s_mesh_info[max_supported_meshes];
 
-// Declare wavelength sampling distribution
-declare_distr_sampler(wavelength, buff_wvls_distr)
-
-// Part of mesh data comes from storage buffers, part
-// comes from shared memory
-declare_scene_mesh_data(buff_mesh_vert.data, 
-                        buff_mesh_elem.data, 
-                        buff_bvhs_prim.data, 
-                        buff_bvhs_node.data,
-                        s_mesh_info, buff_meshes.n);
-
-// Traversal stack lives in shared memory, depth 16
-declare_scene_traversal_stack(16);
-
-// Object and emitter data come from shared memory
+// Traversal stack lives in shared memory
+// Object and emitter data comes from shared memory
+// Texture data comes from uniform buffers and samplers
+// Wavelength/emitter sampling distributions draw from uniform buffers
+// Part of mesh data comes from storage buffers, part from shared memory
+declare_scene_traversal_stack(8); 
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f);
+declare_scene_mesh_data(buff_mesh_vert.data, buff_mesh_elem.data, 
+                        buff_bvhs_prim.data, buff_bvhs_node.data,
+                        s_mesh_info, buff_meshes.n);
+declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
+declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)
 
-#include <surface.glsl>
-#include <intersect.glsl>
-#include <emitter.glsl>
-
-// Define names of scene buffers to replace preproc in brdf.glsl
-// to work around glsl's lack of ssbo argument passing
-#define brdf_buff_objc_info s_objc_info
-#define brdf_buff_bary_info buff_weights.data
-#define brdf_txtr_bary      b_bary_4f
-#define brdf_txtr_spec      b_spec_4f
-#include <brdf.glsl>
-
-// ////
-
-#define scene_buff_mesh_vert  buff_mesh_vert.data
-#define scene_buff_mesh_elem  buff_mesh_elem.data
-#define scene_buff_mesh_prim  buff_bvhs_prim.data
-#define scene_buff_mesh_node  buff_bvhs_node.data
-
-#define scene_buff_mesh_info  s_mesh_info
-#define scene_buff_mesh_count buff_meshes.n
-
-#define scene_buff_emtr_info  s_emtr_info
-#define scene_buff_emtr_count buff_emitters.n
-
-#define scene_buff_objc_info  s_objc_info
-#define scene_buff_objc_count buff_objects.n
-
-#define scene_buff_bary_info  buff_weights.data
-#define scene_buff_bary_txtr  b_bary_4f
-#define scene_buff_wvls_distr b_spec_4f
-#define scene_buff_spec_txtr  b_spec_4f
-// #define scene_buff_emtr_distr  b_spec_4f
+// The following includes rely on above buffers/samplers and are included last
+#include <render/brdf.glsl>
+#include <render/emitter.glsl>
+#include <render/intersect.glsl>
+#include <render/surface.glsl>
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
     s_objc_info[i] = buff_objects.data[i];
+  }
+  for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
+    s_bary_info[i] = buff_barycentrics.data[i];
   }
   for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
     s_mesh_info[i] = buff_meshes.data[i];
@@ -160,12 +118,12 @@ void load_shared() {
   barrier();
 }
 
-uint load_state() {
+SamplerState load_state(uint spp_iter) {
   // Initial sample state is seeded from pixel index, and rotated by multiplication
   uint invoc_state = 1 
                    + gl_GlobalInvocationID.x 
                    + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-  return invoc_state * (1 + buff_sampler_state.spp_curr);
+  return invoc_state * (1 + buff_sampler_state.spp_curr + spp_iter);
 }
 
 vec3 sample_colsys(in uint colsys_i, in float wvl) {
@@ -219,7 +177,7 @@ float mis_power(in float pdf_a, in float pdf_b) {
 }
 
 // Sample radiance along ray and wavelengths
-vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
+vec4 Li(in Ray ray, in vec4 wvls, in SamplerState ss) {
   // Path throughput information; we track 4 wavelengths simultaneously
   vec4  radiance        = vec4(0.f);
   vec4  throughput      = vec4(1.f);
@@ -229,7 +187,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
     // If the ray misses, terminate current path
-    if (!ray_intersect(ray))
+    if (!scene_intersect(ray))
       break;
 
     // If no surface object is visible, terminate current path
@@ -246,8 +204,6 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
       float weight   = mis_power(prev_bsdf_pdf, emtr_pdf);
       
       radiance += throughput * L * weight;
-
-      break;
     }
 
     // Sample BRDF at position
@@ -255,19 +211,18 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
     
     // Direct illumination sampling;
     {
-      // Generate emitter sample position, and ray towards position,
-      // and then evaluate BRDF along that ray
-      PositionSample ps       = sample_emitters(si, next_3d(state));
+      // Generate position sample on emitter
+      PositionSample ps       = sample_emitters(si, next_3d(ss));
       float          bsdf_pdf = pdf_brdf(brdf, si, ps.d);
       
-      // If the sample position has potential throughput, evaluate a ray towards
-      // the position  
+      // If the sample position has potential throughput, 
+      // evaluate a ray towards the position  
       if (ps.pdf != 0.f && bsdf_pdf != 0.f && dot(ps.d, si.sh.n) > 0.f) {
         Ray ray = ray_towards_point(si, ps.p);
-        if (!ray_intersect_any(ray)) {
+        if (!scene_intersect_any(ray)) {
           // On a success, add contribution to path
-          vec4  L = eval_emitter(ps, wvls) / ps.pdf;
-          vec4  f = eval_brdf(brdf, si, ps.d);
+          vec4 L = eval_emitter(ps, wvls) / ps.pdf;
+          vec4 f = eval_brdf(brdf, si, ps.d);
 
           float weight = mis_power(ps.pdf, prev_bsdf_pdf * bsdf_pdf);
           radiance    += throughput * f * L * weight;
@@ -277,12 +232,12 @@ vec4 Li(in Ray ray, in vec4 wvls, in uint state, inout vec3 debug_color) {
 
     // BRDF sampling; 
     {
-      BRDFSample bs = sample_brdf(brdf, next_2d(state), si);
+      BRDFSample bs = sample_brdf(brdf, next_2d(ss), si);
       if (bs.pdf == 0.f)
         break;
       
       // Update throughput
-      throughput     *= bs.f;
+      throughput *= bs.f;
       if (all(iszero(throughput)))
         break;
 
@@ -311,57 +266,49 @@ void main() {
     guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
   }
 
-  // Initialize sampler state
-  uint state = load_state();
+  vec3 output_color = vec3(0);
+  for (uint spp_iter = 0; spp_iter < buff_sampler_state.spp_per_iter; ++spp_iter) {
+    // Initialize sampler state
+    SamplerState ss = load_state(spp_iter);
 
-  // Generate initial sensor/query ray
-  Ray ray = is_query
-          ? ray_from_query()
-          : ray_from_sensor(ivec2(gl_GlobalInvocationID.xy), next_2d(state));
+    // Generate ray/wavelength samples
+    vec2  ray_sample = next_2d(ss);
+    float wvl_sample = next_1d(ss);
 
-  // Generate path wavelengths
-  float wvl_sample = next_1d(state);
-  vec4 wvls, wvl_pdfs;
-  for (uint i = 0; i < 4; ++i) {
-    // Pass stratified wavelength sample through inverse cdf
-    float wvl_rotated = rotate_sample_1d(wvl_sample, i, 4);
-    DistributionSample ds = sample_wavelength(wvl_rotated);
-    wvls[i]     = ds.f;
-    wvl_pdfs[i] = ds.pdf;
+    // Generate sensor/query ray
+    Ray ray = is_query
+            ? ray_from_query()
+            : ray_from_sensor(ivec2(gl_GlobalInvocationID.xy), ray_sample);
 
-    // Naive alternative
-    // wvls[i]     = next_1d(state);
-    // wvl_pdfs[i] = 1.f;
+    // Generate wavelengths; stratified sample passed through inverse cdf
+    vec4 wvls, wvls_pdfs;
+    for (uint i = 0; i < 4; ++i) {
+      // Pass stratified wavelength sample through inverse cdf
+      DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(wvl_sample, i, 4));
+      wvls[i]      = ds.f;
+      wvls_pdfs[i] = ds.pdf;
+    }
 
-    // Fixed wavelength
-    // wvls[i]     = 0.2;
-    // wvl_pdfs[i] = 1.f;
-  }
+    // Sample incident radiance along ray for given wavelengths
+    vec4 L = Li(ray, wvls, ss) / wvls_pdfs;
 
-  // Evaluate ray/wavelength pair
-  vec3 debug_color = vec3(0);
-  vec4 L = Li(ray, wvls, state, debug_color) / wvl_pdfs;
+    // Integrate over color system and add to output color
+    output_color += sample_colsys(0, wvls) * L;
+  } // for (uint spp_iter)
 
   // Store output
   if (is_query) {
     // ...
   } else {
-    // Integrate radiance over color system to get color
-    vec3 value = sample_colsys(0, wvls) * L;
-    
     // Add prior accumulated average from image
     if (buff_sampler_state.spp_curr > 0) {
-      vec3 prev = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
-      value = prev
-            + (value - prev)
+      vec3 prev_color = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
+      output_color = prev_color
+            + (output_color - prev_color)
             / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
     }
-
-    // TODO remove
-    if (any(notEqual(debug_color, vec3(0))))
-      value = debug_color;
     
     // Store updated image value and sample state
-    imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(value, 1));
+    imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(output_color, 1));
   }
 }

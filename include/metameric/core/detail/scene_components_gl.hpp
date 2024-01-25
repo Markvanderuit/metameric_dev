@@ -71,13 +71,16 @@ namespace met::detail {
     // This buffer stores one instance of EmitterInfoLayout per emitter component
     gl::Buffer emitter_info;
 
+    // Sampling distribution based on each emitter's individual power output
+    gl::Buffer emitter_distr_buffer;
+
     GLPacking();
     void update(std::span<const detail::Component<met::Emitter>>, const Scene &);
   };
 
   // GL-side uplifting data
   // Handles gl-side uplifted texture data, though on a per-object basis. Most
-  // contents of .texture_weights and .texture_spectra are filled in by the
+  // contents of .texture_barycentrics and .texture_spectra are filled in by the
   // uplifting pipeline, which is part of the program pipeline 
   template <>
   class GLPacking<met::Uplifting> {
@@ -87,7 +90,7 @@ namespace met::detail {
   public:
     // Atlas texture; each per-object texture stored in this atlas holds barycentric
     // weights and an index, referring to one set of four spectra in `texture_spectra`
-    atlas_type texture_weights;
+    atlas_type texture_barycentrics;
 
     // Array texture; each layer holds one set of four spectra, packed together s.t.
     // one texture sample equates four reflectances at a single wavelength

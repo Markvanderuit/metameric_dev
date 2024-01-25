@@ -4,6 +4,7 @@
 // Define metameric's scene layout
 const uint max_supported_meshes     = MET_SUPPORTED_MESHES;
 const uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
+const uint max_supported_emitters   = MET_SUPPORTED_EMITTERS;
 const uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
 const uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
 
@@ -51,6 +52,15 @@ struct TextureInfo {
   vec2  uv1;   // Maximum uv value, at region's pixel offset + size
 };
 
+// Texture atlas access info for the barycentric weights atlas
+struct BarycentricInfo {
+  uint  layer;  // layer in texture array in which a barycentric weight patch is located
+  uvec2 offs;   // offset in pixels to texture's region storing this patch
+  uvec2 size;   // size in pixels of texture's region storing this patch
+  vec2  uv0;    // Minimum uv value, at region's offset
+  vec2  uv1;    // Maximum uv value, at region's offset + size
+};
+
 // Atlas access info
 struct AtlasLayout {
   uint  layer;  // layer in texture array in which the patch is located
@@ -60,10 +70,10 @@ struct AtlasLayout {
   vec2  uv1;    // Maximum uv value, at region's offset + size
 };
 
-#define EmitterTypeConstant 0
-#define EmitterTypePoint    1
-#define EmitterTypeSphere   2
-#define EmitterTypeRect     3
+#define EmitterTypeConstant  0
+#define EmitterTypePoint     1
+#define EmitterTypeSphere    2
+#define EmitterTypeRectangle 3
 
 // Info object to gather Scene::Emitter data
 // Given the lack of unions, emitters store additional data
@@ -95,7 +105,7 @@ struct BRDFInfo {
   vec4 r;    // Surface albedo for four wavelengths
 };
 
-// Loader code
-#include <detail/scene.glsl>
+// Loader code gets included last
+#include <render/detail/scene.glsl>
 
 #endif // SCENE_GLSL_GUARD

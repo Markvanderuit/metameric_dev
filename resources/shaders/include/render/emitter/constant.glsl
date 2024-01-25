@@ -1,5 +1,5 @@
-#ifndef EMITTER_CONSTANT_GLSL_GUARD
-#define EMITTER_CONSTANT_GLSL_GUARD
+#ifndef RENDER_EMITTER_CONSTANT_GLSL_GUARD
+#define RENDER_EMITTER_CONSTANT_GLSL_GUARD
 
 PositionSample sample_emitter_constant(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   PositionSample ps;
@@ -18,4 +18,4 @@ float pdf_emitter_constant(in EmitterInfo em, in PositionSample ps) {
   return 0.f;
 }
 
-#endif // EMITTER_CONSTANT_GLSL_GUARD
+#endif // RENDER_EMITTER_CONSTANT_GLSL_GUARD

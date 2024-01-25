@@ -52,7 +52,7 @@ namespace met {
     const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
 
     // Target texture here is gl-side
-    const auto &e_barycentrics = e_scene.components.upliftings.gl.texture_weights;
+    const auto &e_barycentrics = e_scene.components.upliftings.gl.texture_barycentrics;
 
     // Get external resources from object's corresponding, selected uplifting
     // An object has only one uplifting structure associated to it,
