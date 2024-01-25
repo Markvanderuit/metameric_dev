@@ -2,8 +2,8 @@
 #include <distribution.glsl>
 #include <spectrum.glsl>
 #include <math.glsl>
-#include <sampler/uniform.glsl>
 #include <render/scene.glsl>
+#include <sampler/uniform.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
@@ -100,6 +100,8 @@ declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)
 #include <render/emitter.glsl>
 #include <render/intersect.glsl>
 #include <render/surface.glsl>
+#include <render/sensor.glsl>
+#include <render/integration.glsl>
 
 void load_shared() {
   for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
@@ -162,100 +164,6 @@ Ray ray_from_query() {
   return init_ray(buff_query.origin, buff_query.direction);
 }
 
-float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {
-  return mod(sample_1d + float(i) / float(n), 1.f);
-}
-
-float mis_balance(in float pdf_a, in float pdf_b) {
-  return pdf_a / (pdf_a + pdf_b);
-}
-
-float mis_power(in float pdf_a, in float pdf_b) {
-  pdf_a *= pdf_a;
-  pdf_b *= pdf_b;
-  return pdf_a / (pdf_a + pdf_b);
-}
-
-// Sample radiance along ray and wavelengths
-vec4 Li(in Ray ray, in vec4 wvls, in SamplerState ss) {
-  // Path throughput information; we track 4 wavelengths simultaneously
-  vec4  radiance        = vec4(0.f);
-  vec4  throughput      = vec4(1.f);
-  float prev_bsdf_pdf   = 1.f;
-  bool  prev_bsdf_delta = true;
-  
-  // Iterate up to maximum depth
-  for (uint depth = 0; depth < max_depth; ++depth) {
-    // If the ray misses, terminate current path
-    if (!scene_intersect(ray))
-      break;
-
-    // If no surface object is visible, terminate current path
-    SurfaceInfo si = get_surface_info(ray);
-    if (!is_valid(si))
-      break;
-
-    // If an emissive object is hit directly, add contribution to path
-    if (is_emitter(si)) {
-      PositionSample ps = get_position_sample(si);
-      vec4           L  = eval_emitter(ps, wvls);
-
-      float emtr_pdf = prev_bsdf_delta ? 0.f : pdf_emitters(ps);
-      float weight   = mis_power(prev_bsdf_pdf, emtr_pdf);
-      
-      radiance += throughput * L * weight;
-    }
-
-    // Sample BRDF at position
-    BRDFInfo brdf = get_brdf(si, wvls);
-    
-    // Direct illumination sampling;
-    {
-      // Generate position sample on emitter
-      PositionSample ps       = sample_emitters(si, next_3d(ss));
-      float          bsdf_pdf = pdf_brdf(brdf, si, ps.d);
-      
-      // If the sample position has potential throughput, 
-      // evaluate a ray towards the position  
-      if (ps.pdf != 0.f && bsdf_pdf != 0.f && dot(ps.d, si.sh.n) > 0.f) {
-        Ray ray = ray_towards_point(si, ps.p);
-        if (!scene_intersect_any(ray)) {
-          // On a success, add contribution to path
-          vec4 L = eval_emitter(ps, wvls) / ps.pdf;
-          vec4 f = eval_brdf(brdf, si, ps.d);
-
-          float weight = mis_power(ps.pdf, prev_bsdf_pdf * bsdf_pdf);
-          radiance    += throughput * f * L * weight;
-        }
-      }
-    }
-
-    // BRDF sampling; 
-    {
-      BRDFSample bs = sample_brdf(brdf, next_2d(ss), si);
-      if (bs.pdf == 0.f)
-        break;
-      
-      // Update throughput
-      throughput *= bs.f;
-      if (all(iszero(throughput)))
-        break;
-
-      // Store previous BRDF information for MIS
-      prev_bsdf_pdf   = bs.pdf;
-      prev_bsdf_delta = bs.is_delta;
-
-      // Generate next scene ray
-      ray = ray_towards_direction(si, bs.wo);
-    }
-
-    // TODO RR goes here
-    // ...
-  } // for (uint depth)
-
-  return radiance;
-}
-
 void main() {
   load_shared();
 
@@ -266,34 +174,19 @@ void main() {
     guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
   }
 
+  // Load sensor data
+  Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
+
+  // Take a number of pixel samples
   vec3 output_color = vec3(0);
   for (uint spp_iter = 0; spp_iter < buff_sampler_state.spp_per_iter; ++spp_iter) {
-    // Initialize sampler state
-    SamplerState ss = load_state(spp_iter);
+    // Initialize sampler and generate sensor sample
+    SamplerState state         = load_state(spp_iter);
+    SensorSample sensor_sample = sample_sensor(sensor, ivec2(gl_GlobalInvocationID.xy), next_3d(state));
 
-    // Generate ray/wavelength samples
-    vec2  ray_sample = next_2d(ss);
-    float wvl_sample = next_1d(ss);
-
-    // Generate sensor/query ray
-    Ray ray = is_query
-            ? ray_from_query()
-            : ray_from_sensor(ivec2(gl_GlobalInvocationID.xy), ray_sample);
-
-    // Generate wavelengths; stratified sample passed through inverse cdf
-    vec4 wvls, wvls_pdfs;
-    for (uint i = 0; i < 4; ++i) {
-      // Pass stratified wavelength sample through inverse cdf
-      DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(wvl_sample, i, 4));
-      wvls[i]      = ds.f;
-      wvls_pdfs[i] = ds.pdf;
-    }
-
-    // Sample incident radiance along ray for given wavelengths
-    vec4 L = Li(ray, wvls, ss) / wvls_pdfs;
-
-    // Integrate over color system and add to output color
-    output_color += sample_colsys(0, wvls) * L;
+    // Sample incident radiance along ray for given wavelengths, then
+    // integrate over color system and add to output color
+    output_color += sample_colsys(0, sensor_sample.wvls) * Li(sensor_sample, state);
   } // for (uint spp_iter)
 
   // Store output
