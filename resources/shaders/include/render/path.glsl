@@ -4,59 +4,11 @@
 #include <sampler/uniform.glsl>
 #include <render/ray.glsl>
 #include <render/scene.glsl>
+#include <render/surface.glsl>
 #include <render/sensor.glsl>
 
-// Helper struct to cache path vertex information
-struct PathVertex {
-  // World position
-  vec3 p;
-
-  // Record storing object/emitter/primitive id, see record.glsl
-  uint data;
-};
-
-// Helper struct to cache path information,
-// but without surface reflectances, which are ignored
-struct IncompletePath {
-  // Sampled path wavelengths
-  vec4 wvls;
-
-  // Energy over probability density, 
-  // not decreased by surface reflectances
-  vec4 L; 
-
-  // Total length of path before termination
-  uint path_depth;
-
-  // Path vertex information, up to path_depth
-  PathVertex data[max_depth];
-};
-
-// Helper struct to cache full path information
-struct FullPath {
-  // Sampled path wavelengths
-  vec4 wvls;
-
-  // Energy over probability density
-  vec4 L; 
-
-  // Total length of path before termination
-  uint path_depth;
-
-  // Path vertex information, up to path_depth
-  PathVertex data[max_depth];
-};
-
-// #define ENABLE_FULL_PATH_TRACKING
-
-#ifdef ENABLE_FULL_PATH_TRACKING
-#define Path FullPath
-#elif ENABLE_INCP_PATH_TRACKING
-#define Path IncompletePath
-#endif
-
 // Macros for path tracking and store
-#if defined(ENABLE_FULL_PATH_TRACKING) || defined(ENABLE_INCP_PATH_TRACKING)
+#if defined(ENABLE_FULL_PATH_TRACKING) || defined(ENABLE_PARTIAL_PATH_TRACKING)
 #define path_initialize(pt) Path pt
 void path_extend(inout Path pt, in Ray r) {
   pt.data[pt.path_depth] = PathVertex(ray_get_position(r), r.data);

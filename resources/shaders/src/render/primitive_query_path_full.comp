@@ -6,48 +6,46 @@
 #include <render/load.glsl>
 
 // General layout rule declarations
-layout(local_size_x_id = 0, local_size_y_id = 1) in;
+layout(local_size_x_id = 0) in;
 layout(std140) uniform;
 layout(std430) buffer;
 
 // Specialization constant declarations
-layout(constant_id = 2) const uint max_depth = 4; // Maximum path depth
+layout(constant_id = 1) const uint max_depth = 4; // Maximum path depth
+
+// Dependent on max_depth specialization constant
+#include <render/detail/path_types.glsl>
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
-  mat4  full_trf;
-  mat4  proj_trf;
-  mat4  view_trf;
-  uvec2 film_size; 
+  vec3 origin;    /* padd to 16 bytes */ uint p0;
+  vec3 direction; /* padd to 16 bytes */ uint p1;
+  uint n;         // Approximate nr. of paths to measure 
 } buff_sensor;
-layout(binding = 1) uniform b_buff_sampler_state {
-  uint spp_per_iter;
-  uint spp_curr;
-} buff_sampler_state;
-layout(binding = 2) uniform b_buff_objects {
+layout(binding = 1) uniform b_buff_objects {
   uint n;
   ObjectInfo data[max_supported_objects];
 } buff_objects;
-layout(binding = 3) uniform b_buff_meshes {
+layout(binding = 2) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
-layout(binding = 4) uniform b_buff_textures {
+layout(binding = 3) uniform b_buff_textures {
   TextureInfo data[max_supported_textures];
 } buff_textures;
-layout(binding = 5) uniform b_buff_emitters {
+layout(binding = 4) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[max_supported_objects];
 } buff_emitters;
-layout(binding = 6) restrict readonly buffer b_buff_barycentrics {
+layout(binding = 5) restrict readonly buffer b_buff_barycentrics {
   BarycentricInfo data[max_supported_objects];
 } buff_barycentrics;
-layout(binding = 7) uniform b_buff_wvls_distr {
+layout(binding = 6) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
-layout(binding = 8) uniform b_buff_emitters_distr {
+layout(binding = 7) uniform b_buff_emitters_distr {
   float func_sum;
   float func[max_supported_emitters];
   float cdf[max_supported_emitters + 1];
@@ -56,6 +54,8 @@ layout(binding = 8) uniform b_buff_emitters_distr {
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 2) restrict coherent buffer b_buff_path_head { uint data;           } buff_path_head;
+layout(binding = 3) restrict coherent buffer b_buff_path_data { Path data[];         } buff_path_data;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler2DArray   b_txtr_1f; // Alpha texture atlas
@@ -89,7 +89,7 @@ declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
 declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f);
 
 // All includes from and in here rely on buffers/samplers to be declared
-#include <render/path.glsl>
+#include <render/tracking/full.glsl>
 
 void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
@@ -101,46 +101,35 @@ void load_shared() {
   barrier();
 }
 
-// Initial sample state is seeded from pixel index, and rotated by multiplication
-SamplerState get_sampler_state(uint i) {
-  uint state = 1 + gl_GlobalInvocationID.x 
-                 + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-  return state * (1 + i);
-}
-
 void main() {
   load_shared();
 
   // Clamp invocations to requested size
-  guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
+  guard(gl_GlobalInvocationID.x < buff_sensor.n);
 
   // Load sensor data
-  Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
+  RaySensor sensor = { buff_sensor.origin, buff_sensor.direction };
 
   // Target value
   vec3 measure = vec3(0);
 
-  // Take spp_per_iter samples
-  for (uint i = buff_sampler_state.spp_curr;
-            i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
-          ++i) {
-    // Initialize sampler and generate sensor sample
-    SamplerState state         = get_sampler_state(i);
-    SensorSample sensor_sample = sample_sensor(sensor, ivec2(gl_GlobalInvocationID.xy), next_3d(state));
+  // Initialize sampler and generate sensor sample
+  SamplerState state         = gl_GlobalInvocationID.x;
+  SensorSample sensor_sample = sample_sensor(sensor, next_1d(state));
 
-    // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity
-    vec4 L = Li(sensor_sample, state);
+  // Sample incident radiance along ray for given wavelengths, weighted by probability
+  // Discard return value
+  /* vec4 L = */ Li(sensor_sample, state);
 
-    // Integrate over color system and add to measure
-    measure += sensor_apply(sensor_sample, L);
-  } // for (uint spp_iter)
+  /* // Integrate over color system and add to measure
+  vec3 measure = sensor_apply(sensor_sample, L); */
 
-  // Combine running average from film with measure
+  /* // Combine running average from film with measure
   vec3 pm = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
   measure = pm
           + (measure - pm)
           / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
   
   // Store updated measure to film
-  imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(measure, 1));
+  imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(measure, 1)); */
 }
