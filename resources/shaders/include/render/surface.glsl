@@ -38,9 +38,9 @@ SurfaceInfo get_surface_info(in Ray ray) {
   // If hit data is present, forward to underlying surface type: object or emitter
   if (is_valid(si)) {
     if (is_object(si)) {
-      detail_get_surface_info_object(si, ray);
+      detail_fill_surface_info_object(si, ray);
     } else if (is_emitter(si)) {
-      detail_get_surface_info_emitter(si, ray);
+      detail_fill_surface_info_emitter(si, ray);
     } /* else {
       // ...
     } */
@@ -52,6 +52,10 @@ SurfaceInfo get_surface_info(in Ray ray) {
 vec3 surface_offset(in SurfaceInfo si, in vec3 d) {
   return fma(vec3(M_RAY_EPS), si.n, si.p);
 }
+
+// Shorthands for frame transofrmation
+vec3 to_local(in SurfaceInfo si, in vec3 v) { return to_local(si.sh, v); }
+vec3 to_world(in SurfaceInfo si, in vec3 v) { return to_world(si.sh, v); }
 
 Ray ray_towards_direction(in SurfaceInfo si, in vec3 d) {
   return init_ray(surface_offset(si, d), d);
@@ -76,7 +80,7 @@ PositionSample get_position_sample(in SurfaceInfo si) {
   ps.is_delta = false;
   ps.p        = si.p;
   ps.n        = si.n;
-  ps.d        = -frame_to_world(si.sh, si.wi);
+  ps.d        = -to_world(si, si.wi);
   ps.data     = si.data;
   ps.t        = si.t;
 

@@ -125,4 +125,16 @@ SWAP_T(vec2);
 SWAP_T(vec3);
 SWAP_T(vec4);
 
+// Multiple importance sampling heuristics
+
+float mis_balance(in float pdf_a, in float pdf_b) {
+  return pdf_a / (pdf_a + pdf_b);
+}
+
+float mis_power(in float pdf_a, in float pdf_b) {
+  pdf_a *= pdf_a;
+  pdf_b *= pdf_b;
+  return pdf_a / (pdf_a + pdf_b);
+}
+
 #endif // MATH_GLSL_GUARD

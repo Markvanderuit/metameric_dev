@@ -7,7 +7,7 @@ PositionSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in ve
   // Sample position on hemisphere facing surface, point may not be nearest
   Frame frm = get_frame(normalize(si.p - em.center));
   ps.p = em.center 
-       + em.sphere_r * frame_to_world(frm, square_to_unif_hemisphere(sample_2d));
+       + em.sphere_r * to_world(frm, square_to_unif_hemisphere(sample_2d));
 
   // Generate direction to point
   ps.d = ps.p - si.p;
@@ -26,9 +26,13 @@ vec4 eval_emitter_sphere(in EmitterInfo em, in PositionSample ps, in vec4 wvls) 
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
   
+  #ifdef SCENE_DATA_AVAILABLE
   vec4 v = vec4(0);
   for (uint i = 0; i < 4; ++i)
     v[i] = texture(b_illm_1f, vec2(wvls[i], em.illuminant_i)).x;
+  #else
+  vec4 v = vec4(1);
+  #endif
     
   return v * em.illuminant_scale;
 }

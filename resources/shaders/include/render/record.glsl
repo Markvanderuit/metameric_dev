@@ -50,7 +50,7 @@ struct PositionSample {
   // Position/normal on surface of entity
   vec3  p, n;
 
-  // Normalized direction to position
+  // Exitant sampled direction to p, world space
   vec3  d;
 
   // Distance from surface to position
@@ -67,7 +67,7 @@ struct PositionSample {
 };
 
 struct BRDFSample {
-  // Exitant sampled direction in world
+  // Exitant sampled direction, local space
   vec3  wo;
 
   // BSDF value divided by (probability x cosine foreshortening)

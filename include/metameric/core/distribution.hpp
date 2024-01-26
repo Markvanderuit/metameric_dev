@@ -139,8 +139,6 @@ namespace met {
         m_func[i] /= m_func_sum;
       for (uint i = 1; i < m_cdf.size(); ++i)
         m_cdf[i]  /= m_func_sum;
-
-      fmt::print("func {}\ncdf {}\n", m_func, m_cdf);
     }
 
     float cdf(uint i) const {

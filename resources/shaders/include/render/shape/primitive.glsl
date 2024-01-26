@@ -1,25 +1,55 @@
 #ifndef SHAPE_PRIMITIVE_GLSL_GUARD
 #define SHAPE_PRIMITIVE_GLSL_GUARD
 
-#include <render/detail/packing.glsl>
 #include <render/ray.glsl>
 
-struct Primitive {
-  vec3 a, b, c;
+// Unpacked vertex data
+struct Vertex {
+  vec3 p;
+  vec3 n;
+  vec2 tx;
 };
 
-Primitive unpack_primitive(in MeshPrimPack pack) {
-  Primitive prim;
-  prim.a = vec3(unpackUnorm2x16(pack.v0.p0), unpackSnorm2x16(pack.v0.p1).x);
-  prim.b = vec3(unpackUnorm2x16(pack.v1.p0), unpackSnorm2x16(pack.v1.p1).x);
-  prim.c = vec3(unpackUnorm2x16(pack.v2.p0), unpackSnorm2x16(pack.v2.p1).x);
+// Unpacked primitive data, typically queried during bvh travesal
+struct Primitive {
+  Vertex v0;
+  Vertex v1;
+  Vertex v2;
+};
+
+// Unpacked primitive data, positions only
+struct PrimitivePositions {
+  vec3 p0, p1, p2;
+};
+
+Vertex unpack(in MeshVertPack p) {
+  Vertex o;
+  o.p  = vec3(unpackUnorm2x16(p.p0),   unpackSnorm2x16(p.p1).x);
+  o.n  = normalize(vec3(unpackSnorm2x16(p.p1).y, unpackSnorm2x16(p.n)));
+  o.tx = unpackUnorm2x16(p.tx);
+  return o;
+}
+
+Primitive unpack(in MeshPrimPack p) {
+  Primitive o;
+  o.v0 = unpack(p.v0);
+  o.v1 = unpack(p.v1);
+  o.v2 = unpack(p.v2);
+  return o;
+}
+
+PrimitivePositions unpack_positions(in MeshPrimPack pack) {
+  PrimitivePositions prim;
+  prim.p0 = vec3(unpackUnorm2x16(pack.v0.p0), unpackSnorm2x16(pack.v0.p1).x);
+  prim.p1 = vec3(unpackUnorm2x16(pack.v1.p0), unpackSnorm2x16(pack.v1.p1).x);
+  prim.p2 = vec3(unpackUnorm2x16(pack.v2.p0), unpackSnorm2x16(pack.v2.p1).x);
   return prim;
 }
 
 bool ray_intersect(inout Ray ray, in Primitive prim) {
-  vec3 ab = prim.b - prim.a;
-  vec3 bc = prim.c - prim.b;
-  vec3 ca = prim.a - prim.c;
+  vec3 ab = prim.v1.p - prim.v0.p;
+  vec3 bc = prim.v2.p - prim.v1.p;
+  vec3 ca = prim.v0.p - prim.v2.p;
   vec3 n  = normalize(cross(bc, ab));
   
   // Backface test
@@ -28,15 +58,43 @@ bool ray_intersect(inout Ray ray, in Primitive prim) {
     return false; */
 
   // Ray/plane distance test
-  float t = dot(((prim.a + prim.b + prim.c) / 3.f - ray.o), n) / cos_theta;
+  float t = dot(((prim.v0.p + prim.v1.p + prim.v2.p) / 3.f - ray.o), n) / cos_theta;
   if (t < 0.f || t > ray.t)
     return false;
   
   // Point-in-triangle test
   vec3 p = ray.o + t * ray.d;
-  if ((dot(n, cross(p - prim.a, ab)) < 0.f) ||
-      (dot(n, cross(p - prim.b, bc)) < 0.f) ||
-      (dot(n, cross(p - prim.c, ca)) < 0.f))
+  if ((dot(n, cross(p - prim.v0.p, ab)) < 0.f) ||
+      (dot(n, cross(p - prim.v1.p, bc)) < 0.f) ||
+      (dot(n, cross(p - prim.v2.p, ca)) < 0.f))
+    return false;
+
+  // Update closest-hit distance before return
+  ray.t = t;
+  return true;
+}
+
+bool ray_intersect(inout Ray ray, in PrimitivePositions prim) {
+  vec3 ab = prim.p1 - prim.p0;
+  vec3 bc = prim.p2 - prim.p1;
+  vec3 ca = prim.p0 - prim.p2;
+  vec3 n  = normalize(cross(bc, ab));
+  
+  // Backface test
+  float cos_theta = dot(n, ray.d);
+  /* if (cos_theta <= 0)
+    return false; */
+
+  // Ray/plane distance test
+  float t = dot(((prim.p0 + prim.p1 + prim.p2) / 3.f - ray.o), n) / cos_theta;
+  if (t < 0.f || t > ray.t)
+    return false;
+  
+  // Point-in-triangle test
+  vec3 p = ray.o + t * ray.d;
+  if ((dot(n, cross(p - prim.p0, ab)) < 0.f) ||
+      (dot(n, cross(p - prim.p1, bc)) < 0.f) ||
+      (dot(n, cross(p - prim.p2, ca)) < 0.f))
     return false;
 
   // Update closest-hit distance before return

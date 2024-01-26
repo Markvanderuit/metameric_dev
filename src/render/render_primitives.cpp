@@ -220,13 +220,28 @@ namespace met {
                    .cross_path = "resources/shaders/render/primitive_path.comp.json",
                    .spec_const = {{ 0u, 16u            },
                                   { 1u, 16u            },
-                                  { 2u, info.max_depth },
-                                  { 3u, false          }} }};
+                                  { 2u, info.max_depth }} }};
 
     // Assign sampler configuration
     m_spp_curr     = 0;
     m_spp_max      = info.spp_max;
     m_spp_per_iter = info.spp_per_iter;
+  }
+
+  void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+    BaseIntegrationRenderer::reset(sensor, scene);
+
+    // Rebuild target texture if necessary
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
+      m_film = {{ .size = sensor.film_size.max(1).eval() }};
+      auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
+      m_dispatch.groups_x = dispatch_ndiv.x();
+      m_dispatch.groups_y = dispatch_ndiv.y();
+    }
+
+    // Set film to black
+    m_film.clear();
   }
 
   const gl::Texture2d4f &PathRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
@@ -262,8 +277,6 @@ namespace met {
       m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
       m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
       m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
-      m_program.bind("b_buff_mesh_vert",     scene.resources.meshes.gl.mesh_verts);
-      m_program.bind("b_buff_mesh_elem",     scene.resources.meshes.gl.mesh_elems_al);
     }
 
     // Dispatch compute shader
@@ -276,20 +289,5 @@ namespace met {
     advance_sampler_state();
 
     return m_film;
-  }
-
-  void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
-    met_trace_full();
-    BaseIntegrationRenderer::reset(sensor, scene);
-
-    // Rebuild target texture if necessary
-    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
-      m_film = {{ .size = sensor.film_size.max(1).eval() }};
-      auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
-      m_dispatch.groups_x = dispatch_ndiv.x();
-      m_dispatch.groups_y = dispatch_ndiv.y();
-    }
-
-    m_film.clear();
   }
 } // namespace met

@@ -9,7 +9,7 @@ BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo 
   BRDFSample bs;
 
   bs.f        = vec4(1);
-  bs.wo       = frame_to_world(si.sh, si.wi);
+  bs.wo       = to_world(si, si.wi);
   bs.is_delta = true;
   bs.pdf      = 1.f;
 

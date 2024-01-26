@@ -1,9 +1,9 @@
 #include <preamble.glsl>
-#include <distribution.glsl>
-#include <spectrum.glsl>
 #include <math.glsl>
-#include <render/scene.glsl>
+#include <spectrum.glsl>
+#include <distribution.glsl>
 #include <sampler/uniform.glsl>
+#include <render/load.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
@@ -12,7 +12,6 @@ layout(std430) buffer;
 
 // Specialization constant declarations
 layout(constant_id = 2) const uint max_depth = 4;     // Maximum path depth
-layout(constant_id = 3) const bool is_query  = false; // Whether path query mode is eanbled
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
@@ -62,8 +61,6 @@ layout(binding = 9) uniform b_buff_emitters_distr {
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
-layout(binding = 2) restrict readonly buffer b_buff_mesh_vert { MeshVertPack data[]; } buff_mesh_vert;
-layout(binding = 3) restrict readonly buffer b_buff_mesh_elem { uvec3        data[]; } buff_mesh_elem;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler2DArray   b_txtr_1f; // Alpha texture atlas
@@ -84,124 +81,73 @@ shared MeshInfo        s_mesh_info[max_supported_meshes];
 // Object and emitter data comes from shared memory
 // Texture data comes from uniform buffers and samplers
 // Wavelength/emitter sampling distributions draw from uniform buffers
+// Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
 declare_scene_traversal_stack(8); 
-declare_scene_object_data(s_objc_info, buff_objects.n);
-declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
-declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f);
-declare_scene_mesh_data(buff_mesh_vert.data, buff_mesh_elem.data, 
-                        buff_bvhs_prim.data, buff_bvhs_node.data,
-                        s_mesh_info, buff_meshes.n);
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)
+declare_scene_cmfs_data(b_cmfs_3f);
+declare_scene_illuminant_data(b_illm_1f);
+declare_scene_object_data(s_objc_info, buff_objects.n);
+declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
+declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f);
 
 // The following includes rely on above buffers/samplers and are included last
-#include <render/brdf.glsl>
-#include <render/emitter.glsl>
-#include <render/intersect.glsl>
+#include <render/scene.glsl>
 #include <render/surface.glsl>
-#include <render/sensor.glsl>
-#include <render/integration.glsl>
+#include <render/path.glsl>
 
 void load_shared() {
-  for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
-    s_objc_info[i] = buff_objects.data[i];
-  }
-  for (uint i = gl_LocalInvocationID.x; i < buff_objects.n; i += gl_WorkGroupSize.x) {
-    s_bary_info[i] = buff_barycentrics.data[i];
-  }
-  for (uint i = gl_LocalInvocationID.x; i < buff_meshes.n; i += gl_WorkGroupSize.x) {
-    s_mesh_info[i] = buff_meshes.data[i];
-  }
-  for (uint i = gl_LocalInvocationID.x; i < buff_emitters.n; i += gl_WorkGroupSize.x) {
-    s_emtr_info[i] = buff_emitters.data[i];
-  }
+  const uint iter = hprod(gl_WorkGroupSize.xyz);
+  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_bary_info[i] = buff_barycentrics.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
   memoryBarrierShared();
   barrier();
 }
 
-SamplerState load_state(uint spp_iter) {
-  // Initial sample state is seeded from pixel index, and rotated by multiplication
-  uint invoc_state = 1 
-                   + gl_GlobalInvocationID.x 
-                   + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-  return invoc_state * (1 + buff_sampler_state.spp_curr + spp_iter);
-}
-
-vec3 sample_colsys(in uint colsys_i, in float wvl) {
-  // TODO sample by observer data instead
-  return texture(b_cmfs_3f, vec2(wvl, colsys_i)).xyz; // TODO fix integration through exposure
-}
-
-mat4x3 sample_colsys(in uint colsys_i, in vec4 wvl) {
-  mat4x3 csys;
-  for (uint i = 0; i < 4; ++i)
-    csys[i] = sample_colsys(colsys_i, wvl[i]);
-  return csys;
-}
-
-Ray ray_from_sensor(in ivec2 i, in vec2 sample_2d) {
-  // Get necessary sensor information
-  float tan_y    = 1.f / buff_sensor.proj_trf[1][1];
-  float aspect   = float(buff_sensor.film_size.x) / float(buff_sensor.film_size.y);
-  mat4  view_inv = inverse(buff_sensor.view_trf);
-
-  // Get pixel center in [-1, 1]
-  // vec2 xy = (vec2(i) + 0.5) / vec2(buff_sensor.film_size);
-  vec2 xy = (vec2(i) + sample_2d) / vec2(buff_sensor.film_size);
-  xy = (xy - .5f) * 2.f;
-  
-  // Generate camera ray
-  Ray ray;
-  ray.o = (view_inv * vec4(0, 0, 0, 1)).xyz;
-  ray.d = normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz);
-  ray.t = FLT_MAX;
-
-  return ray;
-}
-
-Ray ray_from_query() {
-  return init_ray(buff_query.origin, buff_query.direction);
+// Initial sample state is seeded from pixel index, and rotated by multiplication
+SamplerState get_sampler_state(uint i) {
+  uint state = 1 + gl_GlobalInvocationID.x 
+                 + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+  return state * (1 + i);
 }
 
 void main() {
   load_shared();
 
   // Clamp invocations to requested size
-  if (is_query) {
-    guard(gl_GlobalInvocationID.x < buff_query.n_paths);
-  } else {
-    guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
-  }
+  guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
 
   // Load sensor data
   Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
 
-  // Take a number of pixel samples
-  vec3 output_color = vec3(0);
-  for (uint spp_iter = 0; spp_iter < buff_sampler_state.spp_per_iter; ++spp_iter) {
+  // Target value
+  vec3 measure = vec3(0);
+
+  // Take spp_per_iter samples
+  for (uint i = buff_sampler_state.spp_curr;
+            i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
+          ++i) {
     // Initialize sampler and generate sensor sample
-    SamplerState state         = load_state(spp_iter);
+    SamplerState state         = get_sampler_state(i);
     SensorSample sensor_sample = sample_sensor(sensor, ivec2(gl_GlobalInvocationID.xy), next_3d(state));
 
-    // Sample incident radiance along ray for given wavelengths, then
-    // integrate over color system and add to output color
-    output_color += sample_colsys(0, sensor_sample.wvls) * Li(sensor_sample, state);
+    // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity
+    vec4 L = Li(sensor_sample, state);
+
+    // Integrate over color system and add to measure
+    measure += sensor_apply(sensor_sample, L);
   } // for (uint spp_iter)
 
-  // Store output
-  if (is_query) {
-    // ...
-  } else {
-    // Add prior accumulated average from image
-    if (buff_sampler_state.spp_curr > 0) {
-      vec3 prev_color = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
-      output_color = prev_color
-            + (output_color - prev_color)
-            / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
-    }
-    
-    // Store updated image value and sample state
-    imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(output_color, 1));
-  }
+  // Combine running average from film with measure
+  vec3 pm = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
+  measure = pm
+          + (measure - pm)
+          / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
+  
+  // Store updated measure to film
+  imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(measure, 1));
 }

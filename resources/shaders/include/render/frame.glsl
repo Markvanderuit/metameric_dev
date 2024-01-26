@@ -24,15 +24,15 @@ Frame get_frame(in vec3 n) {
   return fr;
 }
 
-vec3 frame_to_local(in Frame fr, in vec3 v) {
+vec3 to_local(in Frame fr, in vec3 v) {
   return vec3(dot(v, fr.s), dot(v, fr.t), dot(v, fr.n));
 }
 
-vec3 frame_to_world(in Frame fr, in vec3 v) {
+vec3 to_world(in Frame fr, in vec3 v) {
   return fma(fr.n, vec3(v.z), fma(fr.t, vec3(v.y), fr.s * v.x));
 }
 
-float frame_cos_theta(in vec3 v) {
+float cos_theta(in vec3 v) {
   return v.z;
 }
 

@@ -1,15 +1,62 @@
-#ifndef INTERSECT_GLSL_GUARD
-#define INTERSECT_GLSL_GUARD
+#ifndef RENDER_BVH_GLSL_GUARD
+#define RENDER_BVH_GLSL_GUARD
 
 #include <render/ray.glsl>
-#include <render/scene.glsl>
 #include <render/shape/aabb.glsl>
 #include <render/shape/primitive.glsl>
-#include <render/shape/rectangle.glsl>
-#include <render/shape/sphere.glsl>
 
 // Hardcoded constants
 #define bvh_stck_offset 24
+
+// Partially unpacked BVH node with compressed 8-child bounding boxes
+// Child AABBs are unpacked when necessary
+struct BVHNode {
+  // Unpacked helper data to unpack the rest
+  vec3 aabb_minb;
+  vec3 aabb_extn;
+
+  // Remaining packed data
+  uint data_pack;      // leaf | size | offs
+  uint child_aabb0[8]; // per child: lo.x | lo.y | hi.x | hi.y
+  uint child_aabb1[4]; // per child: lo.z | hi.z
+};
+
+// BVH node data queries
+bool bvh_is_leaf(in BVHNode node) { return bool(node.data_pack & (1u << 31)); } // Is leaf or inner node
+uint bvh_offs(in BVHNode node)    { return (node.data_pack & (~(0xF << 27))); } // Node/prim offset
+uint bvh_size(in BVHNode node)    { return (node.data_pack >> 27) & 0xF;      } // Node/prim count
+
+// Extract a child AABB from a BVHNode
+AABB bvh_child_aabb(in BVHNode n, in uint i) {
+  vec4 unpack_0 = unpackUnorm4x8(n.child_aabb0[i    ]);
+  vec4 unpack_1 = unpackUnorm4x8(n.child_aabb1[i / 2] >> (bool(i % 2) ? 16 : 0));
+
+  vec3 safe_minb = vec3(unpack_0.xy, unpack_1.x);
+  vec3 safe_maxb = vec3(unpack_0.zw, unpack_1.y);
+
+  AABB aabb;
+  aabb.minb = n.aabb_minb + n.aabb_extn * safe_minb;
+  aabb.maxb = n.aabb_minb + n.aabb_extn * safe_maxb;
+  return aabb;
+}
+
+BVHNode unpack(in BVHNodePack p) {
+  BVHNode n;
+
+  // Unpack auxiliary AABB data
+  vec2 aabb_unpack_2 = unpackUnorm2x16(p.aabb_pack_2);
+  n.aabb_minb = vec3(unpackUnorm2x16(p.aabb_pack_0), aabb_unpack_2.x);
+  n.aabb_extn = vec3(unpackUnorm2x16(p.aabb_pack_1), aabb_unpack_2.y);
+  
+  // Transfer other data
+  n.data_pack   = p.data_pack;
+  n.child_aabb0 = p.child_aabb0;
+  n.child_aabb1 = p.child_aabb1;
+  
+  return n;
+}
+
+#ifdef SCENE_DATA_AVAILABLE
 
 bool ray_intersect_bvh_any(in Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
@@ -50,7 +97,7 @@ bool ray_intersect_bvh_any(in Ray ray, in uint bvh_i) {
         uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
-        Primitive prim = unpack_primitive(scene_mesh_prim(prim_i));
+        PrimitivePositions prim = unpack_positions(scene_mesh_prim(prim_i));
 
         // Test against primitive; store primitive index on hit
         if (ray_intersect(ray, prim)) {
@@ -118,7 +165,7 @@ bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
         uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
 
         // Obtain and unpack next prim
-        Primitive prim = unpack_primitive(scene_mesh_prim(prim_i));
+        PrimitivePositions prim = unpack_positions(scene_mesh_prim(prim_i));
 
         // Test against primitive; store primitive index on hit
         if (ray_intersect(ray, prim)) {
@@ -147,109 +194,5 @@ bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
   return hit;
 }
 
-bool ray_intersect_object_any(in Ray ray, uint object_i) {
-  ObjectInfo object_info = scene_object_info(object_i);
-  
-  if (!object_info.is_active)
-    return false;
-  
-  // Generate object space ray
-  Ray ray_local;
-  ray_local.o = (object_info.trf_mesh_inv * vec4(ray.o, 1)).xyz;
-  ray_local.d = (object_info.trf_mesh_inv * vec4(ray.d, 0)).xyz;
-  
-  // Get length and normalize direction
-  // Reuse length to adjust ray_local.t if ray.t is not at infty
-  float dt = length(ray_local.d);
-  ray_local.d /= dt;
-  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
-  
-  return ray_intersect_bvh_any(ray_local, object_info.mesh_i);
-}
-
-void ray_intersect_object(inout Ray ray, uint object_i) {
-  ObjectInfo object_info = scene_object_info(object_i);
-  
-  if (!object_info.is_active)
-    return;
-
-  // Generate local ray
-  Ray ray_local;
-  ray_local.o = (object_info.trf_mesh_inv * vec4(ray.o, 1)).xyz;
-  ray_local.d = (object_info.trf_mesh_inv * vec4(ray.d, 0)).xyz;
-  
-  // Get length and normalize direction
-  // Reuse length to adjust ray_local.t if ray.t is not at infty
-  float dt = length(ray_local.d);
-  ray_local.d /= dt;
-  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
-
-  // Run intersection; on a hit, recover world-space distance,
-  // and store intersection data in ray
-  if (ray_intersect_bvh(ray_local, object_info.mesh_i)) {
-    ray.t    = length((object_info.trf_mesh * vec4(ray_local.d * ray_local.t, 0)).xyz);
-    ray.data = ray_local.data;
-    record_set_object(ray.data, object_i);
-  }
-}
-
-bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
-  EmitterInfo em = scene_emitter_info(emitter_i);
-  
-  if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
-    return false;
-  
-  // Run intersection; on a hit, simply return
-  if (em.type == EmitterTypeSphere) {
-    Sphere sphere = { em.center, em.sphere_r };
-    return ray_intersect(ray, sphere);
-  } else if (em.type == EmitterTypeRectangle) {
-    return ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
-  }
-}
-
-bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
-  EmitterInfo em = scene_emitter_info(emitter_i);
-  
-  if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
-    return false;
-
-  bool hit = false;
-  if (em.type == EmitterTypeSphere) {
-    Sphere sphere = { em.center, em.sphere_r };
-    hit = ray_intersect(ray, sphere);
-  } else if (em.type == EmitterTypeRectangle) {
-    hit = ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
-  }
-
-  if (hit)
-    record_set_emitter(ray.data, emitter_i);
-
-  return hit;
-}
-
-bool scene_intersect(inout Ray ray) {
-  for (uint i = 0; i < scene_object_count(); ++i) {
-    ray_intersect_object(ray, i);
-  }
-  for (uint i = 0; i < scene_emitter_count(); ++i) {
-    ray_intersect_emitter(ray, i);
-  }
-  return is_valid(ray);
-}
-
-bool scene_intersect_any(in Ray ray) {
-  for (uint i = 0; i < scene_object_count(); ++i) {
-    if (ray_intersect_object_any(ray, i)) {
-      return true;
-    }
-  }
-  for (uint i = 0; i < scene_emitter_count(); ++i) {
-    if (ray_intersect_emitter_any(ray, i)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-#endif // INTERSECT_GLSL_GUARD
+#endif // SCENE_DATA_AVAILABLE
+#endif // RENDER_BVH_GLSL_GUARD

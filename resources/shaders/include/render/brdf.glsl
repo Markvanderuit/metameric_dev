@@ -1,10 +1,10 @@
 #ifndef BRDF_GLSL_GUARD
 #define BRDF_GLSL_GUARD
 
-#include <math.glsl>
-#include <render/record.glsl>
-#include <render/scene.glsl>
 #include <render/surface.glsl>
+
+#ifdef SCENE_DATA_AVAILABLE
+
 #include <render/brdf/null.glsl>
 #include <render/brdf/diffuse.glsl>
 
@@ -57,4 +57,5 @@ float pdf_brdf(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
   } */
 }
 
+#endif // SCENE_DATA_AVAILABLE
 #endif // BRDF_GLSL_GUARD

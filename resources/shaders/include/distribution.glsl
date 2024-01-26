@@ -1,8 +1,6 @@
 #ifndef DISTRIBUTION_GLSL_GUARD
 #define DISTRIBUTION_GLSL_GUARD
 
-#include <spectrum.glsl>
-
 // Return values for sample_distr(u) functions
 struct DistributionSampleContinuous {
   float f;

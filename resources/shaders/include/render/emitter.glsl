@@ -1,15 +1,20 @@
-#ifndef EMITTER_GLSL_GUARD
-#define EMITTER_GLSL_GUARD
+#ifndef RENDER_EMITTER_GLSL_GUARD
+#define RENDER_EMITTER_GLSL_GUARD
 
 #include <math.glsl>
+#include <distribution.glsl>
 #include <render/ray.glsl>
 #include <render/frame.glsl>
+#include <render/surface.glsl>
 #include <render/warp.glsl>
-#include <render/scene.glsl>
+#include <render/shape/sphere.glsl>
+#include <render/shape/rectangle.glsl>
 #include <render/emitter/sphere.glsl>
 #include <render/emitter/rectangle.glsl>
 #include <render/emitter/point.glsl>
 #include <render/emitter/constant.glsl>
+
+#ifdef SCENE_DATA_AVAILABLE
 
 PositionSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   if (em.type == EmitterTypeSphere) {
@@ -21,10 +26,6 @@ PositionSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec2 samp
   } else if (em.type == EmitterTypeConstant) {
     return sample_emitter_constant(em, si, sample_2d);
   }
-}
-
-PositionSample sample_emitter(in SurfaceInfo si, in uint emitter_i, in vec2 sample_2d) {
-  return sample_emitter(scene_emitter_info(emitter_i), si, sample_2d);
 }
 
 vec4 eval_emitter(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
@@ -82,4 +83,40 @@ float pdf_emitters(in PositionSample ps) {
   return pdf;
 }
 
-#endif // EMITTER_GLSL_GUARD
+bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
+  EmitterInfo em = scene_emitter_info(emitter_i);
+  
+  if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
+    return false;
+
+  bool hit = false;
+  if (em.type == EmitterTypeSphere) {
+    Sphere sphere = { em.center, em.sphere_r };
+    hit = ray_intersect(ray, sphere);
+  } else if (em.type == EmitterTypeRectangle) {
+    hit = ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
+  }
+
+  if (hit)
+    record_set_emitter(ray.data, emitter_i);
+
+  return hit;
+}
+
+bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
+  EmitterInfo em = scene_emitter_info(emitter_i);
+  
+  if (!em.is_active || em.type == EmitterTypeConstant || em.type == EmitterTypePoint)
+    return false;
+  
+  // Run intersection; on a hit, simply return
+  if (em.type == EmitterTypeSphere) {
+    Sphere sphere = { em.center, em.sphere_r };
+    return ray_intersect(ray, sphere);
+  } else if (em.type == EmitterTypeRectangle) {
+    return ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
+  }
+}
+
+#endif // SCENE_DATA_AVAILABLE
+#endif // RENDER_EMITTER_GLSL_GUARD
