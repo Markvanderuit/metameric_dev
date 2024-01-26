@@ -216,8 +216,8 @@ namespace met {
 
     // Initialize program object
     m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/render/primitive_path.comp.spv",
-                   .cross_path = "resources/shaders/render/primitive_path.comp.json",
+                   .spirv_path = "resources/shaders/render/primitive_render_path.comp.spv",
+                   .cross_path = "resources/shaders/render/primitive_render_path.comp.json",
                    .spec_const = {{ 0u, 16u            },
                                   { 1u, 16u            },
                                   { 2u, info.max_depth }} }};
