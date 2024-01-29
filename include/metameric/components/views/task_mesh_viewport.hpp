@@ -2,9 +2,8 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/components/views/mesh_viewport/task_input.hpp>
-#include <metameric/components/views/mesh_viewport/task_draw_direct.hpp>
+#include <metameric/components/views/mesh_viewport/task_render.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
-#include <metameric/components/views/mesh_viewport/task_draw_gbuffer.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw_raytrace.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
 
@@ -15,8 +14,7 @@ namespace met {
 
       info.child_task("viewport_begin").init<detail::ViewportBeginTask>();
       info.child_task("viewport_input").init<MeshViewportInputTask>();
-      info.child_task("viewport_draw_gbuffer").init<MeshViewportDrawGBufferTask>();
-      info.child_task("viewport_draw_direct").init<MeshViewportDrawDirectTask>();
+      info.child_task("viewport_render").init<MeshViewportRenderTask>();
       info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();
       info.child_task("viewport_end").init<detail::ViewportEndTask>();
     }

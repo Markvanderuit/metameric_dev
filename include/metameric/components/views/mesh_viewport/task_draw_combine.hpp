@@ -15,7 +15,7 @@ namespace met {
     gl::Program  m_program;
     
   public:
-    // bool is_active(SchedulerHandle &info) override;
+    bool is_active(SchedulerHandle &info) override;
     void init(SchedulerHandle &info)      override;
     void eval(SchedulerHandle &info)      override;
   };

@@ -345,7 +345,6 @@ namespace met::detail {
     for (uint i = 0; i < 10; ++i) {
       auto sample = distr.sample_discrete(sampler.next_1d());
       auto pdf    = distr.pdf_discrete(sample);
-      fmt::print("{} -> ({}, {})\n", i, sample, pdf);
     }
     
     emitter_distr_buffer = distr.to_buffer_std140();

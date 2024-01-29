@@ -46,6 +46,7 @@ namespace met::detail {
     uint                           m_sampler_state_i;
 
   protected:
+    virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override; // default-implemented
     virtual void reset(const Sensor &sensor, const Scene &scene) override;
 
     void advance_sampler_state();
@@ -57,6 +58,10 @@ namespace met::detail {
 
   public:
     IntegrationRenderPrimitive();
+
+    bool has_next_sample_state() const {
+      return m_spp_max == 0 || m_spp_curr < m_spp_max;
+    }
   };
   
   // Helper class to build a quick first-intersection gbuffer

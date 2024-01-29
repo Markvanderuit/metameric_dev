@@ -11,12 +11,10 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
- /*  bool MeshViewportDrawCombineTask::is_active(SchedulerHandle &info) {
+  bool MeshViewportDrawCombineTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return (info.relative("viewport_begin")("is_active").getr<bool>()
-        ||  info.relative("viewport_input")("arcball").is_mutated())
-       && !info.global("scene").getr<Scene>().components.objects.empty();
-  } */
+    return info.relative("viewport_render")("renderer").is_mutated();
+  }
 
   void MeshViewportDrawCombineTask::init(SchedulerHandle &info) {
     met_trace_full();
@@ -37,7 +35,7 @@ namespace met {
     // Get shared resources 
     const auto &e_scene  = info.global("scene").getr<Scene>();
     const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
-    const auto &e_direct = info.relative("viewport_draw_direct")("direct_renderer").getr<PathRenderPrimitive>();
+    const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
 
     // Specify dispatch size
     auto dispatch_n    = e_target.size();
@@ -49,7 +47,7 @@ namespace met {
 
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif", m_unif_buffer);
-    m_program.bind("b_direct_4f", e_direct.film());
+    m_program.bind("b_direct_4f", e_render.film()); // TODO there is an unnecessary copy going on here
     m_program.bind("b_target_4f", e_target);
 
     // Dispatch compute shader

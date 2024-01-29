@@ -5,7 +5,7 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  class MeshViewportDrawDirectTask : public detail::TaskNode {
+  class MeshViewportRenderTask : public detail::TaskNode {
     struct UnifLayout {
       eig::Matrix4f trf;
       eig::Vector2u viewport_size;

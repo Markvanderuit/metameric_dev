@@ -2,6 +2,8 @@
 #include <metameric/render/primitives_query.hpp>
 
 namespace met {
+  static gl::ProgramCache<gl::ShaderLoadSPIRVInfo> program_cache;
+
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapReadPersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapReadPersistent;
 
@@ -9,11 +11,13 @@ namespace met {
     met_trace_full();
 
     // Initialize program object
-    m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/render/primitive_query_path_full.comp.spv",
-                   .cross_path = "resources/shaders/render/primitive_query_path_full.comp.json",
-                   .spec_const = {{ 0u, 256u           },
-                                  /* { 1u, info.max_depth } */} }};
+    m_program_key = program_cache.set({ 
+      .type       = gl::ShaderType::eCompute,
+      .spirv_path = "resources/shaders/render/primitive_query_path_full.comp.spv",
+      .cross_path = "resources/shaders/render/primitive_query_path_full.comp.json",
+      .spec_const = {{ 0u, 256u           },
+                     { 1u, info.max_depth }}
+    });
   }
 
   const gl::Buffer &FullPathQueryPrimitive::query(const RaySensor &sensor, const Scene &scene) {
@@ -36,36 +40,38 @@ namespace met {
     // Clear output data, specifically the buffer's head
     m_output.clear({ }, 1u, 4 * sizeof(uint));
 
+    // Get relevant program
+    auto &program = program_cache.at(m_program_key);
+
     // Bind required resources to their corresponding targets
-    m_program.bind();
-    m_program.bind("b_buff_path_data",      m_output);
-    m_program.bind("b_buff_sensor",         sensor.buffer());
-    m_program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    m_program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
-    m_program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
-    m_program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
-    m_program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
-    m_program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
-    m_program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
-    m_program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
-    m_program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
+    program.bind();
+    program.bind("b_buff_path_data",      m_output);
+    program.bind("b_buff_sensor",         sensor.buffer());
+    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
+    program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
+    program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
+    program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
+    program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
+    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     if (!scene.resources.images.empty()) {
-      m_program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      m_program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      m_program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+      program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
     }
     if (!scene.resources.meshes.empty()) {
-      m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-      m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-      m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
+      program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
+      program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
     }
 
     // Dispatch compute shader
     gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
                               gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
                               gl::BarrierFlags::eBufferUpdate                                     );
-    gl::dispatch_compute({ .groups_x         = ceil_div(sensor.n_paths, 256u),
-                           .bindable_program = &m_program });
+    gl::dispatch_compute({ .groups_x = ceil_div(sensor.n_paths, 256u) });
 
     // Insert memory barrier and submit a fence object to ensure
     // output data is made visible in mapped region
@@ -86,11 +92,13 @@ namespace met {
     met_trace_full();
 
     // Initialize program object
-    m_program = {{ .type       = gl::ShaderType::eCompute,
-                   .spirv_path = "resources/shaders/render/primitive_query_path_partial.comp.spv",
-                   .cross_path = "resources/shaders/render/primitive_query_path_partial.comp.json",
-                   .spec_const = {{ 0u, 256u           },
-                                  { 1u, info.max_depth }} }};
+    m_program_key = program_cache.set({ 
+      .type       = gl::ShaderType::eCompute,
+      .spirv_path = "resources/shaders/render/primitive_query_path_partial.comp.spv",
+      .cross_path = "resources/shaders/render/primitive_query_path_partial.comp.json",
+      .spec_const = {{ 0u, 256u           },
+                     { 1u, info.max_depth }}
+    });
   }
 
   const gl::Buffer &PartialPathQueryPrimitive::query(const RaySensor &sensor, const Scene &scene) {
@@ -113,36 +121,38 @@ namespace met {
     // Clear output data, specifically the buffer's head
     m_output.clear({ }, 1u, 4 * sizeof(uint));
 
+    // Get relevant program
+    auto &program = program_cache.at(m_program_key);
+
     // Bind required resources to their corresponding targets
-    m_program.bind();
-    m_program.bind("b_buff_path_data",      m_output);
-    m_program.bind("b_buff_sensor",         sensor.buffer());
-    m_program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
-    m_program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
-    m_program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
-    m_program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
-    m_program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
-    m_program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
-    m_program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
-    m_program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
-    m_program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
+    program.bind();
+    program.bind("b_buff_path_data",      m_output);
+    program.bind("b_buff_sensor",         sensor.buffer());
+    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
+    program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
+    program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
+    program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
+    program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
+    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     if (!scene.resources.images.empty()) {
-      m_program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      m_program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      m_program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+      program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
     }
     if (!scene.resources.meshes.empty()) {
-      m_program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-      m_program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-      m_program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
+      program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
+      program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
     }
 
     // Dispatch compute shader
     gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
                               gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
                               gl::BarrierFlags::eBufferUpdate                                     );
-    gl::dispatch_compute({ .groups_x         = ceil_div(sensor.n_paths, 256u),
-                           .bindable_program = &m_program });
+    gl::dispatch_compute({ .groups_x = ceil_div(sensor.n_paths, 256u) });
 
     // Insert memory barrier and submit a fence object to ensure
     // output data is made visible in mapped region

@@ -43,7 +43,7 @@ namespace met {
 
   class PathRenderPrimitive : public detail::IntegrationRenderPrimitive {
     gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
+    std::string     m_program_key; // Key for lookup in cache
 
   public:
     using InfoType = PathRenderPrimitiveCreateInfo;

@@ -37,7 +37,8 @@ namespace met {
       detail::Components<Uplifting>   upliftings;
       detail::Component<Settings>     settings;   // Miscellaneous settings; e.g. texture size
       detail::Component<uint>         observer_i; // Primary observer index; simple enough for now
-
+    
+    public:
       void update(const Scene &scene) {
         settings.state.update(settings.value);
         observer_i.state.update(observer_i.value);
@@ -46,6 +47,12 @@ namespace met {
         objects.update(scene);
         upliftings.update(scene);
       }
+
+      constexpr bool is_mutated() const {
+        return colr_systems || emitters || objects || upliftings || settings || observer_i;
+      }
+
+      constexpr operator bool()   const { return is_mutated(); };
     } components;
 
     // Scene resources, primarily referred to by components in the scene
@@ -57,6 +64,7 @@ namespace met {
       detail::Resources<CMFS>  observers;
       detail::Resources<Basis> bases;
 
+    public:
       void update(const Scene &scene) {
         meshes.update(scene);
         images.update(scene);
@@ -64,11 +72,21 @@ namespace met {
         observers.update(scene);
         bases.update(scene);
       }
+
+      constexpr bool is_mutated() const {
+        return meshes || images || illuminants || observers || bases;
+      }
+
+      constexpr operator bool()   const { return is_mutated(); };
     } resources;
 
     void update() {
       resources.update(*this);
       components.update(*this);
+    }
+
+    constexpr bool is_mutated() const {
+      return resources || components;
     }
     
   public: // Save state and IO handling

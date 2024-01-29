@@ -12,7 +12,7 @@ namespace met {
   // Primitive to query light transport along a single ray and get information
   // on each path
   struct FullPathQueryPrimitive : public detail::BaseQueryPrimitive {
-    gl::Program     m_program;
+    std::string     m_program_key; // Key for lookup in cache
     uint           *m_output_head_map;
     std::span<Path> m_output_data_map;
     gl::sync::Fence m_output_sync;
@@ -31,7 +31,7 @@ namespace met {
   // Primitive to query light transport along a single ray and get information
   // on each path, with reflectances factored out
   class PartialPathQueryPrimitive : public detail::BaseQueryPrimitive {
-    gl::Program     m_program;
+    std::string     m_program_key; // Key for lookup in cache
     uint           *m_output_head_map;
     std::span<Path> m_output_data_map;
     gl::sync::Fence m_output_sync;
