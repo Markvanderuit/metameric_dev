@@ -24,10 +24,11 @@ namespace met {
 
   void MeshViewportRenderTask::init(SchedulerHandle &info) {
     met_trace_full();
+    
+    info("sensor").set<Sensor>({ /* ... */ });
     info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = n_iters_per_dispatch,  
                                                  .spp_max      = n_iters_max,
                                                  .max_depth    = 4 });
-    info("sensor").set<Sensor>({}); // packed gbuffer texture
   }
     
   void MeshViewportRenderTask::eval(SchedulerHandle &info) {

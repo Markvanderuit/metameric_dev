@@ -6,7 +6,7 @@
 
 namespace met {
   class MeshViewportRenderTask : public detail::TaskNode {
-    struct UnifLayout {
+   /*  struct UnifLayout {
       eig::Matrix4f trf;
       eig::Vector2u viewport_size;
     };
@@ -23,7 +23,7 @@ namespace met {
     UnifLayout    *m_unif_buffer_map;
     SamplerLayout *m_sampler_buffer_map;
 
-    uint m_iter;
+    uint m_iter; */
     
   public:
     bool is_active(SchedulerHandle &info) override;
