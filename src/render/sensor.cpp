@@ -17,11 +17,11 @@ namespace met {
     m_unif_map->proj_trf  = proj_trf;
     m_unif_map->view_trf  = view_trf;
     m_unif_map->film_size = film_size;
-
+    
     m_unif.flush();
   }
 
-  void PathQuery::flush() {
+  void RaySensor::flush() {
     met_trace_full();
     
     if (!m_unif.is_init()) {

@@ -4,7 +4,7 @@
 #include <array>
 
 namespace met {
-  constexpr uint path_max_depth    = 4;
+  constexpr uint path_max_depth    = 8;
   constexpr uint path_invalid_data = 0xFFFFFFFF;
   constexpr uint path_emitter_flag = 0x80000000;
   constexpr uint path_object_flag  = 0x00000000;
@@ -29,19 +29,20 @@ namespace met {
   static_assert(sizeof(PathVertex) == 16);
   
   // A queried path object
-  struct PathInfo {
+  struct Path {
     // Sampled path wavelengths
     alignas(16) eig::Array4f wavelengths;
 
-    // Energy times geometric attenuation over probability density,
-    // without reflectances which are separated out
+    // Energy over probability density
+    // Note: if generated with PartialPathQuery(...), reflectances are ignored
+    // along paths.
     alignas(16) eig::Array4f L;
 
-    // Total length of path before termination
+    // Actual length of path before termination
     alignas(16) uint path_depth;
 
-    // Path vertex information, up to path_depth;
+    // Path vertex information, up to maximum depth
     alignas(16) std::array<PathVertex, path_max_depth> data;
   };
-  static_assert(sizeof(PathInfo) == 112);
+  static_assert(sizeof(Path) == (3 + path_max_depth) * 16);
 } // namespace met

@@ -2,7 +2,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/render_primitives.hpp>
+#include <metameric/render/primitives_render.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/dispatch.hpp>

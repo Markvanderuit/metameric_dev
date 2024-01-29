@@ -32,7 +32,7 @@ namespace met {
     void flush();
   };
 
-  struct PathQuery {
+  struct RaySensor {
     // Query path starting ray
     eig::Vector3f origin, direction;
 
@@ -40,11 +40,12 @@ namespace met {
     uint n_paths;
 
   private:
-    struct UnifLayout {
-      alignas(16) eig::Vector3f origin;
-      alignas(16) eig::Vector3f direction;
-      alignas(4)  uint          n_paths; 
+    struct alignas(16) UnifLayout {
+      eig::AlVector3f origin;
+      eig::AlVector3f direction;
+      uint            n_paths; 
     };
+    static_assert(sizeof(UnifLayout) == 48);
 
     gl::Buffer  m_unif;
     UnifLayout *m_unif_map;

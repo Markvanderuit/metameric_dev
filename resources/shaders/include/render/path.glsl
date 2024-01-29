@@ -7,22 +7,28 @@
 #include <render/surface.glsl>
 #include <render/sensor.glsl>
 
-// Macros for path tracking and store
+// Macros for enabling/disabling path tracking
 #if defined(ENABLE_FULL_PATH_TRACKING) || defined(ENABLE_PARTIAL_PATH_TRACKING)
-#define path_initialize(pt) Path pt
+#define path_initialize(pt) Path pt; { pt.path_depth = 0; }
 void path_extend(inout Path pt, in Ray r) {
-  pt.data[pt.path_depth] = PathVertex(ray_get_position(r), r.data);
-  pt.path_depth++;
+  pt.data[pt.path_depth++] = PathVertex(ray_get_position(r), r.data);
 }
-void path_finalize(in Path pt, in vec4 L, in vec4 wvls) {
+void path_finalize_direct(in Path pt, in vec4 L, in vec4 wvls) {
   pt.wvls = wvls;
   pt.L    = L;
-  // Store to buffer
+  set_path(pt, get_next_path_id());
+}
+void path_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 wvls) {
+  pt.data[pt.path_depth++] = PathVertex(r.p, r.data);
+  pt.wvls = wvls;
+  pt.L    = L;
+  set_path(pt, get_next_path_id());
 }
 #else  
-#define path_initialize(pt)          {}
-#define path_extend(path, vt)        {}
-#define path_finalize(path, L, wvls) {}
+#define path_initialize(pt)                     {}
+#define path_extend(path, vt)                   {}
+#define path_finalize_direct(path, L, wvls)     {}
+#define path_finalize_emitter(path, r, L, wvls) {}
 #endif
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
@@ -30,8 +36,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   path_initialize(pt);
   
   // Path throughput information; we track 4 wavelengths simultaneously
-  vec4  S               = vec4(0);
-  vec4  beta            = vec4(1) / wvl_pdfs;
+  vec4  S               = vec4(0.f);
+  vec4  beta            = vec4(1.f / wvl_pdfs);
   float prev_bsdf_pdf   = 1.f;
   bool  prev_bsdf_delta = true;
   
@@ -58,10 +64,12 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
       vec4 s = beta                                // throughput 
              * eval_emitter(ps, wvls)              // emitted value
              * mis_power(prev_bsdf_pdf, emtr_pdf); // mis weight
-      S += s;
 
-      // Store path if requested
-      path_finalize(pt, s, wvls);
+      // Store current path if requested
+      path_finalize_direct(pt, s, wvls);
+
+      // Add to output radiance
+      S += s;
     }
 
     // Sample BRDF at position
@@ -86,10 +94,12 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
                  * eval_emitter(ps, wvls)       // emitted value
                  * mis_power(ps.pdf, bsdf_pdf)  // mis weight
                  / ps.pdf;                      // sample density
-          S += s;
 
-          // Store path if requested
-          path_finalize(pt, s, wvls);
+          // Store current path if requested
+          path_finalize_emitter(pt, ps, s, wvls);
+
+          // Add to output radiance
+          S += s;
         }
       }
     }

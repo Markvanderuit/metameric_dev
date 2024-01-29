@@ -7,13 +7,20 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/render/primitives_query.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 
 namespace met {
-  struct MeshViewportInputTask : public detail::TaskNode {
+  class MeshViewportInputTask : public detail::TaskNode {
+    FullPathQueryPrimitive m_query_prim;
+    RaySensor              m_query_sensor;
+
+  public:
     void init(SchedulerHandle &info) override {
       met_trace();
+
+      m_query_prim = {{ .max_depth = 4 }};
       
       /* info.resource("arcball").init<detail::Arcball>({ 
         .dist            = 2.5f,
@@ -30,7 +37,7 @@ namespace met {
       });
     } 
 
-    // TODO remove after experimentation
+    /* // TODO remove after experimentation
     void eval_rt(SchedulerHandle &info) {
       met_trace();
 
@@ -115,6 +122,46 @@ namespace met {
         ImGui::ColorEdit3("Sample", sample.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
         ImGui::EndTooltip();
       }
+    } */
+
+    void eval_path_query(SchedulerHandle &info) {
+      met_trace_full();
+
+      // Get shared resources
+      const auto &e_scene   = info.global("scene").getr<Scene>();
+      const auto &io        = ImGui::GetIO();
+      const auto &i_arcball = info.resource("arcball").getr<detail::Arcball>();
+
+      // Compute viewport offset and size, minus ImGui's tab bars etc
+      eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                                 + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+
+      // Generate a camera ray from the current mouse position
+      auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
+      auto camera_ray = i_arcball.generate_ray(screen_pos);
+
+      // Update ray sensor
+      m_query_sensor.origin    = camera_ray.o;
+      m_query_sensor.direction = camera_ray.d;
+      m_query_sensor.n_paths   = 4;
+      m_query_sensor.flush();
+
+      // Perform path query
+      m_query_prim.query(m_query_sensor, e_scene);
+
+      // Obtain queried paths
+      auto paths = m_query_prim.data();
+
+      if (paths.empty()) {
+        fmt::print("No contributing paths found\n");
+      } else {
+        fmt::print("Contributing paths found:\n");
+        for (const auto &path : paths) {
+          fmt::print("\tof depth {}\n", path.path_depth);
+        }
+      }
     }
 
     void eval(SchedulerHandle &info) override {
@@ -157,8 +204,9 @@ namespace met {
           << eig::Array2f(io.MouseDelta.x, io.MouseDelta.y) / viewport_size.array(), 0).finished());
       }
 
-      // TODO: remove
-      // eval_rt(info);
+      if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+        eval_path_query(info);
+      }
     }
   };
 } // namespace met

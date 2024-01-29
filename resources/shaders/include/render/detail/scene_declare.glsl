@@ -49,12 +49,4 @@
 #define declare_scene_illuminant_data(scene_txtr_illm_data)           \
   sampler1DArray illuminant_spectra() { return scene_txtr_illm_data; }
 
-#ifdef scene_buff_wvls_distr
-  #define scene_wavelength_distribution() scene_buff_wvls_distr
-#endif
-
-#ifdef scene_buff_emtr_distr
-  #define scene_emitters_distribution() scene_buff_emtr_distr
-#endif
-
 #endif // RENDER_DETAIL_SCENE_DECLARE_GLSL_GUARD

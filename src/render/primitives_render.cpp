@@ -1,12 +1,12 @@
 #include <metameric/core/utility.hpp>
-#include <metameric/render/render_primitives.hpp>
+#include <metameric/render/primitives_render.hpp>
 
 constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
 constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
 namespace met {
   namespace detail {
-    BaseIntegrationRenderer::BaseIntegrationRenderer()
+    IntegrationRenderPrimitive::IntegrationRenderPrimitive()
     : m_sampler_state_i(0) {
       met_trace_full();
       for (uint i = 0; i < m_sampler_state_buffs.size(); ++i) {
@@ -17,7 +17,7 @@ namespace met {
       }
     }
 
-    void BaseIntegrationRenderer::reset(const Sensor &sensor, const Scene &scene) {
+    void IntegrationRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
       met_trace_full();
 
       // Reset current sample count
@@ -31,7 +31,7 @@ namespace met {
       m_sampler_state_syncs[m_sampler_state_i] = gl::sync::Fence(gl::sync::time_s(1));
     }
 
-    void BaseIntegrationRenderer::advance_sampler_state() {
+    void IntegrationRenderPrimitive::advance_sampler_state() {
       met_trace_full();
 
       // Advance current sample count by previous nr. of taken samples
@@ -45,7 +45,7 @@ namespace met {
       m_sampler_state_syncs[m_sampler_state_i] = gl::sync::Fence(gl::sync::time_s(1));
     }
 
-    const gl::Buffer & BaseIntegrationRenderer::get_sampler_state() {
+    const gl::Buffer & IntegrationRenderPrimitive::get_sampler_state() {
       met_trace_full();
 
       // Block if flush operation has not completed
@@ -55,7 +55,7 @@ namespace met {
       return m_sampler_state_buffs[m_sampler_state_i];
     }
 
-    GBuffer::GBuffer() {
+    GBufferRenderPrimitive::GBufferRenderPrimitive() {
       // Initialize program object
       m_program = {{ .type       = gl::ShaderType::eVertex,
                      .spirv_path = "resources/shaders/render/primitive_gbuffer.vert.spv",
@@ -73,7 +73,7 @@ namespace met {
       };
     }
 
-    void GBuffer::reset(const Sensor &sensor, const Scene &scene) {
+    void GBufferRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
       met_trace_full();
       
       // Rebuild framebuffer and target texture if necessary
@@ -85,7 +85,7 @@ namespace met {
       }
     }
     
-    const gl::Texture2d4f &GBuffer::render(const Sensor &sensor, const Scene &scene) {
+    const gl::Texture2d4f &GBufferRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
       met_trace_full();
 
       if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
@@ -134,7 +134,7 @@ namespace met {
   } // namespace detail
 
   DirectRenderPrimitive::DirectRenderPrimitive(DirectRenderPrimitiveCreateInfo info)
-  : detail::BaseIntegrationRenderer() {
+  : detail::IntegrationRenderPrimitive() {
     met_trace_full();
 
     // Initialize program object
@@ -197,7 +197,7 @@ namespace met {
 
   void DirectRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
-    BaseIntegrationRenderer::reset(sensor, scene);
+    IntegrationRenderPrimitive::reset(sensor, scene);
     m_gbuffer.reset(sensor, scene);
 
     // Rebuild target texture if necessary
@@ -211,7 +211,7 @@ namespace met {
   }
 
   PathRenderPrimitive::PathRenderPrimitive(PathRenderPrimitiveCreateInfo info)
-  : detail::BaseIntegrationRenderer() {
+  : detail::IntegrationRenderPrimitive() {
     met_trace_full();
 
     // Initialize program object
@@ -230,7 +230,7 @@ namespace met {
 
   void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
-    BaseIntegrationRenderer::reset(sensor, scene);
+    IntegrationRenderPrimitive::reset(sensor, scene);
 
     // Rebuild target texture if necessary
     if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {

@@ -2,7 +2,7 @@
 #include <metameric/components/views/mesh_viewport/task_draw_gbuffer.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/render/render_primitives.hpp>
+#include <metameric/render/primitives_render.hpp>
 #include <metameric/render/sensor.hpp>
 #include <small_gl/sampler.hpp>
 #include <small_gl/texture.hpp>
@@ -50,7 +50,7 @@ namespace met {
     };
 
     info("gbuffer").set<gl::Texture2d4f>({ });       // packed gbuffer texture
-    info("gbuffer_renderer").set<detail::GBuffer>({}); // packed gbuffer texture
+    info("gbuffer_renderer").set<detail::GBufferRenderPrimitive>({}); // packed gbuffer texture
     info("gbuffer_sensor").set<Sensor>({}); // packed gbuffer texture
   }
     
@@ -92,7 +92,7 @@ namespace met {
 
     
     auto &i_sensor  = info("gbuffer_sensor").getw<Sensor>();
-    auto &i_gbuffer = info("gbuffer_renderer").getw<detail::GBuffer>();
+    auto &i_gbuffer = info("gbuffer_renderer").getw<detail::GBufferRenderPrimitive>();
 
     i_sensor.film_size = e_target.size() / 2;
     i_sensor.proj_trf  = e_arcball.proj().matrix();
