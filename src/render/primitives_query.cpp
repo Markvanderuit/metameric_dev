@@ -2,16 +2,15 @@
 #include <metameric/render/primitives_query.hpp>
 
 namespace met {
-  static gl::ProgramCache<gl::ShaderLoadSPIRVInfo> program_cache;
-
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapReadPersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapReadPersistent;
 
-  FullPathQueryPrimitive::FullPathQueryPrimitive(PathQueryPrimitiveCreateInfo info) {
+  FullPathQueryPrimitive::FullPathQueryPrimitive(PathQueryPrimitiveCreateInfo info)
+  :  m_cache_handle(info.cache_handle) {
     met_trace_full();
 
     // Initialize program object
-    m_program_key = program_cache.set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_query_path_full.comp.spv",
       .cross_path = "resources/shaders/render/primitive_query_path_full.comp.json",
@@ -40,8 +39,8 @@ namespace met {
     // Clear output data, specifically the buffer's head
     m_output.clear({ }, 1u, 4 * sizeof(uint));
 
-    // Get relevant program
-    auto &program = program_cache.at(m_program_key);
+    // Draw relevant program from cache
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();
@@ -88,11 +87,12 @@ namespace met {
     return m_output_data_map.subspan(0, *m_output_head_map);
   }
 
-  PartialPathQueryPrimitive::PartialPathQueryPrimitive(PathQueryPrimitiveCreateInfo info) {
+  PartialPathQueryPrimitive::PartialPathQueryPrimitive(PathQueryPrimitiveCreateInfo info)
+  :  m_cache_handle(info.cache_handle) {
     met_trace_full();
 
     // Initialize program object
-    m_program_key = program_cache.set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_query_path_partial.comp.spv",
       .cross_path = "resources/shaders/render/primitive_query_path_partial.comp.json",
@@ -121,8 +121,8 @@ namespace met {
     // Clear output data, specifically the buffer's head
     m_output.clear({ }, 1u, 4 * sizeof(uint));
 
-    // Get relevant program
-    auto &program = program_cache.at(m_program_key);
+    // Draw relevant program from cache
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();

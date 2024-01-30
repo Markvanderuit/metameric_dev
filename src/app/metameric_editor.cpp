@@ -1,6 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/schedule.hpp>
 #include <small_gl/window.hpp>
+#include <small_gl/program.hpp>
 #include <fmt/core.h>
 #include <cstdlib>
 #include <exception>
@@ -43,6 +44,9 @@ namespace met {
       gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
       gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
     }
+
+    // Initialize program cache, as a resource owned by the scheduler
+    scheduler.global("cache").set<gl::ProgramCache>({ });
 
     // Initialize scene handler, as a resource owned by the scheduler
     auto &scene = scheduler.global("scene").set<Scene>({

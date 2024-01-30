@@ -3,7 +3,7 @@
 
 
 namespace met {
-  static gl::ProgramCache<gl::ShaderLoadSPIRVInfo> program_cache;
+  static gl::ProgramCache program_cache;
 
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
@@ -164,7 +164,7 @@ namespace met {
     if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
       reset(sensor, scene);
 
-    // Return early if sample count has reached specified maximum
+    // Return converged film if sample state was exhausted
     guard(has_next_sample_state(), m_film);
 
     // Either render or reuse the current gbuffer frame as an initial hit
@@ -220,11 +220,12 @@ namespace met {
   }
 
   PathRenderPrimitive::PathRenderPrimitive(PathRenderPrimitiveCreateInfo info)
-  : detail::IntegrationRenderPrimitive() {
+  : detail::IntegrationRenderPrimitive(),
+    m_cache_handle(info.cache_handle) {
     met_trace_full();
 
     // Initialize program object, if it doesn't yet exist
-    m_program_key = program_cache.set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_path.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_path.comp.json",
@@ -265,8 +266,8 @@ namespace met {
     // Return early if sample count has reached specified maximum
     guard(has_next_sample_state(), m_film);
 
-    // Get relevant program
-    auto &program = program_cache.at(m_program_key);
+    // Draw relevant program from cache
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();

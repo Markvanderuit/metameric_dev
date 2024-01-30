@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/scheduler.hpp>
 #include <metameric/render/detail/primitives.hpp>
 #include <metameric/render/path.hpp>
 
@@ -39,11 +40,16 @@ namespace met {
 
     // Maximum path length
     uint max_depth = path_max_depth;
+
+    // Program cache; enforced given the shader's long compile time
+    ResourceHandle cache_handle;
   };
 
   class PathRenderPrimitive : public detail::IntegrationRenderPrimitive {
+    // Handle to program cache, and key for relevant program
+    ResourceHandle  m_cache_handle;
+    std::string     m_cache_key; 
     gl::ComputeInfo m_dispatch;
-    std::string     m_program_key; // Key for lookup in cache
 
   public:
     using InfoType = PathRenderPrimitiveCreateInfo;

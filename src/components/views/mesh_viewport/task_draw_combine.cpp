@@ -11,11 +11,6 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  bool MeshViewportDrawCombineTask::is_active(SchedulerHandle &info) {
-    met_trace();
-    return info.relative("viewport_render")("renderer").is_mutated();
-  }
-
   void MeshViewportDrawCombineTask::init(SchedulerHandle &info) {
     met_trace_full();
 
@@ -50,7 +45,7 @@ namespace met {
     m_program.bind("b_direct_4f", e_render.film()); // TODO there is an unnecessary copy going on here
     m_program.bind("b_target_4f", e_target);
 
-    // Dispatch compute shader
+    // Dispatch compute shader to add inputs to viewport target
     gl::sync::memory_barrier(gl::BarrierFlags::eImageAccess | gl::BarrierFlags::eTextureFetch);
     gl::dispatch_compute({ .groups_x         = dispatch_ndiv.x(),
                            .groups_y         = dispatch_ndiv.y(),

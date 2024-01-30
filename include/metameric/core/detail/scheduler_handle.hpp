@@ -68,6 +68,7 @@ namespace met {
     detail::RsrcNode      *m_rsrc_handle; // nullable
 
   public:
+    ResourceHandle() = default;
     ResourceHandle(detail::SchedulerBase *schd_handle, detail::RsrcInfo key);
 
     // State queries
