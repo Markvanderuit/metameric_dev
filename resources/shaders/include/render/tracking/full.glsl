@@ -1,6 +1,7 @@
 #ifndef RENDER_TRACKING_FULL_GLSL_GUARD
 #define RENDER_TRACKING_FULL_GLSL_GUARD
 
+#define ENABLE_PATH_TRACKING
 #define ENABLE_FULL_PATH_TRACKING
 
 #include <render/path.glsl>

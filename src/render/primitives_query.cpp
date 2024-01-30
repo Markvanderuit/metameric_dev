@@ -80,9 +80,10 @@ namespace met {
     return m_output;
   }
 
-  std::span<const Path> FullPathQueryPrimitive::data() {
+  std::span<const Path> FullPathQueryPrimitive::data() const {
     // Wait for output data to be visible, and then
     // return generated output data
+    guard(m_output_sync.is_init(), std::span<const Path>());
     m_output_sync.cpu_wait();
     return m_output_data_map.subspan(0, *m_output_head_map);
   }
@@ -162,9 +163,10 @@ namespace met {
     return m_output;
   }
 
-  std::span<const Path> PartialPathQueryPrimitive::data() {
+  std::span<const Path> PartialPathQueryPrimitive::data() const {
     // Wait for output data to be visible, and then
     // return generated output data
+    guard(m_output_sync.is_init(), std::span<const Path>());
     m_output_sync.cpu_wait();
     return m_output_data_map.subspan(0, *m_output_head_map);
   }

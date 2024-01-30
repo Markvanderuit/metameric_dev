@@ -13,21 +13,22 @@
 
 namespace met {
   class MeshViewportInputTask : public detail::TaskNode {
-    FullPathQueryPrimitive m_query_prim;
-    RaySensor              m_query_sensor;
+    RaySensor m_query_sensor;
 
   public:
     void init(SchedulerHandle &info) override {
       met_trace();
 
-      m_query_prim = {{ .max_depth    = 4,
-                        .cache_handle = info.global("cache") }};
-
-      info.resource("arcball").init<detail::Arcball>({ 
+      info("arcball").init<detail::Arcball>({ 
         .dist            = 2.f,
         .e_eye           = { -.5f, .5f, 1.f },
         .e_center        = { -.5f, .5f, .0f },
         .zoom_delta_mult = 0.1f
+      });
+
+      info("path_query").init<FullPathQueryPrimitive>({
+        .max_depth    = 4,
+        .cache_handle = info.global("cache")
       });
     } 
 
@@ -124,7 +125,8 @@ namespace met {
       // Get shared resources
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &io        = ImGui::GetIO();
-      const auto &i_arcball = info.resource("arcball").getr<detail::Arcball>();
+      const auto &i_arcball = info("arcball").getr<detail::Arcball>();
+      auto &i_path_query    = info("path_query").getw<FullPathQueryPrimitive>();
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -139,23 +141,22 @@ namespace met {
       // Update ray sensor
       m_query_sensor.origin    = camera_ray.o;
       m_query_sensor.direction = camera_ray.d;
-      m_query_sensor.n_paths   = 4;
+      // m_query_sensor.n_paths   = 1;
       m_query_sensor.flush();
 
       // Perform path query
-      m_query_prim.query(m_query_sensor, e_scene);
+      i_path_query.query(m_query_sensor, e_scene);
 
       // Obtain queried paths
-      auto paths = m_query_prim.data();
-
-      if (paths.empty()) {
+      auto paths = i_path_query.data();
+      /* if (paths.empty()) {
         fmt::print("No contributing paths found\n");
       } else {
         fmt::print("Contributing paths found:\n");
         for (const auto &path : paths) {
           fmt::print("\tof depth {}\n", path.path_depth);
         }
-      }
+      } */
     }
 
     void eval(SchedulerHandle &info) override {
@@ -175,6 +176,13 @@ namespace met {
         auto &i_arcball = arcball_handle.getw<detail::Arcball>();
         i_arcball.set_aspect(viewport_size.x() / viewport_size.y());
       }
+
+      // TODO remove
+      if (ImGui::Begin("Blahhh")) {
+        uint min_v = 1, max_v = 65536;
+        ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_sensor.n_paths, &min_v, &max_v);
+      }
+      ImGui::End();
 
       // If window is not hovered, exit now instead of handling user input
       guard(ImGui::IsItemHovered());

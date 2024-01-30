@@ -8,7 +8,7 @@
 #include <render/sensor.glsl>
 
 // Macros for enabling/disabling path tracking
-#if defined(ENABLE_FULL_PATH_TRACKING) || defined(ENABLE_PARTIAL_PATH_TRACKING)
+#ifdef ENABLE_PATH_TRACKING
 #define path_initialize(pt) Path pt; { pt.path_depth = 0; }
 void path_extend(inout Path pt, in Ray r) {
   pt.data[pt.path_depth++] = PathVertex(ray_get_position(r), r.data);

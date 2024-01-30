@@ -1,7 +1,6 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
 
-
 namespace met {
   static gl::ProgramCache program_cache;
 
@@ -111,7 +110,7 @@ namespace met {
         return meshes.gl.draw_commands[comp.value.mesh_i];
       });
 
-      // Specify draw state for next subask
+      // Specify draw state for next subtask
       gl::state::set_viewport(sensor.film_size);    
       gl::state::set_depth_range(0.f, 1.f);
       gl::state::set_op(gl::DepthOp::eLessOrEqual);

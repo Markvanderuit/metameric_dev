@@ -28,9 +28,10 @@ namespace met {
     met_trace_full();
 
     // Get shared resources 
-    const auto &e_scene  = info.global("scene").getr<Scene>();
-    const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
-    const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_target  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_render  = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
+    const auto &e_overlay = info.relative("viewport_draw_overlay")("target").getr<gl::Texture2d4f>();
 
     // Specify dispatch size
     auto dispatch_n    = e_target.size();
@@ -41,9 +42,10 @@ namespace met {
     m_unif_buffer.flush();
 
     // Bind required resources to their corresponding targets
-    m_program.bind("b_buff_unif", m_unif_buffer);
-    m_program.bind("b_direct_4f", e_render.film()); // TODO there is an unnecessary copy going on here
-    m_program.bind("b_target_4f", e_target);
+    m_program.bind("b_buff_unif",  m_unif_buffer);
+    m_program.bind("b_render_4f",  e_render.film());
+    m_program.bind("b_overlay_4f", e_overlay);
+    m_program.bind("b_target_4f",  e_target);
 
     // Dispatch compute shader to add inputs to viewport target
     gl::sync::memory_barrier(gl::BarrierFlags::eImageAccess | gl::BarrierFlags::eTextureFetch);

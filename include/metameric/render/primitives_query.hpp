@@ -21,9 +21,9 @@ namespace met {
     std::string     m_cache_key; 
 
     // Output data mappings and sync objects
-    uint           *m_output_head_map;
-    std::span<Path> m_output_data_map;
-    gl::sync::Fence m_output_sync;
+    uint                   *m_output_head_map;
+    std::span<Path>         m_output_data_map;
+    mutable gl::sync::Fence m_output_sync;
 
   public:
     using InfoType = PathQueryPrimitiveCreateInfo;
@@ -31,7 +31,7 @@ namespace met {
     FullPathQueryPrimitive() = default;
     FullPathQueryPrimitive(InfoType info);
     
-    std::span<const Path> data();
+    std::span<const Path> data() const;
 
     const gl::Buffer &query(const RaySensor &sensor, const Scene &scene) override;
   };
@@ -44,9 +44,9 @@ namespace met {
     std::string     m_cache_key; 
 
     // Output data mappings and sync objects
-    uint           *m_output_head_map;
-    std::span<Path> m_output_data_map;
-    gl::sync::Fence m_output_sync;
+    uint                   *m_output_head_map;
+    std::span<Path>         m_output_data_map;
+    mutable gl::sync::Fence m_output_sync;
 
   public:
     using InfoType = PathQueryPrimitiveCreateInfo;
@@ -54,7 +54,7 @@ namespace met {
     PartialPathQueryPrimitive() = default;
     PartialPathQueryPrimitive(InfoType info);
 
-    std::span<const Path> data();
+    std::span<const Path> data() const;
 
     const gl::Buffer &query(const RaySensor &sensor, const Scene &scene) override;
   };

@@ -36,6 +36,7 @@ PreliminaryDiffuseBRDF init_brdf_diffuse_preliminary(in SurfaceInfo si) {
 void init_brdf_diffuse(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   PreliminaryDiffuseBRDF pr = init_brdf_diffuse_preliminary(si);
   
+#ifndef ENABLE_PARTIAL_PATH_TRACKING
   // Obtain spectral reflectance
   if (pr.index >= 0) {
     // Hot path; all element indices are the same, so use the one index for texture lookups
@@ -77,6 +78,9 @@ void init_brdf_diffuse(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
 
     brdf.r = mix(mix(r[0], r[1], alpha.x), mix(r[2], r[3], alpha.x), alpha.y);
   }
+#else
+  brdf.r = vec4(1);
+#endif
 }
 
 BRDFSample sample_brdf_diffuse(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo si) {

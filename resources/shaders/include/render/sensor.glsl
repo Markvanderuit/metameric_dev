@@ -77,6 +77,13 @@ SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in vec3 sample_3d) {
   return ss;
 }
 
+vec3 sensor_apply(in vec4 wvls, in vec4 L) {
+  mat4x3 cmfs;
+  for (uint i = 0; i < 4; ++i)
+    cmfs[i] = texture(cmfs_spectra(), vec2(wvls[i], 0)).xyz;
+  return cmfs * L;
+}
+
 vec3 sensor_apply(in SensorSample sensor_sample, in vec4 L) {
   mat4x3 cmfs;
   for (uint i = 0; i < 4; ++i)
