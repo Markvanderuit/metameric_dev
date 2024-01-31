@@ -1,0 +1,72 @@
+#include <preamble.glsl>
+#include <math.glsl>
+#include <spectrum.glsl>
+#include <distribution.glsl>
+#include <sampler/uniform.glsl>
+#include <render/ray.glsl>
+#include <render/load.glsl>
+
+// General layout rule declarations
+layout(local_size_x_id = 0) in;
+layout(std140) uniform;
+layout(std430) buffer;
+
+layout(binding = 1) uniform b_buff_objects {
+  uint n;
+  ObjectInfo data[max_supported_objects];
+} buff_objects;
+layout(binding = 2) uniform b_buff_meshes {
+  uint n;
+  MeshInfo data[max_supported_meshes];
+} buff_meshes;
+layout(binding = 3) uniform b_buff_emitters {
+  uint n;
+  EmitterInfo data[max_supported_objects];
+} buff_emitters;
+
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { 
+  BVHNodePack  data[]; 
+} buff_bvhs_node;
+layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { 
+  MeshPrimPack data[]; 
+} buff_bvhs_prim;
+layout(binding = 2) restrict coherent buffer b_buff_output { 
+  uint head;
+  uint padd[3]; /* align head to 16 bytes */ 
+  Ray data[];
+} buff_output;
+
+// Shared memory declarations
+shared ObjectInfo  s_objc_info[max_supported_objects];
+shared EmitterInfo s_emtr_info[max_supported_objects];
+shared MeshInfo    s_mesh_info[max_supported_meshes];
+
+declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+declare_scene_object_data(s_objc_info, buff_objects.n);
+declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
+declare_scene_traversal_stack(8); 
+declare_scene_illuminant_data_default();
+declare_scene_cmfs_data_default();
+declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
+declare_distr_sampler_default(emitters, buff_emitters_distr, max_supported_emitters)
+
+// All includes from and in here rely on buffers/samplers to be declared
+#include <render/scene.glsl>
+#include <render/sensor.glsl>
+
+void load_shared() {
+  const uint iter = hprod(gl_WorkGroupSize.xyz);
+  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
+  memoryBarrierShared();
+  barrier();
+}
+
+void main() {
+  load_shared();
+
+  // Clamp invocations to requested size
+  guard(gl_GlobalInvocationID.x < buff_sensor.n);
+}

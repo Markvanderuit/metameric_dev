@@ -89,7 +89,6 @@ declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
 declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f);
 
 // All includes from and in here rely on buffers/samplers to be declared
-#define ENABLE_PARTIAL_PATH_TRACKING
 #include <render/path.glsl>
 
 void load_shared() {

@@ -30,7 +30,7 @@
 
 #define declare_scene_emitter_data(scene_buff_emtr_info, scene_buff_emtr_count) \
   EmitterInfo scene_emitter_info(uint i) { return scene_buff_emtr_info[i]; }    \
-  uint scene_emitter_count() { return scene_buff_emtr_count; }
+  uint scene_emitter_count() { return scene_buff_emtr_count; }  
 
 #define declare_scene_object_data(scene_buff_objc_info, scene_buff_objc_count)  \
   ObjectInfo scene_object_info(uint i) { return scene_buff_objc_info[i]; }      \
@@ -43,10 +43,31 @@
   sampler2DArray  scene_reflectance_barycentrics()           { return scene_txtr_bary_data;    } \
   sampler1DArray  scene_reflectance_spectra()                { return scene_txtr_spec_data;    }
 
-#define declare_scene_cmfs_data(scene_txtr_cmfs_data)           \
-  sampler1DArray cmfs_spectra() { return scene_txtr_cmfs_data; }
+#define declare_scene_cmfs_data(scene_txtr_cmfs_data)                  \
+  mat4x3 scene_cmfs(uint cmfs_i, vec4 wvls) {                          \
+    mat4x3 v;                                                          \
+    for (uint i = 0; i < 4; ++i)                                       \
+      v[i] = texture(scene_txtr_cmfs_data, vec2(wvls[i], cmfs_i)).xyz; \
+    return v;                                                          \
+  }
+
+#define declare_scene_cmfs_data_default()     \
+  mat4x3 scene_cmfs(uint cmfs_i, vec4 wvls) { \
+    return mat4x3(1);                         \
+  }
 
 #define declare_scene_illuminant_data(scene_txtr_illm_data)           \
-  sampler1DArray illuminant_spectra() { return scene_txtr_illm_data; }
+  vec4 scene_illuminant(uint illm_i, vec4 wvls) {                     \
+    vec4 v;                                                           \
+    for (uint i = 0; i < 4; ++i)                                      \
+      v[i] = texture(scene_txtr_illm_data, vec2(wvls[i], illm_i)).x;  \
+    return v;                                                         \
+  }
+
+#define declare_scene_illuminant_data_default()   \
+  vec4 scene_illuminant(uint cmfs_i, vec4 wvls) { \
+    return vec4(1);                               \
+  }
+
 
 #endif // RENDER_DETAIL_SCENE_DECLARE_GLSL_GUARD

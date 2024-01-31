@@ -1,6 +1,5 @@
 #pragma once
 
-#include <metameric/core/data.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/ray.hpp>
 #include <metameric/core/scene.hpp>
@@ -12,7 +11,7 @@
 #include <small_gl/window.hpp>
 
 namespace met {
-  class MeshViewportInputTask : public detail::TaskNode {
+  class MeshViewportCameraInputTask : public detail::TaskNode {
     RaySensor m_query_sensor;
 
   public:
@@ -141,7 +140,6 @@ namespace met {
       // Update ray sensor
       m_query_sensor.origin    = camera_ray.o;
       m_query_sensor.direction = camera_ray.d;
-      // m_query_sensor.n_paths   = 1;
       m_query_sensor.flush();
 
       // Perform path query
@@ -149,14 +147,21 @@ namespace met {
 
       // Obtain queried paths
       auto paths = i_path_query.data();
-      /* if (paths.empty()) {
-        fmt::print("No contributing paths found\n");
-      } else {
-        fmt::print("Contributing paths found:\n");
-        for (const auto &path : paths) {
-          fmt::print("\tof depth {}\n", path.path_depth);
+      fmt::print("Queried {} paths, found {}\n",
+        m_query_sensor.n_samples,
+        paths.size());
+
+      if (!paths.empty()) {
+        auto path = paths.front();
+        for (uint i = 0; i < path.path_depth; ++i) {
+          auto vert = path.data[i];
+          guard_break(vert.surface_is_valid());
+          fmt::print("{}{} - {}\n", 
+            vert.surface_is_object() ? "Object: " : "Emitter: ",
+            vert.surface_is_object() ? vert.surface_object_i() : vert.surface_emitter_i(),
+            vert.p);
         }
-      } */
+      }
     }
 
     void eval(SchedulerHandle &info) override {
@@ -180,7 +185,7 @@ namespace met {
       // TODO remove
       if (ImGui::Begin("Blahhh")) {
         uint min_v = 1, max_v = 65536;
-        ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_sensor.n_paths, &min_v, &max_v);
+        ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_sensor.n_samples, &min_v, &max_v);
       }
       ImGui::End();
 

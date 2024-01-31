@@ -37,7 +37,7 @@ namespace met {
     // Get handles, shared resources, modified resources
     const auto &e_scene = info.global("scene").getr<Scene>();
     auto target_handle  = info.relative("viewport_begin")("lrgb_target");
-    auto camera_handle  = info.relative("viewport_input")("arcball");
+    auto camera_handle  = info.relative("viewport_input_camera")("arcball");
     auto render_handle  = info("renderer");
     auto sensor_handle  = info("sensor");
 

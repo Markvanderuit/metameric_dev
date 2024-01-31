@@ -61,4 +61,27 @@ struct DistributionSampleDiscrete {
     return ds;                                                          \
   }                                                                     \
 
+#define declare_distr_sampler_default(name, distr, distr_size)          \
+  float pdf_##name##_discrete(in uint i) {                              \
+    return 1.f;                                                         \
+  }                                                                     \
+                                                                        \
+  float pdf_##name(in float sample_1d) {                                \
+    return 1.f;                                                         \
+  }                                                                     \
+                                                                        \
+  DistributionSampleDiscrete sample_##name##_discrete(in float u) {     \
+    DistributionSampleDiscrete ds;                                      \
+    ds.i   = 0u;                                                        \
+    ds.pdf = 1.f;                                                       \
+    return ds;                                                          \
+  }                                                                     \
+                                                                        \
+  DistributionSampleContinuous sample_##name##_continuous(in float u) { \
+    DistributionSampleContinuous ds;                                    \
+    ds.f   = 0.f;                                                       \
+    ds.pdf = 1.f;                                                       \
+    return ds;                                                          \
+  }                                                                     \
+
 #endif // DISTRIBUTION_GLSL_GUARD

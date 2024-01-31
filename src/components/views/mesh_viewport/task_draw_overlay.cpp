@@ -15,7 +15,7 @@ namespace met {
 
   bool MeshViewportDrawOverlayTask::is_active(SchedulerHandle &info) {
     met_trace();
-    const auto &e_query  = info.relative("viewport_input")("path_query").getr<FullPathQueryPrimitive>();
+    const auto &e_query  = info.relative("viewport_input_camera")("path_query").getr<FullPathQueryPrimitive>();
     return !e_query.data().empty();
   }
 
@@ -45,7 +45,7 @@ namespace met {
     const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
     const auto &e_sensor = info.relative("viewport_render")("sensor").getr<Sensor>();
     const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
-    const auto &e_query  = info.relative("viewport_input")("path_query").getr<FullPathQueryPrimitive>();
+    const auto &e_query  = info.relative("viewport_input_camera")("path_query").getr<FullPathQueryPrimitive>();
     auto &i_target = info("target").getw<gl::Texture2d4f>();
 
     // Prepare output framebuffer
