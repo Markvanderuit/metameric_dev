@@ -1,5 +1,6 @@
 #include <preamble.glsl>
 #include <math.glsl>
+#include <render/load/defaults.glsl>
 #include <render/gbuffer.glsl>
 #include <render/scene.glsl>
 

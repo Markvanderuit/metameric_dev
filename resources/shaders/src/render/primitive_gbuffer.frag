@@ -1,6 +1,7 @@
 #include <preamble.glsl>
 #include <render/gbuffer.glsl>
 #include <render/ray.glsl>
+#include <render/load/defaults.glsl>
 #include <render/scene.glsl>
 
 // Fragment early-Z declaration
@@ -26,7 +27,6 @@ layout(binding = 2) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
-
 
 Ray ray_from_sensor() {
   // Get necessary sensor information

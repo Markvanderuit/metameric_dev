@@ -25,13 +25,8 @@ vec4 eval_emitter_sphere(in EmitterInfo em, in PositionSample ps, in vec4 wvls) 
   // If normal is not inclined along the ray, return nothing
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
-  
-  #ifdef SCENE_DATA_AVAILABLE
+
   vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  #else
-  vec4 v = vec4(1);
-  #endif
-    
   return v * em.illuminant_scale;
 }
 

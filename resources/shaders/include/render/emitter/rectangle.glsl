@@ -26,13 +26,7 @@ vec4 eval_emitter_rectangle(in EmitterInfo em, in PositionSample ps, in vec4 wvl
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
   
-  #ifdef SCENE_DATA_AVAILABLE
   vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  #else
-  vec4 v = vec4(1);
-  #endif
-  
-    
   return v * em.illuminant_scale;
 }
 

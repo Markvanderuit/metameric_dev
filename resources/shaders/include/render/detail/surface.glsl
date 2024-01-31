@@ -17,8 +17,6 @@ vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
 }
 
 void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
-  #ifdef SCENE_DATA_AVAILABLE
-
   // On a valid surface, fill in surface info
   ObjectInfo object_info = scene_object_info(record_get_object(si.data));
   MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
@@ -67,13 +65,9 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.sh = get_frame(ns);
   si.wi = to_local(si.sh, -ray.d);
   si.t  = ray.t;
-
-  #endif // SCENE_DATA_AVAILABLE
 }
 
 void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
-  #ifdef SCENE_DATA_AVAILABLE
-  
   // On a valid emitter, fill in surface info
   EmitterInfo em = scene_emitter_info(record_get_emitter(si.data));
   
@@ -91,8 +85,6 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
   si.sh = get_frame(si.n);
   si.wi = to_local(si.sh, -ray.d);
   si.t  = ray.t;
-  
-  #endif // SCENE_DATA_AVAILABLE
 }
 
 #endif // GLSL_SURFACE_DETAIL_GUARD

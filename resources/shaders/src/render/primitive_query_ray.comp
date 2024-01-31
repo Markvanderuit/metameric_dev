@@ -3,14 +3,26 @@
 #include <spectrum.glsl>
 #include <distribution.glsl>
 #include <sampler/uniform.glsl>
+#include <render/detail/path_types.glsl>
+#include <render/detail/scene_types.glsl>
+#include <render/load/bvh.glsl>
+#include <render/load/emitter.glsl>
+#include <render/load/object.glsl>
+#include <render/load/defaults.glsl>
 #include <render/ray.glsl>
-#include <render/load.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0) in;
 layout(std140) uniform;
 layout(std430) buffer;
 
+layout(binding = 0) uniform b_buff_sensor {
+  mat4  full_trf;
+  mat4  proj_trf;
+  mat4  view_trf;
+  uvec2 film_size; 
+  uvec2 pixel;
+} buff_sensor;
 layout(binding = 1) uniform b_buff_objects {
   uint n;
   ObjectInfo data[max_supported_objects];
@@ -42,12 +54,10 @@ shared ObjectInfo  s_objc_info[max_supported_objects];
 shared EmitterInfo s_emtr_info[max_supported_objects];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
 
+declare_scene_traversal_stack(8); 
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_traversal_stack(8); 
-declare_scene_illuminant_data_default();
-declare_scene_cmfs_data_default();
 declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler_default(emitters, buff_emitters_distr, max_supported_emitters)
 

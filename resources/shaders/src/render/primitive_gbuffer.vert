@@ -1,4 +1,5 @@
 #include <preamble.glsl>
+#include <render/load/defaults.glsl>
 #include <render/scene.glsl>
 
 // Buffer layout declarations

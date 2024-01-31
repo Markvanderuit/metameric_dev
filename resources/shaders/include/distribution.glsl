@@ -79,7 +79,7 @@ struct DistributionSampleDiscrete {
                                                                         \
   DistributionSampleContinuous sample_##name##_continuous(in float u) { \
     DistributionSampleContinuous ds;                                    \
-    ds.f   = 0.f;                                                       \
+    ds.f   = u;                                                         \
     ds.pdf = 1.f;                                                       \
     return ds;                                                          \
   }                                                                     \

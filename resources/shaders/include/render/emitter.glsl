@@ -14,8 +14,6 @@
 #include <render/emitter/point.glsl>
 #include <render/emitter/constant.glsl>
 
-#ifdef SCENE_DATA_AVAILABLE
-
 PositionSample sample_emitter(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   if (em.type == EmitterTypeSphere) {
     return sample_emitter_sphere(em, si, sample_2d);
@@ -70,7 +68,7 @@ PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {
   ds.pdf /= float(max_supported_emitters);
 
   // Sample position on emitter surface
-  PositionSample ps = sample_emitter(s_emtr_info[ds.i], si, sample_3d.xy);
+  PositionSample ps = sample_emitter(scene_emitter_info(ds.i), si, sample_3d.xy);
   record_set_emitter(ps.data, ds.i);
   ps.pdf *= ds.pdf;
   
@@ -118,5 +116,4 @@ bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
   }
 }
 
-#endif // SCENE_DATA_AVAILABLE
 #endif // RENDER_EMITTER_GLSL_GUARD

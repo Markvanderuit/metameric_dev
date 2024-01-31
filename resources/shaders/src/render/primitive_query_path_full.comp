@@ -3,7 +3,17 @@
 #include <spectrum.glsl>
 #include <distribution.glsl>
 #include <sampler/uniform.glsl>
-#include <render/load.glsl>
+// #include <render/load.glsl>
+
+#include <render/detail/path_types.glsl>
+#include <render/detail/scene_types.glsl>
+#include <render/load/bvh.glsl>
+#include <render/load/cmfs.glsl>
+#include <render/load/emitter.glsl>
+#include <render/load/illuminant.glsl>
+#include <render/load/object.glsl>
+#include <render/load/reflectance.glsl>
+#include <render/load/defaults.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0) in;

@@ -31,14 +31,9 @@ SensorSample sample_sensor(in RaySensor sensor, in float sample_1d) {
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
   for (uint i = 0; i < 4; ++i) {
-    #ifdef SCENE_DATA_AVAILABLE
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_1d, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
-    #else // SCENE_DATA_AVAILABLE
-    ss.wvls[i] = rotate_sample_1d(sample_1d);
-    ss.pdfs[i] = 1.f;
-    #endif // SCENE_DATA_AVAILABLE
   }
 
   return ss;
@@ -64,14 +59,9 @@ SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in vec3 sample_3d) {
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
   for (uint i = 0; i < 4; ++i) {
-    #ifdef SCENE_DATA_AVAILABLE
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
-    #else // SCENE_DATA_AVAILABLE
-    ss.wvls[i] = rotate_sample_1d(sample_3d.z);
-    ss.pdfs[i] = 1.f;
-    #endif // SCENE_DATA_AVAILABLE
   }
 
   return ss;

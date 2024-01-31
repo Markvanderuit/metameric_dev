@@ -1,8 +1,6 @@
 #ifndef RENDER_OBJECT_GLSL_GUARD
 #define RENDER_OBJECT_GLSL_GUARD
 
-#ifdef SCENE_DATA_AVAILABLE
-
 void ray_intersect_object(inout Ray ray, uint object_i) {
   ObjectInfo object_info = scene_object_info(object_i);
   
@@ -49,5 +47,4 @@ bool ray_intersect_object_any(in Ray ray, uint object_i) {
   return ray_intersect_bvh_any(ray_local, object_info.mesh_i);
 }
 
-#endif // SCENE_DATA_AVAILABLE
 #endif // RENDER_OBJECT_GLSL_GUARD

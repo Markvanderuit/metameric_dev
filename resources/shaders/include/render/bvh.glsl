@@ -56,8 +56,6 @@ BVHNode unpack(in BVHNodePack p) {
   return n;
 }
 
-#ifdef SCENE_DATA_AVAILABLE
-
 bool ray_intersect_bvh_any(in Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
@@ -194,5 +192,4 @@ bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
   return hit;
 }
 
-#endif // SCENE_DATA_AVAILABLE
 #endif // RENDER_BVH_GLSL_GUARD

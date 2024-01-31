@@ -2,7 +2,9 @@
 #include <math.glsl>
 #include <spectrum.glsl>
 #include <distribution.glsl>
-#include <render/load.glsl>
+#include <render/detail/path_types.glsl>
+#include <render/load/cmfs.glsl>
+#include <render/load/defaults.glsl>
 
 // Buffer layout declarations
 layout(std140) uniform;
@@ -35,7 +37,6 @@ layout(location = 0) out vec3 out_value_c;
 layout(binding = 0) uniform sampler1DArray b_cmfs_3f; // Observer function data, 3 components
 
 // Declare access to cmfs and wavelength data for sensor code
-declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_scene_cmfs_data(b_cmfs_3f);
 
 // All includes from and in here rely on buffers/samplers to be declared
