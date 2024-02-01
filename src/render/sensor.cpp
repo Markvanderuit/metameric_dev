@@ -48,7 +48,6 @@ namespace met {
 
     m_unif_map->origin    = origin;
     m_unif_map->direction = direction;
-    m_unif_map->n_samples = n_samples;
 
     m_unif.flush();
   }

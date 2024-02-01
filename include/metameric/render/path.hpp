@@ -9,27 +9,47 @@ namespace met {
   constexpr uint path_emitter_flag = 0x80000000;
   constexpr uint path_object_flag  = 0x00000000;
 
-  // A single vertex in a queried path object
-  struct PathVertex {
+  // Representation of record data used, generated, and stored by render/query primitives
+  struct SurfaceRecord {
+    uint data;
+    
+  public:
+    bool is_valid()    const { return data != path_invalid_data;       }
+    bool is_emitter()  const { return (data & path_emitter_flag) != 0; }
+    bool is_object()   const { return (data & path_emitter_flag) == 0; }
+    uint object_i()    const { return (data >> 24) & 0x0000007F;       }
+    uint emitter_i()   const { return (data >> 24) & 0x0000007F;       }
+    uint primitive_i() const { return data & 0x00FFFFFF;               }
+  };
+
+  // Ray with a surface record packed inside
+  struct RayRecord {
+    eig::Vector3f o;
+    float         t;
+    eig::Vector3f d;
+    SurfaceRecord record;
+
+  public:
+    eig::Vector3f get_position() const {
+      return t == std::numeric_limits<float>::max() 
+        ? eig::Vector3f(std::numeric_limits<float>::max())
+        : o + t * d;
+    }
+  };
+  static_assert(sizeof(RayRecord) == 32);
+
+  // A single vertex in a queried path object, with a surface record packed inside
+  struct PathVertexRecord {
     // World hit position
     eig::Array3f p;
 
     // Record storing surface data; object/emitter/primitive id
-    uint data;
-
-  public:
-    // Data extraction methods
-    bool surface_is_valid()    const { return data != path_invalid_data;       }
-    bool surface_is_emitter()  const { return (data & path_emitter_flag) != 0; }
-    bool surface_is_object()   const { return (data & path_emitter_flag) == 0; }
-    uint surface_object_i()    const { return (data >> 24) & 0x0000007F;       }
-    uint surface_emitter_i()   const { return (data >> 24) & 0x0000007F;       }
-    uint surface_primitive_i() const { return data & 0x00FFFFFF;               }
+    SurfaceRecord record;
   };
-  static_assert(sizeof(PathVertex) == 16);
+  static_assert(sizeof(PathVertexRecord) == 16);
   
   // A queried path object
-  struct Path {
+  struct PathRecord {
     // Sampled path wavelengths
     alignas(16) eig::Array4f wavelengths;
 
@@ -41,8 +61,8 @@ namespace met {
     // Actual length of path before termination
     alignas(16) uint path_depth;
 
-    // Path vertex information, up to maximum depth
-    alignas(16) std::array<PathVertex, path_max_depth> data;
+    // PathRecord vertex information, up to maximum depth
+    alignas(16) std::array<PathVertexRecord, path_max_depth> data;
   };
-  static_assert(sizeof(Path) == (3 + path_max_depth) * 16);
+  static_assert(sizeof(PathRecord) == (3 + path_max_depth) * 16);
 } // namespace met

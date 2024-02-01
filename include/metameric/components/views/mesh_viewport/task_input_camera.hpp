@@ -13,6 +13,7 @@
 namespace met {
   class MeshViewportCameraInputTask : public detail::TaskNode {
     RaySensor m_query_sensor;
+    uint      m_query_spp = 1;
 
   public:
     void init(SchedulerHandle &info) override {
@@ -143,25 +144,25 @@ namespace met {
       m_query_sensor.flush();
 
       // Perform path query
-      i_path_query.query(m_query_sensor, e_scene);
+      i_path_query.query(m_query_sensor, e_scene, m_query_spp);
 
-      // Obtain queried paths
+      /* // Obtain queried paths
       auto paths = i_path_query.data();
       fmt::print("Queried {} paths, found {}\n",
-        m_query_sensor.n_samples,
+        m_query_spp,
         paths.size());
 
       if (!paths.empty()) {
         auto path = paths.front();
         for (uint i = 0; i < path.path_depth; ++i) {
           auto vert = path.data[i];
-          guard_break(vert.surface_is_valid());
+          guard_break(vert.record.is_valid());
           fmt::print("{}{} - {}\n", 
-            vert.surface_is_object() ? "Object: " : "Emitter: ",
-            vert.surface_is_object() ? vert.surface_object_i() : vert.surface_emitter_i(),
+            vert.record.is_object() ? "Object: " : "Emitter: ",
+            vert.record.is_object() ? vert.record.object_i() : vert.record.emitter_i(),
             vert.p);
         }
-      }
+      } */
     }
 
     void eval(SchedulerHandle &info) override {
@@ -185,7 +186,7 @@ namespace met {
       // TODO remove
       if (ImGui::Begin("Blahhh")) {
         uint min_v = 1, max_v = 65536;
-        ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_sensor.n_samples, &min_v, &max_v);
+        ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();
 

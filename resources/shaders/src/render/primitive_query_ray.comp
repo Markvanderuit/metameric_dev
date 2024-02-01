@@ -3,13 +3,13 @@
 #include <spectrum.glsl>
 #include <distribution.glsl>
 #include <sampler/uniform.glsl>
+#include <render/ray.glsl>
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/defaults.glsl>
-#include <render/ray.glsl>
 
 // General layout rule declarations
 layout(local_size_x_id = 0) in;
@@ -17,11 +17,8 @@ layout(std140) uniform;
 layout(std430) buffer;
 
 layout(binding = 0) uniform b_buff_sensor {
-  mat4  full_trf;
-  mat4  proj_trf;
-  mat4  view_trf;
-  uvec2 film_size; 
-  uvec2 pixel;
+  vec3 origin;    /* padd to 16 bytes */ uint p0;
+  vec3 direction; /* padd to 16 bytes */ uint p1;
 } buff_sensor;
 layout(binding = 1) uniform b_buff_objects {
   uint n;
@@ -44,9 +41,7 @@ layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim {
   MeshPrimPack data[]; 
 } buff_bvhs_prim;
 layout(binding = 2) restrict coherent buffer b_buff_output { 
-  uint head;
-  uint padd[3]; /* align head to 16 bytes */ 
-  Ray data[];
+  Ray data;
 } buff_output;
 
 // Shared memory declarations
@@ -78,5 +73,16 @@ void main() {
   load_shared();
 
   // Clamp invocations to requested size
-  guard(gl_GlobalInvocationID.x < buff_sensor.n);
+  guard(gl_GlobalInvocationID.x == 0);
+
+  // Load sensor data
+  RaySensor sensor = { buff_sensor.origin, buff_sensor.direction };
+  
+  // Initialize sampler and generate sensor ray
+  SamplerState state = gl_GlobalInvocationID.x;
+  Ray           ray  = sample_sensor(sensor, next_1d(state)).ray;
+
+  // Intersect sensor ray and store to buffer
+  scene_intersect(ray);
+  buff_output.data = ray;
 }

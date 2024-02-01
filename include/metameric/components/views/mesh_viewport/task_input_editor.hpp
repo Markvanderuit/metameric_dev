@@ -4,12 +4,14 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/sensor.hpp>
+#include <metameric/render/primitives_query.hpp>
 #include <small_gl/texture.hpp>
 
 namespace met {
   class MeshViewportEditorInputTask : public detail::TaskNode {
-    RaySensor   m_query_sensor;
-    PixelSensor m_sensor;
+    RaySensor         m_query_sensor;
+    RayQueryPrimitive m_query_prim;
+    PixelSensor       m_sensor;
 
     // ...
 
@@ -28,32 +30,42 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       
-      // Prepare sensor buffer
+      /* // Prepare sensor buffer
       m_sensor.proj_trf  = e_arcball.proj().matrix();
       m_sensor.view_trf  = e_arcball.view().matrix();
       m_sensor.film_size = viewport_size.cast<uint>();
       m_sensor.pixel     = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size).cast<uint>();
-      m_sensor.flush();
+      m_sensor.flush(); */
 
-      /* // Generate a camera ray from the current mouse position
+      // Generate a camera ray from the current mouse position
       auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
-      auto camera_ray = e_arcball.generate_ray(screen_pos); */
+      auto camera_ray = e_arcball.generate_ray(screen_pos);
       
-      /* // Prepare sensor buffer
+      // Prepare sensor buffer
       m_query_sensor.origin    = camera_ray.o;
       m_query_sensor.direction = camera_ray.d;
-      m_query_sensor.n_samples = 1;
-      m_query_sensor.flush(); */
+      m_query_sensor.flush();
 
       // Run raycast primitive, block for results
-      // ...
+      m_query_prim.query(m_query_sensor, e_scene);
+      auto ray = m_query_prim.data();
+
+      if (ray.record.is_valid()) {
+        if (ray.record.is_emitter()) {
+          fmt::print("Emitter {} hit at {}\n", ray.record.emitter_i(), ray.get_position());
+        } else {
+          fmt::print("Object {} hit at primitive {} at {}\n", ray.record.object_i(), ray.record.primitive_i(), ray.get_position());
+        }
+      } else {
+        fmt::print("No intersection");
+      }
     }
     
   public:
     void init(SchedulerHandle &info) override {
       met_trace();
 
-
+      m_query_prim = {{ .cache_handle = info.global("cache") }};
     }
     
     void eval(SchedulerHandle &info) override {
@@ -62,13 +74,8 @@ namespace met {
       // If window is not hovered, exit now instead of handling user input
       guard(ImGui::IsItemHovered());
 
-      /* // Get handles, shared resources, modified resources
-      const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-      const auto &io        = ImGui::GetIO(); */
-
-      // On 'R' press, start ray query
-      if (ImGui::IsKeyPressed(ImGuiKey_R, false))
+      // On 'T' press for now, start ray query
+      if (ImGui::IsKeyPressed(ImGuiKey_T, false))
         eval_ray_query(info);
     }
   };

@@ -76,16 +76,12 @@ namespace met {
     // Query path starting ray
     eig::Vector3f origin, direction;
 
-    // Target output size; nr of resulting query samples
-    uint n_samples;
-
   private:
     struct alignas(16) UnifLayout {
       eig::AlVector3f origin;
       eig::AlVector3f direction;
-      uint            n_samples; 
     };
-    static_assert(sizeof(UnifLayout) == 48);
+    static_assert(sizeof(UnifLayout) == 32);
 
     gl::Buffer  m_unif;
     UnifLayout *m_unif_map;

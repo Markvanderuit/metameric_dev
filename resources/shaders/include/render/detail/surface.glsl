@@ -29,7 +29,7 @@ void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   si.n = cross(prim.v1.p - prim.v0.p, prim.v2.p - prim.v1.p);
   
   // Reinterpolate surface position, texture coordinates, shading normal using barycentrics
-  vec3 p  = (object_info.trf_mesh_inv * vec4(ray.o + ray.d * ray.t, 1)).xyz;
+  vec3 p  = (object_info.trf_mesh_inv * vec4(ray_get_position(ray), 1)).xyz;
   vec3 b  = detail_gen_barycentric_coords(p, prim);
   vec3 ns = b.x * prim.v0.n  + b.y * prim.v1.n  + b.z * prim.v2.n;
   si.p    = b.x * prim.v0.p  + b.y * prim.v1.p  + b.z * prim.v2.p;

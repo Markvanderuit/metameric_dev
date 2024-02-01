@@ -25,11 +25,30 @@ namespace met::detail {
   // Query base class; queries track and return one or more paths or rays
   class BaseQueryPrimitive {
   protected:
-    gl::Buffer m_output; // Query render target
+    struct QueryUnifLayout {
+      uint spp;
+    };
+
+    gl::Buffer       m_output;    // Query render target
+    gl::Buffer       m_query;     // Query settings
+    QueryUnifLayout *m_query_map; // Corresponding mapped buffer
+
+    // Protected constructor to initialize query buffer and map 
+    BaseQueryPrimitive();
 
   public:
+    // Return output buffer
     const gl::Buffer &output() const { return m_output; }
-    virtual const gl::Buffer &query(const RaySensor &sensor, const Scene &scene) = 0;
+
+    // Take n samples and return output buffer; default-implemented
+    virtual const gl::Buffer &query(const RaySensor &sensor, const Scene &scene, uint spp) {
+      return m_output;
+    }
+    
+    // Take 1 sample and return output buffer
+    const gl::Buffer &query(const RaySensor &sensor, const Scene &scene) {
+      return query(sensor, scene, 1);
+    }
   };
 
   // Repeated sampling renderer base class
@@ -56,9 +75,10 @@ namespace met::detail {
     uint m_spp_curr;
     uint m_spp_per_iter;
 
-  public:
+    // Protected constructor to initialize sampler state buffers and maps
     IntegrationRenderPrimitive();
 
+  public:
     bool has_next_sample_state() const {
       return m_spp_max == 0 || m_spp_curr < m_spp_max;
     }

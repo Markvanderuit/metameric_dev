@@ -3,8 +3,6 @@
 #include <spectrum.glsl>
 #include <distribution.glsl>
 #include <sampler/uniform.glsl>
-// #include <render/load.glsl>
-
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
