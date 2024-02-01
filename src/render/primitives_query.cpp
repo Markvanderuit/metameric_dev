@@ -32,7 +32,7 @@ namespace met {
     });
   }
 
-  const gl::Buffer &FullPathQueryPrimitive::query(const RaySensor &sensor, const Scene &scene, uint spp) {
+  const gl::Buffer &FullPathQueryPrimitive::query(const PixelSensor &sensor, const Scene &scene, uint spp) {
     met_trace_full();
 
     // Resize output buffer to accomodate requested nr. of paths
@@ -119,7 +119,7 @@ namespace met {
     });
   }
 
-  const gl::Buffer &PartialPathQueryPrimitive::query(const RaySensor &sensor, const Scene &scene, uint spp) {
+  const gl::Buffer &PartialPathQueryPrimitive::query(const PixelSensor &sensor, const Scene &scene, uint spp) {
     met_trace_full();
 
     // Resize output buffer to accomodate requested nr. of paths

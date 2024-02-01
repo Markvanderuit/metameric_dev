@@ -5,13 +5,34 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/render/sensor.hpp>
 #include <metameric/render/primitives_query.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/texture.hpp>
 
 namespace met {
+  namespace detail {
+    eig::Vector3f gen_barycentric_coords(eig::Vector3f p, 
+                                         eig::Vector3f a, 
+                                         eig::Vector3f b, 
+                                         eig::Vector3f c) {
+      met_trace();
+
+      eig::Vector3f ab = b - a, 
+                    ac = c - a, 
+                    ap = p - a;
+
+      float d00 = ab.dot(ab), d01 = ab.dot(ac), d11 = ac.dot(ac);        
+      float d20 = ap.dot(ab), d21 = ap.dot(ac), den = d00 * d11 - d01 * d01;   
+
+      eig::Vector3f v = { 0,  (d11 * d20 - d01 * d21) / den,  (d00 * d21 - d01 * d20) / den };
+      v.x() = 1.f - v.y() - v.z();
+      return v;
+    }
+  } // namespace detail
+
   class MeshViewportEditorInputTask : public detail::TaskNode {
     RaySensor         m_query_sensor;
     RayQueryPrimitive m_query_prim;
-    PixelSensor       m_sensor;
+    RayRecord         m_query_result;
 
     // ...
 
@@ -29,13 +50,6 @@ namespace met {
                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      
-      /* // Prepare sensor buffer
-      m_sensor.proj_trf  = e_arcball.proj().matrix();
-      m_sensor.view_trf  = e_arcball.view().matrix();
-      m_sensor.film_size = viewport_size.cast<uint>();
-      m_sensor.pixel     = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size).cast<uint>();
-      m_sensor.flush(); */
 
       // Generate a camera ray from the current mouse position
       auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
@@ -48,35 +62,77 @@ namespace met {
 
       // Run raycast primitive, block for results
       m_query_prim.query(m_query_sensor, e_scene);
-      auto ray = m_query_prim.data();
-
-      if (ray.record.is_valid()) {
-        if (ray.record.is_emitter()) {
-          fmt::print("Emitter {} hit at {}\n", ray.record.emitter_i(), ray.get_position());
-        } else {
-          fmt::print("Object {} hit at primitive {} at {}\n", ray.record.object_i(), ray.record.primitive_i(), ray.get_position());
-        }
+      if (auto ray = m_query_prim.data(); ray.record.is_valid() && ray.record.is_object()) {
+        m_query_result = ray;
       } else {
-        fmt::print("No intersection");
+        m_query_result = RayRecord::invalid();
       }
+
+      /* // Given a valid intersection on a object surface
+      if (ray.record.is_valid() && ray.record.is_object()) {
+        const auto &e_object = e_scene.components.objects[ray.record.object_i()].value;
+        const auto &e_mesh   = e_scene.resources.meshes[e_object.mesh_i].value();
+        const auto &e_prim   = e_mesh.elems[ray.record.primitive_i()];
+        
+        // Determine hit position and barycentric coordinates in primitive
+        auto p    = ray.get_position();
+        auto bary = detail::gen_barycentric_coords((e_object.transform.affine().inverse() 
+                                                    * eig::Vector4f(p.x(), p.y(), p.z(), 1)).head<3>(),
+                                                   e_mesh.verts[e_prim[0]],
+                                                   e_mesh.verts[e_prim[1]],
+                                                   e_mesh.verts[e_prim[2]]);
+
+        fmt::print("{} -> {}\n", p, bary);
+      } */
     }
     
   public:
     void init(SchedulerHandle &info) override {
       met_trace();
 
-      m_query_prim = {{ .cache_handle = info.global("cache") }};
+      m_query_prim   = {{ .cache_handle = info.global("cache") }};
+      m_query_result = RayRecord::invalid();
     }
     
     void eval(SchedulerHandle &info) override {
       met_trace();
 
-      // If window is not hovered, exit now instead of handling user input
-      guard(ImGui::IsItemHovered());
+      // Get handles, shared resources, modified resources
+      const auto &e_scene   = info.global("scene").getr<Scene>();
+      const auto &e_target  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
+      const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+      const auto &io        = ImGui::GetIO();
 
-      // On 'T' press for now, start ray query
-      if (ImGui::IsKeyPressed(ImGuiKey_T, false))
-        eval_ray_query(info);
+      // If window is not hovered, skip instead of enabling user input over the active viewport
+      if (ImGui::IsItemHovered()) {
+        // On 'T' press for now, start ray query
+        if (ImGui::IsKeyPressed(ImGuiKey_T, false))
+          eval_ray_query(info);
+      }
+
+      // If a valid result is stored, show test tooltip for now
+      if (m_query_result.record.is_valid()) {
+        // Compute viewport offset and size, minus ImGui's tab bars etc
+        eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+        eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+
+        // Get pixel position from query result's world position
+        auto xy = eig::world_to_window_space(m_query_result.get_position(),
+                                             e_arcball.full(),
+                                             viewport_offs,
+                                             viewport_size);
+
+        // Spawn floating window if pixel position falls within viewport
+        if (!(xy.array() <= viewport_offs).any() && !(xy.array() >= viewport_offs + viewport_size).any()) {
+          ImGui::SetNextWindowPos(xy);
+          if (ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoDecoration)) {
+            ImGui::Text("Hi!\n");
+          }
+          ImGui::End();
+        }
+      }
     }
   };
 } // namespace met

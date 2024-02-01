@@ -8,6 +8,16 @@ struct Sensor {
   uvec2 film_size;
 };
 
+// Simple sensor definition based on matrices,
+// for a specific pixel
+struct PixelSensor {
+  mat4  proj_trf;
+  mat4  view_trf;
+  uvec2 film_size;
+  uvec2 pixel;
+};
+
+// Simple sensor definition, for a single ray
 struct RaySensor {
   vec3 o, d;
 };
@@ -49,6 +59,34 @@ SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in vec3 sample_3d) {
 
   // Sample film position inside pixel, transform to [-1, 1]
   vec2 xy = (vec2(px) + sample_3d.xy)  / vec2(sensor.film_size);
+  xy = (xy - .5f) * 2.f;
+  
+  // Generate camera ray from sample
+  ss.ray = init_ray(
+    (view_inv * vec4(0, 0, 0, 1)).xyz,
+    normalize((view_inv * vec4(xy.x * tan_y * aspect, xy.y * tan_y, -1, 0)).xyz)
+  );
+
+  // Sample wavelengths; stratified sample through invercse cdf, if available
+  for (uint i = 0; i < 4; ++i) {
+    DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
+    ss.wvls[i] = ds.f;
+    ss.pdfs[i] = ds.pdf;
+  }
+
+  return ss;
+}
+
+SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
+  SensorSample ss;
+
+  // Get necessary sensor information
+  float tan_y    = 1.f / sensor.proj_trf[1][1];
+  float aspect   = float(sensor.film_size.x) / float(sensor.film_size.y);
+  mat4  view_inv = inverse(sensor.view_trf);
+
+  // Sample film position inside pixel, transform to [-1, 1]
+  vec2 xy = (vec2(sensor.pixel) + sample_3d.xy)  / vec2(sensor.film_size);
   xy = (xy - .5f) * 2.f;
   
   // Generate camera ray from sample

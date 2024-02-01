@@ -44,7 +44,7 @@ namespace met {
     FullPathQueryPrimitive(InfoType info);
     
     // Take n samples and return output buffer
-    const gl::Buffer &query(const RaySensor &sensor, const Scene &scene, uint spp);
+    const gl::Buffer &query(const PixelSensor &sensor, const Scene &scene, uint spp);
 
     // Wait for sync object, and then return output data
     std::span<const PathRecord> data() const;
@@ -69,7 +69,7 @@ namespace met {
     PartialPathQueryPrimitive(InfoType info);
 
     // Take n samples and return output buffer
-    const gl::Buffer &query(const RaySensor &sensor, const Scene &scene, uint spp);
+    const gl::Buffer &query(const PixelSensor &sensor, const Scene &scene, uint spp);
 
     // Wait for sync object, and then return output data
     std::span<const PathRecord> data() const;

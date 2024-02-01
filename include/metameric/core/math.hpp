@@ -90,6 +90,14 @@ namespace Eigen {
     return { v_.x(), 1.f - v_.y() };
   }
 
+  inline
+  Vector2u window_to_pixel(const Array2f &v,      // window-space vector
+                           const Array2f &offs,   // window offset
+                           const Array2f &size) { // window size
+    auto v_ = (v - offs).cast<unsigned>().eval();
+    return { v_.x(), size.y() - 1 - v_.y() };
+  }
+
   // Convert a world-space vector to screen space in [0, 1]
   inline
   Vector2f world_to_screen_space(const Vector3f     &v,     // world-space vector

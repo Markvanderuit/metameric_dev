@@ -75,14 +75,12 @@ void main() {
   // Clamp invocations to requested size
   guard(gl_GlobalInvocationID.x == 0);
 
-  // Load sensor data
-  RaySensor sensor = { buff_sensor.origin, buff_sensor.direction };
-  
-  // Initialize sampler and generate sensor ray
-  SamplerState state = gl_GlobalInvocationID.x;
-  Ray           ray  = sample_sensor(sensor, next_1d(state)).ray;
+  // Load sensor data as ray
+  Ray ray = init_ray(buff_sensor.origin, buff_sensor.direction);
 
-  // Intersect sensor ray and store to buffer
+  // Intersect ray with scene
   scene_intersect(ray);
+
+  // Store result to buffer
   buff_output.data = ray;
 }

@@ -3,8 +3,6 @@
 #include <spectrum.glsl>
 #include <distribution.glsl>
 #include <sampler/uniform.glsl>
-// #include <render/load.glsl>
-
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
@@ -30,8 +28,11 @@ layout(binding = 0) uniform b_buff_query {
   uint spp;
 } buff_query;
 layout(binding = 1) uniform b_buff_sensor {
-  vec3 origin;    /* padd to 16 bytes */ uint p0;
-  vec3 direction; /* padd to 16 bytes */ uint p1;
+  mat4  full_trf;
+  mat4  proj_trf;
+  mat4  view_trf;
+  uvec2 film_size;
+  uvec2 pixel;
 } buff_sensor;
 layout(binding = 2) uniform b_buff_objects {
   uint n;
@@ -126,14 +127,19 @@ void main() {
   guard(gl_GlobalInvocationID.x < buff_query.spp);
 
   // Load sensor data
-  RaySensor sensor = { buff_sensor.origin, buff_sensor.direction };
-
+  PixelSensor sensor = {
+    buff_sensor.proj_trf,
+    buff_sensor.view_trf,
+    buff_sensor.film_size,
+    buff_sensor.pixel
+  };
+  
   // Target value
   vec3 measure = vec3(0);
 
   // Initialize sampler and generate sensor sample
   SamplerState state         = gl_GlobalInvocationID.x;
-  SensorSample sensor_sample = sample_sensor(sensor, next_1d(state));
+  SensorSample sensor_sample = sample_sensor(sensor, next_3d(state));
 
   // Sample incident radiance along ray for given wavelengths, weighted by probability
   // Discard return value

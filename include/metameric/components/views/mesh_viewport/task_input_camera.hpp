@@ -12,8 +12,8 @@
 
 namespace met {
   class MeshViewportCameraInputTask : public detail::TaskNode {
-    RaySensor m_query_sensor;
-    uint      m_query_spp = 1;
+    PixelSensor m_query_sensor;
+    uint        m_query_spp = 1;
 
   public:
     void init(SchedulerHandle &info) override {
@@ -134,19 +134,19 @@ namespace met {
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-      // Generate a camera ray from the current mouse position
-      auto screen_pos = eig::window_to_screen_space(io.MousePos, viewport_offs, viewport_size);
-      auto camera_ray = i_arcball.generate_ray(screen_pos);
-
-      // Update ray sensor
-      m_query_sensor.origin    = camera_ray.o;
-      m_query_sensor.direction = camera_ray.d;
+      // Update pixel sensor
+      m_query_sensor.proj_trf  = i_arcball.proj().matrix();
+      m_query_sensor.view_trf  = i_arcball.view().matrix();
+      m_query_sensor.film_size = viewport_size.cast<uint>();
+      m_query_sensor.pixel     = eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size);
       m_query_sensor.flush();
-
+      
+      fmt::print("{} -> {}\n", m_query_sensor.film_size, m_query_sensor.pixel);
+    
       // Perform path query
       i_path_query.query(m_query_sensor, e_scene, m_query_spp);
 
-      /* // Obtain queried paths
+      // Obtain queried paths
       auto paths = i_path_query.data();
       fmt::print("Queried {} paths, found {}\n",
         m_query_spp,
@@ -162,7 +162,7 @@ namespace met {
             vert.record.is_object() ? vert.record.object_i() : vert.record.emitter_i(),
             vert.p);
         }
-      } */
+      }
     }
 
     void eval(SchedulerHandle &info) override {

@@ -20,6 +20,11 @@ namespace met {
     uint object_i()    const { return (data >> 24) & 0x0000007F;       }
     uint emitter_i()   const { return (data >> 24) & 0x0000007F;       }
     uint primitive_i() const { return data & 0x00FFFFFF;               }
+
+  public:
+    static SurfaceRecord invalid() {
+      return SurfaceRecord { .data = path_invalid_data };
+    }
   };
 
   // Ray with a surface record packed inside
@@ -34,6 +39,13 @@ namespace met {
       return t == std::numeric_limits<float>::max() 
         ? eig::Vector3f(std::numeric_limits<float>::max())
         : o + t * d;
+    }
+
+    static RayRecord invalid() {
+      return RayRecord { .o      = 0,
+                         .t      = std::numeric_limits<float>::max(),
+                         .d      = 0,
+                         .record = SurfaceRecord::invalid() };
     }
   };
   static_assert(sizeof(RayRecord) == 32);
