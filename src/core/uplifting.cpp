@@ -3,22 +3,6 @@
 #include <nlohmann/json.hpp>
 
 namespace met {
-  bool UpliftingConstraint::operator==(const UpliftingConstraint &o) const {
-    guard(type == o.type, false);
-    if (type == Type::eColor) {
-      return colr_i.isApprox(o.colr_i) 
-        && rng::equal(colr_j, o.colr_j, eig::safe_approx_compare<Colr>)
-        && rng::equal(csys_j, o.csys_j);
-    } else if (type == Type::eColorOnMesh) {
-      return colr_i.isApprox(o.colr_i) 
-        && rng::equal(colr_j, o.colr_j, eig::safe_approx_compare<Colr>)
-        && rng::equal(csys_j, o.csys_j);
-    } else if (type == Type::eMeasurement) {
-      return measurement.isApprox(o.measurement);
-    }
-    return false;
-  }
-
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
     return colr_i.isApprox(o.colr_i) 
       && rng::equal(colr_j, o.colr_j, eig::safe_approx_compare<Colr>)

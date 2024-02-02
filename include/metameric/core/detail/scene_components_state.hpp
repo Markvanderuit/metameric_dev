@@ -51,47 +51,17 @@ namespace met::detail {
   
   /* Overload of ComponentState for Uplifting */
   struct UpliftingState : public ComponentStateBase<Uplifting> {
-    /* struct ConstraintState : public ComponentStateBase<Uplifting::Constraint> {
-      using Base = Uplifting::Constraint;
-      using ComponentStateBase<Base>::m_mutated;
-      
-      ComponentState<decltype(Base::type)>                type;
-      ComponentState<decltype(Base::colr_i)>              colr_i;
-      ComponentStates<decltype(Base::colr_j)::value_type> colr_j;
-      ComponentStates<decltype(Base::csys_j)::value_type> csys_j;
-      ComponentState<decltype(Base::object_i)>            object_i;
-      ComponentState<decltype(Base::object_elem_i)>       object_elem_i;
-      ComponentState<decltype(Base::object_elem_bary)>    object_elem_bary;
-      ComponentState<decltype(Base::measurement)>         measurement;
-
-      virtual 
-      bool update(const Base &o) override {
-        return m_mutated = (
-          type.update(o.type)                         |
-          colr_i.update(o.colr_i)                     |
-          colr_j.update(o.colr_j)                     |
-          csys_j.update(o.csys_j)                     |
-          object_i.update(o.object_i)                 |
-          object_elem_i.update(o.object_elem_i)       |
-          object_elem_bary.update(o.object_elem_bary) |
-          measurement.update(o.measurement)
-        );
-      }
-    }; */
-
     using Base = Uplifting;
     using ComponentStateBase<Base>::m_mutated;
 
-    ComponentState<decltype(Base::type)>               type;
     ComponentState<decltype(Base::csys_i)>             csys_i;
     ComponentState<decltype(Base::basis_i)>            basis_i;
     ComponentStates<decltype(Base::verts)::value_type> verts;
-
+    
   public:
     virtual 
     bool update(const Base &o) override {
       return m_mutated = (
-        type.update(o.type)       | 
         csys_i.update(o.csys_i)   |
         basis_i.update(o.basis_i) | 
         verts.update(o.verts)

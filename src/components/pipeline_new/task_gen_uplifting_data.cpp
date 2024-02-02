@@ -152,11 +152,16 @@ namespace met {
       // or the entire underlying color system has changed
       guard_continue(e_state.verts[i] || csys_stale);
       const auto &vert = e_uplifting.verts[i];
-      
-      Spec s;
-      Colr c;
 
-      // Dependent on type, generate spectral value in a different manner
+      // TODO; how to deal with is_active flag?
+      //       should probably reserve and push back instead of
+      //       pre-resizing 
+
+      // Generate vertex color and attached metamer;
+      // this is handled in Scene object to keep it away from the pipeline
+      auto [c, s] = e_scene.get_uplifting_constraint(e_uplifting, vert);
+
+      /* // Dependent on type, generate spectral value in a different manner
       if (vert.type == UpliftingConstraint::Type::eColor) {
         // Generate spectral value based on color constraints
         c = vert.colr_i;
@@ -222,7 +227,7 @@ namespace met {
 
         // Additionally acquire its color for the tesselation
         c = (csys.transpose() * s.matrix()).eval();
-      }
+      } */
       
       // Add to set of spectra, and to tesselation input points
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;

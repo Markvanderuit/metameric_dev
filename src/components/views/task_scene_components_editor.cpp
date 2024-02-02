@@ -15,7 +15,7 @@ namespace met {
       } // if (BeginCombo)
     };
 
-    std::string str_from_constraint_type(UpliftingConstraint::Type type) {
+    /* std::string str_from_constraint_type(UpliftingConstraint::Type type) {
       using Type = UpliftingConstraint::Type;
       switch (type) {
         case Type::eColor:       return "Color";
@@ -23,7 +23,7 @@ namespace met {
         case Type::eMeasurement: return "Measurement";
         default:                 return "Unknown";
       };
-    }
+    } */
 
     std::string str_from_emitter_type(Emitter::Type type) {
       using Type = Emitter::Type;
@@ -96,9 +96,9 @@ namespace met {
         constexpr auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue;
         if (ImGui::InputText("Name", &str, str_edit_flags)) {
           info.global("scene").getw<Scene>().touch({
-            .name = "Modify emitter name",
-            .redo = [i = i, str = str           ](auto &scene) { scene.components.emitters[i].name = str; },
-            .undo = [i = i, str = component.name](auto &scene) { scene.components.emitters[i].name = str; }
+            .name = "Modify object name",
+            .redo = [i = i, str = str           ](auto &scene) { scene.components.objects[i].name = str; },
+            .undo = [i = i, str = component.name](auto &scene) { scene.components.objects[i].name = str; }
           });
         }
         
@@ -343,7 +343,7 @@ namespace met {
     guard(ImGui::CollapsingHeader(std::format("Upliftings ({})", e_upliftings.size()).c_str(), ImGuiTreeNodeFlags_DefaultOpen));
     ImGui::PushID("uplifting_data");
 
-    // Iterate over all objects
+    /* // Iterate over all objects
     for (uint i = 0; i < e_upliftings.size(); ++i) {
       guard_break(i < e_upliftings.size()); // Gracefully handle a deletion
       
@@ -387,7 +387,7 @@ namespace met {
       } // if (open_section)
 
       ImGui::PopID();
-    } // for (uint i)
+    } // for (uint i) */
 
     ImGui::PopID();
   }

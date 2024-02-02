@@ -43,6 +43,7 @@ namespace met {
   struct DirectSurfaceConstraint {
     // Whether the constraint is used in the scene
     bool is_active = true;
+
     // Constraint data for direct color
     Colr              colr_i; // Expected color under primary color system 
     std::vector<Colr> colr_j; // Expected colors under secondary color systems
@@ -69,28 +70,6 @@ namespace met {
 
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;
-  };
-
-  struct UpliftingConstraint {
-    enum class Type {
-      eColor, eColorOnMesh, eMeasurement
-    } type = Type::eColor;
-
-    // If type == Type::eColor, these are the color constraints
-    Colr              colr_i; // Expected color under primary color system 
-    std::vector<Colr> colr_j; // Expected colors under secondary color systems
-    std::vector<uint> csys_j; // Indices of the secondary color systems
-    
-    // If type == Type::eColorOnMesh, these determine mesh location
-    uint         object_i;         // Index of object to which constraint belongs
-    uint         object_elem_i;    // Index of element where constraint is located on object
-    eig::Array3f object_elem_bary; // Barycentric coordinates inside element
-
-    // If type == Type::eMeasurement, this holds a measured spectral constraint
-    Spec measurement;
-
-  public:
-    bool operator==(const UpliftingConstraint &o) const;
   };
 
   // JSON (de)serialization of constraint variants

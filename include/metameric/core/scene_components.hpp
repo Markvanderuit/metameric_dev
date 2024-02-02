@@ -112,21 +112,23 @@ namespace met {
      given its centrality to the codebase. */
   struct Uplifting {
     using state_type = detail::UpliftingState;
-    using cnstr_type = std::variant<DirectColorConstraint,
-                                    MeasurementConstraint,
-                                    DirectSurfaceConstraint,
-                                    IndirectSurfaceConstraint>;
 
-    // The mesh structure defines how constraints are connected; e.g. as points
-    // on a convex hull with generalized barycentrics for the interior, or points 
-    // throughout color space with a delaunay tesselation connecting the interior
-    enum class Type {
-      eConvexHull, eDelaunay      
-    } type = Type::eDelaunay;
+    // Wrapper around vertex constraint data
+    struct Vertex {
+      using cnstr_type = std::variant<DirectColorConstraint,  MeasurementConstraint,
+                                      DirectSurfaceConstraint, IndirectSurfaceConstraint>;
+      // Whether the constraint is used in the scene
+      bool is_active = true;
 
-    uint                    csys_i  = 0; // Index of primary color system
-    uint                    basis_i = 0; // Index of used underlying basis
-    std::vector<cnstr_type> verts; // Vertex constraints on mesh
-    // std::vector<UpliftingConstraint> verts;       // Vertex constraints on uplifting mesh
+      // Underlying constraint data
+      cnstr_type constraint;
+      
+    public:
+      bool operator==(const Vertex &o) const = default;
+    };
+
+    uint                csys_i  = 0; // Index of primary color system
+    uint                basis_i = 0; // Index of used underlying basis
+    std::vector<Vertex> verts;       // Vertex constraints on mesh
   };
 } // namespace met

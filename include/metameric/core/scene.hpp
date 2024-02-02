@@ -52,7 +52,7 @@ namespace met {
         return colr_systems || emitters || objects || upliftings || settings || observer_i;
       }
 
-      constexpr operator bool()   const { return is_mutated(); };
+      constexpr operator bool() const { return is_mutated(); };
     } components;
 
     // Scene resources, primarily referred to by components in the scene
@@ -77,7 +77,7 @@ namespace met {
         return meshes || images || illuminants || observers || bases;
       }
 
-      constexpr operator bool()   const { return is_mutated(); };
+      constexpr operator bool() const { return is_mutated(); };
     } resources;
 
     void update() {
@@ -130,18 +130,23 @@ namespace met {
     void clear_mods();          // Clear entire modification state       
 
   public: // Scene data helper functions
-    // Obtain a pretty-printed name of a certain color system
-    std::string get_csys_name(uint i)                const;
+    // Realize a pretty-printed name of a certain color system
+    std::string get_csys_name(uint i) const;
     std::string get_csys_name(ColorSystem c) const;
 
-    // Obtain the spectral data of a certain color system
-    met::ColrSystem get_csys(uint i)                const;
-    met::ColrSystem get_csys(ColorSystem c) const;
+    // Realize the spectral data of a certain color system
+    ColrSystem get_csys(uint i) const;
+    ColrSystem get_csys(ColorSystem c) const;
 
-    // Obtain the spectral data of a certain emitter
-    met::Spec get_emitter_spd(uint i)             const;
-    met::Spec get_emitter_spd(Emitter e) const;
+    // Realize the spectral data of a certain emitter
+    Spec get_emitter_spd(uint i) const;
+    Spec get_emitter_spd(Emitter e) const;
     
+    // Realize the spectral data of a certain uplifting vertex,
+    // with its attached color location
+    std::pair<Colr, Spec> get_uplifting_constraint(uint i, uint vert_i) const;
+    std::pair<Colr, Spec> get_uplifting_constraint(const Uplifting &u, const Uplifting::Vertex &v) const;
+
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);

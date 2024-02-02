@@ -1,6 +1,7 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/json.hpp>
+#include <metameric/core/metamer.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
@@ -51,41 +52,35 @@ namespace met {
     }
   } // namespace detail
 
-  void to_json(json &js, const UpliftingConstraint &cstr) {
+  void to_json(json &js, const Uplifting::Vertex &vert) {
     met_trace();
-    js = {{ "type",             cstr.type             },
-          { "colr_i",           cstr.colr_i           },
-          { "colr_j",           cstr.colr_j           },
-          { "csys_j",           cstr.csys_j           },
-          { "object_i",         cstr.object_i         },
-          { "object_elem_i",    cstr.object_elem_i    },
-          { "object_elem_bary", cstr.object_elem_bary },
-          { "measurement",      cstr.measurement      }};
+    js = {{ "is_active", vert.is_active          },
+          { "index",     vert.constraint.index() }, 
+          { "variant",   vert.constraint         }};
   }
 
-  void from_json(const json &js, UpliftingConstraint &cstr) {
+  void from_json(const json &js, Uplifting::Vertex &vert) {
     met_trace();
-    js.at("type").get_to(cstr.type);
-    js.at("colr_i").get_to(cstr.colr_i);
-    js.at("colr_j").get_to(cstr.colr_j);
-    js.at("csys_j").get_to(cstr.csys_j);
-    js.at("object_i").get_to(cstr.object_i);
-    js.at("object_elem_i").get_to(cstr.object_elem_i);
-    js.at("object_elem_bary").get_to(cstr.object_elem_bary);
-    js.at("measurement").get_to(cstr.measurement);
+    js.at("is_active").get_to(vert.is_active);
+    
+    switch (js.at("index").get<size_t>()) {
+      case 0: vert.constraint = js.at("variant").get<DirectColorConstraint>(); break;
+      case 1: vert.constraint = js.at("variant").get<MeasurementConstraint>(); break;
+      case 2: vert.constraint = js.at("variant").get<DirectSurfaceConstraint>(); break;
+      case 3: vert.constraint = js.at("variant").get<IndirectSurfaceConstraint>(); break;
+      default: debug::check_expr(false, "Error parsing json constraint data");
+    }
   }
 
   void to_json(json &js, const Uplifting &uplifting) {
     met_trace();
-    js = {{ "type",    uplifting.type    },
-          { "csys_i",  uplifting.csys_i  },
+    js = {{ "csys_i",  uplifting.csys_i  },
           { "basis_i", uplifting.basis_i },
           { "verts",   uplifting.verts   }};
   }
 
   void from_json(const json &js, Uplifting &uplifting) {
     met_trace();
-    js.at("type").get_to(uplifting.type);
     js.at("csys_i").get_to(uplifting.csys_i);
     js.at("basis_i").get_to(uplifting.basis_i);
     js.at("verts").get_to(uplifting.verts);
@@ -227,8 +222,7 @@ namespace met {
     components.colr_systems.push(get_csys_name(csys), csys);
     
     // Default uplifting
-    components.upliftings.emplace("Default uplifting",
-      { .type = Uplifting::Type::eDelaunay, .basis_i = 0 });
+    components.upliftings.emplace("Default uplifting", { .csys_i = 0, .basis_i = 0 });
 
     // Default emitter
     components.emitters.push("Default D65 emitter", {
@@ -316,13 +310,14 @@ namespace met {
     std::transform(range_iter(other.components.upliftings), 
                    std::back_inserter(components.upliftings.data()), [&](auto component) {
       component.value.csys_i += components.colr_systems.size();
-      for (auto &vert : component.value.verts) {
+      // TODO update bookkeeping
+      /* for (auto &vert : component.value.verts) {
         for (auto &j : vert.csys_j)
           j += components.colr_systems.size();
         if (vert.type == UpliftingConstraint::Type::eColorOnMesh) {
           vert.object_i += components.objects.size();
         }
-      }
+      } */
       return component;
     });
     std::transform(range_iter(other.components.objects), 
@@ -643,6 +638,61 @@ namespace met {
     return std::format("{}, {}", 
                        resources.observers[c.observer_i].name, 
                        resources.illuminants[c.illuminant_i].name);
+  }
+
+  
+  std::pair<Colr, Spec> Scene::get_uplifting_constraint(uint i, uint vert_i) const {
+    met_trace();
+    return get_uplifting_constraint(components.upliftings[i].value,
+                                    components.upliftings[i].value.verts[vert_i]);
+  }
+
+  std::pair<Colr, Spec> Scene::get_uplifting_constraint(const Uplifting &u, const Uplifting::Vertex &v) const {
+    met_trace();
+
+    // Color system spectra within which the 'uplifted' texture is defined
+    CMFS csys_i = get_csys(u.csys_i).finalize_direct();
+
+    // Output values
+    Colr c;
+    Spec s;
+
+    // Identify the type of constraint
+    if (const auto *constraint = std::get_if<DirectColorConstraint>(&v.constraint)) {
+      // The specified color becomes our vertex color
+      c = constraint->colr_i;
+
+      // Gather all relevant color system spectra referred by the constraint
+      std::vector<CMFS> systems = { csys_i };
+      rng::transform(constraint->csys_j, std::back_inserter(systems), 
+        [&](uint j) { return get_csys(j).finalize_direct(); });
+      
+      // Obtain corresponding color constraints for each color system
+      std::vector<Colr> signals = { c };
+      rng::copy(constraint->csys_j, std::back_inserter(signals));
+
+      // Generate a metamer satisfying the system+signal constraint set
+      s = generate_spectrum({
+        .basis              = resources.bases[u.basis_i].value(),
+        .systems            = systems,
+        .signals            = signals,
+        .impose_boundedness = true,
+        .solve_dual         = true
+      });
+    } else if (const auto *constraint = std::get_if<MeasurementConstraint>(&v.constraint)) {
+      // The specified spectrum becomes our metamer
+      s = constraint->measurement;
+
+      // The metamer's color under the uplifting's color system becomes our vertex color
+      c = (csys_i.transpose() * s.matrix()).eval();
+    } else if (const auto *constraint = std::get_if<DirectSurfaceConstraint>(&v.constraint)) {
+      debug::check_expr(false, "Not implemented!");
+      // c = constraint->colr_i;
+    } else if (const auto *constraint = std::get_if<IndirectSurfaceConstraint>(&v.constraint)) {
+      debug::check_expr(false, "Not implemented!");
+    }
+
+    return { c, s };
   }
 
   void Scene::to_stream(std::ostream &str) const {
