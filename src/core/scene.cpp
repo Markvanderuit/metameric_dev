@@ -51,7 +51,7 @@ namespace met {
     }
   } // namespace detail
 
-  void to_json(json &js, const Uplifting::Constraint &cstr) {
+  void to_json(json &js, const UpliftingConstraint &cstr) {
     met_trace();
     js = {{ "type",             cstr.type             },
           { "colr_i",           cstr.colr_i           },
@@ -63,7 +63,7 @@ namespace met {
           { "measurement",      cstr.measurement      }};
   }
 
-  void from_json(const json &js, Uplifting::Constraint &cstr) {
+  void from_json(const json &js, UpliftingConstraint &cstr) {
     met_trace();
     js.at("type").get_to(cstr.type);
     js.at("colr_i").get_to(cstr.colr_i);
@@ -319,7 +319,7 @@ namespace met {
       for (auto &vert : component.value.verts) {
         for (auto &j : vert.csys_j)
           j += components.colr_systems.size();
-        if (vert.type == Uplifting::Constraint::Type::eColorOnMesh) {
+        if (vert.type == UpliftingConstraint::Type::eColorOnMesh) {
           vert.object_i += components.objects.size();
         }
       }

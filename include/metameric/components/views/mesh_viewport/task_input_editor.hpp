@@ -129,6 +129,11 @@ namespace met {
           ImGui::SetNextWindowPos(xy);
           if (ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoDecoration)) {
             ImGui::Text("Hi!\n");
+
+            // Track mouse input while dragging the thing.
+            if (io.MouseDown[ImGuiMouseButton_Left]) {
+              eval_ray_query(info);
+            }
           }
           ImGui::End();
         }

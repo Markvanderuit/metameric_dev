@@ -157,7 +157,7 @@ namespace met {
       Colr c;
 
       // Dependent on type, generate spectral value in a different manner
-      if (vert.type == Uplifting::Constraint::Type::eColor) {
+      if (vert.type == UpliftingConstraint::Type::eColor) {
         // Generate spectral value based on color constraints
         c = vert.colr_i;
 
@@ -178,7 +178,7 @@ namespace met {
           .impose_boundedness = true,
           .solve_dual         = true
         });
-      } else if (vert.type == Uplifting::Constraint::Type::eColorOnMesh) {
+      } else if (vert.type == UpliftingConstraint::Type::eColorOnMesh) {
         // Sample color constraint from mesh, and go from there
         // TODO experiment!
         
@@ -216,7 +216,7 @@ namespace met {
           .impose_boundedness = true,
           .solve_dual         = true
         });
-      } else if (vert.type == Uplifting::Constraint::Type::eMeasurement) {
+      } else if (vert.type == UpliftingConstraint::Type::eMeasurement) {
         // Use measured spectral value directly
         s = vert.measurement;
 

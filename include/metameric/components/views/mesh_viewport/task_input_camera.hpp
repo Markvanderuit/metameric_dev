@@ -128,6 +128,9 @@ namespace met {
       const auto &i_arcball = info("arcball").getr<detail::Arcball>();
       auto &i_path_query    = info("path_query").getw<FullPathQueryPrimitive>();
 
+      // Escape for empty scenes
+      guard(!e_scene.components.objects.empty());
+
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
@@ -212,9 +215,9 @@ namespace met {
           << eig::Array2f(io.MouseDelta.x, io.MouseDelta.y) / viewport_size.array(), 0).finished());
       }
 
-      if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+      // if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
         eval_path_query(info);
-      }
+      // }
     }
   };
 } // namespace met

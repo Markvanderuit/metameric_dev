@@ -4,6 +4,7 @@
 #include <metameric/core/detail/scene_components_fwd.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/uplifting.hpp>
 #include <vector>
 
 namespace met {
@@ -111,30 +112,10 @@ namespace met {
      given its centrality to the codebase. */
   struct Uplifting {
     using state_type = detail::UpliftingState;
-
-    // The mesh structure connects a set of user-configured constraints; 
-    // there are three types and they can be used intermittently:
-    // - Color values across different systems, primary color sampled from a color space position
-    // - Color values across different systems; primary color sampled from an object surface position
-    // - Spectral measurements, based on artist-provided data
-    struct Constraint {
-      enum class Type {
-        eColor, eColorOnMesh, eMeasurement
-      } type = Type::eColor;
-
-      // If type == Type::eColor, these are the color constraints
-      Colr              colr_i; // Expected color under primary color system 
-      std::vector<Colr> colr_j; // Expected colors under secondary color systems
-      std::vector<uint> csys_j; // Indices of the secondary color systems
-      
-      // If type == Type::eColorOnMesh, these determine mesh location
-      uint         object_i;         // Index of object to which constraint belongs
-      uint         object_elem_i;    // Index of element where constraint is located on object
-      eig::Array3f object_elem_bary; // Barycentric coordinates inside element
-
-      // If type == Type::eMeasurement, this holds a measured spectral constraint
-      Spec measurement;
-    };
+    using cnstr_type = std::variant<DirectColorConstraint,
+                                    MeasurementConstraint,
+                                    DirectSurfaceConstraint,
+                                    IndirectSurfaceConstraint>;
 
     // The mesh structure defines how constraints are connected; e.g. as points
     // on a convex hull with generalized barycentrics for the interior, or points 
@@ -145,6 +126,7 @@ namespace met {
 
     uint                    csys_i  = 0; // Index of primary color system
     uint                    basis_i = 0; // Index of used underlying basis
-    std::vector<Constraint> verts;       // Vertex constraints on uplifting mesh
+    std::vector<cnstr_type> verts; // Vertex constraints on mesh
+    // std::vector<UpliftingConstraint> verts;       // Vertex constraints on uplifting mesh
   };
 } // namespace met

@@ -51,7 +51,7 @@ namespace met::detail {
   
   /* Overload of ComponentState for Uplifting */
   struct UpliftingState : public ComponentStateBase<Uplifting> {
-    struct ConstraintState : public ComponentStateBase<Uplifting::Constraint> {
+    /* struct ConstraintState : public ComponentStateBase<Uplifting::Constraint> {
       using Base = Uplifting::Constraint;
       using ComponentStateBase<Base>::m_mutated;
       
@@ -77,7 +77,7 @@ namespace met::detail {
           measurement.update(o.measurement)
         );
       }
-    };
+    }; */
 
     using Base = Uplifting;
     using ComponentStateBase<Base>::m_mutated;
@@ -85,8 +85,7 @@ namespace met::detail {
     ComponentState<decltype(Base::type)>               type;
     ComponentState<decltype(Base::csys_i)>             csys_i;
     ComponentState<decltype(Base::basis_i)>            basis_i;
-    ComponentStates<decltype(Base::verts)::value_type, 
-                                      ConstraintState> verts;
+    ComponentStates<decltype(Base::verts)::value_type> verts;
 
   public:
     virtual 

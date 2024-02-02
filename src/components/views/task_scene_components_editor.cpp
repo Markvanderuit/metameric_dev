@@ -15,8 +15,8 @@ namespace met {
       } // if (BeginCombo)
     };
 
-    std::string str_from_constraint_type(Uplifting::Constraint::Type type) {
-      using Type = Uplifting::Constraint::Type;
+    std::string str_from_constraint_type(UpliftingConstraint::Type type) {
+      using Type = UpliftingConstraint::Type;
       switch (type) {
         case Type::eColor:       return "Color";
         case Type::eColorOnMesh: return "Color (on mesh)";

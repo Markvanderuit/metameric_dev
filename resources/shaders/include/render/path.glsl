@@ -68,8 +68,9 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
       // Store current path if requested
       path_finalize_direct(pt, s, wvls);
 
-      // Add to output radiance
+      // Add to output radiance and terminate path
       S += s;
+      break;
     }
 
     // Sample BRDF at position
