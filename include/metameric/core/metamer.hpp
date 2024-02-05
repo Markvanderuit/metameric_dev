@@ -26,13 +26,21 @@ namespace met {
   };
 
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
-  struct GenerateMMVBoundaryInfo {
+  /* struct GenerateMMVBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     const CMFS                   &system_j;   // Color system for mismatching region
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
     std::optional<CMFS> system_j_override;    // TODO remove this absolute hack
+  }; */
+  struct GenerateMMVBoundaryInfo {
+    const Basis                  &basis;      // Spectral basis functions
+    std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
+    std::span<const Colr>         signals_i;  // Color signals for prior constraints
+    std::span<const CMFS>         systems_j;  // Color system spectra for objective function
+    const CMFS                    &system_j;  // Color system for mismatching region
+    std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };
 
   // Corresponding functions to above generate objects
@@ -59,5 +67,5 @@ namespace met {
   // Generate a gamut solution using a linear programming problem; see GenerateGamutInfo 
   // above for necessary information. Note: returns n=generalized_weights spectra; 
   // the last (padded) spectra should be ignored
-  std::vector<Spec> generate_gamut(const GenerateGamutInfo &info);
+  /* std::vector<Spec> generate_gamut(const GenerateGamutInfo &info); */
 } // namespace met

@@ -1,7 +1,6 @@
 #include <metameric/core/data.hpp>
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/linprog.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/spectrum.hpp>
