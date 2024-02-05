@@ -27,6 +27,8 @@ namespace met {
       v.x() = 1.f - v.y() - v.z();
       return v;
     }
+
+
   } // namespace detail
 
   class MeshViewportEditorInputTask : public detail::TaskNode {
@@ -103,6 +105,12 @@ namespace met {
       const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
       const auto &io        = ImGui::GetIO();
 
+      // Compute viewport offset and size, minus ImGui's tab bars etc
+      eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+
       // If window is not hovered, skip instead of enabling user input over the active viewport
       if (ImGui::IsItemHovered()) {
         // On 'T' press for now, start ray query
@@ -110,13 +118,43 @@ namespace met {
           eval_ray_query(info);
       }
 
+      // Iterate all upliftings
+      for (const auto &[e_uplifting, _] : e_scene.components.upliftings) {
+        // Iterate a copy of all direct surface constraints
+        /* for (DirectSurfaceConstraint constraint : e_uplifting.verts | variant_filter<DirectSurfaceConstraint>) {
+          
+        } */
+      }
+      
+
+      // Draw current surface constraints using ImGui's drawlist
+      {
+        for (const auto &[e_uplifting, _] : e_scene.components.upliftings) {
+          for (const auto &vert : e_uplifting.verts) {
+            if (auto *constraint = std::get_if<DirectSurfaceConstraint>(&vert.constraint)) {
+              auto xy = eig::world_to_window_space(constraint->surface_p,
+                                                  e_arcball.full(),
+                                                  viewport_offs,
+                                                  viewport_size);
+              if (constraint->is_valid()) {
+                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 8.f, ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f }));
+                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 4.f, ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f }));
+              } else {
+                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 8.f, ImGui::ColorConvertFloat4ToU32({ 1.f, .5f, .5f, 1.f }));
+                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 4.f, ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f }));
+              }
+            }
+          }
+        }
+      }
+
       // If a valid result is stored, show test tooltip for now
       if (m_query_result.record.is_valid()) {
         // Compute viewport offset and size, minus ImGui's tab bars etc
         eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-                                  + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+                                   + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
         eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+                                   - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
         // Get pixel position from query result's world position
         auto xy = eig::world_to_window_space(m_query_result.get_position(),
@@ -124,9 +162,13 @@ namespace met {
                                              viewport_offs,
                                              viewport_size);
 
-        // Spawn floating window if pixel position falls within viewport
+        // Spawn floating dot if pixel position falls within viewport
         if (!(xy.array() <= viewport_offs).any() && !(xy.array() >= viewport_offs + viewport_size).any()) {
-          ImGui::SetNextWindowPos(xy);
+          
+          ImGui::GetWindowDrawList()->AddCircleFilled(xy, 8.f, ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f }));
+          ImGui::GetWindowDrawList()->AddCircleFilled(xy, 4.f, ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f }));
+
+          /* ImGui::SetNextWindowPos(xy);
           if (ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoDecoration)) {
             ImGui::Text("Hi!\n");
 
@@ -135,7 +177,7 @@ namespace met {
               eval_ray_query(info);
             }
           }
-          ImGui::End();
+          ImGui::End(); */
         }
       }
     }

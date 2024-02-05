@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/surface.hpp>
 
 namespace met {
   /* Constraint definition used in uplifting;
@@ -41,20 +42,18 @@ namespace met {
      for a position on a scene surface, under a specified color system,
      given direct illumination. */
   struct DirectSurfaceConstraint {
-    // Whether the constraint is used in the scene
-    bool is_active = true;
-
     // Constraint data for direct color
-    Colr              colr_i; // Expected color under primary color system 
+    // Note: colr_i as in DirectConstraint is sampled from the underlying surface
     std::vector<Colr> colr_j; // Expected colors under secondary color systems
     std::vector<uint> csys_j; // Indices of the secondary color systems
 
-    // Surface data
-    uint         object_i;         // Index of object to which constraint belongs
-    uint         object_elem_i;    // Index of element where constraint is located on object
-    eig::Array3f object_elem_bary; // Barycentric coordinates inside element
+    // Surface data comprises a a small record object
+    // and a world position
+    SurfaceRecord surface_data = SurfaceRecord::invalid();
+    eig::Array3f  surface_p    = 0.5; 
 
   public:
+    bool is_valid() const { return surface_data.is_valid(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
 

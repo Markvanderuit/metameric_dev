@@ -74,9 +74,21 @@ namespace met {
     return { reinterpret_cast<T*>(data), s.size_bytes() / sizeof(T) };
   }
 
+  // Take a pair of integers, cast to same type, and do a ceiling divide
   template <typename T, typename T_>
   constexpr inline T ceil_div(T n, T_ div) {
     return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
+  }
+
+  // Variant filter view declaration
+  // Source: https://stackoverflow.com/questions/69164187/using-filter-on-vector-of-variant
+  template <typename T> struct variant_filter_t {};
+  template <typename T> inline constexpr auto variant_filter = variant_filter_t<T>{};
+
+  template <typename R, typename T>
+  decltype(auto) operator|(R &&r, variant_filter_t<T>) {
+    return r | vws::filter(detail::engaged<T>) 
+             | vws::transform(detail::variant_get<T>);
   }
 
   namespace debug {

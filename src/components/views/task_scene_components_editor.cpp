@@ -15,15 +15,21 @@ namespace met {
       } // if (BeginCombo)
     };
 
-    /* std::string str_from_constraint_type(UpliftingConstraint::Type type) {
-      using Type = UpliftingConstraint::Type;
-      switch (type) {
-        case Type::eColor:       return "Color";
-        case Type::eColorOnMesh: return "Color (on mesh)";
-        case Type::eMeasurement: return "Measurement";
-        default:                 return "Unknown";
-      };
-    } */
+    std::string str_from_uplifting_vertex_type(Uplifting::Vertex vert) {
+      return std::visit([](auto &&arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, DirectColorConstraint>)
+          return "direct";
+        else if constexpr (std::is_same_v<T, MeasurementConstraint>)
+          return "measurement";
+        else if constexpr (std::is_same_v<T, DirectSurfaceConstraint>)
+          return "direct surface";
+        else if constexpr (std::is_same_v<T, IndirectSurfaceConstraint>)
+          return "indirect surface";
+        else
+          return "unknown";
+      }, vert.constraint);
+    }
 
     std::string str_from_emitter_type(Emitter::Type type) {
       using Type = Emitter::Type;
@@ -76,7 +82,7 @@ namespace met {
       // Add treenode section; postpone jumping into section
       bool open_section = ImGui::TreeNodeEx(component.name.c_str());
       
-      // Insert delete button, is_active button on same
+      // Insert delete button, is_active button on same line
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
       if (ImGui::SmallButton(object.is_active ? "V" : "H"))
         object.is_active = !object.is_active;
@@ -337,20 +343,20 @@ namespace met {
 
     // Get external resources and shorthands
     const auto &e_scene      = info.global("scene").getr<Scene>();
+    const auto &e_objects    = e_scene.components.objects;
     const auto &e_upliftings = e_scene.components.upliftings;
 
     // Spawn a collapsing header section
     guard(ImGui::CollapsingHeader(std::format("Upliftings ({})", e_upliftings.size()).c_str(), ImGuiTreeNodeFlags_DefaultOpen));
     ImGui::PushID("uplifting_data");
 
-    /* // Iterate over all objects
+    // Iterate over all upliftings
     for (uint i = 0; i < e_upliftings.size(); ++i) {
       guard_break(i < e_upliftings.size()); // Gracefully handle a deletion
       
-      ImGui::PushID(std::format("object_data_{}", i).c_str());
+      ImGui::PushID(std::format("uplifting_data_{}", i).c_str());
       
       // We copy the object, and then test for changes
-      // TODO; should handle this fine-grained for (large) upliftings
       const auto &component = e_upliftings[i];
             auto  uplifting = component.value;
       
@@ -370,24 +376,100 @@ namespace met {
 
       if (open_section) {
         detail::fun_resource_selector("Basis", e_scene.resources.bases, uplifting.basis_i);
-
-
-        for (auto &vert : uplifting.verts) {
-          ImGui::Separator();
-          ImGui::Indent();
-
-          auto type_str = detail::str_from_constraint_type(vert.type);
-          ImGui::LabelText("Type", type_str.c_str());
         
+        // Iterate constraints
+        for (uint j = 0; j < uplifting.verts.size(); ++j) {
+          ImGui::PushID(std::format("uplifting_vertex_data_{}", j).c_str());
 
-          ImGui::Unindent();
-        } // for (vert)       
+          auto &vert     = uplifting.verts[j];
+          auto vert_name = std::format("Constraint {} ({})", j, detail::str_from_uplifting_vertex_type(vert));
+          
+          // Add treenode section; postpone jumping into section
+          bool open_section = ImGui::TreeNodeEx(vert_name.c_str());
+
+          // Insert delete button, is_active button on same line
+          ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
+          if (ImGui::SmallButton(vert.is_active ? "V" : "H"))
+            vert.is_active = !vert.is_active;
+          ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+
+          if (ImGui::SmallButton("X")) {
+            uplifting.verts.erase(uplifting.verts.begin() + j);
+            break;
+          }
+
+          if (open_section) {
+            if (auto *constraint = std::get_if<DirectSurfaceConstraint>(&vert.constraint)) {
+              ImGui::SliderFloat3("Surface position", constraint->surface_p.data(), -1.f, 1.f);
+            } else {
+              ImGui::Text("Not implemented!");
+            }
+            ImGui::TreePop();
+          } // if (open_section)
+
+          /* if (ImGui::TreeNode(vert_name.c_str())) {
+            ImGui::Checkbox("Is active", &vert.is_active);
+            // ...
+          } */
+
+          ImGui::PopID();
+        } // for (uint j)
+        
+        // Handle additions to uplifting vertices
+        {
+          if (!uplifting.verts.empty())
+            ImGui::Separator();
+          
+          ImGui::NewLine();
+          ImGui::SameLine(ImGui::GetContentRegionMax().x - 84.f);
+          if (ImGui::SmallButton("Add constraint"))
+            ImGui::OpenPopup("popup_add_uplifting_vertex");
+          
+          int selected_type = -1;
+
+          if (ImGui::BeginPopup("popup_add_uplifting_vertex")) {
+            if (ImGui::Selectable("Direct"))
+              uplifting.verts.push_back({ .constraint = DirectColorConstraint { .colr_i = 0.5  }});
+              
+            if (ImGui::Selectable("Measurement"))
+              uplifting.verts.push_back({ .constraint = MeasurementConstraint { .measurement = 0.5  }});
+            
+            if (ImGui::Selectable("Direct surface"))
+              uplifting.verts.push_back({ .constraint = DirectSurfaceConstraint { .surface_p = 0.5 }});
+
+            ImGui::EndPopup();
+          }
+        } 
 
         ImGui::TreePop();
       } // if (open_section)
 
+      // Handle modifications to uplifting copy
+      if (uplifting != component.value) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Modify uplifting",
+          .redo = [i = i, v = uplifting      ](auto &scene) { scene.components.upliftings[i].value = v; },
+          .undo = [i = i, v = component.value](auto &scene) { scene.components.upliftings[i].value = v; }
+        });
+      }
+
       ImGui::PopID();
-    } // for (uint i) */
+    } // for (uint i)
+
+    // Handle additions to emitters
+    {
+      if (!e_upliftings.empty())
+        ImGui::Separator();
+      ImGui::NewLine();
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
+      if (ImGui::SmallButton("Add")) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Add uplifting",
+          .redo = [](auto &scene) { scene.components.upliftings.push("Uplifting", { });                        },
+          .undo = [](auto &scene) { scene.components.upliftings.erase(scene.components.upliftings.size() - 1); }
+        });
+      }
+    }
 
     ImGui::PopID();
   }

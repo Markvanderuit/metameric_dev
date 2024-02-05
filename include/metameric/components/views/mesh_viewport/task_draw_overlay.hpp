@@ -10,13 +10,6 @@ namespace met {
   class MeshViewportDrawOverlayTask : public detail::TaskNode {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
 
-    // struct UnifLayout {
-      // eig::Vector2u viewport_size;
-    // };
-    // 
-    // gl::Buffer   m_unif_buffer;
-    // UnifLayout  *m_unif_buffer_map;
-
     gl::Program     m_program;
     gl::Array       m_vao;
     gl::Framebuffer m_fbo;

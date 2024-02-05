@@ -673,11 +673,9 @@ namespace met {
 
       // Generate a metamer satisfying the system+signal constraint set
       s = generate_spectrum({
-        .basis              = resources.bases[u.basis_i].value(),
-        .systems            = systems,
-        .signals            = signals,
-        .impose_boundedness = true,
-        .solve_dual         = true
+        .basis   = resources.bases[u.basis_i].value(),
+        .systems = systems,
+        .signals = signals
       });
     } else if (const auto *constraint = std::get_if<MeasurementConstraint>(&v.constraint)) {
       // The specified spectrum becomes our metamer
@@ -686,10 +684,32 @@ namespace met {
       // The metamer's color under the uplifting's color system becomes our vertex color
       c = (csys_i.transpose() * s.matrix()).eval();
     } else if (const auto *constraint = std::get_if<DirectSurfaceConstraint>(&v.constraint)) {
-      debug::check_expr(false, "Not implemented!");
-      // c = constraint->colr_i;
+      // debug::check_expr(false, "Not implemented!");
+
+      s = 0.5; // TODO This will break a few eggs
+      c = 0.5; // TODO This will break a few eggs
+
+      /* // The specified color becomes our vertex color
+      c = constraint->colr_i;
+
+      // Gather all relevant color system spectra referred by the constraint
+      std::vector<CMFS> systems = { csys_i };
+      rng::transform(constraint->csys_j, std::back_inserter(systems), 
+        [&](uint j) { return get_csys(j).finalize_direct(); });
+
+      // Obtain corresponding color constraints for each color system
+      std::vector<Colr> signals = { c };
+      rng::copy(constraint->csys_j, std::back_inserter(signals));
+
+      // Generate a metamer satisfying the system+signal constraint set
+      s = generate_spectrum({
+        .basis   = resources.bases[u.basis_i].value(),
+        .systems = systems,
+        .signals = signals
+      }); */
     } else if (const auto *constraint = std::get_if<IndirectSurfaceConstraint>(&v.constraint)) {
       debug::check_expr(false, "Not implemented!");
+      // TODO ...
     }
 
     return { c, s };

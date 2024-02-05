@@ -1,31 +1,11 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/surface.hpp>
 #include <array>
 
 namespace met {
-  constexpr uint path_max_depth    = 8;
-  constexpr uint path_invalid_data = 0xFFFFFFFF;
-  constexpr uint path_emitter_flag = 0x80000000;
-  constexpr uint path_object_flag  = 0x00000000;
-
-  // Representation of record data used, generated, and stored by render/query primitives
-  struct SurfaceRecord {
-    uint data;
-    
-  public:
-    bool is_valid()    const { return data != path_invalid_data;       }
-    bool is_emitter()  const { return (data & path_emitter_flag) != 0; }
-    bool is_object()   const { return (data & path_emitter_flag) == 0; }
-    uint object_i()    const { return (data >> 24) & 0x0000007F;       }
-    uint emitter_i()   const { return (data >> 24) & 0x0000007F;       }
-    uint primitive_i() const { return data & 0x00FFFFFF;               }
-
-  public:
-    static SurfaceRecord invalid() {
-      return SurfaceRecord { .data = path_invalid_data };
-    }
-  };
+  constexpr uint path_max_depth = 8;
 
   // Ray with a surface record packed inside
   struct RayRecord {

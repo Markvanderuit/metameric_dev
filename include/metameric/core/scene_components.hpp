@@ -130,5 +130,9 @@ namespace met {
     uint                csys_i  = 0; // Index of primary color system
     uint                basis_i = 0; // Index of used underlying basis
     std::vector<Vertex> verts;       // Vertex constraints on mesh
+
+    inline bool operator==(const Uplifting &o) const {
+      return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
+    }
   };
 } // namespace met
