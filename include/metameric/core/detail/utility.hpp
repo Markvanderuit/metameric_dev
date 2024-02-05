@@ -52,7 +52,7 @@ namespace met::detail {
   // Helpers for variant filter in std ranges
   // Source: https://stackoverflow.com/questions/69164187/using-filter-on-vector-of-variant
 
-  template <typename T> struct engaged_t {
+  /* template <typename T> struct engaged_t {
     template <typename... Ts>
     constexpr bool operator()(const std::variant<Ts...> &variant) const {
       return std::holds_alternative<T>(variant);
@@ -74,5 +74,5 @@ namespace met::detail {
       return std::get<T>(variant);
     }
   };
-  template <typename T> inline constexpr auto variant_get = variant_get_t<T>{};
+  template <typename T> inline constexpr auto variant_get = variant_get_t<T>{}; */
 } // namespace met::detail

@@ -687,7 +687,7 @@ namespace met {
       // debug::check_expr(false, "Not implemented!");
 
       s = 0.5; // TODO This will break a few eggs
-      c = 0.5; // TODO This will break a few eggs
+      c = (csys_i.transpose() * s.matrix()).eval();
 
       /* // The specified color becomes our vertex color
       c = constraint->colr_i;

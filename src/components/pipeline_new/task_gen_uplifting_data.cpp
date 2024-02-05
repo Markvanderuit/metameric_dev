@@ -11,7 +11,7 @@
 #include <numbers>
 
 namespace met {
-  constexpr uint n_system_boundary_samples    = 96u;
+  constexpr uint n_system_boundary_samples    = 64u;
   constexpr uint max_supported_delaunay_elems = 512u;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;

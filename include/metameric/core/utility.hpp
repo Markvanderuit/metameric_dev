@@ -82,14 +82,14 @@ namespace met {
 
   // Variant filter view declaration
   // Source: https://stackoverflow.com/questions/69164187/using-filter-on-vector-of-variant
-  template <typename T> struct variant_filter_t {};
+  /* template <typename T> struct variant_filter_t {};
   template <typename T> inline constexpr auto variant_filter = variant_filter_t<T>{};
 
   template <typename R, typename T>
   decltype(auto) operator|(R &&r, variant_filter_t<T>) {
     return r | vws::filter(detail::engaged<T>) 
              | vws::transform(detail::variant_get<T>);
-  }
+  } */
 
   namespace debug {
     // Evaluate a boolean expression, throwing a detailed exception pointing

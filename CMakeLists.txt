@@ -22,7 +22,7 @@ set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supp
 set(MET_SUPPORTED_MESHES      16)
 set(MET_SUPPORTED_OBJECTS     16)
 set(MET_SUPPORTED_EMITTERS    16)
-set(MET_SUPPORTED_UPLIFTINGS   8)
+set(MET_SUPPORTED_UPLIFTINGS   4)
 set(MET_SUPPORTED_TEXTURES   256)
 
 # Print configuration info

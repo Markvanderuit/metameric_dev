@@ -21,8 +21,10 @@ namespace met {
   constexpr static float wavelength_ssize = wavelength_range / static_cast<float>(wavelength_samples);  
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
-  /* Define the maximum nr. of metameric's spectral uplifting constraints */
-  constexpr static uint max_supported_spectra = 256u;
+  /* Define the maximum nr. of metameric's spectral uplifting constraints,
+     per uplifting. This includes boundary points and additional points inserted
+     by the tesselation. */
+  constexpr static uint max_supported_spectra = 512u;
 
   /* Define program's underlying spectrum/cmfs/color classes as renamed Eigen objects */
   using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix
