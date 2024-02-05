@@ -63,9 +63,6 @@ find_package(Threads REQUIRED)
 # Include third party libraries provided through vcpkg
 find_package(assimp    CONFIG REQUIRED)
 find_package(Catch2    CONFIG REQUIRED)
-find_package(CoinUtils CONFIG REQUIRED)
-find_package(Osi       CONFIG REQUIRED)
-find_package(Clp       CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
 find_package(imgui     CONFIG REQUIRED)
@@ -80,6 +77,7 @@ find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
+
 # Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
@@ -292,7 +290,6 @@ target_link_libraries(core PUBLIC
   small_gl_parser_lib
   Eigen3::Eigen
   fmt::fmt-header-only
-  Coin::Clp
   embree
   Tracy::TracyClient
   nlohmann_json::nlohmann_json

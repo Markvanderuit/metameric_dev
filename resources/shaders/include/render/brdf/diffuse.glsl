@@ -2,15 +2,16 @@
 #define BRDF_DIFFUSE_GLSL_GUARD
 
 #include <render/warp.glsl>
+#include <render/record.glsl>
 
-// Partial BRDFInfo data, used to front-load some intermediary work
+/* // Partial BRDFInfo data, used to front-load some intermediary work
 // for the spectral reflectance data
 struct PreliminaryDiffuseBRDF {
   int   index; // -1 if they differ, index otherwise
   vec3  tx;    // Barycentric texture coordinate
-};
+}; */
 
-PreliminaryDiffuseBRDF init_brdf_diffuse_preliminary(in SurfaceInfo si) {
+/* PreliminaryDiffuseBRDF init_brdf_diffuse_preliminary(in SurfaceInfo si) {
   PreliminaryDiffuseBRDF pr;
 
   // Load relevant info objects
@@ -31,10 +32,12 @@ PreliminaryDiffuseBRDF init_brdf_diffuse_preliminary(in SurfaceInfo si) {
   }
 
   return pr;
-}
+} */
 
 void init_brdf_diffuse(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
-  PreliminaryDiffuseBRDF pr = init_brdf_diffuse_preliminary(si);
+  brdf.r = scene_sample_reflectance(record_get_object(si.data), si.tx, wvls);
+
+  /* PreliminaryDiffuseBRDF pr = init_brdf_diffuse_preliminary(si);
   
 #ifndef ENABLE_PARTIAL_PATH_TRACKING
   // Obtain spectral reflectance
@@ -80,7 +83,7 @@ void init_brdf_diffuse(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   }
 #else
   brdf.r = vec4(1);
-#endif
+#endif */
 }
 
 BRDFSample sample_brdf_diffuse(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo si) {

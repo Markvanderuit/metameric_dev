@@ -31,11 +31,7 @@ uint scene_object_count()            { return 0;               }
 #endif // !SCENE_DATA_OBJECT
 
 #ifndef SCENE_DATA_REFLECTANCE
-uniform sampler2DArray b_txtr_refl_default_0;
-uniform sampler1DArray b_txtr_refl_default_1;
-BarycentricInfo scene_reflectance_barycentric_info(uint i) { BarycentricInfo d; return d;  }
-sampler2DArray  scene_reflectance_barycentrics()           { return b_txtr_refl_default_0; } // TODO, if this does not work, construct a unbound one and return it
-sampler1DArray  scene_reflectance_spectra()                { return b_txtr_refl_default_1; } // TODO, if this does not work, construct a unbound one and return it
+vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) { return vec4(1); }
 #endif // !SCENE_DATA_REFLECTANCE
 
 #ifndef SCENE_DATA_CMFS

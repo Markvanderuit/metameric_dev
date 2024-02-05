@@ -1,21 +1,37 @@
 {
-  "name" : "spectral-uplifting",
-  "version-string" : "0.1.0",
-  "dependencies" : [
+  "name": "spectral-uplifting",
+  "version-string": "0.1.0",
+  "dependencies": [
     "assimp",
-    "clp",
     "cxxopts",
     "catch2",
     "eigen3",
-    "glslang",
+    {
+      "name" : "glslang",
+      "features": [ "tools" ]
+    },
     "spirv-cross",
-    "spirv-tools",
+    {
+      "name" : "spirv-tools",
+      "features" : [ "tools" ]
+    },
     "fmt",
-    { "name": "glad", 
-      "features": [ "extensions", "gl-api-latest" ] },
-    { "name" : "imgui", 
-      "features" : [ "opengl3-binding", "glfw-binding", "docking-experimental" ] },
-    "imguizmo", 
+    {
+      "name": "glad",
+      "features": [
+        "extensions",
+        "gl-api-latest"
+      ]
+    },
+    {
+      "name": "imgui",
+      "features": [
+        "opengl3-binding",
+        "glfw-binding",
+        "docking-experimental"
+      ]
+    },
+    "imguizmo",
     "implot",
     "meshoptimizer",
     "nativefiledialog",
@@ -29,17 +45,21 @@
     "zlib",
     "zstr"
   ],
-  "vcpkg-configuration" : {
+  "vcpkg-configuration": {
     "default-registry": {
       "kind": "builtin",
-      "baseline": "6f7ffeb18f99796233b958aaaf14ec7bd4fb64b2"
+      "baseline": "c3801cf53c614ffc54c94051d124eba097b057b1"
     },
     "registries": [
       {
         "kind": "filesystem",
-        "path": "third_party/vcpkg-registry",
         "baseline": "2023-02-22",
-        "packages": [ "meshoptimizer", "qhull", "nlopt" ]
+        "path": "third_party/vcpkg-registry",
+        "packages": [
+          "meshoptimizer",
+          "qhull",
+          "nlopt"
+        ]
       }
     ]
   }
