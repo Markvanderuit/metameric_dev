@@ -8,6 +8,7 @@
 #include <metameric/render/primitives_query.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/texture.hpp>
+#include <ImGuizmo.h>
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
@@ -228,7 +229,7 @@ namespace met {
           // Extract world-space position from surface constraints
           eig::Vector3f p_world = std::visit(overloaded {
             [](const SurfaceConstraint auto &cstr) { return cstr.surface_p; },
-            [](auto) { return eig::Array3f(0); }
+            [](const auto &cstr) { return eig::Array3f(0); }
           }, vert.constraint);
 
           // Get screen-space position; test distance and continue if we are too far away
@@ -273,7 +274,7 @@ namespace met {
           // Add world-space delta to surface constraint
           std::visit(overloaded {
             [&](SurfaceConstraint auto &cstr) { cstr.surface_p += trnsl.head<3>().array(); },
-            [](auto) { }
+            [](const auto &cstr) { }
           }, e_vert.constraint);
         }
       }
@@ -283,7 +284,7 @@ namespace met {
         // Extract world-space position and validity of visible vertices
         auto [is_valid, p_world] = std::visit(overloaded {
           [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.is_valid(), cstr.surface_p }; },
-          [](auto) { return std::pair { false, eig::Array3f(0) }; }
+          [](const auto &cstr) { return std::pair { false, eig::Array3f(0) }; }
         }, vert.constraint);
 
         // Get screen-space position
