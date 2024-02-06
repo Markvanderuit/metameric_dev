@@ -2,6 +2,7 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/scene.hpp>
+#include <metameric/core/surface.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/sensor.hpp>
 #include <metameric/render/primitives_query.hpp>
@@ -9,6 +10,26 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
+  static constexpr float selector_near_distance = 12.f;
+  static const     auto  vertex_color_center  = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f });
+  static const     auto  vertex_color_valid   = ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f });
+  static const     auto  vertex_color_invalid = ImGui::ColorConvertFloat4ToU32({ 1.f, .5f, .5f, 1.f });
+
+  class InputSelection {
+    constexpr static uint invalid_data = 0xFFFFFFFF;
+
+  public:
+    uint uplifting_i  = invalid_data;
+    uint constraint_i = 0;
+  
+  public:
+    bool is_valid() const { return uplifting_i != invalid_data; }
+
+    static InputSelection invalid() { return InputSelection(); }
+    
+    friend auto operator<=>(const InputSelection &, const InputSelection &) = default;
+  };
+
   namespace detail {
     eig::Vector3f gen_barycentric_coords(eig::Vector3f p, 
                                          eig::Vector3f a, 
@@ -27,8 +48,65 @@ namespace met {
       v.x() = 1.f - v.y() - v.z();
       return v;
     }
+  template <typename T> struct engaged_t {
+    template <typename... Ts>
+    constexpr bool operator()(const std::variant<Ts...> &variant) const {
+      return std::holds_alternative<T>(variant);
+    }
+    template <typename... Ts>
+    constexpr bool operator()(std::variant<Ts...> variant) const {
+      return std::holds_alternative<T>(variant);
+    }
+  };
+  template <typename T> inline constexpr auto engaged = engaged_t<T>{};
+  
+  template <typename T> struct variant_get_t {
+    template <typename... Ts>
+    constexpr decltype(auto) operator()(const std::variant<Ts...> &variant) const {
+      return std::get<T>(variant);
+    }
+    template <typename... Ts>
+    constexpr decltype(auto) operator()(std::variant<Ts...> variant) const {
+      return std::get<T>(variant);
+    }
+  };
+  template <typename T> inline constexpr auto variant_get = variant_get_t<T>{};
 
+    template <typename T> struct variant_filter_t {};
+    template <typename T> inline constexpr auto variant_filter = variant_filter_t<T>{};
 
+    template <typename R, typename T>
+    decltype(auto) operator|(R &&r, variant_filter_t<T>) {
+      return r | vws::filter(engaged<T>) 
+               | vws::transform(variant_get<T>);
+    }
+
+    template <typename R, typename T>
+    decltype(auto) operator|(R &r, variant_filter_t<T>) {
+      return r | vws::filter(engaged<T>) 
+               | vws::transform(variant_get<T>);
+    }
+    
+    template <typename R, typename T>
+    decltype(auto) operator|(const R &r, variant_filter_t<T>) {
+      return r | vws::filter(engaged<T>) 
+               | vws::transform(variant_get<T>);
+    }
+
+  /*   template <typename T>  */ // struct enumerate_view_t {};
+  /*   template <typename T>  */ // inline constexpr auto enumerate_view = enumerate_view_t{};
+
+    /* template <typename R>
+    decltype(auto) operator|(R &&r, enumerate_view_t) {
+      return vws::iota(0, static_cast<uint>(r.size()))
+           | vws::transform([&r](uint i) { return std::pair { i, r[i] }; });
+    } */
+
+    inline constexpr auto enumerate_view =
+      [](rng::viewable_range auto &&r) {
+        return vws::iota(0u, static_cast<uint>(r.size()))
+             | vws::transform([&r](uint i) { return std::pair { i, r[i] }; });
+      };
   } // namespace detail
 
   class MeshViewportEditorInputTask : public detail::TaskNode {
@@ -92,6 +170,9 @@ namespace met {
     void init(SchedulerHandle &info) override {
       met_trace();
 
+      // Record selection item; by default no selection
+      info("selection").set<InputSelection>(InputSelection::invalid());
+
       m_query_prim   = {{ .cache_handle = info.global("cache") }};
       m_query_result = RayRecord::invalid();
     }
@@ -100,10 +181,11 @@ namespace met {
       met_trace();
 
       // Get handles, shared resources, modified resources
-      const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &e_target  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
-      const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-      const auto &io        = ImGui::GetIO();
+      const auto &e_scene      = info.global("scene").getr<Scene>();
+      const auto &e_target     = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
+      const auto &e_arcball    = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+      const auto &io           = ImGui::GetIO();
+      const auto &is_selection = info("selection").getr<InputSelection>();
 
       // Compute viewport offset and size, minus ImGui's tab bars etc
       eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -118,34 +200,103 @@ namespace met {
           eval_ray_query(info);
       }
 
-      // Iterate all upliftings
-      for (const auto &[e_uplifting, _] : e_scene.components.upliftings) {
-        // Iterate a copy of all direct surface constraints
-        /* for (DirectSurfaceConstraint constraint : e_uplifting.verts | variant_filter<DirectSurfaceConstraint>) {
-          
-        } */
-      }
-      
-
-      // Draw current surface constraints using ImGui's drawlist
-      {
-        for (const auto &[e_uplifting, _] : e_scene.components.upliftings) {
-          for (const auto &vert : e_uplifting.verts) {
-            if (auto *constraint = std::get_if<DirectSurfaceConstraint>(&vert.constraint)) {
-              auto xy = eig::world_to_window_space(constraint->surface_p,
-                                                  e_arcball.full(),
-                                                  viewport_offs,
-                                                  viewport_size);
-              if (constraint->is_valid()) {
-                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 8.f, ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f }));
-                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 4.f, ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f }));
-              } else {
-                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 8.f, ImGui::ColorConvertFloat4ToU32({ 1.f, .5f, .5f, 1.f }));
-                ImGui::GetWindowDrawList()->AddCircleFilled(xy, 4.f, ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f }));
-              }
-            }
-          }
+      // Generate InputSelection for each relevant constraint
+      std::vector<InputSelection> viable_selections;
+      for (const auto &[i, comp] : detail::enumerate_view(e_scene.components.upliftings)) {
+        const auto &uplifting = comp.value; 
+        for (const auto &[j, vert] : detail::enumerate_view(uplifting.verts)) {
+          guard_continue(std::holds_alternative<DirectSurfaceConstraint>(vert.constraint)
+                      || std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint));
+          viable_selections.push_back({ .uplifting_i = i, .constraint_i = j });
         }
+      }
+
+      // Gather relevant constraints together with enumeration data
+      auto viable_verts = viable_selections | vws::transform([&](InputSelection is) { 
+        return std::pair { is, e_scene.components.upliftings[is.uplifting_i].value.verts[is.constraint_i] };
+      });
+      
+      // InputSelection that is near enough to the mouse to be "active"
+      InputSelection is_nearest = InputSelection::invalid();
+
+      // If window is active, handle mouse input
+      if (ImGui::IsItemHovered()) {
+        // Find first constraint near to mouse in screen-space
+        for (const auto &[is, vert] : viable_verts) {
+          guard_continue(vert.is_active);
+
+          // Extract world-space position from surface constraints
+          eig::Vector3f p_world = std::visit(overloaded {
+            [](const SurfaceConstraint auto &cstr) { return cstr.surface_p; },
+            [](auto) { return eig::Array3f(0); }
+          }, vert.constraint);
+
+          // Get screen-space position; test distance and continue if we are too far away
+          eig::Vector2f p_screen 
+            = eig::world_to_window_space(p_world, e_arcball.full(), viewport_offs, viewport_size);
+          guard_continue((p_screen - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance);
+          
+          // The first surviving constraint is a mouseover candidate
+          is_nearest = is;
+          break;
+        }
+
+        // On mouse click, assign current moused-over selection as active selection, or set to invalid selection
+        if (io.MouseClicked[0])
+          info("selection").getw<InputSelection>() = is_nearest.is_valid() ? is_nearest : InputSelection::invalid();
+        
+        // On mouse hold, snap current moused-over selection along mouse, and ray-trace
+        if (io.MouseDown[0] && is_selection.is_valid()) {
+          // Get readable vertex data
+          auto &e_vert = info.global("scene").getw<Scene>()
+            .components.upliftings[is_selection.uplifting_i].value.verts[is_selection.constraint_i];
+          
+          // Extract world-space position from surface constraints
+          /* eig::Vector3f p_world = std::visit(overloaded {
+            [](const SurfaceConstraint auto &cstr) { return cstr.surface_p; },
+            [](auto) { return eig::Array3f(0); }
+          }, e_vert.constraint);
+          eig::Vector2f p_screen 
+            = eig::world_to_window_space(p_world, e_arcball.full(), viewport_offs, viewport_size); */
+
+          // Determine translation based on transformed mouse delta
+          // eig::Vector4f delta = (eig::Vector4f() << eig::window_to_screen_space(io.MouseDelta, viewport_offs, viewport_size), 0, 0).finished();
+          // eig::Vector4f delta = (eig::Vector4f() << eig::Vector2f(io.MouseDelta), 0, 0).finished();
+          eig::Vector4f delta = {  1.f /* 2.f */ * io.MouseDelta.x / viewport_size.x(), 
+                                  -1.f /* 2.f */ * io.MouseDelta.y / viewport_size.y(), 1, 0 };
+          eig::Vector4f trnsl = (e_arcball.full().inverse().matrix() * delta);
+          // trnsl *= trnsl.w();
+
+          fmt::print("delta = {}\n", delta);
+          fmt::print("trnsl = {}\n", trnsl);
+
+          // Add world-space delta to surface constraint
+          std::visit(overloaded {
+            [&](SurfaceConstraint auto &cstr) { cstr.surface_p += trnsl.head<3>().array(); },
+            [](auto) { }
+          }, e_vert.constraint);
+        }
+      }
+
+      // Draw all visible vertices representing surface constraints
+      for (const auto &[is, vert] : viable_verts) {
+        // Extract world-space position and validity of visible vertices
+        auto [is_valid, p_world] = std::visit(overloaded {
+          [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.is_valid(), cstr.surface_p }; },
+          [](auto) { return std::pair { false, eig::Array3f(0) }; }
+        }, vert.constraint);
+
+        // Get screen-space position
+        eig::Vector2f p_screen 
+          = eig::world_to_window_space(p_world, e_arcball.full(), viewport_offs, viewport_size);
+
+        // Clip vertices outside viewport
+        guard_continue((p_screen.array() >= viewport_offs).all() && (p_screen.array() <= viewport_offs + viewport_size).all());
+
+        // Draw vertex with special coloring dependent on constraint state
+        auto dl = ImGui::GetWindowDrawList();
+        dl->AddCircleFilled(p_screen, 8.f, is_valid           ? vertex_color_valid : vertex_color_invalid);
+        dl->AddCircleFilled(p_screen, 4.f, is == is_selection ? vertex_color_valid : vertex_color_center);
       }
 
       // If a valid result is stored, show test tooltip for now

@@ -144,18 +144,18 @@ namespace met {
       m_query_sensor.pixel     = eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size);
       m_query_sensor.flush();
       
-      fmt::print("{} -> {}\n", m_query_sensor.film_size, m_query_sensor.pixel);
+      // fmt::print("{} -> {}\n", m_query_sensor.film_size, m_query_sensor.pixel);
     
       // Perform path query
       i_path_query.query(m_query_sensor, e_scene, m_query_spp);
 
       // Obtain queried paths
       auto paths = i_path_query.data();
-      fmt::print("Queried {} paths, found {}\n",
-        m_query_spp,
-        paths.size());
+      // fmt::print("Queried {} paths, found {}\n",
+      //   m_query_spp,
+      //   paths.size());
 
-      if (!paths.empty()) {
+      /* if (!paths.empty()) {
         auto path = paths.front();
         for (uint i = 0; i < path.path_depth; ++i) {
           auto vert = path.data[i];
@@ -165,7 +165,7 @@ namespace met {
             vert.record.is_object() ? vert.record.object_i() : vert.record.emitter_i(),
             vert.p);
         }
-      }
+      } */
     }
 
     void eval(SchedulerHandle &info) override {

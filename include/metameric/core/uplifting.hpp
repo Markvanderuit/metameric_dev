@@ -37,6 +37,17 @@ namespace met {
     bool operator==(const MeasurementConstraint &o) const;
   };
 
+  // Concept restricting the expected components of on-surface constraints 
+  template <typename Ty>
+  concept SurfaceConstraint = requires(Ty t) {
+    { t.is_valid()    } -> std::same_as<bool>;
+    { t.surface_p     } -> std::same_as<eig::Array3f &>;
+    { t.surface_data  } -> std::same_as<SurfaceRecord &>;
+  };
+  template <typename Ty>
+  concept is_surface_constraint = SurfaceConstraint<Ty>;
+
+
   /* Constraint definition used in uplifting;
      A direct surface constraint imposes specific color reproduction
      for a position on a scene surface, under a specified color system,
@@ -56,6 +67,7 @@ namespace met {
     bool is_valid() const { return surface_data.is_valid(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
+  static_assert(is_surface_constraint<DirectSurfaceConstraint>);
 
   /* Constraint definition used in upliftin
      A indirect surface constraint imposes specific color reproduction
@@ -65,11 +77,21 @@ namespace met {
     // Whether the constraint is used in the scene
     bool is_active = true;
 
-    // TODO ...
+    // Surface data comprises a a small record object
+    // and a world position
+    SurfaceRecord surface_data = SurfaceRecord::invalid();
+    eig::Array3f  surface_p    = 0.5; 
 
   public:
+    bool is_valid() const { return surface_data.is_valid(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
+  static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
+
+  // Helper concepts/statics
+
+  // template <typename Ty>
+  // concept is_surface_constraint = std::is_same_v<Ty, DirectSurfaceConstraint> || std::is_same_v<Ty, IndirectSurfaceConstraint>;
 
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);

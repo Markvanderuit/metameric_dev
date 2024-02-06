@@ -1,25 +1,29 @@
 #pragma once
 
-#define IM_VEC2_CLASS_EXTRA                                        \
-  ImVec2(const met::eig::Vector2f &v) : x(v.x()), y(v.y()) { }     \
-  ImVec2(const met::eig::Vector2i &v) : x(v.x()), y(v.y()) { }     \
-  ImVec2(const met::eig::Array2f &v)  : x(v.x()), y(v.y()) { }     \
-  ImVec2(const met::eig::Array2i &v)  : x(v.x()), y(v.y()) { }     \
-  operator met::eig::Vector2f() const { return { x, y }; }         \
-  operator met::eig::Vector2i() const { return {                   \
-    static_cast<int>(x), static_cast<int>(y) }; }                  \
-  operator met::eig::Array2f() const { return { x, y }; }          \
-  operator met::eig::Array2i() const { return {                    \
+#define IM_VEC2_CLASS_EXTRA                                    \
+  ImVec2(const met::eig::Vector2f &v) : x(v.x()), y(v.y()) { } \
+  ImVec2(const met::eig::Vector2i &v) : x(v.x()), y(v.y()) { } \
+  ImVec2(const met::eig::Array2f &v)  : x(v.x()), y(v.y()) { } \
+  ImVec2(const met::eig::Array2i &v)  : x(v.x()), y(v.y()) { } \
+  operator met::eig::Vector2f() const { return { x, y }; }     \
+  operator met::eig::Vector2i() const { return {               \
+    static_cast<int>(x), static_cast<int>(y) }; }              \
+  operator met::eig::Array2f() const { return { x, y }; }      \
+  operator met::eig::Array2i() const { return {                \
     static_cast<int>(x), static_cast<int>(y) }; }
 
-#define IM_VEC4_CLASS_EXTRA                                        \
-  operator met::eig::Vector4f() const { return { x, y, z, w }; }   \
-  operator met::eig::Vector4i() const { return {                   \
-    static_cast<int>(x), static_cast<int>(y),                      \
-    static_cast<int>(z), static_cast<int>(w) }; }                  \
-  operator met::eig::Array4f() const { return { x, y, z, w }; }    \
-  operator met::eig::Array4i() const { return {                    \
-    static_cast<int>(x), static_cast<int>(y),                      \
+#define IM_VEC4_CLASS_EXTRA                                                        \
+  ImVec4(const met::eig::Vector4f &v) : x(v.x()), y(v.y()), z(v.z()), w(v.w()) { } \
+  ImVec4(const met::eig::Vector4i &v) : x(v.x()), y(v.y()), z(v.z()), w(v.w()) { } \
+  ImVec4(const met::eig::Array4f &v)  : x(v.x()), y(v.y()), z(v.z()), w(v.w()) { } \
+  ImVec4(const met::eig::Array4i &v)  : x(v.x()), y(v.y()), z(v.z()), w(v.w()) { } \
+  operator met::eig::Vector4f() const { return { x, y, z, w }; }                   \
+  operator met::eig::Vector4i() const { return {                                   \
+    static_cast<int>(x), static_cast<int>(y),                                      \
+    static_cast<int>(z), static_cast<int>(w) }; }                                  \
+  operator met::eig::Array4f() const { return { x, y, z, w }; }                    \
+  operator met::eig::Array4i() const { return {                                    \
+    static_cast<int>(x), static_cast<int>(y),                                      \
     static_cast<int>(z), static_cast<int>(w) }; }
 
 #include <metameric/core/math.hpp>

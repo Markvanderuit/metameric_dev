@@ -7,9 +7,12 @@
 #include <source_location>
 
 // Simple guard statement syntactic sugar
-#define guard(expr,...) if (!(expr)) { return __VA_ARGS__ ; }
-#define guard_continue(expr) if (!(expr)) { continue; }
-#define guard_break(expr) if (!(expr)) { break; }
+#define guard(expr,...)                if (!(expr)) { return __VA_ARGS__ ; }
+#define guard_continue(expr)           if (!(expr)) { continue; }
+#define guard_break(expr)              if (!(expr)) { break; }
+#define guard_constexpr(expr,...)      if constexpr (!(expr)) { return __VA_ARGS__ ; }
+#define guard_constexpr_continue(expr) if constexpr (!(expr)) { continue; }
+#define guard_constexpr_break(expr)    if constexpr (!(expr)) { break; }
 
 // Simple range-like syntactic sugar
 #define range_iter(c)  c.begin(), c.end()
@@ -80,16 +83,10 @@ namespace met {
     return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
   }
 
-  // Variant filter view declaration
-  // Source: https://stackoverflow.com/questions/69164187/using-filter-on-vector-of-variant
-  /* template <typename T> struct variant_filter_t {};
-  template <typename T> inline constexpr auto variant_filter = variant_filter_t<T>{};
-
-  template <typename R, typename T>
-  decltype(auto) operator|(R &&r, variant_filter_t<T>) {
-    return r | vws::filter(detail::engaged<T>) 
-             | vws::transform(detail::variant_get<T>);
-  } */
+  // Helper type for std::visit
+  // Src: https://en.cppreference.com/w/cpp/utility/variant/visit
+  template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+  template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
   namespace debug {
     // Evaluate a boolean expression, throwing a detailed exception pointing

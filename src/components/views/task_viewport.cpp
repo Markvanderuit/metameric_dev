@@ -105,7 +105,7 @@ namespace met {
 
       eig::Array4f clear_colr = e_appl_data.color_mode == ApplicationData::ColorMode::eDark
                               ? eig::Array4f { 0, 0, 0, 1 } 
-                              : ImGui::GetStyleColorVec4(ImGuiCol_ChildBg);
+                              : eig::Array4f(ImGui::GetStyleColorVec4(ImGuiCol_ChildBg));
 
       // Clear framebuffer target for next subtasks
       i_frame_buffer_ms.clear(gl::FramebufferType::eColor, clear_colr);
