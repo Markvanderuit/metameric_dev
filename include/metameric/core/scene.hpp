@@ -147,6 +147,15 @@ namespace met {
     std::pair<Colr, Spec> get_uplifting_constraint(uint i, uint vert_i) const;
     std::pair<Colr, Spec> get_uplifting_constraint(const Uplifting &u, const Uplifting::Vertex &v) const;
 
+    // Extract a specific uplifting vertex, given indices;
+    // supplied here given the common cumbersomeness of deep access
+    const Uplifting::Vertex &get_uplifting_vertex(uint uplifting_i, uint vertex_i) const {
+      return components.upliftings[uplifting_i].value.verts[vertex_i];
+    }
+    Uplifting::Vertex &get_uplifting_vertex(uint uplifting_i, uint vertex_i) {
+      return components.upliftings[uplifting_i].value.verts[vertex_i];
+    }
+
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);

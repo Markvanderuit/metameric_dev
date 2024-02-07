@@ -52,11 +52,12 @@ namespace met::detail {
     value_type  value = { }; // Underlying component value
     state_type  state = { }; // State tracking object to detect internal changes
     
-    constexpr friend 
-    auto operator<=>(const Component &, const Component &) = default;
-    
+  public: // Boilerplate
     constexpr
     operator bool() const { return state.is_mutated(); };
+    
+    constexpr friend 
+    auto operator<=>(const Component &, const Component &) = default;
     
   public: // Serialization
     void to_stream(std::ostream &str) const {
@@ -119,7 +120,7 @@ namespace met::detail {
 
     constexpr friend 
     auto operator<=>(const Resource &, const Resource &) = default;
-    
+
   public: // Serialization
     void to_stream(std::ostream &str) const {
       met_trace();
@@ -223,7 +224,6 @@ namespace met::detail {
       debug::check_expr(it != m_data.end(), "Queried scene component does not exist");
       return *it;
     }
-
     constexpr cmpnt_type &operator()(std::string_view name) {
       auto it = rng::find(m_data, name, &cmpnt_type::name);
       debug::check_expr(it != m_data.end(), "Queried scene component does not exist");
