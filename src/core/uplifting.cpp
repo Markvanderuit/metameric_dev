@@ -14,8 +14,7 @@ namespace met {
   }
   
   bool DirectSurfaceConstraint::operator==(const DirectSurfaceConstraint &o) const {
-    return surface_data == o.surface_data
-        && surface_p.isApprox(o.surface_p)
+    return surface == o.surface
         && rng::equal(colr_j, o.colr_j, eig::safe_approx_compare<Colr>)
         && rng::equal(csys_j, o.csys_j);
   }
@@ -52,16 +51,14 @@ namespace met {
     met_trace();
     js.at("colr_j").get_to(c.colr_j);
     js.at("csys_j").get_to(c.csys_j);
-    js.at("surface_data").get_to(c.surface_data.data);
-    js.at("surface_p").get_to(c.surface_p);
+    js.at("surface").get_to(c.surface);
   }
 
   void to_json(json &js, const DirectSurfaceConstraint &c) {
     met_trace();
-    js = {{ "colr_j",       c.colr_j            },
-          { "csys_j",       c.csys_j            },
-          { "surface_data", c.surface_data.data },
-          { "surface_p",    c.surface_p         }};
+    js = {{ "colr_j",  c.colr_j  },
+          { "csys_j",  c.csys_j  },
+          { "surface", c.surface }};
   }
 
   void from_json(const json &js, IndirectSurfaceConstraint &c) {

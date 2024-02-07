@@ -4,6 +4,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/record.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene_components.hpp>
 #include <metameric/core/detail/scene_components_gl.hpp>
@@ -155,6 +156,9 @@ namespace met {
     Uplifting::Vertex &get_uplifting_vertex(uint uplifting_i, uint vertex_i) {
       return components.upliftings[uplifting_i].value.verts[vertex_i];
     }
+
+    // Given a RayRecord, recover underlying SurfaceInfo
+    SurfaceInfo get_surface_info(const RayRecord &ray) const;
 
   public: // Serialization
     void to_stream(std::ostream &str) const;

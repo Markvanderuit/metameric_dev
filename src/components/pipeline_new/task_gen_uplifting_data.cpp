@@ -153,81 +153,9 @@ namespace met {
       guard_continue(e_state.verts[i] || csys_stale);
       const auto &vert = e_uplifting.verts[i];
 
-      // TODO; how to deal with is_active flag?
-      //       should probably reserve and push back instead of
-      //       pre-resizing 
-
       // Generate vertex color and attached metamer;
       // this is handled in Scene object to keep it away from the pipeline
       auto [c, s] = e_scene.get_uplifting_constraint(e_uplifting, vert);
-
-      /* // Dependent on type, generate spectral value in a different manner
-      if (vert.type == UpliftingConstraint::Type::eColor) {
-        // Generate spectral value based on color constraints
-        c = vert.colr_i;
-
-        // Obtain all color system spectra referred by this vertex
-        std::vector<CMFS> systems = { csys };
-        rng::transform(vert.csys_j, std::back_inserter(systems), 
-          [&](uint j) { return e_scene.get_csys(j).finalize_direct(); });
-
-        // Obtain corresponding color constraints for each color system
-        std::vector<Colr> signals = { c };
-        rng::copy(vert.csys_j, std::back_inserter(signals));
-
-        // Generate a metamer satisfying the system+signal constraint set
-        s = generate_spectrum({
-          .basis              = e_basis.value(),
-          .systems            = systems,
-          .signals            = signals,
-          .impose_boundedness = true,
-          .solve_dual         = true
-        });
-      } else if (vert.type == UpliftingConstraint::Type::eColorOnMesh) {
-        // Sample color constraint from mesh, and go from there
-        // TODO experiment!
-        
-        // Obtain relevant mesh and uv coordinates to mesh
-        const auto &e_object = e_objects[vert.object_i].value;
-        const auto &e_mesh   = e_meshes[e_object.mesh_i].value();
-        const auto &e_elem   = e_mesh.elems[vert.object_elem_i];
-        eig::Array2f uv = (e_mesh.txuvs[e_elem[0]] * vert.object_elem_bary[0]
-                         + e_mesh.txuvs[e_elem[1]] * vert.object_elem_bary[1]
-                         + e_mesh.txuvs[e_elem[2]] * vert.object_elem_bary[2])
-                        .unaryExpr([](float f) { return std::fmod(f, 1.f); });
-
-        // Sample surface albedo at uv position
-        if (e_object.diffuse.index() == 0) {
-          c = std::get<0>(e_object.diffuse);
-        } else {
-          const auto &e_image = e_images[std::get<1>(e_object.diffuse)].value();
-          c = e_image.sample(uv, Image::ColorFormat::eSRGB).head<3>();
-        }
-
-        // Obtain all color system spectra referred by this vertex
-        std::vector<CMFS> systems = { csys };
-        rng::transform(vert.csys_j, std::back_inserter(systems), 
-          [&](uint j) { return e_scene.get_csys(j).finalize_direct(); });
-
-        // Obtain corresponding color constraints for each color system
-        std::vector<Colr> signals = { c };
-        rng::copy(vert.csys_j, std::back_inserter(signals));
-
-        // Generate a metamer satisfying the system+signal constraint set
-        s = generate_spectrum({
-          .basis              = e_basis.value(),
-          .systems            = systems,
-          .signals            = signals,
-          .impose_boundedness = true,
-          .solve_dual         = true
-        });
-      } else if (vert.type == UpliftingConstraint::Type::eMeasurement) {
-        // Use measured spectral value directly
-        s = vert.measurement;
-
-        // Additionally acquire its color for the tesselation
-        c = (csys.transpose() * s.matrix()).eval();
-      } */
       
       // Add to set of spectra, and to tesselation input points
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
@@ -247,7 +175,10 @@ namespace met {
       m_tesselation = generate_delaunay<AlDelaunay, Colr>(m_tesselation_points);
 
       // Update packed data for fast per-object delaunay traversal
-      std::transform(std::execution::par_unseq, range_iter(m_tesselation.elems), m_tesselation_pack_map.begin(), [&](const auto &el) {
+      std::transform(std::execution::par_unseq, 
+                     range_iter(m_tesselation.elems), 
+                     m_tesselation_pack_map.begin(), 
+      [&](const auto &el) {
         const auto vts = el | indexed_view(m_tesselation.verts);
         MeshPackLayout pack;
         pack.inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
@@ -257,7 +188,8 @@ namespace met {
         return pack;
       });
 
-      fmt::print("Resulting tesselation: {} verts, {} elems\n", m_tesselation.verts.size(), m_tesselation.elems.size());
+      fmt::print("Resulting tesselation: {} verts, {} elems\n", 
+        m_tesselation.verts.size(), m_tesselation.elems.size());
 
       // Update packing layout data
       m_tesselation_data_map->elem_offs = max_supported_spectra * m_uplifting_i;

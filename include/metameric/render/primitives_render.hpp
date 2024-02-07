@@ -1,8 +1,8 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/render/detail/primitives.hpp>
-#include <metameric/render/path.hpp>
 
 namespace met {
   struct DirectRenderPrimitiveCreateInfo {
@@ -39,7 +39,7 @@ namespace met {
     uint spp_max = std::numeric_limits<uint>::max();
 
     // Maximum path length
-    uint max_depth = path_max_depth;
+    uint max_depth = PathRecord::path_max_depth;
 
     // Program cache; enforced given the shader's long compile time
     ResourceHandle cache_handle;

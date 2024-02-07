@@ -18,8 +18,6 @@ struct SurfaceInfo {
   vec3 wi;  // Incident direction in local shading frame
   float t;  // Distance traveled along ray in incident direction
   
-  vec3 bary;
-
   // Intersected object record; object/emitter index, primitive index
   uint data;
 };

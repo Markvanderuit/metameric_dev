@@ -3,7 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/surface.hpp>
+#include <metameric/core/record.hpp>
 
 namespace met {
   /* Constraint definition used in uplifting;
@@ -34,9 +34,8 @@ namespace met {
   // Concept defining the expected components of on-surface constraints 
   template <typename Ty>
   concept SurfaceConstraint = requires(Ty t) {
-    { t.is_valid()    } -> std::same_as<bool>;
-    { t.surface_p     } -> std::same_as<eig::Array3f &>;
-    { t.surface_data  } -> std::same_as<SurfaceRecord &>;
+    { t.is_valid() } -> std::same_as<bool>;
+    { t.surface    } -> std::same_as<SurfaceInfo &>;
   };
   template <typename Ty>
   concept is_surface_constraint = SurfaceConstraint<Ty>;
@@ -51,13 +50,11 @@ namespace met {
     std::vector<Colr> colr_j; // Expected colors under secondary color systems
     std::vector<uint> csys_j; // Indices of the secondary color systems
 
-    // Surface data comprises a a small record object
-    // and a world position
-    SurfaceRecord surface_data = SurfaceRecord::invalid();
-    eig::Array3f  surface_p    = 0.5; 
+    // Surface data recorded through user interaction
+    SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
-    bool is_valid() const { return surface_data.is_valid(); }
+    bool is_valid() const { return surface.is_valid(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
@@ -67,13 +64,11 @@ namespace met {
      for a position on a scene surface, taking into account light transport
      affecting this surface position. */
   struct IndirectSurfaceConstraint {
-    // Surface data comprises a a small record object
-    // and a world position
-    SurfaceRecord surface_data = SurfaceRecord::invalid();
-    eig::Array3f  surface_p    = 0.5; 
+    // Surface data recorded through user interaction
+    SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
-    bool is_valid() const { return surface_data.is_valid(); }
+    bool is_valid() const { return surface.is_valid(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
   static_assert(is_surface_constraint<IndirectSurfaceConstraint>);

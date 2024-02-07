@@ -119,6 +119,9 @@ namespace met {
         ImGui::DragFloat3("Rotation", object.transform.rotation.data(), 0.01f, -10.f, 10.f);
         ImGui::DragFloat3("Scaling",  object.transform.scaling.data(),  0.01f, 0.001f, 100.f);
 
+        // Important catch; prevent scale from falling to 0, something somewhere breaks :D
+        object.transform.scaling = object.transform.scaling.cwiseMax(0.001f);
+        
         ImGui::Separator();
 
         // Diffuse section
@@ -400,17 +403,15 @@ namespace met {
 
           if (open_section) {
             if (auto *constraint = std::get_if<DirectSurfaceConstraint>(&vert.constraint)) {
-              ImGui::SliderFloat3("Surface position", constraint->surface_p.data(), -1.f, 1.f);
+              ImGui::InputFloat3("Surface position", constraint->surface.p.data());
+              ImGui::ColorEdit3("Surface diffuse", constraint->surface.diffuse.data(),
+                ImGuiColorEditFlags_Float    |
+                ImGuiColorEditFlags_NoOptions);
             } else {
               ImGui::Text("Not implemented!");
             }
             ImGui::TreePop();
           } // if (open_section)
-
-          /* if (ImGui::TreeNode(vert_name.c_str())) {
-            ImGui::Checkbox("Is active", &vert.is_active);
-            // ...
-          } */
 
           ImGui::PopID();
         } // for (uint j)
@@ -435,7 +436,7 @@ namespace met {
               uplifting.verts.push_back({ .constraint = MeasurementConstraint { .measurement = 0.5  }});
             
             if (ImGui::Selectable("Direct surface"))
-              uplifting.verts.push_back({ .constraint = DirectSurfaceConstraint { .surface_p = 0.5 }});
+              uplifting.verts.push_back({ .constraint = DirectSurfaceConstraint()});
 
             ImGui::EndPopup();
           }

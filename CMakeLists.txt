@@ -201,10 +201,9 @@ foreach(glsl_src ${glsl_srcs})
     COMMAND ${spirv-opt} ${spirv_temp_fp} 
             -o ${spirv_bin_fp} 
             -O 
-            --strength-reduction 
-            --combine-access-chains
+            -Os
     DEPENDS ${spirv_temp_fp}
-    VERBATIM
+    VERBATIM 
   )
 
   # Generate spir-v reflection information in .json files using spirv-cross

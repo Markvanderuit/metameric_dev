@@ -2,7 +2,6 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/scene.hpp>
-#include <metameric/core/surface.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/sensor.hpp>
 #include <metameric/render/primitives_query.hpp>
@@ -104,8 +103,7 @@ namespace met {
     RayQueryPrimitive m_query_prim;
     RayRecord         m_query_result;
     bool              m_is_gizmo_used;
-    eig::Array3f      m_gizmo_prev_p;
-    SurfaceRecord     m_gizmo_prev_record;
+    SurfaceInfo       m_gizmo_prev_si;
 
     RayRecord eval_ray_query(SchedulerHandle &info, eig::Vector2f xy) {
       met_trace_full();
@@ -122,48 +120,7 @@ namespace met {
 
       // Run raycast primitive, block for results
       m_query_prim.query(m_query_sensor, e_scene);
-      auto ray = m_query_prim.data();
-
-      // // Given a valid intersection on a object surface
-      if (ray.record.is_valid() && ray.record.is_object()) {
-        // Get relevant resources
-        const auto &e_object = e_scene.components.objects[ray.record.object_i()].value;
-        const auto &e_prim   = e_scene.resources.meshes
-          .gl.bvh_prims_cpu[ray.record.primitive_i()].unpack();
-
-        // const auto &e_prim   = e_mesh.elems[ray.record.primitive_i()];
-        
-        // Get transforms used for gl-side world-model space
-        auto trf = e_scene.components.objects.gl.objects()[ray.record.object_i()].trf_mesh;
-        auto inv = e_scene.components.objects.gl.objects()[ray.record.object_i()].trf_mesh_inv;
-
-        // Determine hit position and barycentric coordinates in primitive
-        eig::Vector3f p    = ray.get_position();
-        eig::Vector4f pinv = inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f);
-        auto bary = detail::barycentric_coords(pinv.head<3>(),
-                                               e_prim.v0.p,
-                                               e_prim.v1.p,
-                                               e_prim.v2.p);
-
-        // Test inversion
-        eig::Vector3f prec = bary.x() * e_prim.v0.p
-                           + bary.y() * e_prim.v1.p
-                           + bary.z() * e_prim.v2.p;
-        // prec = (trf * eig::Vector4f(prec.x(), prec.y(), prec.z(), 1.f)).head<3>();
-        
-        fmt::print("---\nobject: {}, mesh: {}, prim: {}\n",
-          e_scene.components.objects[ray.record.object_i()].name,
-          e_scene.resources.meshes[e_object.mesh_i].name,
-          ray.record.primitive_i());
-        fmt::print("a = {}, b = {}, c = {}\n",
-          /* (trf * (eig::Vector4f() << */ e_prim.v0.p,/*  1.f).finished()).head<3>().eval(), */ 
-          /* (trf * (eig::Vector4f() << */ e_prim.v1.p,/*  1.f).finished()).head<3>().eval(), */ 
-          /* (trf * (eig::Vector4f() << */ e_prim.v2.p/*,  1.f).finished()).head<3>().eval() */);
-        fmt::print("bary = {}\n", bary);
-        fmt::print("p = {} -> {}\n", pinv.head<3>().eval(), prec);
-      }
-
-      return ray;
+      return m_query_prim.data();
     }
     
   public:
@@ -213,14 +170,14 @@ namespace met {
       // Draw all visible vertices representing surface constraints
       for (const auto &[is, vert] : viable_verts) {
         // Extract world-space position and validity of visible vertices
-        auto [is_valid, p_world] = std::visit(overloaded {
-          [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.is_valid(), cstr.surface_p }; },
-          [](const auto &cstr) { return std::pair { false, eig::Array3f(0) }; }
+        auto [is_valid, si] = std::visit(overloaded {
+          [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.is_valid(), cstr.surface }; },
+          [](const auto &cstr) { return std::pair { false, SurfaceInfo::invalid() }; }
         }, vert.constraint);
 
         // Get screen-space position
         eig::Vector2f p_screen 
-          = eig::world_to_window_space(p_world, e_arcball.full(), viewport_offs, viewport_size);
+          = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
 
         // Clip vertices outside viewport
         guard_continue((p_screen.array() >= viewport_offs).all() && (p_screen.array() <= viewport_offs + viewport_size).all());
@@ -239,15 +196,15 @@ namespace met {
           InputSelection is_nearest = InputSelection::invalid();
 
           for (const auto &[is, vert] : viable_verts) {
-            // Extract world-space position from surface constraints
-            eig::Vector3f p_world = std::visit(overloaded {
-              [](const SurfaceConstraint auto &cstr) { return cstr.surface_p; },
-              [](const auto &cstr) { return eig::Array3f(0); }
+            // Extract surface information from surface constraint
+            auto si = std::visit(overloaded {
+              [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
+              [](const auto &cstr) { return SurfaceInfo::invalid(); }
             }, vert.constraint);
 
             // Get screen-space position; test distance and continue if we are too far away
             eig::Vector2f p_screen 
-              = eig::world_to_window_space(p_world, e_arcball.full(), viewport_offs, viewport_size);
+              = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
             guard_continue((p_screen - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance);
             
             // The first surviving constraint is a mouseover candidate
@@ -268,14 +225,14 @@ namespace met {
           const auto &e_vert = info.global("scene").getr<Scene>()
             .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
           
-          // Extract world-space position and data from surface constraints
-          auto [p_world, record] = std::visit(overloaded {
-            [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.surface_p, cstr.surface_data }; },
-            [](const auto &) { return std::pair { eig::Array3f(0), SurfaceRecord::invalid() }; }
+          // Extract surface information from surface constraint
+          auto si = std::visit(overloaded {
+            [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
+            [](const auto &) { return SurfaceInfo::invalid(); }
           }, e_vert.constraint);
 
           // ImGuizmo manipulator operates on transforms
-          auto trf_vert  = eig::Affine3f(eig::Translation3f(p_world));
+          auto trf_vert  = eig::Affine3f(eig::Translation3f(si.p));
           auto trf_delta = eig::Affine3f::Identity();
 
           // Specify ImGuizmo enabled operation; transl for one vertex, transl/rotate for several
@@ -289,36 +246,33 @@ namespace met {
 
           // Register gizmo use start; cache current vertex position
           if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-            m_gizmo_prev_p      = p_world;
-            m_gizmo_prev_record = record;
-            m_is_gizmo_used     = true;
+            m_gizmo_prev_si = si;
+            m_is_gizmo_used = true;
           }
 
           // Register continuous gizmo use
           if (ImGuizmo::IsUsing()) {
             // Apply world-space delta to constraint position
-            p_world = trf_delta * p_world;
+            si.p = trf_delta * si.p;
 
             // Get screen-space position
-            eig::Vector2f p_screen 
-              = eig::world_to_screen_space(p_world, e_arcball.full());
+            eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
             
             // Do a raycast, snapping the world position to the nearest surface
-            // on a surface hit
+            // on a surface hit, and update the local SurfaceInfo object to accomodate
             m_query_result = eval_ray_query(info, p_screen);
-            record  = m_query_result.record; // update the surface record either way
-            if (m_query_result.record.is_valid() && m_query_result.record.is_object()) {
-              p_world = m_query_result.get_position();
-            }
+            si = (m_query_result.record.is_valid() && m_query_result.record.is_object())
+               ? e_scene.get_surface_info(m_query_result)
+               : SurfaceInfo { .p = si.p };
 
             // Get writable vertex data
             auto &e_vert = info.global("scene").getw<Scene>()
               .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
 
             // Store world-space position in surface constraint
+            // TODO no, replace by surface data
             std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
-              cstr.surface_p    = p_world; 
-              cstr.surface_data = record;
+              cstr.surface = si;
             }, [](const auto &cstr) { } }, e_vert.constraint);
           }
 
@@ -327,23 +281,20 @@ namespace met {
             m_is_gizmo_used = false;
             
             // Get screen-space position
-            eig::Vector2f p_screen 
-              = eig::world_to_screen_space(p_world, e_arcball.full());
+            eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
             
             info.global("scene").getw<Scene>().touch({
               .name = "Move surface constraint",
-              .redo = [p = p_world, r = record, is = is_selection](auto &scene) {
+              .redo = [si = si, is = is_selection](auto &scene) {
                 auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
                 std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
-                  cstr.surface_p    = p;
-                  cstr.surface_data = r;
+                  cstr.surface = si;
                 }, [](const auto &cstr) {}}, e_vert.constraint);
               },
-              .undo = [p = m_gizmo_prev_p, r = m_gizmo_prev_record, is = is_selection](auto &scene) {
+              .undo = [si = m_gizmo_prev_si, is = is_selection](auto &scene) {
                 auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
                 std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
-                  cstr.surface_p    = p;
-                  cstr.surface_data = r;
+                  cstr.surface = si;
                 }, [](const auto &cstr) {}}, e_vert.constraint);
               }
             });

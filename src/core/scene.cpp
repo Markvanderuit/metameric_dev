@@ -120,10 +120,10 @@ namespace met {
           { "uplifting_i", object.uplifting_i }};
       
     js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse }};
-    js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
+    /* js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
     js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic }};
     js["opacity"]   = {{ "index", object.opacity.index() },   { "variant", object.opacity }};
-    js["normals"]   = {{ "index", object.normals.index() },   { "variant", object.normals }};
+    js["normals"]   = {{ "index", object.normals.index() },   { "variant", object.normals }}; */
   }
 
   void from_json(const json &js, Object &object) {
@@ -137,7 +137,7 @@ namespace met {
       case 1: object.diffuse = js.at("diffuse").at("variant").get<uint>(); break;
       default: debug::check_expr(false, "Error parsing json material data");
     }
-    switch (js.at("roughness").at("index").get<size_t>()) {
+    /* switch (js.at("roughness").at("index").get<size_t>()) {
       case 0: object.roughness = js.at("roughness").at("variant").get<float>(); break;
       case 1: object.roughness = js.at("roughness").at("variant").get<uint>(); break;
       default: debug::check_expr(false, "Error parsing json material data");
@@ -156,7 +156,7 @@ namespace met {
       case 0: object.normals = js.at("normals").at("variant").get<Colr>(); break;
       case 1: object.normals = js.at("normals").at("variant").get<uint>(); break;
       default: debug::check_expr(false, "Error parsing json material data");
-    }
+    } */
   }
 
   void to_json(json &js, const Emitter &emitter) {
@@ -341,14 +341,14 @@ namespace met {
       component.value.mesh_i += resources.meshes.size();
       if (component.value.diffuse.index() == 1)
         component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + resources.images.size());
-      if (component.value.roughness.index() == 1)
+      /* if (component.value.roughness.index() == 1)
         component.value.roughness = static_cast<uint>(std::get<1>(component.value.roughness) + resources.images.size());
       if (component.value.metallic.index() == 1)
         component.value.metallic = static_cast<uint>(std::get<1>(component.value.metallic) + resources.images.size());
       if (component.value.opacity.index() == 1)
         component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + resources.images.size());
       if (component.value.normals.index() == 1)
-        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + resources.images.size());
+        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + resources.images.size()); */
       if (!other.components.upliftings.empty())
         component.value.uplifting_i += components.upliftings.size();
       return component;
@@ -525,9 +525,9 @@ namespace met {
         material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColorValue);
 
       // Attempt to fetch miscellaneous properties
-      material->Get(AI_MATKEY_METALLIC_FACTOR, metallicValue);
+      /* material->Get(AI_MATKEY_METALLIC_FACTOR, metallicValue);
       material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessValue);
-      material->Get(AI_MATKEY_OPACITY, opacityValue);
+      material->Get(AI_MATKEY_OPACITY, opacityValue); */
 
       // Assuming texture file paths are available, next attempt to gather these
       aiString baseColorTexture, metallicTexture, roughnessTexture, opacityTexture, normalTexture;
@@ -539,15 +539,15 @@ namespace met {
       }
         
       // Search for a corresponding texture path for normal maps
-      for (auto tag : { aiTextureType_NORMALS, aiTextureType_HEIGHT, aiTextureType_NORMAL_CAMERA }) {
+      /* for (auto tag : { aiTextureType_NORMALS, aiTextureType_HEIGHT, aiTextureType_NORMAL_CAMERA }) {
         material->GetTexture(tag, 0, &normalTexture);
         guard_break(normalTexture.length == 0);
-      }
+      } */
 
       // Search for texture paths for miscellaneous values
-      material->GetTexture(aiTextureType_METALNESS,         0, &metallicTexture);
+      /* material->GetTexture(aiTextureType_METALNESS,         0, &metallicTexture);
       material->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTexture);
-      material->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture);
+      material->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture); */
 
       // Texture image load helper
       auto image_load = [&](auto &target, std::string_view image_str, auto image_value) {
@@ -565,10 +565,10 @@ namespace met {
 
       // Attempt to load all referred texture images into their variant, or instead use the provided value
       image_load(object.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
-      image_load(object.metallic,  metallicTexture.C_Str(), metallicValue);
+      /* image_load(object.metallic,  metallicTexture.C_Str(), metallicValue);
       image_load(object.roughness, roughnessTexture.C_Str(), roughnessValue);
       image_load(object.opacity,   opacityTexture.C_Str(), opacityValue);
-      image_load(object.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 });
+      image_load(object.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 }); */
     }
 
     import_scene(std::move(scene));
@@ -666,6 +666,10 @@ namespace met {
   std::pair<Colr, Spec> Scene::get_uplifting_constraint(const Uplifting &u, const Uplifting::Vertex &v) const {
     met_trace();
 
+    // Return zero constraint for inactive parts
+    if (!v.is_active)
+      return { Colr(0.f), Spec(0.f) };
+
     // Color system spectra within which the 'uplifted' texture is defined
     CMFS csys_i = get_csys(u.csys_i).finalize_direct();
 
@@ -700,44 +704,12 @@ namespace met {
       // The metamer's color under the uplifting's color system becomes our vertex color
       c = (csys_i.transpose() * s.matrix()).eval();
     } else if (const auto *constraint = std::get_if<DirectSurfaceConstraint>(&v.constraint)) {
-      const auto &object = components.objects[constraint->surface_data.object_i()].value;
-      
-      if (const Colr *colr = std::get_if<Colr>(&object.diffuse)) {
-        // If the surface material describes a color, we simply copy this
-        c = *colr;
-      } else if (const uint *txtr_i = std::get_if<uint>(&object.diffuse)) {
-        // If, instead, the surface material uses a diffuse texture, we sample it
-        // at the specified location
+      // Return zero constraint for invalid surfaces
+      if (!constraint->is_valid())
+        return { Colr(0.f), Spec(0.f) };
 
-        debug::check_expr(constraint->is_valid(), "Uhhhh!");
-
-        // Get relevant resources
-        const auto &mesh = resources.meshes[object.mesh_i].value();
-        const auto &prim = mesh.elems[constraint->surface_data.primitive_i()];
-        const auto &txtr = resources.images[*txtr_i].value();
-        
-        // Take surface position, and invert into mesh space
-        eig::Vector3f p     = constraint->surface_p;
-        eig::Vector3f p_inv = (object.transform.affine().matrix().inverse() 
-                            * eig::Vector4f(p.x(), p.y(), p.z(), 1)).head<3>();
-
-        // Obtain hit uvs from barycentric coordinates
-        auto uv_clamp = [](float f) {
-          int i = static_cast<int>(f);
-          return (i % 2) ? 1.f - (f - i) : f - i;
-        };
-        eig::Vector3f br = detail::gen_barycentric_coords(p_inv, mesh.verts[prim[0]], mesh.verts[prim[1]], mesh.verts[prim[2]]);
-        eig::Vector2f uv = (mesh.txuvs[prim[0]]).unaryExpr(uv_clamp) * br[0] 
-                         + (mesh.txuvs[prim[1]]).unaryExpr(uv_clamp) * br[1] 
-                         + (mesh.txuvs[prim[2]]).unaryExpr(uv_clamp) * br[2];
-        
-        fmt::print("br = {}\nuv = {}\np={}\np_inv={}\n", br, uv, p, p_inv);
-
-        // Sample texture and assign output color
-        c = 0.5; // txtr.sample(uv, Image::ColorFormat::eLRGB).head<3>();
-      } else {
-        debug::check_expr(false, "variant options exhausted");
-      }
+      // Color is obtained from surface information
+      c = constraint->surface.diffuse;
 
       // Gather all relevant color system spectra referred by the constraint
       std::vector<CMFS> systems = { csys_i };
@@ -760,6 +732,47 @@ namespace met {
     }
 
     return { c, s };
+  }
+
+  SurfaceInfo Scene::get_surface_info(const RayRecord &ray) const {
+    met_trace();
+
+    // Return object; return early if an invalid object was given
+    SurfaceInfo si = { .record = ray.record };
+    guard(si.is_valid(), si);
+    
+    // Get relevant resources; mostly gl-side resources
+    const auto &object    = components.objects[si.record.object_i()].value;
+    const auto &object_gl = components.objects.gl.objects()[ray.record.object_i()];
+    const auto &prim      = resources.meshes.gl.bvh_prims_cpu[ray.record.primitive_i()].unpack();
+  
+    // Get transforms used for gl-side world-model space
+    auto trf = object_gl.trf_mesh;
+    auto inv = object_gl.trf_mesh_inv;
+
+    // Generate barycentric coordinates
+    eig::Vector3f p    = ray.get_position();
+    eig::Vector3f pinv = (inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
+    auto bary = detail::gen_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
+
+    // Recover surface geometric data
+    si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
+    si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
+    si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
+    si.p  = (trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
+    si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 1.f)).head<3>();
+    si.n.normalize();
+
+    // Recover surface diffuse data based on underlying object material
+    si.diffuse = std::visit(overloaded {
+      [&](const uint &i) {
+        const auto &txtr = resources.images[i].value();
+        return txtr.sample(si.tx, Image::ColorFormat::eLRGB).head<3>().eval();
+      },
+      [](const Colr &c) { return c; }
+    }, object.diffuse);
+
+    return si;
   }
 
   void Scene::to_stream(std::ostream &str) const {

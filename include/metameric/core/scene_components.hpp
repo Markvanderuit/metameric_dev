@@ -55,28 +55,28 @@ namespace met {
 
     // Material data, packed with object; either a specified value, or a texture index
     std::variant<Colr,  uint> diffuse;
-    std::variant<Colr,  uint> normals;
+    /* std::variant<Colr,  uint> normals;
     std::variant<float, uint> roughness;
     std::variant<float, uint> metallic;
-    std::variant<float, uint> opacity;
+    std::variant<float, uint> opacity; */
     
   public:
     inline 
     bool operator==(const Object &o) const {
       guard(std::tie(is_active, transform, mesh_i, uplifting_i) == 
             std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i), false);
-      guard(std::tie(roughness, metallic, opacity) == 
-            std::tie(o.roughness, o.metallic, o.opacity), false);
-      guard(diffuse.index() == o.diffuse.index() && 
-            normals.index() == o.normals.index(), false);
+      /* guard(std::tie(roughness, metallic, opacity) == 
+            std::tie(o.roughness, o.metallic, o.opacity), false); */
+      guard(diffuse.index() == o.diffuse.index() /* && 
+            normals.index() == o.normals.index() */, false);
       switch (diffuse.index()) {
         case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
         case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
       }
-      switch (normals.index()) {
+      /* switch (normals.index()) {
         case 0: guard(std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)), false); break;
         case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
-      }
+      } */
       return true;
     }
   };
