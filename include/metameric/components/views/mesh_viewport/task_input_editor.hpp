@@ -271,7 +271,7 @@ namespace met {
           // Extract world-space position and data from surface constraints
           auto [p_world, record] = std::visit(overloaded {
             [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.surface_p, cstr.surface_data }; },
-            [](auto) { return std::pair { eig::Array3f(0), SurfaceRecord::invalid() }; }
+            [](const auto &) { return std::pair { eig::Array3f(0), SurfaceRecord::invalid() }; }
           }, e_vert.constraint);
 
           // ImGuizmo manipulator operates on transforms
