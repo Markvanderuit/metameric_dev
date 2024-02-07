@@ -113,8 +113,10 @@ namespace met {
   class MeshViewportEditorInputTask : public detail::TaskNode {
     RaySensor         m_query_sensor;
     RayQueryPrimitive m_query_prim;
+    RayRecord         m_query_result;
     bool              m_is_gizmo_used;
-    eig::Array3f      m_gizmo_p_prev;
+    eig::Array3f      m_gizmo_prev_p;
+    SurfaceRecord     m_gizmo_prev_record;
 
     RayRecord eval_ray_query(SchedulerHandle &info, eig::Vector2f xy) {
       met_trace_full();
@@ -226,8 +228,8 @@ namespace met {
 
         // Draw vertex with special coloring dependent on constraint state
         auto dl = ImGui::GetWindowDrawList();
-        dl->AddCircleFilled(p_screen, 8.f, is_valid           ? vertex_color_valid : vertex_color_invalid);
-        dl->AddCircleFilled(p_screen, 4.f, is == is_selection ? vertex_color_valid : vertex_color_center);
+        dl->AddCircleFilled(p_screen, 8.f, is_valid ? vertex_color_valid : vertex_color_invalid);
+        dl->AddCircleFilled(p_screen, 4.f, vertex_color_center);
       }
 
       // If window is active, handle mouse input
@@ -267,10 +269,10 @@ namespace met {
           const auto &e_vert = info.global("scene").getr<Scene>()
             .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
           
-          // Extract world-space position from surface constraints
-          eig::Vector3f p_world = std::visit(overloaded {
-            [](const SurfaceConstraint auto &cstr) { return cstr.surface_p; },
-            [](auto) { return eig::Array3f(0); }
+          // Extract world-space position and data from surface constraints
+          auto [p_world, record] = std::visit(overloaded {
+            [](const SurfaceConstraint auto &cstr) { return std::pair { cstr.surface_p, cstr.surface_data }; },
+            [](auto) { return std::pair { eig::Array3f(0), SurfaceRecord::invalid() }; }
           }, e_vert.constraint);
 
           // ImGuizmo manipulator operates on transforms
@@ -288,8 +290,9 @@ namespace met {
 
           // Register gizmo use start; cache current vertex position
           if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-            m_gizmo_p_prev  = p_world;
-            m_is_gizmo_used = true;
+            m_gizmo_prev_p      = p_world;
+            m_gizmo_prev_record = record;
+            m_is_gizmo_used     = true;
           }
 
           // Register continuous gizmo use
@@ -303,9 +306,10 @@ namespace met {
             
             // Do a raycast, snapping the world position to the nearest surface
             // on a surface hit
-            if (auto ray = eval_ray_query(info, p_screen); 
-                ray.record.is_valid() && ray.record.is_object()) {
-              p_world = ray.get_position();
+            m_query_result = eval_ray_query(info, p_screen);
+            record  = m_query_result.record; // update the surface record either way
+            if (m_query_result.record.is_valid() && m_query_result.record.is_object()) {
+              p_world = m_query_result.get_position();
             }
 
             // Get writable vertex data
@@ -313,10 +317,10 @@ namespace met {
               .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
 
             // Store world-space position in surface constraint
-            std::visit(overloaded {
-              [&](SurfaceConstraint auto &cstr) { cstr.surface_p = p_world; },
-              [](const auto &cstr) { }
-            }, e_vert.constraint);
+            std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
+              cstr.surface_p    = p_world; 
+              cstr.surface_data = record;
+            }, [](const auto &cstr) { } }, e_vert.constraint);
           }
 
           // Register gizmo use end; apply current vertex position to scene savte state
@@ -326,31 +330,22 @@ namespace met {
             // Get screen-space position
             eig::Vector2f p_screen 
               = eig::world_to_screen_space(p_world, e_arcball.full());
-
-
-            // TODO Continue here
-            /* // Do a raycast, recording surface data on a hit
-            SurfaceRecord record = SurfaceRecord::invalid();
-            if (auto ray = eval_ray_query(info, p_screen); 
-                ray.record.is_valid() && ray.record.is_object()) {
-              record = ray.record;
-            } */
             
             info.global("scene").getw<Scene>().touch({
               .name = "Move surface constraint",
-              .redo = [p = p_world, is = is_selection](auto &scene) {
+              .redo = [p = p_world, r = record, is = is_selection](auto &scene) {
                 auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
-                std::visit(overloaded {
-                  [&](SurfaceConstraint auto &cstr) { cstr.surface_p = p; },
-                  [](const auto &cstr) { }
-                }, e_vert.constraint);
+                std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
+                  cstr.surface_p    = p;
+                  cstr.surface_data = r;
+                }, [](const auto &cstr) {}}, e_vert.constraint);
               },
-              .undo = [p = m_gizmo_p_prev, is = is_selection](auto &scene) {
+              .undo = [p = m_gizmo_prev_p, r = m_gizmo_prev_record, is = is_selection](auto &scene) {
                 auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
-                std::visit(overloaded {
-                  [&](SurfaceConstraint auto &cstr) { cstr.surface_p = p; },
-                  [](const auto &cstr) { }
-                }, e_vert.constraint);
+                std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
+                  cstr.surface_p    = p;
+                  cstr.surface_data = r;
+                }, [](const auto &cstr) {}}, e_vert.constraint);
               }
             });
           }
