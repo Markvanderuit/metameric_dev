@@ -297,7 +297,9 @@ namespace met {
   }
 
   eig::Array4f Image::sample(const eig::Array2f &uv, ColorFormat output_frmt) const {
-    eig::Array2f xy   = (uv * m_size.cast<float>() - 0.5f).eval();
+    constexpr auto fmod = [](float f) { return std::fmodf(f, 1.f); };
+
+    eig::Array2f xy   = (uv.unaryExpr(fmod) * m_size.cast<float>() - 0.5f).eval();
     eig::Array2f lerp = xy - xy.floor();
     eig::Array2u minv = xy.floor().cast<uint>();
     eig::Array2u maxv = xy.ceil().cast<uint>();

@@ -9,39 +9,11 @@ namespace met::detail {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  // Packed vertex struct data
-  struct VertexPack {
-    uint p0; // unorm, 2x16
-    uint p1; // unorm, 1x16 + padding 1x16
-    uint n;  // snorm, 2x16
-    uint tx; // unorm, 2x16
-  };
-  static_assert(sizeof(VertexPack) == 16);
-
-  // Packed primitive struct data
-  struct alignas(64) PrimPack {
-    VertexPack v0, v1, v2;
-  };
-  static_assert(sizeof(PrimPack) == 64);
-
-  // Packed BVH struct data
-  struct NodePack {
-    uint aabb_pack_0;                 // lo.x, lo.y
-    uint aabb_pack_1;                 // hi.x, hi.y
-    uint aabb_pack_2;                 // lo.z, hi.z
-    uint data_pack;                   // leaf | size | offs
-    std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
-    std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
-  };
-  static_assert(sizeof(NodePack) == 64);
-
   // Helper method to pack vertex data tightly
-  VertexPack pack(const eig::Array3f &p, const eig::Array3f &n, const eig::Array2f &tx) {
+  /* VertexPack pack(const eig::Array3f &p, const eig::Array3f &n, const eig::Array2f &tx) {
     auto tx_ = tx.unaryExpr([](float f) {
       int i = static_cast<int>(f);
-      if (i % 2) f = 1.f - (f - i);
-      else       f = f - i;
-      return f;
+      return (i % 2) ? 1.f - (f - i) : f - i;
     }).eval();
 
     return VertexPack {
@@ -50,10 +22,10 @@ namespace met::detail {
       .n  = pack_snorm_2x16({ n.y(), n.z() }),
       .tx = pack_unorm_2x16(tx_)
     };
-  }
+  } */
 
   // Helper method to pack BVH node data tightly
-  NodePack pack(const BVH::Node &node) {
+  GLPacking<met::Mesh>::NodePack pack(const BVH::Node &node) {
     // Obtain a merger of the child bounding boxes
     constexpr auto merge = [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
       return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
@@ -61,7 +33,7 @@ namespace met::detail {
     auto aabb = rng::fold_left_first(node.child_aabb.begin(), 
                                      node.child_aabb.begin() + node.size(), merge).value();
 
-    NodePack p;
+    GLPacking<met::Mesh>::NodePack p;
 
     // 3xu32 packs AABB lo, ex
     auto b_lo_in = aabb.minb;
@@ -432,7 +404,7 @@ namespace met::detail {
 
       // Temporary pack data vectors
       std::vector<VertexPack>     verts_packed(verts_size.back() + verts_offs.back());
-      std::vector<PrimPack>       prims_packed(elems_size.back() + elems_offs.back());
+      std::vector<PrimitivePack>  prims_packed(elems_size.back() + elems_offs.back());
       std::vector<NodePack>       nodes_packed(nodes_size.back() + nodes_offs.back());
       std::vector<eig::Array3u>   elems_packed(elems_size.back() + elems_offs.back()); // Not packed
       std::vector<eig::AlArray3u> elems_packed_al(elems_packed.size());                // Not packed
@@ -448,7 +420,8 @@ namespace met::detail {
         for (int j = 0; j < mesh.verts.size(); ++j) {
           auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
           auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
-          verts_packed[verts_offs[i] + j] = pack(mesh.verts[j], norm, txuv);
+          Vertex v = { .p = mesh.verts[j], .n = norm, .tx = txuv };
+          verts_packed[verts_offs[i] + j] = v.pack();
         }
 
         // Pack node data tightly and copy to the correctly offset range
@@ -463,16 +436,10 @@ namespace met::detail {
         for (int j = 0; j < bvh.prims.size(); ++j) {
           // BVH primitives are packed in bvh order
           auto el = mesh.elems[bvh.prims[j]];
-          prims_packed[elems_offs[i] + j] = {
-            .v0 = pack(mesh.verts[el[0]], 
-                       mesh.has_norms() ? mesh.norms[el[0]] : eig::Array3f(0, 0, 1), 
-                       mesh.has_txuvs() ? mesh.txuvs[el[0]] : eig::Array2f(0.5)    ),
-            .v1 = pack(mesh.verts[el[1]], 
-                       mesh.has_norms() ? mesh.norms[el[1]] : eig::Array3f(0, 0, 1), 
-                       mesh.has_txuvs() ? mesh.txuvs[el[1]] : eig::Array2f(0.5)    ),
-            .v2 = pack(mesh.verts[el[2]], 
-                       mesh.has_norms() ? mesh.norms[el[2]] : eig::Array3f(0, 0, 1), 
-                       mesh.has_txuvs() ? mesh.txuvs[el[2]] : eig::Array2f(0.5)    ),
+          prims_packed[elems_offs[i] + j] = PrimitivePack {
+            .v0 = verts_packed[verts_offs[i] + el[0]],
+            .v1 = verts_packed[verts_offs[i] + el[1]],
+            .v2 = verts_packed[verts_offs[i] + el[2]]
           };
         }
         
@@ -490,6 +457,10 @@ namespace met::detail {
       bvh_nodes     = {{ .data = cnt_span<const std::byte>(nodes_packed)    }};
       mesh_elems    = {{ .data = cnt_span<const std::byte>(elems_packed)    }};
       mesh_elems_al = {{ .data = cnt_span<const std::byte>(elems_packed_al) }};
+
+      // Keep packed primitive data around for cpu-side access with gpu-side
+      // data
+      bvh_prims_cpu = prims_packed;
     }
 
     // Define corresponding vertex array object and generate multidraw command info

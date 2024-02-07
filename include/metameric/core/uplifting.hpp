@@ -10,9 +10,6 @@ namespace met {
      A direct constraint imposes specific color reproduction under a 
      specified color system, i.e. direct illumination. */
   struct DirectColorConstraint {
-    // Whether the constraint is used in the scene
-    bool is_active = true;
-
     // Constraint data for direct color
     Colr              colr_i; // Expected color under uplifting's color system 
     std::vector<Colr> colr_j; // Expected colors under secondary color systems
@@ -27,9 +24,6 @@ namespace met {
      for some given spectra, for at the least the corresponding color
      in the uplifting's primary color system. */
   struct MeasurementConstraint {
-    // Whether the constraint is used in the scene
-    bool is_active = true;
-
     // Measured spectral data
     Spec measurement; 
 
@@ -37,7 +31,7 @@ namespace met {
     bool operator==(const MeasurementConstraint &o) const;
   };
 
-  // Concept restricting the expected components of on-surface constraints 
+  // Concept defining the expected components of on-surface constraints 
   template <typename Ty>
   concept SurfaceConstraint = requires(Ty t) {
     { t.is_valid()    } -> std::same_as<bool>;
@@ -46,7 +40,6 @@ namespace met {
   };
   template <typename Ty>
   concept is_surface_constraint = SurfaceConstraint<Ty>;
-
 
   /* Constraint definition used in uplifting;
      A direct surface constraint imposes specific color reproduction
@@ -74,9 +67,6 @@ namespace met {
      for a position on a scene surface, taking into account light transport
      affecting this surface position. */
   struct IndirectSurfaceConstraint {
-    // Whether the constraint is used in the scene
-    bool is_active = true;
-
     // Surface data comprises a a small record object
     // and a world position
     SurfaceRecord surface_data = SurfaceRecord::invalid();

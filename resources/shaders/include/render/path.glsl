@@ -31,6 +31,26 @@ void path_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 w
 #define path_finalize_emitter(path, r, L, wvls) {}
 #endif
 
+vec3 Li_debug(in Ray ray) {
+  // If the ray misses, terminate current path
+  if (!scene_intersect(ray))
+    return vec3(0);
+
+  // If no surface object is visible, terminate current path
+  SurfaceInfo si = get_surface_info(ray);
+  if (!is_valid(si) || !is_object(si))
+    return vec3(0);
+
+  // On a valid surface, return debug data
+  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+  MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
+
+  uint prim_i = record_get_object_primitive(si.data);
+  float a = float(prim_i) / float(mesh_info.prims_size);
+
+  return vec3(a);
+}
+
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   // Initialize path store if requested
   path_initialize(pt);

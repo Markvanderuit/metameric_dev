@@ -33,11 +33,6 @@ namespace met {
       trf.rotation.y() = std::acos((rot * eig::Vector3f::UnitY()).dot(eig::Vector3f::UnitY()));
       trf.rotation.z() = std::acos((rot * eig::Vector3f::UnitZ()).dot(eig::Vector3f::UnitZ()));
       trf.scaling      = scl * eig::Vector3f(1.f);
-
-      // fmt::print("rotmat = {}\n", rot.reshaped());
-      // fmt::print("sclmat = {}\n", scl.reshaped());
-      // fmt::print("pos {}, rot {}, scl {}\n",
-      //   trf.position, trf.rotation, trf.scaling);
             
       return trf;
     }

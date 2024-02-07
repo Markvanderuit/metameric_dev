@@ -43,6 +43,8 @@ namespace met::detail {
   public:
     GLPacking();
     void update(std::span<const detail::Component<met::Object>>, const Scene &);
+
+    std::span<const ObjectInfoLayout> objects() const { return m_buffer_map_data; }
   };
   
   template <>
@@ -122,7 +124,19 @@ namespace met::detail {
   // Handles packed mesh buffers, bvh buffers, and info to unpack
   // said buffers shader-side
   template <>
-  class GLPacking<met::Mesh> {
+  struct GLPacking<met::Mesh> {
+    // Packed BVH struct data
+    // No unpacked representation available
+    struct NodePack {
+      uint aabb_pack_0;                 // lo.x, lo.y
+      uint aabb_pack_1;                 // hi.x, hi.y
+      uint aabb_pack_2;                 // lo.z, hi.z
+      uint data_pack;                   // leaf | size | offs
+      std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
+      std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
+    };
+    static_assert(sizeof(NodePack) == 64);
+
     struct MeshInfoLayout {
       alignas(16) eig::Matrix4f trf; // Model packing transform
 
@@ -137,6 +151,7 @@ namespace met::detail {
     };
     static_assert(sizeof(MeshInfoLayout) == 96);
 
+  private:
     // Caches of simplified meshes and generated acceleration data
     std::vector<met::Mesh> m_meshes;
     std::vector<met::BVH>  m_bvhs;
@@ -159,7 +174,11 @@ namespace met::detail {
     // Packed BVH data
     gl::Buffer bvh_nodes;
     gl::Buffer bvh_prims;
-    
+
+    // CPU-side packed bvh data
+    // Useful for ray interaction recovery that mirrors the gpu-side precision issues
+    std::vector<PrimitivePack> bvh_prims_cpu;
+
     // Draw array referencing packed, indexed mesh data
     // and a set of draw commands for assembling multidraw operations over this array;
     // one command for each mesh is present
@@ -171,6 +190,10 @@ namespace met::detail {
   public:
     GLPacking();
     void update(std::span<const detail::Resource<met::Mesh>>, const Scene &);
+
+  public:
+    std::span<const met::Mesh> meshes() const { return m_meshes; }
+    std::span<const met::BVH>  bvhs() const { return m_bvhs; }
   };
   
   // GL-side texture data

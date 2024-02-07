@@ -7,8 +7,8 @@ namespace met {
   // and in surface-based uplifting constraints
   class SurfaceRecord {
     constexpr static uint record_invalid_data = 0xFFFFFFFF;
-    constexpr static uint record_emitter_flag = 0x80000000;
     constexpr static uint record_object_flag  = 0x00000000;
+    constexpr static uint record_emitter_flag = 0x80000000;
 
   public:  
     uint data;
@@ -20,7 +20,7 @@ namespace met {
     uint object_i()    const { return (data >> 24) & 0x0000007F;       }
     uint emitter_i()   const { return (data >> 24) & 0x0000007F;       }
     uint primitive_i() const { return data & 0x00FFFFFF;               }
-
+    
   public:
     SurfaceRecord() : data(record_invalid_data) { }
   
@@ -29,4 +29,5 @@ namespace met {
     friend
     auto operator<=>(const SurfaceRecord &, const SurfaceRecord &) = default;
   };
+  static_assert(sizeof(SurfaceRecord) == 4);
 } // namespace met

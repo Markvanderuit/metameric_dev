@@ -4,8 +4,8 @@
 
 namespace met {
   /* 
-    This header contains copies of float/snorm/unorm packing routines in the GLM library,
-    adapted for Eigen types. Useful for vertex data packing and stuff.
+    Most of this header contains copies of float/snorm/unorm packing routines in the 
+    GLM library, adapted for Eigen types. Useful for vertex data packing and stuff.
     - src: https://github.com/g-truc/glm/blob/master/glm/detail/type_half.inl
     - src: https://github.com/g-truc/glm/blob/master/glm/detail/func_packing.inl
   */
@@ -290,5 +290,90 @@ namespace met {
       n.head<2>() = (1.f - n.head<2>().reverse().abs())
                   * (n.head<2>().unaryExpr([](float f) { return f >= 0.f ? 1.f : -1.f; }));
     return n.matrix().normalized().eval();
+  }
+
+  /*
+    The rest of this header focuses on bvh/mesh data packing. 
+   */
+
+  // FWD
+  struct Vertex;
+  struct VertexPack;
+  struct Primitive;
+  struct PrimitivePack;
+
+  // Simple unpacked vertex data
+  struct Vertex {
+    eig::Vector3f p;
+    eig::Vector3f n;
+    eig::Vector2f tx;
+  
+  public:
+    VertexPack pack() const;
+  };
+  
+  // Packed vertex struct data
+  struct VertexPack {
+    uint p0; // unorm, 2x16
+    uint p1; // unorm, 1x16 + padding 1x16
+    uint n;  // snorm, 2x16
+    uint tx; // unorm, 2x16
+
+  public:
+    Vertex unpack() const;
+  };
+  static_assert(sizeof(VertexPack) == 16);
+
+  // Simple unpacked primitive data
+  struct Primitive {
+    Vertex v0, v1, v2;
+  
+  public:
+    PrimitivePack pack() const;
+  };
+
+  // Packed primitive struct data
+  struct alignas(64) PrimitivePack {
+    VertexPack v0, v1, v2;
+  
+  public:
+    Primitive unpack() const;
+  };
+  static_assert(sizeof(PrimitivePack) == 64);
+
+  // Packing definitions
+
+  inline
+  Vertex VertexPack::unpack() const {
+    Vertex o;
+    o.p << unpack_unorm_2x16(p0), unpack_snorm_2x16(p1).x();
+    o.n << unpack_snorm_2x16(p1).y(), unpack_snorm_2x16(n);
+    o.n.normalize();
+    o.tx << unpack_unorm_2x16(tx);
+    return o;
+  }
+
+  inline
+  VertexPack Vertex::pack() const {
+    auto tx_ = tx.unaryExpr([](float f) {
+      int i = static_cast<int>(f);
+      return (i % 2) ? 1.f - (f - i) : f - i;
+    }).eval();
+    return VertexPack {
+      .p0 = pack_unorm_2x16({ p.x(), p.y() }),
+      .p1 = pack_snorm_2x16({ p.z(), n.x() }),
+      .n  = pack_snorm_2x16({ n.y(), n.z() }),
+      .tx = pack_unorm_2x16(tx_)
+    };
+  }
+
+  inline
+  Primitive PrimitivePack::unpack() const {
+      return { .v0 = v0.unpack(), .v1 = v1.unpack(), .v2 = v2.unpack() };
+  }
+
+  inline
+  PrimitivePack Primitive::pack() const {
+      return { .v0 = v0.pack(), .v1 = v1.pack(), .v2 = v2.pack() };
   }
 } // namespace met

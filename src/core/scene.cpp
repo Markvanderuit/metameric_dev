@@ -50,6 +50,22 @@ namespace met {
       js.at("name").get_to(component.name);
       js.at("value").get_to(component.value);
     }
+
+    eig::Vector3f gen_barycentric_coords(eig::Vector3f p, 
+                                         eig::Vector3f a, 
+                                         eig::Vector3f b, 
+                                         eig::Vector3f c) {
+      met_trace();
+
+      eig::Vector3f ab = b - a, ac = c - a;
+
+      float a_tri = std::abs(.5f * ac.cross(ab).norm());
+      float a_ab  = std::abs(.5f * (p - a).cross(ab).norm());
+      float a_ac  = std::abs(.5f * ac.cross(p - a).norm());
+      float a_bc  = std::abs(.5f * (c - p).cross(b - p).norm());
+
+      return (eig::Vector3f(a_bc, a_ac, a_ab) / a_tri).eval();
+    }
   } // namespace detail
 
   void to_json(json &js, const Uplifting::Vertex &vert) {
@@ -684,13 +700,44 @@ namespace met {
       // The metamer's color under the uplifting's color system becomes our vertex color
       c = (csys_i.transpose() * s.matrix()).eval();
     } else if (const auto *constraint = std::get_if<DirectSurfaceConstraint>(&v.constraint)) {
-      // debug::check_expr(false, "Not implemented!");
+      const auto &object = components.objects[constraint->surface_data.object_i()].value;
+      
+      if (const Colr *colr = std::get_if<Colr>(&object.diffuse)) {
+        // If the surface material describes a color, we simply copy this
+        c = *colr;
+      } else if (const uint *txtr_i = std::get_if<uint>(&object.diffuse)) {
+        // If, instead, the surface material uses a diffuse texture, we sample it
+        // at the specified location
 
-      s = 0.5; // TODO This will break a few eggs
-      c = (csys_i.transpose() * s.matrix()).eval();
+        debug::check_expr(constraint->is_valid(), "Uhhhh!");
 
-      /* // The specified color becomes our vertex color
-      c = constraint->colr_i;
+        // Get relevant resources
+        const auto &mesh = resources.meshes[object.mesh_i].value();
+        const auto &prim = mesh.elems[constraint->surface_data.primitive_i()];
+        const auto &txtr = resources.images[*txtr_i].value();
+        
+        // Take surface position, and invert into mesh space
+        eig::Vector3f p     = constraint->surface_p;
+        eig::Vector3f p_inv = (object.transform.affine().matrix().inverse() 
+                            * eig::Vector4f(p.x(), p.y(), p.z(), 1)).head<3>();
+
+        // Obtain hit uvs from barycentric coordinates
+        auto uv_clamp = [](float f) {
+          int i = static_cast<int>(f);
+          return (i % 2) ? 1.f - (f - i) : f - i;
+        };
+        eig::Vector3f br = detail::gen_barycentric_coords(p_inv, mesh.verts[prim[0]], mesh.verts[prim[1]], mesh.verts[prim[2]]);
+        eig::Vector2f uv = (mesh.txuvs[prim[0]]).unaryExpr(uv_clamp) * br[0] 
+                         + (mesh.txuvs[prim[1]]).unaryExpr(uv_clamp) * br[1] 
+                         + (mesh.txuvs[prim[2]]).unaryExpr(uv_clamp) * br[2];
+        
+        fmt::print("br = {}\nuv = {}\np={}\np_inv={}\n", br, uv, p, p_inv);
+
+        // Sample texture and assign output color
+        c = 0.5; // txtr.sample(uv, Image::ColorFormat::eLRGB).head<3>();
+      } else {
+        debug::check_expr(false, "variant options exhausted");
+      }
 
       // Gather all relevant color system spectra referred by the constraint
       std::vector<CMFS> systems = { csys_i };
@@ -706,7 +753,7 @@ namespace met {
         .basis   = resources.bases[u.basis_i].value(),
         .systems = systems,
         .signals = signals
-      }); */
+      });
     } else if (const auto *constraint = std::get_if<IndirectSurfaceConstraint>(&v.constraint)) {
       debug::check_expr(false, "Not implemented!");
       // TODO ...

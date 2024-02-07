@@ -16,6 +16,7 @@ namespace met {
   static const     auto  vertex_color_valid   = ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f });
   static const     auto  vertex_color_invalid = ImGui::ColorConvertFloat4ToU32({ 1.f, .5f, .5f, 1.f });
 
+  // Helper class to define active uplifting/constraint selection
   class InputSelection {
     constexpr static uint invalid_data = 0xFFFFFFFF;
 
@@ -32,10 +33,10 @@ namespace met {
   };
 
   namespace detail {
-    eig::Vector3f gen_barycentric_coords(eig::Vector3f p, 
-                                         eig::Vector3f a, 
-                                         eig::Vector3f b, 
-                                         eig::Vector3f c) {
+    /* eig::Vector3f barycentric_coords(eig::Vector3f p, 
+                                     eig::Vector3f a, 
+                                     eig::Vector3f b, 
+                                     eig::Vector3f c) {
       met_trace();
 
       eig::Vector3f ab = b - a, 
@@ -48,66 +49,54 @@ namespace met {
       eig::Vector3f v = { 0,  (d11 * d20 - d01 * d21) / den,  (d00 * d21 - d01 * d20) / den };
       v.x() = 1.f - v.y() - v.z();
       return v;
-    }
-  template <typename T> struct engaged_t {
-    template <typename... Ts>
-    constexpr bool operator()(const std::variant<Ts...> &variant) const {
-      return std::holds_alternative<T>(variant);
-    }
-    template <typename... Ts>
-    constexpr bool operator()(std::variant<Ts...> variant) const {
-      return std::holds_alternative<T>(variant);
-    }
-  };
-  template <typename T> inline constexpr auto engaged = engaged_t<T>{};
-  
-  template <typename T> struct variant_get_t {
-    template <typename... Ts>
-    constexpr decltype(auto) operator()(const std::variant<Ts...> &variant) const {
-      return std::get<T>(variant);
-    }
-    template <typename... Ts>
-    constexpr decltype(auto) operator()(std::variant<Ts...> variant) const {
-      return std::get<T>(variant);
-    }
-  };
-  template <typename T> inline constexpr auto variant_get = variant_get_t<T>{};
-
-    template <typename T> struct variant_filter_t {};
-    template <typename T> inline constexpr auto variant_filter = variant_filter_t<T>{};
-
-    template <typename R, typename T>
-    decltype(auto) operator|(R &&r, variant_filter_t<T>) {
-      return r | vws::filter(engaged<T>) 
-               | vws::transform(variant_get<T>);
-    }
-
-    template <typename R, typename T>
-    decltype(auto) operator|(R &r, variant_filter_t<T>) {
-      return r | vws::filter(engaged<T>) 
-               | vws::transform(variant_get<T>);
-    }
-    
-    template <typename R, typename T>
-    decltype(auto) operator|(const R &r, variant_filter_t<T>) {
-      return r | vws::filter(engaged<T>) 
-               | vws::transform(variant_get<T>);
-    }
-
-  /*   template <typename T>  */ // struct enumerate_view_t {};
-  /*   template <typename T>  */ // inline constexpr auto enumerate_view = enumerate_view_t{};
-
-    /* template <typename R>
-    decltype(auto) operator|(R &&r, enumerate_view_t) {
-      return vws::iota(0, static_cast<uint>(r.size()))
-           | vws::transform([&r](uint i) { return std::pair { i, r[i] }; });
     } */
+    
+    inline
+    eig::Vector3f barycentric_coords(eig::Vector3f p, 
+                                     eig::Vector3f a, 
+                                     eig::Vector3f b, 
+                                     eig::Vector3f c) {
+      met_trace();
 
-    inline constexpr auto enumerate_view =
-      [](rng::viewable_range auto &&r) {
-        return vws::iota(0u, static_cast<uint>(r.size()))
-             | vws::transform([&r](uint i) { return std::pair { i, r[i] }; });
-      };
+      eig::Vector3f ab = b - a, ac = c - a;
+
+      float a_tri = std::abs(.5f * ac.cross(ab).norm());
+      float a_ab  = std::abs(.5f * (p - a).cross(ab).norm());
+      float a_ac  = std::abs(.5f * ac.cross(p - a).norm());
+      float a_bc  = std::abs(.5f * (c - p).cross(b - p).norm());
+
+      return (eig::Vector3f(a_bc, a_ac, a_ab) / a_tri).eval();
+    }
+
+    template <typename T> struct engaged_t {
+      template <typename... Ts>
+      constexpr bool operator()(const std::variant<Ts...> &variant) const {
+        return std::holds_alternative<T>(variant);
+      }
+      template <typename... Ts>
+      constexpr bool operator()(std::variant<Ts...> variant) const {
+        return std::holds_alternative<T>(variant);
+      }
+    };
+    template <typename T> inline constexpr auto engaged = engaged_t<T>{};
+    
+    template <typename T> struct variant_get_t {
+      template <typename... Ts>
+      constexpr decltype(auto) operator()(const std::variant<Ts...> &variant) const {
+        return std::get<T>(variant);
+      }
+      template <typename... Ts>
+      constexpr decltype(auto) operator()(std::variant<Ts...> variant) const {
+        return std::get<T>(variant);
+      }
+    };
+    template <typename T> inline constexpr auto variant_get = variant_get_t<T>{};
+
+    template <typename T>
+    inline constexpr auto variant_filter_view = [](rng::viewable_range auto &&r) {
+      return r | vws::filter(engaged<T>)
+               | vws::transform(variant_get<T>);
+    };
   } // namespace detail
 
   class MeshViewportEditorInputTask : public detail::TaskNode {
@@ -123,15 +112,7 @@ namespace met {
       
       // Get handles, shared resources, modified resources
       const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &e_target  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
       const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-      const auto &io        = ImGui::GetIO();
-      
-      // Compute viewport offset and size, minus ImGui's tab bars etc
-      eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-                                 + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
       // Prepare sensor buffer
       auto camera_ray = e_arcball.generate_ray(xy);
@@ -141,30 +122,48 @@ namespace met {
 
       // Run raycast primitive, block for results
       m_query_prim.query(m_query_sensor, e_scene);
-      return m_query_prim.data();
-        
-      // if (auto ray = m_query_prim.data(); ray.record.is_valid() && ray.record.is_object()) {
-      //   m_query_result = ray;
-      // } else {
-      //   m_query_result = RayRecord::invalid();
-      // }
+      auto ray = m_query_prim.data();
 
       // // Given a valid intersection on a object surface
-      // if (ray.record.is_valid() && ray.record.is_object()) {
-      //   const auto &e_object = e_scene.components.objects[ray.record.object_i()].value;
-      //   const auto &e_mesh   = e_scene.resources.meshes[e_object.mesh_i].value();
-      //   const auto &e_prim   = e_mesh.elems[ray.record.primitive_i()];
-        
-      //   // Determine hit position and barycentric coordinates in primitive
-      //   auto p    = ray.get_position();
-      //   auto bary = detail::gen_barycentric_coords((e_object.transform.affine().inverse() 
-      //                                               * eig::Vector4f(p.x(), p.y(), p.z(), 1)).head<3>(),
-      //                                              e_mesh.verts[e_prim[0]],
-      //                                              e_mesh.verts[e_prim[1]],
-      //                                              e_mesh.verts[e_prim[2]]);
+      if (ray.record.is_valid() && ray.record.is_object()) {
+        // Get relevant resources
+        const auto &e_object = e_scene.components.objects[ray.record.object_i()].value;
+        const auto &e_prim   = e_scene.resources.meshes
+          .gl.bvh_prims_cpu[ray.record.primitive_i()].unpack();
 
-      //   fmt::print("{} -> {}\n", p, bary);
-      // }
+        // const auto &e_prim   = e_mesh.elems[ray.record.primitive_i()];
+        
+        // Get transforms used for gl-side world-model space
+        auto trf = e_scene.components.objects.gl.objects()[ray.record.object_i()].trf_mesh;
+        auto inv = e_scene.components.objects.gl.objects()[ray.record.object_i()].trf_mesh_inv;
+
+        // Determine hit position and barycentric coordinates in primitive
+        eig::Vector3f p    = ray.get_position();
+        eig::Vector4f pinv = inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f);
+        auto bary = detail::barycentric_coords(pinv.head<3>(),
+                                               e_prim.v0.p,
+                                               e_prim.v1.p,
+                                               e_prim.v2.p);
+
+        // Test inversion
+        eig::Vector3f prec = bary.x() * e_prim.v0.p
+                           + bary.y() * e_prim.v1.p
+                           + bary.z() * e_prim.v2.p;
+        // prec = (trf * eig::Vector4f(prec.x(), prec.y(), prec.z(), 1.f)).head<3>();
+        
+        fmt::print("---\nobject: {}, mesh: {}, prim: {}\n",
+          e_scene.components.objects[ray.record.object_i()].name,
+          e_scene.resources.meshes[e_object.mesh_i].name,
+          ray.record.primitive_i());
+        fmt::print("a = {}, b = {}, c = {}\n",
+          /* (trf * (eig::Vector4f() << */ e_prim.v0.p,/*  1.f).finished()).head<3>().eval(), */ 
+          /* (trf * (eig::Vector4f() << */ e_prim.v1.p,/*  1.f).finished()).head<3>().eval(), */ 
+          /* (trf * (eig::Vector4f() << */ e_prim.v2.p/*,  1.f).finished()).head<3>().eval() */);
+        fmt::print("bary = {}\n", bary);
+        fmt::print("p = {} -> {}\n", pinv.head<3>().eval(), prec);
+      }
+
+      return ray;
     }
     
   public:
@@ -196,9 +195,9 @@ namespace met {
 
       // Generate InputSelection for each relevant constraint
       std::vector<InputSelection> viable_selections;
-      for (const auto &[i, comp] : detail::enumerate_view(e_scene.components.upliftings)) {
+      for (const auto &[i, comp] : enumerate_view(e_scene.components.upliftings)) {
         const auto &uplifting = comp.value; 
-        for (const auto &[j, vert] : detail::enumerate_view(uplifting.verts)) {
+        for (const auto &[j, vert] : enumerate_view(uplifting.verts)) {
           guard_continue(vert.is_active);
           guard_continue(std::holds_alternative<DirectSurfaceConstraint>(vert.constraint)
                       || std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint));
@@ -351,39 +350,6 @@ namespace met {
           }
         }
       }
-
-      // If a valid result is stored, show test tooltip for now
-      // if (m_query_result.record.is_valid()) {
-      //   // Compute viewport offset and size, minus ImGui's tab bars etc
-      //   eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-      //                              + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      //   eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-      //                              - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-
-      //   // Get pixel position from query result's world position
-      //   auto xy = eig::world_to_window_space(m_query_result.get_position(),
-      //                                        e_arcball.full(),
-      //                                        viewport_offs,
-      //                                        viewport_size);
-
-      //   // Spawn floating dot if pixel position falls within viewport
-      //   if (!(xy.array() <= viewport_offs).any() && !(xy.array() >= viewport_offs + viewport_size).any()) {
-          
-      //     ImGui::GetWindowDrawList()->AddCircleFilled(xy, 8.f, ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f }));
-      //     ImGui::GetWindowDrawList()->AddCircleFilled(xy, 4.f, ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f }));
-
-      //     /* ImGui::SetNextWindowPos(xy);
-      //     if (ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoDecoration)) {
-      //       ImGui::Text("Hi!\n");
-
-      //       // Track mouse input while dragging the thing.
-      //       if (io.MouseDown[ImGuiMouseButton_Left]) {
-      //         eval_ray_query(info);
-      //       }
-      //     }
-      //     ImGui::End(); */
-      //   }
-      // }
     }
   };
 } // namespace met

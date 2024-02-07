@@ -54,7 +54,7 @@ namespace met {
   namespace rng = std::ranges;
   namespace vws = std::views;
 
-  // Interpret a container type as a span of type T
+  // Interpret a sized contiguous container as a span of type T
   template <class T, class C>
   constexpr
   std::span<T> cnt_span(C &c) {
@@ -63,13 +63,14 @@ namespace met {
     return { reinterpret_cast<T*>(data), (c.size() * sizeof(C::value_type)) / sizeof(T) };
   }
 
+  // Interpret an object as a span of type T
   template <class T, class O>
   constexpr
   std::span<T> obj_span(O &o) {
     return { reinterpret_cast<T*>(&o), sizeof(O) / sizeof(T) };
   }
 
-  // Convert a span over type U to 
+  // Interpret a span of U to a span of type T
   template <class T, class U>
   std::span<T> cast_span(std::span<U> s) {
     auto data = s.data();
@@ -82,6 +83,12 @@ namespace met {
   constexpr inline T ceil_div(T n, T_ div) {
     return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
   }
+
+  // Helper view; iterate a range and return [i, item] enumated view
+  inline constexpr auto enumerate_view = [](rng::viewable_range auto &&r) {
+    return vws::iota(0u, static_cast<unsigned>(r.size()))
+         | vws::transform([&r](unsigned i) { return std::pair { i, r[i] }; });
+  };
 
   // Helper type for std::visit
   // Src: https://en.cppreference.com/w/cpp/utility/variant/visit

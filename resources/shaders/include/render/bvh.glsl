@@ -167,7 +167,7 @@ bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
 
         // Test against primitive; store primitive index on hit
         if (ray_intersect(ray, prim)) {
-          record_set_object_primitive(ray.data, bvh_offs(node) + i);
+          record_set_object_primitive(ray.data, prim_i);
           hit = true;
         }
       }
