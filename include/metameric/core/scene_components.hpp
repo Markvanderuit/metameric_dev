@@ -110,9 +110,10 @@ namespace met {
      Mostly a tesselation of a color space, with constraints on the tesselation's
      vertices describing spectral behavior. Kept separate from Scene object,
      given its centrality to the codebase. */
-  struct Uplifting {
+  class Uplifting {
+  public:
     using state_type = detail::UpliftingState;
-
+  
     // Wrapper around vertex constraint data
     struct Vertex {
       using cnstr_type = std::variant<DirectColorConstraint,  MeasurementConstraint,
@@ -125,6 +126,13 @@ namespace met {
       
     public:
       bool operator==(const Vertex &o) const = default;
+      
+      // Helper visitors for accessing an underlying constraint's surface
+      // data, if said constraint fulfills SurfaceConstraint; otherwise
+      // a invalid static is returned
+      bool has_surface() const;
+      const SurfaceInfo &surface() const;
+            SurfaceInfo &surface();
     };
 
     uint                csys_i  = 0; // Index of primary color system

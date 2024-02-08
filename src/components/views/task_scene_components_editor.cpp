@@ -44,7 +44,7 @@ namespace met {
   } // namespace detail
 
   void SceneComponentsEditorTask::eval(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     if (ImGui::Begin("Scene components")) {
       eval_objects(info);
@@ -56,7 +56,7 @@ namespace met {
   }
 
   void SceneComponentsEditorTask::eval_objects(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     // Get external resources and shorthands
     const auto &e_scene      = info.global("scene").getr<Scene>();
@@ -207,7 +207,7 @@ namespace met {
       ImGui::PopID();
     } // for (uint i)
 
-    // Handle additions to emitters
+    // Handle additions to objects
     {
       if (!e_objects.empty())
         ImGui::Separator();
@@ -226,7 +226,7 @@ namespace met {
   }
 
   void SceneComponentsEditorTask::eval_emitters(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     // Get external resources
     const auto &e_scene       = info.global("scene").getr<Scene>();
@@ -342,7 +342,7 @@ namespace met {
   }
     
   void SceneComponentsEditorTask::eval_upliftings(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     // Get external resources and shorthands
     const auto &e_scene      = info.global("scene").getr<Scene>();
@@ -476,27 +476,88 @@ namespace met {
   }
 
   void SceneComponentsEditorTask::eval_colr_systems(SchedulerHandle &info) {
-    met_trace_full();
+    met_trace();
 
     // Get external resources and shorthands
-    const auto &e_scene        = info.global("scene").getr<Scene>();
-    const auto &e_colr_systems = e_scene.components.colr_systems;
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    const auto &e_csys  = e_scene.components.colr_systems;
+    const auto &e_cmfs  = e_scene.resources.observers;
+    const auto &e_illm  = e_scene.resources.illuminants;
 
     // Spawn a collapsing header section
-    guard(ImGui::CollapsingHeader(std::format("Color systems ({})", e_colr_systems.size()).c_str(), ImGuiTreeNodeFlags_DefaultOpen));
-    ImGui::PushID("colr_system_data");
+    guard(ImGui::CollapsingHeader(std::format("Color systems ({})", e_csys.size()).c_str(), ImGuiTreeNodeFlags_DefaultOpen));
+    ImGui::PushID("csys_data");
 
-    for (const auto &csys : e_colr_systems) {
-      if (ImGui::TreeNodeEx(csys.name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+    // Iterate over all color systems
+    for (uint i = 0; i < e_csys.size(); ++i) {
+      guard_break(i < e_csys.size()); // Gracefully handle a deletion
 
-        if (ImGui::SmallButton("X")) {
-          debug::check_expr(false, "Not implemented");
-        } 
+      ImGui::PushID(std::format("csys_data_{}", i).c_str());
+
+      // We copy the object, and then test for changes
+      const auto &component = e_csys[i];
+            auto csys       = component.value;
+
+      // Add treenode section; postpone jumping into section
+      bool open_section = ImGui::TreeNodeEx(component.name.c_str());
+
+      // Insert delete button on same line
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+      if (ImGui::SmallButton("X")) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Delete csys",
+          .redo = [i = i]               (auto &scene) { scene.components.colr_systems.erase(i);     },
+          .undo = [i = i, o = component](auto &scene) { scene.components.colr_systems.insert(i, o); }
+        });
+        break;
+      }
+
+      if (open_section) {
+        // Note: no name editor; let's keep things simple
+        // Color system cmfs/illuminant selectors
+        detail::fun_resource_selector("CMFS", e_cmfs, csys.observer_i);
+        detail::fun_resource_selector("Illuminant", e_illm, csys.illuminant_i);
         
         ImGui::TreePop();
+      } // if (open_section)
+
+      // Handle modifications to object copy
+      if (csys != component.value) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Modify color system",
+          .redo = [i = i, obj = csys           ](auto &scene) { 
+            scene.components.colr_systems[i].value = obj;
+            scene.components.colr_systems[i].name = scene.get_csys_name(i);
+          },
+          .undo = [i = i, obj = component.value](auto &scene) { 
+            scene.components.colr_systems[i].value = obj;
+            scene.components.colr_systems[i].name = scene.get_csys_name(i);
+          }
+        });
       }
-    } // for (csys)
+
+      ImGui::PopID();
+    } // for (uint i)
+
+    // Handle additions to emitters
+    {
+      if (!e_csys.empty())
+        ImGui::Separator();
+      ImGui::NewLine();
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
+      if (ImGui::SmallButton("Add")) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Add color system",
+          .redo = [](auto &scene) { 
+            ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
+            scene.components.colr_systems.push(scene.get_csys_name(csys), csys);
+          },
+          .undo = [](auto &scene) { 
+            scene.components.objects.erase(scene.components.objects.size() - 1); 
+          }
+        });
+      }
+    }
 
     ImGui::PopID();
   }

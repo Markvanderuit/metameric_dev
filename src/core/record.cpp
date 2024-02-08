@@ -7,7 +7,7 @@ namespace met {
     si.p           = js.at("p").get<eig::Array3f>();
     si.n           = js.at("n").get<eig::Array3f>();
     si.tx          = js.at("tx").get<eig::Array2f>();
-    si.diffuse     = js.at("tx").get<Colr>();
+    si.diffuse     = js.at("diffuse").get<Colr>();
     si.record.data = js.at("record").get<uint>();
   }
 

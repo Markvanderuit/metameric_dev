@@ -760,7 +760,7 @@ namespace met {
     si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
     si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
     si.p  = (trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
-    si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 1.f)).head<3>();
+    si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
     si.n.normalize();
 
     // Recover surface diffuse data based on underlying object material
