@@ -62,16 +62,14 @@ namespace met {
 
     // Draw vertex for each visible vertex at its surface
     for (const SurfaceInfo &si : surfaces) {
-      // Get screen-space position of surface point, and of
-      // a slightly offset point along the normal
-      eig::Vector2f p_screen = eig::world_to_window_space(si.p, 
-        e_arcball.full(), viewport_offs, viewport_size);
-      eig::Vector2f n_screen = eig::world_to_window_space(si.p + .025f * si.n, 
-        e_arcball.full(), viewport_offs, viewport_size);
+      // Get screen-space and window-space position of surface point, and of
+      // a slightly offset point along the surface normal
+      eig::Vector2f p_window = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
+      eig::Vector2f n_window = eig::world_to_window_space(si.p + si.n * 0.025f, e_arcball.full(), viewport_offs, viewport_size);
 
       // Clip vertices outside viewport
-      guard_continue((p_screen.array() >= viewport_offs).all() 
-                  && (p_screen.array() <= viewport_offs + viewport_size).all());
+      guard_continue((p_window.array() >= viewport_offs).all() 
+                  && (p_window.array() <= viewport_offs + viewport_size).all());
       
       auto dl = ImGui::GetWindowDrawList();
 
@@ -85,12 +83,12 @@ namespace met {
 
       // Draw vertex with special coloring dependent on constraint state
       // and a small line along the geometric normal with a dot on the end
-      dl->AddCircleFilled(p_screen, 8.f, vertex_color_border);
+      dl->AddCircleFilled(p_window, 8.f, vertex_color_border);
       if (si.is_valid()) {
-        dl->AddCircleFilled(n_screen, 6.f, vertex_color_border);
-        dl->AddLine(p_screen, n_screen, vertex_color_border, 6.f);
+        dl->AddCircleFilled(n_window, 6.f, vertex_color_border);
+        dl->AddLine(p_window, n_window, vertex_color_border, 6.f);
       }
-      dl->AddCircleFilled(p_screen, 4.f, vertex_color_center);
+      dl->AddCircleFilled(p_window, 4.f, vertex_color_center);
     }
   }
 
