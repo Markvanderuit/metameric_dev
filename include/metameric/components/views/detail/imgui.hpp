@@ -42,6 +42,7 @@ namespace ImGui {
   void BeginFrame();
   void DrawFrame();
 
+  // Helper for RAII ImGui PushStyleVar/PopStyleVar wrapper
   struct ScopedStyleVar {
     ScopedStyleVar() = delete;
 
@@ -55,6 +56,19 @@ namespace ImGui {
 
     ~ScopedStyleVar() {
       PopStyleVar();
+    }
+  };
+
+  // Helper for RAII ImGui PushID/PopID wrapper
+  struct ScopedID {
+    ScopedID() = delete;
+
+    ScopedID(const std::string &s) {
+      PushID(s.c_str());
+    }
+
+    ~ScopedID() {
+      PopID();
     }
   };
 

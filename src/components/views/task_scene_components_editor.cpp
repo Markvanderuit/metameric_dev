@@ -1,6 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_scene_components_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/component_edit.hpp>
 #include <format>
 
 namespace met {
@@ -73,138 +74,141 @@ namespace met {
     for (uint i = 0; i < e_objects.size(); ++i) {
       guard_break(i < e_objects.size()); // Gracefully handle a deletion
       
-      ImGui::PushID(std::format("object_data_{}", i).c_str());
+      push_imgui_object_edit(info, i);
+
+
+      // ImGui::PushID(std::format("object_data_{}", i).c_str());
       
-      // We copy the object, and then test for changes
-      const auto &component = e_objects[i];
-            auto object     = component.value;
+      // // We copy the object, and then test for changes
+      // const auto &component = e_objects[i];
+      //       auto object     = component.value;
 
-      // Add treenode section; postpone jumping into section
-      bool open_section = ImGui::TreeNodeEx(component.name.c_str());
+      // // Add treenode section; postpone jumping into section
+      // bool open_section = ImGui::TreeNodeEx(component.name.c_str());
       
-      // Insert delete button, is_active button on same line
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
-      if (ImGui::SmallButton(object.is_active ? "V" : "H"))
-        object.is_active = !object.is_active;
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-      if (ImGui::SmallButton("X")) {
-        info.global("scene").getw<Scene>().touch({
-          .name = "Delete object",
-          .redo = [i = i]               (auto &scene) { scene.components.objects.erase(i);     },
-          .undo = [i = i, o = component](auto &scene) { scene.components.objects.insert(i, o); }
-        });
-        break;
-      }
+      // // Insert delete button, is_active button on same line
+      // ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
+      // if (ImGui::SmallButton(object.is_active ? "V" : "H"))
+      //   object.is_active = !object.is_active;
+      // ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+      // if (ImGui::SmallButton("X")) {
+      //   info.global("scene").getw<Scene>().touch({
+      //     .name = "Delete object",
+      //     .redo = [i = i]               (auto &scene) { scene.components.objects.erase(i);     },
+      //     .undo = [i = i, o = component](auto &scene) { scene.components.objects.insert(i, o); }
+      //   });
+      //   break;
+      // }
 
-      if (open_section) {
-        // Name editor
-        std::string str = component.name;
-        constexpr auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue;
-        if (ImGui::InputText("Name", &str, str_edit_flags)) {
-          info.global("scene").getw<Scene>().touch({
-            .name = "Modify object name",
-            .redo = [i = i, str = str           ](auto &scene) { scene.components.objects[i].name = str; },
-            .undo = [i = i, str = component.name](auto &scene) { scene.components.objects[i].name = str; }
-          });
-        }
+      // if (open_section) {
+      //   // Name editor
+      //   std::string str = component.name;
+      //   constexpr auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue;
+      //   if (ImGui::InputText("Name", &str, str_edit_flags)) {
+      //     info.global("scene").getw<Scene>().touch({
+      //       .name = "Modify object name",
+      //       .redo = [i = i, str = str           ](auto &scene) { scene.components.objects[i].name = str; },
+      //       .undo = [i = i, str = component.name](auto &scene) { scene.components.objects[i].name = str; }
+      //     });
+      //   }
         
-        // Object mesh/uplifting selection
-        detail::fun_resource_selector("Uplifting", e_upliftings, object.uplifting_i);
-        detail::fun_resource_selector("Mesh", e_meshes, object.mesh_i);
+      //   // Object mesh/uplifting selection
+      //   detail::fun_resource_selector("Uplifting", e_upliftings, object.uplifting_i);
+      //   detail::fun_resource_selector("Mesh", e_meshes, object.mesh_i);
 
-        ImGui::Separator();
+      //   ImGui::Separator();
 
-        // Object transforms
-        ImGui::DragFloat3("Position", object.transform.position.data(), 0.01f, -100.f, 100.f);
-        ImGui::DragFloat3("Rotation", object.transform.rotation.data(), 0.01f, -10.f, 10.f);
-        ImGui::DragFloat3("Scaling",  object.transform.scaling.data(),  0.01f, 0.001f, 100.f);
+      //   // Object transforms
+      //   ImGui::DragFloat3("Position", object.transform.position.data(), 0.01f, -100.f, 100.f);
+      //   ImGui::DragFloat3("Rotation", object.transform.rotation.data(), 0.01f, -10.f, 10.f);
+      //   ImGui::DragFloat3("Scaling",  object.transform.scaling.data(),  0.01f, 0.001f, 100.f);
 
-        // Important catch; prevent scale from falling to 0, something somewhere breaks :D
-        object.transform.scaling = object.transform.scaling.cwiseMax(0.001f);
+      //   // Important catch; prevent scale from falling to 0, something somewhere breaks :D
+      //   object.transform.scaling = object.transform.scaling.cwiseMax(0.001f);
         
-        ImGui::Separator();
+      //   ImGui::Separator();
 
-        // Diffuse section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
-        if (object.diffuse.index() == 0) {
-          ImGui::ColorEdit3("##diffuse_value", std::get<0>(object.diffuse).data());
-        } else {
-          detail::fun_resource_selector("##diffuse_texture", e_images, std::get<1>(object.diffuse));
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (ImGui::BeginCombo("##diffuse_data", "Diffuse")) {
-          if (ImGui::Selectable("Value", object.diffuse.index() == 0))
-            object.diffuse.emplace<0>(Colr(1));
-          if (ImGui::Selectable("Texture", object.diffuse.index() == 1))
-            object.diffuse.emplace<1>(0u);
-          ImGui::EndCombo();
-        } // If (BeginCombo)
+      //   // Diffuse section
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      //   if (object.diffuse.index() == 0) {
+      //     ImGui::ColorEdit3("##diffuse_value", std::get<0>(object.diffuse).data());
+      //   } else {
+      //     detail::fun_resource_selector("##diffuse_texture", e_images, std::get<1>(object.diffuse));
+      //   }
+      //   ImGui::SameLine();
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      //   if (ImGui::BeginCombo("##diffuse_data", "Diffuse")) {
+      //     if (ImGui::Selectable("Value", object.diffuse.index() == 0))
+      //       object.diffuse.emplace<0>(Colr(1));
+      //     if (ImGui::Selectable("Texture", object.diffuse.index() == 1))
+      //       object.diffuse.emplace<1>(0u);
+      //     ImGui::EndCombo();
+      //   } // If (BeginCombo)
         
-        /* // Roughess section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
-        if (object.roughness.index() == 0) {
-          ImGui::SliderFloat("##roughness_value", &std::get<0>(object.roughness), 0.f, 1.f);
-        } else {
-          detail::fun_resource_selector("##roughness_texture", e_images, std::get<1>(object.roughness));
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (ImGui::BeginCombo("##roughness_data", "Roughness")) {
-          if (ImGui::Selectable("Value", object.roughness.index() == 0))
-            object.roughness.emplace<0>(0.f);
-          if (ImGui::Selectable("Texture", object.roughness.index() == 1))
-            object.roughness.emplace<1>(0u);
-          ImGui::EndCombo();
-        } // If (BeginCombo) */
+      //   /* // Roughess section
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      //   if (object.roughness.index() == 0) {
+      //     ImGui::SliderFloat("##roughness_value", &std::get<0>(object.roughness), 0.f, 1.f);
+      //   } else {
+      //     detail::fun_resource_selector("##roughness_texture", e_images, std::get<1>(object.roughness));
+      //   }
+      //   ImGui::SameLine();
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      //   if (ImGui::BeginCombo("##roughness_data", "Roughness")) {
+      //     if (ImGui::Selectable("Value", object.roughness.index() == 0))
+      //       object.roughness.emplace<0>(0.f);
+      //     if (ImGui::Selectable("Texture", object.roughness.index() == 1))
+      //       object.roughness.emplace<1>(0u);
+      //     ImGui::EndCombo();
+      //   } // If (BeginCombo) */
 
-        /* // Metallic section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
-        if (object.metallic.index() == 0) {
-          ImGui::SliderFloat("##metallic_value", &std::get<0>(object.metallic), 0.f, 1.f);
-        } else {
-          detail::fun_resource_selector("##metallic_texture", e_images, std::get<1>(object.metallic));
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (ImGui::BeginCombo("##metallic_data", "Metallic")) {
-          if (ImGui::Selectable("Value", object.metallic.index() == 0))
-            object.roughness.emplace<0>(0.f);
-          if (ImGui::Selectable("Texture", object.metallic.index() == 1))
-            object.metallic.emplace<1>(0u);
-          ImGui::EndCombo();
-        } // If (BeginCombo) */
+      //   /* // Metallic section
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      //   if (object.metallic.index() == 0) {
+      //     ImGui::SliderFloat("##metallic_value", &std::get<0>(object.metallic), 0.f, 1.f);
+      //   } else {
+      //     detail::fun_resource_selector("##metallic_texture", e_images, std::get<1>(object.metallic));
+      //   }
+      //   ImGui::SameLine();
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      //   if (ImGui::BeginCombo("##metallic_data", "Metallic")) {
+      //     if (ImGui::Selectable("Value", object.metallic.index() == 0))
+      //       object.roughness.emplace<0>(0.f);
+      //     if (ImGui::Selectable("Texture", object.metallic.index() == 1))
+      //       object.metallic.emplace<1>(0u);
+      //     ImGui::EndCombo();
+      //   } // If (BeginCombo) */
 
-       /*  // Opacity section
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
-        if (object.opacity.index() == 0) {
-          ImGui::SliderFloat("##opacity_value", &std::get<0>(object.opacity), 0.f, 1.f);
-        } else {
-          detail::fun_resource_selector("##opacity_texture", e_images, std::get<1>(object.opacity));
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (ImGui::BeginCombo("##opacity_data", "Opacity")) {
-          if (ImGui::Selectable("Value", object.opacity.index() == 0))
-            object.roughness.emplace<0>(0.f);
-          if (ImGui::Selectable("Texture", object.opacity.index() == 1))
-            object.opacity.emplace<1>(0u);
-          ImGui::EndCombo();
-        } // If (BeginCombo) */
+      //  /*  // Opacity section
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      //   if (object.opacity.index() == 0) {
+      //     ImGui::SliderFloat("##opacity_value", &std::get<0>(object.opacity), 0.f, 1.f);
+      //   } else {
+      //     detail::fun_resource_selector("##opacity_texture", e_images, std::get<1>(object.opacity));
+      //   }
+      //   ImGui::SameLine();
+      //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      //   if (ImGui::BeginCombo("##opacity_data", "Opacity")) {
+      //     if (ImGui::Selectable("Value", object.opacity.index() == 0))
+      //       object.roughness.emplace<0>(0.f);
+      //     if (ImGui::Selectable("Texture", object.opacity.index() == 1))
+      //       object.opacity.emplace<1>(0u);
+      //     ImGui::EndCombo();
+      //   } // If (BeginCombo) */
         
-        ImGui::TreePop();
-      } // if (open_section)
+      //   ImGui::TreePop();
+      // } // if (open_section)
 
-      // Handle modifications to object copy
-      if (object != component.value) {
-        info.global("scene").getw<Scene>().touch({
-          .name = "Modify object",
-          .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
-          .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
-        });
-      }
+      // // Handle modifications to object copy
+      // if (object != component.value) {
+      //   info.global("scene").getw<Scene>().touch({
+      //     .name = "Modify object",
+      //     .redo = [i = i, obj = object         ](auto &scene) { scene.components.objects[i].value = obj; },
+      //     .undo = [i = i, obj = component.value](auto &scene) { scene.components.objects[i].value = obj; }
+      //   });
+      // }
 
-      ImGui::PopID();
+      // ImGui::PopID();
     } // for (uint i)
 
     // Handle additions to objects
