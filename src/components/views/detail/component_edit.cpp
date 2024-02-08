@@ -162,12 +162,12 @@ namespace met::detail {
   void push_component_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info, std::function<void (SchedulerHandle &, Ty &)> visitor) {
     met_trace();
 
+    // Set local scope ID j.i.c.
+    auto _scope = ImGui::ScopedID(std::format("{}_edit_{}", typeid(Ty).name(), i));
+
     // Get external resources and shorthands
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &component = scene_component_accessor<Ty>(e_scene)[i];
-
-    // Set local scope ID j.i.c.
-    ImGui::ScopedID(std::format("{}_edit_{}", typeid(Ty).name(), i));
 
     // If requested, spawn a TreeNode. If the TreeNode is closed, return early
     bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(component.name.c_str());
@@ -186,46 +186,95 @@ namespace met::detail {
     } // if (inside_tree && enable_delete)
 
     // Name editor
-    if (edit_info.enable_name_editing) {
+    if (edit_info.enable_name_editing)
       push_name_editor<Object>("Name", info, i);
-    } // if (enable_name_editing)
 
     // Data editor
-    if (edit_info.enable_value_editing) {
+    if (edit_info.enable_value_editing)
       encapsulate_value_editing<Object>("Modify object", info, i, visitor);
-    } // if (enable_value_editing)
+
+    // If requested, and we got this far, close TreeNode
+    if (edit_info.inside_tree)
+      ImGui::TreePop();
   }
+
+  template <typename Ty>
+  void push_components_edit(const std::string &section_name, SchedulerHandle &info, ImGuiEditInfo edit_info, std::function<void (SchedulerHandle &, Ty &)> visitor) {
+    met_trace();
+
+    // Get external resources and shorthands
+    const auto &e_scene      = info.global("scene").getr<Scene>();
+    const auto &e_components = scene_component_accessor<Ty>(e_scene);
+
+    // Set local scope ID j.i.c.
+    auto _scope = ImGui::ScopedID(std::format("{}_list", typeid(Ty).name()));
+
+    // If requested, spawn a TreeNode. If the TreeNode is closed, return early
+    bool section_open = !edit_info.inside_tree || ImGui::CollapsingHeader(section_name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+    // Iterate over all components
+    for (uint i = 0; i < e_components.size(); ++i) {
+      guard_break(i < e_components.size()); // Gracefully handle a deletion
+      push_component_edit<Ty>(info, i, edit_info, visitor);
+    } // for (uint i)
+
+    if (edit_info.enable_addition) {
+      if (!e_components.empty())
+        ImGui::Separator();
+      
+      // Spawn an addition button
+      ImGui::NewLine();
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
+
+      if (ImGui::SmallButton("Add")) {
+        info.global("scene").getw<Scene>().touch({
+          .name = "Add component",
+          .redo = [](auto &sc) { 
+            scene_component_accessor<Ty>(sc).push("New component", { }); },
+          .undo = [](auto &sc) { 
+            scene_component_accessor<Ty>(sc).erase(scene_component_accessor<Ty>(sc).size() - 1); }
+        });
+      }
+    }
+  }
+
+  constexpr auto object_visitor = [](SchedulerHandle &info, auto &value) {
+    // Get external resources and shorthands
+    const auto &e_scene = info.global("scene").getr<Scene>();
+
+    // Object mesh/uplifting selectors
+    push_resource_selector("Uplifting", e_scene.components.upliftings, value.uplifting_i);
+    push_resource_selector("Mesh",      e_scene.resources.meshes, value.mesh_i);
+    
+    ImGui::Separator();
+
+    // Object transforms
+    ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
+    ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
+    ImGui::DragFloat3("Scaling",  value.transform.scaling.data(),  0.01f, 0.001f, 100.f);
+
+    // Important catch; prevent scale from falling to 0, something somewhere breaks :D
+    value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
+
+    ImGui::Separator();
+      
+    // Texture selectors
+    push_texture_variant_selector("Diffuse", e_scene.resources.images, value.diffuse);
+    // push_texture_variant_selector("Roughness", e_scene.resources.images, value.roughness);
+    // push_texture_variant_selector("Metallic", e_scene.resources.images, value.metallic);
+    // push_texture_variant_selector("Normals", e_scene.resources.images, value.normals);
+    // push_texture_variant_selector("Opacity", e_scene.resources.images, value.opacity);
+  };
 
   // Describe imgui layout for editing object i
   void push_imgui_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
     met_trace();
-    push_component_edit<Object>(info, i, edit_info, [](SchedulerHandle &info, auto &value) {
-      // Get external resources and shorthands
-      const auto &e_scene = info.global("scene").getr<Scene>();
+    push_component_edit<Object>(info, i, edit_info, object_visitor);
+  }
 
-      // Object mesh/uplifting selectors
-      push_resource_selector("Uplifting", e_scene.components.upliftings, value.uplifting_i);
-      push_resource_selector("Mesh",      e_scene.resources.meshes, value.mesh_i);
-      
-      ImGui::Separator();
-
-      // Object transforms
-      ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
-      ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
-      ImGui::DragFloat3("Scaling",  value.transform.scaling.data(),  0.01f, 0.001f, 100.f);
-
-      // Important catch; prevent scale from falling to 0, something somewhere breaks :D
-      value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
-
-      ImGui::Separator();
-        
-      // Texture selectors
-      push_texture_variant_selector("Diffuse", e_scene.resources.images, value.diffuse);
-      // push_texture_variant_selector("Roughness", e_scene.resources.images, value.roughness);
-      // push_texture_variant_selector("Metallic", e_scene.resources.images, value.metallic);
-      // push_texture_variant_selector("Normals", e_scene.resources.images, value.normals);
-      // push_texture_variant_selector("Opacity", e_scene.resources.images, value.opacity);
-    });
+  void push_imgui_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
+    met_trace();
+    push_components_edit<Object>("Objects", info, edit_info, object_visitor);
   }
 
   // Describe imgui layout for editing emitter i

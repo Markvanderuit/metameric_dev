@@ -22,6 +22,7 @@ namespace met::detail {
 
   // Describe imgui layout for editing object i
   void push_imgui_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  void push_imgui_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info = { });
 
   // Describe imgui layout for editing emitter i
   void push_imgui_emitter_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
