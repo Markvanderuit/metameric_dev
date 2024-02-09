@@ -53,16 +53,18 @@ namespace met::detail {
 
   // Repeated sampling renderer base class
   class IntegrationRenderPrimitive : public BaseRenderPrimitive {
+    constexpr static uint sampler_state_size = 6;
+    
     struct SamplerState {
       alignas(4) uint spp_per_iter;
       alignas(4) uint spp_curr;
     };
     
     // Rolling set of mapped buffers that track incrementing sampler state over several frames
-    std::array<gl::Buffer,      6> m_sampler_state_buffs;
-    std::array<SamplerState *,  6> m_sampler_state_mapps;
-    std::array<gl::sync::Fence, 6> m_sampler_state_syncs;
-    uint                           m_sampler_state_i;
+    std::array<gl::Buffer,      sampler_state_size> m_sampler_state_buffs;
+    std::array<SamplerState *,  sampler_state_size> m_sampler_state_mapps;
+    std::array<gl::sync::Fence, sampler_state_size> m_sampler_state_syncs;
+    uint                                            m_sampler_state_i;
 
   protected:
     virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override; // default-implemented

@@ -14,7 +14,7 @@
   uint scene_mesh_count() { return scene_buff_mesh_count; }
   
 #define declare_scene_traversal_stack(stack_depth)                                                   \
-  shared uint scene_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y *gl_WorkGroupSize.z][stack_depth]; \
+  shared uint scene_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z][stack_depth]; \
   void scene_set_stack_value(uint i, uint v) { scene_stack[gl_LocalInvocationIndex][i] = v;    }     \
   uint scene_get_stack_value(uint i)         { return scene_stack[gl_LocalInvocationIndex][i]; }
 

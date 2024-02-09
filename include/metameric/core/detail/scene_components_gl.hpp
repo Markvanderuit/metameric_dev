@@ -32,6 +32,8 @@ namespace met::detail {
       alignas(16) Colr          albedo_v;
     };
 
+    constexpr static size_t v = sizeof(ObjectInfoLayout);
+
     // Mapped buffer accessors
     uint*                       m_buffer_map_size;
     std::span<ObjectInfoLayout> m_buffer_map_data;

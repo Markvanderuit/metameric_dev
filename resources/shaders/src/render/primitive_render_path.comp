@@ -125,10 +125,10 @@ void main() {
   // Load sensor data
   Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
 
-  // Target value
-  vec3 measure = vec3(0);
+  // Running average measure is current value in film
+  vec3 measure = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
 
-  // Take spp_per_iter samples
+  // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
             i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
           ++i) {
@@ -139,16 +139,10 @@ void main() {
     // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity
     vec4 L = Li(sensor_sample, state);
 
-    // Integrate over color system and add to measure
-    measure += sensor_apply(sensor_sample, L);
+    // Integrate over color system and add to measure in running average
+    measure += (sensor_apply(sensor_sample, L) - measure) / float(1 + i);
   } // for (uint spp_iter)
-
-  // Combine running average from film with measure
-  vec3 pm = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
-  measure = pm
-          + (measure - pm)
-          / float(buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter);
   
-  // Store updated measure to film
+  // Store running average measure to film
   imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(measure, 1));
 }

@@ -8,19 +8,6 @@ const uint max_supported_emitters   = MET_SUPPORTED_EMITTERS;
 const uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
 const uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
 
-// Info object for referred mesh.bvh data
-struct MeshInfo {
-  mat4 trf;
-  uint verts_offs;
-  uint verts_size;
-
-  uint prims_offs;
-  uint prims_size;
-  
-  uint nodes_offs;
-  uint nodes_size;
-};
-
 // Info object to gather Scene::Object data
 struct ObjectInfo {
   // Transform and inverse transform data
@@ -40,6 +27,20 @@ struct ObjectInfo {
   bool is_albedo_sampled; // Use sampler or direct value?
   uint albedo_i;          // Sampler index
   vec3 albedo_v;          // Direct value
+};
+
+// Info object for referred mesh.bvh data
+struct MeshInfo {
+  mat4 trf;
+  
+  uint verts_offs;
+  uint verts_size;
+
+  uint prims_offs;
+  uint prims_size;
+  
+  uint nodes_offs;
+  uint nodes_size;
 };
 
 // Info object for referred texture data

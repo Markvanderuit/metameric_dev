@@ -2,6 +2,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
+#include <concepts>
 
 namespace met::detail {
   // Helper function; forward to the matching scene components based on the specified type
@@ -15,8 +16,6 @@ namespace met::detail {
       return scene.components.objects;
     } else if constexpr (std::is_same_v<Ty, Uplifting>) {
       return scene.components.upliftings;
-    } else if constexpr (std::is_same_v<Ty, Settings>) {
-      return scene.components.settings;
     } else {
       debug::check_expr(false, "scene_component_accessor<Ty> exhausted its options"); 
     }
@@ -33,8 +32,6 @@ namespace met::detail {
       return scene.components.objects;
     } else if constexpr (std::is_same_v<Ty, Uplifting>) {
       return scene.components.upliftings;
-    } else if constexpr (std::is_same_v<Ty, Settings>) {
-      return scene.components.settings;
     } else {
       debug::check_expr(false, "scene_component_accessor<Ty> exhausted its options"); 
     }
@@ -128,6 +125,11 @@ namespace met::detail {
   }
 
   template <typename Ty>
+  concept has_active_value = requires (Ty t) {
+    { t.is_active } -> std::same_as<bool>;
+  };
+
+  template <typename Ty>
   constexpr void push_active_button(SchedulerHandle &info, uint i) {
     met_trace();
     encapsulate_value_editing<Ty>("Swap component active", info, i, [](auto &info, auto &value) {
@@ -169,31 +171,35 @@ namespace met::detail {
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &component = scene_component_accessor<Ty>(e_scene)[i];
 
-    // If requested, spawn a TreeNode. If the TreeNode is closed, return early
+    // If requested, spawn a TreeNode.
     bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(component.name.c_str());
-    guard(section_open);
 
-    // Is_active button, on same line as tree node
-    if (edit_info.inside_tree && edit_info.enable_value_editing) {
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
-      push_active_button<Object>(info, i);
-    } // if (inside_tree && enable_value_editing)
+    // Is_active button, on same line as tree node if available
+    if constexpr (has_active_value<Ty>) {
+      if (edit_info.inside_tree && edit_info.enable_value_editing) {
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
+        push_active_button<Ty>(info, i);
+      } // if (inside_tree && enable_value_editing)
+    } // if (has_active_value)
 
     // Delete button, on same line as tree node
     if (edit_info.inside_tree && edit_info.enable_delete) {
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-      guard(!push_delete_button<Object>(info, i));
+      guard(!push_delete_button<Ty>(info, i));
     } // if (inside_tree && enable_delete)
 
-    // Name editor
+    //  If the section is closed, we return early
+    guard(section_open);
+
+    // Optionall spawn component name editor
     if (edit_info.enable_name_editing)
-      push_name_editor<Object>("Name", info, i);
+      push_name_editor<Ty>("Name", info, i);
 
-    // Data editor
+    // Optionally internalize component data visitor
     if (edit_info.enable_value_editing)
-      encapsulate_value_editing<Object>("Modify object", info, i, visitor);
+      encapsulate_value_editing<Ty>("Modify object", info, i, visitor);
 
-    // If requested, and we got this far, close TreeNode
+    // If the section needs closing, do so
     if (edit_info.inside_tree)
       ImGui::TreePop();
   }
@@ -202,23 +208,30 @@ namespace met::detail {
   void push_components_edit(const std::string &section_name, SchedulerHandle &info, ImGuiEditInfo edit_info, std::function<void (SchedulerHandle &, Ty &)> visitor) {
     met_trace();
 
+    // Set local scope ID j.i.c.
+    auto _scope = ImGui::ScopedID(std::format("{}_list", typeid(Ty).name()));
+
     // Get external resources and shorthands
     const auto &e_scene      = info.global("scene").getr<Scene>();
     const auto &e_components = scene_component_accessor<Ty>(e_scene);
 
-    // Set local scope ID j.i.c.
-    auto _scope = ImGui::ScopedID(std::format("{}_list", typeid(Ty).name()));
-
     // If requested, spawn a TreeNode. If the TreeNode is closed, return early
     bool section_open = !edit_info.inside_tree || ImGui::CollapsingHeader(section_name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 
-    // Iterate over all components
+    // Iterate over all relevant components
     for (uint i = 0; i < e_components.size(); ++i) {
       guard_break(i < e_components.size()); // Gracefully handle a deletion
+
+      // If inlining, add a visual separator between each component
+      if (i > 0 && !edit_info.inside_tree)
+        ImGui::Separator();
+      
+      // Visit component internals
       push_component_edit<Ty>(info, i, edit_info, visitor);
     } // for (uint i)
 
     if (edit_info.enable_addition) {
+      // If there are listed components, visually separate this section
       if (!e_components.empty())
         ImGui::Separator();
       
@@ -238,7 +251,8 @@ namespace met::detail {
     }
   }
 
-  constexpr auto object_visitor = [](SchedulerHandle &info, auto &value) {
+  // Default implementation of editing visitor for Object components
+  constexpr auto object_visitor = [](SchedulerHandle &info, Object &value) {
     // Get external resources and shorthands
     const auto &e_scene = info.global("scene").getr<Scene>();
 
@@ -266,29 +280,60 @@ namespace met::detail {
     // push_texture_variant_selector("Opacity", e_scene.resources.images, value.opacity);
   };
 
-  // Describe imgui layout for editing object i
-  void push_imgui_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    met_trace();
+
+  // Default implementation of editing visitor for Emitter components
+  constexpr auto emitter_visitor = [](SchedulerHandle &info, Emitter &value) {
+    // Get external resources and shorthands
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    
+    // ...
+  };
+
+  // Default implementation of editing visitor for Uplifting components
+  constexpr auto uplifting_visitor = [](SchedulerHandle &info, Uplifting &value) {
+    // Get external resources and shorthands
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    
+    // ...
+  };
+
+  // Default implementation of editing visitor for ColorSystem components
+  constexpr auto colr_system_visitor = [](SchedulerHandle &info, ColorSystem &value) {
+    // Get external resources and shorthands
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    
+    // ...
+  };
+
+  void push_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
     push_component_edit<Object>(info, i, edit_info, object_visitor);
   }
 
-  void push_imgui_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
-    met_trace();
+  void push_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
     push_components_edit<Object>("Objects", info, edit_info, object_visitor);
   }
 
-  // Describe imgui layout for editing emitter i
-  void push_imgui_emitter_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    met_trace();
+  void push_emitter_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
+    push_component_edit<Emitter>(info, i, edit_info, emitter_visitor);
   }
 
-  // Describe imgui layout for editing uplifting i
-  void push_imgui_uplifting_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    met_trace();
+  void push_emitters_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
+    push_components_edit<Emitter>("Emitters", info, edit_info, emitter_visitor);
   }
 
-  // Describe imgui layout for editing color system i
-  void push_imgui_csys_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    met_trace();
+  void push_uplifting_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
+    push_component_edit<Uplifting>(info, i, edit_info, uplifting_visitor);
+  }
+
+  void push_upliftings_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
+    push_components_edit<Uplifting>("Upliftings", info, edit_info, uplifting_visitor);
+  }
+
+  void push_colr_system_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
+    push_component_edit<ColorSystem>(info, i, edit_info, colr_system_visitor);
+  }
+
+  void push_colr_systems_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
+    push_components_edit<ColorSystem>("Color Systems", info, edit_info, colr_system_visitor);
   }
 } // namespace met::detail

@@ -1,10 +1,13 @@
 #pragma once
 
+#include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 
 namespace met::detail {
   struct ImGuiEditInfo {
-    // Push imgui components inside a TreeNode section
+    // Push imgui components inside a TreeNode section,
+    // or inline directly instead
     bool inside_tree   = true;
 
     // Allow adding of objects
@@ -20,16 +23,23 @@ namespace met::detail {
     bool enable_value_editing = true;
   };
 
-  // Describe imgui layout for editing object i
-  void push_imgui_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
-  void push_imgui_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info = { });
+  template <typename Ty>
+  using ImGuiComponentVisitor = std::function<void (SchedulerHandle &, Ty &)>;
 
-  // Describe imgui layout for editing emitter i
-  void push_imgui_emitter_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  // Helpers for generating unified component editor layouts, with appropriate save state
+  // handling and imgui state wrapping in place
+  template <typename Ty>
+  void push_component_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info, ImGuiComponentVisitor<Ty> visitor);
+  template <typename Ty>
+  void push_components_edit(const std::string &section_name, SchedulerHandle &info, ImGuiEditInfo edit_info, ImGuiComponentVisitor<Ty> visitor);
 
-  // Describe imgui layout for editing uplifting i
-  void push_imgui_uplifting_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
-
-  // Describe imgui layout for editing color system i
-  void push_imgui_csys_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  // Defaults for component editor layout for most components
+  void push_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  void push_emitter_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  void push_uplifting_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  void push_colr_system_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info = { });
+  void push_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info = { });
+  void push_emitters_edit(SchedulerHandle &info, ImGuiEditInfo edit_info = { });
+  void push_upliftings_edit(SchedulerHandle &info, ImGuiEditInfo edit_info = { });
+  void push_colr_systems_edit(SchedulerHandle &info, ImGuiEditInfo edit_info = { });
 } // namespace met::detail

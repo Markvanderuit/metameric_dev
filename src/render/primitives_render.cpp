@@ -52,7 +52,7 @@ namespace met {
 
       // Block if flush operation has not completed
       if (auto &sync = m_sampler_state_syncs[m_sampler_state_i]; sync.is_init())
-        sync.gpu_wait();
+        sync.cpu_wait();
       
       return m_sampler_state_buffs[m_sampler_state_i];
     }
@@ -61,7 +61,6 @@ namespace met {
       met_trace();
       return m_film;
     }
-
 
     GBufferRenderPrimitive::GBufferRenderPrimitive() {
       // Initialize program object

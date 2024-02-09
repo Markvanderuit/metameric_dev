@@ -360,7 +360,8 @@ namespace met::detail {
       guard_continue(state);
       
       // Simplified copy of mesh, inverse matrix to undo [0, 1] packing, and acceleration structure
-      auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-3));
+      // auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-3));
+      auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 16384, 1e-3));
       auto bvh         = create_bvh({ .mesh = copy, .n_node_children = 8, .n_leaf_children = 3 });
 
       // Store both processed mesh and bvh
@@ -461,6 +462,7 @@ namespace met::detail {
       // Keep packed primitive data around for cpu-side access with gpu-side
       // data
       bvh_prims_cpu = prims_packed;
+      fmt::print("Primitive count: {}\n", bvh_prims_cpu.size());
     }
 
     // Define corresponding vertex array object and generate multidraw command info

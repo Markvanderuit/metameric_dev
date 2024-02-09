@@ -46,51 +46,13 @@ namespace met {
 
   void SceneComponentsEditorTask::eval(SchedulerHandle &info) {
     met_trace();
-
     if (ImGui::Begin("Scene components")) {
-      eval_objects(info);
+      push_objects_edit(info);
       eval_emitters(info);
       eval_upliftings(info);
       eval_colr_systems(info);
     }
     ImGui::End();
-  }
-
-  void SceneComponentsEditorTask::eval_objects(SchedulerHandle &info) {
-    met_trace();
-
-    push_imgui_objects_edit(info);
-
-    // // Get external resources and shorthands
-    // const auto &e_scene   = info.global("scene").getr<Scene>();
-    // const auto &e_objects = e_scene.components.objects;
-
-    // // Spawn a collapsing header
-    // guard(ImGui::CollapsingHeader(std::format("Objects ({})", e_objects.size()).c_str(), ImGuiTreeNodeFlags_DefaultOpen));
-    // ImGui::PushID("object_data");
-
-    // // Iterate over all objects
-    // for (uint i = 0; i < e_objects.size(); ++i) {
-    //   guard_break(i < e_objects.size()); // Gracefully handle a deletion
-    //   push_imgui_object_edit(info, i);
-    // } // for (uint i)
-
-    // // Handle additions to objects
-    // {
-    //   if (!e_objects.empty())
-    //     ImGui::Separator();
-    //   ImGui::NewLine();
-    //   ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
-    //   if (ImGui::SmallButton("Add")) {
-    //     info.global("scene").getw<Scene>().touch({
-    //       .name = "Add object",
-    //       .redo = [](auto &scene) { scene.components.objects.push("Object", { });                        },
-    //       .undo = [](auto &scene) { scene.components.objects.erase(scene.components.objects.size() - 1); }
-    //     });
-    //   }
-    // }
-    
-    // ImGui::PopID();
   }
 
   void SceneComponentsEditorTask::eval_emitters(SchedulerHandle &info) {
@@ -272,9 +234,12 @@ namespace met {
           if (open_section) {
             if (auto *constraint = std::get_if<DirectSurfaceConstraint>(&vert.constraint)) {
               ImGui::InputFloat3("Surface position", constraint->surface.p.data());
-              ImGui::ColorEdit3("Surface diffuse", constraint->surface.diffuse.data(),
+              ImGui::InputFloat3("Surface normal",  constraint->surface.n.data());
+              ImGui::Value("Vector norm", constraint->surface.n.norm());
+              ImGui::ColorEdit3("Surface diffuse",  constraint->surface.diffuse.data(),
                 ImGuiColorEditFlags_Float    |
                 ImGuiColorEditFlags_NoOptions);
+              
             } else {
               ImGui::Text("Not implemented!");
             }

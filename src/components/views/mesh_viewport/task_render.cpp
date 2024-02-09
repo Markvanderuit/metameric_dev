@@ -11,9 +11,6 @@
 namespace met {
   using RendererType = PathRenderPrimitive;
 
-  constexpr uint n_iters_per_dispatch = 1u;
-  constexpr uint n_iters_max          = 4096u; // 65536u;
-
   bool MeshViewportRenderTask::is_active(SchedulerHandle &info) {
     met_trace();
     const auto &e_scene  = info.global("scene").getr<Scene>();
@@ -25,10 +22,10 @@ namespace met {
   void MeshViewportRenderTask::init(SchedulerHandle &info) {
     met_trace_full();    
     info("sensor").set<Sensor>({ /* ... */ });
-    info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = n_iters_per_dispatch,  
-                                                 .spp_max      = n_iters_max,
-                                                 .max_depth    = 4,
-                                                 .cache_handle = info.global("cache") });
+    info("renderer").init<RendererType>({ .spp_per_iter = 1u,  
+                                          .spp_max      = 4096u,
+                                          .max_depth    = 4u,
+                                          .cache_handle = info.global("cache") });
   }
     
   void MeshViewportRenderTask::eval(SchedulerHandle &info) {

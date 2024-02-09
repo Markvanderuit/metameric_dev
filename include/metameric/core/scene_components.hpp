@@ -144,3 +144,18 @@ namespace met {
     }
   };
 } // namespace met
+
+// std::ostream overloads for some types
+namespace std {
+  constexpr inline
+  std::ostream &operator<<(std::ostream& os, met::Emitter::Type ty) {
+    switch (ty) {
+      case met::Emitter::Type::eConstant : os << "constant";
+      case met::Emitter::Type::ePoint    : os << "point";
+      case met::Emitter::Type::eSphere   : os << "sphere";
+      case met::Emitter::Type::eRect     : os << "rect";
+      default                            : os.setstate(std::ios_base::failbit);
+    }
+    return os;
+  }
+} // namespace std
