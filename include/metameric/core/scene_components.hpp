@@ -145,17 +145,41 @@ namespace met {
   };
 } // namespace met
 
-// std::ostream overloads for some types
+// Custom std::format overloads for some types
 namespace std {
-  constexpr inline
-  std::ostream &operator<<(std::ostream& os, met::Emitter::Type ty) {
-    switch (ty) {
-      case met::Emitter::Type::eConstant : os << "constant";
-      case met::Emitter::Type::ePoint    : os << "point";
-      case met::Emitter::Type::eSphere   : os << "sphere";
-      case met::Emitter::Type::eRect     : os << "rect";
-      default                            : os.setstate(std::ios_base::failbit);
+  // Format Emitter::Type
+  template <>
+  struct std::formatter<met::Emitter::Type> : std::formatter<string_view> {
+    auto format(const met::Emitter::Type& ty, std::format_context& ctx) const {
+      std::string s;
+      switch (ty) {
+        case met::Emitter::Type::eConstant : s = "constant"; break;
+        case met::Emitter::Type::ePoint    : s = "point"; break;
+        case met::Emitter::Type::eRect     : s = "rect"; break;
+        case met::Emitter::Type::eSphere   : s = "sphere"; break;
+      };
+      return std::formatter<std::string_view>::format(s, ctx);
     }
-    return os;
-  }
+  };
+
+  // Format Uplifting::Vertex::cstr_type
+  template <>
+  struct std::formatter<met::Uplifting::Vertex::cnstr_type> : std::formatter<string_view> {
+    auto format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {
+      std::string s = std::visit([](auto &&arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, met::DirectColorConstraint>)
+          return "direct";
+        else if constexpr (std::is_same_v<T, met::MeasurementConstraint>)
+          return "measurement";
+        else if constexpr (std::is_same_v<T, met::DirectSurfaceConstraint>)
+          return "direct surface";
+        else if constexpr (std::is_same_v<T, met::IndirectSurfaceConstraint>)
+          return "indirect surface";
+        else
+          return "unknown";
+      }, constraint);
+      return std::formatter<std::string_view>::format(s, ctx);
+    }
+  };
 } // namespace std

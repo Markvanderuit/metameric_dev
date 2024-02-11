@@ -54,7 +54,7 @@ namespace met {
     SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
-    bool is_valid() const { return surface.is_valid(); }
+    bool is_valid() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
