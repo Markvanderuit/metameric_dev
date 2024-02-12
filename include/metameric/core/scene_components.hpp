@@ -8,6 +8,10 @@
 #include <vector>
 
 namespace met {
+  // Concept; some components have active flags to enable/disable them in the scene
+  template <typename Ty>
+  concept has_active_value = requires (Ty ty) { { ty.is_active } -> std::same_as<bool&>; };
+
   /* Scene settings data layout. */
   struct Settings {
     using state_type = detail::SettingsState;
@@ -80,6 +84,7 @@ namespace met {
       return true;
     }
   };
+  static_assert(has_active_value<Object>);
 
   /* Emitter representation; just a simple point light for now */
   struct Emitter {
@@ -105,6 +110,7 @@ namespace met {
           == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale);
     }
   };
+  static_assert(has_active_value<Emitter>);
 
   /* Spectral uplifting data layout;
      Mostly a tesselation of a color space, with constraints on the tesselation's

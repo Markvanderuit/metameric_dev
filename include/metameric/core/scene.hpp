@@ -160,6 +160,39 @@ namespace met {
     // Given a RayRecord, recover underlying SurfaceInfo
     SurfaceInfo get_surface_info(const RayRecord &ray) const;
 
+  public: // Type-based component accessors
+    template <typename Ty>
+    constexpr auto components_by_type() -> detail::Components<typename Ty::value_type> & {
+      using VTy = typename Ty::value_type;
+      if constexpr (std::is_same_v<VTy, ColorSystem>) {
+        return components.colr_systems;
+      } else if constexpr (std::is_same_v<VTy, Emitter>) {
+        return components.emitters;
+      } else if constexpr (std::is_same_v<VTy, Object>) {
+        return components.objects;
+      } else if constexpr (std::is_same_v<VTy, Uplifting>) {
+        return components.upliftings;
+      } else {
+        debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
+      }
+    }
+
+    template <typename Ty>
+    constexpr auto components_by_type() const -> const detail::Components<typename Ty::value_type> & {
+      using VTy = typename Ty::value_type;
+      if constexpr (std::is_same_v<VTy, ColorSystem>) {
+        return components.colr_systems;
+      } else if constexpr (std::is_same_v<VTy, Emitter>) {
+        return components.emitters;
+      } else if constexpr (std::is_same_v<VTy, Object>) {
+        return components.objects;
+      } else if constexpr (std::is_same_v<VTy, Uplifting>) {
+        return components.upliftings;
+      } else {
+        debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
+      }
+    }
+
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);

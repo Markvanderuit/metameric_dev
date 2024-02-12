@@ -21,15 +21,20 @@
 #include <metameric/components/views/task_mappings_viewer.hpp>
 #include <metameric/components/views/task_spectra_editor.hpp>
 #include <metameric/components/views/task_embedding_viewport.hpp>
-#include <metameric/components/views/task_mesh_viewport.hpp>
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
-#include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/dev/task_gen_random_constraints.hpp>
 #include <metameric/components/dev/task_gen_random_mappings.hpp>
 #include <metameric/components/dev/task_random_mapping_viewer.hpp>
 #include <metameric/components/views/task_scene_resources_editor.hpp>
-#include <metameric/components/views/task_scene_components_editor.hpp>
+#include <metameric/components/views/mesh_viewport/task_input_camera.hpp>
+#include <metameric/components/views/mesh_viewport/task_input_editor.hpp>
+#include <metameric/components/views/mesh_viewport/task_render.hpp>
+#include <metameric/components/views/mesh_viewport/task_draw_overlay.hpp>
+#include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/component_edit.hpp>
+#include <metameric/components/views/detail/task_viewport.hpp>
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
@@ -124,7 +129,7 @@ namespace met {
     scheduler.task("bary_viewer").init<BaryViewerTask>();
 
     // The following tasks are in development
-    scheduler.task("mesh_viewport").init<MeshViewportTask>();
+    // scheduler.task("mesh_viewport").init<MeshViewportTask>();
     // scheduler.task("embedding_viewport").init<EmbeddingViewportTask>();
     // scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
     // scheduler.task("gen_random_mappings").init<GenRandomMappingsTask>();
@@ -186,7 +191,7 @@ namespace met {
     scheduler.task("window").init<WindowTask>();
 
     // Simple task triggers scene update at start of frame
-    scheduler.task("scene_handler").init<LambdaTask>([](SchedulerHandle &info) {
+    scheduler.task("scene_handler").init<LambdaTask>([](auto &info) {
       met_trace_full();
       info.global("scene").getw<Scene>().update();
     });
@@ -196,9 +201,27 @@ namespace met {
     scheduler.task("gen_objects").init<GenObjectsTask>();
 
     // View tasks handle UI components
-    scheduler.task("scene_components_editor").init<SceneComponentsEditorTask>();
+    scheduler.task("scene_components_editor").init<LambdaTask>([](auto &info) {
+      met_trace_full();
+      if (ImGui::Begin("Scene components")) {
+        push_editor<detail::Component<Object>>(info);
+        push_editor<detail::Component<Emitter>>(info);
+        push_editor<detail::Component<Uplifting>>(info);
+        push_editor<detail::Component<ColorSystem>>(info, { .edit_name = false });
+      }
+      ImGui::End();
+    });
     scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
-    scheduler.task("mesh_viewport").init<MeshViewportTask>();
+    scheduler.task("mesh_viewport").init<LambdaTask>([](auto &info) {
+      met_trace();
+      info.child_task("viewport_begin").init<detail::ViewportBeginTask>();
+      info.child_task("viewport_input_camera").init<MeshViewportCameraInputTask>();
+      info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
+      info.child_task("viewport_render").init<MeshViewportRenderTask>();
+      info.child_task("viewport_draw_overlay").init<MeshViewportDrawOverlayTask>();
+      info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();
+      info.child_task("viewport_end").init<detail::ViewportEndTask>();
+    }, [](auto &) { });
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);

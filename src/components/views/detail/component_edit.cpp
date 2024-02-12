@@ -4,420 +4,193 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <concepts>
 
-namespace met::detail {
-  // Helper function; forward to the matching scene components based on the specified type
-  template <typename Ty>
-  constexpr auto scene_component_accessor(Scene &scene) -> Components<Ty> & {
-    if constexpr (std::is_same_v<Ty, ColorSystem>) {
-      return scene.components.colr_systems;
-    } else if constexpr (std::is_same_v<Ty, Emitter>) {
-      return scene.components.emitters;
-    } else if constexpr (std::is_same_v<Ty, Object>) {
-      return scene.components.objects;
-    } else if constexpr (std::is_same_v<Ty, Uplifting>) {
-      return scene.components.upliftings;
-    } else {
-      debug::check_expr(false, "scene_component_accessor<Ty> exhausted its options"); 
-    }
-  }
+namespace met {
+  namespace detail {
+    // Helper function; given a title, access to a set of scene resources,
+    // and a modifiable index pointing to one of those resources, spawn
+    // a combo box for selecting said resource
+    constexpr
+    void push_resource_selector(std::string_view title, const auto &resources, uint &j) {
+      if (ImGui::BeginCombo(title.data(), resources[j].name.c_str())) {
+        for (uint i = 0; i < resources.size(); ++i)
+          if (ImGui::Selectable(resources[i].name.c_str(), j == i))
+            j = i;
+        ImGui::EndCombo();
+      } // if (BeginCombo)
+    };
 
-  // Helper function; forward to the matching scene components based on the specified type
-  template <typename Ty>
-  constexpr auto scene_component_accessor(const Scene &scene) -> const Components<Ty> & {
-    if constexpr (std::is_same_v<Ty, ColorSystem>) {
-      return scene.components.colr_systems;
-    } else if constexpr (std::is_same_v<Ty, Emitter>) {
-      return scene.components.emitters;
-    } else if constexpr (std::is_same_v<Ty, Object>) {
-      return scene.components.objects;
-    } else if constexpr (std::is_same_v<Ty, Uplifting>) {
-      return scene.components.upliftings;
-    } else {
-      debug::check_expr(false, "scene_component_accessor<Ty> exhausted its options"); 
-    }
-  }
-
-  // Helper function; safely encapsulate some value-editing inside scene change recording,
-  // based on whether the value was changed in some way
-  template <typename Ty>
-  constexpr void encapsulate_value_editing(const std::string &edit_name, SchedulerHandle &info, uint i, ImGuiComponentVisitor<Ty> visitor) {
-    met_trace();
-
-    // Access relevant resources
-    // We copy the object, and then test for changes at the end of the section
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &component = scene_component_accessor<Ty>(e_scene)[i];
-          auto copy       = component;
-
-    // Edit value
-    visitor(info, copy); // Visitor potentially edits value
-
-    // Given inequality comparison, record a scene change for redo/undo
-    if (copy != component) {
-      info.global("scene").getw<Scene>().touch({
-        .name = edit_name,
-        .redo = [i = i, c = copy     ](auto &sc) { scene_component_accessor<Ty>(sc)[i] = c; },
-        .undo = [i = i, c = component](auto &sc) { scene_component_accessor<Ty>(sc)[i] = c; }
-      });
-    }
-  }
-
-  // Helper function; given a title, access to a set of scene resources,
-  // and a modifiable index pointing to one of those resources, spawn
-  // a combo box for selecting said resource
-  constexpr
-  void push_resource_selector(std::string_view title, const auto &resources, uint &j) {
-    if (ImGui::BeginCombo(title.data(), resources[j].name.c_str())) {
-      for (uint i = 0; i < resources.size(); ++i)
-        if (ImGui::Selectable(resources[i].name.c_str(), j == i))
-          j = i;
-      ImGui::EndCombo();
-    } // if (BeginCombo)
-  };
-
-  // Helper function; given a title, access to a set of textures, and a modifiable variant
-  // representing a color or a texture, spawn a combo box for texture/color selection
-  constexpr
-  void push_texture_variant_selector(const std::string &title, const auto &resources, auto &variant) {
-    // First, spawn a editor for the variant's specific type; color editor, or texture selector
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
-    if (std::holds_alternative<Colr>(variant)) {
-      ImGui::ColorEdit3(std::format("##_{}_value", title).c_str(), std::get<Colr>(variant).data());
-    } else if (std::holds_alternative<uint>(variant)) {
-      push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
-    }
-    
-    // Then, spawn a combobox to switch between the variant's types
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
-      if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
-        variant = Colr(1);
-      if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
-        variant = uint(0u);
-      ImGui::EndCombo();
-    } // If (BeginCombo)
-  }
-
-  // Helper function; given a title and a specified component type and index,
-  // enable name editing
-  template <typename Ty>
-  constexpr void push_name_editor(std::string_view title, SchedulerHandle &info, uint i) {
-    met_trace();
-    
-    constexpr auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue;
-
-    // We copy the component's name, and then test for changes
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &component = scene_component_accessor<Ty>(e_scene)[i];
-          auto name       = component.name;
-
-    // Spawn text editor; on a signaled edit, record a scene change for redo/undo
-    if (ImGui::InputText(title.data(), &name, str_edit_flags)) {
-      info.global("scene").getw<Scene>().touch({
-        .name = "Modify component name",
-        .redo = [i = i, name = name](auto &sc) { 
-          scene_component_accessor<Ty>(sc)[i].name = name; },
-        .undo = [i = i, name = component.name](auto &sc) { 
-          scene_component_accessor<Ty>(sc)[i].name = name; }
-      });
-    }
-  }
-
-  template <typename Ty>
-  concept has_active_value = requires (Ty t) {
-    { t.is_active } -> std::same_as<bool>;
-  };
-
-  template <typename Ty>
-  constexpr void push_active_button(SchedulerHandle &info, uint i) {
-    met_trace();
-    encapsulate_value_editing<Ty>("Swap component active", info, i, [](auto &info, auto &value) {
-      if (ImGui::SmallButton(value.is_active ? "V" : "H"))
-        value.is_active = !value.is_active;
-    });
-  }
-
-  template <typename Ty>
-  constexpr bool push_delete_button(SchedulerHandle &info, uint i) {
-    met_trace();
-    
-    // Access relevant resources
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &component = scene_component_accessor<Ty>(e_scene)[i];
-
-    // Spawn small X button
-    if (ImGui::SmallButton("X")) {
-      info.global("scene").getw<Scene>().touch({
-        .name = "Delete component",
-        .redo = [i = i] (auto &sc) { 
-          scene_component_accessor<Ty>(sc).erase(i); },
-        .undo = [i = i, o = component](auto &sc) { 
-          scene_component_accessor<Ty>(sc).insert(i, o); }
-      });
-      return true;
-    }
-    return false;
-  }
-
-  template <typename Ty>
-  void push_component_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info, ImGuiComponentVisitor<Ty> visitor) {
-    met_trace();
-
-    // Set local scope ID j.i.c.
-    auto _scope = ImGui::ScopedID(std::format("{}_edit_{}", typeid(Ty).name(), i));
-
-    // Get external resources and shorthands
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &component = scene_component_accessor<Ty>(e_scene)[i];
-
-    // If requested, spawn a TreeNode.
-    bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(component.name.c_str());
-
-    // Is_active button, on same line as tree node if available
-    if constexpr (has_active_value<Ty>) {
-      if (edit_info.inside_tree && edit_info.enable_value_editing) {
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
-        push_active_button<Ty>(info, i);
-      } // if (inside_tree && enable_value_editing)
-    } // if (has_active_value)
-
-    // Delete button, on same line as tree node
-    if (edit_info.inside_tree && edit_info.enable_delete) {
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-      guard(!push_delete_button<Ty>(info, i));
-    } // if (inside_tree && enable_delete)
-
-    //  If the section is closed, we return early
-    guard(section_open);
-
-    // Optionall spawn component name editor
-    if (edit_info.enable_name_editing)
-      push_name_editor<Ty>("Name", info, i);
-
-    // Optionally internalize component data visitor
-    if (edit_info.enable_value_editing)
-      encapsulate_value_editing<Ty>("Modify object", info, i, visitor);
-
-    // If the section needs closing, do so
-    if (edit_info.inside_tree)
-      ImGui::TreePop();
-  }
-
-  template <typename Ty>
-  void push_components_edit(const std::string &section_name, SchedulerHandle &info, ImGuiEditInfo edit_info, ImGuiComponentVisitor<Ty> visitor) {
-    met_trace();
-
-    // Set local scope ID j.i.c.
-    auto _scope = ImGui::ScopedID(std::format("{}_list", typeid(Ty).name()));
-
-    // Get external resources and shorthands
-    const auto &e_scene      = info.global("scene").getr<Scene>();
-    const auto &e_components = scene_component_accessor<Ty>(e_scene);
-
-    // If requested, spawn a TreeNode. If the TreeNode is closed, return early
-    bool section_open = !edit_info.inside_tree || ImGui::CollapsingHeader(section_name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-
-    // Iterate over all relevant components
-    for (uint i = 0; i < e_components.size(); ++i) {
-      guard_break(i < e_components.size()); // Gracefully handle a deletion
-
-      // If inlining, add a visual separator between each component
-      if (i > 0 && !edit_info.inside_tree)
-        ImGui::Separator();
-      
-      // Visit component internals
-      push_component_edit<Ty>(info, i, edit_info, visitor);
-    } // for (uint i)
-
-    if (edit_info.enable_addition) {
-      // If there are listed components, visually separate this section
-      if (!e_components.empty())
-        ImGui::Separator();
-      
-      // Spawn an addition button
-      ImGui::NewLine();
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - 32.f);
-
-      if (ImGui::SmallButton("Add")) {
-        info.global("scene").getw<Scene>().touch({
-          .name = "Add component",
-          .redo = [](auto &sc) { 
-            scene_component_accessor<Ty>(sc).push("New component", { }); },
-          .undo = [](auto &sc) { 
-            scene_component_accessor<Ty>(sc).erase(scene_component_accessor<Ty>(sc).size() - 1); }
-        });
+    // Helper function; given a title, access to a set of textures, and a modifiable variant
+    // representing a color or a texture, spawn a combo box for texture/color selection
+    constexpr
+    void push_texture_variant_selector(const std::string &title, const auto &resources, auto &variant) {
+      // First, spawn a editor for the variant's specific type; color editor, or texture selector
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
+      if (std::holds_alternative<Colr>(variant)) {
+        ImGui::ColorEdit3(std::format("##_{}_value", title).c_str(), std::get<Colr>(variant).data());
+      } else if (std::holds_alternative<uint>(variant)) {
+        push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
       }
-    }
-  }
-
-  // Default implementation of editing visitor for Object components
-  constexpr auto object_visitor = [](SchedulerHandle &info, Component<Object> &component) {
-    // Get external resources and shorthands
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    auto &value = component.value;
-
-    // Object mesh/uplifting selectors
-    push_resource_selector("Uplifting", e_scene.components.upliftings, value.uplifting_i);
-    push_resource_selector("Mesh",      e_scene.resources.meshes, value.mesh_i);
-    
-    ImGui::Separator();
-
-    // Object transforms
-    ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
-    ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
-    ImGui::DragFloat3("Scaling",  value.transform.scaling.data(),  0.01f, 0.001f, 100.f);
-
-    // Important catch; prevent scale from falling to 0, something somewhere breaks :D
-    value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
-
-    ImGui::Separator();
       
-    // Texture selectors
-    push_texture_variant_selector("Diffuse", e_scene.resources.images, value.diffuse);
-    // push_texture_variant_selector("Roughness", e_scene.resources.images, value.roughness);
-    // push_texture_variant_selector("Metallic", e_scene.resources.images, value.metallic);
-    // push_texture_variant_selector("Normals", e_scene.resources.images, value.normals);
-    // push_texture_variant_selector("Opacity", e_scene.resources.images, value.opacity);
-  };
-
-
-  // Default implementation of editing visitor for Emitter components
-  constexpr auto emitter_visitor = [](SchedulerHandle &info, Component<Emitter> &component) {
-    // Get external resources and shorthands
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    auto &value = component.value;
-    
-    // Type selector
-    if (ImGui::BeginCombo("Type", std::format("{}", value.type).c_str())) {
-      for (uint i = 0; i < 4; ++i) {
-        auto type = static_cast<Emitter::Type>(i);
-        auto name = std::format("{}", type);
-        if (ImGui::Selectable(name.c_str(), value.type == type)) {
-          value.type = type;
-        }
-      } // for (uint i)
-      ImGui::EndCombo();
+      // Then, spawn a combobox to switch between the variant's types
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+      if (ImGui::BeginCombo(std::format("##_{}_data", title).c_str(), title.c_str())) {
+        if (ImGui::Selectable("Value", std::holds_alternative<Colr>(variant)))
+          variant = Colr(1);
+        if (ImGui::Selectable("Texture", std::holds_alternative<uint>(variant)))
+          variant = uint(0u);
+        ImGui::EndCombo();
+      } // If (BeginCombo)
     }
 
-    ImGui::Separator();
+    // Default implementation of editing visitor for Object components
+    template <>
+    void edit_visitor_default(SchedulerHandle &info, Component<Object> &component) {
+      // Get external resources and shorthands
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      auto &value = component.value;
 
-    // Object transforms
-    // Some parts are only available in part dependent on emitter type
-    ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
-    if (value.type == Emitter::Type::eSphere) {
-      ImGui::DragFloat("Scaling", value.transform.scaling.data(), 0.01f, 0.001f, 100.f);
-      value.transform.scaling = eig::Vector3f(value.transform.scaling.x());
-    } else if (value.type == Emitter::Type::eRect) {
+      // Object mesh/uplifting selectors
+      push_resource_selector("Uplifting", e_scene.components.upliftings, value.uplifting_i);
+      push_resource_selector("Mesh",      e_scene.resources.meshes, value.mesh_i);
+      
+      ImGui::Separator();
+
+      // Object transforms
+      ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
       ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
-      ImGui::DragFloat2("Scaling", value.transform.scaling.data(), 0.01f, 0.001f, 100.f);
-    }
-    
-    ImGui::Separator();
+      ImGui::DragFloat3("Scaling",  value.transform.scaling.data(),  0.01f, 0.001f, 100.f);
 
-    // Target distribution
-    push_resource_selector("Illuminant", e_scene.resources.illuminants, value.illuminant_i);
-    ImGui::DragFloat("Power", &value.illuminant_scale, 0.1f, 0.0f, 100.f);
-  };
+      // Important catch; prevent scale from falling to 0, something somewhere breaks :D
+      value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
 
-  // Default implementation of editing visitor for Uplifting components
-  constexpr auto uplifting_visitor = [](SchedulerHandle &info, Component<Uplifting> &component) {
-    // Get external resources and shorthands
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    auto &value = component.value;
-    
-    // Uplifting value modifications
-    push_resource_selector("Basis functions", e_scene.resources.bases, value.basis_i);
-    push_resource_selector("Base color system", e_scene.components.colr_systems, value.csys_i);
+      ImGui::Separator();
+        
+      // Texture selectors
+      push_texture_variant_selector("Diffuse", e_scene.resources.images, value.diffuse);
+      // push_texture_variant_selector("Roughness", e_scene.resources.images, value.roughness);
+      // push_texture_variant_selector("Metallic", e_scene.resources.images, value.metallic);
+      // push_texture_variant_selector("Normals", e_scene.resources.images, value.normals);
+      // push_texture_variant_selector("Opacity", e_scene.resources.images, value.opacity);
+    };
 
-    // Per-constraint vertex
-    for (uint i = 0; i < value.verts.size(); ++i) {
-      // Get shorthands
-      auto &vert  = value.verts[i];
-      auto _scope = ImGui::ScopedID(std::format("{}_{}", typeid(Uplifting::Vertex).name(), i));
-      auto _name  = std::format("Constraint {} ({})", i, vert.constraint);
+    // Default implementation of editing visitor for Emitter components
+    template <>
+    void edit_visitor_default(SchedulerHandle &info, Component<Emitter> &component) {
+      // Get external resources and shorthands
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      auto &value = component.value;
       
-      // Add treenode section; postpone jumping into section
-      bool section_open = vert.has_surface() && ImGui::TreeNodeEx(_name.c_str());
-      
-      // Insert delete button, is_active button on same line
-      if constexpr (has_active_value<Uplifting::Vertex>) {
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
-        push_active_button<Uplifting::Vertex>(info, i);
-      }
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
-      if (ImGui::SmallButton("X")) {
-        value.verts.erase(value.verts.begin() + i);
-        break;
+      // Type selector
+      if (ImGui::BeginCombo("Type", std::format("{}", value.type).c_str())) {
+        for (uint i = 0; i < 4; ++i) {
+          auto type = static_cast<Emitter::Type>(i);
+          auto name = std::format("{}", type);
+          if (ImGui::Selectable(name.c_str(), value.type == type)) {
+            value.type = type;
+          }
+        } // for (uint i)
+        ImGui::EndCombo();
       }
 
-      // Continue if treenode is not open
-      guard_continue(section_open);
+      ImGui::Separator();
 
-      // Visitor handles the four different constraint types
-      std::visit(overloaded {
-        [&](DirectSurfaceConstraint &c) {
-          guard(c.is_valid());
-          
-          ImGui::InputFloat3("Surface position", c.surface.p.data());
-          ImGui::InputFloat3("Surface normal",   c.surface.n.data());
-          ImGui::ColorEdit3("Surface diffuse",   c.surface.diffuse.data(),
-                ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoOptions);
-        },
-        [](auto &) {
-          ImGui::Text("Not implemented");
+      // Object transforms
+      // Some parts are only available in part dependent on emitter type
+      ImGui::DragFloat3("Position", value.transform.position.data(), 0.01f, -100.f, 100.f);
+      if (value.type == Emitter::Type::eSphere) {
+        ImGui::DragFloat("Scaling", value.transform.scaling.data(), 0.01f, 0.001f, 100.f);
+        value.transform.scaling = eig::Vector3f(value.transform.scaling.x());
+      } else if (value.type == Emitter::Type::eRect) {
+        ImGui::DragFloat3("Rotation", value.transform.rotation.data(), 0.01f, -10.f, 10.f);
+        ImGui::DragFloat2("Scaling", value.transform.scaling.data(), 0.01f, 0.001f, 100.f);
+      }
+      
+      ImGui::Separator();
+
+      // Target distribution
+      push_resource_selector("Illuminant", e_scene.resources.illuminants, value.illuminant_i);
+      ImGui::DragFloat("Power", &value.illuminant_scale, 0.1f, 0.0f, 100.f);
+    };
+
+    // Default implementation of editing visitor for Uplifting components
+    template <>
+    void edit_visitor_default(SchedulerHandle &info, Component<Uplifting> &component) {
+      // Get external resources and shorthands
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      auto &value = component.value;
+      
+      // Uplifting value modifications
+      push_resource_selector("Basis functions", e_scene.resources.bases, value.basis_i);
+      push_resource_selector("Base color system", e_scene.components.colr_systems, value.csys_i);
+
+      // Per-constraint vertex
+      for (uint i = 0; i < value.verts.size(); ++i) {
+        // Get shorthands
+        auto &vert  = value.verts[i];
+        auto _scope = ImGui::ScopedID(std::format("{}_{}", typeid(Uplifting::Vertex).name(), i));
+        auto _name  = std::format("Constraint {} ({})", i, vert.constraint);
+        
+        // Add treenode section; postpone jumping into section
+        bool section_open = vert.has_surface() && ImGui::TreeNodeEx(_name.c_str());
+        
+        // Insert delete button, is_active button on same line
+        if constexpr (has_active_value<Uplifting::Vertex>) {
+          ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
+          if (ImGui::SmallButton(vert.is_active ? "V" : "H"))
+            vert.is_active = !vert.is_active;
         }
-      }, vert.constraint);
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
+        if (ImGui::SmallButton("X")) {
+          value.verts.erase(value.verts.begin() + i);
+          break;
+        }
+
+        // Continue if treenode is not open
+        guard_continue(section_open);
+
+        // Visitor handles the four different constraint types
+        std::visit(overloaded {
+          [&](DirectSurfaceConstraint &c) {
+            guard(c.is_valid());
+            
+            ImGui::InputFloat3("Surface position", c.surface.p.data());
+            ImGui::InputFloat3("Surface normal",   c.surface.n.data());
+            ImGui::ColorEdit3("Surface diffuse",   c.surface.diffuse.data(),
+                  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoOptions);
+          },
+          [](auto &) {
+            ImGui::Text("Not implemented");
+          }
+        }, vert.constraint);
+        
+        // Close treenode if the visitor got this far
+        ImGui::TreePop();
+      } // for (uint i)
+    };
+
+    // Default implementation of editing visitor for ColorSystem components
+    template <>
+    void edit_visitor_default(SchedulerHandle &info, Component<ColorSystem> &component) {
+      // Get external resources and shorthands
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      auto &value = component.value;
       
-      // Close treenode if the visitor got this far
-      ImGui::TreePop();
-    } // for (uint i)
-  };
+      push_resource_selector("CMFS", e_scene.resources.observers, value.observer_i);
+      push_resource_selector("Illuminant", e_scene.resources.illuminants, value.illuminant_i);
 
-  // Default implementation of editing visitor for ColorSystem components
-  constexpr auto colr_system_visitor = [](SchedulerHandle &info, Component<ColorSystem> &component) {
-    // Get external resources and shorthands
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    auto &value = component.value;
-    
-    push_resource_selector("CMFS", e_scene.resources.observers, value.observer_i);
-    push_resource_selector("Illuminant", e_scene.resources.illuminants, value.illuminant_i);
+      // Force update name to adhere to [CMFS][Illuminant] naming clarity
+      component.name = e_scene.get_csys_name(value);
+    };
+  } // namespace detail
 
-    // Force update name to adhere to [CMFS][Illuminant] naming clarity
-    component.name = e_scene.get_csys_name(value);
-  };
-
-  void push_object_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    push_component_edit<Object>(info, i, edit_info, object_visitor);
-  }
-
-  void push_objects_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
-    push_components_edit<Object>("Objects", info, edit_info, object_visitor);
-  }
-
-  void push_emitter_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    push_component_edit<Emitter>(info, i, edit_info, emitter_visitor);
-  }
-
-  void push_emitters_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
-    push_components_edit<Emitter>("Emitters", info, edit_info, emitter_visitor);
-  }
-
-  void push_uplifting_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    push_component_edit<Uplifting>(info, i, edit_info, uplifting_visitor);
-  }
-
-  void push_upliftings_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
-    push_components_edit<Uplifting>("Upliftings", info, edit_info, uplifting_visitor);
-  }
-
-  void push_colr_system_edit(SchedulerHandle &info, uint i, ImGuiEditInfo edit_info) {
-    edit_info.enable_name_editing = false;
-    push_component_edit<ColorSystem>(info, i, edit_info, colr_system_visitor);
-  }
-
-  void push_colr_systems_edit(SchedulerHandle &info, ImGuiEditInfo edit_info) {
-    edit_info.enable_name_editing = false;
-    push_components_edit<ColorSystem>("Color Systems", info, edit_info, colr_system_visitor);
-  }
-} // namespace met::detail
+  /* Explicit template instantiations */
+  template
+  void push_editor<detail::Component<Object>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<Object>>);
+  template
+  void push_editor<detail::Component<Emitter>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<Emitter>>);
+  template
+  void push_editor<detail::Component<Uplifting>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<Uplifting>>);
+  template
+  void push_editor<detail::Component<ColorSystem>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<ColorSystem>>);
+} // namespace met
