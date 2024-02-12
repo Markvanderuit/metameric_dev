@@ -47,12 +47,12 @@ namespace met {
     template <>
     void edit_visitor_default(SchedulerHandle &info, Component<Object> &component) {
       // Get external resources and shorthands
-      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &scene = info.global("scene").getr<Scene>();
       auto &value = component.value;
 
       // Object mesh/uplifting selectors
-      push_resource_selector("Uplifting", e_scene.components.upliftings, value.uplifting_i);
-      push_resource_selector("Mesh",      e_scene.resources.meshes, value.mesh_i);
+      push_resource_selector("Uplifting", scene.components.upliftings, value.uplifting_i);
+      push_resource_selector("Mesh",      scene.resources.meshes, value.mesh_i);
       
       ImGui::Separator();
 
@@ -67,18 +67,18 @@ namespace met {
       ImGui::Separator();
         
       // Texture selectors
-      push_texture_variant_selector("Diffuse", e_scene.resources.images, value.diffuse);
-      // push_texture_variant_selector("Roughness", e_scene.resources.images, value.roughness);
-      // push_texture_variant_selector("Metallic", e_scene.resources.images, value.metallic);
-      // push_texture_variant_selector("Normals", e_scene.resources.images, value.normals);
-      // push_texture_variant_selector("Opacity", e_scene.resources.images, value.opacity);
+      push_texture_variant_selector("Diffuse", scene.resources.images, value.diffuse);
+      // push_texture_variant_selector("Roughness", scene.resources.images, value.roughness);
+      // push_texture_variant_selector("Metallic", scene.resources.images, value.metallic);
+      // push_texture_variant_selector("Normals", scene.resources.images, value.normals);
+      // push_texture_variant_selector("Opacity", scene.resources.images, value.opacity);
     };
 
     // Default implementation of editing visitor for Emitter components
     template <>
     void edit_visitor_default(SchedulerHandle &info, Component<Emitter> &component) {
       // Get external resources and shorthands
-      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &scene = info.global("scene").getr<Scene>();
       auto &value = component.value;
       
       // Type selector
@@ -109,7 +109,7 @@ namespace met {
       ImGui::Separator();
 
       // Target distribution
-      push_resource_selector("Illuminant", e_scene.resources.illuminants, value.illuminant_i);
+      push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
       ImGui::DragFloat("Power", &value.illuminant_scale, 0.1f, 0.0f, 100.f);
     };
 
@@ -117,12 +117,12 @@ namespace met {
     template <>
     void edit_visitor_default(SchedulerHandle &info, Component<Uplifting> &component) {
       // Get external resources and shorthands
-      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &scene = info.global("scene").getr<Scene>();
       auto &value = component.value;
       
       // Uplifting value modifications
-      push_resource_selector("Basis functions", e_scene.resources.bases, value.basis_i);
-      push_resource_selector("Base color system", e_scene.components.colr_systems, value.csys_i);
+      push_resource_selector("Basis functions", scene.resources.bases, value.basis_i);
+      push_resource_selector("Base color system", scene.components.colr_systems, value.csys_i);
 
       // Per-constraint vertex
       for (uint i = 0; i < value.verts.size(); ++i) {
@@ -163,25 +163,57 @@ namespace met {
             ImGui::Text("Not implemented");
           }
         }, vert.constraint);
-        
+
         // Close treenode if the visitor got this far
         ImGui::TreePop();
       } // for (uint i)
+
+      // Visual separator between vertex constraints and add button
+      if (!value.verts.empty())
+          ImGui::Separator();
+
+      // Handle additions to vertex constraints
+      ImGui::NewLine();
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 84.f);
+      if (ImGui::SmallButton("Add constraint"))
+        ImGui::OpenPopup("popup_add_uplifting_vertex");
+      int selected_type = -1;
+      if (ImGui::BeginPopup("popup_add_uplifting_vertex")) {
+        if (ImGui::Selectable("Direct"))
+          value.verts.push_back({ .constraint = DirectColorConstraint { .colr_i = 0.5  }});
+        if (ImGui::Selectable("Measurement"))
+          value.verts.push_back({ .constraint = MeasurementConstraint { .measurement = 0.5  }});
+        if (ImGui::Selectable("Direct surface"))
+          value.verts.push_back({ .constraint = DirectSurfaceConstraint()});
+        ImGui::EndPopup();
+      } // if (BeginPopup())
     };
 
     // Default implementation of editing visitor for ColorSystem components
     template <>
     void edit_visitor_default(SchedulerHandle &info, Component<ColorSystem> &component) {
       // Get external resources and shorthands
-      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &scene = info.global("scene").getr<Scene>();
       auto &value = component.value;
       
-      push_resource_selector("CMFS", e_scene.resources.observers, value.observer_i);
-      push_resource_selector("Illuminant", e_scene.resources.illuminants, value.illuminant_i);
+      push_resource_selector("CMFS", scene.resources.observers, value.observer_i);
+      push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
 
       // Force update name to adhere to [CMFS][Illuminant] naming clarity
-      component.name = e_scene.get_csys_name(value);
+      component.name = scene.get_csys_name(value);
     };
+
+    // Default implementation of editing visitor for Mesh resources
+    template <>
+    void edit_visitor_default(SchedulerHandle &info, const Resource<Mesh> &resource) {
+      // Get external resources and shorthands
+      const auto &scene = info.global("scene").getr<Scene>();
+      const auto &value = resource.value();
+      
+      ImGui::LabelText("Vertices", "%d", value.verts.size());
+      ImGui::LabelText("Elements", "%d", value.elems.size());
+    };
+
   } // namespace detail
 
   /* Explicit template instantiations */
@@ -193,4 +225,6 @@ namespace met {
   void push_editor<detail::Component<Uplifting>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<Uplifting>>);
   template
   void push_editor<detail::Component<ColorSystem>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<ColorSystem>>);
+  template
+  void push_editor<detail::Resource<Mesh>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Resource<Mesh>>);
 } // namespace met

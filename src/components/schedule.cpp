@@ -202,16 +202,27 @@ namespace met {
 
     // View tasks handle UI components
     scheduler.task("scene_components_editor").init<LambdaTask>([](auto &info) {
-      met_trace_full();
+      met_trace();
       if (ImGui::Begin("Scene components")) {
-        push_editor<detail::Component<Object>>(info);
-        push_editor<detail::Component<Emitter>>(info);
-        push_editor<detail::Component<Uplifting>>(info);
-        push_editor<detail::Component<ColorSystem>>(info, { .edit_name = false });
+        push_editor<detail::Component<Object>>(info,      { .editor_name = "Objects" });
+        push_editor<detail::Component<Emitter>>(info,     { .editor_name = "Emitters" });
+        push_editor<detail::Component<Uplifting>>(info,   { .editor_name = "Uplifting models" });
+        push_editor<detail::Component<ColorSystem>>(info, { .editor_name = "Color systems", .edit_name = false });
       }
       ImGui::End();
     });
-    scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
+    scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
+      met_trace();
+      if (ImGui::Begin("Scene resources")) {
+        push_editor<detail::Resource<Mesh>>(info, { .editor_name = "Meshes",
+                                                    .show_add    = false,
+                                                    .show_del    = false });
+      }
+      ImGui::End();
+    });
+
+    // scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
+
     scheduler.task("mesh_viewport").init<LambdaTask>([](auto &info) {
       met_trace();
       info.child_task("viewport_begin").init<detail::ViewportBeginTask>();

@@ -354,8 +354,10 @@ namespace met {
       constexpr       auto & data()       { return m_data; }
 
       // Bookkeeping; expose miscellaneous std::vector member functions
+      constexpr void insert(size_t i, const resrc_type& v) 
+                                      { m_data.insert(m_data.begin() + i, v); }
       constexpr void resize(size_t i) { m_data.resize(i);      }
-      constexpr void erase(uint i)    { m_data.erase(i);       }
+      constexpr void erase(size_t i)  { m_data.erase(m_data.begin() + i); }
       constexpr void clear()          { m_data.clear();        }
       constexpr auto empty()    const { return m_data.empty(); }
       constexpr auto size()     const { return m_data.size();  }
