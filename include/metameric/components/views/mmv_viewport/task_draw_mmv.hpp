@@ -10,4 +10,4 @@ namespace met {
     void eval(SchedulerHandle &info) override;
     bool is_active(SchedulerHandle &info) override;
   };
-} // namespace meto
+} // namespace met
