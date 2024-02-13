@@ -116,8 +116,7 @@ namespace met {
      Mostly a tesselation of a color space, with constraints on the tesselation's
      vertices describing spectral behavior. Kept separate from Scene object,
      given its centrality to the codebase. */
-  class Uplifting {
-  public:
+  struct Uplifting {
     using state_type = detail::UpliftingState;
   
     // Wrapper around vertex constraint data
@@ -149,11 +148,12 @@ namespace met {
       return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
     }
   };
+  static_assert(has_active_value<Uplifting::Vertex>);
 } // namespace met
 
 // Custom std::format overloads for some types
 namespace std {
-  // Format Emitter::Type
+  // Format Emitter::Type, wich is an enum class
   template <>
   struct std::formatter<met::Emitter::Type> : std::formatter<string_view> {
     auto format(const met::Emitter::Type& ty, std::format_context& ctx) const {
@@ -168,7 +168,7 @@ namespace std {
     }
   };
 
-  // Format Uplifting::Vertex::cstr_type
+  // Format Uplifting::Vertex::cstr_type, which is a std::variant
   template <>
   struct std::formatter<met::Uplifting::Vertex::cnstr_type> : std::formatter<string_view> {
     auto format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {

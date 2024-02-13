@@ -94,10 +94,27 @@ float sdot(in vec2  v) { return dot(v, v); }
 float sdot(in vec3  v) { return dot(v, v); }
 float sdot(in vec4  v) { return dot(v, v); }
 
-// iszero(...) for short, fast zero check
+// is_all_equal(...) for short, fast, component equality check
 
-#define IS_ZERO(type, n)                      \
-  bvec##n iszero(in type##vec##n v) {   \
+#define IS_ALL_EQUAL(type, n)                \
+  bool is_all_equal(in type##vec##n v) {     \
+    return all(equal(v, type##vec##n(v.x))); \
+  }
+
+#define IS_ALL_EQUAL_ALL_N(type) \
+  IS_ALL_EQUAL(type, 2)          \
+  IS_ALL_EQUAL(type, 3)          \
+  IS_ALL_EQUAL(type, 4)
+  
+IS_ALL_EQUAL_ALL_N( )
+IS_ALL_EQUAL_ALL_N(d)
+IS_ALL_EQUAL_ALL_N(i)
+IS_ALL_EQUAL_ALL_N(u)
+
+// is_zero(...) for short, fast zero check
+
+#define IS_ZERO(type, n)               \
+  bvec##n is_zero(in type##vec##n v) { \
     return equal(v, type##vec##n(0));  \
   }
 

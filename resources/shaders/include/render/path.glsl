@@ -138,7 +138,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
             / bs.pdf;           // sample density
       
       // Early exit on zero throughput
-      if (all(iszero(beta)))
+      if (all(is_zero(beta)))
         break;
 
       // Store previous BRDF information for MIS

@@ -221,7 +221,15 @@ namespace met {
       ImGui::End();
     });
 
-    // scheduler.task("scene_resources_editor").init<SceneResourcesEditorTask>();
+    // scheduler.task("gnome_rotator").init<LambdaTask>([](auto &info) {
+    //   met_trace();
+    //   try {
+    //     auto &e_scene = info.global("scene").getw<Scene>();
+    //     auto &e_gnome = e_scene.components.objects("Gnome").value;
+
+    //     e_gnome.transform.rotation.y() += 0.1f;
+    //   } catch (const std::exception &e) { /* Ignore; gnome not loaded yet */ }
+    // });
 
     scheduler.task("mesh_viewport").init<LambdaTask>([](auto &info) {
       met_trace();

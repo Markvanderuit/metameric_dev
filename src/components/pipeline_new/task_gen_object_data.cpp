@@ -21,7 +21,9 @@ namespace met {
     
     // Force on first run, then make dependent on uplifting/object/texture settings. Yikes
     return is_first_eval()               ||
-           e_object.state                ||  
+           e_object.state.diffuse        ||  
+           e_object.state.mesh_i         ||  
+           e_object.state.uplifting_i    || // Note; we ignore object transforms
            e_uplifting.state             ||
            e_scene.resources.meshes      || 
            e_scene.resources.images      ||

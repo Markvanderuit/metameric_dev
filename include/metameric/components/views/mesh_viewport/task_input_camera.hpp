@@ -13,7 +13,7 @@
 namespace met {
   class MeshViewportCameraInputTask : public detail::TaskNode {
     PixelSensor m_query_sensor;
-    uint        m_query_spp = 1;
+    uint        m_query_spp = 0;
 
   public:
     void init(SchedulerHandle &info) override {
@@ -188,7 +188,7 @@ namespace met {
 
       // TODO remove
       if (ImGui::Begin("Blahhh")) {
-        uint min_v = 1, max_v = 65536;
+        uint min_v = 0, max_v = 65536;
         ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();
@@ -215,9 +215,8 @@ namespace met {
           << eig::Array2f(io.MouseDelta.x, io.MouseDelta.y) / viewport_size.array(), 0).finished());
       }
 
-      // if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+      if (m_query_spp > 0)
         eval_path_query(info);
-      // }
     }
   };
 } // namespace met
