@@ -60,7 +60,7 @@ namespace met {
 
   bool GenMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return true;
+    return info.relative("viewport_begin")("is_active").getr<bool>();
   }
 
   void GenMMVTask::init(SchedulerHandle &info) {
