@@ -80,29 +80,20 @@ namespace met {
 
   void GenMMVTask::eval(SchedulerHandle &info) {
     met_trace();
-    
+
+    // Get shared resources
+    const auto &e_scene     = info.global("scene").getr<Scene>();
+    const auto &e_is        = info.parent()("selection").getr<InputSelection>();
+    const auto &e_uplifting = e_scene.components.upliftings[e_is.uplifting_i].value;
+    const auto &e_vert      = e_uplifting.verts[e_is.constraint_i];
+
     // TODO move to is_active
-    // TODO reset on constraint change
+    // TODO reset on some vertex constraint state change
     if (m_iter >= mmv_samples_max)
       return;
 
-    // Get handles, shared resources, modified resources
-    // Get uplifting object, and carefully determine if the task should
-    // still be alive if an uplifting/constraint goes missing
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    if (e_scene.components.upliftings.size() <= m_is.uplifting_i) {
-      info.task().dstr();
-      return;
-    }
-    const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i].value;
-    if (e_uplifting.verts.size() <= m_is.constraint_i) {
-      info.task().dstr();
-      return;
-    }
-    const auto &e_vertex = e_uplifting.verts[m_is.constraint_i];
-
     // Visit underlying constraint types one by one
-    bool should_destroy = false;
+    bool should_clear = false;
     std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
         // Generate 6D unit vector samples
@@ -128,9 +119,9 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const DirectSurfaceConstraint &cstr) {
-        // Bad surface; flag for destruction
+        // Bad surface; flag for clearing out
         if (!cstr.is_valid()) {
-          should_destroy = true;
+          should_clear = true;
           return;
         }
 
@@ -157,29 +148,30 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        // Bad surface; flag for destruction
+        // Bad surface; flag for clearing out
         if (!cstr.is_valid()) {
-          should_destroy = true;
+          should_clear = true;
           return;
         }
 
         // ...
       },
       [&](const auto &) { 
-        // Incompatible constraint type; flag for destruction
-        should_destroy = true;
+        // Incompatible constraint type; flag for clearing out for now
+        should_clear = true;
       }
-    }, e_vertex.constraint);
+    }, e_vert.constraint);
 
-    // Self-destroy task, if indicated to do so
-    if (should_destroy) {
-      info.task().dstr();
+    // Clear task output if incidated;
+    // after this point, if the task survived, we generate a convex hull from a
+    // viable point set
+    if (should_clear) {
+      info("chull_array").getw<gl::Array>() = {}; // Set output array to uninitialized for now
+      m_points.clear();
+      m_iter = 0;
       return;
     }
 
-    // At this point, if the task survived, we generate a convex hull from the
-    // active point set
-    
     // Determine extents of generated point sets
     auto maxb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.max(b).eval(); }).value();
     auto minb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.min(b).eval(); }).value();

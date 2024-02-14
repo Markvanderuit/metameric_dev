@@ -198,11 +198,10 @@ namespace met {
 
     // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
-    info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(
-      info.child("viewport_begin")("lrgb_target"));
-    // 1. Make it so this task is openeable, closable, etc.
-    // 2. Add generate task
-    // 3. Add render task, draw to active framebuffer
+    info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_begin")("lrgb_target"));
+    // 1. Add generate task
+    // 2. Add render task, draw to active framebuffer
+    // 3. Add input
     info.child_task("viewport_end").init<MMVEditorEndTask>();
   }
 
