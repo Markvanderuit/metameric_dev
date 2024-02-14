@@ -61,20 +61,20 @@ namespace met {
     // while the enclosing method takes care of state editing and undo/redo saving and stuff.
     template <typename Ty> requires (is_scene_data<Ty>)
     using ImGuiEditVisitor = std::conditional_t<is_component<Ty>,
-                                                std::function<void (SchedulerHandle &,       Ty &)>,
-                                                std::function<void (SchedulerHandle &, const Ty &)>>;
+                                                std::function<void (SchedulerHandle &, uint,       Ty &)>,
+                                                std::function<void (SchedulerHandle &, uint, const Ty &)>>;
 
     // Default instantiations for ImGuiEditVisitor that encapsulate components/resources;
     // see component_edit.cpp for implementations
     template <typename Ty> requires(is_component<Ty>)
-    void edit_visitor_default(SchedulerHandle &, Ty &);
+    void edit_visitor_default(SchedulerHandle &, uint i, Ty &);
     template <typename Ty> requires (is_resource<Ty>)
-    void edit_visitor_default(SchedulerHandle &, const Ty &);
-    template <> void edit_visitor_default(SchedulerHandle &, Component<Object> &);
-    template <> void edit_visitor_default(SchedulerHandle &, Component<Emitter> &);
-    template <> void edit_visitor_default(SchedulerHandle &, Component<Uplifting> &);
-    template <> void edit_visitor_default(SchedulerHandle &, Component<ColorSystem> &);
-    template <> void edit_visitor_default(SchedulerHandle &, const Resource<Mesh> &);
+    void edit_visitor_default(SchedulerHandle &, uint i, const Ty &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Object> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Emitter> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Uplifting> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ColorSystem> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Mesh> &);
 
     // Helper method; encapsulate a scene component whose data can be edited by a visitor closure, 
     // s.t. this surrounding method handles scene save state updating
@@ -94,7 +94,7 @@ namespace met {
         // We copy the component's value for modification; visitor
         //  potentially modifies value; we return if no modifications were made
         auto copy  = data;
-        visitor(info, copy);
+        visitor(info, data_i, copy);
         guard(copy != data);
         
         // Submit scene edit s.t. redo/undo modifications are recorded
@@ -107,7 +107,7 @@ namespace met {
         });
       } else {
         // If component/resource is not comparable, visitor simply views data
-        visitor(info, data);
+        visitor(info, data_i, data);
       }
     }
 
@@ -166,7 +166,7 @@ namespace met {
     if constexpr (has_active_value<typename Ty::value_type>) {
       if (edit_info.inside_tree && edit_info.edit_data) {
         ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
-        encapsulate_scene_data<Ty>(info, data_i, [](auto &info, auto &data) {
+        encapsulate_scene_data<Ty>(info, data_i, [](auto &info, uint i, auto &data) {
           if (ImGui::SmallButton(data.value.is_active ? "V" : "H"))
             data.value.is_active = !data.value.is_active;
         });
@@ -177,6 +177,7 @@ namespace met {
     if (edit_info.inside_tree && edit_info.show_del) {
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.f);
       if (ImGui::SmallButton("X")) {
+        if (section_open && edit_info.inside_tree) ImGui::TreePop();
         info.global("scene").getw<Scene>().touch({
           .name = "Delete component",
           .redo = [data_i] (auto &scene)                                { 

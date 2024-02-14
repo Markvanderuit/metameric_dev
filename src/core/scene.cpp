@@ -70,15 +70,16 @@ namespace met {
 
   void to_json(json &js, const Uplifting::Vertex &vert) {
     met_trace();
-    js = {{ "is_active", vert.is_active          },
+    js = {{ "name",      vert.name               },
+          { "is_active", vert.is_active          },
           { "index",     vert.constraint.index() }, 
           { "variant",   vert.constraint         }};
   }
 
   void from_json(const json &js, Uplifting::Vertex &vert) {
     met_trace();
+    js.at("name").get_to(vert.name);
     js.at("is_active").get_to(vert.is_active);
-    
     switch (js.at("index").get<size_t>()) {
       case 0: vert.constraint = js.at("variant").get<DirectColorConstraint>(); break;
       case 1: vert.constraint = js.at("variant").get<MeasurementConstraint>(); break;

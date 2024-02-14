@@ -6,8 +6,8 @@ namespace met {
   // Implementation base for resource handles, returned by scheduler/handle::task(...)/child_task(...)
   class TaskHandle {
     detail::TaskInfo       m_task_key;
-    detail::SchedulerBase *m_schd_handle;
-    detail::TaskNode      *m_task_handle; // nullable
+    detail::SchedulerBase *m_schd_handle = nullptr;
+    detail::TaskNode      *m_task_handle = nullptr;
 
   public:
     TaskHandle(detail::SchedulerBase *schd_handle, detail::TaskInfo key);
@@ -64,8 +64,8 @@ namespace met {
   // Implementation base for resource handles, returned by scheduler/handle::resource(...)
   class ResourceHandle {
     detail::RsrcInfo       m_rsrc_key;
-    detail::SchedulerBase *m_schd_handle;
-    detail::RsrcNode      *m_rsrc_handle; // nullable
+    detail::SchedulerBase *m_schd_handle = nullptr;
+    detail::RsrcNode      *m_rsrc_handle = nullptr;
 
   public:
     ResourceHandle() = default;
@@ -79,6 +79,11 @@ namespace met {
     const std::string & task_key() const { return m_rsrc_key.task_key; }
     const std::string & rsrc_key() const { return m_rsrc_key.rsrc_key; }
     
+    // Reinitialize w.r.t. active scheduler
+    void reinitialize(SchedulerHandle &info) {
+      *this = ResourceHandle(&info, m_rsrc_key);
+    }
+
   public: /* Accessors */
     template <typename Ty> 
     const Ty & getr() const { 

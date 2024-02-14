@@ -123,6 +123,9 @@ namespace met {
     struct Vertex {
       using cnstr_type = std::variant<DirectColorConstraint,  MeasurementConstraint,
                                       DirectSurfaceConstraint, IndirectSurfaceConstraint>;
+      // Associated name
+      std::string name;
+      
       // Whether the constraint is used in the scene
       bool is_active = true;
 
@@ -138,6 +141,9 @@ namespace met {
       bool has_surface() const;
       const SurfaceInfo &surface() const;
             SurfaceInfo &surface();
+      
+      // Test if the constraint allows editing using mismatch volumes
+      bool has_mismatching() const;
     };
 
     uint                csys_i  = 0; // Index of primary color system

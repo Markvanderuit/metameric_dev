@@ -132,29 +132,37 @@ namespace met {
         return std::pair { is, e_scene.components.upliftings[is.uplifting_i].value.verts[is.constraint_i] };
       });
 
-      // On mouse click, and non-use of the gizmo, find the nearest constraint
-      // to the mouse in screen-space and assign it as the new active selection
-      if (io.MouseClicked[0] && (!ImGuizmo::IsOver() || !is_selection.is_valid())) {
-        InputSelection is_nearest = InputSelection::invalid();
+      // Determine nearest constraint to the mouse in screen-space
+      InputSelection is_nearest = InputSelection::invalid();
+      for (const auto &[is, vert] : viable_verts) {
+        // Extract surface information from surface constraint
+        auto si = std::visit(overloaded {
+          [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
+          [](const auto &cstr) { return SurfaceInfo::invalid(); }
+        }, vert.constraint);
 
-        for (const auto &[is, vert] : viable_verts) {
-          // Extract surface information from surface constraint
-          auto si = std::visit(overloaded {
-            [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
-            [](const auto &cstr) { return SurfaceInfo::invalid(); }
-          }, vert.constraint);
-
-          // Get screen-space position; test distance and continue if we are too far away
-          eig::Vector2f p_screen 
-            = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
-          guard_continue((p_screen - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance);
-          
-          // The first surviving constraint is a mouseover candidate
-          is_nearest = is;
-          break;
-        }
+        // Get screen-space position; test distance and continue if we are too far away
+        eig::Vector2f p_screen 
+          = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
+        guard_continue((p_screen - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance);
         
-        // Update is_selection
+        // The first surviving constraint is a mouseover candidate
+        is_nearest = is;
+        break;
+      }
+
+      // If a nearest selection is found, show tooltip with the vertex' constraint name
+      if (is_nearest.is_valid()) {
+        const auto &e_vert = info.global("scene").getr<Scene>()
+          .get_uplifting_vertex(is_nearest.uplifting_i, is_nearest.constraint_i);
+        ImGui::BeginTooltip();
+        ImGui::Text(e_vert.name.c_str());
+        ImGui::EndTooltip();
+      }
+
+      // On mouse click, and non-use of the gizmo, assign the nearest constraint
+      // as the active selection
+      if (io.MouseClicked[0] && (!ImGuizmo::IsOver() || !is_selection.is_valid())) {
         info("selection").getw<InputSelection>() = is_nearest;
       }
       

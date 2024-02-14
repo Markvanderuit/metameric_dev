@@ -13,6 +13,15 @@ namespace met {
     }, constraint);
   }
 
+  bool Uplifting::Vertex::has_mismatching() const {
+    return std::visit(overloaded {
+      [](const DirectColorConstraint &c) { return true; },
+      [](const DirectSurfaceConstraint &c) { return true; },
+      [](const IndirectSurfaceConstraint &c) { return true; },
+      [&](const auto &) { return false; }
+    }, constraint);
+  }
+
   SurfaceInfo &Uplifting::Vertex::surface() {
     return std::visit(overloaded {
       [](SurfaceConstraint auto &c) -> SurfaceInfo & { return c.surface; },

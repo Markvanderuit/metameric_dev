@@ -73,13 +73,13 @@ namespace met {
       
       auto dl = ImGui::GetWindowDrawList();
 
+      // Get srgb vertex color;
+      auto vertex_color_si 
+        = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(si.diffuse), 1.f).finished());
+
       // Vertex color is obtained from surface diffuse color
-      auto vertex_color_border = si.is_valid()
-                               ? vertex_color_valid
-                               : vertex_color_invalid;
-      auto vertex_color_center = si.is_valid() 
-                               ? ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << si.diffuse, 1.f).finished())
-                               : vertex_color_white;
+      auto vertex_color_border = si.is_valid() ? vertex_color_valid : vertex_color_invalid;
+      auto vertex_color_center = si.is_valid() ? vertex_color_si    : vertex_color_white;
 
       // Draw vertex with special coloring dependent on constraint state
       // and a small line along the geometric normal with a dot on the end
@@ -101,7 +101,7 @@ namespace met {
     const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
     const auto &e_sensor = info.relative("viewport_render")("sensor").getr<Sensor>();
     const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
-    const auto &e_query  = info.relative("viewport_input_camera")("path_query").getr<FullPathQueryPrimitive>();
+    const auto &e_query  = info.relative("viewport_input_query")("path_query").getr<FullPathQueryPrimitive>();
     auto &i_target       = info("target").getw<gl::Texture2d4f>();
 
     guard(!e_query.data().empty());

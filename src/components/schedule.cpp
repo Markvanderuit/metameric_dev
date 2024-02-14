@@ -27,7 +27,7 @@
 #include <metameric/components/dev/task_gen_random_mappings.hpp>
 #include <metameric/components/dev/task_random_mapping_viewer.hpp>
 #include <metameric/components/views/task_scene_resources_editor.hpp>
-#include <metameric/components/views/mesh_viewport/task_input_camera.hpp>
+#include <metameric/components/views/mesh_viewport/task_input_query.hpp>
 #include <metameric/components/views/mesh_viewport/task_input_editor.hpp>
 #include <metameric/components/views/mesh_viewport/task_render.hpp>
 #include <metameric/components/views/mesh_viewport/task_draw_overlay.hpp>
@@ -35,6 +35,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
+#include <metameric/components/views/detail/task_arcball_input.hpp>
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {
@@ -231,10 +232,12 @@ namespace met {
     //   } catch (const std::exception &e) { /* Ignore; gnome not loaded yet */ }
     // });
 
-    scheduler.task("mesh_viewport").init<LambdaTask>([](auto &info) {
+    scheduler.task("mesh_viewport").init<LambdaTask>([](SchedulerHandle &info) {
       met_trace();
       info.child_task("viewport_begin").init<detail::ViewportBeginTask>();
-      info.child_task("viewport_input_camera").init<MeshViewportCameraInputTask>();
+      info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(
+        info.child("viewport_begin")("lrgb_target"));
+      info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
       info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
       info.child_task("viewport_render").init<MeshViewportRenderTask>();
       info.child_task("viewport_draw_overlay").init<MeshViewportDrawOverlayTask>();

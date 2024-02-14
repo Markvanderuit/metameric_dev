@@ -1,6 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/task_arcball_input.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/framebuffer.hpp>
@@ -39,21 +40,34 @@ namespace met {
       const auto &i_lrgb_target = info("lrgb_target").getr<gl::Texture2d4f>();
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       auto &i_frame_buffer      = info("frame_buffer").getw<gl::Framebuffer>();
+      auto &e_selection         = info.parent()("selection").getr<InputSelection>();
 
-      // Declare scoped ImGui style state
-      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      // Define window name
+      auto name = std::format("Mismatching editor (uplifting {}, vertex {})",
+        e_selection.uplifting_i, e_selection.constraint_i);  
       
+      // Ensure sensible window size on first open
+      ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);
+
       // Open main viewport window, and forward window activity to "is_active" flag
-      // Note: window end is post-pended in ViewportEndTask
-      bool is_active = ImGui::Begin("Mesh Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
+      // Note: window end is post-pended in ViewportEndTask so subtasks can do stuff with imgui state
+      // Note: we track close button as an edge case
+      bool is_open = true;
+      bool is_active = ImGui::Begin(name.c_str(), &is_open);
       info("is_active").getw<bool>() = is_active;
 
+      // Close button pressed; ensure related tasks get torn down gracefully
+      if (!is_open) {
+        ImGui::End();
+        info("is_active").getw<bool>() = false;
+        info.parent_task().dstr();
+        return;
+      }
 
-      // Compute viewport size minus ImGui's tab bars etc
+      // Compute viewport size s.t. texture is square
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+      viewport_size.y() = viewport_size.x();
       if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).any()) {
         // (Re-)create viewport texture if the viewport weas resized
         info("lrgb_target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
@@ -69,10 +83,14 @@ namespace met {
 
       // Halt on window inactivity
       guard(is_active);
+
+      // TODO remove
+      eig::Array4f colr_value = { 1, 0, 1, 1 };
       
       // Prepare framebuffer target for next subtasks
       i_frame_buffer.bind();
       i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
+      i_frame_buffer.clear(gl::FramebufferType::eColor, colr_value);
       i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
 
       // Specify viewport for next subtasks
@@ -175,9 +193,14 @@ namespace met {
   void MMVEditorTask::init(SchedulerHandle &info) {
     met_trace();
     
+    // Make selection available
+    m_is = info("selection").set(std::move(m_is)).getr<InputSelection>();
+
+    // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
-    // 0. Make it so this task is openeable, closable, etc.
-    // 1. Extract arcball camera and make it a reusable task
+    info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(
+      info.child("viewport_begin")("lrgb_target"));
+    // 1. Make it so this task is openeable, closable, etc.
     // 2. Add generate task
     // 3. Add render task, draw to active framebuffer
     info.child_task("viewport_end").init<MMVEditorEndTask>();
@@ -186,16 +209,23 @@ namespace met {
   void MMVEditorTask::eval(SchedulerHandle &info) {
     met_trace();
     
-    // Get handles, shared resources, modified resources
-    // Get uplifting object, and carefully determine if the task should
-    // still be alive if an uplifting/constraint goes missing
+    // Ensure the selected uplifting exists
     const auto &e_scene = info.global("scene").getr<Scene>();
     if (e_scene.components.upliftings.size() <= m_is.uplifting_i) {
       info.task().dstr();
       return;
     }
+
+    // Ensure the selected constraint vertex exists
     const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i].value;
     if (e_uplifting.verts.size() <= m_is.constraint_i) {
+      info.task().dstr();
+      return;
+    }
+
+    // Ensure the selected constraint vertex even allows metameric mismatching
+    const auto &e_vert = e_uplifting.verts[m_is.constraint_i];
+    if (!e_vert.has_mismatching()) {
       info.task().dstr();
       return;
     }
