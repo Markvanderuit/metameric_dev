@@ -15,8 +15,8 @@ namespace met {
 
   bool Uplifting::Vertex::has_mismatching() const {
     return std::visit(overloaded {
-      [](const DirectColorConstraint &c) { return true; },
-      [](const DirectSurfaceConstraint &c) { return true; },
+      [](const DirectColorConstraint &c) {  return !c.csys_j.empty(); },
+      [](const DirectSurfaceConstraint &c) {  return !c.csys_j.empty(); },
       [](const IndirectSurfaceConstraint &c) { return true; },
       [&](const auto &) { return false; }
     }, constraint);

@@ -36,10 +36,26 @@ vec3 Li_debug(in Ray ray) {
   if (!scene_intersect(ray))
     return vec3(0);
 
-  // If no surface object is visible, terminate current path
   SurfaceInfo si = get_surface_info(ray);
   if (!is_valid(si) || !is_object(si))
     return vec3(0);
+  
+  // If no surface object is visible, terminate current path
+#ifdef SCENE_DATA_REFLECTANCE
+  // Load relevant info objects
+  ObjectInfo      object_info       = scene_object_info(record_get_object(si.data));
+  BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(record_get_object(si.data));
+
+  // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
+  // also handle single-color objects by sampling the center of their patch
+  vec2 tx_si = object_info.is_albedo_sampled ? si.tx : vec2(0.5f);
+  vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
+
+  // Gather barycentric indices; assume all-equal for now
+  uint indx = uint(scene_barycentric_data_gather_w(tx_uv).x);
+
+  return vec3(float(indx) / 512.f);
+#else
 
   // On a valid surface, return debug data
   ObjectInfo object_info = scene_object_info(record_get_object(si.data));
@@ -49,6 +65,7 @@ vec3 Li_debug(in Ray ray) {
   float a = float(prim_i) / float(mesh_info.prims_size);
 
   return vec3(a);
+#endif
 }
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {

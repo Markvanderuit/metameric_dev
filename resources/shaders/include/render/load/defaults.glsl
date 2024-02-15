@@ -31,9 +31,6 @@ uint scene_object_count()            { return 0;               }
 #endif // !SCENE_DATA_OBJECT
 
 #ifndef SCENE_DATA_REFLECTANCE
-// vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {                                       \
-//   return vec4(1);
-// }
 #endif // !SCENE_DATA_REFLECTANCE
 
 #ifndef SCENE_DATA_CMFS

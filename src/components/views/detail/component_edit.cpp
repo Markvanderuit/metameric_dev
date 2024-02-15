@@ -129,7 +129,149 @@ namespace met {
       push_resource_selector("Basis functions", scene.resources.bases, value.basis_i);
       push_resource_selector("Base color system", scene.components.colr_systems, value.csys_i);
 
-      // Per-constraint vertex
+      // Visual separator into constraint list
+      ImGui::Separator();
+
+      // Button and accompanying popup to add new constraint vertices
+      if (ImGui::Button("New constraint")) {
+        ImGui::OpenPopup("popup_add_uplifting_vertex");
+      }
+      if (ImGui::BeginPopup("popup_add_uplifting_vertex")) {
+        if (ImGui::Selectable("Direct"))
+          value.verts.push_back({ 
+            .name       = "New direct constraint",
+            .constraint = DirectColorConstraint { .colr_i = 0.5  }
+          });
+        if (ImGui::Selectable("Measurement"))
+          value.verts.push_back({ 
+            .name       = "New measurement constraint",
+            .constraint = MeasurementConstraint { .measurement = 0.5  }
+          });
+        if (ImGui::Selectable("Direct surface"))
+          value.verts.push_back({ 
+            .name       = "New direct surface constraint",
+            .constraint = DirectSurfaceConstraint()
+          });
+        ImGui::EndPopup();
+      } // if (BeginPopup())
+
+      // Button to clear existing constraints
+      ImGui::SameLine();
+      if (ImGui::Button("Clear constraints")) {
+        value.verts.clear();
+      }
+
+      /* // Jump left to avoid treenode indentation
+      ImGui::Unindent(ImGui::GetTreeNodeToLabelSpacing()); */
+      
+      // Vertex constraint type
+      ImGui::BeginGroup();
+      {
+        ImGui::AlignTextToFramePadding();
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
+        ImGui::Text("Name");
+        for (uint j = 0; j < value.verts.size(); ++j) {
+          // Get shorthands
+          auto _scope = ImGui::ScopedID(std::format("constraint_{}_{}", typeid(Uplifting::Vertex).name(), j));
+          auto &vert  = value.verts[j];
+          
+          // Show name editor
+          auto copy = vert.name; 
+          ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
+          if (ImGui::InputText("##constraint_name", &copy, str_edit_flags)) {
+            vert.name = copy;
+          }
+        } // for (uint j)
+      }
+      ImGui::EndGroup();
+      ImGui::SameLine();
+
+      // Vertex constraint type
+      ImGui::BeginGroup();
+      {
+        ImGui::AlignTextToFramePadding();
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
+        ImGui::Text("Constraint");
+        for (uint j = 0; j < value.verts.size(); ++j) {
+          // Get shorthands
+          auto _scope = ImGui::ScopedID(std::format("constraint_{}_{}", typeid(Uplifting::Vertex).name(), j));
+          auto &vert  = value.verts[j];
+
+          ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
+          if (ImGui::BeginCombo("##constraint_type", "Direct")) {
+            ImGui::EndCombo();
+          }
+        } // for (uint j)
+      }
+      ImGui::EndGroup();
+      ImGui::SameLine();
+
+      // Vertex base color
+      ImGui::BeginGroup();
+      {
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Result");
+        for (uint j = 0; j < value.verts.size(); ++j) {
+          // Get shorthands
+          auto _scope = ImGui::ScopedID(std::format("basecolor_{}_{}", typeid(Uplifting::Vertex).name(), j));
+          auto &vert  = value.verts[j];
+
+          // Small 
+          ImGui::ColorButton("##base_color", { 1, 0, 1, 1 }, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
+
+          // Insert MMV editor button if vertex constraint supports this
+          ImGui::SameLine();
+          if (ImGui::Button("Edit")) {
+            auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+            auto child_handle = info.child_task(child_name);
+            if (!child_handle.is_init()) {
+              child_handle.init<MMVEditorTask>(
+                InputSelection { .uplifting_i = i, .constraint_i = j });
+            }
+          }
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Edit constraint mismatching");
+        } // for (uint j)
+      }
+      ImGui::EndGroup();
+      ImGui::SameLine();
+
+      // Vertex edit button
+      ImGui::BeginGroup();
+      {
+        ImGui::AlignTextToFramePadding();
+        if (ImGui::Button("Add constraint")) {
+          
+        }
+        
+        for (uint j = 0; j < value.verts.size(); ++j) {
+          // Get shorthands
+          auto _scope = ImGui::ScopedID(std::format("dadada_{}_{}", typeid(Uplifting::Vertex).name(), j));
+          auto &vert  = value.verts[j];
+
+          // Optionally insert hide/show button at end of line if vertex constraint supports this
+          ImGui::NewLine();
+          ImGui::Spacing();
+          if constexpr (has_active_value<Uplifting::Vertex>) {
+            if (ImGui::Button(vert.is_active ? "V" : "H"))
+              vert.is_active = !vert.is_active;
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Toggle active");
+            ImGui::SameLine();
+          }
+
+          // Insert delete button at end of line
+          if (ImGui::Button("X")) {
+            value.verts.erase(value.verts.begin() + j);
+            break;
+          }
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Delete component");
+        } // for (uint j)
+      }
+      ImGui::EndGroup();
+
+      // Per-constraint vertex, show a small tree node
       for (uint j = 0; j < value.verts.size(); ++j) {
         // Get shorthands
         auto _scope = ImGui::ScopedID(std::format("{}_{}", typeid(Uplifting::Vertex).name(), j));
@@ -149,13 +291,15 @@ namespace met {
                 InputSelection { .uplifting_i = i, .constraint_i = j });
             }
           }
-        }        
+        }
 
         // Optionally insert hide/show button at end of line if vertex constraint supports this
         if constexpr (has_active_value<Uplifting::Vertex>) {
           ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
           if (ImGui::SmallButton(vert.is_active ? "V" : "H"))
             vert.is_active = !vert.is_active;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Toggle active");
         }
 
         // Insert delete button at end of line
@@ -165,6 +309,8 @@ namespace met {
           value.verts.erase(value.verts.begin() + j);
           break;
         }
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Delete component");
 
         // Continue if treenode is not open
         guard_continue(section_open);
@@ -180,9 +326,8 @@ namespace met {
           [&](DirectColorConstraint &c) {
             ImGui::ColorEdit3("Base color", c.colr_i.data(), colr_view_flags);
 
-            ImGui::Separator();
-            
             // If requested, spawn mismatch volume editor
+            // ImGui::Separator();
             /* if (ImGui::Button("Edit mismatching")) {
               auto child_name   = std::format("mmv_editor_{}_{}", i, j);
               auto child_handle = info.child_task(child_name);
@@ -204,9 +349,8 @@ namespace met {
             ImGui::ColorEdit3("Diffuse color (lrgb)", lrgb.data(), colr_view_flags);
             ImGui::ColorEdit3("Diffuse color (srgb)", srgb.data(), colr_view_flags);
 
-            ImGui::Separator();
-
             // If requested, spawn mismatch volume editor
+            // ImGui::Separator();
             /* if (ImGui::Button("Edit mismatching")) {
               auto child_name   = std::format("mmv_editor_{}_{}", i, j);
               auto child_handle = info.child_task(child_name);
@@ -225,12 +369,16 @@ namespace met {
         ImGui::TreePop();
       } // for (uint j)
 
+
+      /* // Jump right to avoid treenode indentation
+      ImGui::Indent(ImGui::GetTreeNodeToLabelSpacing()); */
+
       // Visual separator between vertex constraints and add button
-      if (!value.verts.empty())
-          ImGui::Separator();
+      /* if (!value.verts.empty())
+          ImGui::Separator(); */
 
       // Handle additions to vertex constraints
-      ImGui::NewLine();
+      /* ImGui::NewLine();
       ImGui::SameLine(ImGui::GetContentRegionMax().x - 84.f);
       if (ImGui::SmallButton("Add constraint"))
         ImGui::OpenPopup("popup_add_uplifting_vertex");
@@ -252,7 +400,8 @@ namespace met {
             .constraint = DirectSurfaceConstraint()
           });
         ImGui::EndPopup();
-      } // if (BeginPopup())
+      } // if (BeginPopup()) */
+
     };
 
     // Default implementation of editing visitor for ColorSystem components

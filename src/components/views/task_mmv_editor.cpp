@@ -1,5 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
+#include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
+#include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
 #include <small_gl/buffer.hpp>
@@ -199,9 +201,10 @@ namespace met {
     // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
     info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_begin")("lrgb_target"));
-    // 1. Add generate task
-    // 2. Add render task, draw to active framebuffer
-    // 3. Add input
+    info.child_task("viewport_gen_mmv").init<GenMMVTask>();
+    info.child_task("viewport_draw_mmv").init<DrawMMVTask>();
+    // 3. Add color controls
+    // 4. Add guizmo input
     info.child_task("viewport_end").init<MMVEditorEndTask>();
   }
 

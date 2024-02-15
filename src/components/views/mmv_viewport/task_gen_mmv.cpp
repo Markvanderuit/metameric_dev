@@ -4,6 +4,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
 #include <small_gl/array.hpp>
+#include <small_gl/dispatch.hpp>
 #include <algorithm>
 #include <execution>
 
@@ -60,7 +61,20 @@ namespace met {
 
   bool GenMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info.relative("viewport_begin")("is_active").getr<bool>();
+
+    // Get shared resources
+    const auto &e_scene             = info.global("scene").getr<Scene>();
+    const auto &e_is                = info.parent()("selection").getr<InputSelection>();
+    const auto &[e_object, e_state] = e_scene.components.upliftings[e_is.uplifting_i];
+
+    // Stale on first run, or if specific uplifting data has changed
+    bool is_stale = is_first_eval() 
+      || e_state.basis_i 
+      || e_state.csys_i 
+      || e_state.verts[e_is.constraint_i]
+      || e_scene.components.colr_systems[e_object.csys_i];
+    
+    return info.relative("viewport_begin")("is_active").getr<bool>() && is_stale;
   }
 
   void GenMMVTask::init(SchedulerHandle &info) {
@@ -76,6 +90,7 @@ namespace met {
 
     // Make vertex array object available, uninitialized
     info("chull_array").set<gl::Array>({ });
+    info("chull_draw").set<gl::DrawInfo>({ });
   }
 
   void GenMMVTask::eval(SchedulerHandle &info) {
@@ -120,7 +135,7 @@ namespace met {
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Bad surface; flag for clearing out
-        if (!cstr.is_valid()) {
+        if (!cstr.is_valid() || !e_vert.has_mismatching()) {
           should_clear = true;
           return;
         }
@@ -187,6 +202,7 @@ namespace met {
     // If a convex hull is available, generate a vertex array object
     // for rendering purposes
     auto &i_array = info("chull_array").getw<gl::Array>();
+    auto &i_draw  = info("chull_draw").getw<gl::DrawInfo>();
     if (m_chull.elems.size() > 0) {
       m_chull_verts = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
       m_chull_elems = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
@@ -195,6 +211,11 @@ namespace met {
         .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         .elements = &m_chull_elems
       }};
+      i_draw = { .type             = gl::PrimitiveType::eTriangles,
+                 .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
+                 .capabilities     = {{ gl::DrawCapability::eCullOp, true    },
+                                      { gl::DrawCapability::eDepthTest, true }},
+                 .bindable_array   = &i_array };
     } else {
       // Deinitialize
       i_array = {};

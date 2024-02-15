@@ -1,6 +1,8 @@
 #ifndef RENDER_SENSOR_GLSL_GUARD
 #define RENDER_SENSOR_GLSL_GUARD
 
+#include <render/ray.glsl>
+
 // Simple sensor definition based on matrices
 struct Sensor {
   mat4  proj_trf;
