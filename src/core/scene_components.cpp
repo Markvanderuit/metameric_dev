@@ -15,10 +15,10 @@ namespace met {
 
   bool Uplifting::Vertex::has_mismatching() const {
     return std::visit(overloaded {
-      [](const DirectColorConstraint &c) {  return !c.csys_j.empty(); },
-      [](const DirectSurfaceConstraint &c) {  return !c.csys_j.empty(); },
-      [](const IndirectSurfaceConstraint &c) { return true; },
-      [&](const auto &) { return false; }
+      [](const DirectColorConstraint &c)     { return c.has_mismatching(); },
+      [](const DirectSurfaceConstraint &c)   { return c.has_mismatching(); },
+      [](const IndirectSurfaceConstraint &c) { return false; },
+      [&](const auto &)                      { return false; }
     }, constraint);
   }
 

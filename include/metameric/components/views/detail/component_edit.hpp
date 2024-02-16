@@ -141,6 +141,62 @@ namespace met {
           scene_data_by_type<Ty>(scene)[data_i].name = name; }
       });
     }
+
+    // Helper method to spawn a imgui group of a fixed width, and then call a visitor()
+    // over every element of a range, s.t. a column is built for all elements
+    template <typename Ty>
+    void visit_range_column(const std::string          &col_name,
+                            float                       col_width,
+                            rng::sized_range auto      &range,
+                            std::function<void (Ty &)> visitor) {
+      ImGui::BeginGroup();
+      ImGui::AlignTextToFramePadding();
+
+      if (col_name.empty()) {
+        ImGui::NewLine();
+      } else {
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * col_width);
+        ImGui::Text(col_name.c_str());
+      }
+
+      for (uint j = 0; j < range.size(); ++j) {
+        auto scope = ImGui::ScopedID(std::format("{}", j));
+        visitor(range[j]);
+      }
+
+      ImGui::EndGroup();
+    }
+
+    // Helper function; given a title, access to a set of scene resources,
+    // and a modifiable index pointing to one of those resources, spawn
+    // a combo box for selecting said resource
+    constexpr
+    void push_resource_selector(std::string_view title, const auto &resources, uint &j) {
+      if (ImGui::BeginCombo(title.data(), resources[j].name.c_str())) {
+        for (uint i = 0; i < resources.size(); ++i)
+          if (ImGui::Selectable(resources[i].name.c_str(), j == i))
+            j = i;
+        ImGui::EndCombo();
+      } // if (BeginCombo)
+    };
+
+    // Helper function; given a title, access to a set of scene resources,
+    // and a modifiable index pointing to one of those resources, spawn
+    // a combo box for selecting said resource, where names are pulled using
+    // a user-provided visitor function
+    template <typename Ty>
+    void push_resource_selector(const std::string                       &title,
+                                rng::sized_range auto                   &range,
+                                uint                                    &selection_j,
+                                std::function<std::string (const Ty &)> name_visitor) {
+      if (ImGui::BeginCombo(title.c_str(), name_visitor(range[selection_j]).c_str())) {
+        for (uint i = 0; i < range.size(); ++i)
+          if (ImGui::Selectable(name_visitor(range[i]).c_str(), selection_j == i)) {
+            selection_j = i;
+          }
+        ImGui::EndCombo();
+      } // if (BeginCombo)
+    }
   } // namespace detail
 
   // Helper method;  spawn a sensible editor view with name editing, activity flags, a delete

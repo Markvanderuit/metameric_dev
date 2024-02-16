@@ -35,7 +35,7 @@ namespace met {
     
     // Get shared resources
     const auto &e_draw = info.relative("viewport_gen_mmv")("chull_draw").getr<gl::DrawInfo>();
-    const auto &e_arcb = info.relative("viewport_input")("arcball").getr<detail::Arcball>();
+    const auto &e_arcb = info.relative("viewport_camera_input")("arcball").getr<detail::Arcball>();
     const auto &e_trgt = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
 
     // Update sensor settings
@@ -50,8 +50,10 @@ namespace met {
     m_program.bind("b_buff_settings", m_unif_buffer);
 
     // Prepare draw state
+    gl::state::set_depth_range(0.f, 1.f);
     gl::state::set_viewport(e_trgt.size());
     gl::state::set_op(gl::CullOp::eBack);
+    gl::state::set_op(gl::DepthOp::eLessOrEqual);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
     

@@ -22,7 +22,6 @@ namespace met {
       .rel_func_tol = 1e-3,
       .rel_xpar_tol = 1e-2,
     };
-    
 
     // Objective function minimizes squared l2 norm
     solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {

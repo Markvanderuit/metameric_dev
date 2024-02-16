@@ -112,7 +112,7 @@ namespace met::detail {
         for (uint i = 0; i < m_cache.size(); ++i)
           m_cache[i].update(o[i]);
         m_mutated = rng::any_of(m_cache, [](const auto &v) { return v.is_mutated(); });
-        m_resized = true;
+        m_resized = false;
       } else {
         // Handle shrink/grow
         size_t min_r = std::min(m_cache.size(), o.size()), 
@@ -129,7 +129,7 @@ namespace met::detail {
             m_cache[i].update(o[i]);
         
         m_mutated = true;
-        m_resized = false;
+        m_resized = true;
       }
 
       return m_mutated;

@@ -157,6 +157,8 @@ namespace met {
       // this is handled in Scene object to keep it away from the pipeline
       auto [c, s] = e_scene.get_uplifting_constraint(e_uplifting, vert);
       
+      fmt::print("c = {}\ns = {}\n", c, s);
+
       // Add to set of spectra, and to tesselation input points
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
 

@@ -2,6 +2,7 @@
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
+#include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
 #include <small_gl/buffer.hpp>
@@ -42,11 +43,13 @@ namespace met {
       const auto &i_lrgb_target = info("lrgb_target").getr<gl::Texture2d4f>();
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       auto &i_frame_buffer      = info("frame_buffer").getw<gl::Framebuffer>();
-      auto &e_selection         = info.parent()("selection").getr<InputSelection>();
+      auto &e_is                = info.parent()("selection").getr<InputSelection>();
+      const auto &e_scene       = info.global("scene").getr<Scene>();
+      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
 
       // Define window name
-      auto name = std::format("Mismatching editor (uplifting {}, vertex {})",
-        e_selection.uplifting_i, e_selection.constraint_i);  
+      auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
+        e_vert.name, e_is.uplifting_i, e_is.constraint_i);  
       
       // Ensure sensible window size on first open
       ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);
@@ -86,27 +89,11 @@ namespace met {
       // Halt on window inactivity
       guard(is_active);
 
-      // TODO remove
-      eig::Array4f colr_value = { 1, 0, 1, 1 };
-      
       // Prepare framebuffer target for next subtasks
       i_frame_buffer.bind();
       i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
-      i_frame_buffer.clear(gl::FramebufferType::eColor, colr_value);
+      i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
       i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
-
-      // Specify viewport for next subtasks
-      gl::state::set_viewport(i_lrgb_target.size());    
-
-      // Specify draw state for next subask
-      gl::state::set_depth_range(0.f, 1.f);
-      gl::state::set_op(gl::DepthOp::eLessOrEqual);
-      gl::state::set_op(gl::CullOp::eBack);
-      gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
-
-      // Insert image, applying viewport texture to viewport; texture can be safely drawn 
-      // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
-      ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
     }
   };
 
@@ -200,6 +187,7 @@ namespace met {
 
     // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
+    info.child_task("viewport_edit_mmv").init<EditMMVTask>();
     info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_begin")("lrgb_target"));
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
     info.child_task("viewport_draw_mmv").init<DrawMMVTask>();
@@ -213,21 +201,14 @@ namespace met {
     
     // Ensure the selected uplifting exists
     const auto &e_scene = info.global("scene").getr<Scene>();
-    if (e_scene.components.upliftings.size() <= m_is.uplifting_i) {
+    if (e_scene.components.upliftings.is_resized()) {
       info.task().dstr();
       return;
     }
 
     // Ensure the selected constraint vertex exists
-    const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i].value;
-    if (e_uplifting.verts.size() <= m_is.constraint_i) {
-      info.task().dstr();
-      return;
-    }
-
-    // Ensure the selected constraint vertex even allows metameric mismatching
-    const auto &e_vert = e_uplifting.verts[m_is.constraint_i];
-    if (!e_vert.has_mismatching()) {
+    const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i];
+    if (e_uplifting.state.verts.is_resized()) {
       info.task().dstr();
       return;
     }

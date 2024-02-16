@@ -73,8 +73,17 @@ namespace met {
       || e_state.csys_i 
       || e_state.verts[e_is.constraint_i]
       || e_scene.components.colr_systems[e_object.csys_i];
+
+    // Reset samples if stale
+    if (is_stale)  {
+      m_iter = 0;
+      m_points.clear();
+    }
     
-    return info.relative("viewport_begin")("is_active").getr<bool>() && is_stale;
+    // Only pass if metameric mismatching is possible and samples are required
+    bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_iter < mmv_samples_max;
+    
+    return info.relative("viewport_begin")("is_active").getr<bool>() && (is_stale || is_mmv);
   }
 
   void GenMMVTask::init(SchedulerHandle &info) {

@@ -679,58 +679,62 @@ namespace met {
     Spec s;
 
     // Identify the type of constraint
-    if (const auto *constraint = std::get_if<DirectColorConstraint>(&v.constraint)) {
-      // The specified color becomes our vertex color
-      c = constraint->colr_i;
+    std::visit(overloaded {
+      [&](const DirectColorConstraint &cstr) {
+        // The specified color becomes our vertex color
+        c = cstr.colr_i;
 
-      // Gather all relevant color system spectra referred by the constraint
-      std::vector<CMFS> systems = { csys_i };
-      rng::transform(constraint->csys_j, std::back_inserter(systems), 
-        [&](uint j) { return get_csys(j).finalize_direct(); });
-      
-      // Obtain corresponding color constraints for each color system
-      std::vector<Colr> signals = { c };
-      rng::copy(constraint->csys_j, std::back_inserter(signals));
+        // Gather all relevant color system spectra and corresponding color signals
+        std::vector<CMFS> systems = { csys_i };
+        std::vector<Colr> signals = { c      };
+        rng::transform(cstr.csys_j, std::back_inserter(systems), 
+          [&](uint csys_j) { return get_csys(csys_j).finalize_direct(); });
+        rng::copy(cstr.colr_j, std::back_inserter(signals));
 
-      // Generate a metamer satisfying the system+signal constraint set
-      s = generate_spectrum({
-        .basis   = resources.bases[u.basis_i].value(),
-        .systems = systems,
-        .signals = signals
-      });
-    } else if (const auto *constraint = std::get_if<MeasurementConstraint>(&v.constraint)) {
-      // The specified spectrum becomes our metamer
-      s = constraint->measurement;
+        // Generate a metamer satisfying the system+signal constraint set
+        s = generate_spectrum({
+          .basis   = resources.bases[u.basis_i].value(),
+          .systems = systems,
+          .signals = signals
+        });
+      },
+      [&](const DirectSurfaceConstraint &cstr) {
+        // Return zero constraint for invalid surfaces
+        if (!cstr.is_valid()) {
+          c = 0.f;
+          s = 0.f;
+          return;
+        }
 
-      // The metamer's color under the uplifting's color system becomes our vertex color
-      c = (csys_i.transpose() * s.matrix()).eval();
-    } else if (const auto *constraint = std::get_if<DirectSurfaceConstraint>(&v.constraint)) {
-      // Return zero constraint for invalid surfaces
-      if (!constraint->is_valid())
-        return { Colr(0.f), Spec(0.f) };
+        // Color is obtained from surface information
+        c = cstr.surface.diffuse;
 
-      // Color is obtained from surface information
-      c = constraint->surface.diffuse;
+        // Gather all relevant color system spectra and corresponding color signals
+        std::vector<CMFS> systems = { csys_i };
+        std::vector<Colr> signals = { c      };
+        rng::transform(cstr.csys_j, std::back_inserter(systems), 
+          [&](uint csys_j) { return get_csys(csys_j).finalize_direct(); });
+        rng::copy(cstr.colr_j, std::back_inserter(signals));
 
-      // Gather all relevant color system spectra referred by the constraint
-      std::vector<CMFS> systems = { csys_i };
-      rng::transform(constraint->csys_j, std::back_inserter(systems), 
-        [&](uint j) { return get_csys(j).finalize_direct(); });
+        // Generate a metamer satisfying the system+signal constraint set
+        s = generate_spectrum({
+          .basis   = resources.bases[u.basis_i].value(),
+          .systems = systems,
+          .signals = signals
+        });
+      },
+      [&](const IndirectSurfaceConstraint &cstr) {
+        debug::check_expr(false, "Not implemented!");
+        // TODO ...
+      },
+      [&](const MeasurementConstraint &cstr) {
+        // The specified spectrum becomes our metamer
+        s = cstr.measurement;
 
-      // Obtain corresponding color constraints for each color system
-      std::vector<Colr> signals = { c };
-      rng::copy(constraint->csys_j, std::back_inserter(signals));
-
-      // Generate a metamer satisfying the system+signal constraint set
-      s = generate_spectrum({
-        .basis   = resources.bases[u.basis_i].value(),
-        .systems = systems,
-        .signals = signals
-      });
-    } else if (const auto *constraint = std::get_if<IndirectSurfaceConstraint>(&v.constraint)) {
-      debug::check_expr(false, "Not implemented!");
-      // TODO ...
-    }
+        // The metamer's color under the uplifting's color system becomes our vertex color
+        c = (csys_i.transpose() * s.matrix()).eval();
+      }
+    }, v.constraint);
 
     return { c, s };
   }

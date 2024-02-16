@@ -16,6 +16,7 @@ namespace met {
     std::vector<uint> csys_j; // Indices of the secondary color systems
 
   public:
+    bool has_mismatching() const { return !colr_j.empty(); }
     bool operator==(const DirectColorConstraint &o) const;
   };
 
@@ -34,8 +35,8 @@ namespace met {
   // Concept defining the expected components of on-surface constraints 
   template <typename Ty>
   concept SurfaceConstraint = requires(Ty t) {
-    { t.is_valid() } -> std::same_as<bool>;
-    { t.surface    } -> std::same_as<SurfaceInfo &>;
+    { t.is_valid()        } -> std::same_as<bool>;
+    { t.surface           } -> std::same_as<SurfaceInfo &>;
   };
   template <typename Ty>
   concept is_surface_constraint = SurfaceConstraint<Ty>;
@@ -54,6 +55,7 @@ namespace met {
     SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
+    bool has_mismatching() const { return !colr_j.empty(); }
     bool is_valid() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
@@ -68,6 +70,7 @@ namespace met {
     SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
+    // bool has_mismatching() const { return !colr_j.empty(); }
     bool is_valid() const { return surface.is_valid(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
