@@ -31,41 +31,46 @@ void path_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 w
 #define path_finalize_emitter(path, r, L, wvls) {}
 #endif
 
-vec3 Li_debug(in Ray ray) {
+vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   // If the ray misses, terminate current path
   if (!scene_intersect(ray))
-    return vec3(0);
+    return vec4(0);
 
   SurfaceInfo si = get_surface_info(ray);
   if (!is_valid(si) || !is_object(si))
-    return vec3(0);
-  
-  // If no surface object is visible, terminate current path
-#ifdef SCENE_DATA_REFLECTANCE
-  // Load relevant info objects
-  ObjectInfo      object_info       = scene_object_info(record_get_object(si.data));
-  BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(record_get_object(si.data));
+    return vec4(0);
 
-  // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
-  // also handle single-color objects by sampling the center of their patch
-  vec2 tx_si = object_info.is_albedo_sampled ? si.tx : vec2(0.5f);
-  vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
+  // Sample BRDF at position
+  BRDFInfo brdf = get_brdf(si, wvls);
 
-  // Gather barycentric indices; assume all-equal for now
-  uint indx = uint(scene_barycentric_data_gather_w(tx_uv).x);
+  return brdf.r;
 
-  return vec3(float(indx) / 512.f);
-#else
+//   // If no surface object is visible, terminate current path
+// #ifdef SCENE_DATA_REFLECTANCE
+//   // Load relevant info objects
+//   ObjectInfo      object_info       = scene_object_info(record_get_object(si.data));
+//   BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(record_get_object(si.data));
 
-  // On a valid surface, return debug data
-  ObjectInfo object_info = scene_object_info(record_get_object(si.data));
-  MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
+//   // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
+//   // also handle single-color objects by sampling the center of their patch
+//   vec2 tx_si = object_info.is_albedo_sampled ? si.tx : vec2(0.5f);
+//   vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
 
-  uint prim_i = record_get_object_primitive(si.data);
-  float a = float(prim_i) / float(mesh_info.prims_size);
+//   // Gather barycentric indices; assume all-equal for now
+//   uint indx = uint(scene_barycentric_data_gather_w(tx_uv).x);
 
-  return vec3(a);
-#endif
+//   return vec3(float(indx) / 512.f);
+// #else
+
+//   // On a valid surface, return debug data
+//   ObjectInfo object_info = scene_object_info(record_get_object(si.data));
+//   MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
+
+//   uint prim_i = record_get_object_primitive(si.data);
+//   float a = float(prim_i) / float(mesh_info.prims_size);
+
+//   return vec3(a);
+// #endif
 }
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
@@ -171,6 +176,10 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   } // for (uint depth)
 
   return S;
+}
+
+vec4 Li_debug(in SensorSample sensor_sample, in SamplerState state) {
+  return Li_debug(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state);
 }
 
 vec4 Li(in SensorSample sensor_sample, in SamplerState state) {

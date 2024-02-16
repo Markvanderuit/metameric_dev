@@ -26,7 +26,11 @@ namespace met {
       std::visit(overloaded {
         [&](DirectColorConstraint &cstr) {
           // Color baseline value
-          ImGui::ColorEdit3("Base color", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
+          {
+            auto srgb = lrgb_to_srgb(cstr.colr_i);
+            ImGui::ColorEdit3("Base color", srgb.data(), ImGuiColorEditFlags_Float);
+            cstr.colr_i = srgb_to_lrgb(srgb);
+          }
           ImGui::Separator();
 
           // Color constraint; system column
@@ -40,23 +44,30 @@ namespace met {
             if (csys_j != _csys_j) {
               csys_j = _csys_j;
 
-              auto csys = e_scene.get_csys(uplf.value.csys_i);
-              auto systems = { csys.finalize_direct() };
-              auto signals = { cstr.colr_i };
+              // Gather relevant color systems
+              auto colsys_i = e_scene.get_csys(uplf.value.csys_i);
+              auto colsys_j = e_scene.get_csys(csys_j);
+              auto systems  = { colsys_i.finalize_direct() };
+              auto signals  = { cstr.colr_i };
+
+              // Generate spectral distribution
               Spec s = generate_spectrum({
                 .basis   = e_scene.resources.bases[uplf.value.basis_i].value(),
                 .systems = systems,
                 .signals = signals
               });
               
-              cstr.colr_j[i] = e_scene.get_csys(csys_j).apply_color_direct(s);
+              // Assign corresponding coor
+              cstr.colr_j[i] = colsys_j.apply_color_direct(s);
             }
           });
           ImGui::SameLine();
 
           // Color constraint; value column
           detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
-            ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+            auto srgb = lrgb_to_srgb(colr_j);
+            ImGui::ColorEdit3("##color_editor", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+            colr_j = srgb_to_lrgb(srgb);
           });
           
           if (ImGui::Button("Add constraint")) {
