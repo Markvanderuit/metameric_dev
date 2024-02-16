@@ -145,10 +145,10 @@ namespace met {
     // Helper method to spawn a imgui group of a fixed width, and then call a visitor()
     // over every element of a range, s.t. a column is built for all elements
     template <typename Ty>
-    void visit_range_column(const std::string          &col_name,
-                            float                       col_width,
-                            rng::sized_range auto      &range,
-                            std::function<void (Ty &)> visitor) {
+    void visit_range_column(const std::string               &col_name,
+                            float                            col_width,
+                            rng::sized_range auto           &range,
+                            std::function<void (uint, Ty &)> visitor) {
       ImGui::BeginGroup();
       ImGui::AlignTextToFramePadding();
 
@@ -161,7 +161,7 @@ namespace met {
 
       for (uint j = 0; j < range.size(); ++j) {
         auto scope = ImGui::ScopedID(std::format("{}", j));
-        visitor(range[j]);
+        visitor(j, range[j]);
       }
 
       ImGui::EndGroup();

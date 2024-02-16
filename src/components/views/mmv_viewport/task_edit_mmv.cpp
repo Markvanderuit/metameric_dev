@@ -1,5 +1,6 @@
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
+#include <metameric/core/metamer.hpp>
 #include <small_gl/texture.hpp>
 
 namespace met {
@@ -14,13 +15,14 @@ namespace met {
     using ComponentType = detail::Component<Uplifting>;
 
     // Get shared resources
-    const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_trgt  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
     const auto &e_is    = info.parent()("selection").getr<InputSelection>();
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_is.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
       auto &vert = uplf.value.verts[e_is.constraint_i];
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      
       std::visit(overloaded {
         [&](DirectColorConstraint &cstr) {
           // Color baseline value
@@ -28,14 +30,32 @@ namespace met {
           ImGui::Separator();
 
           // Color constraint; system column
-          detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint &csys_j) {
+          detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
+            uint _csys_j = csys_j;
             detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, csys_j, 
               [](const auto &c) { return c.name; });
+
+            // On a change of system, reset accompanying color value to a valid center
+            // by doing a quick spectral roundtrip with a known valid metamer
+            if (csys_j != _csys_j) {
+              csys_j = _csys_j;
+
+              auto csys = e_scene.get_csys(uplf.value.csys_i);
+              auto systems = { csys.finalize_direct() };
+              auto signals = { cstr.colr_i };
+              Spec s = generate_spectrum({
+                .basis   = e_scene.resources.bases[uplf.value.basis_i].value(),
+                .systems = systems,
+                .signals = signals
+              });
+              
+              cstr.colr_j[i] = e_scene.get_csys(csys_j).apply_color_direct(s);
+            }
           });
           ImGui::SameLine();
 
           // Color constraint; value column
-          detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](Colr &colr_j) {
+          detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
             ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
           });
           
@@ -55,14 +75,14 @@ namespace met {
           ImGui::Separator();
 
           // Color constraint; system column
-          detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint &csys_j) {
+          detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
             detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, csys_j, 
               [](const auto &c) { return c.name; });
           });
           ImGui::SameLine();
 
           // Color constraint; value column
-          detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](Colr &colr_j) {
+          detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
             ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
           });
           

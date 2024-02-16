@@ -135,7 +135,7 @@ namespace met {
       };
       
       // Vertex name editor column
-      detail::visit_range_column<Uplifting::Vertex>("Name", 0.25, value.verts, [&](Uplifting::Vertex &vert) {
+      detail::visit_range_column<Uplifting::Vertex>("Name", 0.25, value.verts, [&](uint i, Uplifting::Vertex &vert) {
         auto copy = vert.name; 
         ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
         if (ImGui::InputText("##constraint_name", &copy, str_edit_flags)) {
@@ -146,7 +146,7 @@ namespace met {
       
       // Vertex type editor column;
       // if type is changed, constraint data is essentially discarded
-      detail::visit_range_column<Uplifting::Vertex>("Type", 0.25, value.verts, [&](Uplifting::Vertex &vert) {
+      detail::visit_range_column<Uplifting::Vertex>("Type", 0.25, value.verts, [&](uint i, Uplifting::Vertex &vert) {
         ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
         if (ImGui::BeginCombo("##constraint_type", std::format("{}", vert.constraint).c_str())) {
           if (ImGui::Selectable("direct", std::holds_alternative<DirectColorConstraint>(vert.constraint))) {
@@ -175,7 +175,7 @@ namespace met {
       ImGui::SameLine();
       
       // Vertex property view column
-      detail::visit_range_column<Uplifting::Vertex>("Properties", 0.4, value.verts, [&](Uplifting::Vertex &vert) {
+      detail::visit_range_column<Uplifting::Vertex>("Properties", 0.4, value.verts, [&](uint i, Uplifting::Vertex &vert) {
         std::visit(overloaded {
           [](DirectColorConstraint &cstr) { },
           [](DirectSurfaceConstraint &cstr) {
