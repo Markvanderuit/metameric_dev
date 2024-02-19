@@ -28,22 +28,24 @@ namespace met::detail {
     void init(SchedulerHandle &info) override {
       met_trace();
 
-      m_view_handle.reinitialize(info);
-      debug::check_expr(m_view_handle.is_init());
+      // debug::check_expr(m_view_handle.is_init());
 
-      // Get shared resources
+      /* // Get shared resources
       const auto &e_view = m_view_handle.getr<gl::Texture2d4f>();
       auto view_size = e_view.size().cast<float>().eval();
 
       // Make arcball available as "arcball" resource 
-      auto &i_arcball = info("arcball").init<Arcball>(m_info).getw<Arcball>();
+      auto &i_arcball =  */info("arcball").init<Arcball>(m_info);/* .getw<Arcball>();
       
       // Initialize arcball properties to match the viewport
-      i_arcball.set_aspect(view_size.x() / view_size.y());
+      i_arcball.set_aspect(view_size.x() / view_size.y()); */
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace();
+      
+      // Handle to the view resource is masked, s.t. we can query it directly
+      m_view_handle.reinitialize(info);
       
       // Get relevant handles and resources
       auto arcb_handle   = info("arcball");
@@ -54,7 +56,7 @@ namespace met::detail {
       auto view_size = e_view.size().cast<float>().eval();
       
       // On viewport change, arcb_handle aspect ratio      
-      if (m_view_handle.is_mutated()) {
+      if (m_view_handle.is_mutated() || is_first_eval()) {
         arcb_handle.getw<detail::Arcball>()
                    .set_aspect(view_size.x() / view_size.y());
       }

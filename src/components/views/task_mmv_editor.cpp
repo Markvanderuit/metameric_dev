@@ -19,20 +19,9 @@ namespace met {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   
-  class MMVEditorBeginTask : public detail::TaskNode {
-    using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
-
-    // Framebuffer attachments
-    Depthbuffer m_depth_buffer;
-
-  public:
+  struct MMVEditorBeginTask : public detail::TaskNode {
     void init(SchedulerHandle &info) override {
       met_trace_full();
-
-      // Share resources for ViewportEndTask and the relevant middle tasks
-      info("frame_buffer").set<gl::Framebuffer>({ });
-      info("lrgb_target").init<gl::Texture2d4f>({ .size = 1 });
-      info("srgb_target").init<gl::Texture2d4f>({ .size = 1 });
       info("is_active").init<bool>(false);
     }
 
@@ -40,12 +29,9 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      const auto &i_lrgb_target = info("lrgb_target").getr<gl::Texture2d4f>();
-      const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
-      auto &i_frame_buffer      = info("frame_buffer").getw<gl::Framebuffer>();
-      auto &e_is                = info.parent()("selection").getr<InputSelection>();
-      const auto &e_scene       = info.global("scene").getr<Scene>();
-      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_is    = info.parent()("selection").getr<InputSelection>();
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &e_vert  = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
 
       // Define window name
       auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
@@ -69,30 +55,76 @@ namespace met {
         return;
       }
 
-      // Compute viewport size s.t. texture is square
-      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      viewport_size.y() = viewport_size.x();
-      if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).any()) {
-        // (Re-)create viewport texture if the viewport weas resized
-        info("lrgb_target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
-        info("srgb_target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
-
-        // (Re-)create framebuffer and renderbuffers if the viewport has resized
-        m_depth_buffer = {{ .size = i_lrgb_target.size().max(1).eval() }};
-        i_frame_buffer = {{ .type = gl::FramebufferType::eColor, .attachment = &i_lrgb_target  },
-                          { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer }};
-        i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
-        i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
-      }
-
       // Halt on window inactivity
       guard(is_active);
+    }
+  };
 
-      // Prepare framebuffer target for next subtasks
-      i_frame_buffer.bind();
-      i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
-      i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
+  class MMVEditorImageTask : public detail::TaskNode {
+    using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
+    Depthbuffer m_depth_buffer;
+
+  public:
+    void resize_fb(SchedulerHandle &info, eig::Array2u size) {
+      met_trace_full();
+
+      // Get shared resources
+      auto &i_frame_buffer = info("frame_buffer").getw<gl::Framebuffer>();
+      auto &i_lrgb_target  = info("lrgb_target").getw<gl::Texture2d4f>();
+      auto &i_srgb_target  = info("srgb_target").getw<gl::Texture2d4f>();
+      
+      // Recreate texture resources
+      i_lrgb_target  = {{ .size = size }};
+      i_srgb_target  = {{ .size = size }};
+      m_depth_buffer = {{ .size = size }};
+
+      // Recreate framebuffer, bound to newly resized resources
+      i_frame_buffer = {{ .type = gl::FramebufferType::eColor, .attachment = &i_lrgb_target  },
+                        { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer }};
+    }
+
+    void init(SchedulerHandle &info) override {
+      // Frame buffer initial state for subtasks to not "blurb" out
+      info("lrgb_target").init<gl::Texture2d4f>({ .size = 1 });
+      info("srgb_target").init<gl::Texture2d4f>({ .size = 1 });
+      info("frame_buffer").set(gl::Framebuffer { });
+    }
+
+    void eval(SchedulerHandle &info) override {
+      met_trace_full();
+      
+      // Get handles to relative task resource
+      auto begin_handle = info.relative("viewport_begin");
+      auto end_handle   = info.relative("viewport_end");
+      
+      // Get shared resources
+      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
+      const auto &e_scene       = info.global("scene").getr<Scene>();
+      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
+      
+      if (begin_handle("is_active").getr<bool>() && e_vert.has_mismatching()) {
+        // Visual separator from editing components drawn in previous tasks
+        ImGui::Separator();
+
+        // Compute viewport size s.t. texture fills rest of window
+        // and if necessary resize framebuffer
+        eig::Array2u image_size = static_cast<eig::Array2f>(ImGui::GetContentRegionAvail()).max(1.f).cast<uint>();
+        if ((i_srgb_target.size() != image_size).any()) {
+          resize_fb(info, image_size);
+        }
+
+        // Prepare framebuffer target for next subtasks
+        auto &i_frame_buffer = info("frame_buffer").getw<gl::Framebuffer>();
+        i_frame_buffer.bind();
+        i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
+        i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
+
+        // Place texture view using draw target
+        ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), 
+          i_srgb_target.size().cast<float>().eval(), 
+          eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+      }
     }
   };
 
@@ -102,6 +134,7 @@ namespace met {
       alignas(4) uint lrgb_to_srgb;
     };
 
+    // Framebuffer attachments
     gl::ComputeInfo m_dispatch;
     gl::Program     m_program;
     gl::Sampler     m_sampler;
@@ -114,13 +147,13 @@ namespace met {
       // Set up draw components for gamma correction
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, 
                      .mag_filter = gl::SamplerMagFilter::eNearest }};
-      m_program = {{ .type = gl::ShaderType::eCompute, 
+      m_program = {{ .type       = gl::ShaderType::eCompute, 
                      .glsl_path  = "resources/shaders/misc/texture_resample.comp", 
                      .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping
       m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-      m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+      m_uniform_map    = m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags).data();
       m_uniform_map->lrgb_to_srgb = true;
     }
 
@@ -129,15 +162,20 @@ namespace met {
 
       // Get handle to relative task resource
       auto begin_handle = info.relative("viewport_begin");
+      auto image_handle = info.relative("viewport_image");
+      
+      // Get shared resources
+      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
+      const auto &e_scene       = info.global("scene").getr<Scene>();
+      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_lrgb_target = image_handle("lrgb_target").getr<gl::Texture2d4f>();
+      const auto &e_srgb_target = image_handle("srgb_target").getr<gl::Texture2d4f>();
 
       // Finish draw operation if ViewBeginTask has an active window
-      if (begin_handle("is_active").getr<bool>()) {
-        // Get external resources 
-        auto e_lrgb_target_handle = begin_handle("lrgb_target");
-        const auto &e_lrgb_target = e_lrgb_target_handle.getr<gl::Texture2d4f>();
-
-        // Set dispatch size correctly, if input texture size changed
-        if (e_lrgb_target_handle.is_mutated()) {
+      // and some draw has to happen
+      if (begin_handle("is_active").getr<bool>() && e_vert.has_mismatching()) {
+        // Push new dispatch size, if associated textures were modified
+        if (image_handle("lrgb_target").is_mutated() || is_first_eval()) {
           eig::Array2u dispatch_n    = e_lrgb_target.size();
           eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
           m_dispatch = { .groups_x = dispatch_ndiv.x(),
@@ -147,29 +185,23 @@ namespace met {
           m_uniform_buffer.flush();
         }
 
-        // Bind image/sampler resources for coming dispatch
+        // Bind relevant resources for dispatch
+        m_program.bind();
         m_program.bind("b_uniform", m_uniform_buffer);
         m_program.bind("s_image_r", m_sampler);
         m_program.bind("s_image_r", e_lrgb_target);
-        m_program.bind("i_image_w", begin_handle("srgb_target").getw<gl::Texture2d4f>());
+        m_program.bind("i_image_w", e_srgb_target);
 
-        // Dispatch prepared work
+        // Dispatch lrgb->srgb conversion
         gl::dispatch_compute(m_dispatch);
-
+        
         // Switch back to default framebuffer
         gl::Framebuffer::make_default().bind();
       }
 
       // Finish ImGui state
-      {
-        // Declare scoped ImGui style state
-        auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
-
-        // Note: window end is post-pended here, but window begin is in ViewportBeginTask
-        ImGui::End();
-      }
+      // Note: window end is post-pended here, but window begin is in ViewportBeginTask
+      ImGui::End();
     }
   };
 
@@ -187,11 +219,10 @@ namespace met {
     // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
     info.child_task("viewport_edit_mmv").init<EditMMVTask>();
-    info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_begin")("lrgb_target"));
+    info.child_task("viewport_image").init<MMVEditorImageTask>();
+    info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"));
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
     info.child_task("viewport_draw_mmv").init<DrawMMVTask>();
-    // 3. Add color controls
-    // 4. Add guizmo input
     info.child_task("viewport_end").init<MMVEditorEndTask>();
   }
 
@@ -200,14 +231,14 @@ namespace met {
     
     // Ensure the selected uplifting exists
     const auto &e_scene = info.global("scene").getr<Scene>();
-    if (e_scene.components.upliftings.is_resized()) {
+    if (e_scene.components.upliftings.is_resized() && !is_first_eval()) {
       info.task().dstr();
       return;
     }
 
     // Ensure the selected constraint vertex exists
     const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i];
-    if (e_uplifting.state.verts.is_resized()) {
+    if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
       info.task().dstr();
       return;
     }

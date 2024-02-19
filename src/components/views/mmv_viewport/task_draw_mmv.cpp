@@ -36,7 +36,7 @@ namespace met {
     // Get shared resources
     const auto &e_draw = info.relative("viewport_gen_mmv")("chull_draw").getr<gl::DrawInfo>();
     const auto &e_arcb = info.relative("viewport_camera_input")("arcball").getr<detail::Arcball>();
-    const auto &e_trgt = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_trgt = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
 
     // Update sensor settings
     m_sensor.proj_trf  = e_arcb.proj().matrix();

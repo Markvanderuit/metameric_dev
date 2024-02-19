@@ -106,18 +106,26 @@ namespace met {
     met_trace();
 
     // Get shared resources
-    const auto &e_scene     = info.global("scene").getr<Scene>();
-    const auto &e_is        = info.parent()("selection").getr<InputSelection>();
-    const auto &e_uplifting = e_scene.components.upliftings[e_is.uplifting_i].value;
-    const auto &e_vert      = e_uplifting.verts[e_is.constraint_i];
+    const auto &e_scene       = info.global("scene").getr<Scene>();
+    const auto &e_is          = info.parent()("selection").getr<InputSelection>();
+    const auto &[e_uplifting, 
+                 e_state]     = e_scene.components.upliftings[e_is.uplifting_i];
+    const auto &e_vert        = e_uplifting.verts[e_is.constraint_i];
 
+    // Determine if a reset is in order
+    bool should_clear = is_first_eval() 
+      || e_state.basis_i 
+      || e_state.csys_i 
+      || e_state.verts[e_is.constraint_i]
+      || e_scene.components.colr_systems[e_uplifting.csys_i];;
+    
+    
     // TODO move to is_active
     // TODO reset on some vertex constraint state change
-    if (m_iter >= mmv_samples_max)
+    if (m_iter >= mmv_samples_max && !should_clear)
       return;
 
     // Visit underlying constraint types one by one
-    bool should_clear = false;
     std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
         // Bad surface; flag for clearing out
@@ -192,6 +200,9 @@ namespace met {
       }
     }, e_vert.constraint);
 
+    // Increment iteration up to sample count
+    m_iter += mmv_samples_per_iter;
+
     // Clear task output if incidated;
     // after this point, if the task survived, we generate a convex hull from a
     // viable point set
@@ -201,6 +212,8 @@ namespace met {
       m_iter = 0;
       return;
     }
+
+    fmt::print("Total points: {}\n", m_points.size());
 
     // Determine extents of generated point sets
     auto maxb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.max(b).eval(); }).value();
@@ -230,6 +243,7 @@ namespace met {
                  .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
                  .capabilities     = {{ gl::DrawCapability::eCullOp, true    },
                                       { gl::DrawCapability::eDepthTest, true }},
+                 .draw_op          = gl::DrawOp::eFill,
                  .bindable_array   = &i_array };
     } else {
       // Deinitialize

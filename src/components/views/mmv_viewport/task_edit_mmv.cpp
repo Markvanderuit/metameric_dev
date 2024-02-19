@@ -15,8 +15,7 @@ namespace met {
     using ComponentType = detail::Component<Uplifting>;
 
     // Get shared resources
-    const auto &e_trgt  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
-    const auto &e_is    = info.parent()("selection").getr<InputSelection>();
+    const auto &e_is = info.parent()("selection").getr<InputSelection>();
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_is.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
@@ -33,35 +32,35 @@ namespace met {
             // ImGui::ColorEdit3("Base color", srgb.data(), ImGuiColorEditFlags_Float);
             // cstr.colr_i = srgb_to_lrgb(srgb);
           }
-          ImGui::Separator();
+          ImGui::Separator(); 
 
           // Color constraint; system column
           detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
+            // Spawn selector; work on a copy to detect changes
             uint _csys_j = csys_j;
-            detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, csys_j, 
+            detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, _csys_j, 
               [](const auto &c) { return c.name; });
 
-            // On a change of system, reset accompanying color value to a valid center
+            // On a change, we reset the accompanying color value to a valid center
             // by doing a quick spectral roundtrip with a known valid metamer
-            if (csys_j != _csys_j) {
-              csys_j = _csys_j;
+            guard(csys_j != _csys_j);
+            csys_j = _csys_j;
 
-              // Gather relevant color systems
-              auto colsys_i = e_scene.get_csys(uplf.value.csys_i);
-              auto colsys_j = e_scene.get_csys(csys_j);
-              auto systems  = { colsys_i.finalize_direct() };
-              auto signals  = { cstr.colr_i };
+            // Gather relevant color systems
+            auto colsys_i = e_scene.get_csys(uplf.value.csys_i);
+            auto colsys_j = e_scene.get_csys(csys_j);
+            auto systems  = { colsys_i.finalize_direct() };
+            auto signals  = { cstr.colr_i };
 
-              // Generate spectral distribution
-              Spec s = generate_spectrum({
-                .basis   = e_scene.resources.bases[uplf.value.basis_i].value(),
-                .systems = systems,
-                .signals = signals
-              });
-              
-              // Assign corresponding coor
-              cstr.colr_j[i] = colsys_j.apply_color_direct(s);
-            }
+            // Generate spectral distribution
+            Spec s = generate_spectrum({
+              .basis   = e_scene.resources.bases[uplf.value.basis_i].value(),
+              .systems = systems,
+              .signals = signals
+            });
+            
+            // Assign the reset accompanying color
+            cstr.colr_j[i] = colsys_j.apply_color_direct(s);
           });
           ImGui::SameLine();
 
@@ -76,11 +75,6 @@ namespace met {
           if (ImGui::Button("Add constraint")) {
             cstr.csys_j.push_back(0);
             cstr.colr_j.push_back(cstr.colr_i);
-          }
-          
-          if (cstr.has_mismatching()) {
-            ImGui::Separator();
-            ImGui::Image(ImGui::to_ptr(e_trgt.object()), e_trgt.size().cast<float>().eval(), eig::Vector2f(0, 1), eig::Vector2f(1, 0));
           }
         },
         [&](DirectSurfaceConstraint &cstr) {
@@ -104,17 +98,12 @@ namespace met {
             cstr.csys_j.push_back(0);
             cstr.colr_j.push_back(cstr.surface.diffuse);
           }
-
-          if (cstr.has_mismatching()) {
-            ImGui::Separator();
-            ImGui::Image(ImGui::to_ptr(e_trgt.object()), e_trgt.size().cast<float>().eval(), eig::Vector2f(0, 1), eig::Vector2f(1, 0));
-          }
         },
         [&](IndirectSurfaceConstraint &cstr) {
-
+          ImGui::Text("Not implemented");
         },
         [&](MeasurementConstraint &cstr) {
-
+          ImGui::Text("Not implemented");
         }
       }, vert.constraint);
     });
