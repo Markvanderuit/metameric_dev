@@ -10,6 +10,9 @@
 #include <execution>
 #include <numbers>
 
+// TODO remove
+#include <metameric/components/views/task_uplifting_viewer.hpp>
+
 namespace met {
   constexpr uint n_system_boundary_samples    = 64u;
   constexpr uint max_supported_delaunay_elems = 512u;
@@ -91,9 +94,13 @@ namespace met {
     m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<MeshPackLayout>(buffer_access_flags);
 
     // Initialize buffer to hold packed spectral data; this buffer is copied over to a texture
-    // in upliftings.gl for fast access during rendering
+    // in <scene.components.upliftings.gl.*> for fast access during rendering
     m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_spectra, .flags = buffer_create_flags  }};
     m_buffer_spec_pack_map = m_buffer_spec_pack.map_as<SpecPackLayout>(buffer_access_flags);
+
+    // Specify draw dispatch, as handle for a potential viewer to render the tesselation
+    info("tesselation_draw").set<gl::DrawInfo>({});
+    info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
@@ -133,7 +140,7 @@ namespace met {
         range_iter(m_csys_boundary_spectra), m_tesselation_points.begin(),
         [&](const Spec &s) { return (csys.transpose() * s.matrix()).eval(); });
 
-      fmt::print("Sampled color system boundary, {} points\n", m_csys_boundary_spectra.size());
+      fmt::print("Uplifting color system boundary, {} points\n", m_csys_boundary_spectra.size());
     }
 
     // Resize internal objects storing vertex positions, and corresponding spectra;
@@ -157,8 +164,6 @@ namespace met {
       // this is handled in Scene object to keep it away from the pipeline
       auto [c, s] = e_scene.get_uplifting_constraint(e_uplifting, vert);
       
-      fmt::print("c = {}\ns = {}\n", c, s);
-
       // Add to set of spectra, and to tesselation input points
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
 
@@ -190,7 +195,7 @@ namespace met {
         return pack;
       });
 
-      fmt::print("Resulting tesselation: {} verts, {} elems\n", 
+      fmt::print("Uplifting tesselation: {} verts, {} elems\n", 
         m_tesselation.verts.size(), m_tesselation.elems.size());
 
       // Update packing layout data
@@ -226,6 +231,34 @@ namespace met {
       // Do pixel-buffer copy of packed spectra to sampleable texture
       e_scene.components.upliftings.gl.texture_spectra.set(m_buffer_spec_pack, 0, { wavelength_samples, m_tesselation_data_map->elem_size },
                                                                                   { 0,                  m_tesselation_data_map->elem_offs });
+    }
+
+    // If a viewer task exists, we should supply mesh data for rendering
+    auto viewer_name   = std::format("uplifting_viewport_{}", m_uplifting_i);
+    auto viewer_handle = info.task(viewer_name);
+    if (tssl_stale && viewer_handle.is_init()) {
+      // Convert delaunay to triangle mesh
+      auto mesh = convert_mesh<AlMesh>(m_tesselation);
+
+      // Push mesh data and generate vertex array; we do a full, expensive, inefficient copy. 
+      // The viewer is only for debugging anyways
+      m_buffer_viewer_verts = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
+      m_buffer_viewer_elems = {{ .data = cnt_span<const std::byte>(mesh.elems) }};
+      m_buffer_viewer_array = {{
+        .buffers  = {{ .buffer = &m_buffer_viewer_verts, .index = 0, .stride = sizeof(eig::Array4f) }},
+        .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+        .elements = &m_buffer_viewer_elems
+      }};
+      
+      // Expose dispatch draw information to other tasks
+      info("tesselation_draw").set<gl::DrawInfo>({
+        .type           = gl::PrimitiveType::eTriangles,
+        .vertex_count   = (uint) (m_buffer_viewer_elems.size() / sizeof(uint)),
+        .capabilities   = {{ gl::DrawCapability::eDepthTest, true },
+                           { gl::DrawCapability::eCullOp,   false }},
+        .draw_op        = gl::DrawOp::eLine,
+        .bindable_array = &m_buffer_viewer_array
+      });
     }
   }
 } // namespace met

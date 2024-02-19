@@ -1,10 +1,8 @@
 #include <metameric/core/scene.hpp>
-#include <metameric/components/views/task_mmv_editor.hpp>
-#include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
-#include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
-#include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
-#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/task_uplifting_viewer.hpp>
+#include <metameric/components/views/uplifting_viewport/task_draw_color_system.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>
 #include <small_gl/framebuffer.hpp>
@@ -19,13 +17,16 @@ namespace met {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   
-  class MMVEditorBeginTask : public detail::TaskNode {
+  class UpliftingViewerBeginTask : public detail::TaskNode {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
 
-    // Framebuffer attachments
     Depthbuffer m_depth_buffer;
+    uint        m_uplifting_i;
 
   public:
+    UpliftingViewerBeginTask(uint uplifting_i) 
+    : m_uplifting_i(uplifting_i) { }
+
     void init(SchedulerHandle &info) override {
       met_trace_full();
 
@@ -43,17 +44,20 @@ namespace met {
       const auto &i_lrgb_target = info("lrgb_target").getr<gl::Texture2d4f>();
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       auto &i_frame_buffer      = info("frame_buffer").getw<gl::Framebuffer>();
-      auto &e_is                = info.parent()("selection").getr<InputSelection>();
       const auto &e_scene       = info.global("scene").getr<Scene>();
-      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
 
       // Define window name
-      auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
-        e_vert.name, e_is.uplifting_i, e_is.constraint_i);  
+      auto name = std::format("Uplifting viewer ({})",
+        e_scene.components.upliftings[m_uplifting_i].name);
       
       // Ensure sensible window size on first open
       ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);
 
+      // Declare scoped ImGui style state
+      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      
       // Open main viewport window, and forward window activity to "is_active" flag
       // Note: window end is post-pended in ViewportEndTask so subtasks can do stuff with imgui state
       // Note: we track close button as an edge case
@@ -72,7 +76,6 @@ namespace met {
       // Compute viewport size s.t. texture is square
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      viewport_size.y() = viewport_size.x();
       if (!i_lrgb_target.is_init() || (i_lrgb_target.size() != viewport_size.cast<uint>()).any()) {
         // (Re-)create viewport texture if the viewport weas resized
         info("lrgb_target").getw<gl::Texture2d4f>() = {{ .size = viewport_size.max(1.f).cast<uint>() }};
@@ -93,10 +96,23 @@ namespace met {
       i_frame_buffer.bind();
       i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0));
       i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
+      
+      // Specify viewport for next subtasks
+      gl::state::set_viewport(i_lrgb_target.size());    
+
+      // Specify draw state for next subask
+      gl::state::set_depth_range(0.f, 1.f);
+      gl::state::set_op(gl::DepthOp::eLessOrEqual);
+      gl::state::set_op(gl::CullOp::eBack);
+      gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
+
+      // Insert image, applying viewport texture to viewport; texture can be safely drawn 
+      // to later in the render loop. Flip y-axis UVs to obtain the correct orientation.
+      ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), viewport_size, eig::Vector2f(0, 1), eig::Vector2f(1, 0));
     }
   };
 
-  class MMVEditorEndTask : public detail::TaskNode {
+  class UpliftingViewerEndTask : public detail::TaskNode {
     struct UniformBuffer {
       alignas(8) eig::Array2u size;
       alignas(4) uint lrgb_to_srgb;
@@ -164,8 +180,8 @@ namespace met {
       {
         // Declare scoped ImGui style state
         auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
 
         // Note: window end is post-pended here, but window begin is in ViewportBeginTask
         ImGui::End();
@@ -173,41 +189,27 @@ namespace met {
     }
   };
 
-  bool MMVEditorTask::is_active(SchedulerHandle &info) {
+  bool UpliftingViewerTask::is_active(SchedulerHandle &info) {
     met_trace();
     return true;
   }
 
-  void MMVEditorTask::init(SchedulerHandle &info) {
+  void UpliftingViewerTask::init(SchedulerHandle &info) {
     met_trace();
     
-    // Make selection available
-    m_is = info("selection").set(std::move(m_is)).getr<InputSelection>();
-
     // Spawn subtasks
-    info.child_task("viewport_begin").init<MMVEditorBeginTask>();
-    info.child_task("viewport_edit_mmv").init<EditMMVTask>();
+    info.child_task("viewport_begin").init<UpliftingViewerBeginTask>(m_uplifting_i);
     info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_begin")("lrgb_target"));
-    info.child_task("viewport_gen_mmv").init<GenMMVTask>();
-    info.child_task("viewport_draw_mmv").init<DrawMMVTask>();
-    // 3. Add color controls
-    // 4. Add guizmo input
-    info.child_task("viewport_end").init<MMVEditorEndTask>();
+    info.child_task("viewport_draw").init<DrawColorSystemTask>(m_uplifting_i);
+    info.child_task("viewport_end").init<UpliftingViewerEndTask>();
   }
 
-  void MMVEditorTask::eval(SchedulerHandle &info) {
+  void UpliftingViewerTask::eval(SchedulerHandle &info) {
     met_trace();
     
     // Ensure the selected uplifting exists
     const auto &e_scene = info.global("scene").getr<Scene>();
-    if (e_scene.components.upliftings.is_resized()) {
-      info.task().dstr();
-      return;
-    }
-
-    // Ensure the selected constraint vertex exists
-    const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i];
-    if (e_uplifting.state.verts.is_resized()) {
+    if (!is_first_eval() && e_scene.components.upliftings.is_resized()) {
       info.task().dstr();
       return;
     }

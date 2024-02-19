@@ -3,6 +3,8 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
+#include <small_gl/array.hpp>
+#include <small_gl/buffer.hpp>
 
 namespace met {
   class GenUpliftingDataTask : public detail::TaskNode {
@@ -49,6 +51,11 @@ namespace met {
     // for fast sampled access during rendering
     gl::Buffer                m_buffer_spec_pack;
     std::span<SpecPackLayout> m_buffer_spec_pack_map;
+
+    // Buffers for mesh data, if a accompanying viewer exists
+    gl::Array  m_buffer_viewer_array;
+    gl::Buffer m_buffer_viewer_verts;
+    gl::Buffer m_buffer_viewer_elems;
 
   public:
     GenUpliftingDataTask(uint uplifting_i);

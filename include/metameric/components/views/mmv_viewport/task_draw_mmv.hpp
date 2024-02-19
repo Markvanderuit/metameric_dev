@@ -9,11 +9,8 @@
 #include <small_gl/program.hpp>
 
 namespace met {
-  struct DrawMMVTask : public detail::TaskNode {
-    
-    struct UnifLayout {
-      alignas(4) float alpha;
-    };
+  class DrawMMVTask : public detail::TaskNode {
+    struct UnifLayout {  float alpha; };
 
     Sensor       m_sensor;
     gl::Buffer   m_unif_buffer;
@@ -22,8 +19,8 @@ namespace met {
     gl::DrawInfo m_dispatch;
 
   public:
+    bool is_active(SchedulerHandle &info) override;
     void init(SchedulerHandle &info) override;
     void eval(SchedulerHandle &info) override;
-    bool is_active(SchedulerHandle &info) override;
   };
 } // namespace met

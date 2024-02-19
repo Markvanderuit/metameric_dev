@@ -120,6 +120,12 @@ namespace met {
     bool should_clear = false;
     std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
+        // Bad surface; flag for clearing out
+        if (!e_vert.has_mismatching()) {
+          should_clear = true;
+          return;
+        }
+
         // Generate 6D unit vector samples
         auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 6, m_iter);
         

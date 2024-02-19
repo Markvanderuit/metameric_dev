@@ -5,6 +5,7 @@
 // Layout declarations
 layout(std140) uniform;
 layout(std430) buffer;
+layout(early_fragment_tests) in;
 
 // Uniform buffer declaration
 layout(binding = 0) uniform b_buff_sensor {
@@ -17,14 +18,10 @@ layout(binding = 1) uniform b_buff_settings {
   float alpha;
 } buff_settings;
 
-// Vertex stage declarations
+// Fragment stage declarations
 layout(location = 0) in vec3  value_in;
-layout(location = 0) out vec3 value_out;
+layout(location = 0) out vec4 value_out;
 
 void main() {
-  // Value is color position, so pass through
-  value_out = value_in;
-  
-  // Vertex position is transformed color position
-  gl_Position = buff_sensor.full_trf * vec4(value_in.xyz, 1);
+  value_out = vec4(value_in, buff_settings.alpha);
 }
