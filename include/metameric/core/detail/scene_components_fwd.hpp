@@ -17,6 +17,7 @@ namespace met {
     // FWD
     // Overloads of component state
     struct UpliftingState;
+    struct VertexState;
     struct ObjectState;
     struct SettingsState;
   } // namespace detail

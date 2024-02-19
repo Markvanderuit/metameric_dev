@@ -68,4 +68,24 @@ namespace met::detail {
       );
     }
   };
+
+  /* Overload of ComponentState for Uplifting::Vertex */
+  struct VertexState : public ComponentStateBase<Uplifting::Vertex> {
+    using Base = Uplifting::Vertex;
+    using ComponentStateBase<Base>::m_mutated;
+
+    ComponentState<decltype(Base::name)>       name;
+    ComponentState<decltype(Base::is_active)>  is_active;
+    ComponentState<decltype(Base::constraint)> constraint;
+
+  public:
+    virtual 
+    bool update(const Base &o) override {
+      return m_mutated = (
+        name.update(o.name)   |
+        is_active.update(o.is_active) | 
+        constraint.update(o.constraint)
+      );
+    }
+  };
 } // namespace met::detail

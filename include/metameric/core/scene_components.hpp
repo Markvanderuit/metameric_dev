@@ -121,6 +121,7 @@ namespace met {
   
     // Wrapper around vertex constraint data
     struct Vertex {
+      using state_type = detail::VertexState;
       using cnstr_type = std::variant<DirectColorConstraint,  MeasurementConstraint,
                                       DirectSurfaceConstraint, IndirectSurfaceConstraint>;
       // Associated name

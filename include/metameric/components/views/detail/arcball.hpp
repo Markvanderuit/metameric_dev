@@ -80,13 +80,13 @@ namespace met::detail {
       met_trace();
       if (m_is_mutated)
         update();
-      return m_center + m_zoom * (m_eye - m_center); 
+      return m_center + m_zoom * m_eye; 
     }
     eig::Array3f eye_dir() const { 
       met_trace();
       if (m_is_mutated)
         update();
-      return (m_eye - m_center).matrix().normalized().eval(); 
+      return m_eye.matrix().normalized().eval(); 
     }
 
   public: // View control functions
@@ -107,6 +107,11 @@ namespace met::detail {
 
     void set_aspect(float aspect) {
       m_aspect = aspect;
+      m_is_mutated = true;
+    }
+
+    void set_center(eig::Array3f center) {
+      m_center = center;
       m_is_mutated = true;
     }
 

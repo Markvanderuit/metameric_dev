@@ -105,7 +105,14 @@ namespace met {
       
       if (begin_handle("is_active").getr<bool>() && e_vert.has_mismatching()) {
         // Visual separator from editing components drawn in previous tasks
-        ImGui::Separator();
+        ImGui::SeparatorText("Mismatch Volume");
+        
+        // Declare scoped ImGui style state to remove border padding
+        auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+                            
+        ImGui::BeginChild("##mmv_view");
 
         // Compute viewport size s.t. texture fills rest of window
         // and if necessary resize framebuffer
@@ -117,7 +124,7 @@ namespace met {
         // Prepare framebuffer target for next subtasks
         auto &i_frame_buffer = info("frame_buffer").getw<gl::Framebuffer>();
         i_frame_buffer.bind();
-        i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 1));
+        i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 0));
         i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
 
         // Place texture view using draw target
@@ -197,6 +204,9 @@ namespace met {
         
         // Switch back to default framebuffer
         gl::Framebuffer::make_default().bind();
+        
+        // Close child separator zone
+        ImGui::EndChild();
       }
 
       // Finish ImGui state
@@ -241,6 +251,13 @@ namespace met {
     if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
       info.task().dstr();
       return;
+    }
+
+    // Update camera while mmv progresses
+    if (info.child("viewport_begin")("is_active").getr<bool>()) {
+      info.child("viewport_camera_input")("arcball").getw<detail::Arcball>().set_center(
+        info.child("viewport_gen_mmv")("chull_center").getr<eig::Array3f>()
+      );
     }
   }
 } // namespace met

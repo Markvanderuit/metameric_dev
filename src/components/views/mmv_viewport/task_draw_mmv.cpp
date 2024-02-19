@@ -1,3 +1,5 @@
+#include <metameric/core/scene.hpp>
+#include <metameric/components/views/mesh_viewport/task_input_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/array.hpp>
@@ -7,30 +9,27 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
-  bool DrawMMVTask::is_active(SchedulerHandle &info) {
-    met_trace();
-    return info.relative("viewport_begin")("is_active").getr<bool>() &&
-           info.relative("viewport_gen_mmv")("chull_array").getr<gl::Array>().is_init();
-  }
-
-  void DrawMMVTask::init(SchedulerHandle &info) {
+  
+  void DrawMMVTask::eval_draw_constraints(SchedulerHandle &info) {
     met_trace_full();
     
-    // Generate program object
-    m_program = {{ .type       = gl::ShaderType::eVertex,   
-                   .spirv_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.vert.spv",
-                   .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.vert.json" },
-                 { .type       = gl::ShaderType::eFragment, 
-                   .spirv_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.spv",
-                   .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.json" }};
+    // Get handles, shared resources, modified resources
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+    const auto &e_is      = info.parent()("selection").getr<InputSelection>();
+    const auto &e_vert    = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+
+    // Compute viewport offset and size, minus ImGui's tab bars etc
+    eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                               + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
     
-    // Generate and set mapped uniform buffer
-    m_unif_buffer     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-    m_unif_buffer_map = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
-    m_unif_buffer_map->alpha = 1.f;
+    // Chain of visits to extract relevant constraint data
+    // ...
   }
 
-  void DrawMMVTask::eval(SchedulerHandle &info) {
+  void DrawMMVTask::eval_draw_volume(SchedulerHandle &info) {
     met_trace_full();
     
     // Get shared resources
@@ -59,5 +58,33 @@ namespace met {
     
     // Dispatch draw information
     gl::dispatch_draw(e_draw);
+  }
+
+  bool DrawMMVTask::is_active(SchedulerHandle &info) {
+    met_trace();
+    return info.relative("viewport_begin")("is_active").getr<bool>() &&
+           info.relative("viewport_gen_mmv")("chull_array").getr<gl::Array>().is_init();
+  }
+
+  void DrawMMVTask::init(SchedulerHandle &info) {
+    met_trace_full();
+    
+    // Generate program object
+    m_program = {{ .type       = gl::ShaderType::eVertex,   
+                   .spirv_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.vert.spv",
+                   .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.vert.json" },
+                 { .type       = gl::ShaderType::eFragment, 
+                   .spirv_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.spv",
+                   .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.json" }};
+    
+    // Generate and set mapped uniform buffer
+    m_unif_buffer     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
+    m_unif_buffer_map = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
+    m_unif_buffer_map->alpha = 1.f;
+  }
+
+  void DrawMMVTask::eval(SchedulerHandle &info) {
+    eval_draw_volume(info);
+    eval_draw_constraints(info);
   }
 } // namespace met

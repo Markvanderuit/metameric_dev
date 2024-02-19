@@ -19,26 +19,15 @@ namespace met::detail {
     // - prior; arcb_handle to corresponding target viewport; should hold gl::Texture2d4f
     // - info; arcball initialization settings
     ArcballInputTask(ResourceHandle view, InfoType info = {
-      .dist            = 2.f,
-      .e_eye           = { -.5f, .5f, 1.f },
-      .e_center        = { -.5f, .5f, .0f },
+      .dist            = 1.f,
+      .e_eye           = 1.f,
+      .e_center        = 0.f,
       .zoom_delta_mult = 0.1f
     }) : m_view_handle(view), m_info(info) { }
 
     void init(SchedulerHandle &info) override {
       met_trace();
-
-      // debug::check_expr(m_view_handle.is_init());
-
-      /* // Get shared resources
-      const auto &e_view = m_view_handle.getr<gl::Texture2d4f>();
-      auto view_size = e_view.size().cast<float>().eval();
-
-      // Make arcball available as "arcball" resource 
-      auto &i_arcball =  */info("arcball").init<Arcball>(m_info);/* .getw<Arcball>();
-      
-      // Initialize arcball properties to match the viewport
-      i_arcball.set_aspect(view_size.x() / view_size.y()); */
+      info("arcball").init<Arcball>(m_info);
     }
 
     void eval(SchedulerHandle &info) override {

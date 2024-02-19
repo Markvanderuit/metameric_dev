@@ -18,6 +18,9 @@ namespace met {
     gl::Program  m_program;
     gl::DrawInfo m_dispatch;
 
+    void eval_draw_constraints(SchedulerHandle &info);
+    void eval_draw_volume(SchedulerHandle &info);
+
   public:
     bool is_active(SchedulerHandle &info) override;
     void init(SchedulerHandle &info) override;

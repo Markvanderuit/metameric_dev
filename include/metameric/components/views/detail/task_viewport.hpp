@@ -40,11 +40,6 @@ namespace met::detail {
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       auto &i_frame_buffer_ms   = info("frame_buffer_ms").getw<gl::Framebuffer>();
       auto &i_frame_buffer      = info("frame_buffer").getw<gl::Framebuffer>();
-
-      // Declare scoped ImGui style state
-      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
       
       // Open main viewport window, and forward window activity to "is_active" flag
       // Note: window end is post-pended in ViewportEndTask

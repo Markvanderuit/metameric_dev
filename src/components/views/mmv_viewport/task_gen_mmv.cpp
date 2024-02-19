@@ -100,6 +100,7 @@ namespace met {
     // Make vertex array object available, uninitialized
     info("chull_array").set<gl::Array>({ });
     info("chull_draw").set<gl::DrawInfo>({ });
+    info("chull_center").set<eig::Array3f>(0.f);
   }
 
   void GenMMVTask::eval(SchedulerHandle &info) {
@@ -118,8 +119,7 @@ namespace met {
       || e_state.csys_i 
       || e_state.verts[e_is.constraint_i]
       || e_scene.components.colr_systems[e_uplifting.csys_i];;
-    
-    
+
     // TODO move to is_active
     // TODO reset on some vertex constraint state change
     if (m_iter >= mmv_samples_max && !should_clear)
@@ -227,6 +227,10 @@ namespace met {
       m_chull = generate_convex_hull<AlMesh, Colr>(points);
     }
 
+    // If a set of points is available, generate approximate center
+    info("chull_center").getw<eig::Array3f>() = (minb + 0.5 * (maxb - minb)).eval();
+    fmt::print("Center = {}\n", info("chull_center").getr<eig::Array3f>());
+    
     // If a convex hull is available, generate a vertex array object
     // for rendering purposes
     auto &i_array = info("chull_array").getw<gl::Array>();

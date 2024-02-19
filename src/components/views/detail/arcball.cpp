@@ -21,7 +21,7 @@ namespace met::detail {
   void Arcball::update() const {
     met_trace();
     
-    m_view = eig::lookat_rh(m_zoom * (m_eye - m_center) + m_center, m_center, m_up);
+    m_view = eig::lookat_rh(m_zoom * m_eye + m_center, m_center, m_up);
     m_proj = eig::perspective_rh_no(m_fov_y, m_aspect, m_near_z, m_far_z);
     m_full = m_proj * m_view;
     
@@ -62,7 +62,7 @@ namespace met::detail {
                     * eig::AngleAxisf(delta_angle.x(), m_up.matrix()));
     
     // Apply rotation
-    m_eye = m_center + rot * (m_eye - m_center);
+    m_eye = rot * m_eye;
   }
   
   void Arcball::set_move_delta(eig::Array3f delta) {
@@ -83,7 +83,7 @@ namespace met::detail {
 
     // Translate entire of camera by specified amount
     m_center = transform * m_center.matrix();
-    m_eye    = transform * m_eye.matrix();
+    // m_eye    = transform * (m_center + m_eye).matrix() - m_center;
   }
 
   Ray Arcball::generate_ray(eig::Vector2f screen_pos) const {
