@@ -110,3 +110,33 @@ namespace met {
   void from_json(const json &js, IndirectSurfaceConstraint &c);
   void to_json(json &js, const IndirectSurfaceConstraint &c);
 } // namespace met
+
+namespace std {
+  template <>
+  struct std::formatter<met::DirectColorConstraint> : std::formatter<string_view> {
+    auto format(const met::DirectColorConstraint& ty, std::format_context& ctx) const {
+      return std::formatter<std::string_view>::format("direct", ctx);
+    }
+  };
+
+  template <>
+  struct std::formatter<met::MeasurementConstraint> : std::formatter<string_view> {
+    auto format(const met::MeasurementConstraint& ty, std::format_context& ctx) const {
+      return std::formatter<std::string_view>::format("measurement", ctx);
+    }
+  };
+
+  template <>
+  struct std::formatter<met::DirectSurfaceConstraint> : std::formatter<string_view> {
+    auto format(const met::DirectSurfaceConstraint& ty, std::format_context& ctx) const {
+      return std::formatter<std::string_view>::format("direct surface", ctx);
+    }
+  };
+
+  template <>
+  struct std::formatter<met::IndirectSurfaceConstraint> : std::formatter<string_view> {
+    auto format(const met::IndirectSurfaceConstraint& ty, std::format_context& ctx) const {
+      return std::formatter<std::string_view>::format("indirect surface", ctx);
+    }
+  };
+} // namespace std
