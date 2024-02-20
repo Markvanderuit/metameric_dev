@@ -100,6 +100,27 @@ namespace met {
       push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
       ImGui::DragFloat("Power", &value.illuminant_scale, 0.1f, 0.0f, 100.f);
     };
+    
+    template<std::size_t I> using index_t = std::integral_constant<std::size_t, I>;
+    template<std::size_t I> constexpr index_t<I> index{};
+
+    template<std::size_t...Is> 
+    constexpr std::tuple< index_t<Is>... > make_indexes(std::index_sequence<Is...>){
+      return std::make_tuple(index<Is>...);
+    }
+
+    template<std::size_t N>
+    constexpr auto indexing_tuple = make_indexes(std::make_index_sequence<N>{});
+
+    template<std::size_t...Is, class T, class F>
+    auto tuple_foreach( std::index_sequence<Is...>, T&& tup, F&& f ) {
+      ( f( std::get<Is>( std::forward<T>(tup) ) ), ... );
+    }
+    template<class T, class F>
+    auto tuple_foreach( T&& tup, F&& f ) {
+      auto indexes = std::make_index_sequence< std::tuple_size_v< std::decay_t<T> > >{};
+      return tuple_foreach( indexes, std::forward<T>(tup), std::forward<F>(f) );
+    }
 
     // Default implementation of editing visitor for Uplifting components
     template <>
@@ -116,104 +137,132 @@ namespace met {
       push_resource_selector("Basis functions", scene.resources.bases, value.basis_i);
       push_resource_selector("Base color system", scene.components.colr_systems, value.csys_i);
 
-      // Visual separator into constraint list
+      // Visual separator for vertex constraints
       ImGui::Separator();
 
-      // Helper lambda to dedicate a group to all available vertices
-      auto visit_vertex_column = [&](std::string                                            col_name, 
-                                     float                                                  col_width,
-                                     std::function<void (float width, Uplifting::Vertex &)> visitor) {
-        ImGui::BeginGroup();
-        ImGui::AlignTextToFramePadding();
-        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * col_width);
-        ImGui::Text(col_name.c_str());
-        for (uint j = 0; j < value.verts.size(); ++j) {
-          auto scope = ImGui::ScopedID(std::format("{}", j));
-          visitor(col_width, value.verts[j]);
-        }
-        ImGui::EndGroup();
-      };
-      
-      // Vertex name editor column
-      detail::visit_range_column<Uplifting::Vertex>("Name", 0.25, value.verts, [&](uint i, Uplifting::Vertex &vert) {
-        auto copy = vert.name; 
-        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
-        if (ImGui::InputText("##constraint_name", &copy, str_edit_flags)) {
-          vert.name = copy;
-        }
-      });
-      ImGui::SameLine();
-      
-      // Vertex type editor column;
-      // if type is changed, constraint data is essentially discarded
-      detail::visit_range_column<Uplifting::Vertex>("Type", 0.25, value.verts, [&](uint i, Uplifting::Vertex &vert) {
-        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25);
-        if (ImGui::BeginCombo("##constraint_type", std::format("{}", vert.constraint).c_str())) {
-          if (ImGui::Selectable("direct", std::holds_alternative<DirectColorConstraint>(vert.constraint))) {
-            if (!std::holds_alternative<DirectColorConstraint>(vert.constraint)) {
-              vert.constraint = DirectColorConstraint { .colr_i = 0.5 };
-            }
-          }
-          if (ImGui::Selectable("direct surface", std::holds_alternative<DirectSurfaceConstraint>(vert.constraint))) {
-            if (!std::holds_alternative<DirectSurfaceConstraint>(vert.constraint)) {
-              vert.constraint = DirectSurfaceConstraint();
-            }
-          }
-          if (ImGui::Selectable("indirect surface", std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint))) {
-            if (!std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint)) {
-              vert.constraint = IndirectSurfaceConstraint();
-            }
-          }
-          if (ImGui::Selectable("measurement", std::holds_alternative<MeasurementConstraint>(vert.constraint))) {
-            if (!std::holds_alternative<MeasurementConstraint>(vert.constraint)) {
-              vert.constraint = MeasurementConstraint { .measurement = 0.5  };
-            }
-          }
-          ImGui::EndCombo();
-        }
-      });
-      ImGui::SameLine();
-      
-      // Vertex property view column
-      detail::visit_range_column<Uplifting::Vertex>("Properties", 0.4, value.verts, [&](uint i, Uplifting::Vertex &vert) {
-        std::visit(overloaded {
-          [](DirectColorConstraint &cstr) { },
-          [](DirectSurfaceConstraint &cstr) {
-            // Show primary color value taken from surface
-            auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.surface.diffuse), 1).finished();
-            ImGui::ColorButton("##base_color", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
-
-            // Show secondary color constraints, up to a maximum amount before overflow
-            for (uint i = 0; i < std::min(3u, static_cast<uint>(cstr.colr_j.size())); ++i) {
-              auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.colr_j[i]), 1).finished();
-              ImGui::SameLine();
-              ImGui::ColorButton("##base_color", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
-            }
-          },
-          [](IndirectSurfaceConstraint &cstr) { },
-          [](MeasurementConstraint &cstr) { },
-        }, vert.constraint);
-      });
-      ImGui::SameLine();
-
-      ImGui::BeginGroup();
-      {
-        ImGui::AlignTextToFramePadding();
-        ImGui::NewLine();
-        ImGui::SameLine(36.f);
+      // Table for vertex constraints
+      if (!value.verts.empty() && ImGui::BeginTable("Properties", 4, ImGuiTableFlags_SizingStretchProp)) {
+        // Setup table header; column 4 is left without header
+        // Columns are shown without hover or color; cleaner than using header
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0); ImGui::Text("Constraint");
+        ImGui::TableSetColumnIndex(1); ImGui::Text("Type");
+        ImGui::TableSetColumnIndex(2); ImGui::Text("Data");
         
-        // Optionally insert hide/show button to hide/show all vertices
-        bool is_any_active = rng::any_of(value.verts, &Uplifting::Vertex::is_active);
-        if (ImGui::Button(is_any_active ? "V" : "H")) {
-          is_any_active = !is_any_active;
-          rng::fill(value.verts | vws::transform(&Uplifting::Vertex::is_active), is_any_active);
-        }
-        if (ImGui::IsItemHovered())
-          ImGui::SetTooltip("Toggle all active");
-        ImGui::SameLine();
+        // Each next row is dedicated to a single vertex constraint
+        for (uint j = 0; j < value.verts.size(); ++j) {
+          ImGui::TableNextRow();
+          auto &vert = value.verts[j];
+          auto scope = ImGui::ScopedID(std::format("table_row_{}", typeid(Uplifting::Vertex).name(), j));
 
-        // Button and accompanying popup to add new constraint vertices
-        if (ImGui::Button("+")) {
+          // Name editor column
+          ImGui::TableSetColumnIndex(0);
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+          auto copy = vert.name; 
+          if (ImGui::InputText("##constraint_name", &copy, str_edit_flags)) {
+            vert.name = copy;
+          }
+
+          // Type editor column
+          ImGui::TableSetColumnIndex(1);
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+          {
+            auto combo_str = to_capital(std::format("{}", vert.constraint));
+            if (ImGui::BeginCombo("##constraint_type", combo_str.c_str())) {
+              auto indexes = indexing_tuple<std::variant_size_v<Uplifting::Vertex::cnstr_type>>;
+              tuple_foreach(indexes, [&](auto I) {
+                using Ty = std::variant_alternative_t<I, Uplifting::Vertex::cnstr_type>;
+
+                Ty ty;
+                
+                // auto selectable_str = to_capital(std::format("{}", ty));
+                // bool holds_ty  = std::holds_alternative<Ty>(vert.constraint);
+                // if (ImGui::Selectable(selectable_str.c_str(), holds_ty) && !holds_ty) {
+                //   vert.constraint = ty;
+                // }
+              });
+              
+              /* if (ImGui::Selectable("direct", std::holds_alternative<DirectColorConstraint>(vert.constraint))) {
+                if (!std::holds_alternative<DirectColorConstraint>(vert.constraint))
+                  vert.constraint = DirectColorConstraint { .colr_i = 0.5 };
+              }
+              if (ImGui::Selectable("direct surface", std::holds_alternative<DirectSurfaceConstraint>(vert.constraint))) {
+                if (!std::holds_alternative<DirectSurfaceConstraint>(vert.constraint))
+                  vert.constraint = DirectSurfaceConstraint();
+              }
+              if (ImGui::Selectable("indirect surface", std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint))) {
+                if (!std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint))
+                  vert.constraint = IndirectSurfaceConstraint();
+              }
+              if (ImGui::Selectable("measurement", std::holds_alternative<MeasurementConstraint>(vert.constraint))) {
+                if (!std::holds_alternative<MeasurementConstraint>(vert.constraint))
+                  vert.constraint = MeasurementConstraint { .measurement = 0.5  };
+              } */
+
+              ImGui::EndCombo();
+            }
+          }
+          
+          // Properties view column
+          ImGui::TableSetColumnIndex(2);
+          std::visit(overloaded {
+            [](ColorConstraint auto &cstr) {
+              // Show primary color value
+              auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.get_colr_i()), 1).finished();
+              ImGui::ColorButton("##base_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
+
+              // Show secondary color constraints
+              for (auto &colr_j : cstr.colr_j | vws::take(3ul)) {
+                auto srgb = (eig::Array4f() << lrgb_to_srgb(colr_j), 1).finished();
+                ImGui::SameLine();
+                ImGui::ColorButton("##cstr_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
+              }
+            },
+            [](auto &cstr) { },
+          }, vert.constraint);
+
+          // Edit buttons
+          ImGui::TableSetColumnIndex(3);
+          {
+            // Edit button spawns MMVEditorTask window
+            if (ImGui::Button("Edit")) {
+              auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+              auto child_handle = info.child_task(child_name);
+              if (!child_handle.is_init()) {
+                child_handle.init<MMVEditorTask>(
+                  InputSelection { .uplifting_i = i, .constraint_i = j });
+              }
+            }
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Edit constraint");
+            ImGui::SameLine();
+
+            // Optionally insert hide/show button at end of line if vertex constraint supports this
+            if (ImGui::Button(vert.is_active ? "V" : "H"))
+              vert.is_active = !vert.is_active;
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Toggle active");
+            ImGui::SameLine();
+
+            // Insert delete button at end of line
+            if (ImGui::Button("X")) {
+              value.verts.erase(value.verts.begin() + j);
+              break;
+            }
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Delete component");
+          }
+
+          ImGui::PopID();
+        }
+
+        ImGui::EndTable();
+      } 
+
+      // Add button and accompanying popup to add new constraint vertices
+      {
+        if (ImGui::Button("New constraint")) {
           ImGui::OpenPopup("popup_add_uplifting_vertex");
         }
         if (ImGui::BeginPopup("popup_add_uplifting_vertex")) {
@@ -234,42 +283,7 @@ namespace met {
             });
           ImGui::EndPopup();
         } // if (BeginPopup())
-        
-        for (uint j = 0; j < value.verts.size(); ++j) {
-          // Get shorthands
-          auto scope = ImGui::ScopedID(std::format("dadada_{}_{}", typeid(Uplifting::Vertex).name(), j));
-          auto &vert = value.verts[j];
-
-          // Edit button spawns MMVEditorTask window
-          if (ImGui::Button("Edit")) {
-            auto child_name   = std::format("mmv_editor_{}_{}", i, j);
-            auto child_handle = info.child_task(child_name);
-            if (!child_handle.is_init()) {
-              child_handle.init<MMVEditorTask>(
-                InputSelection { .uplifting_i = i, .constraint_i = j });
-            }
-          }
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Edit constraint");
-          ImGui::SameLine();
-
-          // Optionally insert hide/show button at end of line if vertex constraint supports this
-          if (ImGui::Button(vert.is_active ? "V" : "H"))
-            vert.is_active = !vert.is_active;
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Toggle active");
-          ImGui::SameLine();
-
-          // Insert delete button at end of line
-          if (ImGui::Button("X")) {
-            value.verts.erase(value.verts.begin() + j);
-            break;
-          }
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Delete component");
-        } // for (uint j)
       }
-      ImGui::EndGroup();
     };
 
     // Default implementation of editing visitor for ColorSystem components

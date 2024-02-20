@@ -77,6 +77,13 @@ namespace met {
     guard(data, {});
     return { reinterpret_cast<T*>(data), s.size_bytes() / sizeof(T) };
   }
+  
+  // Helper; capitalize a string
+  inline
+  std::string to_capital(std::string s) {
+    s[0] = std::toupper(s[0]);
+    return s;
+  }
 
   // Take a pair of integers, cast to same type, and do a ceiling divide
   template <typename T, typename T_>

@@ -10,7 +10,7 @@
 
 namespace met {
   // Constants
-  constexpr uint mmv_samples_per_iter = 8u;
+  constexpr uint mmv_samples_per_iter = 32u;
   constexpr uint mmv_samples_max      = 256u;
   constexpr auto buffer_create_flags  = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags  = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;

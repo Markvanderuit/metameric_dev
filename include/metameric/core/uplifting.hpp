@@ -9,8 +9,9 @@ namespace met {
   // Concept defining the expected components of color-system constraints
   template <typename Ty>
   concept ColorConstraint = requires(Ty t) {
-    { t.colr_j } -> std::same_as<std::vector<Colr> &>;
-    { t.csys_j } -> std::same_as<std::vector<uint> &>;
+    { t.get_colr_i() } -> std::same_as<Colr &>;
+    { t.colr_j       } -> std::same_as<std::vector<Colr> &>;
+    { t.csys_j       } -> std::same_as<std::vector<uint> &>;
   };
   template <typename Ty>
   concept is_color_constraint = ColorConstraint<Ty>;
@@ -36,6 +37,10 @@ namespace met {
   public:
     bool has_mismatching() const { return !colr_j.empty(); }
     bool operator==(const DirectColorConstraint &o) const;
+
+  public:
+          Colr &get_colr_i()       { return colr_i; }
+    const Colr &get_colr_i() const { return colr_i; }
   };
   static_assert(is_color_constraint<DirectColorConstraint>);
 
@@ -45,7 +50,8 @@ namespace met {
      given direct illumination. */
   struct DirectSurfaceConstraint {
     // Constraint data for direct color
-    // Note: colr_i as in DirectConstraint is sampled from the underlying surface
+    // Note: colr_i as in DirectConstraint is sampled from the underlying surface;
+    // alternatively, see get_colr_i()
     std::vector<Colr> colr_j; // Expected colors under secondary color systems
     std::vector<uint> csys_j; // Indices of the secondary color systems
 
@@ -56,6 +62,10 @@ namespace met {
     bool has_mismatching() const { return !colr_j.empty(); }
     bool is_valid() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
+
+  public:
+          Colr &get_colr_i()       { return surface.diffuse; }
+    const Colr &get_colr_i() const { return surface.diffuse; }
   };
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
   static_assert(is_color_constraint<DirectSurfaceConstraint>);

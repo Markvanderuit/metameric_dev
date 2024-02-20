@@ -155,7 +155,7 @@ namespace met {
       if (col_name.empty()) {
         ImGui::NewLine();
       } else {
-        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * col_width);
+        ImGui::SetNextItemWidth(col_width);
         ImGui::Text(col_name.c_str());
       }
 

@@ -32,10 +32,15 @@ namespace met {
             ImGui::ColorEdit3("Base color", srgb.data(), ImGuiColorEditFlags_Float);
             cstr.colr_i = srgb_to_lrgb(srgb);
           }
+
+          // Visual separator into constraint list
           ImGui::Separator(); 
 
+          // Maximum column width is part of available content region
+          float col_width = ImGui::GetContentRegionAvail().x;
+
           // Color constraint; system column
-          detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
+          detail::visit_range_column<uint>("Color system", col_width * 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
             // Spawn selector; work on a copy to detect changes
             uint _csys_j = csys_j;
             detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, _csys_j, 
@@ -65,7 +70,7 @@ namespace met {
           ImGui::SameLine();
 
           // Color constraint; value column
-          detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
+          detail::visit_range_column<Colr>("Color value", col_width * 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
             // ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
             auto srgb = lrgb_to_srgb(colr_j);
             ImGui::ColorEdit3("##color_editor", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
@@ -80,17 +85,22 @@ namespace met {
         [&](DirectSurfaceConstraint &cstr) {
           // Color baseline value extracted from surface
           ImGui::ColorEdit3("Base color", cstr.surface.diffuse.data(), ImGuiColorEditFlags_Float);
+          
+          // Visual separator into constraint list
           ImGui::Separator();
 
+          // Maximum column width is part of available content region
+          float col_width = ImGui::GetContentRegionAvail().x;
+          
           // Color constraint; system column
-          detail::visit_range_column<uint>("Color system", 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
+          detail::visit_range_column<uint>("Color system", col_width * 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
             detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, csys_j, 
               [](const auto &c) { return c.name; });
           });
           ImGui::SameLine();
 
           // Color constraint; value column
-          detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
+          detail::visit_range_column<Colr>("Color value", col_width * 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
             ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
           });
           
