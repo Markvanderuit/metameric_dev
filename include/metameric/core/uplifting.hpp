@@ -6,6 +6,24 @@
 #include <metameric/core/record.hpp>
 
 namespace met {
+  // Concept defining the expected components of color-system constraints
+  template <typename Ty>
+  concept ColorConstraint = requires(Ty t) {
+    { t.colr_j } -> std::same_as<std::vector<Colr> &>;
+    { t.csys_j } -> std::same_as<std::vector<uint> &>;
+  };
+  template <typename Ty>
+  concept is_color_constraint = ColorConstraint<Ty>;
+
+  // Concept defining the expected components of on-surface constraints 
+  template <typename Ty>
+  concept SurfaceConstraint = requires(Ty t) {
+    { t.is_valid() } -> std::same_as<bool>;
+    { t.surface    } -> std::same_as<SurfaceInfo &>;
+  };
+  template <typename Ty>
+  concept is_surface_constraint = SurfaceConstraint<Ty>;
+
   /* Constraint definition used in uplifting;
      A direct constraint imposes specific color reproduction under a 
      specified color system, i.e. direct illumination. */
@@ -19,27 +37,7 @@ namespace met {
     bool has_mismatching() const { return !colr_j.empty(); }
     bool operator==(const DirectColorConstraint &o) const;
   };
-
-  /* Constraint definition used in uplifting;
-     A measurement constraint imposes specific spectrum reproduction
-     for some given spectra, for at the least the corresponding color
-     in the uplifting's primary color system. */
-  struct MeasurementConstraint {
-    // Measured spectral data
-    Spec measurement; 
-
-  public:
-    bool operator==(const MeasurementConstraint &o) const;
-  };
-
-  // Concept defining the expected components of on-surface constraints 
-  template <typename Ty>
-  concept SurfaceConstraint = requires(Ty t) {
-    { t.is_valid()        } -> std::same_as<bool>;
-    { t.surface           } -> std::same_as<SurfaceInfo &>;
-  };
-  template <typename Ty>
-  concept is_surface_constraint = SurfaceConstraint<Ty>;
+  static_assert(is_color_constraint<DirectColorConstraint>);
 
   /* Constraint definition used in uplifting;
      A direct surface constraint imposes specific color reproduction
@@ -60,6 +58,7 @@ namespace met {
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
+  static_assert(is_color_constraint<DirectSurfaceConstraint>);
 
   /* Constraint definition used in upliftin
      A indirect surface constraint imposes specific color reproduction
@@ -69,6 +68,8 @@ namespace met {
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
 
+    // ...
+
   public:
     // bool has_mismatching() const { return !colr_j.empty(); }
     bool is_valid() const { return surface.is_valid(); }
@@ -76,10 +77,18 @@ namespace met {
   };
   static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
 
-  // Helper concepts/statics
 
-  // template <typename Ty>
-  // concept is_surface_constraint = std::is_same_v<Ty, DirectSurfaceConstraint> || std::is_same_v<Ty, IndirectSurfaceConstraint>;
+  /* Constraint definition used in uplifting;
+     A measurement constraint imposes specific spectrum reproduction
+     for some given spectra, for at the least the corresponding color
+     in the uplifting's primary color system. */
+  struct MeasurementConstraint {
+    // Measured spectral data
+    Spec measurement; 
+
+  public:
+    bool operator==(const MeasurementConstraint &o) const;
+  };
 
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);

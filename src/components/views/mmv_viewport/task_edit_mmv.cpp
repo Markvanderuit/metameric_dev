@@ -27,10 +27,10 @@ namespace met {
         [&](DirectColorConstraint &cstr) {
           // Color baseline value
           {
-            ImGui::ColorEdit3("Base color", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
-            // auto srgb = lrgb_to_srgb(cstr.colr_i);
-            // ImGui::ColorEdit3("Base color", srgb.data(), ImGuiColorEditFlags_Float);
-            // cstr.colr_i = srgb_to_lrgb(srgb);
+            // ImGui::ColorEdit3("Base color", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
+            auto srgb = lrgb_to_srgb(cstr.colr_i);
+            ImGui::ColorEdit3("Base color", srgb.data(), ImGuiColorEditFlags_Float);
+            cstr.colr_i = srgb_to_lrgb(srgb);
           }
           ImGui::Separator(); 
 
@@ -66,10 +66,10 @@ namespace met {
 
           // Color constraint; value column
           detail::visit_range_column<Colr>("Color value", 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
-            ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-            // auto srgb = lrgb_to_srgb(colr_j);
-            // ImGui::ColorEdit3("##color_editor", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-            // colr_j = srgb_to_lrgb(srgb);
+            // ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+            auto srgb = lrgb_to_srgb(colr_j);
+            ImGui::ColorEdit3("##color_editor", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+            colr_j = srgb_to_lrgb(srgb);
           });
           
           if (ImGui::Button("Add constraint")) {

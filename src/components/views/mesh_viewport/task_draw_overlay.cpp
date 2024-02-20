@@ -62,7 +62,7 @@ namespace met {
 
     // Draw vertex for each visible vertex at its surface
     for (const SurfaceInfo &si : surfaces) {
-      // Get screen-space and window-space position of surface point, and of
+      // Get window-space position of surface point, and of
       // a slightly offset point along the surface normal
       eig::Vector2f p_window = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
       eig::Vector2f n_window = eig::world_to_window_space(si.p + si.n * 0.025f, e_arcball.full(), viewport_offs, viewport_size);
