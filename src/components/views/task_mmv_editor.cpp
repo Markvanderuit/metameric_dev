@@ -20,11 +20,6 @@ namespace met {
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   
   struct MMVEditorBeginTask : public detail::TaskNode {
-    void init(SchedulerHandle &info) override {
-      met_trace_full();
-      info("is_active").init<bool>(false);
-    }
-
     void eval(SchedulerHandle &info) override {
       met_trace_full();
 
@@ -37,26 +32,27 @@ namespace met {
       auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
         e_vert.name, e_is.uplifting_i, e_is.constraint_i);  
       
-      // Ensure sensible window size on first open
+      // Define window size on first open
       ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);
 
       // Open main viewport window, and forward window activity to "is_active" flag
       // Note: window end is post-pended in ViewportEndTask so subtasks can do stuff with imgui state
       // Note: we track close button as an edge case
       bool is_open = true;
-      bool is_active = ImGui::Begin(name.c_str(), &is_open);
-      info("is_active").getw<bool>() = is_active;
+      bool is_active = info.parent()("is_active").getw<bool>() 
+                     = ImGui::Begin(name.c_str(), &is_open);
+
+      // Close prematurely; subsequent tasks do not activate either way
+      if (!is_active || !is_open)
+        ImGui::End();
 
       // Close button pressed; ensure related tasks get torn down gracefully
+      // and close ImGui scope prematurely
       if (!is_open) {
-        ImGui::End();
-        info("is_active").getw<bool>() = false;
+        info.parent()("is_active").set(false);
         info.parent_task().dstr();
-        return;
+        return; 
       }
-
-      // Halt on window inactivity
-      guard(is_active);
     }
   };
 
@@ -83,7 +79,21 @@ namespace met {
                         { .type = gl::FramebufferType::eDepth, .attachment = &m_depth_buffer }};
     }
 
+    bool is_active(SchedulerHandle &info) override {
+      met_trace();
+      
+      // Get shared resources
+      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
+      const auto &e_scene       = info.global("scene").getr<Scene>();
+      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+
+      // Activate only if parent task triggers and vertex mismatching requires rendering
+      return info.parent()("is_active").getr<bool>() && e_vert.has_mismatching();
+    }
+
     void init(SchedulerHandle &info) override {
+      met_trace();
+
       // Frame buffer initial state for subtasks to not "blurb" out
       info("lrgb_target").init<gl::Texture2d4f>({ .size = 1 });
       info("srgb_target").init<gl::Texture2d4f>({ .size = 1 });
@@ -93,45 +103,39 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
       
-      // Get handles to relative task resource
-      auto begin_handle = info.relative("viewport_begin");
-      auto end_handle   = info.relative("viewport_end");
-      
       // Get shared resources
       const auto &e_is          = info.parent()("selection").getr<InputSelection>();
       const auto &e_scene       = info.global("scene").getr<Scene>();
       const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       
-      if (begin_handle("is_active").getr<bool>() && e_vert.has_mismatching()) {
-        // Visual separator from editing components drawn in previous tasks
-        ImGui::SeparatorText("Mismatch Volume");
-        
-        // Declare scoped ImGui style state to remove border padding
-        auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
-                            
-        ImGui::BeginChild("##mmv_view");
+      // Visual separator from editing components drawn in previous tasks
+      ImGui::SeparatorText("Mismatch Volume");
+      
+      // Declare scoped ImGui style state to remove border padding
+      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
+                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+                          
+      ImGui::BeginChild("##mmv_view");
 
-        // Compute viewport size s.t. texture fills rest of window
-        // and if necessary resize framebuffer
-        eig::Array2u image_size = static_cast<eig::Array2f>(ImGui::GetContentRegionAvail()).max(1.f).cast<uint>();
-        if ((i_srgb_target.size() != image_size).any()) {
-          resize_fb(info, image_size);
-        }
-
-        // Prepare framebuffer target for next subtasks
-        auto &i_frame_buffer = info("frame_buffer").getw<gl::Framebuffer>();
-        i_frame_buffer.bind();
-        i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 0));
-        i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
-
-        // Place texture view using draw target
-        ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), 
-          i_srgb_target.size().cast<float>().eval(), 
-          eig::Vector2f(0, 1), eig::Vector2f(1, 0));
+      // Compute viewport size s.t. texture fills rest of window
+      // and if necessary resize framebuffer
+      eig::Array2u image_size = static_cast<eig::Array2f>(ImGui::GetContentRegionAvail()).max(1.f).cast<uint>();
+      if ((i_srgb_target.size() != image_size).any()) {
+        resize_fb(info, image_size);
       }
+
+      // Prepare framebuffer target for next subtasks
+      auto &i_frame_buffer = info("frame_buffer").getw<gl::Framebuffer>();
+      i_frame_buffer.bind();
+      i_frame_buffer.clear(gl::FramebufferType::eColor, eig::Array4f(0, 0, 0, 0));
+      i_frame_buffer.clear(gl::FramebufferType::eDepth, 1.f);
+
+      // Place texture view using draw target
+      ImGui::Image(ImGui::to_ptr(i_srgb_target.object()), 
+        i_srgb_target.size().cast<float>().eval(), 
+        eig::Vector2f(0, 1), eig::Vector2f(1, 0));
     }
   };
 
@@ -147,6 +151,19 @@ namespace met {
     gl::Sampler     m_sampler;
     gl::Buffer      m_uniform_buffer;
     UniformBuffer  *m_uniform_map;
+
+  public:
+    bool is_active(SchedulerHandle &info) override {
+      met_trace();
+      
+      // Get shared resources
+      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
+      const auto &e_scene       = info.global("scene").getr<Scene>();
+      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+
+      // Activate only if parent task triggers and vertex mismatching requires rendering
+      return info.parent()("is_active").getr<bool>() && e_vert.has_mismatching();
+    }
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
@@ -168,49 +185,39 @@ namespace met {
       met_trace_full();
 
       // Get handle to relative task resource
-      auto begin_handle = info.relative("viewport_begin");
       auto image_handle = info.relative("viewport_image");
       
       // Get shared resources
-      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
-      const auto &e_scene       = info.global("scene").getr<Scene>();
-      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
       const auto &e_lrgb_target = image_handle("lrgb_target").getr<gl::Texture2d4f>();
       const auto &e_srgb_target = image_handle("srgb_target").getr<gl::Texture2d4f>();
 
-      // Finish draw operation if ViewBeginTask has an active window
-      // and some draw has to happen
-      if (begin_handle("is_active").getr<bool>() && e_vert.has_mismatching()) {
-        // Push new dispatch size, if associated textures were modified
-        if (image_handle("lrgb_target").is_mutated() || is_first_eval()) {
-          eig::Array2u dispatch_n    = e_lrgb_target.size();
-          eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
-          m_dispatch = { .groups_x = dispatch_ndiv.x(),
-                         .groups_y = dispatch_ndiv.y(),
-                         .bindable_program = &m_program };
-          m_uniform_map->size = dispatch_n;
-          m_uniform_buffer.flush();
-        }
-
-        // Bind relevant resources for dispatch
-        m_program.bind();
-        m_program.bind("b_uniform", m_uniform_buffer);
-        m_program.bind("s_image_r", m_sampler);
-        m_program.bind("s_image_r", e_lrgb_target);
-        m_program.bind("i_image_w", e_srgb_target);
-
-        // Dispatch lrgb->srgb conversion
-        gl::dispatch_compute(m_dispatch);
-        
-        // Switch back to default framebuffer
-        gl::Framebuffer::make_default().bind();
-        
-        // Close child separator zone
-        ImGui::EndChild();
+      // Push new dispatch size, if associated textures were modified
+      if (image_handle("lrgb_target").is_mutated() || is_first_eval()) {
+        eig::Array2u dispatch_n    = e_lrgb_target.size();
+        eig::Array2u dispatch_ndiv = ceil_div(dispatch_n, 16u);
+        m_dispatch = { .groups_x = dispatch_ndiv.x(),
+                       .groups_y = dispatch_ndiv.y(),
+                       .bindable_program = &m_program };
+        m_uniform_map->size = dispatch_n;
+        m_uniform_buffer.flush();
       }
 
-      // Finish ImGui state
+      // Bind relevant resources for dispatch
+      m_program.bind();
+      m_program.bind("b_uniform", m_uniform_buffer);
+      m_program.bind("s_image_r", m_sampler);
+      m_program.bind("s_image_r", e_lrgb_target);
+      m_program.bind("i_image_w", e_srgb_target);
+
+      // Dispatch lrgb->srgb conversion
+      gl::dispatch_compute(m_dispatch);
+      
+      // Switch back to default framebuffer
+      gl::Framebuffer::make_default().bind();
+      
+      // Close child separator zone and finish ImGui State
       // Note: window end is post-pended here, but window begin is in ViewportBeginTask
+      ImGui::EndChild();
       ImGui::End();
     }
   };
@@ -223,6 +230,9 @@ namespace met {
   void MMVEditorTask::init(SchedulerHandle &info) {
     met_trace();
     
+    // Make is_active available
+    info("is_active").set(true);
+
     // Make selection available
     m_is = info("selection").set(std::move(m_is)).getr<InputSelection>();
 
@@ -230,7 +240,7 @@ namespace met {
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
     info.child_task("viewport_edit_mmv").init<EditMMVTask>();
     info.child_task("viewport_image").init<MMVEditorImageTask>();
-    info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"));
+    info.child_task("viewport_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"));
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
     info.child_task("viewport_draw_mmv").init<DrawMMVTask>();
     info.child_task("viewport_end").init<MMVEditorEndTask>();
@@ -254,8 +264,8 @@ namespace met {
     }
 
     // Update camera while mmv progresses
-    if (info.child("viewport_begin")("is_active").getr<bool>()) {
-      info.child("viewport_camera_input")("arcball").getw<detail::Arcball>().set_center(
+    if (info("is_active").getr<bool>()) {
+      info.child("viewport_camera")("arcball").getw<detail::Arcball>().set_center(
         info.child("viewport_gen_mmv")("chull_center").getr<eig::Array3f>()
       );
     }

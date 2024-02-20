@@ -8,21 +8,20 @@
 namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
-
   
   void DrawMMVTask::eval_draw_constraints(SchedulerHandle &info) {
     met_trace_full();
     
     // Get handles, shared resources, modified resources
     const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+    const auto &e_arcball = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
     const auto &e_is      = info.parent()("selection").getr<InputSelection>();
     const auto &e_vert    = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui:: GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
     
     // Chain of visits to extract relevant constraint data
@@ -34,7 +33,7 @@ namespace met {
     
     // Get shared resources
     const auto &e_draw = info.relative("viewport_gen_mmv")("chull_draw").getr<gl::DrawInfo>();
-    const auto &e_arcb = info.relative("viewport_camera_input")("arcball").getr<detail::Arcball>();
+    const auto &e_arcb = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
     const auto &e_trgt = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
 
     // Update sensor settings
@@ -62,7 +61,7 @@ namespace met {
 
   bool DrawMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info.relative("viewport_begin")("is_active").getr<bool>() &&
+    return info.parent()("is_active").getr<bool>() &&
            info.relative("viewport_gen_mmv")("chull_array").getr<gl::Array>().is_init();
   }
 

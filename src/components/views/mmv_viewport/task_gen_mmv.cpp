@@ -83,7 +83,7 @@ namespace met {
     // Only pass if metameric mismatching is possible and samples are required
     bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_iter < mmv_samples_max;
     
-    return info.relative("viewport_begin")("is_active").getr<bool>() && (is_stale || is_mmv);
+    return info.parent()("is_active").getr<bool>() && (is_stale || is_mmv);
   }
 
   void GenMMVTask::init(SchedulerHandle &info) {

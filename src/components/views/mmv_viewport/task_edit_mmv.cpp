@@ -6,7 +6,7 @@
 namespace met {
   bool EditMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
-    return info.relative("viewport_begin")("is_active").getr<bool>();
+    return info.parent()("is_active").getr<bool>();
   }
 
   void EditMMVTask::eval(SchedulerHandle &info) {
