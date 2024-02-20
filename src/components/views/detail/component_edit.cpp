@@ -175,8 +175,11 @@ namespace met {
                 using Ty = std::variant_alternative_t<I, Uplifting::Vertex::cnstr_type>;
 
                 Ty ty;
+
+                // TODO See the formatter implementation; you support the variant, not the underlying type
+                // fmt::print("{}\n", typeid(ty).name());
                 
-                // auto selectable_str = to_capital(std::format("{}", ty));
+                auto selectable_str = to_capital(std::format("{}", ty));
                 // bool holds_ty  = std::holds_alternative<Ty>(vert.constraint);
                 // if (ImGui::Selectable(selectable_str.c_str(), holds_ty) && !holds_ty) {
                 //   vert.constraint = ty;
