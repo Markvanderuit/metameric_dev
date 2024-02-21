@@ -211,8 +211,13 @@ namespace met {
       m_chull = generate_convex_hull<AlMesh, Colr>(points);
     }
 
-    // If a set of points is available, generate an approximate center for the camera
-    info("chull_center").getw<eig::Array3f>() = (minb + 0.5 * (maxb - minb)).eval();
+    // If a set of points is available, generate an approximate center for the camera, and update this
+    // if the distance shift exceeds some threshold
+    auto new_center = (minb + 0.5 * (maxb - minb)).eval();
+    if (auto &curr_center = info("chull_center").getw<eig::Array3f>(); (curr_center - new_center).matrix().norm() > 0.1f) {
+      curr_center = new_center;
+      info.relative("viewport_camera")("arcball").getw<detail::Arcball>().set_center(curr_center);
+    }
     
     // If a convex hull is available, generate a vertex array object
     // for rendering purposes

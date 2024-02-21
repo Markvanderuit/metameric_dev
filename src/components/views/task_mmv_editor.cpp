@@ -359,12 +359,5 @@ namespace met {
       info.task().dstr();
       return;
     }
-
-    // Update camera while mmv progresses
-    if (info("is_active").getr<bool>()) {
-      info.child("viewport_camera")("arcball").getw<detail::Arcball>().set_center(
-        info.child("viewport_gen_mmv")("chull_center").getr<eig::Array3f>()
-      );
-    }
   }
 } // namespace met
