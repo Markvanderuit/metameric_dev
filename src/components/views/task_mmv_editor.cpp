@@ -232,7 +232,7 @@ namespace met {
     
     // Make is_active available
     info("is_active").set(true);
-
+    
     // Make selection available
     m_is = info("selection").set(std::move(m_is)).getr<InputSelection>();
 

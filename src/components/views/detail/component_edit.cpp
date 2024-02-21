@@ -100,27 +100,6 @@ namespace met {
       push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
       ImGui::DragFloat("Power", &value.illuminant_scale, 0.1f, 0.0f, 100.f);
     };
-    
-    template<std::size_t I> using index_t = std::integral_constant<std::size_t, I>;
-    template<std::size_t I> constexpr index_t<I> index{};
-
-    template<std::size_t...Is> 
-    constexpr std::tuple< index_t<Is>... > make_indexes(std::index_sequence<Is...>){
-      return std::make_tuple(index<Is>...);
-    }
-
-    template<std::size_t N>
-    constexpr auto indexing_tuple = make_indexes(std::make_index_sequence<N>{});
-
-    template<std::size_t...Is, class T, class F>
-    auto tuple_foreach( std::index_sequence<Is...>, T&& tup, F&& f ) {
-      ( f( std::get<Is>( std::forward<T>(tup) ) ), ... );
-    }
-    template<class T, class F>
-    auto tuple_foreach( T&& tup, F&& f ) {
-      auto indexes = std::make_index_sequence< std::tuple_size_v< std::decay_t<T> > >{};
-      return tuple_foreach( indexes, std::forward<T>(tup), std::forward<F>(f) );
-    }
 
     // Default implementation of editing visitor for Uplifting components
     template <>
@@ -138,15 +117,14 @@ namespace met {
       push_resource_selector("Base color system", scene.components.colr_systems, value.csys_i);
 
       // Visual separator for vertex constraints
-      ImGui::Separator();
-
-      // Table for vertex constraints
+      // which are layed out in a table
+      ImGui::SeparatorText("Constraints");
       if (!value.verts.empty() && ImGui::BeginTable("Properties", 4, ImGuiTableFlags_SizingStretchProp)) {
         // Setup table header; column 4 is left without header
         // Columns are shown without hover or color; cleaner than using header
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0); ImGui::Text("Constraint");
+        ImGui::TableSetColumnIndex(0); ImGui::Text("Name");
         ImGui::TableSetColumnIndex(1); ImGui::Text("Type");
         ImGui::TableSetColumnIndex(2); ImGui::Text("Data");
         
@@ -168,41 +146,16 @@ namespace met {
           ImGui::TableSetColumnIndex(1);
           ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
           {
+            // Iterate over the types in the std::variant of constraints
+            // for this combobox
             auto combo_str = to_capital(std::format("{}", vert.constraint));
             if (ImGui::BeginCombo("##constraint_type", combo_str.c_str())) {
-              auto indexes = indexing_tuple<std::variant_size_v<Uplifting::Vertex::cnstr_type>>;
-              tuple_foreach(indexes, [&](auto I) {
-                using Ty = std::variant_alternative_t<I, Uplifting::Vertex::cnstr_type>;
-
-                Ty ty;
-
-                // TODO See the formatter implementation; you support the variant, not the underlying type
-                // fmt::print("{}\n", typeid(ty).name());
-                
-                auto selectable_str = to_capital(std::format("{}", ty));
-                // bool holds_ty  = std::holds_alternative<Ty>(vert.constraint);
-                // if (ImGui::Selectable(selectable_str.c_str(), holds_ty) && !holds_ty) {
-                //   vert.constraint = ty;
-                // }
+              variant_visit<Uplifting::Vertex::cnstr_type>([&](auto v) {
+                auto selectable_str = to_capital(std::format("{}", v));
+                bool holds_ty       = std::holds_alternative<decltype(v)>(vert.constraint);
+                if (ImGui::Selectable(selectable_str.c_str(), holds_ty) && !holds_ty)
+                  vert.constraint = v;
               });
-              
-              /* if (ImGui::Selectable("direct", std::holds_alternative<DirectColorConstraint>(vert.constraint))) {
-                if (!std::holds_alternative<DirectColorConstraint>(vert.constraint))
-                  vert.constraint = DirectColorConstraint { .colr_i = 0.5 };
-              }
-              if (ImGui::Selectable("direct surface", std::holds_alternative<DirectSurfaceConstraint>(vert.constraint))) {
-                if (!std::holds_alternative<DirectSurfaceConstraint>(vert.constraint))
-                  vert.constraint = DirectSurfaceConstraint();
-              }
-              if (ImGui::Selectable("indirect surface", std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint))) {
-                if (!std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint))
-                  vert.constraint = IndirectSurfaceConstraint();
-              }
-              if (ImGui::Selectable("measurement", std::holds_alternative<MeasurementConstraint>(vert.constraint))) {
-                if (!std::holds_alternative<MeasurementConstraint>(vert.constraint))
-                  vert.constraint = MeasurementConstraint { .measurement = 0.5  };
-              } */
-
               ImGui::EndCombo();
             }
           }
@@ -258,8 +211,7 @@ namespace met {
           }
 
           ImGui::PopID();
-        }
-
+        } // for (uint j)
         ImGui::EndTable();
       } 
 

@@ -178,26 +178,9 @@ namespace std {
   // Format Uplifting::Vertex::cstr_type, which is a std::variant
   template <>
   struct std::formatter<met::Uplifting::Vertex::cnstr_type> : std::formatter<string_view> {
-    template <class FmtCtx>
-    FmtCtx::iterator format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {
-      return std::visit([&](auto &&arg) -> FmtCtx::iterator {
-        using Ty = std::decay_t<decltype(arg)>;
-        return std::formatter<Ty>::format(arg, ctx);
-      }, constraint);
-      /* return std::visit([](auto &&arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, met::DirectColorConstraint>)
-          return "direct";
-        else if constexpr (std::is_same_v<T, met::MeasurementConstraint>)
-          return "measurement";
-        else if constexpr (std::is_same_v<T, met::DirectSurfaceConstraint>)
-          return "direct surface";
-        else if constexpr (std::is_same_v<T, met::IndirectSurfaceConstraint>)
-          return "indirect surface";
-        else
-          return "unknown";
-      }, constraint);
-      return std::formatter<std::string_view>::format(s, ctx); */
+    auto format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {
+      std::string s = std::visit([&](const auto &arg) { return std::format("{}", arg); }, constraint);
+      return std::formatter<std::string_view>::format(s, ctx);
     }
   };
 } // namespace std

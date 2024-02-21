@@ -29,10 +29,10 @@ namespace met {
      A direct constraint imposes specific color reproduction under a 
      specified color system, i.e. direct illumination. */
   struct DirectColorConstraint {
-    // Constraint data for direct color
-    Colr              colr_i; // Expected color under uplifting's color system 
-    std::vector<Colr> colr_j; // Expected colors under secondary color systems
-    std::vector<uint> csys_j; // Indices of the secondary color systems
+    // Constraint data for direct color with sensible defaults
+    Colr              colr_i = 0.5; // Expected color under uplifting's color system 
+    std::vector<Colr> colr_j = { }; // Expected colors under secondary color systems
+    std::vector<uint> csys_j = { }; // Indices of the secondary color systems
 
   public:
     bool has_mismatching() const { return !colr_j.empty(); }
@@ -52,8 +52,8 @@ namespace met {
     // Constraint data for direct color
     // Note: colr_i as in DirectConstraint is sampled from the underlying surface;
     // alternatively, see get_colr_i()
-    std::vector<Colr> colr_j; // Expected colors under secondary color systems
-    std::vector<uint> csys_j; // Indices of the secondary color systems
+    std::vector<Colr> colr_j = { }; // Expected colors under secondary color systems
+    std::vector<uint> csys_j = { }; // Indices of the secondary color systems
 
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
@@ -94,7 +94,7 @@ namespace met {
      in the uplifting's primary color system. */
   struct MeasurementConstraint {
     // Measured spectral data
-    Spec measurement; 
+    Spec measurement = 0.5;
 
   public:
     bool operator==(const MeasurementConstraint &o) const;
@@ -115,28 +115,32 @@ namespace std {
   template <>
   struct std::formatter<met::DirectColorConstraint> : std::formatter<string_view> {
     auto format(const met::DirectColorConstraint& ty, std::format_context& ctx) const {
-      return std::formatter<std::string_view>::format("direct", ctx);
+      std::string s = "direct";
+      return std::formatter<std::string_view>::format(s, ctx);
     }
   };
 
   template <>
   struct std::formatter<met::MeasurementConstraint> : std::formatter<string_view> {
     auto format(const met::MeasurementConstraint& ty, std::format_context& ctx) const {
-      return std::formatter<std::string_view>::format("measurement", ctx);
+      std::string s = "measurement";
+      return std::formatter<std::string_view>::format(s, ctx);
     }
   };
 
   template <>
   struct std::formatter<met::DirectSurfaceConstraint> : std::formatter<string_view> {
     auto format(const met::DirectSurfaceConstraint& ty, std::format_context& ctx) const {
-      return std::formatter<std::string_view>::format("direct surface", ctx);
+      std::string s = "direct surface";
+      return std::formatter<std::string_view>::format(s, ctx);
     }
   };
 
   template <>
   struct std::formatter<met::IndirectSurfaceConstraint> : std::formatter<string_view> {
     auto format(const met::IndirectSurfaceConstraint& ty, std::format_context& ctx) const {
-      return std::formatter<std::string_view>::format("indirect surface", ctx);
+      std::string s = "indirect surface";
+      return std::formatter<std::string_view>::format(s, ctx);
     }
   };
 } // namespace std

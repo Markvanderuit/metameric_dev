@@ -98,6 +98,9 @@ namespace met {
     m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_spectra, .flags = buffer_create_flags  }};
     m_buffer_spec_pack_map = m_buffer_spec_pack.map_as<SpecPackLayout>(buffer_access_flags);
 
+    // Specify spectrum cache, for plotting of generated constraint spectra
+    info("constraint_spectra").set<std::vector<Spec>>({});
+
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
@@ -232,33 +235,43 @@ namespace met {
       e_scene.components.upliftings.gl.texture_spectra.set(m_buffer_spec_pack, 0, { wavelength_samples, m_tesselation_data_map->elem_size },
                                                                                   { 0,                  m_tesselation_data_map->elem_offs });
     }
-
-    // If a viewer task exists, we should supply mesh data for rendering
-    auto viewer_name   = std::format("uplifting_viewport_{}", m_uplifting_i);
-    auto viewer_handle = info.task(viewer_name);
-    if (tssl_stale && viewer_handle.is_init()) {
-      // Convert delaunay to triangle mesh
-      auto mesh = convert_mesh<AlMesh>(m_tesselation);
-
-      // Push mesh data and generate vertex array; we do a full, expensive, inefficient copy. 
-      // The viewer is only for debugging anyways
-      m_buffer_viewer_verts = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
-      m_buffer_viewer_elems = {{ .data = cnt_span<const std::byte>(mesh.elems) }};
-      m_buffer_viewer_array = {{
-        .buffers  = {{ .buffer = &m_buffer_viewer_verts, .index = 0, .stride = sizeof(eig::Array4f) }},
-        .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-        .elements = &m_buffer_viewer_elems
-      }};
+    
+    // 5. If a viewer task exists, we should supply mesh data for rendering
+    {
+      auto viewer_name   = std::format("uplifting_viewport_{}", m_uplifting_i);
+      auto viewer_handle = info.task(viewer_name);
       
-      // Expose dispatch draw information to other tasks
-      info("tesselation_draw").set<gl::DrawInfo>({
-        .type           = gl::PrimitiveType::eTriangles,
-        .vertex_count   = (uint) (m_buffer_viewer_elems.size() / sizeof(uint)),
-        .capabilities   = {{ gl::DrawCapability::eDepthTest, true },
-                           { gl::DrawCapability::eCullOp,   false }},
-        .draw_op        = gl::DrawOp::eLine,
-        .bindable_array = &m_buffer_viewer_array
-      });
+      if (tssl_stale && viewer_handle.is_init()) {
+        // Convert delaunay to triangle mesh
+        auto mesh = convert_mesh<AlMesh>(m_tesselation);
+
+        // Push mesh data and generate vertex array; we do a full, expensive, inefficient copy. 
+        // The viewer is only for debugging anyways
+        m_buffer_viewer_verts = {{ .data = cnt_span<const std::byte>(mesh.verts) }};
+        m_buffer_viewer_elems = {{ .data = cnt_span<const std::byte>(mesh.elems) }};
+        m_buffer_viewer_array = {{
+          .buffers  = {{ .buffer = &m_buffer_viewer_verts, .index = 0, .stride = sizeof(eig::Array4f) }},
+          .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+          .elements = &m_buffer_viewer_elems
+        }};
+        
+        // Expose dispatch draw information to other tasks
+        info("tesselation_draw").set<gl::DrawInfo>({
+          .type           = gl::PrimitiveType::eTriangles,
+          .vertex_count   = (uint) (m_buffer_viewer_elems.size() / sizeof(uint)),
+          .capabilities   = {{ gl::DrawCapability::eDepthTest, true },
+                            { gl::DrawCapability::eCullOp,   false }},
+          .draw_op        = gl::DrawOp::eLine,
+          .bindable_array = &m_buffer_viewer_array
+        });
+      }
+    }
+
+    // 6. Expose a copy of generated constraint spectra for visualization
+    {
+      auto &constraint_spectra = info("constraint_spectra").getw<std::vector<Spec>>();
+      constraint_spectra.resize(e_uplifting.verts.size());      
+      rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), constraint_spectra.begin());
     }
   }
 } // namespace met

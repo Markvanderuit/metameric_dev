@@ -2,6 +2,8 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/core/metamer.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/window.hpp>
+#include <implot.h>
 
 namespace met {
   bool EditMMVTask::is_active(SchedulerHandle &info) {
@@ -27,9 +29,9 @@ namespace met {
         [&](DirectColorConstraint &cstr) {
           // Color baseline value
           {
-            // ImGui::ColorEdit3("Base color", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Base color (lrgb)", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
             auto srgb = lrgb_to_srgb(cstr.colr_i);
-            ImGui::ColorEdit3("Base color", srgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
             cstr.colr_i = srgb_to_lrgb(srgb);
           }
 
@@ -118,6 +120,29 @@ namespace met {
       }, vert.constraint);
     });
 
-    
+    // Plotter for the current constraint's resulting spectrum
+    ImGui::SeparatorText("Output spectrum");
+    {
+      // Get shared resources
+      auto uplf_handle = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_is.uplifting_i)).mask(info);
+      const auto &e_window  = info.global("window").getr<gl::Window>();
+      const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
+      const auto &e_sd      = e_spectra[e_is.constraint_i];
+
+      if (ImPlot::BeginPlot("##output_spectrum_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+        // Get wavelength values for x-axis in plot
+        Spec x_values;
+        rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+      
+        // Setup minimal format for coming line plots
+        ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+        ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+        ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0, 1.0, ImPlotCond_Always);
+
+        // Do the thing
+        ImPlot::PlotLine("", x_values.data(), e_sd.data(), wavelength_samples);
+        ImPlot::EndPlot();
+      }
+    }
   }
 } // namespace met

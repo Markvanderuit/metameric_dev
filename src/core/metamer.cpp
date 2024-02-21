@@ -79,54 +79,6 @@ namespace met {
     NLOptResult r = solve(solver);
     Spec s = info.basis.mean + Spec((basis * r.x).cast<float>());
     return s;
-
-   /*  // Out-of-loop state
-    bool is_first_run = true;
-    Spec s = 0;
-
-    const uint N = info.basis_count;
-    const uint M = 3 * info.systems.size() 
-                + (info.impose_boundedness ? 2 * wavelength_samples : 0);
-
-    // Initialize parameter object for LP solver with expected matrix sizes M, N
-    LPParameters params(M, N);
-
-    // Obtain appropriate nr. of basis functions from data
-    eig::MatrixXf basis = info.basis.func.block(0, 0, wavelength_samples, N).eval();
-
-    // Construct basis bounds
-    Spec upper_bounds = Spec(1.0) - info.basis.mean;
-    Spec lower_bounds = upper_bounds - Spec(1.0); 
-
-    // Add constraints to ensure resulting spectra produce the given color signals
-    for (uint i = 0; i < info.systems.size(); ++i) {
-      Colr signal_offs = (info.systems[i].transpose() * info.basis.mean.matrix()).transpose().eval();
-      params.A.block(3 * i, 0, 3, N) = (info.systems[i].transpose() * basis).cast<double>().eval();
-      params.b.block(3 * i, 0, 3, 1) = (info.signals[i] - signal_offs).cast<double>().eval();
-    }
-
-    // Add constraints to ensure resulting spectra are bounded to [0, 1]
-    if (info.impose_boundedness) {
-      const uint offs_l = 3 * info.systems.size();
-      const uint offs_u = offs_l + wavelength_samples;
-      params.A.block(offs_l, 0, wavelength_samples, N) = basis.cast<double>().eval();
-      params.A.block(offs_u, 0, wavelength_samples, N) = basis.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_l, 0) = lower_bounds.cast<double>().eval();
-      params.b.block<wavelength_samples, 1>(offs_u, 0) = upper_bounds.cast<double>().eval();
-      params.r.block<wavelength_samples, 1>(offs_l, 0) = LPCompare::eGE;
-      params.r.block<wavelength_samples, 1>(offs_u, 0) = LPCompare::eLE;
-    }
-
-    // Average min/max objectives for a nice smooth result
-    params.objective = LPObjective::eMaximize;
-    auto [opt_max, res_max] = lp_solve_res(params);
-    params.objective = LPObjective::eMinimize;
-    auto [opt_min, res_min] = lp_solve_res(params);
-
-    // Obtain spectral reflectance
-    Spec s_max = info.basis.mean + Spec(basis * res_max.cast<float>().matrix());
-    Spec s_min = info.basis.mean + Spec(basis * res_min.cast<float>().matrix());
-    return (0.5 * (s_min + s_max)).eval(); */
   }
 
   /* Spec generate_spectrum_recursive(GenerateSpectrumInfo info) {
