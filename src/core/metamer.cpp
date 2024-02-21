@@ -8,6 +8,79 @@
 namespace met {
   constexpr uint min_wavelength_bases = 4;
 
+  // Spec generate_spectrum(GenerateSpectrumInfo info) {
+  //   met_trace();
+  //   debug::check_expr(info.systems.size() == info.signals.size(),
+  //     "Color system size not equal to color signal size");
+
+  //   NLOptInfo solver = {
+  //     .n            = wavelength_samples,
+  //     .algo         = NLOptAlgo::LD_SLSQP,
+  //     .form         = NLOptForm::eMinimize,
+  //     .x_init       = Spec(0.5).cast<double>().eval(),
+  //     .upper        = Spec(1.0).cast<double>().eval(),
+  //     .lower        = Spec(0.0).cast<double>().eval(),
+  //     .max_iters    = 10,
+  //     .rel_func_tol = 1e-3,
+  //     .rel_xpar_tol = 1e-2,
+  //   };
+
+  //   // Objective function minimizes squared l2 norm
+  //   solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+  //     using DSpec = eig::Vector<double, wavelength_samples>;
+      
+  //     // DSpec grad = 0.f;
+  //     // for (uint i = 1; i < wavelength_samples; ++i)
+  //     //   grad[i] = x[i] - x[i - 1];
+  //     // if (g.size())
+  //     //   g = 2.f * grad;
+  //     // return grad.dot(grad);
+
+  //     DSpec avg = x.sum() / static_cast<double>(wavelength_samples);
+  //     DSpec diff = (x - avg).eval();
+
+  //     if (g.size())
+  //       g = 2.0 * diff 
+  //         + 0.15 * 2.0 * x;
+
+  //     return diff.dot(diff) + 0.15 * x.dot(x);
+
+  //     // double max_coeff = x.maxCoeff();
+  //     // if (g.size())
+  //     //   g = x.NullaryExpr([max_coeff](double x_) { return x_ == max_coeff ? max_coeff : 0.f; });
+  //     // return max_coeff;
+  //     //   // g = (3.0 * x * x).eval();
+  //     //   // g = (3.0 * x.pow(2.0).eval()).eval();
+  //     // // return (x * x * x).sum();
+  //     // // return x.pow(3.0).sum().eval();
+      
+      
+  //     // if (g.size())
+  //       // g = (2.0 * x).eval();
+  //     // return x.dot(x);
+  //   };
+
+  //   // Add color system equality constraints
+  //   for (uint i = 0; i < info.systems.size(); ++i) {
+  //     auto A = info.systems[i].cast<double>().eval();
+  //     auto b = info.signals[i].cast<double>().eval();
+
+  //     for (uint j = 0; j < 3; ++j) {
+  //       solver.eq_constraints.push_back(
+  //         [A = A.col(j).eval(), b = b[j]]
+  //         (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+  //           if (g.size())
+  //             g = A;
+  //           return A.dot(x) - b;
+  //       });
+  //     } // for (uint j)
+  //   } // for (uint i)
+
+  //   // Optimize result and return
+  //   NLOptResult r = solve(solver);
+  //   return Spec(r.x.cast<float>());
+  // }
+
   Spec generate_spectrum(GenerateSpectrumInfo info) {
     met_trace();
     debug::check_expr(info.systems.size() == info.signals.size(),
@@ -23,17 +96,17 @@ namespace met {
       .rel_xpar_tol = 1e-2,
     };
 
+    // Construct basis matrix and boundary vectors
+    auto basis = info.basis.func.cast<double>().eval();
+    Spec upper_bounds = Spec(1.0) - info.basis.mean;
+    Spec lower_bounds = upper_bounds - Spec(1.0); 
+
     // Objective function minimizes squared l2 norm
     solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
       if (g.size())
         g = (2.0 * x).eval();
       return x.dot(x);
     };
-    
-    // Construct basis matrix and boundary vectors
-    auto basis = info.basis.func.cast<double>().eval();
-    Spec upper_bounds = Spec(1.0) - info.basis.mean;
-    Spec lower_bounds = upper_bounds - Spec(1.0); 
 
     // Add boundary inequality constraints
     if (info.impose_boundedness) {

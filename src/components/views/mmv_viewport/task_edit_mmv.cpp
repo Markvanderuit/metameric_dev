@@ -29,10 +29,10 @@ namespace met {
         [&](DirectColorConstraint &cstr) {
           // Color baseline value
           {
-            ImGui::ColorEdit3("Base color (lrgb)", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
-            auto srgb = lrgb_to_srgb(cstr.colr_i);
+            ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
+            auto srgb = lrgb_to_srgb(cstr.get_colr_i());
             ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
-            cstr.colr_i = srgb_to_lrgb(srgb);
+            cstr.get_colr_i() = srgb_to_lrgb(srgb);
           }
 
           // Visual separator into constraint list
@@ -86,7 +86,12 @@ namespace met {
         },
         [&](DirectSurfaceConstraint &cstr) {
           // Color baseline value extracted from surface
-          ImGui::ColorEdit3("Base color", cstr.surface.diffuse.data(), ImGuiColorEditFlags_Float);
+          {
+            ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
+            auto srgb = lrgb_to_srgb(cstr.get_colr_i());
+            ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
+            cstr.get_colr_i() = srgb_to_lrgb(srgb);
+          }
           
           // Visual separator into constraint list
           ImGui::Separator();
@@ -137,12 +142,23 @@ namespace met {
         // Setup minimal format for coming line plots
         ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
         ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
-        ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.0, 1.0, ImPlotCond_Always);
+        ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05, 1.05, ImPlotCond_Always);
 
         // Do the thing
         ImPlot::PlotLine("", x_values.data(), e_sd.data(), wavelength_samples);
         ImPlot::EndPlot();
       }
+
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      
+      Spec illuminant = e_scene.get_emitter_spd(0);
+      ColrSystem csys = {
+        .cmfs       = e_scene.resources.observers[0].value(),
+        .illuminant = e_scene.resources.illuminants[0].value(),
+        .n_scatters = 1
+      };
+      auto colr = csys.apply_color_direct(e_sd);
+      ImGui::ColorEdit3("Roundtrip color", colr.data(), ImGuiColorEditFlags_Float);
     }
   }
 } // namespace met

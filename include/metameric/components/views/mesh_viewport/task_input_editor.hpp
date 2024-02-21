@@ -221,7 +221,6 @@ namespace met {
             .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
 
           // Store world-space position in surface constraint
-          // TODO no, replace by surface data
           std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
             cstr.surface = si;
           }, [](const auto &cstr) { } }, e_vert.constraint);
@@ -230,10 +229,6 @@ namespace met {
         // Register gizmo use end; apply current vertex position to scene savte state
         if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
           m_is_gizmo_used = false;
-          
-          // Get screen-space position
-          eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
-          
           info.global("scene").getw<Scene>().touch({
             .name = "Move surface constraint",
             .redo = [si = si, is = is_selection](auto &scene) {

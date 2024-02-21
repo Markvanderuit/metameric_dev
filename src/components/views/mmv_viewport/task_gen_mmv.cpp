@@ -119,21 +119,32 @@ namespace met {
       || e_state.csys_i 
       || e_state.verts[e_is.constraint_i]
       || e_scene.components.colr_systems[e_uplifting.csys_i];;
+    if (should_clear) {
+      info("chull_array").getw<gl::Array>() = {};
+      m_points.clear();
+      m_iter = 0;
+    }
 
-    // TODO move to is_active
-    // TODO reset on some vertex constraint state change
-    if (m_iter >= mmv_samples_max && !should_clear)
+    // Only continue for valid and mismatch-supporting constraints
+    if (std::visit(overloaded {
+      [](const DirectColorConstraint &cstr)     { return !cstr.has_mismatching(); },
+      [](const DirectSurfaceConstraint &cstr)   { return !cstr.is_valid() || !cstr.has_mismatching(); },
+      [](const IndirectSurfaceConstraint &cstr) { return !cstr.is_valid(); },
+      [](const auto &) { return false; }
+    }, e_vert.constraint)) {
+      info("chull_array").getw<gl::Array>() = {};
+      m_points.clear();
+      m_iter = 0;
+      return;
+    }
+    
+    // Only continue if more samples are necessary
+    if (m_iter >= mmv_samples_max)
       return;
 
     // Visit underlying constraint types one by one
     std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
-        // Bad surface; flag for clearing out
-        if (!e_vert.has_mismatching()) {
-          should_clear = true;
-          return;
-        }
-
         // Generate 6D unit vector samples
         auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 6, m_iter);
         
@@ -157,12 +168,6 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const DirectSurfaceConstraint &cstr) {
-        // Bad surface; flag for clearing out
-        if (!cstr.is_valid() || !e_vert.has_mismatching()) {
-          should_clear = true;
-          return;
-        }
-
         // Generate 6D unit vector samples
         auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 6, m_iter);
         
@@ -186,34 +191,13 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        // Bad surface; flag for clearing out
-        if (!cstr.is_valid()) {
-          should_clear = true;
-          return;
-        }
-
-        // ...
+        // ..
       },
-      [&](const auto &) { 
-        // Incompatible constraint type; flag for clearing out for now
-        should_clear = true;
-      }
+      [&](const auto &) { }
     }, e_vert.constraint);
 
     // Increment iteration up to sample count
     m_iter += mmv_samples_per_iter;
-
-    // Clear task output if incidated;
-    // after this point, if the task survived, we generate a convex hull from a
-    // viable point set
-    if (should_clear) {
-      info("chull_array").getw<gl::Array>() = {}; // Set output array to uninitialized for now
-      m_points.clear();
-      m_iter = 0;
-      return;
-    }
-
-    fmt::print("Total points: {}\n", m_points.size());
 
     // Determine extents of generated point sets
     auto maxb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.max(b).eval(); }).value();
@@ -227,9 +211,8 @@ namespace met {
       m_chull = generate_convex_hull<AlMesh, Colr>(points);
     }
 
-    // If a set of points is available, generate approximate center
+    // If a set of points is available, generate an approximate center for the camera
     info("chull_center").getw<eig::Array3f>() = (minb + 0.5 * (maxb - minb)).eval();
-    fmt::print("Center = {}\n", info("chull_center").getr<eig::Array3f>());
     
     // If a convex hull is available, generate a vertex array object
     // for rendering purposes

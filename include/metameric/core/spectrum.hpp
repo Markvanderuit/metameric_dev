@@ -68,9 +68,9 @@ namespace met {
   /* System object defining how a reflectance-to-color conversion is performed */
   struct ColrSystem {
     // Public members
-    CMFS cmfs;       // Color matching or sensor response functions, defining the observer
-    Spec illuminant; // Illuminant under which observation is performed
-    uint n_scatters; // Nr. of recursive scatters of observed refletance; default 1
+    CMFS cmfs;           // Color matching or sensor response functions, defining the observer
+    Spec illuminant;     // Illuminant under which observation is performed
+    uint n_scatters = 1; // Nr. of recursive scatters of observed refletance; default 1
 
     // Simplify the CMFS/illuminant into color system spectra
     CMFS finalize_direct() const;
