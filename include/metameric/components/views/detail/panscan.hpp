@@ -5,7 +5,7 @@
 #include <numbers>
 
 namespace met::detail {
-  struct PanscanCreateInfo {
+  struct PanscanInfo {
     float near_z        =-1000.f;
     float far_z         = 1000.f;
     float scale         = 1.f;
@@ -34,11 +34,11 @@ namespace met::detail {
     float             m_scale_delta_curv;
 
   public:
-    using InfoType = PanscanCreateInfo;
+    using InfoType = PanscanInfo;
 
     /* constr */
 
-    Panscan(PanscanCreateInfo info = { })
+    Panscan(PanscanInfo info = { })
     : m_scale(info.scale),
       m_near_z(info.near_z),
       m_far_z(info.far_z),

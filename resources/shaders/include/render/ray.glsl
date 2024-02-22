@@ -13,7 +13,7 @@ struct Ray {
   float t;
   vec3  d;
 
-  // Intersected object record, or anyhit information
+  // Intersected object record, or anyhit information; see record.glsl
   uint data;
 };
 

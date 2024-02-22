@@ -18,8 +18,13 @@ namespace met::detail {
   public:
     const gl::Texture2d4f &film() const { return m_film; }
 
-    virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) = 0;
-    virtual void reset(const Sensor &sensor, const Scene &scene) = 0;
+    virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) {
+      return m_film;
+    }
+
+    virtual void reset(const Sensor &sensor, const Scene &scene) {
+      // ...
+    }
   };
 
   // Query base class; queries track and return one or more paths or rays

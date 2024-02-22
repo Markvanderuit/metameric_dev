@@ -140,6 +140,161 @@ namespace met {
     }
   } // namespace detail
 
+  GBufferPrimitive::GBufferPrimitive(GBufferPrimitiveInfo info)
+  : detail::BaseRenderPrimitive(),
+    m_cache_handle(info.cache_handle) {
+    met_trace_full();
+
+    // Initialize program object, if it doesn't yet exist
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({{ 
+      .type       = gl::ShaderType::eVertex,
+      .spirv_path = "resources/shaders/render/primitive_render_gbuffer.vert.spv",
+      .cross_path = "resources/shaders/render/primitive_render_gbuffer.vert.json"
+    }, {
+      .type       = gl::ShaderType::eFragment,
+      .spirv_path = "resources/shaders/render/primitive_render_gbuffer.frag.spv",
+      .cross_path = "resources/shaders/render/primitive_render_gbuffer.frag.json"
+    }});
+
+    // Initialize draw object
+    m_draw = { 
+      .type         = gl::PrimitiveType::eTriangles,
+      .capabilities = {{ gl::DrawCapability::eDepthTest, true  },
+                       { gl::DrawCapability::eCullOp,    true  },
+                       { gl::DrawCapability::eBlendOp,   false }},
+      .draw_op      = gl::DrawOp::eFill
+    };
+  }
+
+  void GBufferPrimitive::reset(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+
+    // Rebuild target framebuffer if necessary
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
+      m_film        = {{ .size = sensor.film_size.max(1).eval() }};
+      m_depthbuffer = {{ .size = sensor.film_size.max(1).eval() }};
+      m_framebuffer = {{ .type = gl::FramebufferType::eColor, .attachment = &m_film        },
+                       { .type = gl::FramebufferType::eDepth, .attachment = &m_depthbuffer }};
+    }
+
+    // Set film to black
+    m_film.clear();
+  }
+
+  const gl::Texture2d4f &GBufferPrimitive::render(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+    
+    // If the film object is stale, run a reset()
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
+      reset(sensor, scene);
+    
+    // Draw relevant program from cache
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+
+    // Assemble appropriate draw commands for each object in the scene
+    // by taking the relevant draw command from its mesh data
+    m_draw.bindable_array = &scene.resources.meshes.gl.array;
+    m_draw.commands.resize(scene.components.objects.size());
+    rng::transform(scene.components.objects, m_draw.commands.begin(), [&](const auto &comp) {
+      guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
+      return scene.resources.meshes.gl.draw_commands[comp.value.mesh_i];
+    });
+    
+    // Specify draw states
+    gl::state::set_viewport(sensor.film_size);    
+    gl::state::set_depth_range(0.f, 1.f);
+    gl::state::set_op(gl::DepthOp::eLessOrEqual);
+    gl::state::set_op(gl::CullOp::eBack);
+    gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
+
+    // Prepare framebuffer
+    eig::Array4f clear_value = { 0, 0, 0, std::bit_cast<float>(SurfaceRecord::record_invalid_data) };
+    m_framebuffer.bind();
+    m_framebuffer.clear(gl::FramebufferType::eColor, clear_value, 0);
+    m_framebuffer.clear(gl::FramebufferType::eDepth, 1.f);
+
+    // Prepare program state
+    program.bind();
+    program.bind("b_buff_sensor",  sensor.buffer());
+    program.bind("b_buff_objects", scene.components.objects.gl.object_info);
+
+    // Dispatch draw call with appropriate barriers
+    gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | gl::BarrierFlags::eTextureFetch  |
+                             gl::BarrierFlags::eClientMappedBuffer | gl::BarrierFlags::eUniformBuffer );
+    gl::dispatch_multidraw(m_draw);
+
+    return m_film;
+  }
+
+  GBufferViewPrimitive::GBufferViewPrimitive(GBufferViewPrimitiveInfo info)
+  : detail::BaseRenderPrimitive(),
+    m_cache_handle(info.cache_handle) {
+    met_trace_full();
+
+    // Initialize program object, if it doesn't yet exist
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
+      .type       = gl::ShaderType::eCompute,
+      .spirv_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.spv",
+      .cross_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.json",
+      .spec_const = {{ 0u, 16u                               },
+                     { 1u, 16u                               },
+                     { 2u, static_cast<uint>(info.view_type) }}
+    });
+  }
+
+  void GBufferViewPrimitive::reset(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+
+    // Rebuild target framebuffer if necessary
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
+      m_film        = {{ .size = sensor.film_size.max(1).eval() }};
+      auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
+      m_dispatch.groups_x = dispatch_ndiv.x();
+      m_dispatch.groups_y = dispatch_ndiv.y();
+    }
+
+    // Set film to black
+    m_film.clear();
+  }
+
+  const gl::Texture2d4f &GBufferViewPrimitive::render(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+    
+    // If the film object is stale, run a reset()
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
+      reset(sensor, scene);
+    
+    // Dispatch compute shader
+    gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
+                              gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
+                              gl::BarrierFlags::eBufferUpdate                                     );
+    gl::dispatch_compute(m_dispatch);
+
+    return m_film;
+  }
+
+  const gl::Texture2d4f &GBufferViewPrimitive::render(const gl::Texture2d4f &gbuffer, const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+
+    // Draw relevant program from cache
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+
+    // Bind required resources to their corresponding targets
+    program.bind();
+    program.bind("b_gbuffer",       gbuffer);
+    program.bind("b_film",          m_film);
+    program.bind("b_buff_sensor",   sensor.buffer());
+    program.bind("b_buff_objects",  scene.components.objects.gl.object_info);
+
+    // Let primary handle rest
+    return render(sensor, scene);
+  }
+  
+  const gl::Texture2d4f &GBufferViewPrimitive::render(const GBufferPrimitive &gbuffer, const Sensor &sensor, const Scene &scene) {
+    met_trace();
+    return render(gbuffer.film(), sensor, scene);
+  }
+
   PathRenderPrimitive::PathRenderPrimitive(PathRenderPrimitiveInfo info)
   : detail::IntegrationRenderPrimitive(),
     m_cache_handle(info.cache_handle) {

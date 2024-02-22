@@ -87,6 +87,10 @@ namespace met {
     }
     
   public:
+    bool is_active(SchedulerHandle &info) override {
+      return info.parent()("is_active").getr<bool>();
+    }
+    
     void init(SchedulerHandle &info) override {
       met_trace();
 

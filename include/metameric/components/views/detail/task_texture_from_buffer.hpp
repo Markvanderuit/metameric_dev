@@ -7,7 +7,7 @@
 
 namespace met::detail {
   template <class TextureType>
-  struct TextureFromBufferTaskCreateInfo {
+  struct TextureFromBufferTaskInfo {
     using StringPair  = std::pair<std::string, std::string>;
     using TextureInfo = TextureType::InfoType;
 
@@ -19,7 +19,7 @@ namespace met::detail {
 
   template <class TextureType>
   class TextureFromBufferTask : public detail::TaskNode {
-    using InfoType = TextureFromBufferTaskCreateInfo<TextureType>;
+    using InfoType = TextureFromBufferTaskInfo<TextureType>;
 
     InfoType        m_info;
     gl::ComputeInfo m_dispatch;

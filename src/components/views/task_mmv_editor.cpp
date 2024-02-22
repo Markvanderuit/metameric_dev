@@ -42,7 +42,7 @@ namespace met {
       bool is_active = info.parent()("is_active").getw<bool>() 
                      = ImGui::Begin(name.c_str(), &is_open);
 
-      // Close prematurely; subsequent tasks do not activate either way
+      // Close prematurely; subsequent tasks should not activate either way
       if (!is_active || !is_open)
         ImGui::End();
 
@@ -104,9 +104,6 @@ namespace met {
       met_trace_full();
       
       // Get shared resources
-      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
-      const auto &e_scene       = info.global("scene").getr<Scene>();
-      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
       
       // Visual separator from editing components drawn in previous tasks
@@ -117,7 +114,7 @@ namespace met {
                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                             ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
                           
-      ImGui::BeginChild("##mmv_view");
+      ImGui::BeginChild("##viewport_image_view");
 
       // Compute viewport size s.t. texture fills rest of window
       // and if necessary resize framebuffer
@@ -317,11 +314,6 @@ namespace met {
       }, e_vert.constraint);
     }
   };
-
-  bool MMVEditorTask::is_active(SchedulerHandle &info) {
-    met_trace();
-    return true;
-  }
 
   void MMVEditorTask::init(SchedulerHandle &info) {
     met_trace();

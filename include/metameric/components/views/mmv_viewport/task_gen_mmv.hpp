@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/components/views/mesh_viewport/task_input_editor.hpp>
+#include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/scheduler.hpp>

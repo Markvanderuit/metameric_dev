@@ -22,6 +22,15 @@ struct PrimitivePositions {
   vec3 p0, p1, p2;
 };
 
+MeshVertPack to_mesh_vert_pack(in uvec4 v) {
+  MeshVertPack p;
+  p.p0 = v.x;
+  p.p1 = v.y;
+  p.n  = v.z;
+  p.tx = v.w;
+  return p;
+}
+
 Vertex unpack(in MeshVertPack p) {
   Vertex o;
   o.p  = vec3(unpackUnorm2x16(p.p0),   unpackSnorm2x16(p.p1).x);

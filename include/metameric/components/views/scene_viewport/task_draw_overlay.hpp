@@ -19,6 +19,7 @@ namespace met {
     void eval_draw_path_queries(SchedulerHandle &info);
 
   public:
+    bool is_active(SchedulerHandle &info) override;
     void init(SchedulerHandle &info)      override;
     void eval(SchedulerHandle &info)      override;
   };

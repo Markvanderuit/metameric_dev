@@ -33,5 +33,5 @@ layout(binding = 2) uniform b_buff_meshes {
 } buff_meshes;
 
 void main() {
-  out_value = uintBitsToFloat(encode_gbuffer(gl_FragCoord.z, in_value_n, in_value_tx, in_value_id));
+  out_value = uintBitsToFloat(pack_gbuffer(gl_FragCoord.z, in_value_n, in_value_tx, in_value_id));
 }

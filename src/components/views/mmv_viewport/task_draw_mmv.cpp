@@ -1,5 +1,5 @@
 #include <metameric/core/scene.hpp>
-#include <metameric/components/views/mesh_viewport/task_input_editor.hpp>
+#include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/array.hpp>

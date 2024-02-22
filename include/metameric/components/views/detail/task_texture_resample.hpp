@@ -9,7 +9,7 @@
 
 namespace met::detail {
   template <class TextureType>
-  struct TextureResampleTaskCreateInfo {
+  struct TextureResampleTaskInfo {
     using StringPair  = std::pair<std::string, std::string>;
     using TextureInfo = TextureType::InfoType;
     using SamplerInfo = gl::Sampler::InfoType;
@@ -24,7 +24,7 @@ namespace met::detail {
   template <class TextureTy>
   class TextureResampleTask : public detail::TaskNode {
     using TextureType = TextureTy;
-    using InfoType    = TextureResampleTaskCreateInfo<TextureType>;
+    using InfoType    = TextureResampleTaskInfo<TextureType>;
 
     struct UniformBuffer {
       alignas(8) eig::Array2u size;

@@ -16,6 +16,10 @@ namespace met {
     uint        m_query_spp = 0;
 
   public:
+    bool is_active(SchedulerHandle &info) override {
+      return info.parent()("is_active").getr<bool>();
+    }
+
     void init(SchedulerHandle &info) override {
       met_trace();
       info("path_query").init<FullPathQueryPrimitive>({

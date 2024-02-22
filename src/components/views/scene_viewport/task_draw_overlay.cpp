@@ -1,6 +1,6 @@
 #include <metameric/core/scene.hpp>
-#include <metameric/components/views/mesh_viewport/task_draw_overlay.hpp>
-#include <metameric/components/views/mesh_viewport/task_input_editor.hpp>
+#include <metameric/components/views/scene_viewport/task_draw_overlay.hpp>
+#include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/render/primitives_query.hpp>
@@ -17,6 +17,10 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
+  bool MeshViewportDrawOverlayTask::is_active(SchedulerHandle &info) {
+    return info.parent()("is_active").getr<bool>();
+  }
+  
   void MeshViewportDrawOverlayTask::init(SchedulerHandle &info) {
     met_trace_full();
 
@@ -96,9 +100,12 @@ namespace met {
   void MeshViewportDrawOverlayTask::eval_draw_path_queries(SchedulerHandle &info) {
     met_trace_full();
 
+    // Escape early if query task d.n.e.
+    guard(info.relative_task("viewport_input_query").is_init());
+
     // Get handles, shared resources, modified resources
     const auto &e_scene  = info.global("scene").getr<Scene>();
-    const auto &e_target = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_target = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
     const auto &e_sensor = info.relative("viewport_render")("sensor").getr<Sensor>();
     const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
     const auto &e_query  = info.relative("viewport_input_query")("path_query").getr<FullPathQueryPrimitive>();

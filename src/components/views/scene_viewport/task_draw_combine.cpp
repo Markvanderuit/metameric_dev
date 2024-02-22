@@ -1,5 +1,5 @@
 #include <metameric/core/scene.hpp>
-#include <metameric/components/views/mesh_viewport/task_draw_combine.hpp>
+#include <metameric/components/views/scene_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/render/primitives_render.hpp>
@@ -11,6 +11,11 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
+
+  bool MeshViewportDrawCombineTask::is_active(SchedulerHandle &info) {
+    return info.parent()("is_active").getr<bool>();
+  }
+  
   void MeshViewportDrawCombineTask::init(SchedulerHandle &info) {
     met_trace_full();
 
@@ -29,8 +34,8 @@ namespace met {
 
     // Get shared resources 
     const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_target  = info.relative("viewport_begin")("lrgb_target").getr<gl::Texture2d4f>();
-    const auto &e_render  = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
+    const auto &e_target  = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_render  = info.relative("viewport_render")("renderer").getr<detail::BaseRenderPrimitive>();
     const auto &e_overlay = info.relative("viewport_draw_overlay")("target").getr<gl::Texture2d4f>();
 
     // Specify dispatch size

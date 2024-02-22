@@ -7,7 +7,7 @@
 namespace met {
   // Representation of record data used, generated, and stored by render/query primitives
   // and in surface-based uplifting constraints
-  class SurfaceRecord {
+  struct SurfaceRecord {
     constexpr static uint record_invalid_data = 0xFFFFFFFF;
     constexpr static uint record_object_flag  = 0x00000000;
     constexpr static uint record_emitter_flag = 0x80000000;

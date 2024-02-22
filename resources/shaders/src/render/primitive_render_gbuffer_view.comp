@@ -1,0 +1,65 @@
+#include <preamble.glsl>
+#include <math.glsl>
+#include <render/load/defaults.glsl>
+#include <render/record.glsl>
+#include <render/gbuffer.glsl>
+
+// GBuffer view settings
+#define GbufferViewTypePosition  0
+#define GbufferViewTypeNormals   1
+#define GbufferViewTypeTexCoords 2
+#define GbufferViewTypeObjectIDs 3
+
+// General layout rule declarations
+layout(local_size_x_id = 0, local_size_y_id = 1) in;
+layout(std140) uniform;
+layout(std430) buffer;
+
+// Specialization constant declarations
+layout(constant_id = 2) const uint gbuffer_view_type = GbufferViewTypePosition;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_sensor {
+  mat4  full_trf;
+  mat4  proj_trf;
+  mat4  view_trf;
+  uvec2 film_size; 
+} buff_sensor;
+layout(binding = 1) uniform b_buff_objects {
+  uint n;
+  ObjectInfo data[max_supported_objects];
+} buff_objects;
+
+// Texture/image units, ergo samplers and output images
+layout(binding = 0, rgba32f) uniform restrict readonly  image2D b_gbuffer; // Source film
+layout(binding = 0, rgba32f) uniform restrict writeonly image2D b_film;    // Target film
+
+void main() {
+  // Clamp invocations to requested size
+  ivec2 px = ivec2(gl_GlobalInvocationID.xy);
+  guard(all(lessThan(px, buff_sensor.film_size)));
+
+  // Determine x/y positions in [-1, 1]
+  vec2 xy = (vec2(px) + vec2(0.5)) / vec2(buff_sensor.film_size);
+  xy = (xy - .5f) * 2.f;
+
+  // Load gbuffer data
+  uvec4 gbpk = floatBitsToUint(imageLoad(b_gbuffer, ivec2(gl_GlobalInvocationID.xy)));
+  GBuffer gb = unpack_gbuffer(gbpk, xy, inverse(buff_sensor.full_trf));
+
+  // Output value is based on requested output type
+  vec3 v = vec3(0);
+  if (gbuffer_view_type == GbufferViewTypePosition) {
+    v = gb.p;
+  } else if (gbuffer_view_type == GbufferViewTypeNormals) {
+    v = gb.n;
+  } else if (gbuffer_view_type == GbufferViewTypeTexCoords) {
+    v = vec3(gb.tx, 1);
+  } else if (gbuffer_view_type == GbufferViewTypeObjectIDs) {
+    v = vec3(float(1u + record_get_object(gb.data)) / float(buff_objects.n));
+  }
+
+  // Write to film
+  imageStore(b_film, px, vec4(v, 1));
+  imageStore(b_film, px, vec4(uintBitsToFloat(gbpk).xyz, 1));
+}
