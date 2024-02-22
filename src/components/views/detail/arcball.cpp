@@ -1,7 +1,7 @@
 #include <metameric/components/views/detail/arcball.hpp>
 
 namespace met::detail {
-  Arcball::Arcball(ArcballCreateInfo info)
+  Arcball::Arcball(ArcballInfo info)
   : m_is_mutated(true),
     m_fov_y(info.fov_y),
     m_near_z(info.near_z),

@@ -8,7 +8,7 @@
 
 namespace met {
   // Application create settings
-  struct MetamericEditorCreateInfo {
+  struct MetamericEditorInfo {
     // Direct load scene
     fs::path scene_path = "";
 
@@ -18,7 +18,7 @@ namespace met {
   };
 
   // Application create function
-  void create_metameric_editor(MetamericEditorCreateInfo info) {
+  void create_metameric_editor(MetamericEditorInfo info) {
     met_trace();
     
     fmt::print(
@@ -34,9 +34,9 @@ namespace met {
     auto &window = scheduler.global("window").init<gl::Window>({ 
       .size  = info.app_size, 
       .title = info.app_title, 
-      .flags = gl::WindowCreateFlags::eVisible   | gl::WindowCreateFlags::eFocused 
-             | gl::WindowCreateFlags::eDecorated | gl::WindowCreateFlags::eResizable 
-             | gl::WindowCreateFlags::eMSAA met_debug_insert(| gl::WindowCreateFlags::eDebug)
+      .flags = gl::WindowFlags::eVisible   | gl::WindowFlags::eFocused 
+             | gl::WindowFlags::eDecorated | gl::WindowFlags::eResizable 
+             | gl::WindowFlags::eMSAA met_debug_insert(| gl::WindowFlags::eDebug)
     }).getw<gl::Window>();
 
     // Initialize OpenGL debug messages, if requested

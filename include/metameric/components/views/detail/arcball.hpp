@@ -6,7 +6,7 @@
 #include <numbers>
 
 namespace met::detail {
-  struct ArcballCreateInfo {
+  struct ArcballInfo {
     float fov_y  = 45.f * std::numbers::pi_v<float> / 180.f;
     float near_z = 0.001f;
     float far_z  = 1000.f;
@@ -50,10 +50,10 @@ namespace met::detail {
     mutable eig::Projective3f m_full;
 
   public: // Public members
-    using InfoType = ArcballCreateInfo;
+    using InfoType = ArcballInfo;
 
     Arcball() = default;
-    Arcball(ArcballCreateInfo info = { });
+    Arcball(ArcballInfo info = { });
 
     // Data accessors 
     const eig::Affine3f & view() const { 

@@ -16,7 +16,7 @@ namespace met {
     }
   } // namespace detail
 
-  FullPathQueryPrimitive::FullPathQueryPrimitive(PathQueryPrimitiveCreateInfo info)
+  FullPathQueryPrimitive::FullPathQueryPrimitive(PathQueryPrimitiveInfo info)
   : detail::BaseQueryPrimitive(),
     m_cache_handle(info.cache_handle),
     m_max_depth(info.max_depth) {
@@ -103,7 +103,7 @@ namespace met {
     return m_output_data_map.subspan(0, *m_output_head_map);
   }
 
-  PartialPathQueryPrimitive::PartialPathQueryPrimitive(PathQueryPrimitiveCreateInfo info)
+  PartialPathQueryPrimitive::PartialPathQueryPrimitive(PathQueryPrimitiveInfo info)
   : detail::BaseQueryPrimitive(),
     m_cache_handle(info.cache_handle),
     m_max_depth(info.max_depth)  {
@@ -190,7 +190,7 @@ namespace met {
     return m_output_data_map.subspan(0, *m_output_head_map);
   }
 
-  RayQueryPrimitive::RayQueryPrimitive(RayQueryPrimitiveCreateInfo info)
+  RayQueryPrimitive::RayQueryPrimitive(RayQueryPrimitiveInfo info)
   :  m_cache_handle(info.cache_handle) {
     met_trace_full();
 

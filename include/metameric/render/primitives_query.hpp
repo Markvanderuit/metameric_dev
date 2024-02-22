@@ -7,7 +7,7 @@
 
 namespace met {
   // Helper object for creation of FullPathQueryPrimitive and PartialPathQueryPrimitive
-  struct PathQueryPrimitiveCreateInfo {
+  struct PathQueryPrimitiveInfo {
     // Maximum path length
     uint max_depth = PathRecord::path_max_depth;
     
@@ -15,14 +15,10 @@ namespace met {
     ResourceHandle cache_handle;
   };
 
-  // Helper object for invocation of FullPathQueryPrimitive and PartialPathQueryPrimitive
-  struct PathQueryPrimitiveInvokeInfo {
-    // Samples to take on invocation
-    uint spp = 1u;
-
-    // Necessary references
-    const RaySensor &sensor;
-    const Scene     &scene;
+  // Helper object for creation of RayQueryPrimitive
+  struct RayQueryPrimitiveInfo {
+    // Program cache; enforced given the shader's long compile time
+    ResourceHandle cache_handle;
   };
   
   // Primitive to query light transport along a single ray and get information
@@ -38,7 +34,7 @@ namespace met {
     mutable gl::sync::Fence m_output_sync;
     
   public:
-    using InfoType = PathQueryPrimitiveCreateInfo;
+    using InfoType = PathQueryPrimitiveInfo;
 
     FullPathQueryPrimitive() = default;
     FullPathQueryPrimitive(InfoType info);
@@ -63,7 +59,7 @@ namespace met {
     mutable gl::sync::Fence m_output_sync;
 
   public:
-    using InfoType = PathQueryPrimitiveCreateInfo;
+    using InfoType = PathQueryPrimitiveInfo;
 
     PartialPathQueryPrimitive() = default;
     PartialPathQueryPrimitive(InfoType info);
@@ -73,12 +69,6 @@ namespace met {
 
     // Wait for sync object, and then return output data
     std::span<const PathRecord> data() const;
-  };
-
-  // Helper object for creation of RayQueryPrimitive
-  struct RayQueryPrimitiveCreateInfo {
-    // Program cache; enforced given the shader's long compile time
-    ResourceHandle cache_handle;
   };
 
   // Primitive to perform a simple raycast
@@ -92,7 +82,7 @@ namespace met {
     mutable gl::sync::Fence m_output_sync;
 
   public:
-    using InfoType = RayQueryPrimitiveCreateInfo;
+    using InfoType = RayQueryPrimitiveInfo;
 
     RayQueryPrimitive() = default;
     RayQueryPrimitive(InfoType info);

@@ -5,32 +5,14 @@
 #include <metameric/render/detail/primitives.hpp>
 
 namespace met {
-  struct DirectRenderPrimitiveCreateInfo {
-    // Number of samples per pixel when a renderer primitive is invoked
-    uint spp_per_iter = 1;
-
-    // Renderer primitives will accumulate up to this number. Afterwards
-    // the target is left unmodified. If set to 0, no limit is imposed.
-    uint spp_max = std::numeric_limits<uint>::max();
+  // Helper struct for creation of GBufferPrimitive
+  struct GBufferRenderPrimitiveInfo {
+    // Program cache; enforced given the shader's long compile time
+    ResourceHandle cache_handle;
   };
 
-  class DirectRenderPrimitive : public detail::IntegrationRenderPrimitive {
-    detail::GBufferRenderPrimitive m_gbuffer;
-    
-  public:
-    using InfoType = DirectRenderPrimitiveCreateInfo;
-    
-    gl::Program     m_program;
-    gl::ComputeInfo m_dispatch;
-
-  public:
-    DirectRenderPrimitive(InfoType info);
-
-    void reset(const Sensor &sensor, const Scene &scene) override;
-    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
-  };
-
-  struct PathRenderPrimitiveCreateInfo {
+  // Helper struct for creation of PathRenderPrimitive
+  struct PathRenderPrimitiveInfo {
     // Number of samples per pixel when a renderer primitive is invoked
     uint spp_per_iter = 1;
 
@@ -45,6 +27,15 @@ namespace met {
     ResourceHandle cache_handle;
   };
 
+  // Rendering primitive; implementation of a simple gbuffer builder
+  class GBufferPrimitive {
+
+  public:
+
+  };
+  	
+  // Rendering primitive; implementation of a unidirectional spectral path
+  // tracer with next-event-estimation and four-wavelength sampling.
   class PathRenderPrimitive : public detail::IntegrationRenderPrimitive {
     // Handle to program cache, and key for relevant program
     ResourceHandle  m_cache_handle;
@@ -52,7 +43,7 @@ namespace met {
     gl::ComputeInfo m_dispatch;
 
   public:
-    using InfoType = PathRenderPrimitiveCreateInfo;
+    using InfoType = PathRenderPrimitiveInfo;
     
     PathRenderPrimitive(InfoType info);
 

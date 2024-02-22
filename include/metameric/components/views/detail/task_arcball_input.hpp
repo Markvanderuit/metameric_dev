@@ -9,7 +9,7 @@
 
 namespace met::detail {
   class ArcballInputTask : public detail::TaskNode {
-    using InfoType = detail::ArcballCreateInfo;
+    using InfoType = detail::ArcballInfo;
     
     InfoType       m_info;
     ResourceHandle m_view_handle;
