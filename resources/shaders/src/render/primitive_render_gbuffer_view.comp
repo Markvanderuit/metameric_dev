@@ -44,8 +44,8 @@ void main() {
   xy = (xy - .5f) * 2.f;
 
   // Load gbuffer data
-  uvec4 gbpk = floatBitsToUint(imageLoad(b_gbuffer, ivec2(gl_GlobalInvocationID.xy)));
-  GBuffer gb = unpack_gbuffer(gbpk, xy, inverse(buff_sensor.full_trf));
+  vec4  gbpk = imageLoad(b_gbuffer, ivec2(gl_GlobalInvocationID.xy));
+  GBuffer gb = unpack_gbuffer(floatBitsToUint(gbpk), xy, inverse(buff_sensor.full_trf));
 
   // Output value is based on requested output type
   vec3 v = vec3(0);
@@ -61,5 +61,5 @@ void main() {
 
   // Write to film
   imageStore(b_film, px, vec4(v, 1));
-  imageStore(b_film, px, vec4(uintBitsToFloat(gbpk).xyz, 1));
+  imageStore(b_film, px, vec4(gbpk.xyz, 1));
 }

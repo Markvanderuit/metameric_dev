@@ -208,7 +208,7 @@ namespace met {
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
 
     // Prepare framebuffer
-    eig::Array4f clear_value = { 0, 0, 0, std::bit_cast<float>(SurfaceRecord::record_invalid_data) };
+    eig::Array4f clear_value = { 1, 1, 0, std::bit_cast<float>(SurfaceRecord::record_invalid_data) };
     m_framebuffer.bind();
     m_framebuffer.clear(gl::FramebufferType::eColor, clear_value, 0);
     m_framebuffer.clear(gl::FramebufferType::eDepth, 1.f);

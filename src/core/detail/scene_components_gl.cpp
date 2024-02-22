@@ -467,7 +467,7 @@ namespace met::detail {
 
     // Define corresponding vertex array object and generate multidraw command info
     array = {{
-      .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)    }},
+      .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)      }},
       .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }},
       .elements = &mesh_elems
     }};
