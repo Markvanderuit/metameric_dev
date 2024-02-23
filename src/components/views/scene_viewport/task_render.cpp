@@ -21,6 +21,7 @@ namespace met {
     info("sensor").set<Sensor>({ /* ... */ });
     info("gbuffer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
     info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
+    // info("renderer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
     /* info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = 1u,  
                                                  .spp_max      = 4096u,
                                                  .max_depth    = 4u,
@@ -35,6 +36,7 @@ namespace met {
     auto target_handle  = info.relative("viewport_image")("lrgb_target");
     auto camera_handle  = info.relative("viewport_input_camera")("arcball");
     auto render_handle  = info("renderer");
+    auto gbuffer_handle = info("gbuffer");
     auto sensor_handle  = info("sensor");
     const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &i_pathr = render_handle.getr<GBufferViewPrimitive>();
@@ -51,8 +53,10 @@ namespace met {
       const auto &e_camera = camera_handle.getr<detail::Arcball>();
       auto &i_sensor       = sensor_handle.getw<Sensor>();
       auto &i_pathr        = render_handle.getw<GBufferViewPrimitive>();
-      /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
+      auto &i_gbuffer      = gbuffer_handle.getw<GBufferPrimitive>();
 
+      // auto &i_pathr        = render_handle.getw<GBufferPrimitive>();
+      /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
       
       i_sensor.film_size = e_target.size() / 2;
       i_sensor.proj_trf  = e_camera.proj().matrix();
@@ -62,8 +66,8 @@ namespace met {
       i_pathr.reset(i_sensor, e_scene);
 
       // Build new gbuffer for hacky denoising
-      auto &i_gbuffer = info("gbuffer").getw<GBufferPrimitive>();
-      i_pathr.render(i_gbuffer.render(i_sensor, e_scene), i_sensor, e_scene);
+      i_gbuffer.render(i_sensor, e_scene);
+      i_pathr.render(i_gbuffer, i_sensor, e_scene);
     }
 
     // ... then call renderer
@@ -71,5 +75,6 @@ namespace met {
       auto &i_pathr = render_handle.getw<PathRenderPrimitive>();
       i_pathr.render(sensor_handle.getr<Sensor>(), e_scene);
     } */
+    
   }
 } // namespace met

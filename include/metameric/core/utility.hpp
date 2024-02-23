@@ -97,6 +97,11 @@ namespace met {
          | vws::transform([&r](unsigned i) { return std::pair { i, r[i] }; });
   };
 
+  // Helper view; pass an index and extract a reference to item inside a range
+  inline constexpr auto index_into_view = [](rng::viewable_range auto &&r) {
+    return vws::transform([&r](unsigned i) { return r[i]; });
+  };
+
   // Helper type for std::visit
   // Src: https://en.cppreference.com/w/cpp/utility/variant/visit
   template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };

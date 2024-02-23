@@ -32,7 +32,7 @@ layout(binding = 1) uniform b_buff_objects {
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0, rgba32f) uniform restrict readonly  image2D b_gbuffer; // Source film
-layout(binding = 0, rgba32f) uniform restrict writeonly image2D b_film;    // Target film
+layout(binding = 1, rgba32f) uniform restrict writeonly image2D b_film;    // Target film
 
 void main() {
   // Clamp invocations to requested size
@@ -45,21 +45,24 @@ void main() {
 
   // Load gbuffer data
   vec4  gbpk = imageLoad(b_gbuffer, ivec2(gl_GlobalInvocationID.xy));
-  GBuffer gb = unpack_gbuffer(floatBitsToUint(gbpk), xy, inverse(buff_sensor.full_trf));
+  GBuffer gb = unpack_gbuffer(floatBitsToUint(gbpk), xy, inverse(buff_sensor.proj_trf), inverse(buff_sensor.view_trf));
+
+  // Output value
+  vec3 v = vec3(0);
 
   // Output value is based on requested output type
-  vec3 v = vec3(0);
-  if (gbuffer_view_type == GbufferViewTypePosition) {
-    v = gb.p;
-  } else if (gbuffer_view_type == GbufferViewTypeNormals) {
-    v = gb.n;
-  } else if (gbuffer_view_type == GbufferViewTypeTexCoords) {
-    v = vec3(gb.tx, 1);
-  } else if (gbuffer_view_type == GbufferViewTypeObjectIDs) {
-    v = vec3(float(1u + record_get_object(gb.data)) / float(buff_objects.n));
+  if (record_is_valid(gb.data)) {
+    if (gbuffer_view_type == GbufferViewTypePosition) {
+      v = gb.p;
+    } else if (gbuffer_view_type == GbufferViewTypeNormals) {
+      v = gb.n;
+    } else if (gbuffer_view_type == GbufferViewTypeTexCoords) {
+      v = vec3(gb.tx, 1);
+    } else if (gbuffer_view_type == GbufferViewTypeObjectIDs) {
+      v = vec3(float(1u + record_get_object(gb.data)) / float(buff_objects.n));
+    }
   }
 
   // Write to film
   imageStore(b_film, px, vec4(v, 1));
-  imageStore(b_film, px, vec4(gbpk.xyz, 1));
 }

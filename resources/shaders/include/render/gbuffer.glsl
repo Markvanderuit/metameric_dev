@@ -4,12 +4,6 @@
 #include <math.glsl>
 #include <render/record.glsl>
 
-/* struct GBufferRay {
-  vec3 p;           // World-space hit
-  uint object_i;    // Index of hit object
-  uint primitive_i; // Index of hit primitive in object
-}; */
-
 // Basic G-Buffer representation
 struct GBuffer {
   // Surface data
@@ -81,6 +75,14 @@ float decode_depth(in vec2 pack)
   return depth * (256.0*256.0) / (256.0*256.0 - 1.0);
 }
 
+// Linearize depth, assuming range of [0, 1] for now
+float linearize_depth(in float d) {
+    const float z_far  = 1.f;
+    const float z_near = 0.f;
+    const float l = z_near / (z_far - d * (z_far - z_near)) * z_far;
+    return l * 2.f - 1.f;
+}
+
 // Generate packed data from gbuffer inputs
 uvec4 pack_gbuffer(in float d, in vec3 n, in vec2 tx, in uint data) {
   uvec4 pack = uvec4(0);
@@ -99,7 +101,7 @@ uvec4 pack_gbuffer(in float d, in vec3 n, in vec2 tx, in uint data) {
 }
 
 // Generate gbuffer object from packed inputs
-GBuffer unpack_gbuffer(in uvec4 v, in vec2 xy, in mat4 d_inv) {
+GBuffer unpack_gbuffer(in uvec4 v, in vec2 xy, in mat4 proj_inv, in mat4 view_inv) {
   GBuffer gb;
 
   // Early out; return unspecified gbuffer if no values are set
@@ -112,27 +114,13 @@ GBuffer unpack_gbuffer(in uvec4 v, in vec2 xy, in mat4 d_inv) {
   gb.data = v.w;
 
   // Recover world-space position from depth
-  // There's def. cheaper ways to do this
-  vec4 invp = d_inv * vec4(vec3(xy, uintBitsToFloat(v.z)) * 2.f - 1.f, 1);
-  gb.p = invp.xyz / invp.w;
+  // There's cheaper ways to do this but I do not have time
+  vec4 invp = proj_inv 
+            * vec4(vec3(xy, uintBitsToFloat(v.z) * 2.f - 1.f), 1);
+  invp /= invp.w;
+  gb.p = (view_inv * invp).xyz;
 
   return gb;
 }
-
-/* uvec4 pack_gbuffer_ray(in GBufferRay gb) {
-  return uvec4(
-    floatBitsToUint(gb.p),
-    (gb.object_i & 0x000000FF) << 24 | (gb.primitive_i & 0x00FFFFFF)
-  );
-} */
-
-/* GBufferRay unpack_gbuffer_ray(in uvec4 v) {
-  GBufferRay gb = { 
-    uintBitsToFloat(v.xyz), 
-    (v.w & 0xFF000000) >> 24,
-    (v.w & 0x00FFFFFF)
-  };
-  return gb;
-} */
 
 #endif // GLSL_GBUFFER_GUARD

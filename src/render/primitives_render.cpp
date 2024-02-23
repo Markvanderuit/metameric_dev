@@ -176,9 +176,6 @@ namespace met {
       m_framebuffer = {{ .type = gl::FramebufferType::eColor, .attachment = &m_film        },
                        { .type = gl::FramebufferType::eDepth, .attachment = &m_depthbuffer }};
     }
-
-    // Set film to black
-    m_film.clear();
   }
 
   const gl::Texture2d4f &GBufferPrimitive::render(const Sensor &sensor, const Scene &scene) {
@@ -194,11 +191,17 @@ namespace met {
     // Assemble appropriate draw commands for each object in the scene
     // by taking the relevant draw command from its mesh data
     m_draw.bindable_array = &scene.resources.meshes.gl.array;
-    m_draw.commands.resize(scene.components.objects.size());
-    rng::transform(scene.components.objects, m_draw.commands.begin(), [&](const auto &comp) {
-      guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
-      return scene.resources.meshes.gl.draw_commands[comp.value.mesh_i];
-    });
+    m_draw.commands = scene.components.objects.values_view()
+                    | vws::filter(&Object::is_active)
+                    | vws::transform(&Object::mesh_i)
+                    | index_into_view(scene.resources.meshes.gl.draw_commands)
+                    | rng::to<std::vector>();
+
+    // m_draw.commands.resize(scene.components.objects.size());
+    // rng::transform(scene.components.objects, m_draw.commands.begin(), [&](const auto &comp) {
+    //   guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
+    //   return scene.resources.meshes.gl.draw_commands[comp.value.mesh_i];
+    // });
     
     // Specify draw states
     gl::state::set_viewport(sensor.film_size);    
@@ -259,23 +262,20 @@ namespace met {
 
   const gl::Texture2d4f &GBufferViewPrimitive::render(const Sensor &sensor, const Scene &scene) {
     met_trace_full();
-    
-    // If the film object is stale, run a reset()
-    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
-      reset(sensor, scene);
-    
-    // Dispatch compute shader
     gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
                               gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
                               gl::BarrierFlags::eBufferUpdate                                     );
     gl::dispatch_compute(m_dispatch);
-
     return m_film;
   }
 
   const gl::Texture2d4f &GBufferViewPrimitive::render(const gl::Texture2d4f &gbuffer, const Sensor &sensor, const Scene &scene) {
     met_trace_full();
 
+    // If the film object is stale, run a reset()
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
+      reset(sensor, scene);
+    
     // Draw relevant program from cache
     auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
 

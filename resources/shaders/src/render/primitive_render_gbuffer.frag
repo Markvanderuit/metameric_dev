@@ -12,7 +12,7 @@ layout(early_fragment_tests) in;
 layout(location = 0) in vec3      in_value_n;
 layout(location = 1) in vec2      in_value_tx;
 layout(location = 2) in flat uint in_value_rc;
-layout(location = 0) out uvec4    out_value_gb;
+layout(location = 0) out vec4     out_value_gb;
 
 // Buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
@@ -32,10 +32,11 @@ void main() {
   record_set_object_primitive(rc, gl_PrimitiveID);
 
   // Output packed gbuffer data
-  out_value_gb = pack_gbuffer(
+  // out_value_gb = vec4(in_value_n, 1);
+  out_value_gb = uintBitsToFloat(pack_gbuffer(
     gl_FragCoord.z, // user can recover position from depth
     in_value_n,
     in_value_tx,
     rc
-  );
+  ));
 }

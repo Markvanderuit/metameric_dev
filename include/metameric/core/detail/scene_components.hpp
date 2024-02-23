@@ -248,7 +248,11 @@ namespace met {
       constexpr auto end()      const { return m_data.end();   }
       constexpr auto begin()          { return m_data.begin(); }
       constexpr auto end()            { return m_data.end();   }
-    
+
+      // Bookkeeping; expose views over component values
+      constexpr auto values_view() const { return m_data | vws::transform(&cmpnt_type::value); }
+      constexpr auto values_view()       { return m_data | vws::transform(&cmpnt_type::value); }
+
     public: // GL-side packing; always accessible to the underlying pipeline
       mutable gl_type gl;
 
