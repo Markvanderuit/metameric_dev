@@ -35,7 +35,7 @@ namespace met {
     info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(
       info.child("viewport_image")("lrgb_target"));
     info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
-    // info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
+    info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
     info.child_task("viewport_render").init<MeshViewportRenderTask>();
     info.child_task("viewport_draw_overlay").init<MeshViewportDrawOverlayTask>();
     info.child_task("viewport_draw_combine").init<MeshViewportDrawCombineTask>();

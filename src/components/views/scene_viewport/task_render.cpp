@@ -19,13 +19,13 @@ namespace met {
   void MeshViewportRenderTask::init(SchedulerHandle &info) {
     met_trace_full();    
     info("sensor").set<Sensor>({ /* ... */ });
-    info("gbuffer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
-    info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
+    // info("gbuffer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
+    // info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
     // info("renderer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
-    /* info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = 1u,  
+    info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = 1u,  
                                                  .spp_max      = 4096u,
                                                  .max_depth    = 4u,
-                                                 .cache_handle = info.global("cache") }); */
+                                                 .cache_handle = info.global("cache") });
     
   }
     
@@ -39,8 +39,8 @@ namespace met {
     auto gbuffer_handle = info("gbuffer");
     auto sensor_handle  = info("sensor");
     const auto &e_scene = info.global("scene").getr<Scene>();
-    const auto &i_pathr = render_handle.getr<GBufferViewPrimitive>();
-    /* const auto &i_pathr = render_handle.getr<PathRenderPrimitive>(); */
+    // const auto &i_pathr = render_handle.getr<GBufferViewPrimitive>();
+    const auto &i_pathr = render_handle.getr<PathRenderPrimitive>();
 
     // Test if renderer necessitates a reset; scene changes, camera changes, target changes
     bool reset_target = target_handle.is_mutated();
@@ -52,8 +52,8 @@ namespace met {
       const auto &e_target = target_handle.getr<gl::Texture2d4f>();
       const auto &e_camera = camera_handle.getr<detail::Arcball>();
       auto &i_sensor       = sensor_handle.getw<Sensor>();
-      auto &i_pathr        = render_handle.getw<GBufferViewPrimitive>();
-      auto &i_gbuffer      = gbuffer_handle.getw<GBufferPrimitive>();
+      auto &i_pathr        = render_handle.getw<PathRenderPrimitive>();
+      // auto &i_gbuffer      = gbuffer_handle.getw<PathRenderPrimitive>();
 
       // auto &i_pathr        = render_handle.getw<GBufferPrimitive>();
       /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
@@ -66,15 +66,14 @@ namespace met {
       i_pathr.reset(i_sensor, e_scene);
 
       // Build new gbuffer for hacky denoising
-      i_gbuffer.render(i_sensor, e_scene);
-      i_pathr.render(i_gbuffer, i_sensor, e_scene);
+      // i_gbuffer.render(i_sensor, e_scene);
+      // i_pathr.render(i_gbuffer, i_sensor, e_scene);
     }
 
     // ... then call renderer
-    /* if (i_pathr.has_next_sample_state()) {
+    if (i_pathr.has_next_sample_state()) {
       auto &i_pathr = render_handle.getw<PathRenderPrimitive>();
       i_pathr.render(sensor_handle.getr<Sensor>(), e_scene);
-    } */
-    
+    }
   }
 } // namespace met

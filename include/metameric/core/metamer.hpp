@@ -26,14 +26,6 @@ namespace met {
   };
 
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
-  /* struct GenerateMMVBoundaryInfo {
-    const Basis                  &basis;      // Spectral basis functions
-    std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
-    std::span<const Colr>         signals_i;  // Color signals for prior constraints
-    const CMFS                   &system_j;   // Color system for mismatching region
-    std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
-    std::optional<CMFS> system_j_override;    // TODO remove this absolute hack
-  }; */
   struct GenerateMMVBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
@@ -68,4 +60,6 @@ namespace met {
   // above for necessary information. Note: returns n=generalized_weights spectra; 
   // the last (padded) spectra should be ignored
   /* std::vector<Spec> generate_gamut(const GenerateGamutInfo &info); */
+
+  
 } // namespace met

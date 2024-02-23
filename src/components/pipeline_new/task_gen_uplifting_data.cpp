@@ -274,4 +274,26 @@ namespace met {
       rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), constraint_spectra.begin());
     }
   }
+
+  TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(uint i) const {
+    met_trace();
+
+    TetrahedronRecord tr;
+
+    // First, find element indices for this tetrahedron
+    debug::check_expr(i < m_tesselation.elems.size());
+    auto elems = m_tesselation.elems[i];
+
+    // Next, and find matching vertex colors and associated spectra
+    rng::copy(elems | index_into_view(m_tesselation_points), tr.verts.begin());
+    rng::copy(elems | index_into_view(m_tesselation_spectra), tr.spectra.begin());
+    
+    // Then, assign constraint indices, or -1 if a boundary position
+    rng::copy(elems | vws::transform([&](uint i) {
+      int j = static_cast<int>(i) - static_cast<int>(m_csys_boundary_samples.size());
+      return std::max<int>(j, -1);
+    }), tr.indices.begin());
+
+    return tr;
+  }
 } // namespace met

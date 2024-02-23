@@ -10,6 +10,10 @@
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 
+// TODO remove
+#include <algorithm>
+#include <execution>
+
 namespace met {
   class MeshViewportQueryInputTask : public detail::TaskNode {
     PixelSensor m_query_sensor;
@@ -53,26 +57,33 @@ namespace met {
       m_query_sensor.pixel     = eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size);
       m_query_sensor.flush();
       
-      // fmt::print("{} -> {}\n", m_query_sensor.film_size, m_query_sensor.pixel);
-    
-      // Perform path query
+      // Perform path query and obtain path data
       i_path_query.query(m_query_sensor, e_scene, m_query_spp);
+      auto paths = i_path_query.data();
 
-      // Obtain queried paths
-      // auto paths = i_path_query.data();
+      // For each path, associate spectral record data
+      std::vector<std::array<TetrahedronRecord, PathRecord::path_max_depth>> tetrahedron_data;
+      /* std::transform(std::execution::par_unseq, range_iter(paths), tetrahedron_data.begin(), [](const auto &record) {
+        
+        
+
+      }); */
+      
+      
     }
 
     void eval(SchedulerHandle &info) override {
       met_trace();
       
       if (ImGui::Begin("Blahhh")) {
-        uint min_v = 0, max_v = 65536;
+        uint min_v = 0, max_v = 1024;
         ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();
       
-      if (m_query_spp > 0)
+      if (m_query_spp > 0) {
         eval_path_query(info);
+      }
     }
   };
 } // namespace met

@@ -90,20 +90,4 @@ namespace met::detail {
       return m_spp_max == 0 || m_spp_curr < m_spp_max;
     }
   };
-  
-  // Helper class to build a quick first-intersection gbuffer
-  class GBufferRenderPrimitive : public BaseRenderPrimitive {
-    using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
-
-    Depthbuffer       m_fbo_depth;
-    gl::Framebuffer   m_fbo;
-    gl::Program       m_program;
-    gl::MultiDrawInfo m_draw;
-
-  public:
-    GBufferRenderPrimitive();
-
-    const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override;
-    void reset(const Sensor &sensor, const Scene &scene) override;
-  };
 } // namespace met::detail

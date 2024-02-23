@@ -96,7 +96,7 @@ namespace met {
     SurfaceRecord record;
   };
   static_assert(sizeof(VertexRecord) == 16);
-  
+
   // A queried path object
   struct PathRecord {
     constexpr static uint path_max_depth = 4;
@@ -106,8 +106,7 @@ namespace met {
     alignas(16) eig::Array4f wavelengths;
 
     // Energy over probability density
-    // Note: if generated with PartialPathQuery(...), reflectances are ignored
-    // along paths.
+    // Note: if generated with PartialPathQuery(...), reflectances are ignored along paths.
     alignas(16) eig::Array4f L;
 
     // Actual length of path before termination
@@ -118,6 +117,16 @@ namespace met {
   };
   static_assert(sizeof(PathRecord) == (3 + PathRecord::path_max_depth) * 16);
 
+  // A queried spectral uplifting tetrahedron component
+  // Contains lookup information for querying or finding a specific tetrahedron's
+  // spectral information
+  struct TetrahedronRecord {
+    std::array<Colr, 4> verts;   // Vertex positions forming the tetrahedron
+    std::array<Spec, 4> spectra; // Associated spectra at the vertices
+    std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated 
+                                 // from a constraint and -1 otherwise
+  };
+  
   // JSON (de)serialization of surface info
   void from_json(const json &js, SurfaceInfo &si);
   void to_json(json &js, const SurfaceInfo &si);

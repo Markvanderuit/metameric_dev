@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/scheduler.hpp>
+#include <metameric/core/record.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <small_gl/array.hpp>
@@ -9,7 +10,7 @@
 namespace met {
   class GenUpliftingDataTask : public detail::TaskNode {
     // Helper data for which tetrahedra go where, as in render data all meshes
-    // are tightly packed into a single shape
+    // are tightly packed into a single buffer
     struct MeshDataLayout {
       alignas(4) uint elem_offs; 
       alignas(4) uint elem_size;
@@ -24,9 +25,7 @@ namespace met {
 
     // Packed spectrum representation; four spectra interleaved per tetrahedron
     // ensure we can access all four spectra as one texture sample during rendering
-    using SpecPackLayout = eig::Array<
-      float, wavelength_samples, 4
-    >;
+    using SpecPackLayout = eig::Array<float, wavelength_samples, 4>;
 
     // Miscellaneous data
     uint              m_uplifting_i;
@@ -63,6 +62,9 @@ namespace met {
     bool is_active(SchedulerHandle &) override;
     void init(SchedulerHandle &)      override;
     void eval(SchedulerHandle &)      override;
+
+  public:
+    TetrahedronRecord query_tetrahedron(uint i) const;
   };
 
   class GenUpliftingsTask : public detail::TaskNode {

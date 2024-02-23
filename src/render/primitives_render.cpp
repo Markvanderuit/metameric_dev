@@ -61,83 +61,6 @@ namespace met {
       met_trace();
       return m_film;
     }
-
-    GBufferRenderPrimitive::GBufferRenderPrimitive() {
-      // Initialize program object
-      m_program = {{ .type       = gl::ShaderType::eVertex,
-                     .spirv_path = "resources/shaders/render/primitive_gbuffer.vert.spv",
-                     .cross_path = "resources/shaders/render/primitive_gbuffer.vert.json" },
-                   { .type       = gl::ShaderType::eFragment,
-                     .spirv_path = "resources/shaders/render/primitive_gbuffer.frag.spv",
-                     .cross_path = "resources/shaders/render/primitive_gbuffer.frag.json" }};
-
-      // Initialize draw object
-      m_draw = { 
-        .type         = gl::PrimitiveType::eTriangles,
-        .capabilities = {{ gl::DrawCapability::eDepthTest, true },
-                         { gl::DrawCapability::eCullOp,    true }},
-        .draw_op      = gl::DrawOp::eFill
-      };
-    }
-
-    void GBufferRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
-      met_trace_full();
-      
-      // Rebuild framebuffer and target texture if necessary
-      if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
-        m_film      = {{ .size = sensor.film_size.max(1).eval() }};
-        m_fbo_depth = {{ .size = sensor.film_size.max(1).eval() }};
-        m_fbo = {{ .type = gl::FramebufferType::eColor, .attachment = &m_film      },
-                 { .type = gl::FramebufferType::eDepth, .attachment = &m_fbo_depth }};
-      }
-    }
-    
-    const gl::Texture2d4f &GBufferRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
-      met_trace_full();
-
-      if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
-        reset(sensor, scene);
-      
-      const auto &objects = scene.components.objects;
-      const auto &meshes  = scene.resources.meshes;
-      
-      // Assemble appropriate draw data for each object in the scene
-      m_draw.bindable_array = &scene.resources.meshes.gl.array;
-      m_draw.commands.resize(objects.size());
-      rng::transform(objects, m_draw.commands.begin(), [&](const auto &comp) {
-        guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
-        return meshes.gl.draw_commands[comp.value.mesh_i];
-      });
-
-      // Specify draw state for next subtask
-      gl::state::set_viewport(sensor.film_size);    
-      gl::state::set_depth_range(0.f, 1.f);
-      gl::state::set_op(gl::DepthOp::eLessOrEqual);
-      gl::state::set_op(gl::CullOp::eBack);
-      gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
-
-      // Prepare framebuffer state
-      eig::Array4f fbo_colr_value = { 0, 0, 0, std::bit_cast<float>(0xFFFFFFFFu) };
-      m_fbo.bind();
-      m_fbo.clear(gl::FramebufferType::eColor, fbo_colr_value, 0);
-      m_fbo.clear(gl::FramebufferType::eDepth, 1.f);
-
-      // Prepare program state
-      m_program.bind();
-      m_program.bind("b_buff_sensor",  sensor.buffer());
-      m_program.bind("b_buff_objects", objects.gl.object_info);
-      m_program.bind("b_buff_meshes",  meshes.gl.mesh_info);
-      
-      // Dispatch draw call with appropriate barriers
-      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
-                               gl::BarrierFlags::eTextureFetch       |
-                               gl::BarrierFlags::eClientMappedBuffer |
-                               gl::BarrierFlags::eUniformBuffer      );
-      gl::dispatch_multidraw(m_draw);
-
-      // Return film, which is bound to the framebuffer as color target
-      return m_film;
-    }
   } // namespace detail
 
   GBufferPrimitive::GBufferPrimitive(GBufferPrimitiveInfo info)
@@ -196,12 +119,6 @@ namespace met {
                     | vws::transform(&Object::mesh_i)
                     | index_into_view(scene.resources.meshes.gl.draw_commands)
                     | rng::to<std::vector>();
-
-    // m_draw.commands.resize(scene.components.objects.size());
-    // rng::transform(scene.components.objects, m_draw.commands.begin(), [&](const auto &comp) {
-    //   guard(comp.value.is_active, gl::MultiDrawInfo::DrawCommand { });
-    //   return scene.resources.meshes.gl.draw_commands[comp.value.mesh_i];
-    // });
     
     // Specify draw states
     gl::state::set_viewport(sensor.film_size);    
@@ -211,7 +128,7 @@ namespace met {
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
 
     // Prepare framebuffer
-    eig::Array4f clear_value = { 1, 1, 0, std::bit_cast<float>(SurfaceRecord::record_invalid_data) };
+    eig::Array4f clear_value = { 0, 0, 0, std::bit_cast<float>(SurfaceRecord::record_invalid_data) };
     m_framebuffer.bind();
     m_framebuffer.clear(gl::FramebufferType::eColor, clear_value, 0);
     m_framebuffer.clear(gl::FramebufferType::eDepth, 1.f);
