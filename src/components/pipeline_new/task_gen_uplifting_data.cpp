@@ -275,15 +275,39 @@ namespace met {
     }
   }
 
-  TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(uint i) const {
+  TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(const Colr &c) const {
     met_trace();
 
-    TetrahedronRecord tr;
+    float result_err = std::numeric_limits<float>::max();
+    uint  result_i = 0;
+    auto  result_bary = eig::Vector4f(0.f);
+
+    // Find tetrahedron with positive barycentric weights
+    for (uint i = 0; i < m_tesselation.elems.size(); ++i) {
+      const auto &pack = m_tesselation_pack_map[i];
+      const auto &inv  = pack.inv.block<3, 3>(0, 0).eval();
+      const auto &sub  = pack.sub.head<3>().eval();
+
+      // Compute barycentric weights using packed element data
+      eig::Vector3f xyz  = (inv * (c - sub.array()).matrix()).eval();
+      eig::Vector4f bary = (eig::Array4f() << xyz, 1.f - xyz.sum()).finished();
+
+      // Compute squared error of potentially unbounded barycentric weights
+      float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f)).dot(bary - bary.cwiseMax(0.f).cwiseMin(1.f));
+
+      // Store best result if error improves
+      guard_continue(err < result_err);
+      result_err  = err;
+      result_bary = bary;
+      result_i    = i;
+    }
+
+    TetrahedronRecord tr = { .weights = result_bary };
 
     // First, find element indices for this tetrahedron
-    debug::check_expr(i < m_tesselation.elems.size());
-    auto elems = m_tesselation.elems[i];
-
+    debug::check_expr(result_i < m_tesselation.elems.size());
+    auto elems = m_tesselation.elems[result_i];
+    
     // Next, and find matching vertex colors and associated spectra
     rng::copy(elems | index_into_view(m_tesselation_points), tr.verts.begin());
     rng::copy(elems | index_into_view(m_tesselation_spectra), tr.spectra.begin());

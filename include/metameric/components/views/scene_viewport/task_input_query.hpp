@@ -6,6 +6,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
 #include <metameric/render/primitives_query.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -63,11 +64,24 @@ namespace met {
 
       // For each path, associate spectral record data
       std::vector<std::array<TetrahedronRecord, PathRecord::path_max_depth>> tetrahedron_data;
-      /* std::transform(std::execution::par_unseq, range_iter(paths), tetrahedron_data.begin(), [](const auto &record) {
-        
-        
+      std::transform(std::execution::par_unseq, range_iter(paths), tetrahedron_data.begin(), [&](const PathRecord &record) {
+        std::array<TetrahedronRecord, PathRecord::path_max_depth> data;
 
-      }); */
+        for (uint i = 0; i < record.path_depth; ++i) {
+          const auto &vert = record.data[i];
+          SurfaceInfo   si = e_scene.get_surface_info(vert.p, vert.record);
+          uint uplifting_i = e_scene.components.objects[si.record.object_i()].value.uplifting_i;
+
+          // Get handle to relevant uplifting task
+          const auto &uplf_handle = info.task(std::format("gen_upliftings.gen_uplifting_{}", uplifting_i))
+                                        .realize<GenUpliftingDataTask>();
+          // uplf_handle.query_tetrahedron()
+
+          
+        }
+        
+        return data;
+      });
       
       
     }

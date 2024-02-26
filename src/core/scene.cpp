@@ -739,24 +739,24 @@ namespace met {
     return { c, s };
   }
 
-  SurfaceInfo Scene::get_surface_info(const RayRecord &ray) const {
+  // SurfaceInfo Scene::get_surface_info(const RayRecord &ray) const {
+  SurfaceInfo Scene::get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const {
     met_trace();
 
     // Return object; return early if an invalid object was given
-    SurfaceInfo si = { .record = ray.record };
+    SurfaceInfo si = { .record = rc };
     guard(si.is_valid(), si);
     
     // Get relevant resources; mostly gl-side resources
     const auto &object    = components.objects[si.record.object_i()].value;
-    const auto &object_gl = components.objects.gl.objects()[ray.record.object_i()];
-    const auto &prim      = resources.meshes.gl.bvh_prims_cpu[ray.record.primitive_i()].unpack();
+    const auto &object_gl = components.objects.gl.objects()[si.record.object_i()];
+    const auto &prim      = resources.meshes.gl.bvh_prims_cpu[si.record.primitive_i()].unpack();
   
     // Get transforms used for gl-side world-model space
     auto trf = object_gl.trf_mesh;
     auto inv = object_gl.trf_mesh_inv;
 
     // Generate barycentric coordinates
-    eig::Vector3f p    = ray.get_position();
     eig::Vector3f pinv = (inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
     auto bary = detail::gen_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
 

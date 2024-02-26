@@ -217,7 +217,7 @@ namespace met {
           // on a surface hit, and update the local SurfaceInfo object to accomodate
           m_query_result = eval_ray_query(info, p_screen);
           si = (m_query_result.record.is_valid() && m_query_result.record.is_object())
-              ? e_scene.get_surface_info(m_query_result)
+              ? e_scene.get_surface_info(m_query_result.get_position(), m_query_result.record)
               : SurfaceInfo { .p = si.p };
 
           // Get writable vertex data

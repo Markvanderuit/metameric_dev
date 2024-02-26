@@ -158,7 +158,7 @@ namespace met {
     }
 
     // Given a RayRecord, recover underlying SurfaceInfo
-    SurfaceInfo get_surface_info(const RayRecord &ray) const;
+    SurfaceInfo get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const;
 
   public: // Serialization
     void to_stream(std::ostream &str) const;

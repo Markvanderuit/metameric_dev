@@ -64,7 +64,7 @@ namespace met {
     void eval(SchedulerHandle &)      override;
 
   public:
-    TetrahedronRecord query_tetrahedron(uint i) const;
+    TetrahedronRecord query_tetrahedron(const Colr &c) const;
   };
 
   class GenUpliftingsTask : public detail::TaskNode {

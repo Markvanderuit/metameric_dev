@@ -121,6 +121,7 @@ namespace met {
   // Contains lookup information for querying or finding a specific tetrahedron's
   // spectral information
   struct TetrahedronRecord {
+    eig::Array4f        weights; // Barycentric weights combining tetrahedron
     std::array<Colr, 4> verts;   // Vertex positions forming the tetrahedron
     std::array<Spec, 4> spectra; // Associated spectra at the vertices
     std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated 
