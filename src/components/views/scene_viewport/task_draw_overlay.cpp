@@ -142,7 +142,9 @@ namespace met {
     m_program.bind("b_buff_wvls_distr", e_scene.components.colr_systems.gl.wavelength_distr_buffer);
     m_program.bind("b_cmfs_3f",         e_scene.resources.observers.gl.cmfs_texture);
 
-    uint n_dispatch = 2 * 4 * static_cast<uint>(e_query.data().size());
+    uint n_dispatch = 2 
+                    * PathRecord::path_max_depth
+                    * static_cast<uint>(e_query.data().size());
 
     // Dispatch draw call
     gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer   | 

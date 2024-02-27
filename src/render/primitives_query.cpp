@@ -47,7 +47,8 @@ namespace met {
     }
 
     // Clear output data, specifically the buffer's head
-    m_output.clear({ }, 1u, 4 * sizeof(uint));
+    eig::Array4f clear_value = 0.f;
+    m_output.clear(obj_span<const std::byte>(clear_value), 1u, sizeof(decltype(clear_value)));
 
     // Flush sample count to query buffer
     m_query_map->spp = spp;
@@ -134,7 +135,8 @@ namespace met {
     }
 
     // Clear output data, specifically the buffer's head
-    m_output.clear({ }, 1u, 4 * sizeof(uint));
+    eig::Array4f clear_value = 0.f;
+    m_output.clear(obj_span<const std::byte>(clear_value), 1u, sizeof(decltype(clear_value)));
 
     // Flush sample count to query buffer
     m_query_map->spp = spp;

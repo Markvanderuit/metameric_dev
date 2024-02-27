@@ -13,18 +13,16 @@ namespace met {
     constexpr static uint record_emitter_flag = 0x80000000;
 
   public:
-    uint data;
+    uint data = record_invalid_data;
     
-    bool is_valid()    const { return data != record_invalid_data;       }
+    bool is_valid()    const { return  data != record_invalid_data;       }
     bool is_emitter()  const { return (data & record_emitter_flag) != 0; }
     bool is_object()   const { return (data & record_emitter_flag) == 0; }
     uint object_i()    const { return (data >> 24) & 0x0000007F;       }
     uint emitter_i()   const { return (data >> 24) & 0x0000007F;       }
     uint primitive_i() const { return data & 0x00FFFFFF;               }
     
-  public:
-    SurfaceRecord() : data(record_invalid_data) { }
-  
+  public:  
     static SurfaceRecord invalid() { return SurfaceRecord(); }
 
     constexpr auto operator<=>(const SurfaceRecord &) const = default;
@@ -117,7 +115,7 @@ namespace met {
   };
   static_assert(sizeof(PathRecord) == (3 + PathRecord::path_max_depth) * 16);
 
-  // A queried spectral uplifting tetrahedron component
+  // A queried spectral uplifting tetrahedron component surrounding a specific color
   // Contains lookup information for querying or finding a specific tetrahedron's
   // spectral information
   struct TetrahedronRecord {
@@ -125,7 +123,7 @@ namespace met {
     std::array<Colr, 4> verts;   // Vertex positions forming the tetrahedron
     std::array<Spec, 4> spectra; // Associated spectra at the vertices
     std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated 
-                                 // from a constraint and -1 otherwise
+                                 // from a constraint; -1 otherwise
   };
   
   // JSON (de)serialization of surface info

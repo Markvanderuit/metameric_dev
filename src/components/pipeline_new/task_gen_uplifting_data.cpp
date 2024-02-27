@@ -312,7 +312,7 @@ namespace met {
     rng::copy(elems | index_into_view(m_tesselation_points), tr.verts.begin());
     rng::copy(elems | index_into_view(m_tesselation_spectra), tr.spectra.begin());
     
-    // Then, assign constraint indices, or -1 if a boundary position
+    // Then, assign constraint indices, or -1 if a constraint is a boundary vertex
     rng::copy(elems | vws::transform([&](uint i) {
       int j = static_cast<int>(i) - static_cast<int>(m_csys_boundary_samples.size());
       return std::max<int>(j, -1);

@@ -14,6 +14,7 @@
 // TODO remove
 #include <algorithm>
 #include <execution>
+#include <implot.h>
 
 namespace met {
   class MeshViewportQueryInputTask : public detail::TaskNode {
@@ -37,6 +38,7 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
+      const auto &e_window  = info.global("window").getr<gl::Window>(); // TODO remove
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &io        = ImGui::GetIO();
       const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
@@ -60,30 +62,70 @@ namespace met {
       
       // Perform path query and obtain path data
       i_path_query.query(m_query_sensor, e_scene, m_query_spp);
-      auto paths = i_path_query.data();
+      auto _paths = i_path_query.data();
+      std::vector<PathRecord> paths(range_iter(_paths));
 
-      // For each path, associate spectral record data
-      std::vector<std::array<TetrahedronRecord, PathRecord::path_max_depth>> tetrahedron_data;
-      std::transform(std::execution::par_unseq, range_iter(paths), tetrahedron_data.begin(), [&](const PathRecord &record) {
+      guard(!paths.empty());
+
+      // Collect handles to all uplifting tasks
+      std::vector<TaskHandle> uplf_handles;
+      rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
+        std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
+
+      // For each path, gather relevant spectral tetrahedron data along vertices
+      std::vector<std::array<TetrahedronRecord, PathRecord::path_max_depth>> tetr_data(paths.size());
+      std::transform(std::execution::par_unseq, range_iter(paths), tetr_data.begin(), [&](const PathRecord &record) {
         std::array<TetrahedronRecord, PathRecord::path_max_depth> data;
+        data.fill(TetrahedronRecord { .weights = { .25f, .25f, .25f, .25f }, .verts   = { 0.f, 0.f, 0.f, 0.f },
+                                      .spectra = { 1.f, 1.f, 1.f, 1.f     }, .indices = { -1, -1, -1, -1     }});
 
-        for (uint i = 0; i < record.path_depth; ++i) {
-          const auto &vert = record.data[i];
-          SurfaceInfo   si = e_scene.get_surface_info(vert.p, vert.record);
+        // We take n-1 vertices, as the last vertex necessarily hits an emitter
+        int n_refl_vertices = std::clamp(static_cast<int>(record.path_depth) - 1, // last one is an emitter, which we do not care about
+                                         0,
+                                         static_cast<int>(PathRecord::path_max_depth) - 1);
+
+        // For each vertex, find reflectance data 
+        rng::transform(record.data | vws::take(n_refl_vertices), data.begin(), [&](const auto &vert) {
+          // Query surface info at the vertex position
+          SurfaceInfo si   = e_scene.get_surface_info(vert.p, vert.record);
+
+          // Get handle to relevant uplifting task and generate a uplifting tetrahedron that constructs the surface reflectance
           uint uplifting_i = e_scene.components.objects[si.record.object_i()].value.uplifting_i;
-
-          // Get handle to relevant uplifting task
-          const auto &uplf_handle = info.task(std::format("gen_upliftings.gen_uplifting_{}", uplifting_i))
-                                        .realize<GenUpliftingDataTask>();
-          // uplf_handle.query_tetrahedron()
-
-          
-        }
+          return uplf_handles[uplifting_i].realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse);
+        });
         
         return data;
       });
       
-      
+      // Attempt a reconstruction of the first vertex spectrum
+      if (paths[0].path_depth > 1) {
+        ImGui::BeginTooltip();
+        if (ImPlot::BeginPlot("##output_spectrum_plot", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+          // Get wavelength values for x-axis in plot
+          Spec x_values;
+          rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+
+          // Setup minimal format for coming line plots
+          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05, 1.05, ImPlotCond_Always);
+          ImPlot::SetupAxisTicks(ImAxis_X1, nullptr, 0);
+          ImPlot::SetupAxisTicks(ImAxis_Y1, nullptr, 0);
+          
+          for (int i = 0; i < static_cast<int>(paths[0].path_depth) - 1; ++i) {
+            auto tetr = tetr_data[0][i];
+            Spec r = tetr.weights[0] * tetr.spectra[0]
+                   + tetr.weights[1] * tetr.spectra[1]
+                   + tetr.weights[2] * tetr.spectra[2]
+                   + tetr.weights[3] * tetr.spectra[3];
+
+            // Do the thing
+            ImPlot::PlotLine(std::format("{}", i).c_str(), x_values.data(), r.data(), wavelength_samples);
+          }
+
+          ImPlot::EndPlot();
+        }
+        ImGui::EndTooltip();
+      }
     }
 
     void eval(SchedulerHandle &info) override {
