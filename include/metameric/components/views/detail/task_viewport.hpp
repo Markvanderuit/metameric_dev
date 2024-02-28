@@ -538,6 +538,14 @@ namespace met::detail {
 
         // Dispatch lrgb->srgb conversion
         gl::dispatch_compute(m_dispatch);
+      } else {
+        // Get shared resources
+        auto image_handle         = info.relative("viewport_image");
+        const auto &e_lrgb_target = image_handle("lrgb_target").getr<gl::Texture2d4f>();
+        auto &e_srgb_target       = image_handle("srgb_target").getw<gl::Texture2d4f>();
+
+        // Manually copy over so both targets are matching
+        e_lrgb_target.copy_to(e_srgb_target);
       }
       
       // Switch back to default framebuffer

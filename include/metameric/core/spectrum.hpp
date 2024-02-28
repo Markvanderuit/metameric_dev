@@ -178,4 +178,28 @@ namespace met {
     float y = c.sum();
     return y > 0.f ? Chro(c[0] / y, c[2] / y) : 0.f;
   }
+
+  inline
+  Colr sample_cmfs(const CMFS &cmfs, float wvl) {
+    float v = std::clamp(wvl * wavelength_samples - 0.5f, 
+                         0.f, 
+                         static_cast<float>(wavelength_samples - 1));
+    uint  t = static_cast<uint>(v);
+    float a = v - static_cast<float>(t);
+    
+    if (a == 0.f)
+      return cmfs.row(t);
+    else
+      return cmfs.row(t) + a * (cmfs.row(t + 1) - cmfs.row(t));
+  }
+
+  // Given a set of wavelengths and spectral values, integrate
+  // a color matching function into a resulting color
+  inline
+  Colr integrate_cmfs(const CMFS &cmfs, eig::Array4f wvls, eig::Array4f values) {
+    Colr c = 0.f;
+    for (auto [wvl, value] : vws::zip(wvls, values))
+      c += sample_cmfs(cmfs, wvl) * value;
+    return c;
+  }
 } // namespace met

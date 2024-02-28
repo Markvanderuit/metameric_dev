@@ -24,6 +24,7 @@ namespace met {
     // Make is_active available
     info("is_active").set(true);
 
+    // Specify viewport settings
     detail::ViewportTaskInfo viewport_info = {
       .name         = "Scene viewport",
       .is_closeable = false
@@ -32,8 +33,7 @@ namespace met {
     // Spawn subtasks
     info.child_task("viewport_begin").init<detail::_ViewportBeginTask>(viewport_info);
     info.child_task("viewport_image").init<detail::_ViewportImageTask>(viewport_info);
-    info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(
-      info.child("viewport_image")("lrgb_target"));
+    info.child_task("viewport_input_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"));
     info.child_task("viewport_input_editor").init<MeshViewportEditorInputTask>();
     info.child_task("viewport_input_query").init<MeshViewportQueryInputTask>();
     info.child_task("viewport_render").init<MeshViewportRenderTask>();

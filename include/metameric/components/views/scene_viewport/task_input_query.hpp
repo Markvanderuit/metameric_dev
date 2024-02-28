@@ -72,6 +72,24 @@ namespace met {
       rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
         std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
 
+      // Camera cmfs
+      CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
+      cmfs = (cmfs.array())
+           / (cmfs.array().col(1) * wavelength_ssize).sum();
+      cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
+
+      // For each path, sum spectral information into a relevant color;
+      // basically attempt to reproduce output color for testing
+      float colr_div = 1.f / static_cast<float>(m_query_spp);
+      Colr colr_lrgb = std::transform_reduce(std::execution::par_unseq,
+        range_iter(paths), Colr(0), 
+        [](const auto &a, const auto &b) -> Colr { 
+          return (a + b).eval(); }, 
+        [&cmfs, colr_div](const auto &path) -> Colr {
+          return colr_div * integrate_cmfs(cmfs, path.wavelengths, path.L);
+      });
+      Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
+
       // For each path, gather relevant spectral tetrahedron data along vertices
       std::vector<std::array<TetrahedronRecord, PathRecord::path_max_depth>> tetr_data(paths.size());
       std::transform(std::execution::par_unseq, range_iter(paths), tetr_data.begin(), [&](const PathRecord &record) {
@@ -100,6 +118,9 @@ namespace met {
       // Attempt a reconstruction of the first vertex spectrum
       if (paths[0].path_depth > 1) {
         ImGui::BeginTooltip();
+        
+        ImGui::ColorEdit3("##color", colr_srgb.data(), ImGuiColorEditFlags_Float);
+
         if (ImPlot::BeginPlot("##output_spectrum_plot", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
           // Get wavelength values for x-axis in plot
           Spec x_values;

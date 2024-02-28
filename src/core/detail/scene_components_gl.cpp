@@ -612,7 +612,7 @@ namespace met::detail {
     // fmt::print("Type updated: {}\n", typeid( decltype(cmfs)::value_type).name());
     
     // Whitepoint for normalization
-    Spec illuminant = models::emitter_cie_d65;
+    // Spec illuminant = models::emitter_cie_d65;
 
     for (uint i = 0; i < cmfs.size(); ++i) {
       const auto &[value, state] = cmfs[i];
