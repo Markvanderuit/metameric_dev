@@ -180,10 +180,39 @@ namespace met {
   }
 
   inline
+  void accumulate_spectrum(Spec &s, float wvl, float value) {
+    float v = std::clamp(wvl * wavelength_samples - 0.5f, 
+                         0.f, static_cast<float>(wavelength_samples - 1));
+    uint  t = static_cast<uint>(v);
+    float a = v - static_cast<float>(t);
+
+    if (a == 0.f) {
+      s[t] = value;
+    } else {
+      s[t]     += value * (1.f - a);
+      s[t + 1] += value * a;
+    } 
+  }
+
+  inline
+  Spec integrate_spectrum(float wvl, float value) {
+    Spec s = 0.f;
+    accumulate_spectrum(s, wvl, value);
+    return s;
+  }
+
+  inline
+  Spec integrate_spectrum(const eig::Array4f &wvls, const eig::Array4f &values) {
+    Spec s = 0.f;
+    for (auto [wvl, value] : vws::zip(wvls, values))
+      accumulate_spectrum(s, wvl, value);
+    return s;
+  }
+
+  inline
   Colr sample_cmfs(const CMFS &cmfs, float wvl) {
     float v = std::clamp(wvl * wavelength_samples - 0.5f, 
-                         0.f, 
-                         static_cast<float>(wavelength_samples - 1));
+                         0.f, static_cast<float>(wavelength_samples - 1));
     uint  t = static_cast<uint>(v);
     float a = v - static_cast<float>(t);
     

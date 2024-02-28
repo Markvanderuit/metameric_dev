@@ -724,8 +724,31 @@ namespace met {
         });
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        debug::check_expr(false, "Not implemented!");
-        // TODO ...
+        if (cstr.is_valid()) {
+          debug::check_expr(false, "Not implemented!");
+          // ... The Magic Doth Happen Here ....
+        } else {
+          // We attempt to fill in a default spectrum, which is necessary to establish the initial system
+          if (!cstr.surface.is_valid()) {
+            c = 0.f;
+            s = 0.f;
+            return;
+          }
+          
+          // Surface diffuse is constraint position
+          c = cstr.surface.diffuse;
+
+          // Gather all relevant color system spectra and corresponding color signals
+          std::vector<CMFS> systems = { csys_i };
+          std::vector<Colr> signals = { c      };
+
+          // Generate a metamer satisfying the system+signal constraint set
+          s = generate_spectrum({
+            .basis   = resources.bases[u.basis_i].value(),
+            .systems = systems,
+            .signals = signals
+          });
+        }
       },
       [&](const MeasurementConstraint &cstr) {
         // The specified spectrum becomes our metamer
@@ -739,19 +762,22 @@ namespace met {
     return { c, s };
   }
 
-  // SurfaceInfo Scene::get_surface_info(const RayRecord &ray) const {
-  SurfaceInfo Scene::get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const {
+  Scene::SceneSurfaceInfo Scene::get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const {
     met_trace();
 
-    // Return object; return early if an invalid object was given
-    SurfaceInfo si = { .record = rc };
-    guard(si.is_valid(), si);
-    
     // Get relevant resources; mostly gl-side resources
-    const auto &object    = components.objects[si.record.object_i()].value;
-    const auto &object_gl = components.objects.gl.objects()[si.record.object_i()];
-    const auto &prim      = resources.meshes.gl.bvh_prims_cpu[si.record.primitive_i()].unpack();
+    const auto &object    = components.objects[rc.object_i()].value;
+    const auto &object_gl = components.objects.gl.objects()[rc.object_i()];
+    const auto &uplifting = components.upliftings[object.uplifting_i].value;
+    const auto &prim      = resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
   
+    // Return object; fill in often accessed indices
+    SceneSurfaceInfo si = {
+      .object    = object,
+      .uplifting = uplifting
+    };
+    si.record = rc;
+
     // Get transforms used for gl-side world-model space
     auto trf = object_gl.trf_mesh;
     auto inv = object_gl.trf_mesh_inv;

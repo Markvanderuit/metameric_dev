@@ -6,7 +6,7 @@
 #include <metameric/render/detail/primitives.hpp>
 
 namespace met {
-  // Helper object for creation of FullPathQueryPrimitive and PartialPathQueryPrimitive
+  // Helper object for creation of PathQueryPrimitive and PartialPathQueryPrimitive
   struct PathQueryPrimitiveInfo {
     // Maximum path length
     uint max_depth = PathRecord::path_max_depth;
@@ -23,7 +23,7 @@ namespace met {
   
   // Primitive to query light transport along a single ray and get information
   // on each path
-  struct FullPathQueryPrimitive : public detail::BaseQueryPrimitive {
+  struct PathQueryPrimitive : public detail::BaseQueryPrimitive {
     ResourceHandle m_cache_handle;
     std::string    m_cache_key; 
     uint           m_max_depth;
@@ -36,34 +36,9 @@ namespace met {
   public:
     using InfoType = PathQueryPrimitiveInfo;
 
-    FullPathQueryPrimitive() = default;
-    FullPathQueryPrimitive(InfoType info);
+    PathQueryPrimitive() = default;
+    PathQueryPrimitive(InfoType info);
     
-    // Take n samples and return output buffer
-    const gl::Buffer &query(const PixelSensor &sensor, const Scene &scene, uint spp);
-
-    // Wait for sync object, and then return output data
-    std::span<const PathRecord> data() const;
-  };
-
-  // Primitive to query light transport along a single ray and get information
-  // on each path, with reflectances factored out
-  class PartialPathQueryPrimitive : public detail::BaseQueryPrimitive {
-    ResourceHandle m_cache_handle;
-    std::string    m_cache_key; 
-    uint           m_max_depth;
-
-    // Output data mappings and sync objects
-    uint                   *m_output_head_map;
-    std::span<PathRecord>   m_output_data_map;
-    mutable gl::sync::Fence m_output_sync;
-
-  public:
-    using InfoType = PathQueryPrimitiveInfo;
-
-    PartialPathQueryPrimitive() = default;
-    PartialPathQueryPrimitive(InfoType info);
-
     // Take n samples and return output buffer
     const gl::Buffer &query(const PixelSensor &sensor, const Scene &scene, uint spp);
 

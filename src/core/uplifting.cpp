@@ -20,7 +20,9 @@ namespace met {
   }
   
   bool IndirectSurfaceConstraint::operator==(const IndirectSurfaceConstraint &o) const {
-    return true;
+    return surface == o.surface
+        && rng::equal(colr, o.colr, eig::safe_approx_compare<Colr>)
+        && rng::equal(powers, o.powers, eig::safe_approx_compare<Spec>);
   }
 
   void from_json(const json &js, DirectColorConstraint &c) {
@@ -63,11 +65,15 @@ namespace met {
 
   void from_json(const json &js, IndirectSurfaceConstraint &c) {
     met_trace();
-    // TODO ...
+    js.at("colr").get_to(c.colr);
+    js.at("powers").get_to(c.powers);
+    js.at("surface").get_to(c.surface);
   }
 
   void to_json(json &js, const IndirectSurfaceConstraint &c) {
     met_trace();
-    // TODO ...
+    js = {{ "colr",    c.colr    },
+          { "powers",  c.powers  },
+          { "surface", c.surface }};
   }
 } // namespace met

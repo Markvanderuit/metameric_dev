@@ -108,7 +108,7 @@ namespace met {
     const auto &e_target = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
     const auto &e_sensor = info.relative("viewport_render")("sensor").getr<Sensor>();
     const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
-    const auto &e_query  = info.relative("viewport_input_query")("path_query").getr<FullPathQueryPrimitive>();
+    const auto &e_query  = info.relative("viewport_input_query")("path_query").getr<PathQueryPrimitive>();
     auto &i_target       = info("target").getw<gl::Texture2d4f>();
 
     guard(!e_query.data().empty());
@@ -162,6 +162,6 @@ namespace met {
   void MeshViewportDrawOverlayTask::eval(SchedulerHandle &info) {
     met_trace_full();
     eval_draw_constraints(info);
-    eval_draw_path_queries(info);
+    // eval_draw_path_queries(info);
   }
 } // namespace met

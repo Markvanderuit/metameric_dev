@@ -78,15 +78,21 @@ namespace met {
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
 
-    // ...
+    // Components of power series for solving, initially recorded 
+    // at time of constraint building and used for metamer generation w.r.t. scene light transport
+    std::vector<Spec> powers = { };
+    
+    // Requested output color, initially recorded at time of constraint building
+    // and then moddified by the user through constraint editing
+    Colr colr;
 
   public:
     // bool has_mismatching() const { return !colr_j.empty(); }
-    bool is_valid() const { return surface.is_valid(); }
+    bool has_mismatching() const { return !powers.empty() && !colr.isZero(); }
+    bool is_valid() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
   static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
-
 
   /* Constraint definition used in uplifting;
      A measurement constraint imposes specific spectrum reproduction

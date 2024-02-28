@@ -28,7 +28,7 @@ namespace met {
 
     void init(SchedulerHandle &info) override {
       met_trace();
-      info("path_query").init<FullPathQueryPrimitive>({
+      info("path_query").init<PathQueryPrimitive>({
         .max_depth    = 4,
         .cache_handle = info.global("cache")
       });
@@ -42,7 +42,7 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &io        = ImGui::GetIO();
       const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-      auto &i_path_query    = info("path_query").getw<FullPathQueryPrimitive>();
+      auto &i_path_query    = info("path_query").getw<PathQueryPrimitive>();
 
       // Escape for empty scenes
       guard(!e_scene.components.objects.empty());
@@ -62,10 +62,14 @@ namespace met {
       
       // Perform path query and obtain path data
       i_path_query.query(m_query_sensor, e_scene, m_query_spp);
-      auto _paths = i_path_query.data();
-      std::vector<PathRecord> paths(range_iter(_paths));
-
+      auto paths = i_path_query.data();
       guard(!paths.empty());
+
+      struct SeparationRecord {
+        uint         power;  // nr. of times constriant reflectance appears along path
+        eig::Array4f wvls;   // integration wavelengths 
+        eig::Array4f values; // remainder of incident radiance, without constraint reflectance
+      };
 
       // Collect handles to all uplifting tasks
       std::vector<TaskHandle> uplf_handles;
@@ -78,9 +82,25 @@ namespace met {
            / (cmfs.array().col(1) * wavelength_ssize).sum();
       cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
 
-      // For each path, sum spectral information into a relevant color;
-      // basically attempt to reproduce output color for testing
+      // Divider by nr. of requested path samples; not total paths. Most extra paths
+      // come from NEE, and further division is taken into account by probability weighintg
       float colr_div = 1.f / static_cast<float>(m_query_spp);
+
+      // For each path, integrate spectral throughput into a distribution and
+      // then convert this to a color.
+      // Basically attempt to reproduce color output for testing
+      Spec spec_distr = std::transform_reduce(std::execution::par_unseq,
+        range_iter(paths), Spec(0), 
+        [](const auto &a, const auto &b) -> Spec { 
+          return (a + b).eval(); }, 
+        [&cmfs, colr_div](const auto &path) -> Spec {
+          return colr_div * integrate_spectrum(path.wavelengths, path.L);
+      });
+      Colr colr_lrgb_dstr = (cmfs.transpose() * spec_distr.matrix());
+      Colr colr_srgb_dstr = lrgb_to_srgb(colr_lrgb_dstr);
+
+      // For each path, integrate spectral information into a relevant color directly.
+      // basically attempt to reproduce output color for testing
       Colr colr_lrgb = std::transform_reduce(std::execution::par_unseq,
         range_iter(paths), Colr(0), 
         [](const auto &a, const auto &b) -> Colr { 
@@ -90,61 +110,88 @@ namespace met {
       });
       Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
 
-      // For each path, gather relevant spectral tetrahedron data along vertices
-      std::vector<std::array<TetrahedronRecord, PathRecord::path_max_depth>> tetr_data(paths.size());
-      std::transform(std::execution::par_unseq, range_iter(paths), tetr_data.begin(), [&](const PathRecord &record) {
-        std::array<TetrahedronRecord, PathRecord::path_max_depth> data;
-        data.fill(TetrahedronRecord { .weights = { .25f, .25f, .25f, .25f }, .verts   = { 0.f, 0.f, 0.f, 0.f },
-                                      .spectra = { 1.f, 1.f, 1.f, 1.f     }, .indices = { -1, -1, -1, -1     }});
-
-        // We take n-1 vertices, as the last vertex necessarily hits an emitter
-        int n_refl_vertices = std::clamp(static_cast<int>(record.path_depth) - 1, // last one is an emitter, which we do not care about
-                                         0,
-                                         static_cast<int>(PathRecord::path_max_depth) - 1);
-
-        // For each vertex, find reflectance data 
-        rng::transform(record.data | vws::take(n_refl_vertices), data.begin(), [&](const auto &vert) {
-          // Query surface info at the vertex position
-          SurfaceInfo si   = e_scene.get_surface_info(vert.p, vert.record);
-
-          // Get handle to relevant uplifting task and generate a uplifting tetrahedron that constructs the surface reflectance
-          uint uplifting_i = e_scene.components.objects[si.record.object_i()].value.uplifting_i;
-          return uplf_handles[uplifting_i].realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse);
-        });
-        
-        return data;
-      });
+      // For each path, gather relevant spectral tetrahedral uplifting data along vertices
+      std::vector<std::vector<TetrahedronRecord>> tetr_data(paths.size());
+      std::transform(std::execution::par_unseq, 
+        range_iter(paths), tetr_data.begin(), 
+        [&](const PathRecord &record) {
+          // For n-1 vertices (the last vertex necessarily hits an emitter, so we ignore it)
+          return record.data 
+            | vws::take(std::max(static_cast<int>(record.path_depth) - 1, 0))
+            | vws::transform([&](const auto &vt) { 
+              // ... find associated surface info
+              return e_scene.get_surface_info(vt.p, vt.record); }) 
+            | vws::transform([&](const auto &si) {
+              // ... then find surface's uplifting task, and let it generate a uplifting tetrahedron
+              auto handle = uplf_handles[si.object.uplifting_i];
+              return handle.realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse); })
+            | rng::to<std::vector<TetrahedronRecord>>(); });
+      
+      // Assume for now, only one uplifting exists
+      // Continue only if there is a constraint
+      const auto &e_uplifting = e_scene.components.upliftings[0].value;
+      guard(!e_uplifting.verts.empty());
       
       // Attempt a reconstruction of the first vertex spectrum
-      if (paths[0].path_depth > 1) {
+      {
         ImGui::BeginTooltip();
-        
-        ImGui::ColorEdit3("##color", colr_srgb.data(), ImGuiColorEditFlags_Float);
+    
+        // Plot intergrated color
+        ImGui::ColorEdit3("lrgb (ntgr)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("lrgb (dstr)", colr_lrgb_dstr.data(), ImGuiColorEditFlags_Float);
 
-        if (ImPlot::BeginPlot("##output_spectrum_plot", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-          // Get wavelength values for x-axis in plot
-          Spec x_values;
-          rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+        ImGui::ColorEdit3("srgb (ntgr)", colr_srgb.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("srgb (dstr)", colr_srgb_dstr.data(), ImGuiColorEditFlags_Float);
 
+        ImGui::Separator();
+
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
+        ImGui::Value("Minimum", spec_distr.minCoeff());
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
+        ImGui::Value("Maximum", spec_distr.maxCoeff());
+
+        ImGui::Separator();
+
+        // Get wavelength values for x-axis in plot
+        Spec x_values;
+        rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+
+        // Run a spectrum plot for the accumulated radiance
+        if (ImPlot::BeginPlot("Radiance", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+          // Setup minimal format for coming line plots
+          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.f, spec_distr.maxCoeff(), ImPlotCond_Always);
+          ImPlot::SetupAxisTicks(ImAxis_X1, nullptr, 0);
+          ImPlot::SetupAxisTicks(ImAxis_Y1, nullptr, 0);
+
+          // Iterate tetrahedron data and plot it
+          ImPlot::PlotLine("##rad", x_values.data(), spec_distr.data(), wavelength_samples);
+
+          ImPlot::EndPlot();
+        }
+
+        // Run a spectrum plot for encountered spectra
+        /* if (ImPlot::BeginPlot("Reflectances", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
           // Setup minimal format for coming line plots
           ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
           ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05, 1.05, ImPlotCond_Always);
           ImPlot::SetupAxisTicks(ImAxis_X1, nullptr, 0);
           ImPlot::SetupAxisTicks(ImAxis_Y1, nullptr, 0);
-          
-          for (int i = 0; i < static_cast<int>(paths[0].path_depth) - 1; ++i) {
-            auto tetr = tetr_data[0][i];
-            Spec r = tetr.weights[0] * tetr.spectra[0]
-                   + tetr.weights[1] * tetr.spectra[1]
-                   + tetr.weights[2] * tetr.spectra[2]
-                   + tetr.weights[3] * tetr.spectra[3];
 
-            // Do the thing
-            ImPlot::PlotLine(std::format("{}", i).c_str(), x_values.data(), r.data(), wavelength_samples);
+          // Iterate tetrahedron data and plot it
+          uint scope_i = 0;
+          for (const auto &data : tetr_data) {
+            for (const auto &tetr : data) {
+              Spec r = tetr.weights[0] * tetr.spectra[0] + tetr.weights[1] * tetr.spectra[1]
+                     + tetr.weights[2] * tetr.spectra[2] + tetr.weights[3] * tetr.spectra[3];
+              ImPlot::PlotLine(std::format("##scope_{}", scope_i++).c_str(), x_values.data(), r.data(), wavelength_samples);
+            }
           }
 
           ImPlot::EndPlot();
-        }
+        } */
+        
         ImGui::EndTooltip();
       }
     }
@@ -153,7 +200,7 @@ namespace met {
       met_trace();
       
       if (ImGui::Begin("Blahhh")) {
-        uint min_v = 0, max_v = 1024;
+        uint min_v = 0, max_v = 4096;
         ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }
       ImGui::End();

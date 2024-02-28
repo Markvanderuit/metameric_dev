@@ -295,11 +295,16 @@ namespace met {
       // Compute squared error of potentially unbounded barycentric weights
       float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f)).dot(bary - bary.cwiseMax(0.f).cwiseMin(1.f));
 
-      // Store best result if error improves
+      // Continue if error does not improve
       guard_continue(err < result_err);
+
+      // Store best result
       result_err  = err;
       result_bary = bary;
       result_i    = i;
+
+      // Exit if zero error is reached
+      guard_break(result_err > 0.f);
     }
 
     TetrahedronRecord tr = { .weights = result_bary };
@@ -309,7 +314,7 @@ namespace met {
     auto elems = m_tesselation.elems[result_i];
     
     // Next, and find matching vertex colors and associated spectra
-    rng::copy(elems | index_into_view(m_tesselation_points), tr.verts.begin());
+    // rng::copy(elems | index_into_view(m_tesselation_points), tr.verts.begin());
     rng::copy(elems | index_into_view(m_tesselation_spectra), tr.spectra.begin());
     
     // Then, assign constraint indices, or -1 if a constraint is a boundary vertex

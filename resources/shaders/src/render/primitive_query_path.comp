@@ -107,8 +107,10 @@ declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)
 declare_path_data(buff_output.head, buff_output.data);
 
-// All includes from and in here rely on buffers/samplers to be declared
-#include <render/tracking/full.glsl>
+// All includes from here on rely on buffers/samplers to be declared
+#define ENABLE_PATH_TRACKING
+#define ENABLE_FULL_PATH_TRACKING
+#include <render/path.glsl>
 
 void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
