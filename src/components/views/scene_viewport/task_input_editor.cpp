@@ -171,6 +171,24 @@ namespace met {
       accumulate_spectrum(cstr.powers[path.power], path.wvls, path.values);
     for (auto &power : cstr.powers)
       power /= static_cast<float>(n_spp);
+
+    // Generate a default color value for which a valid reflectance should exist
+    {
+      // Get camera cmfs
+      CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
+      cmfs = (cmfs.array())
+            / (cmfs.array().col(1) * wavelength_ssize).sum();
+      cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
+      
+      // Reconstruct radiance from truncated power series
+      Spec r = e_uplf_task.query_constraint(is.constraint_i);
+      Spec s = 0.f;
+      for (uint i = 0; i < cstr.powers.size(); ++i)
+        s += r.pow(static_cast<float>(i)) * cstr.powers[i];
+      
+      // Recover output color and store in constraint
+      cstr.colr = (cmfs.transpose() * s.matrix());
+    }
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {

@@ -142,11 +142,12 @@ namespace met {
     const auto &i_samples = info(fmt::format("samples_{}", cmfs_i.size())).getr<std::vector<eig::ArrayXf>>();
 
     // Generate points on metamer set boundary; store in aligned format
-    auto data = generate_mmv_boundary_colr({ .basis      = e_appl_data.loaded_basis,
-                                             .systems_i  = cmfs_i, 
-                                             .signals_i  = sign_i, 
-                                             .system_j   = cmfs_j, 
-                                             .samples    = i_samples });
+    auto data = generate_mmv_boundary_colr(GenerateMMVBoundaryInfo { 
+                                             .basis     = e_appl_data.loaded_basis,
+                                             .systems_i = cmfs_i, 
+                                             .signals_i = sign_i, 
+                                             .system_j  = cmfs_j, 
+                                             .samples   = i_samples });
     
     // Generate cleaned mesh from data
     auto mesh = generate_convex_hull<AlMesh, eig::Array3f>(data);

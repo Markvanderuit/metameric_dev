@@ -724,10 +724,11 @@ namespace met {
         });
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        if (cstr.has_mismatching()) {
+        /* if (cstr.has_mismatching()) {
           debug::check_expr(false, "Not implemented!");
           // ... The Magic Doth Happen Here ....
-        } else {
+        } else  */
+        {
           // We attempt to fill in a default spectrum, which is necessary to establish the initial system
           if (!cstr.surface.is_valid()) {
             c = 0.f;

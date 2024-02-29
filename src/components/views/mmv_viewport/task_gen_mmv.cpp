@@ -129,7 +129,7 @@ namespace met {
     if (std::visit(overloaded {
       [](const DirectColorConstraint &cstr)     { return !cstr.has_mismatching(); },
       [](const DirectSurfaceConstraint &cstr)   { return !cstr.is_valid() || !cstr.has_mismatching(); },
-      [](const IndirectSurfaceConstraint &cstr) { return !cstr.is_valid(); },
+      [](const IndirectSurfaceConstraint &cstr) { return !cstr.is_valid() || !cstr.has_mismatching(); },
       [](const auto &) { return false; }
     }, e_vert.constraint)) {
       info("chull_array").getw<gl::Array>() = {};
@@ -191,8 +191,30 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        // TODO generate MMV
-        // ..
+        // Generate 3D unit vector samples
+        auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 3, m_iter);
+
+        // Get camera cmfs
+        CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
+        cmfs = (cmfs.array())
+             / (cmfs.array().col(1) * wavelength_ssize).sum();
+        cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
+
+        auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize_direct() };
+        auto signals_i = { cstr.surface.diffuse };
+
+        // Prepare data for MMV point generation
+        GenerateIndirectMMVBoundaryInfo mmv_info = {
+          .basis      = e_scene.resources.bases[e_uplifting.basis_i].value(),
+          .systems_i  = systems_i,
+          .signals_i  = signals_i,
+          .components = cstr.powers,
+          .system_j   = cmfs,
+          .samples    = samples,
+        };
+
+        // Generate MMV points and append to current point set
+        m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const auto &) { }
     }, e_vert.constraint);

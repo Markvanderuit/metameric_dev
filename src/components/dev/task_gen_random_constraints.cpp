@@ -114,11 +114,12 @@ namespace met {
       std::vector<Colr> sign_i = { vert.colr_i };
 
       // Generate boundary points over mismatch volume; these points lie on a convex hull
-      auto ocs_gen_data = generate_mmv_boundary_colr({ .basis      = e_appl_data.loaded_basis,
-                                                       .systems_i  = cmfs_i, 
-                                                       .signals_i  = sign_i, 
-                                                       .system_j   = cmfs_j.front(), 
-                                                       .samples    = i_samples_6d });
+      auto ocs_gen_data = generate_mmv_boundary_colr(GenerateMMVBoundaryInfo {
+                                                       .basis     = e_appl_data.loaded_basis,
+                                                       .systems_i = cmfs_i, 
+                                                       .signals_i = sign_i, 
+                                                       .system_j  = cmfs_j.front(), 
+                                                       .samples   = i_samples_6d });
     
       // Compute center of convex hull
       constexpr auto f_add = [](const auto &a, const auto &b) { return (a + b).eval(); };
