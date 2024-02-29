@@ -187,11 +187,34 @@ namespace met {
     float a = v - static_cast<float>(t);
 
     if (a == 0.f) {
-      s[t] = value;
+      s[t] += value;
     } else {
       s[t]     += value * (1.f - a);
       s[t + 1] += value * a;
     } 
+  }
+
+  inline
+  void accumulate_spectrum(Spec &s, const eig::Array4f &wvls, const eig::Array4f &values) {
+    for (auto [wvl, value] : vws::zip(wvls, values))
+      accumulate_spectrum(s, wvl, value);
+  }
+
+  inline
+  float sample_spectrum(const float &wvl, const Spec &s) {
+    float v = std::clamp(wvl * wavelength_samples - 0.5f, 
+                         0.f, static_cast<float>(wavelength_samples - 1));
+    uint  t = static_cast<uint>(v);
+    float a = v - static_cast<float>(t);
+    return a == 0.f ? s[t] : s[t] + a * (s[t + 1] - s[t]);
+  }
+
+  inline
+  eig::Array4f sample_spectrum(const eig::Array4f &wvls, const Spec &s) {
+    eig::Array4f v = 0.f;
+    for (uint i = 0; i < 4; ++i)
+      v[i] = sample_spectrum(wvls[i], s);
+    return v;
   }
 
   inline
@@ -230,5 +253,11 @@ namespace met {
     for (auto [wvl, value] : vws::zip(wvls, values))
       c += sample_cmfs(cmfs, wvl) * value;
     return c;
+  }
+
+  // Simple safe dividor in case some components may fall to 0
+  inline
+  Spec safe_div(const Spec &s, const Spec &div) {
+    return (s / div.NullaryExpr([](float f) { return f != 0.f ? f : 1.f; })).eval();
   }
 } // namespace met

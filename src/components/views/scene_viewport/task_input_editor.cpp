@@ -1,6 +1,8 @@
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
+#include <bitset>
 #include <execution>
 
 namespace met {
@@ -30,7 +32,7 @@ namespace met {
                                 + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-                                
+    
     // Update pixel sensor
     m_path_sensor.proj_trf  = e_arcball.proj().matrix();
     m_path_sensor.view_trf  = e_arcball.view().matrix();
@@ -39,56 +41,136 @@ namespace met {
     m_path_sensor.flush();
 
     // Perform path query and obtain path samples
-    m_path_prim.query(m_path_sensor, e_scene, 1024);
+    uint n_spp = 16384;
+    m_path_prim.query(m_path_sensor, e_scene, n_spp);
     auto paths = m_path_prim.data();
 
     // If no paths were found, clear data so the constraint becomes invalid for MMV/spectrum generation
     if (paths.empty()) {
       cstr.colr   = 0.f;
       cstr.powers = { };
+      return;
     }
+
+    fmt::print("Found {} paths through query\n", paths.size());
   
     // Collect handles to all uplifting tasks
     std::vector<TaskHandle> uplf_handles;
     rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
       std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
     
+    // Collect handle to relevant uplifting taslk
+    const auto &e_uplf_task = uplf_handles[is.uplifting_i].realize<GenUpliftingDataTask>();
+
     // Collect camera cmfs
     CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
     cmfs = (cmfs.array())
           / (cmfs.array().col(1) * wavelength_ssize).sum();
     cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
 
-    // Helper struct
+    // Helper structs
     struct SeparationRecord {
       uint         power;  // nr. of times constriant reflectance appears along path
       eig::Array4f wvls;   // integration wavelengths 
       eig::Array4f values; // remainder of incident radiance, without constraint reflectance
     };
+    struct CompactTetrRecord {
+      float        r_weight;
+      eig::Array4f remainder;
+    };
 
     // Compact paths into R^P + aR', which likely means separating them instead
-    std::vector<SeparationRecord> paths_separated;
-    paths_separated.reserve(paths.size());
+    tbb::concurrent_vector<SeparationRecord> tbb_paths;
+    tbb_paths.reserve(paths.size());
     #pragma omp parallel for
     for (int i = 0; i < paths.size(); ++i) {
       const PathRecord &path = paths[i];
 
-      // Gather spectral uplifting data for every non-emitter vertex along the path
-      auto tetrs = path.data 
-                 | vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))
-                 | vws::transform([&](const auto &vt) { 
-                   // ... find associated surface info
-                   return e_scene.get_surface_info(vt.p, vt.record); }) 
-                 | vws::transform([&](const auto &si) {
-                   // ... then find surface's uplifting task, and let it generate a uplifting tetrahedron
-                   auto handle = uplf_handles[si.object.uplifting_i];
-                   return handle.realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse); })
-                 | rng::to<std::vector<TetrahedronRecord>>();
+      // Filter vertices along path for which the uplifting data is relevant to our
+      // current constraint
+      auto verts = path.data
+                 | vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0)) // 1. drop padded memory
+                 | vws::transform([&](const auto &vt) {                          // 2. generate surface info at vertex position
+                   return e_scene.get_surface_info(vt.p, vt.record); })          
+                 | vws::filter([&](const auto &si) {                             // 3. drop vertices on other uplifting structures
+                   return si.object.uplifting_i == is.uplifting_i; })            
+                 | vws::transform([&](const auto &si) {                          // 4. generate uplifting tetrahedron from uplifting task
+                   return e_uplf_task.query_tetrahedron(si.diffuse); })          
+                 | vws::transform([&](const auto &tetr) {                        // 5. find index of vertex that is linked to our constraint
+                   auto it = rng::find(tetr.indices, is.constraint_i);           //    and return together with tetrahedron
+                   uint i =  std::distance(tetr.indices.begin(), it);            
+                   return std::pair { tetr, i };  })
+                 | vws::filter([&](const auto &pair) {                           // 6. drop tetrahedra that don't touch on our selected constraint
+                   return pair.second < 4; })                                    
+                 | vws::transform([&](const auto &pair) {                        // 7. return compact representation; weight of r and summed remainder
+                   auto [tetr, i] = pair;
+                   CompactTetrRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
+                   for (uint j = 0; j < 4; ++j) {
+                     guard_continue(j != i);
+                     rc.remainder += tetr.weights[j] * sample_spectrum(path.wavelengths, tetr.spectra[j]);
+                   }
+                   return rc; 
+                 }) | rng::to<std::vector<CompactTetrRecord>>();                 // 8. finalize to vector
       
-      // .. Where the magic happens ...
+      /* if (verts.empty()) { 
+        // This path is either very unlikely (as first hits of each ray **should** hit the constraint itself)
+        // or just completely impossible. Either way, ignoring as it hasn't happened in any scene I've tested 
+        // If no constraint vertices were encountered, full path throughput is pushed back
+        tbb_paths.push_back(SeparationRecord {
+          .power  = 0,
+          .wvls   = path.wavelengths,
+          .values = path.L
+        });
+      } else  */
+      {
+        // Get the relevant constraint's current reflectance
+        // at the path's wavelengths (notably, this data is from last frame)
+        eig::Array4f r = sample_spectrum(path.wavelengths, e_uplf_task.query_constraint(is.constraint_i));
+
+        // We get the "fixed" part of the path's throughput, by stripping all reflectances of
+        // the constrained vertices through division; on div-by-0, we set a component to 0
+        eig::Array4f back = path.L;
+        rng::for_each(verts, [&](const auto &vt) {
+          auto rdiv = (r * vt.r_weight + vt.remainder).eval();
+          back = (rdiv != 0.f).select(back / rdiv, 0.f);
+        });
+        
+        // We them iterate all permutations of the current constraint vertices
+        // and collapse reflectances into this value
+        std::vector<SeparationRecord> permutations;
+        uint n_perms = std::pow(2u, static_cast<uint>(verts.size()));
+        for (uint i = 0; i < std::pow(2u, static_cast<uint>(verts.size())); ++i) {
+          auto bits = std::bitset<32>(i);
+          SeparationRecord sr = { .power = 0, .wvls = path.wavelengths, .values = back };
+          for (uint j = 0; j < verts.size(); ++j) {
+            if (bits[j]) {
+              sr.power++;
+              sr.values *= verts[j].r_weight;
+            } else {
+              sr.values *= verts[j].remainder;
+            }
+          }
+          tbb_paths.push_back(sr);
+        }
+      }
     }
 
-    // ...
+    // Copy tbb over to single vector block
+    std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
+    
+    fmt::print("Separated into {} path permutations\n", paths_finalized.size());
+
+    // Make space in constraint available, up to maximum power
+    // and set everything to zero for now
+    cstr.powers.resize(1 + rng::max_element(paths_finalized, {}, &SeparationRecord::power)->power);
+    rng::fill(cstr.powers, Spec(0));
+
+    // Reduce spectral data into its respective power bracket and divide by sample count
+    // TODO parallel reduction
+    for (const auto &path : paths_finalized)
+      accumulate_spectrum(cstr.powers[path.power], path.wvls, path.values);
+    for (auto &power : cstr.powers)
+      power /= static_cast<float>(n_spp);
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {
@@ -209,6 +291,13 @@ namespace met {
       if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
         m_gizmo_prev_si = si;
         m_is_gizmo_used = true;
+        
+        // Right at the start, we set the indirect constraint set into an invalid state
+        // to prevent overhead from constraint generation
+        std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+          cstr.powers.clear();
+          cstr.colr = 0.f;
+        }, [](auto &cstr) { } }, e_vert.constraint);
       }
 
       // Register continuous gizmo use
@@ -238,9 +327,9 @@ namespace met {
 
       // Register gizmo use end; apply current vertex position to scene savte state
       if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
-        // Build light transport constraints for indirect surface constraint HERE
+        // Right at the end, we build the indirect surface constraint HERE
         // as it secretly uses previous frame data to fill in some details, and is
-        // more costly per frame than I'd like to admit
+        // way more costly per frame than I'd like to admit
         auto vert = e_vert; // copy of vertex
         std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
           cstr.surface = si;

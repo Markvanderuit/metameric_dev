@@ -191,6 +191,7 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
+        // TODO generate MMV
         // ..
       },
       [&](const auto &) { }
@@ -198,6 +199,9 @@ namespace met {
 
     // Increment iteration up to sample count
     m_iter += mmv_samples_per_iter;
+
+    // Only continue if points are found
+    guard(!m_points.empty());
 
     // Determine extents of generated point sets
     auto maxb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.max(b).eval(); }).value();

@@ -17,12 +17,15 @@ namespace met {
     using ComponentType = detail::Component<Uplifting>;
 
     // Get shared resources
-    const auto &e_is = info.parent()("selection").getr<InputSelection>();
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_is      = info.parent()("selection").getr<InputSelection>();
+    auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_is.uplifting_i)).mask(info);
+    const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_is.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
-      auto &vert = uplf.value.verts[e_is.constraint_i];
-      const auto &e_scene = info.global("scene").getr<Scene>();
+      auto &vert            = uplf.value.verts[e_is.constraint_i];
+      const auto &e_window  = info.global("window").getr<gl::Window>();
       
       // Visit the underlying constraint data
       std::visit(overloaded {
@@ -43,6 +46,8 @@ namespace met {
 
           // Color constraint; system column
           detail::visit_range_column<uint>("Color system", col_width * 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
+            const auto &e_scene = info.global("scene").getr<Scene>();
+
             // Spawn selector; work on a copy to detect changes
             uint _csys_j = csys_j;
             detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, _csys_j, 
@@ -117,6 +122,70 @@ namespace met {
           }
         },
         [&](IndirectSurfaceConstraint &cstr) {
+          // Color baseline value extracted from surface
+          {
+            ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
+            auto srgb = lrgb_to_srgb(cstr.get_colr_i());
+            ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
+            cstr.get_colr_i() = srgb_to_lrgb(srgb);
+          }
+
+          // Visual separator into constraint list
+          ImGui::Separator();
+
+          // Get wavelength values for x-axis in plot
+          Spec x_values;
+          rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+
+          uint p = 0;
+          for (const auto &spec : cstr.powers) {
+            // Run a spectrum plot for the accumulated radiance
+            if (ImPlot::BeginPlot(std::format("power {}", p).c_str(),
+                                  { 256.f * e_window.content_scale(), 96.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+              ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+              ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, spec.minCoeff(), spec.maxCoeff(), ImPlotCond_Always);
+              ImPlot::PlotLine("##rad", x_values.data(), spec.data(), wavelength_samples);
+              ImPlot::EndPlot();
+            }
+            p++;
+          }
+
+          ImGui::SeparatorText("Estimated output");
+          {
+            // Reconstruct radiance from truncated power series
+            Spec r = e_spectra[e_is.constraint_i];
+            Spec s = 0.f;
+            for (uint i = 0; i < cstr.powers.size(); ++i)
+              s += r.pow(static_cast<float>(i)) * cstr.powers[i];
+
+            // Get camera cmfs
+            CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
+            cmfs = (cmfs.array())
+                 / (cmfs.array().col(1) * wavelength_ssize).sum();
+            cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
+
+            // Recover output color
+            Colr colr_lrgb = (cmfs.transpose() * s.matrix());
+            Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
+
+            // Plot color
+            ImGui::ColorEdit3("Radiance color", colr_srgb.data(), ImGuiColorEditFlags_Float);
+
+            // Plot radiance
+            if (ImPlot::BeginPlot("Radiance distr", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+              // Get wavelength values for x-axis in plot
+              Spec x_values;
+              rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+
+              // Simple barebones spectrum plot
+              ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+              ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, s.maxCoeff() + 0.05f, ImPlotCond_Always);
+              ImPlot::PlotLine("##radiance_line", x_values.data(), s.data(), wavelength_samples);
+              ImPlot::EndPlot();
+            }
+          }
+
+
           ImGui::Text("Not implemented");
         },
         [&](MeasurementConstraint &cstr) {
@@ -129,9 +198,7 @@ namespace met {
     ImGui::SeparatorText("Output spectrum");
     {
       // Get shared resources
-      auto uplf_handle = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_is.uplifting_i)).mask(info);
       const auto &e_window  = info.global("window").getr<gl::Window>();
-      const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
       const auto &e_sd      = e_spectra[e_is.constraint_i];
 
       if (ImPlot::BeginPlot("##output_spectrum_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {

@@ -17,7 +17,7 @@ namespace met {
     return std::visit(overloaded {
       [](const DirectColorConstraint &c)     { return c.has_mismatching(); },
       [](const DirectSurfaceConstraint &c)   { return c.has_mismatching(); },
-      [](const IndirectSurfaceConstraint &c) { return false; },
+      [](const IndirectSurfaceConstraint &c) { return c.has_mismatching(); },
       [&](const auto &)                      { return false; }
     }, constraint);
   }

@@ -64,6 +64,8 @@ namespace met {
     void eval(SchedulerHandle &)      override;
 
   public:
+    // Accessors to some internal data; used by indirect surface constraints
+    Spec              query_constraint(uint i)         const;
     TetrahedronRecord query_tetrahedron(const Colr &c) const;
   };
 

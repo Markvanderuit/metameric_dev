@@ -91,6 +91,10 @@ namespace met {
     bool has_mismatching() const { return !powers.empty() && !colr.isZero(); }
     bool is_valid() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
+    
+  public:
+          Colr &get_colr_i()       { return surface.diffuse; }
+    const Colr &get_colr_i() const { return surface.diffuse; }
   };
   static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
 

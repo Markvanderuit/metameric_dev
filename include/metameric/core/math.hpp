@@ -117,4 +117,10 @@ namespace Eigen {
                                  const Vector2f     &size) { // window size
     return screen_to_window_space(world_to_screen_space(v, mat), offs, size);
   }
+
+  // Simple safe dividor in case some components may fall to 0
+  inline
+  Array4f safe_div(const Array4f &v, const Array4f &div) {
+    return (v / div.NullaryExpr([](float f) { return f != 0.f ? f : 1.f; })).eval();
+  }
 } // namespace Eigen

@@ -297,6 +297,7 @@ target_link_libraries(core PUBLIC
   meshoptimizer::meshoptimizer
   Qhull::qhullcpp
   Qhull::qhull_r
+  TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy
   ZLIB::ZLIB
 )
 target_include_directories(core PUBLIC

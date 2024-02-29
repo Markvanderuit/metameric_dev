@@ -275,6 +275,11 @@ namespace met {
     }
   }
 
+  Spec GenUpliftingDataTask::query_constraint(uint i) const {
+    met_trace();
+    return m_tesselation_spectra[m_csys_boundary_spectra.size() + i];
+  }
+
   TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(const Colr &c) const {
     met_trace();
 
@@ -284,16 +289,16 @@ namespace met {
 
     // Find tetrahedron with positive barycentric weights
     for (uint i = 0; i < m_tesselation.elems.size(); ++i) {
-      const auto &pack = m_tesselation_pack_map[i];
-      const auto &inv  = pack.inv.block<3, 3>(0, 0).eval();
-      const auto &sub  = pack.sub.head<3>().eval();
+      auto inv = m_tesselation_pack_map[i].inv.block<3, 3>(0, 0).eval();
+      auto sub = m_tesselation_pack_map[i].sub.head<3>().eval();
 
       // Compute barycentric weights using packed element data
       eig::Vector3f xyz  = (inv * (c - sub.array()).matrix()).eval();
       eig::Vector4f bary = (eig::Array4f() << xyz, 1.f - xyz.sum()).finished();
 
       // Compute squared error of potentially unbounded barycentric weights
-      float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f)).dot(bary - bary.cwiseMax(0.f).cwiseMin(1.f));
+      float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f))
+              .dot(bary - bary.cwiseMax(0.f).cwiseMin(1.f));
 
       // Continue if error does not improve
       guard_continue(err < result_err);
@@ -319,7 +324,7 @@ namespace met {
     
     // Then, assign constraint indices, or -1 if a constraint is a boundary vertex
     rng::copy(elems | vws::transform([&](uint i) {
-      int j = static_cast<int>(i) - static_cast<int>(m_csys_boundary_samples.size());
+      int j = static_cast<int>(i) - static_cast<int>(m_csys_boundary_spectra.size());
       return std::max<int>(j, -1);
     }), tr.indices.begin());
 

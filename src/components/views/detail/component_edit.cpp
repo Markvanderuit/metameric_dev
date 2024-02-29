@@ -223,18 +223,23 @@ namespace met {
         if (ImGui::BeginPopup("popup_add_uplifting_vertex")) {
           if (ImGui::Selectable("Direct"))
             value.verts.push_back({ 
-              .name       = "New direct constraint",
+              .name       = "Direct Color",
               .constraint = DirectColorConstraint { .colr_i = 0.5  }
             });
           if (ImGui::Selectable("Measurement"))
             value.verts.push_back({ 
-              .name       = "New measurement constraint",
+              .name       = "Meaurement",
               .constraint = MeasurementConstraint { .measurement = 0.5  }
             });
           if (ImGui::Selectable("Direct surface"))
             value.verts.push_back({ 
-              .name       = "New direct surface constraint",
+              .name       = "Direct Surface",
               .constraint = DirectSurfaceConstraint()
+            });
+          if (ImGui::Selectable("Inirect surface"))
+            value.verts.push_back({ 
+              .name       = "Indirect Surface",
+              .constraint = IndirectSurfaceConstraint()
             });
           ImGui::EndPopup();
         } // if (BeginPopup())

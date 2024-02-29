@@ -724,7 +724,7 @@ namespace met {
         });
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        if (cstr.is_valid()) {
+        if (cstr.has_mismatching()) {
           debug::check_expr(false, "Not implemented!");
           // ... The Magic Doth Happen Here ....
         } else {
