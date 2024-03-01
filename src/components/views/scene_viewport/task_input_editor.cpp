@@ -86,8 +86,7 @@ namespace met {
     for (int i = 0; i < paths.size(); ++i) {
       const PathRecord &path = paths[i];
 
-      // Filter vertices along path for which the uplifting data is relevant to our
-      // current constraint
+      // Filter vertices along path for which the uplifting data is relevant to our current constraint
       auto verts = path.data
                  | vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0)) // 1. drop padded memory
                  | vws::transform([&](const auto &vt) {                          // 2. generate surface info at vertex position

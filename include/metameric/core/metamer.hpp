@@ -42,6 +42,7 @@ namespace met {
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     std::span<const Spec>         components; // Increasing components of the power series
+    std::span<const CMFS>         systems_j;  // Color system spectra for objective function
     const CMFS                    &system_j;  // Observer function for mismatching region
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };

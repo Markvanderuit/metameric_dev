@@ -131,9 +131,9 @@ namespace met {
           }
 
           // Visual separator into constraint list
-          ImGui::Separator();
+          // ImGui::Separator();
 
-          // Get wavelength values for x-axis in plot
+          /* // Get wavelength values for x-axis in plot
           Spec x_values;
           rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
 
@@ -148,9 +148,9 @@ namespace met {
               ImPlot::EndPlot();
             }
             p++;
-          }
+          } */
 
-          ImGui::SeparatorText("Estimated output");
+          /* ImGui::SeparatorText("Estimated output");
           {
             // Reconstruct radiance from truncated power series
             Spec r = e_spectra[e_is.constraint_i];
@@ -183,10 +183,7 @@ namespace met {
               ImPlot::PlotLine("##radiance_line", x_values.data(), s.data(), wavelength_samples);
               ImPlot::EndPlot();
             }
-          }
-
-
-          ImGui::Text("Not implemented");
+          } */
         },
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");

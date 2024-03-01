@@ -95,37 +95,37 @@ namespace met {
           return (a + b).eval(); }, 
         [&cmfs, colr_div](const auto &path) -> Spec {
           return colr_div * integrate_spectrum(path.wavelengths, path.L);
-      });
+      }).max(0.f).eval();
       Colr colr_lrgb_dstr = (cmfs.transpose() * spec_distr.matrix());
       Colr colr_srgb_dstr = lrgb_to_srgb(colr_lrgb_dstr);
 
-      // For each path, integrate spectral information into a relevant color directly.
-      // basically attempt to reproduce output color for testing
-      Colr colr_lrgb = std::transform_reduce(std::execution::par_unseq,
-        range_iter(paths), Colr(0), 
-        [](const auto &a, const auto &b) -> Colr { 
-          return (a + b).eval(); }, 
-        [&cmfs, colr_div](const auto &path) -> Colr {
-          return colr_div * integrate_cmfs(cmfs, path.wavelengths, path.L);
-      });
-      Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
+      // // For each path, integrate spectral information into a relevant color directly.
+      // // basically attempt to reproduce output color for testing
+      // Colr colr_lrgb = std::transform_reduce(std::execution::par_unseq,
+      //   range_iter(paths), Colr(0), 
+      //   [](const auto &a, const auto &b) -> Colr { 
+      //     return (a + b).eval(); }, 
+      //   [&cmfs, colr_div](const auto &path) -> Colr {
+      //     return colr_div * integrate_cmfs(cmfs, path.wavelengths, path.L);
+      // });
+      // Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
 
       // For each path, gather relevant spectral tetrahedral uplifting data along vertices
-      std::vector<std::vector<TetrahedronRecord>> tetr_data(paths.size());
-      std::transform(std::execution::par_unseq, 
-        range_iter(paths), tetr_data.begin(), 
-        [&](const PathRecord &record) {
-          // For n-1 vertices (the last vertex necessarily hits an emitter, so we ignore it)
-          return record.data 
-            | vws::take(std::max(static_cast<int>(record.path_depth) - 1, 0))
-            | vws::transform([&](const auto &vt) { 
-              // ... find associated surface info
-              return e_scene.get_surface_info(vt.p, vt.record); }) 
-            | vws::transform([&](const auto &si) {
-              // ... then find surface's uplifting task, and let it generate a uplifting tetrahedron
-              auto handle = uplf_handles[si.object.uplifting_i];
-              return handle.realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse); })
-            | rng::to<std::vector<TetrahedronRecord>>(); });
+      // std::vector<std::vector<TetrahedronRecord>> tetr_data(paths.size());
+      // std::transform(std::execution::par_unseq, 
+      //   range_iter(paths), tetr_data.begin(), 
+      //   [&](const PathRecord &record) {
+      //     // For n-1 vertices (the last vertex necessarily hits an emitter, so we ignore it)
+      //     return record.data 
+      //       | vws::take(std::max(static_cast<int>(record.path_depth) - 1, 0))
+      //       | vws::transform([&](const auto &vt) { 
+      //         // ... find associated surface info
+      //         return e_scene.get_surface_info(vt.p, vt.record); }) 
+      //       | vws::transform([&](const auto &si) {
+      //         // ... then find surface's uplifting task, and let it generate a uplifting tetrahedron
+      //         auto handle = uplf_handles[si.object.uplifting_i];
+      //         return handle.realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse); })
+      //       | rng::to<std::vector<TetrahedronRecord>>(); });
       
       // Assume for now, only one uplifting exists
       // Continue only if there is a constraint
@@ -137,11 +137,8 @@ namespace met {
         ImGui::BeginTooltip();
     
         // Plot intergrated color
-        ImGui::ColorEdit3("lrgb (ntgr)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("lrgb (dstr)", colr_lrgb_dstr.data(), ImGuiColorEditFlags_Float);
-
-        ImGui::ColorEdit3("srgb (ntgr)", colr_srgb.data(), ImGuiColorEditFlags_Float);
-        ImGui::ColorEdit3("srgb (dstr)", colr_srgb_dstr.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("lrgb", colr_lrgb_dstr.data(), ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit3("srgb", colr_srgb_dstr.data(), ImGuiColorEditFlags_Float);
 
         ImGui::Separator();
 
@@ -158,15 +155,13 @@ namespace met {
         rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
 
         // Run a spectrum plot for the accumulated radiance
-        if (ImPlot::BeginPlot("Radiance", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+        if (ImPlot::BeginPlot("##rad_plot", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
           // Setup minimal format for coming line plots
           ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
-          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, 0.f, spec_distr.maxCoeff(), ImPlotCond_Always);
-          ImPlot::SetupAxisTicks(ImAxis_X1, nullptr, 0);
-          ImPlot::SetupAxisTicks(ImAxis_Y1, nullptr, 0);
+          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, spec_distr.maxCoeff() + 0.05f, ImPlotCond_Always);
 
           // Iterate tetrahedron data and plot it
-          ImPlot::PlotLine("##rad", x_values.data(), spec_distr.data(), wavelength_samples);
+          ImPlot::PlotLine("##rad_line", x_values.data(), spec_distr.data(), wavelength_samples);
 
           ImPlot::EndPlot();
         }

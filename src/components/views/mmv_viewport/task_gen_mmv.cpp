@@ -151,7 +151,8 @@ namespace met {
         // Prepare input color systems and corresponding signals
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize_direct() };
         auto signals_i = { cstr.colr_i };
-        auto systems_j = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.get_csys(i).finalize_direct(); })
+        auto systems_j = cstr.csys_j
+                       | vws::transform([&](uint i) { return e_scene.get_csys(i).finalize_direct(); })
                        | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
@@ -169,7 +170,7 @@ namespace met {
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Generate 6D unit vector samples
-        auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 6, m_iter);
+        auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 3, m_iter);
         
         // Prepare input color systems and corresponding signals
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize_direct() };
@@ -200,8 +201,20 @@ namespace met {
              / (cmfs.array().col(1) * wavelength_ssize).sum();
         cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
 
+        // Get constraint components
+        auto system_j  =  e_scene.get_csys(e_uplifting.csys_i).finalize_direct();
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize_direct() };
         auto signals_i = { cstr.surface.diffuse };
+
+        // Construct objective color system spectra from power series
+        auto systems_j = cstr.powers
+                       | vws::transform([&](Spec s) {
+                          CMFS to_xyz = (cmfs.array().colwise() * s * wavelength_ssize)/* 
+                                      / (cmfs.array().col(1)    * s * wavelength_ssize).sum();
+                          CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose() */;
+                          // return to_rgb; })
+                          return to_xyz; })
+                       | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
         GenerateIndirectMMVBoundaryInfo mmv_info = {
@@ -209,12 +222,15 @@ namespace met {
           .systems_i  = systems_i,
           .signals_i  = signals_i,
           .components = cstr.powers,
-          .system_j   = cmfs,
+          .systems_j  = systems_j,
+          .system_j   = system_j,
           .samples    = samples,
         };
 
         // Generate MMV points and append to current point set
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
+        fmt::print("Found {}\n", m_points.size());
+        fmt::print("{}\n", m_points);
       },
       [&](const auto &) { }
     }, e_vert.constraint);

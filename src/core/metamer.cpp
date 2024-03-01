@@ -400,29 +400,23 @@ namespace met {
   std::vector<Spec> generate_mmv_boundary_spec(const GenerateIndirectMMVBoundaryInfo &info) {
     met_trace();
 
+    // Helper spectra
     using DSpec = eig::Vector<double, wavelength_samples>;
-
+    using BSpec = eig::Vector<double, wavelength_bases>;
 
     // Construct basis matrix
     auto B = info.basis.func.cast<double>().eval();
-    auto basis_trf = 
-      [B](const auto &csys) { return (csys.transpose().cast<double>() * B).eval(); };
+    auto basis_trf = [B](const auto &csys) { return (csys.transpose().cast<double>() * B).eval(); };
 
     NLOptInfo solver = {
       .n            = wavelength_bases,
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
-      .x_init       = eig::Vector<double, wavelength_bases>(0.5),
-      // .max_iters    = 100,
+      .x_init       = BSpec(0.5),
+      // .max_iters    = 4,
       .rel_func_tol = 1e-2,
       .rel_xpar_tol = 1e-3,
     };
-
-    // // Construct orthogonal matrix used during maximiation
-    // auto S = rng::fold_left_first(info.systems_j, std::plus<CMFS> {}).value().cast<double>().eval();
-    // eig::JacobiSVD<decltype(S)> svd;
-    // svd.compute(S, eig::ComputeFullV);
-    // auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
 
     // Add color system equality constraints
     for (uint i = 0; i < info.systems_i.size(); ++i) {
@@ -432,8 +426,6 @@ namespace met {
         solver.eq_constraints.push_back(
           [A = A.row(j).eval(), b = b[j]]
           (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
-            using Spec = eig::Vector<double, wavelength_samples>;
-
             // Linear function:
             // - f(x) = A^T Bx - b == 0
             // - d(f) = A^T B
@@ -467,9 +459,11 @@ namespace met {
 
     // Partial objective functions
     // TODO this may be wrong; see finalize_direct's sum() for why
-    std::vector<CMFS> objective_components(info.components.size());
-    rng::transform(info.components, objective_components.begin(),
-      [&](const Spec &s) { return info.system_j.array().colwise() * s; });
+    // std::vector<CMFS> objective_components(info.components.size());
+    // rng::transform(info.components, objective_components.begin(),
+    //   [&](const Spec &s) { return info.system_j.array().colwise() * s; });
+
+    // fmt::print("Solving for {} components\n", info.systems_j.size());
 
     // Parallel solve for basis function weights defining OCS boundary spectra
     #pragma omp parallel
@@ -477,46 +471,49 @@ namespace met {
       // Per thread copy of current solver parameter set
       NLOptInfo local_solver = solver;
 
-      std::vector<DSpec> C_components;
-      C_components.reserve(objective_components.size());
-      
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
+        // fmt::print("Sample {}\n", i);
+
         // Define objective function components: 64x1
-        C_components.clear();
-        rng::transform(objective_components, std::back_inserter(C_components), [&](const CMFS &O) {
-          return (O * info.samples[i].matrix()).cast<double>().eval();
+        std::vector<DSpec> C(info.systems_j.size());
+        rng::transform(info.systems_j, C.begin(), [&](const CMFS &cmfs) {
+          return (cmfs * info.samples[i].matrix()).cast<double>().eval();
         });
-
-
         
         // Define objective function: max (Uk)^T (Bx)^p -> max C^T (Bx)^p
         // auto C = (U * info.samples[i].matrix().cast<double>()).eval();
 
+        uint p_max = static_cast<uint>(C.size());
+        
         local_solver.objective = 
-          [&C_components, &B, p_max = static_cast<uint>(C_components.size())]
+          [&C, &B, p_max]
           (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) -> double {
-            // using DSpec = eig::Vector<double, wavelength_samples>;
-            
             DSpec X = B * x;
 
-            float p = 0.f;
-            for (uint i = 0; i < p_max; ++i) {
-              p += X.array().pow(static_cast<double>(i)).matrix().dot(C_components[i]);
+            double obj = C[0].sum();
+            for (uint j = 1; j < p_max; ++j) {
+              // fmt::print("before i = {}, obj = {}\n", j, obj);
+              double p = static_cast<double>(j);
+              DSpec px = X.array().pow(p);
+              obj += C[j].dot(px);
             }
+            // fmt::print("after, obj = {}\n", obj);
 
             if (g.size()) {
-              DSpec G = 0.0f;
-              for (uint i = 1; i < p_max; ++i) {
-                G += (C_components[i].array().cwiseProduct(X.array().pow(static_cast<double>(i - 1)))
-                   * static_cast<double>(i)).matrix().eval();
-                // G += (X.array().pow(static_cast<double>(i - 1)).matrix().dot(C_components[i])
-                //    * static_cast<double>(i));
+              BSpec grad = 0.0f;
+              for (uint j = 1; j < p_max; ++j) {
+                double p = static_cast<double>(j);
+                DSpec dx = X.array().pow(p - 1.0);
+                grad += p * (C[j].cwiseProduct(dx).transpose() * B);
               }
-              g = G;
+              g = grad;
             }
 
-            return p;
+            // fmt::print("x = {}, g = {}, obj = {}\n", x, g, obj);
+            // fmt::print("X = {}\n", X);
+
+            return obj;
 
         //     // Power function:
         //     // - f(x) = C^T (Bx)^p
