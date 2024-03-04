@@ -158,8 +158,6 @@ namespace met {
   Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
 
-    fmt::print("Running solve\n");
-
     // Helper spectra
     using DCMFS = eig::Matrix<double, 3, wavelength_samples>;
     using DSpec = eig::Vector<double, wavelength_samples>;
@@ -170,7 +168,7 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMinimize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
-      .max_iters    = 32,
+      // .max_iters    = 128,
       .rel_func_tol = 1e-3,
       .rel_xpar_tol = 1e-2,
     };
@@ -180,8 +178,8 @@ namespace met {
 
     // Construct basis matrix and boundary vectors
     auto basis = info.basis.func.cast<double>().eval();
-    Spec upper_bounds = Spec(1.0) - info.basis.mean;
-    Spec lower_bounds = upper_bounds - Spec(1.0); 
+    Spec upper_bounds = Spec(1.0)/*  - info.basis.mean */;
+    Spec lower_bounds = Spec(0.0)/* upper_bounds - Spec(1.0) */; 
 
     // Objective function minimizes squared l2 norm
     solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
@@ -212,9 +210,10 @@ namespace met {
 
     // Add surface metamerism constraint
     {
-      Colr o = (info.base_system.transpose() * info.basis.mean.matrix()).transpose().eval();
+      // Colr o = (info.base_system.transpose() * info.basis.mean.matrix()).transpose().eval();
       auto A = (info.base_system.transpose().cast<double>() * basis).eval();
-      auto b = (info.base_signal - o).cast<double>().eval();
+      // auto b = (info.base_signal - o).cast<double>().eval();
+      auto b = info.base_signal.cast<double>().eval();
 
       for (uint j = 0; j < 3; ++j) {
         solver.eq_constraints.push_back(
@@ -235,22 +234,32 @@ namespace met {
       
     // Add interreflection result constraint
     {
-      Colr o = 0.f;
-      for (const auto &cs : info.refl_systems)
-        o += (cs.transpose() * info.basis.mean.matrix()).transpose().array().eval();
-      auto b = (info.refl_signal - o).cast<double>().eval();
-      // auto b = info.refl_signal.cast<double>().eval();
+      // Colr o = 0.f;
+      // for (uint i = 0; i < info.refl_systems.size(); ++i) {
+      //   float p = static_cast<float>(i);
+      //   Spec mean = info.basis.mean; //.pow(p);
+      //   fmt::print("mean = {}\n", mean);
+      //   o += (info.refl_systems[i].transpose() * mean.matrix()).transpose().array().eval();
+      // }
+
+      // for (const auto &cs : info.refl_systems)
+      //   o += (cs.transpose() * info.basis.mean.matrix()).transpose().array().eval();
+      // auto b = (info.refl_signal - o).cast<double>().eval();
+
+      auto b = info.refl_signal.cast<double>().eval();
+      // DSpec dmean = info.basis.mean.cast<double>().eval();
 
       for (uint j = 0; j < 3; ++j) {
         solver.eq_constraints.push_back(
-          [&C, &B, &info, j, b] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          [&C, &B, /* &dmean, */ j, b] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
             DSpec R = (B * x).array(); // + info.basis.mean.cast<double>().eval();
 
-            double signal = C[0].row(j).transpose().sum();
+            double err = 0.0; // C[0].row(j).transpose().sum();
             for (uint i = 1; i < C.size(); ++i) {
               double p = static_cast<double>(i);
               DSpec pr = R.array().pow(p);
-              signal += C[i].row(j).transpose().dot(pr);
+              err = err + C[i].row(j).transpose().dot(pr);
+                        // - (b[j] - C[i].row(j).transpose().dot(dmean.array().pow(p).matrix()));
             }
 
             if (g.size()) {
@@ -263,14 +272,14 @@ namespace met {
               g = grad;
             }
             
-            return signal - b[j];
+            return err - b[j];
         });
       }
     }
 
     // Optimize result and return
     NLOptResult r = solve(solver);
-    Spec s = info.basis.mean + Spec((basis * r.x).cast<float>());
+    Spec s = /* info.basis.mean + */ Spec((basis * r.x).cast<float>());
     return s;
   }
 

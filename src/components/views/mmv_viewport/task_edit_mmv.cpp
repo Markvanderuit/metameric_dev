@@ -204,8 +204,8 @@ namespace met {
             Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
 
             // Plot color
-            ImGui::ColorEdit3("Roundtrip radiance (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
-            ImGui::ColorEdit3("Roundtrip radiance (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
 
             // Plot radiance
             if (ImPlot::BeginPlot("Radiance distr", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
