@@ -2,6 +2,7 @@
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
 #include <small_gl/buffer.hpp>
@@ -129,7 +130,7 @@ namespace met {
     bool tssl_stale = is_first_eval();
 
     // Color system spectra within which the 'uplifted' texture is defined
-    auto csys = e_scene.get_csys(e_csys).finalize_direct();
+    auto csys = e_scene.get_csys(e_csys).finalize();
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {

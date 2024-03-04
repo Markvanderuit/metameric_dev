@@ -1,8 +1,6 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
-#include <metameric/core/serialization.hpp>
-#include <metameric/core/utility.hpp>
 
 namespace met {
   /* 
@@ -41,67 +39,45 @@ namespace met {
     using BMat = eig::Matrix<float, wavelength_samples, wavelength_bases>;
     using BVec = eig::Array<float, wavelength_bases, 1>;
 
+  public:
     Spec mean; // Mean offset
     BMat func; // Basis functions around mean ooffset
 
   public: // Boilerplate
-    inline
-    bool operator==(const Basis &o) const {
-      return mean.isApprox(o.mean) && func.isApprox(o.func);
-    }
-
-    inline
-    void to_stream(std::ostream &str) const {
-      met_trace();
-      io::to_stream(mean, str);
-      io::to_stream(func, str);
-    }
-
-    inline
-    void fr_stream(std::istream &str) {
-      met_trace();
-      io::fr_stream(mean, str);
-      io::fr_stream(func, str);
-    }
+    bool operator==(const Basis &o) const;
+    void to_stream(std::ostream &str) const;
+    void fr_stream(std::istream &str);
   };
 
   /* System object defining how a reflectance-to-color conversion is performed */
   struct ColrSystem {
-    // Public members
-    CMFS cmfs;           // Color matching or sensor response functions, defining the observer
-    Spec illuminant;     // Illuminant under which observation is performed
-    uint n_scatters = 1; // Nr. of recursive scatters of observed refletance; default 1
+    CMFS cmfs;       // Color matching or sensor response functions, defining the observer
+    Spec illuminant; // Illuminant under which observation is performed
 
-    // Simplify the CMFS/illuminant into color system spectra
-    CMFS finalize_direct() const;
-    CMFS finalize_indirect(const Spec &sd) const;
+  public:
+    CMFS finalize()           const; // Simplify the CMFS/illuminant into color system spectra
+    Colr apply(const Spec &s) const; // Obtain a color from a reflectance in this color system
     
-    // Obtain a color by applying this spectral mapping
-    Colr apply_color_direct(const Spec &sd) const { met_trace(); return finalize_direct().transpose() * sd.pow(n_scatters).matrix().eval();  }
-    Colr apply_color_indirect(const Spec &sd) const { met_trace(); return finalize_indirect(sd).transpose() * sd.matrix();  }
-    Colr operator()(const Spec &s) const { met_trace(); return apply_color_direct(s);  }
+  public: // Boilerplate
+    Colr operator()(const Spec &s) const { return apply(s);  }
+    bool operator==(const ColrSystem &o) const;
+    void to_stream(std::ostream &str) const;
+    void fr_stream(std::istream &str);
+  };
+
+  struct IndirectColrSystem {
+    CMFS              cmfs;
+    std::vector<Spec> powers;
+  
+  public:
+    std::vector<CMFS> finalize()           const; // Simplify the recrursive system into color system spectra
+    Colr              apply(const Spec &s) const; // Obtain a color from a reflectance in this color system
 
   public: // Boilerplate
-    inline
-    bool operator==(const ColrSystem &o) const { 
-      return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant) && n_scatters == o.n_scatters;
-    }
-
-    inline
-    void to_stream(std::ostream &str) const {
-      met_trace();
-      io::to_stream(cmfs,       str);
-      io::to_stream(illuminant, str);
-      io::to_stream(n_scatters, str);
-    }
-
-    inline
-    void fr_stream(std::istream &str) {
-      met_trace();
-      io::fr_stream(cmfs,       str);
-      io::fr_stream(illuminant, str);
-      io::fr_stream(n_scatters, str);
-    }
+    Colr operator()(const Spec &s) const { return apply(s); }
+    bool operator==(const IndirectColrSystem &o) const;
+    void to_stream(std::ostream &str) const;
+    void fr_stream(std::istream &str);
   };
 
   /* 
@@ -139,16 +115,12 @@ namespace met {
   // Given a spectral bin, obtain the relevant central wavelength of that bin
   constexpr inline
   float wavelength_at_index(size_t i) {
-    debug::check_expr(i >= 0 && i < wavelength_samples, 
-      fmt::format("index {} out of range", i));
     return wavelength_min + wavelength_ssize * (static_cast<float>(i) + .5f);
   }
 
   // Given a wavelength, obtain the relevant surrounding spectral bin's index
   constexpr inline
   size_t index_at_wavelength(float wvl) {
-    debug::check_expr(wvl >= wavelength_min && wvl <= wavelength_max, 
-      fmt::format("wavelength {} out of range", wvl));
     return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
   }
 
@@ -165,8 +137,8 @@ namespace met {
   }
 
   // sRGB/linear sRGB/XYZ conversion shorthands
-  inline Colr srgb_to_lrgb(Colr c) { rng::transform(c, c.begin(), srgb_to_lrgb_f); return c; }
-  inline Colr lrgb_to_srgb(Colr c) { rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
+  Colr   srgb_to_lrgb(Colr c);
+  Colr   lrgb_to_srgb(Colr c);
   inline Colr xyz_to_lrgb(Colr c)  { return models::xyz_to_srgb_transform * c.matrix();      }
   inline Colr lrgb_to_xyz(Colr c)  { return models::srgb_to_xyz_transform * c.matrix();      }
   inline Colr xyz_to_srgb(Colr c)  { return lrgb_to_srgb(xyz_to_lrgb(c));                    }
@@ -193,13 +165,7 @@ namespace met {
       s[t + 1] += value * a;
     } 
   }
-
-  inline
-  void accumulate_spectrum(Spec &s, const eig::Array4f &wvls, const eig::Array4f &values) {
-    for (auto [wvl, value] : vws::zip(wvls, values))
-      accumulate_spectrum(s, wvl, value);
-  }
-
+  
   inline
   float sample_spectrum(const float &wvl, const Spec &s) {
     float v = std::clamp(wvl * wavelength_samples - 0.5f, 
@@ -207,29 +173,6 @@ namespace met {
     uint  t = static_cast<uint>(v);
     float a = v - static_cast<float>(t);
     return a == 0.f ? s[t] : s[t] + a * (s[t + 1] - s[t]);
-  }
-
-  inline
-  eig::Array4f sample_spectrum(const eig::Array4f &wvls, const Spec &s) {
-    eig::Array4f v = 0.f;
-    for (uint i = 0; i < 4; ++i)
-      v[i] = sample_spectrum(wvls[i], s);
-    return v;
-  }
-
-  inline
-  Spec integrate_spectrum(float wvl, float value) {
-    Spec s = 0.f;
-    accumulate_spectrum(s, wvl, value);
-    return s;
-  }
-
-  inline
-  Spec integrate_spectrum(const eig::Array4f &wvls, const eig::Array4f &values) {
-    Spec s = 0.f;
-    for (auto [wvl, value] : vws::zip(wvls, values))
-      accumulate_spectrum(s, wvl, value);
-    return s;
   }
 
   inline
@@ -244,16 +187,19 @@ namespace met {
     else
       return cmfs.row(t) + a * (cmfs.row(t + 1) - cmfs.row(t));
   }
+  
+  // Given a set of wavelengths and a spectrum, sample four valeus from
+  // these wavelengths
+  eig::Array4f sample_spectrum(const eig::Array4f &wvls, const Spec &s);
+
+  // Given a set of wavelengths and spectral values, accumulate these into
+  // a spectrum at the right positions
+  void accumulate_spectrum(Spec &s, const eig::Array4f &wvls, const eig::Array4f &values);
+  Spec accumulate_spectrum(const eig::Array4f &wvls, const eig::Array4f &values);
 
   // Given a set of wavelengths and spectral values, integrate
   // a color matching function into a resulting color
-  inline
-  Colr integrate_cmfs(const CMFS &cmfs, eig::Array4f wvls, eig::Array4f values) {
-    Colr c = 0.f;
-    for (auto [wvl, value] : vws::zip(wvls, values))
-      c += sample_cmfs(cmfs, wvl) * value;
-    return c;
-  }
+  Colr integrate_cmfs(const CMFS &cmfs, eig::Array4f wvls, eig::Array4f values);
 
   // Simple safe dividor in case some components may fall to 0
   inline

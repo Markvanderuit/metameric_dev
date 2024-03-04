@@ -1,3 +1,4 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
 
@@ -114,7 +115,8 @@ namespace met {
     // Assemble appropriate draw commands for each object in the scene
     // by taking the relevant draw command from its mesh data
     m_draw.bindable_array = &scene.resources.meshes.gl.array;
-    m_draw.commands = scene.components.objects.values_view()
+    m_draw.commands = scene.components.objects.data()
+                    | vws::transform(&detail::Component<Object>::value)
                     | vws::filter(&Object::is_active)
                     | vws::transform(&Object::mesh_i)
                     | index_into_view(scene.resources.meshes.gl.draw_commands)

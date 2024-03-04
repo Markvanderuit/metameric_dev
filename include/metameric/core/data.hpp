@@ -65,7 +65,6 @@ namespace met {
     struct CSys { 
       uint cmfs;
       uint illuminant;
-      uint n_scatters; 
 
       friend auto operator<=>(const CSys &, const CSys &) = default;
     };

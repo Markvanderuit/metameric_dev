@@ -100,7 +100,7 @@ namespace met {
     ImGui::Separator();
 
     // Plot output color information
-    Colr color_out = mapp.apply_color_indirect(reflectance);
+    Colr color_out = mapp.apply(reflectance);
     ImGui::ColorEdit3("Rtrip (sRGB)", lrgb_to_srgb(color_out).data(), ImGuiColorEditFlags_Float);
 
     ImGui::Separator();

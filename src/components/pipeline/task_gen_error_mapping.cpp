@@ -74,7 +74,7 @@ namespace met {
     ColrSystem csys = e_proj_data.csys(m_mapping_i);
     for (uint i = 0; i < e_proj_data.verts.size(); ++i) {
       guard_continue(m_is_mutated || e_proj_state.csys[m_mapping_i] || e_proj_state.verts[i]);
-      m_vert_map[i] = csys.apply_color_indirect(e_vert_spec[i]);
+      m_vert_map[i] = csys.apply(e_vert_spec[i]);
       m_vert_buffer.flush(sizeof(AlColr), i * sizeof(AlColr));
     }
 

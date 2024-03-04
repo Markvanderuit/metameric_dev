@@ -1,3 +1,4 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/scene_viewport/task_draw_overlay.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>

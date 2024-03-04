@@ -42,7 +42,8 @@ namespace met {
     std::vector<uint> prims; // Unsorted indices of underlying primitivers
   };
 
-  inline
+  // TODO remove
+  /* inline
   BVH::NodePack bvhpack(const BVH::Node &node) {
     // Obtain a merger of the child bounding boxes
     constexpr auto merge = [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
@@ -82,7 +83,7 @@ namespace met {
     }
 
     return p;
-  }
+  } */
 
   /* inline
   BVH::Node unpack(const BVH::NodePack &p) {

@@ -93,7 +93,7 @@ namespace met {
     // Push unselected/selected gamut data separately
     ColrSystem mapping_csys = e_proj_data.csys(m_mapping_i);
     for (uint i : vert_diff)
-      m_vert_map[i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
+      m_vert_map[i] = mapping_csys.apply(e_vert_spec[i]);
     for (uint i : e_vert_slct)
       m_vert_map[i] = e_verts[i].colr_j[0];
     m_vert_buffer.flush();

@@ -59,7 +59,7 @@ namespace met {
               .name = "Deleted illuminant",
               .redo = [i = i](auto &data) { 
                 data.illuminants.erase(data.illuminants.begin() + i);
-                for (auto &[_cmfs, illm, _n_scatters] : data.color_systems) {
+                for (auto &[_cmfs, illm] : data.color_systems) {
                   if (illm > 0 && illm >= i) illm--;
                 }
               },
@@ -110,7 +110,7 @@ namespace met {
               .name = "Deleted cmfs",
               .redo = [i = i](auto &data) { 
                 data.cmfs.erase(data.cmfs.begin() + i);
-                for (auto &[cmfs, _illm, _n_scatters] : data.color_systems) {
+                for (auto &[cmfs, _illm] : data.color_systems) {
                   if (cmfs > 0 && cmfs >= i) cmfs--;
                 }
               },
@@ -169,7 +169,7 @@ namespace met {
         for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("cmfs_selector_{}", i).c_str());
           
-          auto &[cmfs_i, _illm, _n_scatters] = e_csys[i];
+          auto &[cmfs_i, _illm] = e_csys[i];
           
           if (ImGui::BeginCombo("##CMFS", e_cmfs[cmfs_i].first.c_str())) {
             for (uint j = 0; j < e_cmfs.size(); ++j)
@@ -191,7 +191,7 @@ namespace met {
         for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("illm_selector_{}", i).c_str());
 
-          auto &[_cmfs, illum_i, _n_scatters] = e_csys[i];
+          auto &[_cmfs, illum_i] = e_csys[i];
 
           if (ImGui::BeginCombo("##Illuminant", e_illuminants[illum_i].first.c_str())) {
             for (uint j = 0; j < e_illuminants.size(); ++j)
@@ -208,7 +208,7 @@ namespace met {
         }
         ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
 
-        ImGui::BeginGroup(); ImGui::PushItemWidth(selec_width); ImGui::Text("Scatters"); ImGui::Separator();
+        /* ImGui::BeginGroup(); ImGui::PushItemWidth(selec_width); ImGui::Text("Scatters"); ImGui::Separator();
         for (uint i = 0; i < e_csys.size(); ++i) {
           ImGui::PushID(fmt::format("n_scatters_selector_{}", i).c_str());
 
@@ -225,7 +225,7 @@ namespace met {
 
           ImGui::PopID();
         }
-        ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine();
+        ImGui::EndGroup(); ImGui::PopItemWidth(); ImGui::SameLine(); */
 
 
         // Delete buttons
@@ -252,7 +252,7 @@ namespace met {
         if (ImGui::Button("Add color system")) {
           e_appl_data.touch({
             .name = "Add color system",
-            .redo = [](auto &data) { data.color_systems.push_back({ 0, 0, 1 }); },
+            .redo = [](auto &data) { data.color_systems.push_back({ 0, 0 }); },
             .undo = [](auto &data) { data.color_systems.pop_back(); }
           });
         }

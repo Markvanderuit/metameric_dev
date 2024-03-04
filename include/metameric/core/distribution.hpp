@@ -7,8 +7,6 @@
 #include <functional>
 #include <numeric>
 #include <random>
-#include <fmt/core.h>
-#include <fmt/ranges.h>
 
 namespace met {
   class UniformSampler {
@@ -39,13 +37,15 @@ namespace met {
     template <uint N>
     eig::Array<float, N, 1> next_nd() {
       eig::Array<float, N, 1> v;
-      rng::generate(v, std::bind(&UniformSampler::next_1d, this));
+      for (float &f : v)
+        f = next_1d();
       return v;
     }
 
     eig::Array<float, -1, 1> next_nd(uint n) {
       eig::Array<float, -1, 1> v(n);
-      rng::generate(v, std::bind(&UniformSampler::next_1d, this));
+      for (float &f : v)
+        f = next_1d();
       return v;
     }
 
@@ -95,13 +95,15 @@ namespace met {
     template <uint N>
     eig::Array<float, N, 1> next_nd() {
       eig::Array<float, N, 1> v;
-      rng::generate(v, std::bind(&PCGSampler::next_1d, this));
+      for (float &f : v)
+        f = next_1d();
       return v;
     }
 
     eig::Array<float, -1, 1> next_nd(uint n) {
       eig::Array<float, -1, 1> v(n);
-      rng::generate(v, std::bind(&PCGSampler::next_1d, this));
+      for (float &f : v)
+        f = next_1d();
       return v;
     }
     
@@ -163,7 +165,7 @@ namespace met {
       while (u > m_cdf[i] && i < m_cdf.size() - 1) 
         i++;
       i -= 1;
-      return static_cast<uint>(rng::clamp(i, 0, static_cast<int>(m_func.size()) - 1));
+      return static_cast<uint>(std::clamp(i, 0, static_cast<int>(m_func.size()) - 1));
     }
 
     // Returns between 0 and 1

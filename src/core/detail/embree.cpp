@@ -1,4 +1,5 @@
 #include <metameric/core/detail/embree.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <embree4/rtcore.h>
 #include <algorithm>

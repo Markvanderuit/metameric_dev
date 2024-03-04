@@ -29,7 +29,8 @@ namespace met {
     friend auto operator<=>(const InputSelection &, const InputSelection &) = default;
   };
 
-  namespace detail {
+  // TODO remove
+  /* namespace detail {
     template <typename T> struct engaged_t {
       template <typename... Ts>
       constexpr bool operator()(const std::variant<Ts...> &variant) const {
@@ -59,7 +60,7 @@ namespace met {
       return r | vws::filter(engaged<T>)
                | vws::transform(variant_get<T>);
     };
-  } // namespace detail
+  } // namespace detail */
 
   class MeshViewportEditorInputTask : public detail::TaskNode {
     RayQueryPrimitive  m_ray_prim;

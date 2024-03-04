@@ -1,8 +1,10 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/serialization.hpp>
+#include <metameric/core/ranges.hpp>
+#include <metameric/core/utility.hpp>
 #include <array>
 #include <algorithm>
-#include <ranges>
 
 namespace met {
   namespace models {
@@ -38,23 +40,114 @@ namespace met {
     Spec emitter_cie_fl11    = io::spectrum_from_data(cie_wavelength_values, cie_fl11_values);
     Spec emitter_cie_ledb1   = io::spectrum_from_data(cie_wavelength_values, cie_ledb1_values);
     Spec emitter_cie_ledrgb1 = io::spectrum_from_data(cie_wavelength_values, cie_ledrgb1_values);
-  } // namespace models 
+  } // namespace models
 
-  CMFS ColrSystem::finalize_indirect(const Spec &sd) const {
-    met_trace();
-    Spec indirect = sd.pow(n_scatters - 1) * illuminant;
-    CMFS to_xyz = (cmfs.array().colwise() * indirect   * wavelength_ssize)
-                / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
-    CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-    return to_rgb;
+  
+  Colr srgb_to_lrgb(Colr c) { rng::transform(c, c.begin(), srgb_to_lrgb_f); return c; }
+  Colr lrgb_to_srgb(Colr c) { rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
+
+  void accumulate_spectrum(Spec &s, const eig::Array4f &wvls, const eig::Array4f &values) {
+    for (auto [wvl, value] : vws::zip(wvls, values))
+      accumulate_spectrum(s, wvl, value);
   }
 
-  CMFS ColrSystem::finalize_direct() const {
+  Spec accumulate_spectrum(const eig::Array4f &wvls, const eig::Array4f &values) {
+    Spec s = 0.f;
+    for (auto [wvl, value] : vws::zip(wvls, values))
+      accumulate_spectrum(s, wvl, value);
+    return s;
+  }
+
+  Colr integrate_cmfs(const CMFS &cmfs, eig::Array4f wvls, eig::Array4f values) {
+    Colr c = 0.f;
+    for (auto [wvl, value] : vws::zip(wvls, values))
+      c += sample_cmfs(cmfs, wvl) * value;
+    return c;
+  }
+
+  eig::Array4f sample_spectrum(const eig::Array4f &wvls, const Spec &s) {
+    eig::Array4f v = 0.f;
+    for (uint i = 0; i < 4; ++i)
+      v[i] = sample_spectrum(wvls[i], s);
+    return v;
+  }
+
+  CMFS ColrSystem::finalize() const {
     met_trace();
     CMFS to_xyz = (cmfs.array().colwise() * illuminant * wavelength_ssize)
                 / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
     CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
     return to_rgb;
   }
+  
+  Colr ColrSystem::apply(const Spec &sd) const { 
+    met_trace();
+    return finalize().transpose() * sd.matrix().eval();
+  }
 
+  bool ColrSystem::operator==(const ColrSystem &o) const { 
+    return cmfs.isApprox(o.cmfs) && illuminant.isApprox(o.illuminant);
+  }
+
+  void ColrSystem::to_stream(std::ostream &str) const {
+    met_trace();
+    io::to_stream(cmfs,       str);
+    io::to_stream(illuminant, str);
+  }
+
+  void ColrSystem::fr_stream(std::istream &str) {
+    met_trace();
+    io::fr_stream(cmfs,       str);
+    io::fr_stream(illuminant, str);
+  }
+  
+  std::vector<CMFS> IndirectColrSystem::finalize() const {
+    met_trace();
+    CMFS to_xyz = cmfs.array() / (cmfs.array().col(1) * wavelength_ssize).sum();
+    CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
+    return powers | vws::transform([&](const Spec &pwr) { 
+      return (to_rgb.array().colwise() * pwr).eval();
+    }) | rng::to<std::vector<CMFS>>();
+  }
+
+  Colr IndirectColrSystem::apply(const Spec &s) const {
+    met_trace();
+    Colr c = 0.f;
+    auto csys = finalize();
+    for (auto [i, csys] : enumerate_view(csys))
+      c += (csys.transpose() * s.pow(static_cast<float>(i)).matrix()).array().eval();
+    return c;
+  }
+
+  bool IndirectColrSystem::operator==(const IndirectColrSystem &o) const {
+    return cmfs.isApprox(o.cmfs) && rng::equal(powers, o.powers, eig::safe_approx_compare<Spec>);
+  }
+
+  void IndirectColrSystem::to_stream(std::ostream &str) const {
+    met_trace();
+    io::to_stream(cmfs,   str);
+    io::to_stream(powers, str);
+  }
+
+  void IndirectColrSystem::fr_stream(std::istream &str) {
+    met_trace();
+    io::fr_stream(cmfs,   str);
+    io::fr_stream(powers, str);
+  }
+  
+  bool Basis::operator==(const Basis &o) const {
+    return mean.isApprox(o.mean) && func.isApprox(o.func);
+  }
+
+  void Basis::to_stream(std::ostream &str) const {
+    met_trace();
+    io::to_stream(mean, str);
+    io::to_stream(func, str);
+  }
+
+  void Basis::fr_stream(std::istream &str) {
+    met_trace();
+    io::fr_stream(mean, str);
+    io::fr_stream(func, str);
+  }
 } // namespace met

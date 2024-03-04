@@ -1,4 +1,5 @@
 #include <metameric/core/image.hpp>
+#include <metameric/core/ranges.hpp>
 #include <cstdint>
 #include <limits>
 #include <format>

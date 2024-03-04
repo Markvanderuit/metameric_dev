@@ -2,6 +2,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
@@ -181,15 +182,13 @@ namespace met {
   void to_json(json &js, const ColorSystem &csys) {
     met_trace();
     js = {{ "observer_i",   csys.observer_i   },
-          { "illuminant_i", csys.illuminant_i },
-          { "n_scatters",   csys.n_scatters   }};
+          { "illuminant_i", csys.illuminant_i }};
   }
 
   void from_json(const json &js, ColorSystem &csys) {
     met_trace();
     js.at("observer_i").get_to(csys.observer_i);
     js.at("illuminant_i").get_to(csys.illuminant_i);
-    js.at("n_scatters").get_to(csys.n_scatters);
   }
 
   void to_json(json &js, const Scene &scene) {
@@ -235,7 +234,7 @@ namespace met {
     resources.meshes.push("Rectangle",     models::unit_rect,           false);
 
     // Default color system
-    ColorSystem csys { .observer_i = 0, .illuminant_i = 0, .n_scatters = 0 };
+    ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };
     components.colr_systems.push(get_csys_name(csys), csys);
     
     // Default uplifting
@@ -631,8 +630,7 @@ namespace met {
   met::ColrSystem Scene::get_csys(ColorSystem c) const {
     met_trace();
     return { .cmfs       = resources.observers[c.observer_i].value(),
-             .illuminant = resources.illuminants[c.illuminant_i].value(),
-             .n_scatters = c.n_scatters };
+             .illuminant = resources.illuminants[c.illuminant_i].value() };
   }
 
   met::Spec Scene::get_emitter_spd(uint i) const {
@@ -672,7 +670,7 @@ namespace met {
       return { Colr(0.f), Spec(0.f) };
 
     // Color system spectra within which the 'uplifted' texture is defined
-    CMFS csys_i = get_csys(u.csys_i).finalize_direct();
+    CMFS csys_i = get_csys(u.csys_i).finalize();
 
     // Output values
     Colr c;
@@ -688,7 +686,7 @@ namespace met {
         std::vector<CMFS> systems = { csys_i };
         std::vector<Colr> signals = { c      };
         rng::transform(cstr.csys_j, std::back_inserter(systems), 
-          [&](uint csys_j) { return get_csys(csys_j).finalize_direct(); });
+          [&](uint csys_j) { return get_csys(csys_j).finalize(); });
         rng::copy(cstr.colr_j, std::back_inserter(signals));
 
         // Generate a metamer satisfying the system+signal constraint set
@@ -713,7 +711,7 @@ namespace met {
         std::vector<CMFS> systems = { csys_i };
         std::vector<Colr> signals = { c      };
         rng::transform(cstr.csys_j, std::back_inserter(systems), 
-          [&](uint csys_j) { return get_csys(csys_j).finalize_direct(); });
+          [&](uint csys_j) { return get_csys(csys_j).finalize(); });
         rng::copy(cstr.colr_j, std::back_inserter(signals));
 
         // Generate a metamer satisfying the system+signal constraint set
@@ -724,42 +722,34 @@ namespace met {
         });
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        // if (cstr.has_mismatching()) {
-        //   // Return zero constraint for invalid surfaces
-        //   if (!cstr.surface.is_valid()) {
-        //     c = 0.f;
-        //     s = 0.f;
-        //     return;
-        //   }
-            
-        //   // Get camera cmfs
-        //   CMFS cmfs = resources.observers[components.observer_i.value].value();
-        //   cmfs = (cmfs.array())
-        //       / (cmfs.array().col(1) * wavelength_ssize).sum();
-        //   cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
-            
-        //   // Construct objective color system spectra from power series
-        //   auto systems_j = cstr.powers
-        //                  | vws::transform([&](Spec s) {
-        //                      CMFS to_xyz = (cmfs.array().colwise() * s * wavelength_ssize);/* 
-        //                                  / (cmfs.array().col(1)    * s * wavelength_ssize).sum(); */
-        //                      // CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-        //                      // return to_rgb; })
-        //                      return to_xyz; })
-        //                  | rng::to<std::vector>();
-          
-          
+        if (cstr.has_mismatching()) {
+          // Return zero constraint for invalid surfaces
+          if (!cstr.surface.is_valid()) {
+            c = 0.f;
+            s = 0.f;
+            return;
+          }
 
+          // Surface diffuse is constraint position
+          c = cstr.surface.diffuse;
 
-        //   GenerateIndirectSpectrumInfo info = {
-        //     .basis        = resources.bases[u.basis_i].value(),
-        //     .base_system  = csys_i,
-        //     .base_signal  = cstr.surface.diffuse,
-        //     .refl_systems = 
-        //   };
-
-          
-        // } else 
+          // Generate color system spectra from power series
+          IndirectColrSystem csys = {
+            .cmfs   = resources.observers[components.observer_i.value].value(),
+            .powers = cstr.powers
+          };
+          auto refl_systems = csys.finalize();
+                  
+          // Generate a metamer satisfying the constraint set
+          s = generate_spectrum(GenerateIndirectSpectrumInfo {
+            .basis        = resources.bases[u.basis_i].value(),
+            .base_system  = csys_i,
+            .base_signal  = cstr.surface.diffuse,
+            .refl_systems = refl_systems,
+            .refl_signal  = cstr.colr
+          });
+        }
+        else 
         { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
           // Return zero constraint for invalid surfaces
           if (!cstr.surface.is_valid()) {

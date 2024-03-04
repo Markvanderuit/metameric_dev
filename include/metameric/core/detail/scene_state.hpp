@@ -111,7 +111,10 @@ namespace met::detail {
         // Handle non-resize case first
         for (uint i = 0; i < m_cache.size(); ++i)
           m_cache[i].update(o[i]);
-        m_mutated = rng::any_of(m_cache, [](const auto &v) { return v.is_mutated(); });
+        m_mutated = false;
+        for (const auto &v : m_cache)
+          if (v.is_mutated())
+            m_mutated = true;
         m_resized = false;
       } else {
         // Handle shrink/grow

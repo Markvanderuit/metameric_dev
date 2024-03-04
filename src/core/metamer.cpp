@@ -1,5 +1,6 @@
 #include <metameric/core/nlopt.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <algorithm>
 #include <execution>
@@ -154,10 +155,10 @@ namespace met {
     return s;
   }
 
-  
-
   Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
+
+    fmt::print("Running solve\n");
 
     // Helper spectra
     using DCMFS = eig::Matrix<double, 3, wavelength_samples>;
@@ -169,14 +170,13 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMinimize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
-      // .max_iters    = 10,
+      .max_iters    = 32,
       .rel_func_tol = 1e-3,
       .rel_xpar_tol = 1e-2,
     };
 
     // Construct basis matrix
     auto B = info.basis.func.cast<double>().eval();
-
 
     // Construct basis matrix and boundary vectors
     auto basis = info.basis.func.cast<double>().eval();
@@ -228,32 +228,37 @@ namespace met {
       } // for (uint j)
     }
     
+    // Double, transpose versions of interreflection system
+    std::vector<DCMFS> C(info.refl_systems.size());
+    rng::transform(info.refl_systems, C.begin(), 
+      [&](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); });
+      
     // Add interreflection result constraint
     {
-      std::vector<DCMFS> C(info.refl_systems.size());
-      rng::transform(info.refl_systems, C.begin(), 
-        [&](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); });
-      
-      auto b = info.refl_signal.cast<double>().eval();
+      Colr o = 0.f;
+      for (const auto &cs : info.refl_systems)
+        o += (cs.transpose() * info.basis.mean.matrix()).transpose().array().eval();
+      auto b = (info.refl_signal - o).cast<double>().eval();
+      // auto b = info.refl_signal.cast<double>().eval();
 
       for (uint j = 0; j < 3; ++j) {
         solver.eq_constraints.push_back(
-          [&] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
-            DSpec R = B * x;
+          [&C, &B, &info, j, b] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+            DSpec R = (B * x).array(); // + info.basis.mean.cast<double>().eval();
 
-            double signal = C[0].row(j).dot(R);
-            for (uint i = 1; i < info.refl_systems.size(); ++i) {
+            double signal = C[0].row(j).transpose().sum();
+            for (uint i = 1; i < C.size(); ++i) {
               double p = static_cast<double>(i);
               DSpec pr = R.array().pow(p);
-              signal += C[i].row(j).dot(pr);
+              signal += C[i].row(j).transpose().dot(pr);
             }
 
             if (g.size()) {
               BSpec grad = 0.0;
-              for (uint j = 1; j < info.refl_systems.size(); ++j) {
-                double p = static_cast<double>(j);
+              for (uint i = 1; i < C.size(); ++i) {
+                double p = static_cast<double>(i);
                 DSpec dr = R.array().pow(p - 1.0);
-                grad += p * (C[j].row(j).transpose().cwiseProduct(dr).transpose() * B);
+                grad += p * (C[i].row(j).transpose().cwiseProduct(dr).transpose() * B);
               }
               g = grad;
             }
@@ -537,6 +542,10 @@ namespace met {
     for (uint i = 0; i < info.systems_i.size(); ++i) {
       auto A = basis_trf(info.systems_i[i]);
       auto b = info.signals_i[i].cast<double>().eval();
+      // Colr o = (info.systems_i[i].transpose() * info.basis.mean.matrix()).transpose().eval();
+      // auto A = (info.systems_i[i].transpose().cast<double>() * info.basis.func.cast<double>()).eval();
+      // auto b = (info.signals_i[i] - o).cast<double>().eval();
+
       for (uint j = 0; j < 3; ++j) {
         solver.eq_constraints.push_back(
           [A = A.row(j).eval(), b = b[j]]
@@ -573,7 +582,7 @@ namespace met {
     std::vector<Spec> output(info.samples.size());
 
     // Partial objective functions
-    // TODO this may be wrong; see finalize_direct's sum() for why
+    // TODO this may be wrong; see finalize's sum() for why
     // std::vector<CMFS> objective_components(info.components.size());
     // rng::transform(info.components, objective_components.begin(),
     //   [&](const Spec &s) { return info.system_j.array().colwise() * s; });

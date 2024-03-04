@@ -286,8 +286,8 @@ namespace met {
         Spec sd = illuminants_p0[info("single_visible").getw<uint>()];
         ColrSystem csys_p1_free = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1 };
         ColrSystem csys_p1_base = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2     };
-        Colr colr_free = csys_p1_free.apply_color_direct(sd);
-        Colr colr_base = csys_p1_base.apply_color_direct(sd);
+        Colr colr_free = csys_p1_free.apply(sd);
+        Colr colr_base = csys_p1_base.apply(sd);
 
         ImGui::ColorEdit3("Metamer (FL2)", colr_free.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
         ImGui::ColorEdit3("Metamer (D65)", colr_base.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
@@ -424,7 +424,7 @@ namespace met {
       /* // Generate color system projection for rendering
       auto cs = (ColrSystem { .cmfs = models::cmfs_cie_xyz, 
                               .illuminant = models::emitter_cie_d65,
-                              .n_scatters = 1 }).finalize_direct(); */
+                              .n_scatters = 1 }).finalize(); */
       // Clear render state
       i_pointsets.clear();
 
@@ -689,14 +689,14 @@ namespace met {
   //   // First, generate a mismatch volume for p1
   //   ColrSystem csys_p1_base = { .cmfs = c, .illuminant = e_base };
   //   ColrSystem csys_p1_free = { .cmfs = c, .illuminant = e      };
-  //   std::vector<CMFS> systems_i = { csys_p1_base.finalize_direct() };
+  //   std::vector<CMFS> systems_i = { csys_p1_base.finalize() };
   //   std::vector<Colr> signals_i = { colr_p1 };
 
   //   std::vector<Colr> volume_p1  = generate_mmv_boundary_colr({
   //     .basis      = basis,
   //     .systems_i  = systems_i,
   //     .signals_i  = signals_i,
-  //     .system_j   = csys_p1_free.finalize_direct(),
+  //     .system_j   = csys_p1_free.finalize(),
   //     .samples    = samples_p1
   //   });
 
@@ -705,7 +705,7 @@ namespace met {
   //   illuminants_p0 = std::vector<Spec>(volume_p1.size());
   //   std::transform(std::execution::par_unseq, range_iter(volume_p1), illuminants_p0.begin(), 
   //     [&](const Colr &colr_p1_free) {
-  //       auto systems = { csys_p1_base.finalize_direct(), csys_p1_free.finalize_direct() };
+  //       auto systems = { csys_p1_base.finalize(), csys_p1_free.finalize() };
   //       auto signals = { colr_p1, colr_p1_free };
   //       return generate_spectrum({
   //         .basis      = basis,
@@ -719,13 +719,13 @@ namespace met {
   //   rng::transform(illuminants_p0, std::back_inserter(volumes_p0), [&](const Spec &illuminant_p0) {
   //     ColrSystem csys_p0_base = { .cmfs = c, .illuminant = illuminant_p0 * e };
   //     ColrSystem csys_p0_free = { .cmfs = c, .illuminant = e_base            };
-  //     std::vector<CMFS> systems = { csys_p0_base.finalize_direct() };
+  //     std::vector<CMFS> systems = { csys_p0_base.finalize() };
   //     std::vector<Colr> signals = { colr_p0 };
   //     return generate_mmv_boundary_colr({
   //       .basis      = basis,
   //       .systems_i  = systems,
   //       .signals_i  = signals,
-  //       .system_j   = csys_p0_free.finalize_direct(),
+  //       .system_j   = csys_p0_free.finalize(),
   //       .samples    = samples_p0
   //     });
   //   });

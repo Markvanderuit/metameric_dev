@@ -111,8 +111,8 @@ namespace met {
       
       // Declare scoped ImGui style state to remove border padding
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
                           
       ImGui::BeginChild("##viewport_image_view");
 
@@ -305,6 +305,64 @@ namespace met {
                 auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
                 std::visit(overloaded { [&](ColorConstraint auto &cstr) { 
                   cstr.colr_j[0] = p;
+                }, [](const auto &cstr) {}}, e_vert.constraint);
+              }
+            });
+          }
+        },
+        
+        [&](const IndirectSurfaceConstraint &cstr) {
+          auto p = cstr.colr;
+          
+          // ImGuizmo manipulator operates on transforms
+          auto trf_vert  = eig::Affine3f(eig::Translation3f(p));
+          auto trf_delta = eig::Affine3f::Identity();
+          
+          // Specify ImGuizmo enabled operation; transl for one vertex, transl/rotate for several
+          ImGuizmo::OPERATION op = ImGuizmo::OPERATION::TRANSLATE;
+
+          // Specify ImGuizmo settings for current viewport and insert the gizmo
+          ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
+          ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+          ImGuizmo::Manipulate(e_arcball.view().data(), e_arcball.proj().data(), 
+            op, ImGuizmo::MODE::LOCAL, trf_vert.data(), trf_delta.data());
+          
+          // Register gizmo use start; cache current vertex position
+          if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
+            m_gizmo_prev_p  = p;
+            m_is_gizmo_used = true;
+          }
+
+          // Register continuous gizmo use
+          if (ImGuizmo::IsUsing()) {
+            // Apply world-space delta to constraint position
+            p = trf_delta * p;
+
+            // Get writable vertex data
+            auto &e_vert = info.global("scene").getw<Scene>()
+              .get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+
+            // Store world-space position in surface constraint
+            std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+              cstr.colr = p;
+            }, [](const auto &cstr) { } }, e_vert.constraint);
+          }
+
+          // Register gizmo use end; apply current vertex position to scene save state
+          if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
+            m_is_gizmo_used = false;
+            info.global("scene").getw<Scene>().touch({
+              .name = "Move color constraint",
+              .redo = [p = p, is = e_is](auto &scene) {
+                auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
+                std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+                  cstr.colr = p;
+                }, [](const auto &cstr) {}}, e_vert.constraint);
+              },
+              .undo = [p = m_gizmo_prev_p, is = e_is](auto &scene) {
+                auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
+                std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+                  cstr.colr = p;
                 }, [](const auto &cstr) {}}, e_vert.constraint);
               }
             });

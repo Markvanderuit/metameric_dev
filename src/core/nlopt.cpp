@@ -1,4 +1,5 @@
 #include <metameric/core/nlopt.hpp>
+#include <metameric/core/ranges.hpp>
 #include <algorithm>
 #include <exception>
 #include <execution>

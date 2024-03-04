@@ -1,4 +1,5 @@
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <meshoptimizer.h>

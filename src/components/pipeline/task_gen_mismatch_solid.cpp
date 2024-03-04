@@ -120,14 +120,14 @@ namespace met {
     // Gather color system spectra and corresponding signals
     // The primary color system and color signal are added first
     // All secondary color systems and signals are added after, until the one given by e_cstr_index
-    std::vector<CMFS> cmfs_i = { e_proj_data.csys(e_vert.csys_i).finalize_indirect(e_vert_sd) };
+    std::vector<CMFS> cmfs_i = { e_proj_data.csys(e_vert.csys_i).finalize() };
     std::vector<Colr> sign_i = { e_vert.colr_i };
     std::copy(e_vert.colr_j.begin(), e_vert.colr_j.begin() + e_cstr_slct, std::back_inserter(sign_i));
     std::transform(e_vert.csys_j.begin(), e_vert.csys_j.begin() + e_cstr_slct, std::back_inserter(cmfs_i),
-      [&](uint j) { return e_proj_data.csys(j).finalize_indirect(e_vert_sd); });
+      [&](uint j) { return e_proj_data.csys(j).finalize(); });
 
     // The selected constraint is the varying component, for which we generate a metamer boundary
-    CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize_indirect(e_vert_sd);
+    CMFS cmfs_j = e_proj_data.csys(e_vert.csys_j[e_cstr_slct]).finalize();
 
     // Last-second safety check; cmfs_i != cmfs_j for all i, j
     // or qhull, bless its naive heart, will happily tear down the application 

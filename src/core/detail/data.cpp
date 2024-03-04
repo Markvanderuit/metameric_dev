@@ -76,7 +76,7 @@ namespace met::detail {
 
     // // Compute data points on convex hull of object color solid; used for convex hull clipping
     // auto ocs = generate_ocs_boundary_colr({ .basis      = appl_data.loaded_basis,
-    //                                         .system     = appl_data.project_data.csys(0).finalize_direct(), 
+    //                                         .system     = appl_data.project_data.csys(0).finalize(), 
     //                                         .samples    = detail::gen_unit_dirs<3>(1024) });
 
     // // Generate cleaned mesh from data
@@ -176,9 +176,9 @@ namespace met::detail {
   //         }
 
   //         // Obtain color system spectra for this vertex
-  //         std::vector<CMFS> systems = { appl_data.project_data.csys(vt.csys_i).finalize_direct() };
+  //         std::vector<CMFS> systems = { appl_data.project_data.csys(vt.csys_i).finalize() };
   //         std::ranges::transform(vt.csys_j, std::back_inserter(systems), 
-  //           [&](uint j) { return appl_data.project_data.csys(j).finalize_direct(); });
+  //           [&](uint j) { return appl_data.project_data.csys(j).finalize(); });
 
   //         // Obtain corresponding color signal for each color system
   //         std::vector<Colr> signals(1 + vt.colr_j.size());
@@ -193,7 +193,7 @@ namespace met::detail {
   //         });
 
   //         // Test roundtrip error for generated spectrum, compared to input color signal
-  //         Colr signal_rt = appl_data.project_data.csys(0).apply_color_direct(sd);
+  //         Colr signal_rt = appl_data.project_data.csys(0).apply(sd);
   //         float rt_error = (signal_rt - vt.colr_i).abs().sum();
 
   //         // Only add vertex to data if roundtrip error is below epsilon; otherwise this sample
@@ -345,7 +345,7 @@ namespace met::detail {
 
   //       // Transform mappings
   //       for (uint i = 0; i < appl_data.project_data.color_systems.size(); ++i)
-  //         info.systems[i] = appl_data.project_data.csys(i).finalize_direct();
+  //         info.systems[i] = appl_data.project_data.csys(i).finalize();
 
   //       // Add baseline samples
   //       for (uint i = 0; i < n_samples; ++i)
@@ -387,10 +387,10 @@ namespace met::detail {
 
   //         // Clip constraints to validity
   //         {
-  //           std::vector<CMFS> systems = { appl_data.project_data.csys(vert.csys_i).finalize_direct() };
+  //           std::vector<CMFS> systems = { appl_data.project_data.csys(vert.csys_i).finalize() };
   //           std::vector<Colr> signals = { vert.colr_i };
   //           for (uint j = 0; j < vert.colr_j.size(); ++j) {
-  //             systems.push_back(appl_data.project_data.csys(vert.csys_j[j]).finalize_direct());
+  //             systems.push_back(appl_data.project_data.csys(vert.csys_j[j]).finalize());
   //             signals.push_back(vert.colr_j[j]);
   //           }
             

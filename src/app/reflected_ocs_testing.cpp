@@ -333,16 +333,16 @@ namespace met {
       met_trace_full();
 
       // Define illuminant-induced mismatching to quickly generate a large metamer set
-      ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65, .n_scatters = 1 };
-      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11, .n_scatters = 1 };
-      ColrSystem csys_2 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2, .n_scatters = 1 };
-      ColrSystem csys_3 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1, .n_scatters = 1 };
+      ColrSystem csys_0 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
+      ColrSystem csys_1 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl11 };
+      ColrSystem csys_2 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_fl2 };
+      ColrSystem csys_3 = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_ledrgb1 };
 
       // Specify color system spectra
-      cs_0 = csys_0.finalize_direct();
-      cs_1 = csys_1.finalize_direct();
-      cs_2 = csys_2.finalize_direct();
-      cs_3 = csys_3.finalize_direct();
+      cs_0 = csys_0.finalize();
+      cs_1 = csys_1.finalize();
+      cs_2 = csys_2.finalize();
+      cs_3 = csys_3.finalize();
       cs_v = cs_1; // Visualized cs
 
       // Generate OCS for cs_v

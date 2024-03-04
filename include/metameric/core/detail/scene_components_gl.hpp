@@ -110,7 +110,6 @@ namespace met::detail {
     /* struct alignas(16) ColorSystemUniformLayout {
       alignas(4) uint cmfs_i;
       alignas(4) uint illuminant_i;
-      alignas(4) uint n_scatters;
     }; */
     
   public:

@@ -3,6 +3,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/ray.hpp>
 #include <metameric/core/scene.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -94,7 +95,7 @@ namespace met {
         [](const auto &a, const auto &b) -> Spec { 
           return (a + b).eval(); }, 
         [&cmfs, colr_div](const auto &path) -> Spec {
-          return colr_div * integrate_spectrum(path.wavelengths, path.L);
+          return colr_div * accumulate_spectrum(path.wavelengths, path.L);
       }).max(0.f).eval();
       Colr colr_lrgb_dstr = (cmfs.transpose() * spec_distr.matrix());
       Colr colr_srgb_dstr = lrgb_to_srgb(colr_lrgb_dstr);

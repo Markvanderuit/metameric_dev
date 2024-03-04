@@ -87,7 +87,7 @@ namespace met {
 
     // Get color error
     Colr color_in   = e_colr_data[m_tooltip_pixel];
-    Colr color_out  = mapp.apply_color_indirect(reflectance);
+    Colr color_out  = mapp.apply(reflectance);
     Colr color_err  = (color_out - color_in).abs(); 
 
     // Plot spectra

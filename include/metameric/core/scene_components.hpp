@@ -37,7 +37,6 @@ namespace met {
   struct ColorSystem {
     uint observer_i   = 0;
     uint illuminant_i = 0;
-    uint n_scatters   = 0;
 
     friend
     auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
@@ -64,25 +63,8 @@ namespace met {
     std::variant<float, uint> metallic;
     std::variant<float, uint> opacity; */
     
-  public:
-    inline 
-    bool operator==(const Object &o) const {
-      guard(std::tie(is_active, transform, mesh_i, uplifting_i) == 
-            std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i), false);
-      /* guard(std::tie(roughness, metallic, opacity) == 
-            std::tie(o.roughness, o.metallic, o.opacity), false); */
-      guard(diffuse.index() == o.diffuse.index() /* && 
-            normals.index() == o.normals.index() */, false);
-      switch (diffuse.index()) {
-        case 0: guard(std::get<Colr>(diffuse).isApprox(std::get<Colr>(o.diffuse)), false); break;
-        case 1: guard(std::get<uint>(diffuse) == std::get<uint>(o.diffuse), false); break;
-      }
-      /* switch (normals.index()) {
-        case 0: guard(std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)), false); break;
-        case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
-      } */
-      return true;
-    }
+  public: // Boilerplate
+    bool operator==(const Object &o) const;
   };
   static_assert(has_active_value<Object>);
 
@@ -94,8 +76,12 @@ namespace met {
       ePoint    = 1, 
       eSphere   = 2, 
       eRect     = 3
-    } type = Type::eSphere;
+    };
 
+  public:
+    // Specific emitter type
+    Type type = Type::eSphere;
+    
     // Scene properties
     bool      is_active = true;
     Transform transform;
@@ -104,11 +90,8 @@ namespace met {
     uint         illuminant_i     = 0;    // index to spectral illuminant
     float        illuminant_scale = 1.f;  // power multiplier
 
-    inline 
-    bool operator==(const Emitter &o) const {
-      return std::tie(type, is_active, transform, illuminant_i, illuminant_scale) 
-          == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale);
-    }
+  public: // Boilerplater
+    bool operator==(const Emitter &o) const;
   };
   static_assert(has_active_value<Emitter>);
 
@@ -147,13 +130,13 @@ namespace met {
       bool has_mismatching() const;
     };
 
+  public:
     uint                csys_i  = 0; // Index of primary color system
     uint                basis_i = 0; // Index of used underlying basis
     std::vector<Vertex> verts;       // Vertex constraints on mesh
 
-    inline bool operator==(const Uplifting &o) const {
-      return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
-    }
+  public: // Boilerplate
+    bool operator==(const Uplifting &o) const;
   };
   static_assert(has_active_value<Uplifting::Vertex>);
 } // namespace met

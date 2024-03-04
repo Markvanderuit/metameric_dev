@@ -1,5 +1,6 @@
 #include <metameric/core/detail/scene_components_gl.hpp>
 #include <metameric/core/distribution.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene.hpp>
 #include <ranges>

@@ -1,3 +1,4 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/detail/texture_atlas.hpp>
 #include <algorithm>
 #include <deque>

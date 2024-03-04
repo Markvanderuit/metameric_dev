@@ -1,3 +1,4 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
 #include <oneapi/tbb/concurrent_vector.h>
@@ -171,50 +172,15 @@ namespace met {
     for (auto &power : cstr.powers)
       power /= static_cast<float>(n_spp);
 
-    // Generate a default color value for which a valid reflectance should exist
-    {
-      // Get camera cmfs
-      CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
-      cmfs = (cmfs.array())
-            / (cmfs.array().col(1) * wavelength_ssize).sum();
-      cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
-      
-      // Reconstruct radiance from truncated power series
-      Spec r = e_uplf_task.query_constraint(is.constraint_i);
-      Spec s = 0.f;
-      for (uint i = 0; i < cstr.powers.size(); ++i)
-        s += r.pow(static_cast<float>(i)) * cstr.powers[i];
-      
-      // Recover output color and store in constraint
-      cstr.colr = (cmfs.transpose() * s.matrix());
-
-      { // Do it an alternative awy for testing purposes
-        CMFS _cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
-
-        std::vector<CMFS> power_cmfs(cstr.powers.size());
-        rng::transform(cstr.powers, power_cmfs.begin(), [&](Spec s) {
-          CMFS to_xyz = (_cmfs.array().colwise() * s * wavelength_ssize).eval();
-          to_xyz = to_xyz / (_cmfs.array().col(1) * s * wavelength_ssize).sum();
-          // CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-          return to_xyz;
-        });
-
-        float norm = 0.f;
-        for (const CMFS &cmfs : power_cmfs)
-          norm += (cmfs.array().col(1) * s * wavelength_ssize).sum();
-        for (CMFS &cmfs : power_cmfs)
-          cmfs /= norm;
-
-        Colr c = 0.f;
-        for (uint i = 0; i < power_cmfs.size(); ++i) {
-          float p = static_cast<float>(i);
-          c += (power_cmfs[i].transpose() * r.pow(p).matrix()).array().eval();
-        }
-        c = models::xyz_to_srgb_transform * c.matrix();
-
-        fmt::print("Baseline: {}, experiment: {}\n", cstr.colr, c);
-      }
-    }
+    // Obtain underlying reflectance
+    Spec r = e_uplf_task.query_constraint(is.constraint_i);
+    
+    // Generate a default color value by passing through this reflectance
+    IndirectColrSystem csys = {
+      .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
+      .powers = cstr.powers
+    };
+    cstr.colr = csys(r);
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {

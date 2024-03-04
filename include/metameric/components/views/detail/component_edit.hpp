@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scheduler.hpp>
@@ -140,31 +141,6 @@ namespace met {
         .undo = [data_i, name = data.name](auto &scene)      {
           scene_data_by_type<Ty>(scene)[data_i].name = name; }
       });
-    }
-
-    // Helper method to spawn a imgui group of a fixed width, and then call a visitor()
-    // over every element of a range, s.t. a column is built for all elements
-    template <typename Ty>
-    void visit_range_column(const std::string               &col_name,
-                            float                            col_width,
-                            rng::sized_range auto           &range,
-                            std::function<void (uint, Ty &)> visitor) {
-      ImGui::BeginGroup();
-      ImGui::AlignTextToFramePadding();
-
-      if (col_name.empty()) {
-        ImGui::NewLine();
-      } else {
-        ImGui::SetNextItemWidth(col_width);
-        ImGui::Text(col_name.c_str());
-      }
-
-      for (uint j = 0; j < range.size(); ++j) {
-        auto scope = ImGui::ScopedID(std::format("{}", j));
-        visitor(j, range[j]);
-      }
-
-      ImGui::EndGroup();
     }
 
     // Helper function; given a title, access to a set of scene resources,

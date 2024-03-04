@@ -68,7 +68,7 @@ namespace met {
 
     // // Compute data points on convex hull of object color solid
     // auto data = generate_ocs_boundary_colr({ .basis      = e_appl_data.loaded_basis,
-    //                                          .system     = e_proj_data.csys(0).finalize_direct(), 
+    //                                          .system     = e_proj_data.csys(0).finalize(), 
     //                                          .samples    = detail::gen_unit_dirs<3>(n_samples) });
 
     // // Generate cleaned mesh from data

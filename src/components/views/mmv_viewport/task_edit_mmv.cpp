@@ -1,11 +1,41 @@
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
 #include <implot.h>
 
 namespace met {
+  // TODO remove
+  namespace detail {
+    // Helper method to spawn a imgui group of a fixed width, and then call a visitor()
+    // over every element of a range, s.t. a column is built for all elements
+    template <typename Ty>
+    void visit_range_column(const std::string               &col_name,
+                            float                            col_width,
+                            rng::sized_range auto           &range,
+                            std::function<void (uint, Ty &)> visitor) {
+      ImGui::BeginGroup();
+      ImGui::AlignTextToFramePadding();
+
+      if (col_name.empty()) {
+        ImGui::NewLine();
+      } else {
+        ImGui::SetNextItemWidth(col_width);
+        ImGui::Text(col_name.c_str());
+      }
+
+      for (uint j = 0; j < range.size(); ++j) {
+        auto scope = ImGui::ScopedID(std::format("{}", j));
+        visitor(j, range[j]);
+      }
+
+      ImGui::EndGroup();
+    }
+  } // namespace detail
+
+
   bool EditMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
     return info.parent()("is_active").getr<bool>();
@@ -61,7 +91,7 @@ namespace met {
             // Gather relevant color systems
             auto colsys_i = e_scene.get_csys(uplf.value.csys_i);
             auto colsys_j = e_scene.get_csys(csys_j);
-            auto systems  = { colsys_i.finalize_direct() };
+            auto systems  = { colsys_i.finalize() };
             auto signals  = { cstr.colr_i };
 
             // Generate spectral distribution
@@ -72,7 +102,7 @@ namespace met {
             });
             
             // Assign the reset accompanying color
-            cstr.colr_j[i] = colsys_j.apply_color_direct(s);
+            cstr.colr_j[i] = colsys_j.apply(s);
           });
           ImGui::SameLine();
 
@@ -131,6 +161,13 @@ namespace met {
           }
 
           // Visual separator into constraint list
+          ImGui::Separator();
+
+          auto cstr_srgb = lrgb_to_srgb(cstr.colr);
+          ImGui::ColorEdit3("Radiance (lrgb)", cstr.colr.data(), ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("Radiance (srgb)", cstr_srgb.data(), ImGuiColorEditFlags_Float);
+
+          // Visual separator into constraint list
           // ImGui::Separator();
 
           /* // Get wavelength values for x-axis in plot
@@ -150,26 +187,25 @@ namespace met {
             p++;
           } */
 
-          /* ImGui::SeparatorText("Estimated output");
+          ImGui::SeparatorText("Estimated output");
           {
             // Reconstruct radiance from truncated power series
             Spec r = e_spectra[e_is.constraint_i];
-            Spec s = 0.f;
-            for (uint i = 0; i < cstr.powers.size(); ++i)
+            Spec s = cstr.powers[0];
+            for (uint i = 1; i < cstr.powers.size(); ++i)
               s += r.pow(static_cast<float>(i)) * cstr.powers[i];
 
-            // Get camera cmfs
-            CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
-            cmfs = (cmfs.array())
-                 / (cmfs.array().col(1) * wavelength_ssize).sum();
-            cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
-
             // Recover output color
-            Colr colr_lrgb = (cmfs.transpose() * s.matrix());
+            IndirectColrSystem csys = {
+              .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
+              .powers = cstr.powers
+            };
+            Colr colr_lrgb = csys(r);
             Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
 
             // Plot color
-            ImGui::ColorEdit3("Radiance color", colr_srgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip radiance (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip radiance (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
 
             // Plot radiance
             if (ImPlot::BeginPlot("Radiance distr", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
@@ -177,13 +213,13 @@ namespace met {
               Spec x_values;
               rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
 
-              // Simple barebones spectrum plot
+            // Simple barebones spectrum plot
               ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
               ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, s.maxCoeff() + 0.05f, ImPlotCond_Always);
               ImPlot::PlotLine("##radiance_line", x_values.data(), s.data(), wavelength_samples);
               ImPlot::EndPlot();
             }
-          } */
+          }
         },
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");
@@ -218,10 +254,9 @@ namespace met {
       Spec illuminant = e_scene.get_emitter_spd(0);
       ColrSystem csys = {
         .cmfs       = e_scene.resources.observers[0].value(),
-        .illuminant = e_scene.resources.illuminants[0].value(),
-        .n_scatters = 1
+        .illuminant = e_scene.resources.illuminants[0].value()
       };
-      auto colr = csys.apply_color_direct(e_sd);
+      auto colr = csys(e_sd);
       ImGui::ColorEdit3("Roundtrip color", colr.data(), ImGuiColorEditFlags_Float);
     }
   }

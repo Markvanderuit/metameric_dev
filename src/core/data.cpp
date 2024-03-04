@@ -39,8 +39,7 @@ namespace met {
   ColrSystem ProjectData::csys(CSys m) const {
     met_trace();
     return { .cmfs = cmfs[m.cmfs].second,
-             .illuminant = illuminants[m.illuminant].second,
-             .n_scatters = m.n_scatters };
+             .illuminant = illuminants[m.illuminant].second };
   }
   
   void ApplicationData::create(ProjectCreateInfo &&info) {
@@ -63,8 +62,7 @@ namespace met {
     project_data.color_systems.clear();
     for (auto &image : info.images)
       project_data.color_systems.push_back({ .cmfs = image.cmfs, 
-                                             .illuminant = image.illuminant, 
-                                             .n_scatters = 1 });
+                                             .illuminant = image.illuminant });
 
     // Move first texture into application - not project - data; later stored in separate file
     loaded_texture = std::move(info.images[0].image);

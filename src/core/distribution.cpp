@@ -1,5 +1,6 @@
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/ranges.hpp>
 #include <small_gl/buffer.hpp>
 
 namespace met {

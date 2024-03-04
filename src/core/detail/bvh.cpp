@@ -1,10 +1,10 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/detail/bvh.hpp>
 #include <embree4/rtcore.h>
 #include <algorithm>
 #include <execution>
 #include <memory>
 #include <optional>
-#include <ranges>
 #include <stack>
 
 namespace met {

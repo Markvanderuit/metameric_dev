@@ -107,7 +107,7 @@ namespace met {
       for (int j = 0; j < e_constraints.size(); ++j) {
         const auto &e_verts = e_constraints[j];
         for (uint i : vert_diff)
-          m_vert_map[j * e_verts.size() + i] = mapping_csys.apply_color_direct(e_vert_spec[i]);
+          m_vert_map[j * e_verts.size() + i] = mapping_csys.apply(e_vert_spec[i]);
         for (uint i : vert_select)
           m_vert_map[j * e_verts.size() + i] = e_verts[i].colr_j[0];
 

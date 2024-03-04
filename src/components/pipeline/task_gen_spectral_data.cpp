@@ -45,8 +45,8 @@ namespace met {
       const auto &vert = e_proj_data.verts[i];   
 
       // Obtain color system spectra for this vertex
-      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize_indirect(i_spectra[i]) };
-      std::ranges::transform(vert.csys_j, std::back_inserter(systems), [&](uint j) { return e_proj_data.csys(j).finalize_direct(); });
+      std::vector<CMFS> systems = { e_proj_data.csys(vert.csys_i).finalize() };
+      std::ranges::transform(vert.csys_j, std::back_inserter(systems), [&](uint j) { return e_proj_data.csys(j).finalize(); });
 
       // Obtain corresponding color signal for each color system
       std::vector<Colr> signals = { vert.colr_i };

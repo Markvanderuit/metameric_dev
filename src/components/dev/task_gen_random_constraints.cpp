@@ -3,6 +3,7 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/state.hpp>
 #include <metameric/components/dev/task_gen_random_constraints.hpp>
@@ -96,8 +97,8 @@ namespace met {
     std::ranges::fill(i_constraints, e_verts);
 
     // Provide items necessary for fast OCS generation
-    std::vector<CMFS> cmfs_i = { e_proj_data.csys(0).finalize_direct() }; // TODO ehhr
-    std::vector<CMFS> cmfs_j = { e_proj_data.csys(1).finalize_direct() }; // TODO uhhr
+    std::vector<CMFS> cmfs_i = { e_proj_data.csys(0).finalize() }; // TODO ehhr
+    std::vector<CMFS> cmfs_j = { e_proj_data.csys(1).finalize() }; // TODO uhhr
 
     // We either operate on selected vertices, or, if none are selected, all vertices
     std::vector<uint> vert_select = e_vert_select;
