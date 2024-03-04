@@ -187,6 +187,33 @@ namespace met {
       
       // Recover output color and store in constraint
       cstr.colr = (cmfs.transpose() * s.matrix());
+
+      { // Do it an alternative awy for testing purposes
+        CMFS _cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
+
+        std::vector<CMFS> power_cmfs(cstr.powers.size());
+        rng::transform(cstr.powers, power_cmfs.begin(), [&](Spec s) {
+          CMFS to_xyz = (_cmfs.array().colwise() * s * wavelength_ssize).eval();
+          to_xyz = to_xyz / (_cmfs.array().col(1) * s * wavelength_ssize).sum();
+          // CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
+          return to_xyz;
+        });
+
+        float norm = 0.f;
+        for (const CMFS &cmfs : power_cmfs)
+          norm += (cmfs.array().col(1) * s * wavelength_ssize).sum();
+        for (CMFS &cmfs : power_cmfs)
+          cmfs /= norm;
+
+        Colr c = 0.f;
+        for (uint i = 0; i < power_cmfs.size(); ++i) {
+          float p = static_cast<float>(i);
+          c += (power_cmfs[i].transpose() * r.pow(p).matrix()).array().eval();
+        }
+        c = models::xyz_to_srgb_transform * c.matrix();
+
+        fmt::print("Baseline: {}, experiment: {}\n", cstr.colr, c);
+      }
     }
   }
 

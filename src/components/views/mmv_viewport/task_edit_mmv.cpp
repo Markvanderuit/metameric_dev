@@ -65,7 +65,7 @@ namespace met {
             auto signals  = { cstr.colr_i };
 
             // Generate spectral distribution
-            Spec s = generate_spectrum({
+            Spec s = generate_spectrum(GenerateSpectrumInfo {
               .basis   = e_scene.resources.bases[uplf.value.basis_i].value(),
               .systems = systems,
               .signals = signals

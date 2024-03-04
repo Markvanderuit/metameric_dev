@@ -692,7 +692,7 @@ namespace met {
         rng::copy(cstr.colr_j, std::back_inserter(signals));
 
         // Generate a metamer satisfying the system+signal constraint set
-        s = generate_spectrum({
+        s = generate_spectrum(GenerateSpectrumInfo {
           .basis   = resources.bases[u.basis_i].value(),
           .systems = systems,
           .signals = signals
@@ -717,19 +717,51 @@ namespace met {
         rng::copy(cstr.colr_j, std::back_inserter(signals));
 
         // Generate a metamer satisfying the system+signal constraint set
-        s = generate_spectrum({
+        s = generate_spectrum(GenerateSpectrumInfo {
           .basis   = resources.bases[u.basis_i].value(),
           .systems = systems,
           .signals = signals
         });
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        /* if (cstr.has_mismatching()) {
-          debug::check_expr(false, "Not implemented!");
-          // ... The Magic Doth Happen Here ....
-        } else  */
-        {
-          // We attempt to fill in a default spectrum, which is necessary to establish the initial system
+        // if (cstr.has_mismatching()) {
+        //   // Return zero constraint for invalid surfaces
+        //   if (!cstr.surface.is_valid()) {
+        //     c = 0.f;
+        //     s = 0.f;
+        //     return;
+        //   }
+            
+        //   // Get camera cmfs
+        //   CMFS cmfs = resources.observers[components.observer_i.value].value();
+        //   cmfs = (cmfs.array())
+        //       / (cmfs.array().col(1) * wavelength_ssize).sum();
+        //   cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
+            
+        //   // Construct objective color system spectra from power series
+        //   auto systems_j = cstr.powers
+        //                  | vws::transform([&](Spec s) {
+        //                      CMFS to_xyz = (cmfs.array().colwise() * s * wavelength_ssize);/* 
+        //                                  / (cmfs.array().col(1)    * s * wavelength_ssize).sum(); */
+        //                      // CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
+        //                      // return to_rgb; })
+        //                      return to_xyz; })
+        //                  | rng::to<std::vector>();
+          
+          
+
+
+        //   GenerateIndirectSpectrumInfo info = {
+        //     .basis        = resources.bases[u.basis_i].value(),
+        //     .base_system  = csys_i,
+        //     .base_signal  = cstr.surface.diffuse,
+        //     .refl_systems = 
+        //   };
+
+          
+        // } else 
+        { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
+          // Return zero constraint for invalid surfaces
           if (!cstr.surface.is_valid()) {
             c = 0.f;
             s = 0.f;
@@ -744,7 +776,7 @@ namespace met {
           std::vector<Colr> signals = { c      };
 
           // Generate a metamer satisfying the system+signal constraint set
-          s = generate_spectrum({
+          s = generate_spectrum(GenerateSpectrumInfo {
             .basis   = resources.bases[u.basis_i].value(),
             .systems = systems,
             .signals = signals

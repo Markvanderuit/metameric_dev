@@ -154,6 +154,121 @@ namespace met {
     return s;
   }
 
+  
+
+  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+    met_trace();
+
+    // Helper spectra
+    using DCMFS = eig::Matrix<double, 3, wavelength_samples>;
+    using DSpec = eig::Vector<double, wavelength_samples>;
+    using BSpec = eig::Vector<double, wavelength_bases>;
+
+    NLOptInfo solver = {
+      .n            = wavelength_bases,
+      .algo         = NLOptAlgo::LD_SLSQP,
+      .form         = NLOptForm::eMinimize,
+      .x_init       = Basis::BVec(0.5).cast<double>().eval(),
+      // .max_iters    = 10,
+      .rel_func_tol = 1e-3,
+      .rel_xpar_tol = 1e-2,
+    };
+
+    // Construct basis matrix
+    auto B = info.basis.func.cast<double>().eval();
+
+
+    // Construct basis matrix and boundary vectors
+    auto basis = info.basis.func.cast<double>().eval();
+    Spec upper_bounds = Spec(1.0) - info.basis.mean;
+    Spec lower_bounds = upper_bounds - Spec(1.0); 
+
+    // Objective function minimizes squared l2 norm
+    solver.objective = [&](eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+      if (g.size())
+        g = (2.0 * x).eval();
+      return x.dot(x);
+    };
+
+    // Add boundary inequality constraints
+    for (uint i = 0; i < wavelength_samples; ++i) {
+      solver.nq_constraints.push_back(
+        [A = basis.row(i).eval(), b = upper_bounds[i]]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          double f = A.dot(x);
+          if (g.size())
+            g = A;
+          return f - b;
+      });
+      solver.nq_constraints.push_back(
+        [A = basis.row(i).eval(), b = lower_bounds[i]]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          double f = -A.dot(x);
+          if (g.size())
+            g = -A;
+          return f + b;
+      });
+    }
+
+    // Add surface metamerism constraint
+    {
+      Colr o = (info.base_system.transpose() * info.basis.mean.matrix()).transpose().eval();
+      auto A = (info.base_system.transpose().cast<double>() * basis).eval();
+      auto b = (info.base_signal - o).cast<double>().eval();
+
+      for (uint j = 0; j < 3; ++j) {
+        solver.eq_constraints.push_back(
+          [A = A.row(j).eval(), b = b[j]]
+          (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> grad) {
+            double f = A.dot(x);
+            if (grad.size())
+              grad = A;
+            return f - b;
+        });
+      } // for (uint j)
+    }
+    
+    // Add interreflection result constraint
+    {
+      std::vector<DCMFS> C(info.refl_systems.size());
+      rng::transform(info.refl_systems, C.begin(), 
+        [&](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); });
+      
+      auto b = info.refl_signal.cast<double>().eval();
+
+      for (uint j = 0; j < 3; ++j) {
+        solver.eq_constraints.push_back(
+          [&] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+            DSpec R = B * x;
+
+            double signal = C[0].row(j).dot(R);
+            for (uint i = 1; i < info.refl_systems.size(); ++i) {
+              double p = static_cast<double>(i);
+              DSpec pr = R.array().pow(p);
+              signal += C[i].row(j).dot(pr);
+            }
+
+            if (g.size()) {
+              BSpec grad = 0.0;
+              for (uint j = 1; j < info.refl_systems.size(); ++j) {
+                double p = static_cast<double>(j);
+                DSpec dr = R.array().pow(p - 1.0);
+                grad += p * (C[j].row(j).transpose().cwiseProduct(dr).transpose() * B);
+              }
+              g = grad;
+            }
+            
+            return signal - b[j];
+        });
+      }
+    }
+
+    // Optimize result and return
+    NLOptResult r = solve(solver);
+    Spec s = info.basis.mean + Spec((basis * r.x).cast<float>());
+    return s;
+  }
+
   /* Spec generate_spectrum_recursive(GenerateSpectrumInfo info) {
     met_trace();
     debug::check_expr(info.systems.size() == info.signals.size(),
@@ -493,12 +608,10 @@ namespace met {
 
             double obj = C[0].sum();
             for (uint j = 1; j < p_max; ++j) {
-              // fmt::print("before i = {}, obj = {}\n", j, obj);
               double p = static_cast<double>(j);
               DSpec px = X.array().pow(p);
               obj += C[j].dot(px);
             }
-            // fmt::print("after, obj = {}\n", obj);
 
             if (g.size()) {
               BSpec grad = 0.0f;
@@ -509,9 +622,6 @@ namespace met {
               }
               g = grad;
             }
-
-            // fmt::print("x = {}, g = {}, obj = {}\n", x, g, obj);
-            // fmt::print("X = {}\n", X);
 
             return obj;
 
@@ -566,8 +676,19 @@ namespace met {
 
     // Transform to non-unique colors
     std::vector<Colr> colors(spectra.size());
-    std::transform(std::execution::par_unseq, range_iter(spectra), colors.begin(),
-      [&](const auto &s) -> Colr {  return (info.system_j.transpose() * s.matrix()).eval(); });
+    std::transform(std::execution::par_unseq, 
+      range_iter(spectra), colors.begin(),
+      [&](const Spec &r) -> Colr { 
+        // Compute output radiance based on system of powers
+        Spec s = 0.f;
+        for (uint i = 0; i < info.components.size(); ++i) {
+          float p = static_cast<float>(i);
+          s += info.components[i] * r.array().pow(p);
+        }
+        
+        // Transform to output color
+        return (info.system_j.transpose() * s.matrix()).eval(); 
+      });
 
     // Collapse return value to unique colors
     std::unordered_set<

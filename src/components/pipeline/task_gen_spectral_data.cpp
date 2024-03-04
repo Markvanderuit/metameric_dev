@@ -53,7 +53,7 @@ namespace met {
       std::ranges::copy(vert.colr_j, std::back_inserter(signals));
 
       // Generate new spectrum given the above systems+signals as solver constraints
-      i_spectra[i] = generate_spectrum({ 
+      i_spectra[i] = generate_spectrum(GenerateSpectrumInfo { 
         .basis      = e_appl_data.loaded_basis,
         .systems    = std::span<CMFS> { systems }, 
         .signals    = std::span<Colr> { signals },

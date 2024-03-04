@@ -343,7 +343,7 @@ namespace met {
       [&](const Colr &colr_p1_free) {
         auto systems = { csys_p1_base.finalize_direct(), csys_p1_free.finalize_direct() };
         auto signals = { colr_p1, colr_p1_free };
-        return generate_spectrum({
+        return generate_spectrum(GenerateSpectrumInfo {
           .basis      = basis.functions,
           .basis_mean = basis.mean,
           .systems    = systems,

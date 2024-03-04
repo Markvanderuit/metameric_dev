@@ -223,7 +223,7 @@ namespace met {
           .signals_i  = signals_i,
           .components = cstr.powers,
           .systems_j  = systems_j,
-          .system_j   = system_j,
+          .system_j   = cmfs,
           .samples    = samples,
         };
 
