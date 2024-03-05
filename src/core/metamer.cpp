@@ -53,7 +53,7 @@ namespace met {
           if (g.data())
             g = a;
 
-          // f(x) = a*x - b
+          // f(x) = ax - b
           return a.dot(x) - b;
       };
     };
@@ -64,24 +64,27 @@ namespace met {
     debug::check_expr(info.systems.size() == info.signals.size(),
       "Color system size not equal to color signal size");
 
+    // Solver settings
     NLOptInfo solver = {
       .n            = wavelength_bases,
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMinimize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
-      .rel_func_tol = 1e-4,
-      .rel_xpar_tol = 1e-2,
+      .max_iters    = 128,  // Failsafe; halt after 128 iterations
+      // .rel_func_tol = 1e-6,
+      .rel_xpar_tol = 1e-3, // halt when constraint error falls below threshold
     };
-
-    // Objective function minimizes l2 norm over spectral distribution
-    solver.objective = detail::func_norm(info.basis.func, Spec::Zero());
+    
+    // Note; simple way to get relatively smooth spectra
+    // Objective function minimizes l2 norm over spectral distribution itself
+    solver.objective = detail::func_squared_norm(info.basis.func, Spec::Zero());
 
     // Add color system equality constraints, upholding spectral metamerism
     for (uint i = 0; i < info.systems.size(); ++i) {
       auto A = (info.systems[i].transpose() * info.basis.func.matrix()).eval();
       auto o = (info.systems[i].transpose() * info.basis.mean.matrix()).eval();
       auto b = (info.signals[i] - o.array()).eval();
-      solver.eq_constraints.push_back(detail::func_norm(A, b));
+      solver.eq_constraints.push_back(detail::func_squared_norm(A, b));
     } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1

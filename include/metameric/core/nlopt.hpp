@@ -38,7 +38,7 @@ namespace met {
     std::optional<double> stopval;
     std::optional<uint>   max_iters;        
     std::optional<double> max_time;        
-    std::optional<double> rel_func_tol; // 1e-6;
+    std::optional<double> rel_func_tol; // 1e-6
     std::optional<double> rel_xpar_tol; // 1e-4
   };
 
