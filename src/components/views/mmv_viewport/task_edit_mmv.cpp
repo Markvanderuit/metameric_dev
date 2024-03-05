@@ -207,6 +207,9 @@ namespace met {
             ImGui::ColorEdit3("Roundtrip (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
             ImGui::ColorEdit3("Roundtrip (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
 
+            Colr err = colr_lrgb - cstr.colr;
+            ImGui::ColorEdit3("Error (lrgb)", err.data(), ImGuiColorEditFlags_Float);
+
             // Plot radiance
             if (ImPlot::BeginPlot("Radiance distr", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
               // Get wavelength values for x-axis in plot
