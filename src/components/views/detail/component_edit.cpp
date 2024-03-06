@@ -132,7 +132,7 @@ namespace met {
         for (uint j = 0; j < value.verts.size(); ++j) {
           ImGui::TableNextRow();
           auto &vert = value.verts[j];
-          auto scope = ImGui::ScopedID(std::format("table_row_{}", typeid(Uplifting::Vertex).name(), j));
+          auto scope = ImGui::ScopedID(std::format("table_row_{}", j));
 
           // Name editor column
           ImGui::TableSetColumnIndex(0);
@@ -209,8 +209,6 @@ namespace met {
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Delete component");
           }
-
-          ImGui::PopID();
         } // for (uint j)
         ImGui::EndTable();
       } 

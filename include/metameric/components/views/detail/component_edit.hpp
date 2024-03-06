@@ -228,7 +228,7 @@ namespace met {
     if (edit_info.edit_name) {
       encapsulate_scene_name<Ty>(info, data_i, [](auto &info, auto &name) {
         constexpr static auto str_edit_flags = ImGuiInputTextFlags_AutoSelectAll 
-                                            | ImGuiInputTextFlags_EnterReturnsTrue;
+                                             | ImGuiInputTextFlags_EnterReturnsTrue;
         return ImGui::InputText("Name", &name, str_edit_flags);
       });
     }

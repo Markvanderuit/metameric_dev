@@ -104,11 +104,6 @@ namespace met {
   Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
 
-    // Helper spectra
-    using DCMFS = eig::Matrix<double, 3, wavelength_samples>;
-    using DSpec = eig::Vector<double, wavelength_samples>;
-    using BSpec = eig::Vector<double, wavelength_bases>;
-
     NLOptInfo solver = {
       .n            = wavelength_bases,
       .algo         = NLOptAlgo::LD_SLSQP,
@@ -161,13 +156,13 @@ namespace met {
           // Recover spectral distribution
           auto r = (B * x).eval();
           
-          // f(x) = ||Ax - b ||
+          // f(x) = ||Ax - b||
           // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
           double diff = A[0].sum();
           for (uint i = 1; i < A.size(); ++i) {
             double p = static_cast<double>(i);
             auto rp  = r.array().pow(p).matrix().eval();
-            diff += (A[i] * rp);
+            diff += A[i] * rp;
           }
           diff -= b;
 
@@ -310,6 +305,7 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
+      .max_iters    = 1024,  // Failsafe; halt after 1024 iterations
       .rel_func_tol = 1e-4,
       .rel_xpar_tol = 1e-2,
     };
@@ -317,15 +313,15 @@ namespace met {
     // Add color system equality constraints, upholding spectral metamerism
     for (uint i = 0; i < info.systems_i.size(); ++i) {
       auto A = (info.systems_i[i].transpose() * info.basis.func.matrix()).eval();
-      auto o = (info.systems_i[i].transpose() * info.basis.mean.matrix()).eval();
-      auto b = (info.signals_i[i] - o.array()).eval();
+      // auto o = (info.systems_i[i].transpose() * info.basis.mean.matrix()).eval();
+      auto b = (info.signals_i[i] /* - o.array() */).eval();
       solver.eq_constraints.push_back(detail::func_norm(A, b));
     } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
     for (uint i = 0; i < wavelength_samples; ++i) {
       auto  a  = info.basis.func.row(i).eval();
-      float ub = 1.f - info.basis.mean[i];
+      float ub = 1.f /* - info.basis.mean[i] */;
       float lb = ub - 1.f;
       solver.nq_constraints.push_back(detail::func_dot( a,  ub));
       solver.nq_constraints.push_back(detail::func_dot(-a, -lb));
@@ -341,28 +337,44 @@ namespace met {
 
       #pragma omp for
       for (int i = 0; i < info.samples.size(); ++i) {
-        // Define objective function components: 64x1
-        using DSpec = eig::Array<double, wavelength_samples, 1>;
-        std::vector<DSpec> C(info.systems_j.size());
-        rng::transform(info.systems_j, C.begin(), 
-          [&](const CMFS &cmfs) { return (cmfs * info.samples[i].matrix()).array().cast<double>().eval(); });
-        
         local_solver.objective = 
-          [&C, B = info.basis.func.cast<double>().eval()]
+          [A = info.systems_j
+             | vws::transform([s = info.samples[i]](const CMFS &cmfs) {
+               return (cmfs * s.matrix()).transpose().cast<double>().eval();
+             }) | rng::to<std::vector>(), 
+           B = info.basis.func.cast<double>().eval()]
           (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) -> double {
-            auto   X   = (B * x).eval();
-            double obj = 0.0;
+            // Recover spectral distribution
+            auto r = (B * x).eval();
 
-            for (uint j = 1; j <  C.size(); ++j) {
-              double p  = static_cast<double>(j);
-              
-              obj += C[j].matrix().dot(X.array().pow(p).matrix());
-              if (g.data())
-                g += B.transpose() 
-                   * (p * (C[j] * X.array().pow(p - 1.0))).matrix();              
+            auto diff = 0.0; //A[0].sum();
+            auto grad = eig::Vector<double, wavelength_bases>(0.0);
+            for (uint i = 1; i < A.size(); ++i) {
+              double p = static_cast<double>(i);
+              auto fr  = r.array().pow(p).matrix().eval(); 
+              auto dr  = r.array().pow(p - 1.0).matrix().eval();
+              diff += A[i] * fr;
+              grad += p
+                    * B.transpose()
+                    * A[i].transpose().cwiseProduct(dr);
             }
 
-            return obj;
+            if (g.data())
+              g = grad;
+            return diff;
+
+            // auto   X   = (B * x).eval();
+            // double obj = 0.0;
+            // for (uint j = 1; j <  C.size(); ++j) {
+            //   double p  = static_cast<double>(j);
+              
+            //   obj += C[j].matrix().dot(X.array().pow(p).matrix());
+            //   if (g.data())
+            //     g += B.transpose() 
+            //        * (p * (C[j] * X.array().pow(p - 1.0))).matrix();              
+            // }
+
+            // return obj;
         };
 
         // Run solver and store recovered spectral distribution if it is safe

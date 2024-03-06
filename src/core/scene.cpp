@@ -238,14 +238,22 @@ namespace met {
     components.colr_systems.push(get_csys_name(csys), csys);
     
     // Default uplifting
+    components.objects.emplace("Default object", { 
+      .transform   = { .position = { 0.f, 0.f, 0.f },
+                       .rotation = { -90.f * std::numbers::pi_v<float> / 180.f, 0.f, 0.f },
+                       .scaling  = 1.f },
+      .mesh_i      = 0, 
+      .uplifting_i = 0,
+      .diffuse     = Colr(0.5) 
+    });
     components.upliftings.emplace("Default uplifting", { .csys_i = 0, .basis_i = 0 });
 
     // Default emitter
-    components.emitters.push("Default D65 emitter", {
+    components.emitters.push("Default emitter", {
       .type             = Emitter::Type::eRect,
-      .transform        = { .position = { -0.5f, 0.98f, -0.5f },
+      .transform        = { .position = { 0.f, 1.f, 0.f },
                             .rotation = { 90.f * std::numbers::pi_v<float> / 180.f, 0.f, 0.f },
-                            .scaling  = 0.2f },
+                            .scaling  = .5f },
       .illuminant_i     = 0,
       .illuminant_scale = 1.f
     });

@@ -183,9 +183,11 @@ namespace met::detail {
 
     // Only rebuild if there are upliftings and objects
     guard(!upliftings.empty() && !e_objects.empty());
-    guard(scene.components.upliftings                || 
-          scene.components.objects                   ||
-          scene.components.settings.state.texture_size);
+    guard(scene.components.upliftings                  || 
+          scene.components.objects                     ||
+          scene.components.settings.state.texture_size ||
+          !texture_barycentrics.texture().is_init()    ||
+          !texture_barycentrics.buffer().is_init()     );
     // fmt::print("Type updated: {}\n", typeid(decltype(upliftings)::value_type).name());
     
     // Gather necessary texture sizes for each object
