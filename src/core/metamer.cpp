@@ -138,6 +138,14 @@ namespace met {
       auto b = (info.base_signal /* - o.array() */).eval();
       solver.eq_constraints.push_back(detail::func_norm(A, b));
     } // for (uint i)
+
+    /* // Establish output of basis mean
+    Colr mean_colr = info.refl_systems[0].colwise().sum().eval();
+    for (uint i = 1; i < info.refl_systems.size(); ++i) {
+      double p = static_cast<double>(i);
+      auto r_ = info.basis.mean.pow(p).matrix().eval();
+      mean_colr += (info.refl_systems[i].transpose() * r_).array();
+    } */
     
     // Add interreflection equality constraint, upholding requested output color;
     // specify three equalities for three partial derivatives
@@ -148,7 +156,7 @@ namespace met {
               return cmfs.col(j).transpose().cast<double>().eval(); })
            | rng::to<std::vector>(), 
          B = info.basis.func.matrix().cast<double>().eval(), 
-         b = static_cast<double>(info.refl_signal[j])]
+         b = static_cast<double>(info.refl_signal[j] /* - mean_colr[j] */)]
         (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
           // Recover spectral distribution
           auto r = (B * x).eval();
@@ -158,7 +166,8 @@ namespace met {
           double diff = A[0].sum();
           for (uint i = 1; i < A.size(); ++i) {
             double p = static_cast<double>(i);
-            diff += (A[i] * r.array().pow(p).matrix());
+            auto rp  = r.array().pow(p).matrix().eval();
+            diff += (A[i] * rp);
           }
           diff -= b;
 
@@ -169,10 +178,10 @@ namespace met {
           eig::Vector<double, wavelength_bases> grad = 0.0;
           for (uint i = 1; i < A.size(); ++i) {
             double p = static_cast<double>(i);
-            auto r_ = r.array().pow(p - 1.0).matrix().eval();
-            grad += (p / norm)
+            auto rp  = r.array().pow(p - 1.0).matrix().eval();
+            grad += p
                   * B.transpose()
-                  * ((A[i] * diff).transpose().cwiseProduct(r_)).matrix();
+                  * A[i].transpose().cwiseProduct(rp);
           }
 
           if (g.data())
