@@ -193,6 +193,9 @@ namespace met {
         m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
+        // TODO remove
+        return;
+        
         // Generate 3D unit vector samples
         auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 3, m_iter);
 

@@ -18,7 +18,7 @@ namespace met {
           auto diff = ((A * x).array() - b).matrix().eval();
           auto norm = diff.norm();
 
-          // g(x) = A^T * (Ax - b) / ||(-(Ax - b))||
+          // g(x) = A^T * (Ax - b) / ||(Ax - b)||
           if (g.data())
             g = (A.transpose() * (diff.array() / norm).matrix()).eval();
 
@@ -114,28 +114,13 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMinimize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
-      .rel_func_tol = 1e-4,
-      .rel_xpar_tol = 1e-2,
+      .max_iters    = 1024,  // Failsafe; halt after 1024 iterations
+      // .rel_func_tol = 1e-4,
+      .rel_xpar_tol = 1e-3,
     };
 
-    // Construct basis matrix
-    auto B = info.basis.func.cast<double>().eval();
-
-    // Construct basis matrix and boundary vectors
-    auto basis = info.basis.func.cast<double>().eval();
-    
     // Objective function minimizes l2 norm over spectral distribution
     solver.objective = detail::func_norm(info.basis.func, Spec::Zero());
-
-    // Add color system equality constraints, upholding spectral surface metamerism
-    {
-      // auto A = (info.base_system.transpose() * info.basis.func.matrix()).eval();
-      // auto o = (info.base_system.transpose() * info.basis.mean.matrix()).eval();
-      // auto b = (info.base_signal - o.array()).eval();
-      auto A = (info.base_system.transpose() * info.basis.func.matrix()).eval();
-      auto b = info.base_signal;
-      solver.eq_constraints.push_back(detail::func_norm(A, b));
-    } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
     for (uint i = 0; i < wavelength_samples; ++i) {
@@ -145,89 +130,61 @@ namespace met {
       solver.nq_constraints.push_back(detail::func_dot( a,  ub));
       solver.nq_constraints.push_back(detail::func_dot(-a, -lb));
     } // for (uint i)
-    
-    // Double, transpose versions of interreflection system
-    std::vector<DCMFS> C(info.refl_systems.size());
-    rng::transform(info.refl_systems, C.begin(), 
-      [&](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); });
-      
-    Colr interrefl_err = 0.f;
 
-    // Add interreflection result constraint
+    // Add color system equality constraints, upholding spectral surface metamerism
     {
-      // Colr o = 0.f;
-      // for (uint i = 0; i < info.refl_systems.size(); ++i) {
-      //   float p = static_cast<float>(i);
-      //   Spec mean = info.basis.mean; //.pow(p);
-      //   fmt::print("mean = {}\n", mean);
-      //   o += (info.refl_systems[i].transpose() * mean.matrix()).transpose().array().eval();
-      // }
-
-      // for (const auto &cs : info.refl_systems)
-      //   o += (cs.transpose() * info.basis.mean.matrix()).transpose().array().eval();
-      // auto b = (info.refl_signal - o).cast<double>().eval();
-
-      auto b = info.refl_signal.cast<double>().eval();
-      // DSpec dmean = info.basis.mean.cast<double>().eval();
-
-      /* solver.eq_constraints.push_back(
-        [&C, &B, &interrefl_err, b] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
-          DSpec R = (B * x).array(); // + info.basis.mean.cast<double>().eval();
-
-          eig::Array3d colr = 0.0;
-          for (uint i = 1; i < C.size(); ++i) {
-            double p = static_cast<double>(i);
-            DSpec pr = R.array().pow(p);
-            colr += (C[i].transpose() * pr).array();
-          }
+      auto A = (info.base_system.transpose() * info.basis.func.matrix()).eval();
+      // auto o = (info.base_system.transpose() * info.basis.mean.matrix()).eval();
+      auto b = (info.base_signal /* - o.array() */).eval();
+      solver.eq_constraints.push_back(detail::func_norm(A, b));
+    } // for (uint i)
+    
+    // Add interreflection equality constraint, upholding requested output color;
+    // specify three equalities for three partial derivatives
+    for (uint j = 0; j < 3; ++j) {
+      solver.eq_constraints.push_back(
+        [A = info.refl_systems
+           | vws::transform([j](const CMFS &cmfs) { 
+              return cmfs.col(j).transpose().cast<double>().eval(); })
+           | rng::to<std::vector>(), 
+         B = info.basis.func.matrix().cast<double>().eval(), 
+         b = static_cast<double>(info.refl_signal[j])]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          // Recover spectral distribution
+          auto r = (B * x).eval();
           
-          if (g.size()) {
-            BSpec grad = 0.0;
-            for (uint i = 1; i < C.size(); ++i) {
-              double p = static_cast<double>(i);
-              DSpec dr = R.array().pow(p - 1.0);
+          // f(x) = ||Ax - b ||
+          // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
+          double diff = A[0].sum();
+          for (uint i = 1; i < A.size(); ++i) {
+            double p = static_cast<double>(i);
+            diff += (A[i] * r.array().pow(p).matrix());
+          }
+          diff -= b;
 
-              auto vv = (C[i].transpose().array().colwise() * dr).eval();
-              // grad += p * (C[i].transpose().rowwise() )
-            }
-            
+          double norm = diff; // hoboy
+          
+          // g(x) = ||Ax - b||
+          // -> (B^T*A_1*(Bx)^0 + B^T*2*A_2*(Bx) + B^T*3*a_3*(Bx)^2 + ...)
+          eig::Vector<double, wavelength_bases> grad = 0.0;
+          for (uint i = 1; i < A.size(); ++i) {
+            double p = static_cast<double>(i);
+            auto r_ = r.array().pow(p - 1.0).matrix().eval();
+            grad += (p / norm)
+                  * B.transpose()
+                  * ((A[i] * diff).transpose().cwiseProduct(r_)).matrix();
           }
 
-          return 0.0;
-      }); */
+          if (g.data())
+            g = grad;
 
-      for (uint j = 0; j < 3; ++j) {
-        solver.eq_constraints.push_back(
-          [&C, &B, &interrefl_err, /* &dmean, */ j, b] (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
-            DSpec R = (B * x).array(); // + info.basis.mean.cast<double>().eval();
-
-            double err = 0.0; // C[0].row(j).transpose().sum();
-            for (uint i = 1; i < C.size(); ++i) {
-              double p = static_cast<double>(i);
-              DSpec pr = R.array().pow(p);
-              err = err + C[i].row(j).transpose().dot(pr);
-                        // - (b[j] - C[i].row(j).transpose().dot(dmean.array().pow(p).matrix()));
-            }
-
-            if (g.size()) {
-              BSpec grad = 0.0;
-              for (uint i = 1; i < C.size(); ++i) {
-                double p = static_cast<double>(i);
-                DSpec dr = R.array().pow(p - 1.0);
-                grad += p * (C[i].row(j).transpose().cwiseProduct(dr).transpose() * B);
-              }
-              g = grad;
-            }
-            
-            interrefl_err[j] = err - b[j];
-            return err - b[j];
-        });
-      }
-    }
+          return norm;
+      });
+    } // for (uint j)
 
     // Run solver and return recovered spectral distribution
     NLOptResult r = solve(solver);
-    return (info.basis.func * r.x.cast<float>()).array() + info.basis.mean;
+    return (info.basis.func * r.x.cast<float>()).array() /* + info.basis.mean */;
   }
 
   std::vector<Spec> generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info) {

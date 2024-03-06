@@ -154,9 +154,9 @@ namespace met {
         [&](IndirectSurfaceConstraint &cstr) {
           // Color baseline value extracted from surface
           {
-            ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Surface color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
             auto srgb = lrgb_to_srgb(cstr.get_colr_i());
-            ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Surface color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
             cstr.get_colr_i() = srgb_to_lrgb(srgb);
           }
 
@@ -164,8 +164,8 @@ namespace met {
           ImGui::Separator();
 
           auto cstr_srgb = lrgb_to_srgb(cstr.colr);
-          ImGui::ColorEdit3("Radiance (lrgb)", cstr.colr.data(), ImGuiColorEditFlags_Float);
-          ImGui::ColorEdit3("Radiance (srgb)", cstr_srgb.data(), ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("Constraint radiance (lrgb)", cstr.colr.data(), ImGuiColorEditFlags_Float);
+          ImGui::ColorEdit3("Constraint radiance (srgb)", cstr_srgb.data(), ImGuiColorEditFlags_Float);
 
           // Visual separator into constraint list
           // ImGui::Separator();
@@ -204,22 +204,27 @@ namespace met {
             Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
 
             // Plot color
-            ImGui::ColorEdit3("Roundtrip (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
-            ImGui::ColorEdit3("Roundtrip (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip radiance (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip radiance (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
 
             Colr err = colr_lrgb - cstr.colr;
-            ImGui::ColorEdit3("Error (lrgb)", err.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("Roundtrip error (lrgb)", err.data(), ImGuiColorEditFlags_Float);
+
+            ImGui::SeparatorText("Radiance spectrum");
 
             // Plot radiance
-            if (ImPlot::BeginPlot("Radiance distr", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+            if (ImPlot::BeginPlot("##output_radi_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
               // Get wavelength values for x-axis in plot
               Spec x_values;
               rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
 
-            // Simple barebones spectrum plot
+              // Setup minimal format for coming line plots
               ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+              ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
               ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, s.maxCoeff() + 0.05f, ImPlotCond_Always);
-              ImPlot::PlotLine("##radiance_line", x_values.data(), s.data(), wavelength_samples);
+
+              // Do the thing
+              ImPlot::PlotLine("", x_values.data(), s.data(), wavelength_samples);
               ImPlot::EndPlot();
             }
           }
@@ -231,13 +236,13 @@ namespace met {
     });
 
     // Plotter for the current constraint's resulting spectrum
-    ImGui::SeparatorText("Output spectrum");
+    ImGui::SeparatorText("Reflectance spectrum");
     {
       // Get shared resources
       const auto &e_window  = info.global("window").getr<gl::Window>();
       const auto &e_sd      = e_spectra[e_is.constraint_i];
 
-      if (ImPlot::BeginPlot("##output_spectrum_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+      if (ImPlot::BeginPlot("##output_refl_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
         // Get wavelength values for x-axis in plot
         Spec x_values;
         rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
