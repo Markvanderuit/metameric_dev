@@ -8,6 +8,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/tree.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/nlopt.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/misc/task_lambda.hpp>

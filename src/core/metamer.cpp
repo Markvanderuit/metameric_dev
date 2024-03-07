@@ -347,7 +347,7 @@ namespace met {
             // Recover spectral distribution
             auto r = (B * x).eval();
 
-            auto diff = 0.0; //A[0].sum();
+            auto diff =/*  0.0; */ A[0].sum();
             auto grad = eig::Vector<double, wavelength_bases>(0.0);
             for (uint i = 1; i < A.size(); ++i) {
               double p = static_cast<double>(i);
@@ -362,19 +362,6 @@ namespace met {
             if (g.data())
               g = grad;
             return diff;
-
-            // auto   X   = (B * x).eval();
-            // double obj = 0.0;
-            // for (uint j = 1; j <  C.size(); ++j) {
-            //   double p  = static_cast<double>(j);
-              
-            //   obj += C[j].matrix().dot(X.array().pow(p).matrix());
-            //   if (g.data())
-            //     g += B.transpose() 
-            //        * (p * (C[j] * X.array().pow(p - 1.0))).matrix();              
-            // }
-
-            // return obj;
         };
 
         // Run solver and store recovered spectral distribution if it is safe

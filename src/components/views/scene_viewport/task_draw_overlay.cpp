@@ -153,8 +153,8 @@ namespace met {
     gl::dispatch_draw({ .type                 = gl::PrimitiveType::eLines,
                         .vertex_count         = n_dispatch,
                         .capabilities         = {{ gl::DrawCapability::eDepthTest, false },
-                                                { gl::DrawCapability::eBlendOp,   true  },
-                                                { gl::DrawCapability::eCullOp,    false }},
+                                                 { gl::DrawCapability::eBlendOp,   true  },
+                                                 { gl::DrawCapability::eCullOp,    false }},
                         .bindable_array       = &m_vao,
                         .bindable_program     = &m_program,
                         .bindable_framebuffer = &m_fbo });
@@ -163,6 +163,6 @@ namespace met {
   void MeshViewportDrawOverlayTask::eval(SchedulerHandle &info) {
     met_trace_full();
     eval_draw_constraints(info);
-    // eval_draw_path_queries(info);
+    eval_draw_path_queries(info);
   }
 } // namespace met

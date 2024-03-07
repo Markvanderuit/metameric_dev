@@ -5,5 +5,5 @@ layout(location = 0) in  vec3 in_value_c;
 layout(location = 0) out vec4 out_value_c;
 
 void main() {
-  out_value_c = vec4(in_value_c, 0.5f);
+  out_value_c = vec4(in_value_c, 0.05f);
 }

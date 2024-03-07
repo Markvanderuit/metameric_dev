@@ -23,7 +23,6 @@ namespace met {
     // info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
     // info("renderer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
     info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = 1u,  
-                                                 .spp_max      = 4096u,
                                                  .max_depth    = 4u,
                                                  .cache_handle = info.global("cache") });
   }
