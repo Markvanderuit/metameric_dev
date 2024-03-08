@@ -44,8 +44,6 @@ namespace met {
     Colr                  base_signal;  // Color signal for input texture prior
     std::span<const CMFS> refl_systems; // Components of the truncated interreflection power series
     Colr                  refl_signal;  // Expected color signal at camera
-
-    uint basis_count = wavelength_bases; // Starting nr. of bases
   };
 
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume

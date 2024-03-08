@@ -110,7 +110,6 @@ namespace met {
       .form         = NLOptForm::eMinimize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
       .max_iters    = 1024,  // Failsafe; halt after 1024 iterations
-      // .rel_func_tol = 1e-4,
       .rel_xpar_tol = 1e-3,
     };
 
@@ -133,14 +132,6 @@ namespace met {
       auto b = (info.base_signal /* - o.array() */).eval();
       solver.eq_constraints.push_back(detail::func_norm(A, b));
     } // for (uint i)
-
-    /* // Establish output of basis mean
-    Colr mean_colr = info.refl_systems[0].colwise().sum().eval();
-    for (uint i = 1; i < info.refl_systems.size(); ++i) {
-      double p = static_cast<double>(i);
-      auto r_ = info.basis.mean.pow(p).matrix().eval();
-      mean_colr += (info.refl_systems[i].transpose() * r_).array();
-    } */
     
     // Add interreflection equality constraint, upholding requested output color;
     // specify three equalities for three partial derivatives
@@ -182,13 +173,50 @@ namespace met {
           if (g.data())
             g = grad;
 
+          fmt::print("{}\n", norm);
           return norm;
       });
     } // for (uint j)
 
     // Run solver and return recovered spectral distribution
     NLOptResult r = solve(solver);
-    return (info.basis.func * r.x.cast<float>()).array() /* + info.basis.mean */;
+    Spec s = (info.basis.func * r.x.cast<float>()).array()/*  + info.basis.mean */;
+
+    // TODO remove
+    /* { // Debug time
+      // Establish output of basis mean in nonlinear system
+      Colr mean_colr = 0.f;
+      // mean_colr = info.base_system.transpose() * info.basis.mean.matrix();
+      for (uint i = 0; i < info.refl_systems.size(); ++i) {
+        double p = static_cast<double>(i);
+        auto rp  = info.basis.mean.pow(p).matrix().eval();
+        mean_colr += (info.refl_systems[i].transpose() * rp).array();
+      }
+
+      Colr full_colr = 0.f;
+      // full_colr = info.base_system.transpose() * s.matrix();
+      for (uint i = 0; i < info.refl_systems.size(); ++i) {
+        double p = static_cast<double>(i);
+        auto rp  = s.pow(p).matrix().eval();
+        full_colr += (info.refl_systems[i].transpose() * rp).array();
+      }
+
+      Spec remainder = s - info.basis.mean;      
+      Colr remainder_colr = 0.f;
+      // remainder_colr = info.base_system.transpose() * remainder.matrix();
+      for (uint i = 0; i < info.refl_systems.size(); ++i) {
+        double p = static_cast<double>(i);
+        auto rp  = remainder.pow(p).matrix().eval();
+        remainder_colr += (info.refl_systems[i].transpose() * rp).array();
+      }
+
+      Colr added_colr = mean_colr + remainder_colr;
+      Colr error_colr = added_colr - full_colr;
+
+      fmt::print("expected: {}\nmean: {}\nremainder: {}\nadded: {}\nerror: {}\n", full_colr, mean_colr, remainder_colr, added_colr, error_colr);
+    } */
+    
+    return s;
   }
 
   std::vector<Spec> generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info) {
