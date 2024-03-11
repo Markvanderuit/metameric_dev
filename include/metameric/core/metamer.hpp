@@ -28,10 +28,12 @@ namespace met {
   /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
   struct GenerateMMVBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
+
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     std::span<const CMFS>         systems_j;  // Color system spectra for objective function
     const CMFS                    &system_j;  // Color system for mismatching region
+    
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };
 
@@ -50,11 +52,13 @@ namespace met {
      which is the result of a system of interreflections, expressed as a truncated power series */
   struct GenerateIndirectMMVBoundaryInfo {
     const Basis                  &basis;      // Spectral basis functions
+
     std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
     std::span<const Colr>         signals_i;  // Color signals for prior constraints
     std::span<const Spec>         components; // Increasing components of the power series
     std::span<const CMFS>         systems_j;  // Color system spectra for objective function
     const CMFS                    &system_j;  // Observer function for mismatching region
+    
     std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
   };
 

@@ -74,8 +74,8 @@ namespace met {
 
   CMFS ColrSystem::finalize() const {
     met_trace();
-    CMFS to_xyz = (cmfs.array().colwise() * illuminant * wavelength_ssize)
-                / (cmfs.array().col(1)    * illuminant * wavelength_ssize).sum();
+    CMFS to_xyz = (cmfs.array().colwise() * illuminant)
+                / (cmfs.array().col(1)    * illuminant).sum();
     CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
     return to_rgb;
   }

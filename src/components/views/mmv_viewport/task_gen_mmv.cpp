@@ -11,8 +11,8 @@
 
 namespace met {
   // Constants
-  constexpr uint mmv_samples_per_iter = 32u;
-  constexpr uint mmv_samples_max      = 256u;
+  constexpr uint mmv_samples_per_iter = 32;
+  constexpr uint mmv_samples_max      = 4096; // 256u;
   constexpr auto buffer_create_flags  = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags  = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -101,6 +101,8 @@ namespace met {
     // Make vertex array object available, uninitialized
     info("chull_array").set<gl::Array>({ });
     info("chull_draw").set<gl::DrawInfo>({ });
+    info("points_array").set<gl::Array>({ });
+    info("points_draw").set<gl::DrawInfo>({ });
     info("chull_center").set<eig::Array3f>(0.f);
   }
 
@@ -207,14 +209,18 @@ namespace met {
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
         auto signals_i = { cstr.surface.diffuse };
 
+        ColrSystem csys_base = e_scene.get_csys(e_uplifting.csys_i);
+        IndirectColrSystem csys_refl = {
+          .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
+          .powers = cstr.powers
+        };
+
         // Construct objective color system spectra from power series
         auto systems_j = cstr.powers
                        | vws::transform([&](Spec pwr) {
-                          CMFS to_xyz = (cmfs.array().colwise() * pwr * wavelength_ssize)/* 
-                                      / (cmfs.array().col(1)    * s * wavelength_ssize).sum();
-                          CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose() */;
-                          // return to_rgb; })
-                          return to_xyz; })
+                          CMFS to_xyz = (cmfs.array().colwise() * pwr * wavelength_ssize);
+                          CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
+                          return to_rgb; })
                        | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
@@ -262,11 +268,16 @@ namespace met {
     
     // If a convex hull is available, generate a vertex array object
     // for rendering purposes
-    auto &i_array = info("chull_array").getw<gl::Array>();
-    auto &i_draw  = info("chull_draw").getw<gl::DrawInfo>();
+    auto &i_array        = info("chull_array").getw<gl::Array>();
+    auto &i_draw         = info("chull_draw").getw<gl::DrawInfo>();
+    auto &i_points_array = info("points_array").getw<gl::Array>();
+    auto &i_points_draw  = info("points_draw").getw<gl::DrawInfo>();
     if (m_chull.elems.size() > 0) {
-      m_chull_verts = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
-      m_chull_elems = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
+      std::vector<AlColr> points(range_iter(m_points));
+      m_points_verts = {{ .data = cnt_span<const std::byte>(points) }};
+      m_chull_verts  = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
+      m_chull_elems  = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
+
       i_array = {{
         .buffers  = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
         .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
@@ -274,10 +285,20 @@ namespace met {
       }};
       i_draw = { .type             = gl::PrimitiveType::eTriangles,
                  .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
-                 .capabilities     = {{ gl::DrawCapability::eCullOp, true    },
+                 .capabilities     = {{ gl::DrawCapability::eCullOp, false   },
                                       { gl::DrawCapability::eDepthTest, true }},
-                 .draw_op          = gl::DrawOp::eFill,
+                 .draw_op          = gl::DrawOp::eLine,
                  .bindable_array   = &i_array };
+                 
+      i_points_array = {{
+        .buffers  = {{ .buffer = &m_points_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
+        .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+      }};
+      i_points_draw = { .type             = gl::PrimitiveType::ePoints,
+                        .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
+                        .capabilities     = {{ gl::DrawCapability::eCullOp, false    },
+                                             { gl::DrawCapability::eDepthTest, false }},
+                        .bindable_array   = &i_points_array };
     } else {
       // Deinitialize
       i_array = {};

@@ -56,9 +56,10 @@ namespace met {
     met_trace_full();
     
     // Get shared resources
-    const auto &e_draw = info.relative("viewport_gen_mmv")("chull_draw").getr<gl::DrawInfo>();
-    const auto &e_arcb = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
-    const auto &e_trgt = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
+    const auto &e_draw_chull  = info.relative("viewport_gen_mmv")("chull_draw").getr<gl::DrawInfo>();
+    const auto &e_draw_points = info.relative("viewport_gen_mmv")("points_draw").getr<gl::DrawInfo>();
+    const auto &e_arcb        = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
+    const auto &e_trgt        = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
 
     // Update sensor settings
     m_sensor.proj_trf  = e_arcb.proj().matrix();
@@ -80,7 +81,8 @@ namespace met {
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
     
     // Dispatch draw information
-    gl::dispatch_draw(e_draw);
+    gl::dispatch_draw(e_draw_chull);
+    gl::dispatch_draw(e_draw_points);
   }
 
   bool DrawMMVTask::is_active(SchedulerHandle &info) {
