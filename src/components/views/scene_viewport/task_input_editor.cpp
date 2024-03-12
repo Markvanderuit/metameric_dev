@@ -208,6 +208,19 @@ namespace met {
     const auto &io           = ImGui::GetIO();
     const auto &is_selection = info("selection").getr<InputSelection>();
 
+    // If a constraint was deleted, reset and avoid further input
+    if (is_selection.is_valid()) {
+      if (e_scene.components.upliftings.is_resized() && !is_first_eval()) {
+        info("selection").set(InputSelection::invalid());
+        return;
+      }
+      const auto &e_uplifting = e_scene.components.upliftings[is_selection.uplifting_i];
+      if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
+        info("selection").set(InputSelection::invalid());
+        return;
+      }
+    }
+
     // If window is not active, escape and avoid further input
     guard(ImGui::IsItemHovered());
 

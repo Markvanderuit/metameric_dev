@@ -29,39 +29,6 @@ namespace met {
     friend auto operator<=>(const InputSelection &, const InputSelection &) = default;
   };
 
-  // TODO remove
-  /* namespace detail {
-    template <typename T> struct engaged_t {
-      template <typename... Ts>
-      constexpr bool operator()(const std::variant<Ts...> &variant) const {
-        return std::holds_alternative<T>(variant);
-      }
-      template <typename... Ts>
-      constexpr bool operator()(std::variant<Ts...> variant) const {
-        return std::holds_alternative<T>(variant);
-      }
-    };
-    template <typename T> inline constexpr auto engaged = engaged_t<T>{};
-    
-    template <typename T> struct variant_get_t {
-      template <typename... Ts>
-      constexpr decltype(auto) operator()(const std::variant<Ts...> &variant) const {
-        return std::get<T>(variant);
-      }
-      template <typename... Ts>
-      constexpr decltype(auto) operator()(std::variant<Ts...> variant) const {
-        return std::get<T>(variant);
-      }
-    };
-    template <typename T> inline constexpr auto variant_get = variant_get_t<T>{};
-
-    template <typename T>
-    inline constexpr auto variant_filter_view = [](rng::viewable_range auto &&r) {
-      return r | vws::filter(engaged<T>)
-               | vws::transform(variant_get<T>);
-    };
-  } // namespace detail */
-
   class MeshViewportEditorInputTask : public detail::TaskNode {
     RayQueryPrimitive  m_ray_prim;
     RaySensor          m_ray_sensor;
