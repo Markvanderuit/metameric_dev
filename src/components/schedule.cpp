@@ -2,6 +2,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
@@ -93,76 +94,6 @@ namespace met {
     }); */
   }
 
-  void submit_schedule_main(detail::SchedulerBase &scheduler) {
-    debug::check_expr(scheduler.global("appl_data").is_init() && scheduler.global("window").is_init());
-
-    const auto &e_appl_data = scheduler.global("appl_data").getr<ApplicationData>();
-    const auto &e_proj_data = e_appl_data.project_data;
-    
-    scheduler.clear();
-
-    scheduler.task("frame_begin").init<FrameBeginTask>();
-    scheduler.task("state").init<StateTask>();
-
-    // The following tasks define the color->spectrum uplifting pipeline and dependent data
-    scheduler.task("gen_spectral_data").init<GenSpectralDataTask>();
-    if (e_proj_data.meshing_type == ProjectMeshingType::eConvexHull) {
-      scheduler.task("gen_convex_weights").init<GenGeneralizedWeightsTask>();
-    } else {
-      scheduler.task("gen_convex_weights").init<GenDelaunayWeightsTask>();
-    }
-    scheduler.task("gen_color_mappings_resampled").init<GenColorMappingsResampledTask>();
-    
-    // The following tasks define dependent data for the view components
-    scheduler.task("gen_color_system_solid").init<GenColorSystemSolidTask>();
-    scheduler.task("gen_mismatch_solid").init<GenMismatchSolidTask>();
-
-    // The following tasks define view components and windows
-    scheduler.task("window").init<WindowTask>();
-    scheduler.task("viewport").init<ViewportTask>();
-    scheduler.task("spectra_editor").init<SpectraEditorTask>();
-    scheduler.task("mappings_viewer").init<MappingsViewerTask>();
-    scheduler.task("error_viewer").init<ErrorViewerTask>();
-    scheduler.task("bary_viewer").init<BaryViewerTask>();
-
-    // The following tasks are in development
-    // scheduler.task("mesh_viewport").init<MeshViewportTask>();
-    // scheduler.task("embedding_viewport").init<EmbeddingViewportTask>();
-    // scheduler.task("gen_random_constraints").init<GenRandomConstraintsTask>();
-    // scheduler.task("gen_random_mappings").init<GenRandomMappingsTask>();
-    // scheduler.task("random_mappings_viewer").init<RandomMappingsViewerTask>();
-
-    // Insert temporary unimportant tasks
-    submit_schedule_debug(scheduler);
-
-    scheduler.task("frame_end").init<FrameEndTask>(true);
-  }
-  
-  void submit_schedule_empty(detail::SchedulerBase &scheduler) {
-    debug::check_expr(scheduler.global("window").is_init());
-    
-    scheduler.clear();
-    
-    scheduler.task("frame_begin").init<FrameBeginTask>();
-    scheduler.task("window").init<WindowTask>();
-    scheduler.task("frame_end").init<FrameEndTask>(false);
-  }
-
-  void submit_schedule(detail::SchedulerBase &scheduler) {
-    debug::check_expr(scheduler.global("window").is_init());
-
-    if (auto rsrc = scheduler.global("appl_data"); rsrc.is_init()) {
-      const auto &e_appl_data = rsrc.getr<ApplicationData>();
-      if (e_appl_data.project_save != ProjectSaveState::eUnloaded) {
-        submit_schedule_main(scheduler);
-      } else {
-        submit_schedule_empty(scheduler);
-      }
-    } else {
-      submit_schedule_empty(scheduler);
-    }
-  }
-
   void submit_metameric_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
     met_trace();
 
@@ -187,10 +118,35 @@ namespace met {
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
 
-    // Simple task triggers scene update at start of frame
-    scheduler.task("scene_handler").init<LambdaTask>([](auto &info) {
-      met_trace_full();
-      info.global("scene").getw<Scene>().update();
+    // Simple task triggers scene update and filters some edge cases
+    // for scene data editing; is run at start of frame
+    scheduler.task("scene_handler").init<LambdaTask>([](SchedulerHandle &info) {
+      met_trace();
+
+      // Get shared resources
+      auto &e_scene = info.global("scene").getw<Scene>();
+
+      // Force check of scene indices to ensure linked components/resources still exist
+      for (auto [i, comp] : enumerate_view(e_scene.components.objects)) {
+        auto &obj = comp.value;
+        if (obj.mesh_i >= e_scene.resources.meshes.size())
+          obj.mesh_i = 0u;
+        if (obj.uplifting_i >= e_scene.components.upliftings.size())
+          obj.uplifting_i = 0u;
+      }
+      for (auto [i, comp] : enumerate_view(e_scene.components.emitters)) {
+        auto &emt = comp.value;
+        if (emt.illuminant_i >= e_scene.resources.illuminants.size())
+          emt.illuminant_i = 0u;
+      }
+      for (auto [i, comp] : enumerate_view(e_scene.components.upliftings)) {
+        auto &upl = comp.value;
+        if (upl.csys_i >= e_scene.components.colr_systems.size())
+          upl.csys_i = 0u;
+      }
+
+      // Force update of stale gl-side components
+      e_scene.update();
     });
 
     // Pipeline tasks generate uplifting data per object

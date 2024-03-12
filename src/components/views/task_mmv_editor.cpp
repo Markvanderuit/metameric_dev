@@ -399,6 +399,8 @@ namespace met {
     // Ensure the selected uplifting exists
     const auto &e_scene = info.global("scene").getr<Scene>();
     if (e_scene.components.upliftings.is_resized() && !is_first_eval()) {
+      fmt::print("destr\n");
+      info("is_active").set(false);
       info.task().dstr();
       return;
     }
@@ -406,6 +408,8 @@ namespace met {
     // Ensure the selected constraint vertex exists
     const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i];
     if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
+      fmt::print("destr\n");
+      info("is_active").set(false);
       info.task().dstr();
       return;
     }

@@ -339,8 +339,6 @@ target_link_libraries(components PUBLIC
 add_dependencies(components shaders misc_copy)
 
 # Setup executables
-add_executable_r(metameric src/app/metameric.cpp)
-target_link_libraries(metameric PRIVATE core components)
 add_executable_r(metameric_editor src/app/metameric_editor.cpp)
 target_link_libraries(metameric_editor PRIVATE core render components)
 add_executable_r(ocs_testing src/app/ocs_testing.cpp)

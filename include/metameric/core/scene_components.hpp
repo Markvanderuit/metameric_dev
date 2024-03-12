@@ -87,8 +87,8 @@ namespace met {
     Transform transform;
 
     // Spectral data references a scene resource 
-    uint         illuminant_i     = 0;    // index to spectral illuminant
-    float        illuminant_scale = 1.f;  // power multiplier
+    uint  illuminant_i     = 0;    // index to spectral illuminant
+    float illuminant_scale = 1.f;  // power multiplier
 
   public: // Boilerplater
     bool operator==(const Emitter &o) const;

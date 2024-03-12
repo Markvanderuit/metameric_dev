@@ -325,7 +325,7 @@ namespace met {
     info.global("appl_data").getw<ApplicationData>().create(std::move(m_proj_data));
 
     // Signal schedule re-creation and submit new task schedule
-    submit_schedule_main(info);
+    // submit_schedule_main(info);
 
     return true;
   }

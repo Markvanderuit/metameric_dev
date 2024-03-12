@@ -203,7 +203,18 @@ namespace met {
 
             // Insert delete button at end of line
             if (ImGui::Button("X")) {
+              // Despawn MMVEditorTask window if necessary
+              auto child_name   = std::format("mmv_editor_{}_{}", i, j);
+              auto child_handle = info.child_task(child_name);
+              if (child_handle.is_init()) {
+                child_handle.mask(info)("is_active").set(false);
+                child_handle.dstr();
+              }
+
+              // Remove vertex from data
               value.verts.erase(value.verts.begin() + j);
+
+              // Exit early
               break;
             }
             if (ImGui::IsItemHovered())
