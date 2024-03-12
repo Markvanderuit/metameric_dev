@@ -10,21 +10,6 @@ namespace met::detail {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  // Helper method to pack vertex data tightly
-  /* VertexPack pack(const eig::Array3f &p, const eig::Array3f &n, const eig::Array2f &tx) {
-    auto tx_ = tx.unaryExpr([](float f) {
-      int i = static_cast<int>(f);
-      return (i % 2) ? 1.f - (f - i) : f - i;
-    }).eval();
-
-    return VertexPack {
-      .p0 = pack_unorm_2x16({ p.x(), p.y() }),
-      .p1 = pack_snorm_2x16({ p.z(), n.x() }),
-      .n  = pack_snorm_2x16({ n.y(), n.z() }),
-      .tx = pack_unorm_2x16(tx_)
-    };
-  } */
-
   // Helper method to pack BVH node data tightly
   GLPacking<met::Mesh>::NodePack pack(const BVH::Node &node) {
     // Obtain a merger of the child bounding boxes
@@ -39,10 +24,10 @@ namespace met::detail {
     // 3xu32 packs AABB lo, ex
     auto b_lo_in = aabb.minb;
     auto b_ex_in = (aabb.maxb - aabb.minb).eval();
-    p.aabb_pack_0 = pack_unorm_2x16_floor({ b_lo_in.x(), b_lo_in.y() });
-    p.aabb_pack_1 = pack_unorm_2x16_ceil ({ b_ex_in.x(), b_ex_in.y() });
-    p.aabb_pack_2 = pack_unorm_2x16_floor({ b_lo_in.z(), 0 }) 
-                  | pack_unorm_2x16_ceil ({ 0, b_ex_in.z() });
+    p.aabb_pack_0 = detail::pack_unorm_2x16_floor({ b_lo_in.x(), b_lo_in.y() });
+    p.aabb_pack_1 = detail::pack_unorm_2x16_ceil ({ b_ex_in.x(), b_ex_in.y() });
+    p.aabb_pack_2 = detail::pack_unorm_2x16_floor({ b_lo_in.z(), 0 }) 
+                  | detail::pack_unorm_2x16_ceil ({ 0, b_ex_in.z() });
 
     // 1xu32 packs node type, child offset, child count
     p.data_pack = node.offs_data | (node.size_data << 27);
@@ -53,10 +38,10 @@ namespace met::detail {
     for (uint i = 0; i < node.size(); ++i) {
       auto b_lo_safe = ((node.child_aabb[i].minb - b_lo_in) / b_ex_in).eval();
       auto b_hi_safe = ((node.child_aabb[i].maxb - b_lo_in) / b_ex_in).eval();
-      auto pack_0 = pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.head<2>(), 0, 0).finished())
-                  | pack_unorm_4x8_ceil ((eig::Array4f() << 0, 0, b_hi_safe.head<2>()).finished());
-      auto pack_1 = pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.z(), 0, 0, 0).finished())
-                  | pack_unorm_4x8_ceil ((eig::Array4f() << 0, b_hi_safe.z(), 0, 0).finished());
+      auto pack_0 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.head<2>(), 0, 0).finished())
+                  | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, 0, b_hi_safe.head<2>()).finished());
+      auto pack_1 = detail::pack_unorm_4x8_floor((eig::Array4f() << b_lo_safe.z(), 0, 0, 0).finished())
+                  | detail::pack_unorm_4x8_ceil ((eig::Array4f() << 0, b_hi_safe.z(), 0, 0).finished());
       p.child_pack_0[i    ] |= pack_0;
       p.child_pack_1[i / 2] |= (pack_1 << ((i % 2) ? 16 : 0));
     }

@@ -5,6 +5,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/scene_components.hpp>
 #include <metameric/core/detail/scene_components_state.hpp>
+#include <metameric/core/detail/packing.hpp>
 #include <metameric/core/detail/texture_atlas.hpp>
 #include <metameric/core/detail/bvh.hpp>
 #include <small_gl/array.hpp>
@@ -107,12 +108,6 @@ namespace met::detail {
   
   template <>
   class GLPacking<met::ColorSystem> {
-    /* struct alignas(16) ColorSystemUniformLayout {
-      alignas(4) uint cmfs_i;
-      alignas(4) uint illuminant_i;
-    }; */
-    
-  public:
     Spec       wavelength_distr;
     gl::Buffer wavelength_distr_buffer;
 

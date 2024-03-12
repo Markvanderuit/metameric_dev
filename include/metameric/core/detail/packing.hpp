@@ -2,123 +2,121 @@
 
 #include <metameric/core/math.hpp>
 
-namespace met {
+namespace met::detail {
   /* 
     Most of this header contains copies of float/snorm/unorm packing routines in the 
     GLM library, adapted for Eigen types. Useful for vertex data packing and stuff.
     - src: https://github.com/g-truc/glm/blob/master/glm/detail/type_half.inl
     - src: https://github.com/g-truc/glm/blob/master/glm/detail/func_packing.inl
   */
+  
+  // Copied entirely from glm::detail::overflow
+  inline
+  float overflow() {
+    volatile float f = 1e10;
+    for (int i = 0; i < 10; ++i)
+      f = f * f; // this will overflow before the for loop terminates
+    return f;
+  }
 
-  namespace detail {
-    // Copied entirely from glm::detail::overflow
-    inline
-    float overflow() {
-      volatile float f = 1e10;
-      for (int i = 0; i < 10; ++i)
-        f = f * f; // this will overflow before the for loop terminates
-      return f;
+  // Copied entirely from glm::detail::uif32
+  union uif32 {
+    constexpr uif32() : i(0) {}
+    constexpr uif32(float f_) : f(f_) {}
+    constexpr uif32(uint  i_) : i(i_) {}
+
+    float f;
+    uint i;
+  };
+
+  // Copied entirely from glm::detail::toFloat32
+  inline
+  float to_float32(short value) {
+    int s = (value >> 15) & 0x00000001;
+    int e = (value >> 10) & 0x0000001f;
+    int m =  value        & 0x000003ff;
+
+    if (e == 0) {
+      if (m == 0) {
+        detail::uif32 result;
+        result.i = static_cast<unsigned int>(s << 31);
+        return result.f;
+      } else {
+        while (!(m & 0x00000400)) {
+          m <<= 1;
+          e -=  1;
+        }
+
+        e += 1;
+        m &= ~0x00000400;
+      }
     }
-
-    // Copied entirely from glm::detail::uif32
-    union uif32 {
-      constexpr uif32() : i(0) {}
-      constexpr uif32(float f_) : f(f_) {}
-      constexpr uif32(uint  i_) : i(i_) {}
-
-      float f;
-      uint i;
-    };
-
-    // Copied entirely from glm::detail::toFloat32
-    inline
-    float to_float32(short value) {
-      int s = (value >> 15) & 0x00000001;
-      int e = (value >> 10) & 0x0000001f;
-      int m =  value        & 0x000003ff;
-
-      if (e == 0) {
-        if (m == 0) {
-          detail::uif32 result;
-          result.i = static_cast<unsigned int>(s << 31);
-          return result.f;
-        } else {
-          while (!(m & 0x00000400)) {
-            m <<= 1;
-            e -=  1;
-          }
-
-          e += 1;
-          m &= ~0x00000400;
-        }
+    else if (e == 31) {
+      if (m == 0) {
+        uif32 result;
+        result.i = static_cast<unsigned int>((s << 31) | 0x7f800000);
+        return result.f;
+      } else {
+        uif32 result;
+        result.i = static_cast<unsigned int>((s << 31) | 0x7f800000 | (m << 13));
+        return result.f;
       }
-      else if (e == 31) {
-        if (m == 0) {
-          uif32 result;
-          result.i = static_cast<unsigned int>((s << 31) | 0x7f800000);
-          return result.f;
-        } else {
-          uif32 result;
-          result.i = static_cast<unsigned int>((s << 31) | 0x7f800000 | (m << 13));
-          return result.f;
-        }
-      }
-      
-      e = e + (127 - 15);
-      m = m << 13;
-      
-      uif32 result;
-      result.i = static_cast<unsigned int>((s << 31) | (e << 23) | m);
-      return result.f;
     }
     
-    // Copied entirely from glm::detail::toFloat16
-    inline
-    short to_float16(float f) {
-      uif32 entry;
-      entry.f = f;
-      int i = static_cast<int>(entry.i);
+    e = e + (127 - 15);
+    m = m << 13;
+    
+    uif32 result;
+    result.i = static_cast<unsigned int>((s << 31) | (e << 23) | m);
+    return result.f;
+  }
+  
+  // Copied entirely from glm::detail::toFloat16
+  inline
+  short to_float16(float f) {
+    uif32 entry;
+    entry.f = f;
+    int i = static_cast<int>(entry.i);
 
-      int s =  (i >> 16) & 0x00008000;
-      int e = ((i >> 23) & 0x000000ff) - (127 - 15);
-      int m =   i        & 0x007fffff;
+    int s =  (i >> 16) & 0x00008000;
+    int e = ((i >> 23) & 0x000000ff) - (127 - 15);
+    int m =   i        & 0x007fffff;
 
-      if (e <= 0) {
-        if (e < -10)
-          return short(s);
-        
-        m = (m | 0x00800000) >> (1 - e);
-        
-        if (m & 0x00001000)
-          m += 0x00002000;
+    if (e <= 0) {
+      if (e < -10)
+        return short(s);
+      
+      m = (m | 0x00800000) >> (1 - e);
+      
+      if (m & 0x00001000)
+        m += 0x00002000;
 
-        return short(s | (m >> 13));
-      } else if (e == 0xff - (127 - 15)) {
-        if (m == 0) {
-          return short(s | 0x7c00);
-        } else {
-          m >>= 13;
-          return short(s | 0x7c00 | m | (m == 0));
-        }
+      return short(s | (m >> 13));
+    } else if (e == 0xff - (127 - 15)) {
+      if (m == 0) {
+        return short(s | 0x7c00);
       } else {
-        if(m &  0x00001000) {
-          m += 0x00002000;
-
-          if (m & 0x00800000) {
-            m =  0;
-            e += 1;
-          }
-        }
-        
-        if (e > 30) {
-          overflow();
-          return short(s | 0x7c00);
-        }
-
-        return short(s | (e << 10) | (m >> 13));
+        m >>= 13;
+        return short(s | 0x7c00 | m | (m == 0));
       }
+    } else {
+      if(m &  0x00001000) {
+        m += 0x00002000;
+
+        if (m & 0x00800000) {
+          m =  0;
+          e += 1;
+        }
+      }
+      
+      if (e > 30) {
+        overflow();
+        return short(s | 0x7c00);
+      }
+
+      return short(s | (e << 10) | (m >> 13));
     }
-  } // namespace detail
+  }
 
   // Pack a pair of floats to half precision floats in a single object
   // follows glm::packHalf2x16
