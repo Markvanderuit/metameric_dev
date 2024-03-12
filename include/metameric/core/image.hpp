@@ -30,7 +30,7 @@ namespace met {
     };
 
     struct LoadInfo {
-      fs::path       path;
+      fs::path path;
     };
 
     struct ConvertInfo {
@@ -81,7 +81,7 @@ namespace met {
     eig::Array4f get_pixel(const eig::Array2u &xy, ColorFormat output_frmt = ColorFormat::eNone) const;
     eig::Array4f sample(const eig::Array2f &uv, ColorFormat output_frmt = ColorFormat::eNone) const;
     Image        convert(ConvertInfo info) const;
-
+    
   public: // Misc
     auto size()       const { return m_size;       }
     uint channels()   const;

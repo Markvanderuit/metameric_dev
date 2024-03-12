@@ -8,14 +8,14 @@
 #include <unordered_map>
 
 // Block of loader includes
-// #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #define TINYEXR_USE_MINIZ  1
 #define TINYEXR_USE_OPENMP 1
 #ifdef _WIN32
 #define NOMINMAX
 #endif
-// #define TINYEXR_IMPLEMENTATION
+#define TINYEXR_IMPLEMENTATION
 #include "tinyexr.h"
 
 namespace met {

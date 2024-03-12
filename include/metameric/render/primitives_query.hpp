@@ -1,6 +1,5 @@
 #pragma once
 
-#include <metameric/core/ray.hpp> // TODO discard
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/render/detail/primitives.hpp>

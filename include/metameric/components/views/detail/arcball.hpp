@@ -1,7 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
-#include <metameric/core/ray.hpp>
+#include <metameric/core/record.hpp>
 #include <metameric/core/utility.hpp>
 #include <numbers>
 

@@ -50,7 +50,7 @@ namespace met {
     CMFS load_cmfs(const fs::path &path);
     void save_cmfs(const fs::path &path, const CMFS &s);
 
-    // Simple mesh load/save to/from file
+    // Simple mesh load from file
     // Passes through to ASSIMP under the hood
     template <typename Mesh>
     Mesh load_mesh(const fs::path &path);

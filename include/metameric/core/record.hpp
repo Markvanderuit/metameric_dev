@@ -5,6 +5,9 @@
 #include <array>
 
 namespace met {
+  // Simple ray tracing structure: origin, direction vectors
+  struct Ray { eig::Vector3f o, d; };
+
   // Representation of record data used, generated, and stored by render/query primitives
   // and in surface-based uplifting constraints
   struct SurfaceRecord {
