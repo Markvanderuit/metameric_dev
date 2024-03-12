@@ -23,30 +23,6 @@ namespace met {
     js["func"] = b.func;
   }
 
-  void from_json(const json &js, ProjectData::CSys &v) {
-    v.cmfs       = js.at("cmfs").get<uint>();
-    v.illuminant = js.at("illuminant").get<uint>();
-  }
-
-  void to_json(json &js, const ProjectData::CSys &v) {
-    js["cmfs"]       = v.cmfs;
-    js["illuminant"] = v.illuminant;
-  }
-
-  void from_json(const json &js, ProjectData::Vert &v) {
-    v.colr_i = js.at("colr_i").get<Colr>();
-    v.csys_i = js.at("csys_i").get<uint>();
-    v.colr_j = js.at("colr_j").get<std::vector<Colr>>();
-    v.csys_j = js.at("csys_j").get<std::vector<uint>>();
-  }
-
-  void to_json(json &js, const ProjectData::Vert &v) {
-    js["colr_i"] = v.colr_i;
-    js["csys_i"] = v.csys_i;
-    js["colr_j"] = v.colr_j;
-    js["csys_j"] = v.csys_j;
-  }
-  
   void from_json(const json &js, BasisTreeNode &b) {
     // Extract structure data
     if (js.contains("children"))
@@ -74,39 +50,6 @@ namespace met {
   
   void to_json(json &js, const BasisTreeNode &b) {
     debug::check_expr(false, "Not imeplemented!");
-  }
-
-  void from_json(const json &js, ProjectData &v) {
-    // Account for breaking changes in old builds
-    if (js.contains("gamut_verts") || js.contains("gamut_elems")) {
-      v.verts        = js.at("gamut_verts").get<std::vector<ProjectData::Vert>>();
-      v.elems        = js.at("gamut_elems").get<std::vector<ProjectData::Elem>>();
-      v.meshing_type = ProjectMeshingType::eConvexHull;
-    } else {
-      v.verts        = js.at("verts").get<std::vector<ProjectData::Vert>>();
-      v.elems        = js.at("elems").get<std::vector<ProjectData::Elem>>();
-      v.meshing_type = js.at("meshing_type").get<ProjectMeshingType>();
-    }
-
-    // Account for breaking changes in "mappings"/"color_systems"
-    if (js.contains("mappings")) {
-      v.color_systems = js.at("mappings").get<std::vector<ProjectData::CSys>>();
-    } else {
-      v.color_systems = js.at("color_systems").get<std::vector<ProjectData::CSys>>();
-    }
-
-    // Load misc. data
-    v.cmfs          = js.at("cmfs").get<std::vector<std::pair<std::string, CMFS>>>();
-    v.illuminants   = js.at("illuminants").get<std::vector<std::pair<std::string, Spec>>>();
-  }
-
-  void to_json(json &js, const ProjectData &v) {
-    js["meshing_type"]  = v.meshing_type;
-    js["verts"]         = v.verts;
-    js["elems"]         = v.elems;
-    js["color_systems"] = v.color_systems;
-    js["illuminants"]   = v.illuminants;
-    js["cmfs"]          = v.cmfs;
   }
   
   void from_json(const met::json &js, met::Transform &trf) {

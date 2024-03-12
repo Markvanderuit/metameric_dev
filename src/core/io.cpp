@@ -1,4 +1,3 @@
-#include <metameric/core/data.hpp>
 #include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>

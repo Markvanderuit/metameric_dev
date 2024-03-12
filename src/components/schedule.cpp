@@ -1,6 +1,6 @@
 #include <metameric/core/math.hpp>
-#include <metameric/core/scheduler.hpp>
 #include <metameric/core/scene.hpp>
+#include <metameric/core/scheduler.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
@@ -8,31 +8,16 @@
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
-#include <metameric/components/misc/task_state.hpp>
-#include <metameric/components/pipeline/task_gen_delaunay_weights.hpp>
-#include <metameric/components/pipeline/task_gen_generalized_weights.hpp>
-#include <metameric/components/pipeline/task_gen_spectral_data.hpp>
-#include <metameric/components/pipeline/task_gen_color_mappings.hpp>
-#include <metameric/components/pipeline/task_gen_color_system_solid.hpp>
-#include <metameric/components/pipeline/task_gen_mismatch_solid.hpp>
-#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
-#include <metameric/components/pipeline_new/task_gen_object_data.hpp>
-#include <metameric/components/views/task_error_viewer.hpp>
-#include <metameric/components/views/task_bary_viewer.hpp>
-#include <metameric/components/views/task_mappings_viewer.hpp>
-#include <metameric/components/views/task_spectra_editor.hpp>
-#include <metameric/components/views/task_embedding_viewport.hpp>
 #include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
-#include <metameric/components/dev/task_gen_random_constraints.hpp>
-#include <metameric/components/dev/task_gen_random_mappings.hpp>
-#include <metameric/components/dev/task_random_mapping_viewer.hpp>
 #include <metameric/components/views/task_scene_resources_editor.hpp>
 #include <metameric/components/views/task_scene_viewport.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
+#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline_new/task_gen_object_data.hpp>
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {

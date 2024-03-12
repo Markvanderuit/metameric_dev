@@ -1,8 +1,8 @@
 #pragma once
 
-#include <metameric/core/data.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/tree.hpp>
+#include <metameric/core/io.hpp>
 #include <nlohmann/json_fwd.hpp>
 
 namespace met {
@@ -14,14 +14,6 @@ namespace met {
     json load_json(const fs::path &path);
     void save_json(const fs::path &path, const json &js, uint indent = 2);
   }
-
-  /* json (de)serializations for ProjectData type must be declared in met scope */
-  void from_json(const json &js, ProjectData &v);
-  void to_json(json &js, const ProjectData &v);
-
-  /* json (de)serializations for ProjectData::Mapp type must be declared in met scope */
-  void from_json(const json &js, ProjectData::CSys &v);
-  void to_json(json &js, const ProjectData::CSys &v);
 
   /* json (de)serialization for BasisTreeNode type must be declared in met scope */
   void from_json(const json &js, BasisTreeNode &b);

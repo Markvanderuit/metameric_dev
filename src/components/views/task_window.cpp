@@ -3,7 +3,6 @@
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/views/task_window.hpp>
-#include <metameric/components/views/task_create_project.hpp>
 #include <metameric/components/views/task_settings_editor.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -14,7 +13,6 @@
 
 namespace met {
   /* Titles and ImGui IDs used to spawn modals */
-  const static std::string create_modal_title = "New project";
   const static std::string close_modal_title  = "Close project";
   const static std::string exit_modal_title   = "Exit Metameric";
   
@@ -189,13 +187,6 @@ namespace met {
 
     return false;
   } */
-  
-  /* void WindowTask::handle_new_safe(SchedulerHandle &info) {
-    met_trace_full();
-
-
-  } */
-
 
   void WindowTask::handle_close_safe(SchedulerHandle &info) {
     met_trace_full();
@@ -243,7 +234,6 @@ namespace met {
     // and call OpenPopup() at the end if true
     m_open_close_modal  = false;
     m_open_exit_modal   = false;
-    m_open_create_modal = false;
 
     // Set up the menu bar at the top of the window's viewport
     if (ImGui::BeginMainMenuBar()) {
@@ -253,7 +243,6 @@ namespace met {
         /* Main section follows */
 
         if (ImGui::MenuItem("New..."))                              { detail::handle_new(info);    }
-        // if (ImGui::MenuItem("New..."))                              { m_open_create_modal = true; }
         if (ImGui::MenuItem("Open..."))                             { detail::handle_open(info);   }
         if (ImGui::MenuItem("Close", nullptr, nullptr, is_loaded))  { handle_close_safe(info);     }
 
@@ -344,12 +333,6 @@ namespace met {
     
     // Create an explicit dock space over the entire window's viewport, excluding the menu bar
     ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-
-    // Spawn create modal
-    if (m_open_create_modal) { 
-      info.child_task("create_modal").init<CreateProjectTask>(create_modal_title);
-      ImGui::OpenPopup(create_modal_title.c_str()); 
-    }
 
     // Spawn close modal
     if (m_open_close_modal)  { 
