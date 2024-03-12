@@ -107,7 +107,7 @@ namespace met::detail {
   };
   
   template <>
-  class GLPacking<met::ColorSystem> {
+  struct GLPacking<met::ColorSystem> {
     Spec       wavelength_distr;
     gl::Buffer wavelength_distr_buffer;
 

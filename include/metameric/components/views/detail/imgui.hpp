@@ -57,6 +57,10 @@ namespace ImGui {
     ~ScopedStyleVar() {
       PopStyleVar();
     }
+
+  public:
+    inline void swap(ScopedStyleVar &o) { /* ... */ }
+    met_declare_noncopyable(ScopedStyleVar);
   };
 
   // Helper for RAII ImGui PushID/PopID wrapper
@@ -70,6 +74,10 @@ namespace ImGui {
     ~ScopedID() {
       PopID();
     }
+
+  public:
+    inline void swap(ScopedID &o) { /* ... */ }
+    met_declare_noncopyable(ScopedID);
   };
 
   /* Useful shorthands */

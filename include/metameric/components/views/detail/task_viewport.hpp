@@ -354,11 +354,16 @@ namespace met::detail {
       met_trace_full();
 
       // Keep scoped ImGui state around s.t. image can fill window
-      std::vector<ImGui::ScopedStyleVar> scope;
-      if (m_info.is_filling)
-        scope = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                  ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                  ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+
+      // std::vector<ImGui::ScopedStyleVar> scope;
+      // if (m_info.is_filling) {
+        // scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding,          16.f  ));
+        // scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize,         0.f  ));
+        // scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding,    { 0.f, 0.f } ));
+      // }
       
       // Define window size on first open
       ImGui::SetNextWindowSize(m_info.size.cast<float>().eval(), ImGuiCond_Appearing);
@@ -436,11 +441,15 @@ namespace met::detail {
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
 
       // Keep scoped ImGui state around s.t. image can fill window
-      std::vector<ImGui::ScopedStyleVar> scope;
-      if (m_info.is_filling)
-        scope = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                  ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                  ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      // std::vector<ImGui::ScopedStyleVar> scope;
+      // // if (m_info.is_filling) {
+      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding,          16.f  ));
+      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize,         0.f  ));
+      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding,    { 0.f, 0.f } ));
+      // // }
                           
       ImGui::BeginChild("##viewport_image_view");
 
@@ -506,11 +515,15 @@ namespace met::detail {
       met_trace_full();
 
       // Keep scoped ImGui state around s.t. image can fill window
-      std::vector<ImGui::ScopedStyleVar> scope;
-      if (m_info.is_filling)
-        scope = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
-                  ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
-                  ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
+                           ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
+      // std::vector<ImGui::ScopedStyleVar> scope;
+      // // if (m_info.is_filling) {
+      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding,          16.f  ));
+      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize,         0.f  ));
+      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding,    { 0.f, 0.f } ));
+      // // }
 
       if (m_info.apply_srgb) {
         // Get shared resources
