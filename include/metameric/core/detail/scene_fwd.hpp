@@ -1,8 +1,5 @@
 #pragma once
 
-#include <concepts>
-#include <span>
-
 namespace met {
   // FWD
   // Scene components

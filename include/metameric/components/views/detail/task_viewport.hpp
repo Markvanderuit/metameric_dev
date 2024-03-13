@@ -124,7 +124,6 @@ namespace met::detail {
       bool is_active = ImGui::Begin("Mesh Viewport", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
       info("is_active").getw<bool>() = is_active;
 
-
       // Compute viewport size minus ImGui's tab bars etc
       eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                  - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
@@ -340,7 +339,6 @@ namespace met::detail {
     std::string  name         = "Viewport"; // Surrounding window name
     eig::Array2u size         = { -1, -1 }; // Default initial window size
     bool         is_closeable = false;      // Whether a close button appears, killing parent task on close
-    bool         is_filling   = true;       // Whether imgui window filling scope is set
     bool         apply_srgb   = true;       // Whether draw output is converted in lrgb-srgb resample
   };
 
@@ -358,13 +356,6 @@ namespace met::detail {
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
 
-      // std::vector<ImGui::ScopedStyleVar> scope;
-      // if (m_info.is_filling) {
-        // scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding,          16.f  ));
-        // scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize,         0.f  ));
-        // scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding,    { 0.f, 0.f } ));
-      // }
-      
       // Define window size on first open
       ImGui::SetNextWindowSize(m_info.size.cast<float>().eval(), ImGuiCond_Appearing);
 
@@ -444,12 +435,6 @@ namespace met::detail {
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
-      // std::vector<ImGui::ScopedStyleVar> scope;
-      // // if (m_info.is_filling) {
-      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding,          16.f  ));
-      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize,         0.f  ));
-      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding,    { 0.f, 0.f } ));
-      // // }
                           
       ImGui::BeginChild("##viewport_image_view");
 
@@ -518,12 +503,6 @@ namespace met::detail {
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
-      // std::vector<ImGui::ScopedStyleVar> scope;
-      // // if (m_info.is_filling) {
-      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding,          16.f  ));
-      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize,         0.f  ));
-      //   scope.emplace_back(ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding,    { 0.f, 0.f } ));
-      // // }
 
       if (m_info.apply_srgb) {
         // Get shared resources

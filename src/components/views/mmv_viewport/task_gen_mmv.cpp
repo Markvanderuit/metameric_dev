@@ -12,7 +12,7 @@
 namespace met {
   // Constants
   constexpr uint mmv_samples_per_iter = 32;
-  constexpr uint mmv_samples_max      = 4096; // 256u;
+  constexpr uint mmv_samples_max      = 256;
   constexpr auto buffer_create_flags  = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags  = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -121,7 +121,9 @@ namespace met {
       || e_state.basis_i 
       || e_state.csys_i 
       || e_state.verts[e_is.constraint_i]
-      || e_scene.components.colr_systems[e_uplifting.csys_i];;
+      || e_scene.components.colr_systems[e_uplifting.csys_i];
+    
+    // Reset necessary data
     if (should_clear) {
       info("chull_array").getw<gl::Array>() = {};
       m_points.clear();
@@ -287,7 +289,7 @@ namespace met {
                  .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
                  .capabilities     = {{ gl::DrawCapability::eCullOp, false   },
                                       { gl::DrawCapability::eDepthTest, true }},
-                 .draw_op          = gl::DrawOp::eLine,
+                 .draw_op          = gl::DrawOp::eFill,
                  .bindable_array   = &i_array };
                  
       i_points_array = {{

@@ -2,8 +2,8 @@
 
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/scene_fwd.hpp>
 #include <metameric/core/detail/scene_state.hpp>
-#include <metameric/core/detail/scene_components_fwd.hpp>
 #include <concepts>
 #include <functional>
 #include <type_traits>

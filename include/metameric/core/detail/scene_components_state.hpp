@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/scene_components.hpp>
+#include <metameric/core/components.hpp>
 
 namespace met::detail {
   /* Overload of ComponentState for Object */
@@ -77,7 +77,7 @@ namespace met::detail {
     ComponentState<decltype(Base::name)>       name;
     ComponentState<decltype(Base::is_active)>  is_active;
     ComponentState<decltype(Base::constraint)> constraint;
-
+    
   public:
     virtual 
     bool update(const Base &o) override {

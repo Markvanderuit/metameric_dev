@@ -1,10 +1,9 @@
 #pragma once
 
 #include <metameric/core/detail/scene_components.hpp>
-#include <metameric/core/detail/scene_components_fwd.hpp>
+#include <metameric/core/constraints.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/uplifting.hpp>
 #include <vector>
 
 namespace met {

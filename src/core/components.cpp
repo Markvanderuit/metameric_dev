@@ -1,5 +1,5 @@
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/scene_components.hpp>
+#include <metameric/core/components.hpp>
 
 namespace met {
   namespace detail {

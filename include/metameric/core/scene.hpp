@@ -6,7 +6,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/record.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/scene_components.hpp>
+#include <metameric/core/components.hpp>
 #include <metameric/core/detail/scene_components_gl.hpp>
 #include <metameric/core/detail/scene_components_state.hpp>
 #include <variant>

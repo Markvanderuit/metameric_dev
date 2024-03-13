@@ -44,6 +44,32 @@ namespace met {
       };
     };
 
+    // Describes f(x) = ||(Ax - b)||^2 with corresponding gradient
+    auto func_supremum_norm(const auto &Af, const auto &bf) -> NLOptInfo::Capture {
+      return 
+        [A = Af.cast<double>().eval(), b = bf.cast<double>().eval()]
+        (eig::Map<const eig::VectorXd> x, eig::Map<eig::VectorXd> g) {
+          // shorthand for Ax - b
+          auto diff = ((A * x).array() - b).matrix().eval();
+
+          // Find index and value of maximum coefficient
+          uint  i;
+          float ret = diff.maxCoeff(&i); // diff.array().abs().maxCoeff(&i);
+                // ret = diff[i];
+
+          // Set all other components to zero, store only max coeff
+          diff    = 0.f;
+          diff[i] = ret / std::abs(ret); // 1.f; // ret >= 0.f ? 1.f : -1.f;
+          
+          // g(x) = A^T * (Ax - b) / ||(Ax - b)||
+          if (g.data())
+            g = (A.transpose() * diff).eval();
+
+          // f(x) = ||(Ax - b)||
+          return ret;
+      };
+    };
+
     // Describes f(x) = a * x - b with corresponding gradient
     auto func_dot(const auto &af, const auto &bf) -> NLOptInfo::Capture {
       return 
@@ -77,7 +103,7 @@ namespace met {
     
     // Note; simple way to get relatively smooth spectra
     // Objective function minimizes l2 norm over spectral distribution itself
-    solver.objective = detail::func_squared_norm(info.basis.func, Spec::Zero());
+    solver.objective = detail::func_squared_norm(info.basis.func, -info.basis.mean);
 
     // Add color system equality constraints, upholding spectral metamerism
     for (uint i = 0; i < info.systems.size(); ++i) {
@@ -95,6 +121,13 @@ namespace met {
       solver.nq_constraints.push_back(detail::func_dot( a,  ub));
       solver.nq_constraints.push_back(detail::func_dot(-a, -lb));
     } // for (uint i)
+    /* {
+      auto A = info.basis.func.matrix().eval();
+      Spec ub = 1.f - info.basis.mean;
+      Spec lb = ub - 1.f;
+      solver.nq_constraints.push_back(detail::func_supremum_norm( A,  ub));
+      solver.nq_constraints.push_back(detail::func_supremum_norm(-A, -lb));
+    } */
 
     // Run solver and return recovered spectral distribution
     NLOptResult r = solve(solver);
@@ -117,19 +150,16 @@ namespace met {
     solver.objective = detail::func_norm(info.basis.func, Spec::Zero());
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    for (uint i = 0; i < wavelength_samples; ++i) {
-      auto  a  = info.basis.func.row(i).eval();
-      float ub = 1.f; /* 1.f - info.basis.mean[i]; */
-      float lb = ub - 1.f;
-      solver.nq_constraints.push_back(detail::func_dot( a,  ub));
-      solver.nq_constraints.push_back(detail::func_dot(-a, -lb));
-    } // for (uint i)
+    {
+      auto A = info.basis.func.matrix().eval();
+      solver.nq_constraints.push_back(detail::func_supremum_norm( A, Spec(1.f)));
+      solver.nq_constraints.push_back(detail::func_supremum_norm(-A, Spec(0.f)));
+    }
 
     // Add color system equality constraints, upholding spectral surface metamerism
     {
       auto A = (info.base_system.transpose() * info.basis.func.matrix()).eval();
-      // auto o = (info.base_system.transpose() * info.basis.mean.matrix()).eval();
-      auto b = (info.base_signal /* - o.array() */).eval();
+      auto b = info.base_signal;
       solver.eq_constraints.push_back(detail::func_norm(A, b));
     } // for (uint i)
     
@@ -350,11 +380,12 @@ namespace met {
         auto a = ((U * info.samples[i].matrix()).transpose() * info.basis.func).transpose().eval();
         local_solver.objective = detail::func_dot(a, 0.f);
 
-        // Run solver and store recovered spectral distribution if it is safe
+        // Run solver and store recovered spectral distribution if it is legit
         NLOptResult r = solve(local_solver);
         Spec s = info.basis.func * r.x.cast<float>();
         guard_continue(!s.isNaN().any());
-        tbb_output.push_back(s.cwiseMin(1.f).cwiseMax(0.f).eval());
+        guard_continue(s.maxCoeff() <= 1.f && s.minCoeff() >= 0.f);
+        tbb_output.push_back(s);
       } // for (int i)
     }
 
@@ -369,9 +400,9 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
       .x_init       = Basis::BVec(0.5).cast<double>().eval(),
-      .max_iters    = 256,  // Failsafe; halt after 1024 iterations
-      .rel_func_tol = 1e-4,
-      .rel_xpar_tol = 1e-2,
+      .max_iters    = 128,  // Failsafe; halt after 1024 iterations
+      // .rel_func_tol = 1e-6,
+      .rel_xpar_tol = 1e-3,
     };
 
     // Add color system equality constraints, upholding spectral metamerism
@@ -382,11 +413,17 @@ namespace met {
     } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    for (uint i = 0; i < wavelength_samples; ++i) {
-      auto a = info.basis.func.row(i).eval();
-      solver.nq_constraints.push_back(detail::func_dot( a, 1.f));
-      solver.nq_constraints.push_back(detail::func_dot(-a, 0.f));
-    } // for (uint i)
+    // for (uint i = 0; i < wavelength_samples; ++i) {
+    //   auto a = info.basis.func.row(i).eval();
+    //   solver.nq_constraints.push_back(detail::func_dot( a, 1.f));
+    //   solver.nq_constraints.push_back(detail::func_dot(-a, 0.f));
+    // } // for (uint i)
+    // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
+    {
+      auto A = info.basis.func.matrix().eval();
+      solver.nq_constraints.push_back(detail::func_supremum_norm( A, Spec(1.f)));
+      solver.nq_constraints.push_back(detail::func_supremum_norm(-A, Spec(0.f)));
+    }
 
     // Parallel solve for boundary spectra
     tbb::concurrent_vector<Spec> tbb_output;
@@ -430,7 +467,9 @@ namespace met {
         NLOptResult r = solve(local_solver);
         Spec s = info.basis.func * r.x.cast<float>();
         guard_continue(!s.isNaN().any());
-        tbb_output.push_back(s.cwiseMin(1.f).cwiseMax(0.f).eval());
+        // guard_continue(s.maxCoeff() <= 1.f && s.minCoeff() >= 0.f);
+        // tbb_output.push_back(s);
+        tbb_output.push_back(s/* .cwiseMax(0.f).cwiseMin(1.f).eval() */);
       } // for (int i)
     }
 

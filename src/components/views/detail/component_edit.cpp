@@ -245,7 +245,7 @@ namespace met {
               .name       = "Direct Surface",
               .constraint = DirectSurfaceConstraint()
             });
-          if (ImGui::Selectable("Inirect surface"))
+          if (ImGui::Selectable("Indirect surface"))
             value.verts.push_back({ 
               .name       = "Indirect Surface",
               .constraint = IndirectSurfaceConstraint()

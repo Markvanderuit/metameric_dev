@@ -3,7 +3,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/scene_components.hpp>
+#include <metameric/core/components.hpp>
 #include <metameric/core/detail/scene_components_state.hpp>
 #include <metameric/core/detail/packing.hpp>
 #include <metameric/core/detail/texture_atlas.hpp>
