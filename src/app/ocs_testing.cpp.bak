@@ -102,7 +102,7 @@ namespace met {
                           float                 size = 1.f,
                           eig::Array4f          colr = 1.f, 
                           std::string_view      name = "") {
-      std::vector<AlColr>       posi_copy(range_iter(posi));
+      std::vector<eig::AlArray3f> posi_copy(range_iter(posi));
       std::vector<float>        size_copy(posi.size(), size);
       std::vector<eig::Array4f> colr_copy(posi.size(), colr);
 
@@ -117,7 +117,7 @@ namespace met {
                           std::span<const float>        size,
                           std::span<const eig::Array4f> colr,
                           std::string_view              name = "") {
-      std::vector<AlColr> posi_copy(range_iter(posi));
+      std::vector<eig::AlArray3f> posi_copy(range_iter(posi));
 
       m_buffer_posi = {{ .data = cnt_span<const std::byte>(posi_copy) }};
       m_buffer_size = {{ .data = cnt_span<const std::byte>(size)      }};
@@ -152,9 +152,9 @@ namespace met {
     PointsetDraw() = default;
     
     PointsetDraw(const std::vector<Colr> &points, std::string_view name) {
-      std::vector<AlColr> copy(range_iter(points));
+      std::vector<eig::AlArray3f> copy(range_iter(points));
       m_buffer = {{ .data = cnt_span<const std::byte>(copy) }};
-      m_array  = {{ .buffers = {{ .buffer = &m_buffer, .index = 0, .stride = sizeof(AlColr ) }},
+      m_array  = {{ .buffers = {{ .buffer = &m_buffer, .index = 0, .stride = sizeof(eig::AlArray3f ) }},
                     .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }} }};
       m_name = name;
     }
@@ -163,7 +163,7 @@ namespace met {
       guard(m_array.is_init());
       gl::dispatch_draw({
         .type           = gl::PrimitiveType::ePoints,
-        .vertex_count   = (uint) (m_buffer.size() / sizeof(AlColr)),
+        .vertex_count   = (uint) (m_buffer.size() / sizeof(eig::AlArray3f)),
         .bindable_array = &m_array
       });
     }
@@ -183,7 +183,7 @@ namespace met {
       AlMesh copy = convert_mesh<AlMesh>(mesh);
       m_buffer_vt = {{ .data  = cnt_span<const std::byte>(copy.verts) }};
       m_buffer_el = {{ .data  = cnt_span<const std::byte>(copy.elems) }};
-      m_array  = {{ .buffers  = {{ .buffer = &m_buffer_vt, .index = 0, .stride = sizeof(AlColr ) }},
+      m_array  = {{ .buffers  = {{ .buffer = &m_buffer_vt, .index = 0, .stride = sizeof(eig::AlArray3f ) }},
                     .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
                     .elements = &m_buffer_el  }};
       m_name = name;

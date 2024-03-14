@@ -12,15 +12,15 @@ namespace met {
   struct BasisTreeNode {
   public: /* public data components */
     // Node data
-    uint  depth;
-    Chro  bbox_min, bbox_max; // Bounding box
-    Basis basis;      // Basis functions over spectra in bounding box region
+    uint depth;
+    eig::Array2f bbox_min, bbox_max; // Bounding box
+    Basis basis;                     // Basis functions over spectra in bounding box region
     
     // Child node data
     std::vector<BasisTreeNode> children;
     
   public: /* public methods */
-    Basis traverse(const Chro &xy) const {
+    Basis traverse(const eig::Array2f &xy) const {
       if (depth == 1)
         return basis;
         
@@ -31,7 +31,7 @@ namespace met {
       }
     }
 
-    bool is_in_node(const Chro &xy) const {
+    bool is_in_node(const eig::Array2f &xy) const {
       return xy.max(bbox_min).min(bbox_max).isApprox(xy);
     }
   };

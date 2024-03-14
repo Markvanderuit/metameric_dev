@@ -106,9 +106,9 @@ namespace met {
                           float                 size = 1.f,
                           eig::Array4f          colr = 1.f, 
                           std::string_view      name = "") {
-      std::vector<AlColr>       posi_copy(range_iter(posi));
-      std::vector<float>        size_copy(posi.size(), size);
-      std::vector<eig::Array4f> colr_copy(posi.size(), colr);
+      std::vector<eig::AlArray3f> posi_copy(range_iter(posi));
+      std::vector<float>          size_copy(posi.size(), size);
+      std::vector<eig::Array4f>   colr_copy(posi.size(), colr);
 
       m_buffer_posi = {{ .data = cnt_span<const std::byte>(posi_copy) }};
       m_buffer_size = {{ .data = cnt_span<const std::byte>(size_copy) }};
@@ -123,7 +123,7 @@ namespace met {
                           std::string_view              name = "") {
       guard(!posi.empty());
       
-      std::vector<AlColr> posi_copy(range_iter(posi));
+      std::vector<eig::AlArray3f> posi_copy(range_iter(posi));
 
       m_buffer_posi = {{ .data = cnt_span<const std::byte>(posi_copy) }};
       m_buffer_size = {{ .data = cnt_span<const std::byte>(size)      }};

@@ -30,6 +30,9 @@ namespace met {
 
 /* json (de)serializations for specific Eigen types must be declared in Eigen scope */
 namespace Eigen { 
+  void from_json(const met::json& js, Array2f &v);
+  void to_json(met::json &js, const Array2f &v);
+
   void from_json(const met::json& js, Array3u &v);
   void to_json(met::json &js, const Array3u &v);
 
@@ -47,9 +50,6 @@ namespace Eigen {
 
   void from_json(const met::json &js, met::Basis::BMat &b);
   void to_json(met::json &js, const met::Basis::BMat &b);
-  
-  void from_json(const met::json& js, met::Chro &v);
-  void to_json(met::json &js, const met::Chro &v);
 
   void from_json(const met::json &js, Affine3f &t);
   void to_json(met::json &js, const Affine3f &t);

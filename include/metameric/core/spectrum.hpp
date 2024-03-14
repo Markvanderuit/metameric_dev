@@ -1,6 +1,7 @@
 #pragma once
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/utility.hpp>
 
 namespace met {
   /* 
@@ -12,27 +13,20 @@ namespace met {
   constexpr static float wavelength_max      = MET_WAVELENGTH_MAX;  
   constexpr static uint  wavelength_samples  = MET_WAVELENGTH_SAMPLES;
   constexpr static uint  wavelength_bases    = MET_WAVELENGTH_BASES;
-  constexpr static uint  generalized_weights = MET_GENERALIZED_WEIGHTS;
 
   /* Define derived variables from metameric's spectral range layout */
   constexpr static float wavelength_range = wavelength_max - wavelength_min;
   constexpr static float wavelength_ssize = wavelength_range / static_cast<float>(wavelength_samples);  
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
-  /* Define the maximum nr. of metameric's spectral uplifting constraints,
-     per uplifting. This includes boundary points and additional points inserted
-     by the tesselation. */
+  /* Define maximum nr. of spectral uplifting constraints supported per uplifting. 
+     This includes boundary and additional points inserted by the tesselation. */
   constexpr static uint max_supported_spectra = 512u;
 
-  /* Define program's underlying spectrum/cmfs/color classes as renamed Eigen objects */
+  /* Define program's underlying spectrum/cmfs/color types as renamed Eigen types */
   using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix
   using Spec = eig::Array<float, wavelength_samples, 1>;  // Discrete spectrum matrix
-  using Bary = eig::Array<float, generalized_weights, 1>; // Discrete convex weight data
   using Colr = eig::Array<float,  3, 1>;                  // Color signal matrix
-  using Chro = eig::Array<float,  2, 1>;                  // Color chromaticity matrix
-
-  /* Miscellaneous types, mostly used for basis function operations in src/core/metamer.cpp */
-  using AlColr = eig::AlArray<float, 3>;
 
   /* Basis function object, using a offset around its mean */
   struct Basis {
@@ -49,32 +43,38 @@ namespace met {
     void fr_stream(std::istream &str);
   };
 
-  /* System object defining how a reflectance-to-color conversion is performed */
+  /* Object defining how a reflectance-to-color conversion is performed */
   struct ColrSystem {
-    CMFS cmfs;       // Color matching or sensor response functions, defining the observer
+    CMFS cmfs;       // Sensor color matching or response functions
     Spec illuminant; // Illuminant under which observation is performed
 
   public:
-    CMFS finalize()           const; // Simplify the CMFS/illuminant into color system spectra
-    Colr apply(const Spec &s) const; // Obtain a color from a reflectance in this color system
+    CMFS finalize() const;                                   // Simplify the CMFS/illuminant into color system spectra
+    Colr apply(const Spec &s) const;                         // Obtain a color from a reflectance in this color system
+    std::vector<Colr> apply(std::span<const Spec> sd) const; // Obtain colors from reflectances in this color system
     
   public: // Boilerplate
-    Colr operator()(const Spec &s) const { return apply(s);  }
+    auto operator()(const Spec &s)           const { return apply(s); }
+    auto operator()(std::span<const Spec> s) const { return apply(s); }
     bool operator==(const ColrSystem &o) const;
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
   };
 
+  /* Object defining how a reflectance-to-color conversion is performed,
+     given a truncated power series describing interreflections */
   struct IndirectColrSystem {
-    CMFS              cmfs;
-    std::vector<Spec> powers;
+    CMFS              cmfs;   // Sensor color matching or response functions
+    std::vector<Spec> powers; // Truncated power series describing partial interreflections
   
   public:
-    std::vector<CMFS> finalize()           const; // Simplify the recrursive system into color system spectra
-    Colr              apply(const Spec &s) const; // Obtain a color from a reflectance in this color system
+    std::vector<CMFS> finalize() const;                      // Simplify the recrursive system into color system spectra
+    Colr apply(const Spec &s) const;                         // Obtain a color from a reflectance in this color system
+    std::vector<Colr> apply(std::span<const Spec> sd) const; // Obtain colors from reflectances in this color system
 
   public: // Boilerplate
-    Colr operator()(const Spec &s) const { return apply(s); }
+    auto operator()(const Spec &s)           const { return apply(s); }
+    auto operator()(std::span<const Spec> s) const { return apply(s); }
     bool operator==(const IndirectColrSystem &o) const;
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
@@ -109,20 +109,8 @@ namespace met {
   } // namespace models
 
   /* 
-    Miscellaneous functions.
+    lRGB/sRGB conversion functions
   */
-
-  // Given a spectral bin, obtain the relevant central wavelength of that bin
-  constexpr inline
-  float wavelength_at_index(size_t i) {
-    return wavelength_min + wavelength_ssize * (static_cast<float>(i) + .5f);
-  }
-
-  // Given a wavelength, obtain the relevant surrounding spectral bin's index
-  constexpr inline
-  size_t index_at_wavelength(float wvl) {
-    return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
-  }
 
   // Convert a value in sRGB to linear sRGB
   constexpr inline
@@ -144,11 +132,20 @@ namespace met {
   inline Colr xyz_to_srgb(Colr c)  { return lrgb_to_srgb(xyz_to_lrgb(c));                    }
   inline Colr srgb_to_xyz(Colr c)  { return lrgb_to_xyz(srgb_to_lrgb(c));                    }
 
-  // Convert a XYZ color to xyY
-  inline
-  Chro xyz_to_xy(Colr c) {
-    float y = c.sum();
-    return y > 0.f ? Chro(c[0] / y, c[2] / y) : 0.f;
+  /* 
+    Spectrum helper functions
+  */
+
+  // Given a spectral bin, obtain the relevant central wavelength of that bin
+  constexpr inline
+  float wavelength_at_index(size_t i) {
+    return wavelength_min + wavelength_ssize * (static_cast<float>(i) + .5f);
+  }
+
+  // Given a wavelength, obtain the relevant surrounding spectral bin's index
+  constexpr inline
+  size_t index_at_wavelength(float wvl) {
+    return std::min(static_cast<uint>((wvl - wavelength_min) * wavelength_ssinv), wavelength_samples - 1);
   }
 
   inline

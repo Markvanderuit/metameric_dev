@@ -2,9 +2,9 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/utility.hpp>
-#include <array>
 #include <algorithm>
+#include <execution>
+#include <unordered_set>
 
 namespace met {
   namespace models {
@@ -80,9 +80,29 @@ namespace met {
     return to_rgb;
   }
   
-  Colr ColrSystem::apply(const Spec &sd) const { 
+  Colr ColrSystem::apply(const Spec &s) const { 
     met_trace();
-    return finalize().transpose() * sd.matrix().eval();
+    return finalize().transpose() * s.matrix().eval();
+  }
+  
+  std::vector<Colr> ColrSystem::apply(std::span<const Spec> sd) const { 
+    met_trace();
+    
+    // Gather color system data into matrix
+    auto csys = finalize();
+
+    // Transform to non-unique colors
+    std::vector<Colr> out(sd.size());
+    std::transform(std::execution::par_unseq, range_iter(sd), out.begin(),
+      [&csys](const auto &s) -> Colr { return (csys.transpose() * s.matrix()).eval(); });
+
+    // Collapse return value to unique colors
+    std::unordered_set<
+      Colr, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > out_unique(range_iter(out));
+    return std::vector<Colr>(range_iter(out_unique));
   }
 
   bool ColrSystem::operator==(const ColrSystem &o) const { 
@@ -117,6 +137,31 @@ namespace met {
     for (auto [i, csys] : enumerate_view(csys))
       c += (csys.transpose() * s.pow(static_cast<float>(i)).matrix()).array().eval();
     return c;
+  }
+
+  std::vector<Colr> IndirectColrSystem::apply(std::span<const Spec> sd) const {
+    met_trace();
+
+    // Gather color system data into matrices
+    auto csys = finalize();
+    
+    // Transform to non-unique colors
+    std::vector<Colr> out(sd.size());
+    std::transform(std::execution::par_unseq, range_iter(sd), out.begin(),
+    [&csys](const auto &s) -> Colr { 
+      Colr c = 0.f;
+      for (auto [i, csys] : enumerate_view(csys))
+        c += (csys.transpose() * s.pow(static_cast<float>(i)).matrix()).array().eval();
+      return c;
+    });
+
+    // Collapse return value to unique colors
+    std::unordered_set<
+      Colr, 
+      decltype(Eigen::detail::matrix_hash<float>), 
+      decltype(Eigen::detail::matrix_equal)
+    > out_unique(range_iter(out));
+    return std::vector<Colr>(range_iter(out_unique));
   }
 
   bool IndirectColrSystem::operator==(const IndirectColrSystem &o) const {

@@ -27,8 +27,8 @@ namespace met {
     // Extract structure data
     if (js.contains("children"))
       b.children = js.at("children").get<std::vector<BasisTreeNode>>();
-    b.bbox_min = js.at("bbox_min").get<Chro>();
-    b.bbox_max = js.at("bbox_max").get<Chro>();
+    b.bbox_min = js.at("bbox_min").get<eig::Array2f>();
+    b.bbox_max = js.at("bbox_max").get<eig::Array2f>();
     b.depth    = js.at("depth").get<uint>();
 
     // Extract node data
@@ -116,12 +116,12 @@ namespace Eigen {
     js = std::vector<met::Basis::BMat::value_type>(r.begin(), r.end());
   }
   
-  void from_json(const met::json& js, met::Chro &v) {
+  void from_json(const met::json& js, Array2f &v) {
     std::ranges::copy(js, v.begin());
   }
 
-  void to_json(met::json &js, const met::Chro &v) {
-    js = std::vector<met::Chro::value_type>(v.begin(), v.end());
+  void to_json(met::json &js, const Array2f &v) {
+    js = std::vector<Array2f::value_type>(v.begin(), v.end());
   }
   
   void from_json(const met::json &js, Affine3f &t) {

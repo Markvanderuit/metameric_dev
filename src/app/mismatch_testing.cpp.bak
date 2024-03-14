@@ -160,14 +160,14 @@ namespace met {
       
       // Generate volume buffers
       rng::transform(volumes_p0, std::back_inserter(m_buffers), [](const auto &volume) {
-        std::vector<AlColr> aligned(range_iter(volume));
+        std::vector<eig::AlArray3f> aligned(range_iter(volume));
         return gl::Buffer {{ .data = cnt_span<const std::byte>(aligned) }};
       });
 
       // Generate array objects
       rng::transform(m_buffers, std::back_inserter(m_arrays), [](const auto &buffer) {
         return gl::Array {{
-          .buffers = {{ .buffer = &buffer, .index = 0, .stride = sizeof(AlColr) }},
+          .buffers = {{ .buffer = &buffer, .index = 0, .stride = sizeof(eig::AlArray3f) }},
           .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         }};
       });
@@ -176,7 +176,7 @@ namespace met {
       m_dispatches.resize(m_arrays.size());
       for (uint i = 0; i < m_dispatches.size(); ++i)
         m_dispatches[i] = { .type                 = gl::PrimitiveType::ePoints,
-                            .vertex_count         = (uint) (m_buffers[i].size() / sizeof(AlColr)),
+                            .vertex_count         = (uint) (m_buffers[i].size() / sizeof(eig::AlArray3f)),
                             .bindable_array       = &m_arrays[i] };
 
       // Generate program object

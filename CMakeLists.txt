@@ -15,7 +15,7 @@ option(met_enable_tests      "Build tests"                  ON)
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
-set(MET_WAVELENGTH_BASES    16) # Maximum nr. of bases used in generative functions
+set(MET_WAVELENGTH_BASES    24) # Maximum nr. of bases used in generative functions
 set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported TODO remove
 
 # Define some constants as available on both shader and program side
@@ -341,12 +341,6 @@ add_dependencies(components shaders misc_copy)
 # Setup executables
 add_executable_r(metameric_editor src/app/metameric_editor.cpp)
 target_link_libraries(metameric_editor PRIVATE core render components)
-add_executable_r(ocs_testing src/app/ocs_testing.cpp)
-target_link_libraries(ocs_testing PRIVATE core components)
-add_executable_r(reflected_ocs_testing src/app/reflected_ocs_testing.cpp)
-target_link_libraries(reflected_ocs_testing PRIVATE core components)
-add_executable_r(noise_testing src/app/noise_testing.cpp)
-target_link_libraries(noise_testing PRIVATE core components)
 
 # Optionally setup Catch2 tests
 if (met_enable_tests)

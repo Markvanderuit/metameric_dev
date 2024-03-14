@@ -166,12 +166,12 @@ namespace met {
           .systems_i = systems_i,
           .signals_i = signals_i,
           .systems_j = systems_j,
-          .system_j  = systems_j[m_csys_j], // Current visualized color system
           .samples   = samples,
         };
 
-        // Generate MMV points and append to current point set
-        m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
+        // Generate MMV spectra and append corresponding colors to current point set
+        auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
+        m_points.insert_range(csys(generate_mmv_boundary_spec(mmv_info)));
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Generate 6D unit vector samples
@@ -189,12 +189,12 @@ namespace met {
           .systems_i = systems_i,
           .signals_i = signals_i,
           .systems_j = systems_j,
-          .system_j  = systems_j[m_csys_j], // Current visualized color system
           .samples   = samples,
         };
 
-        // Generate MMV points and append to current point set
-        m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
+        // Generate MMV spectra and append corresponding colors to current point set
+        auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
+        m_points.insert_range(csys(generate_mmv_boundary_spec(mmv_info)));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
         // Generate 3D unit vector samples
@@ -211,12 +211,6 @@ namespace met {
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
         auto signals_i = { cstr.surface.diffuse };
 
-        ColrSystem csys_base = e_scene.get_csys(e_uplifting.csys_i);
-        IndirectColrSystem csys_refl = {
-          .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-          .powers = cstr.powers
-        };
-
         // Construct objective color system spectra from power series
         auto systems_j = cstr.powers
                        | vws::transform([&](Spec pwr) {
@@ -232,12 +226,15 @@ namespace met {
           .signals_i  = signals_i,
           .components = cstr.powers,
           .systems_j  = systems_j,
-          .system_j   = cmfs,
           .samples    = samples,
         };
 
-        // Generate MMV points and append to current point set
-        m_points.insert_range(generate_mmv_boundary_colr(mmv_info));
+        // Generate MMV spectra and append corresponding colors to current point set
+        IndirectColrSystem csys = {
+          .cmfs   = e_scene.resources.observers[0].value(),
+          .powers = cstr.powers
+        };
+        m_points.insert_range(csys(generate_mmv_boundary_spec(mmv_info)));
       },
       [&](const auto &) { }
     }, e_vert.constraint);
@@ -275,7 +272,7 @@ namespace met {
     auto &i_points_array = info("points_array").getw<gl::Array>();
     auto &i_points_draw  = info("points_draw").getw<gl::DrawInfo>();
     if (m_chull.elems.size() > 0) {
-      std::vector<AlColr> points(range_iter(m_points));
+      std::vector<eig::AlArray3f> points(range_iter(m_points));
       m_points_verts = {{ .data = cnt_span<const std::byte>(points) }};
       m_chull_verts  = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
       m_chull_elems  = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
