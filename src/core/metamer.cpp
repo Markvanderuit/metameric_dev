@@ -53,14 +53,13 @@ namespace met {
           auto diff = ((A * x).array() - b).matrix().eval();
 
           // Find index and value of maximum coefficient
-          uint  i;
-          float ret = diff.maxCoeff(&i); // diff.array().abs().maxCoeff(&i);
-                // ret = diff[i];
+          uint i;
+          double ret = diff.maxCoeff(&i);
 
           // Set all other components to zero, store only max coeff
-          diff    = 0.f;
-          diff[i] = ret / std::abs(ret); // 1.f; // ret >= 0.f ? 1.f : -1.f;
-          
+          diff = 0.0;
+          diff[i] = std::copysign(1.0, ret);
+
           // g(x) = A^T * (Ax - b) / ||(Ax - b)||
           if (g.data())
             g = (A.transpose() * diff).eval();
@@ -90,6 +89,8 @@ namespace met {
     debug::check_expr(info.systems.size() == info.signals.size(),
       "Color system size not equal to color signal size");
 
+    // auto b = (info.basis.fun)
+
     // Solver settings
     NLOptInfo solver = {
       .n            = wavelength_bases,
@@ -103,7 +104,7 @@ namespace met {
     
     // Note; simple way to get relatively smooth spectra
     // Objective function minimizes l2 norm over spectral distribution itself
-    solver.objective = detail::func_squared_norm(info.basis.func, -info.basis.mean);
+    solver.objective = detail::func_squared_norm(info.basis.func, Spec::Zero());
 
     // Add color system equality constraints, upholding spectral metamerism
     for (uint i = 0; i < info.systems.size(); ++i) {
@@ -114,20 +115,20 @@ namespace met {
     } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    for (uint i = 0; i < wavelength_samples; ++i) {
+    /* for (uint i = 0; i < wavelength_samples; ++i) {
       auto  a  = info.basis.func.row(i).eval();
       float ub = 1.f - info.basis.mean[i];
       float lb = ub - 1.f;
       solver.nq_constraints.push_back(detail::func_dot( a,  ub));
       solver.nq_constraints.push_back(detail::func_dot(-a, -lb));
-    } // for (uint i)
-    /* {
+    } // for (uint i) */
+    {
       auto A = info.basis.func.matrix().eval();
       Spec ub = 1.f - info.basis.mean;
       Spec lb = ub - 1.f;
       solver.nq_constraints.push_back(detail::func_supremum_norm( A,  ub));
       solver.nq_constraints.push_back(detail::func_supremum_norm(-A, -lb));
-    } */
+    }
 
     // Run solver and return recovered spectral distribution
     NLOptResult r = solve(solver);
@@ -413,17 +414,17 @@ namespace met {
     } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    // for (uint i = 0; i < wavelength_samples; ++i) {
-    //   auto a = info.basis.func.row(i).eval();
-    //   solver.nq_constraints.push_back(detail::func_dot( a, 1.f));
-    //   solver.nq_constraints.push_back(detail::func_dot(-a, 0.f));
-    // } // for (uint i)
+    for (uint i = 0; i < wavelength_samples; ++i) {
+      auto a = info.basis.func.row(i).eval();
+      solver.nq_constraints.push_back(detail::func_dot( a, 1.f));
+      solver.nq_constraints.push_back(detail::func_dot(-a, 0.f));
+    } // for (uint i)
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    {
-      auto A = info.basis.func.matrix().eval();
-      solver.nq_constraints.push_back(detail::func_supremum_norm( A, Spec(1.f)));
-      solver.nq_constraints.push_back(detail::func_supremum_norm(-A, Spec(0.f)));
-    }
+    // {
+    //   auto A = info.basis.func.matrix().eval();
+    //   solver.nq_constraints.push_back(detail::func_supremum_norm( A, Spec(1.f)));
+    //   solver.nq_constraints.push_back(detail::func_supremum_norm(-A, Spec(0.f)));
+    // }
 
     // Parallel solve for boundary spectra
     tbb::concurrent_vector<Spec> tbb_output;
