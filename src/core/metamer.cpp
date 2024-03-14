@@ -89,29 +89,30 @@ namespace met {
     debug::check_expr(info.systems.size() == info.signals.size(),
       "Color system size not equal to color signal size");
 
-    // auto b = (info.basis.fun)
+    // Take a grayscale spectrum as mean to build around
+    Spec mean = info.signals[0].matrix().dot(eig::Vector3f { 0.2126, 0.7252, 0.0722 });
 
     // Solver settings
     NLOptInfo solver = {
       .n            = wavelength_bases,
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMinimize,
-      .x_init       = Basis::BVec(0.5).cast<double>().eval(),
-      .max_iters    = 128,  // Failsafe; halt after 128 iterations
-      // .rel_func_tol = 1e-6,
+      .x_init       = Basis::BVec(0.1).cast<double>().eval(),
+      .max_iters    = 1024, // Failsafe; halt after 128 iterations
+      // .rel_func_tol = 1e-6, // Halt when objective error falls below threshold
       .rel_xpar_tol = 1e-3, // halt when constraint error falls below threshold
     };
     
     // Note; simple way to get relatively smooth spectra
     // Objective function minimizes l2 norm over spectral distribution itself
-    solver.objective = detail::func_squared_norm(info.basis.func, Spec::Zero());
+    solver.objective = detail::func_norm(info.basis.func, Spec::Zero());
 
     // Add color system equality constraints, upholding spectral metamerism
     for (uint i = 0; i < info.systems.size(); ++i) {
       auto A = (info.systems[i].transpose() * info.basis.func.matrix()).eval();
-      auto o = (info.systems[i].transpose() * info.basis.mean.matrix()).eval();
+      auto o = (info.systems[i].transpose() *            mean.matrix()).eval();
       auto b = (info.signals[i] - o.array()).eval();
-      solver.eq_constraints.push_back(detail::func_squared_norm(A, b));
+      solver.eq_constraints.push_back(detail::func_norm(A, b));
     } // for (uint i)
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
@@ -124,7 +125,7 @@ namespace met {
     } // for (uint i) */
     {
       auto A = info.basis.func.matrix().eval();
-      Spec ub = 1.f - info.basis.mean;
+      Spec ub = 1.f - mean;
       Spec lb = ub - 1.f;
       solver.nq_constraints.push_back(detail::func_supremum_norm( A,  ub));
       solver.nq_constraints.push_back(detail::func_supremum_norm(-A, -lb));
@@ -132,7 +133,7 @@ namespace met {
 
     // Run solver and return recovered spectral distribution
     NLOptResult r = solve(solver);
-    return (info.basis.func * r.x.cast<float>()).array() + info.basis.mean;
+    return (info.basis.func * r.x.cast<float>()).array() + mean;
   }
 
   Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
