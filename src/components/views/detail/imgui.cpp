@@ -1,4 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/window.hpp>
@@ -104,6 +105,21 @@ namespace ImGui {
     while (true) {
       guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
       ImGui::CloseCurrentPopup();
+    }
+  }
+
+  void PlotSpectrum(const char* label, const met::Spec &sd, float min_bounds, float max_bounds) {
+    using namespace met;
+
+    if (ImPlot::BeginPlot(label, { -1, 0 }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+      eig::Array<float, wavelength_samples - 4, 1> x_values, y_values;
+      rng::copy(vws::iota(2u, wavelength_samples - 2u) | vws::transform(wavelength_at_index), x_values.begin());
+      rng::copy(sd.begin() + 2, sd.end() - 2, y_values.begin());
+      ImPlot::SetupAxesLimits(wavelength_at_index(x_values[0]), 
+                              wavelength_at_index(x_values[wavelength_samples - 5]), 
+                              min_bounds, max_bounds, ImPlotCond_Always);
+      ImPlot::PlotLine("##sd", x_values.data(), y_values.data(), wavelength_samples);
+      ImPlot::EndPlot();
     }
   }
 

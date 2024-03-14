@@ -1,5 +1,6 @@
 #pragma once
 
+
 #define IM_VEC2_CLASS_EXTRA                                    \
   ImVec2(const met::eig::Vector2f &v) : x(v.x()), y(v.y()) { } \
   ImVec2(const met::eig::Vector2i &v) : x(v.x()), y(v.y()) { } \
@@ -27,6 +28,7 @@
     static_cast<int>(z), static_cast<int>(w) }; }
 
 #include <metameric/core/math.hpp>
+#include <metameric/core/spectrum.hpp>
 #include <small_gl/fwd.hpp>
 #include <imgui.h>
 #include <string>
@@ -85,6 +87,9 @@ namespace ImGui {
   void SpacedSeparator();
   void CloseAnyPopupIfOpen();
   void CloseAllPopupsIfOpen();
+  
+  // Plot a spectral distribution
+  void PlotSpectrum(const char* label, const met::Spec &reflectance, float min_bounds = -0.05f, float max_bounds = 1.05f);
 
   /* Wrappers for std::string STL types.
      Src: https://github.com/ocornut/imgui/blob/master/misc/cpp/imgui_stdlib.h
