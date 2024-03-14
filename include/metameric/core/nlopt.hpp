@@ -10,6 +10,7 @@
 namespace met {
   using NLOptAlgo = nlopt::algorithm;
   
+  // NLOpt optimization direction; shorthand for negated objective function
   enum class NLOptForm {
     eMinimize, // Minimize objective function
     eMaximize  // Maximize objective function by minimizing negative
@@ -20,14 +21,31 @@ namespace met {
       double (eig::Map<const eig::VectorXd>, eig::Map<eig::VectorXd>)
     >;
 
+    using VectorCapture = std::function<
+      void (eig::Map<eig::VectorXd> result, eig::Map<const eig::VectorXd>, eig::Map<eig::MatrixXd>)
+    >;
+
+    struct Constraint {
+      Capture f;
+      double  tol = 0.0;
+    };
+
+    struct VectorConstraint {
+      VectorCapture f;
+      uint          n   = 1;
+      double        tol = 0.0;
+    };
+
     uint      n;                           // Output dimensionality
     NLOptAlgo algo = NLOptAlgo::LD_SLSQP;  // Employed algorithm
     NLOptForm form = NLOptForm::eMinimize; // Minimize/maximize?
 
     // Function arguments
-    Capture              objective;      // Minimization/maximization objective
-    std::vector<Capture> eq_constraints; // Equality constraints:  f(x) == 0
-    std::vector<Capture> nq_constraints; // Inequality constraint: f(x) <= 0
+    Capture                       objective;      // Minimization/maximization objective
+    std::vector<Constraint>       eq_constraints; // Equality constraints:  f(x) == 0
+    std::vector<Constraint>       nq_constraints; // Inequality constraint: f(x) <= 0
+    std::vector<VectorConstraint> eq_constraints_v; // Equality vector constraints:  f(x) == 0
+    std::vector<VectorConstraint> nq_constraints_v; // Inequality vector constraint: f(x) <= 0
 
     // Vector arguments
     eig::VectorXd x_init; // Initial best guess for x
@@ -42,31 +60,13 @@ namespace met {
     std::optional<double> rel_xpar_tol; // 1e-4
   };
 
+  // Return value for solve(NLOptInfo)
   struct NLOptResult {
-    eig::VectorXd x;
-    double        objective;
-    nlopt::result code;
+    eig::VectorXd x;         // Result value
+    double        objective; // Last objective value
+    nlopt::result code;      // Optional return codes; 1 == success
   };
 
+  // Generate program and run optimization
   NLOptResult solve(NLOptInfo &info);
-  
-  using NLMMVBoundarySet = typename std::unordered_set<
-    Colr, eig::detail::matrix_hash_t<Colr>, eig::detail::matrix_equal_t<Colr>
-  >;
-
-  /* Info struct for sampling-based generation of points on the object color solid of a metamer mismatch volume */
-  struct NLGenerateMMVBoundaryInfo {
-    const Basis                  &basis;      // Spectral basis functions
-    std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
-    std::span<const Colr>         signals_i;  // Color signals for prior constraints
-    std::span<const CMFS>         systems_j;  // Color system spectra for objective function
-    const CMFS                    &system_j;  // Color system for mismatching region
-    std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
-  };
-
-  Spec              nl_generate_spectrum(GenerateSpectrumInfo info);
-  std::vector<Spec> nl_generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info);
-  std::vector<Colr> nl_generate_ocs_boundary_colr(const GenerateOCSBoundaryInfo &info);
-  std::vector<Spec> nl_generate_mmv_boundary_spec(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
-  NLMMVBoundarySet  nl_generate_mmv_boundary_colr(const NLGenerateMMVBoundaryInfo &info, double power, bool switch_power);
 } // namespace met

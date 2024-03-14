@@ -60,12 +60,22 @@ namespace met {
       // Visit the underlying constraint data
       std::visit(overloaded {
         [&](DirectColorConstraint &cstr) {
-          // Color baseline value
+          // Color baseline editor
           {
+            // lRGB color picker
+            Colr &lrgb = cstr.get_colr_i();
             ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
-            auto srgb = lrgb_to_srgb(cstr.get_colr_i());
+            
+            // sRGB color picker
+            Colr srgb = lrgb_to_srgb(lrgb);
             ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
-            cstr.get_colr_i() = srgb_to_lrgb(srgb);
+            lrgb = srgb_to_lrgb(srgb);
+            
+            // Roundtrip error
+            Colr rtrp = e_scene.get_csys(0).apply(e_spectra[e_is.constraint_i]);
+            Colr err  = (lrgb - rtrp).abs();
+            ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            // ImGui::ColorEdit3("Roundtrip (lrgb)", err.data(), ImGuiColorEditFlags_Float);
           }
 
           // Visual separator into constraint list
@@ -256,16 +266,6 @@ namespace met {
         ImPlot::PlotLine("", x_values.data(), e_sd.data(), wavelength_samples);
         ImPlot::EndPlot();
       }
-
-      const auto &e_scene = info.global("scene").getr<Scene>();
-      
-      Spec illuminant = e_scene.get_emitter_spd(0);
-      ColrSystem csys = {
-        .cmfs       = e_scene.resources.observers[0].value(),
-        .illuminant = e_scene.resources.illuminants[0].value()
-      };
-      auto colr = csys(e_sd);
-      ImGui::ColorEdit3("Roundtrip color", colr.data(), ImGuiColorEditFlags_Float);
     }
   }
 } // namespace met
