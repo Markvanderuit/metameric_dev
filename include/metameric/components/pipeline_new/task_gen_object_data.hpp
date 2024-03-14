@@ -14,11 +14,11 @@ namespace met {
       alignas(8) eig::Array2u dispatch_n;
     };
 
-    uint            m_object_i;
-    gl::ComputeInfo m_dispatch;
-    gl::Program     m_program;
-    gl::Buffer      m_unif_buffer;
-    UnifLayout     *m_unif_map;
+    uint         m_object_i;
+    gl::Program  m_program_txtr; // Program for texture handling
+    gl::Program  m_program_colr; // Program for single-color handling
+    gl::Buffer   m_unif_buffer;
+    UnifLayout  *m_unif_map;
 
   public:
     GenObjectDataTask(uint object_i);

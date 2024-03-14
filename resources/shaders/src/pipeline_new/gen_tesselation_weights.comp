@@ -13,6 +13,9 @@ layout(local_size_x = 16, local_size_y = 16) in;
 layout(std430) buffer;
 layout(std140) uniform;
 
+// Specialization constant declarations
+layout(constant_id = 0) const bool sample_albedo = true;
+
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
@@ -43,7 +46,10 @@ layout(binding = 0)          uniform                    sampler2DArray b_txtr_3f
 layout(binding = 0, rgba32f) uniform restrict writeonly image2DArray   b_bary_4f;
 
 vec3 fetch_texel(in ObjectInfo object_info, in uvec2 tx_in) {
-  if (object_info.is_albedo_sampled) {
+  // We select color/texture at compile-time and compile
+  // two versions of this shader, to avoid awkward warnings
+  // when there is an unbound sampler object floating around
+  if (sample_albedo) {
     // Color value is supplied by scene texture
     TextureInfo info = buff_textures.data[object_info.albedo_i];
     uvec2 tx = info.offs + min(tx_in, info.size - 1);
