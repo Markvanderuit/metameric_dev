@@ -19,7 +19,7 @@ namespace met::detail {
     // - prior; arcb_handle to corresponding target viewport; should hold gl::Texture2d4f
     // - info; arcball initialization settings
     ArcballInputTask(ResourceHandle view, InfoType info = {
-      .dist            = 1.f,
+      .dist            = 3.4641f,
       .e_eye           = 1.f,
       .e_center        = 0.f,
       .zoom_delta_mult = 0.1f

@@ -18,9 +18,9 @@ PositionSample sample_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec
 }
 
 vec4 eval_emitter_point(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
+  // Attenuate point light by one over squared distance
   vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  v /= sdot(ps.t); // Attenuate point light
-  return v * em.illuminant_scale;
+  return v * em.illuminant_scale / sdot(ps.t);
 }
 
 float pdf_emitter_point(in EmitterInfo em, in PositionSample ps) {

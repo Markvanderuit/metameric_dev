@@ -103,17 +103,21 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
       vec3           wo       = to_local(si, ps.d);
       float          bsdf_pdf = prev_bsdf_pdf * pdf_brdf(brdf, si, wo);
       
+      // Avoid diracs when calculating mis weight
+      float mis_weight = ps.is_delta 
+                       ? 1.f / ps.pdf 
+                       : mis_power(ps.pdf, bsdf_pdf) / ps.pdf;
+
       // If the sample position has potential throughput, 
       // evaluate a ray towards the position and add contribution to output
       if (ps.pdf != 0.f && bsdf_pdf != 0.f && cos_theta(wo) > 0.f) {
         Ray ray = ray_towards_point(si, ps.p);
         if (!scene_intersect_any(ray)) {
-          vec4 s = beta                         // Throughput
-                 * eval_brdf(brdf, si, wo)      // brdf value
-                 * cos_theta(wo)                // cosine attenuation
-                 * eval_emitter(ps, wvls)       // emitted value
-                 * mis_power(ps.pdf, bsdf_pdf)  // mis weight
-                 / ps.pdf;                      // sample density
+          vec4 s = beta                    // Throughput
+                 * eval_brdf(brdf, si, wo) // brdf value
+                 * cos_theta(wo)           // cosine attenuation
+                 * eval_emitter(ps, wvls)  // emitted value
+                 * mis_weight;             // mis weight
 
           // Store current path if requested
           path_finalize_emitter(pt, ps, s, wvls);

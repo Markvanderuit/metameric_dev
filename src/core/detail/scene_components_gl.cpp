@@ -292,12 +292,17 @@ namespace met::detail {
 
     // Build sampling distribution over emitter's powers
     std::vector<float> emitter_distr(max_supported_emitters, 0.f);
+    auto active_emitters = scene.components.emitters
+                         | vws::transform([](const auto &comp) { return comp.value; })
+                         | vws::filter(&Emitter::is_active)
+                         | rng::to<std::vector>();
+    
     #pragma omp parallel for
     for (int i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
       guard_continue(emitter.is_active);
       Spec s  = scene.resources.illuminants[emitter.illuminant_i].value();
-      emitter_distr[i] = 1.f / static_cast<float>(emitters.size());
+      emitter_distr[i] = 1.f / static_cast<float>(active_emitters.size());
       // emitter_distr[i] = s.sum() * emitter.illuminant_scale;
     }
 

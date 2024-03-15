@@ -14,8 +14,8 @@ PositionSample sample_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in
   ps.d /= ps.t;
 
   // Set pdf to non-zero if we are not approaching from a back-face
-  float dp = max(0.f, dot(ps.d, -ps.n));
-  ps.pdf = dp > 0.f ? em.srfc_area_inv * sdot(ps.t) / dp : 0.f;
+  float dp = abs(dot(-ps.d, ps.n));
+  ps.pdf = em.srfc_area_inv * sdot(ps.t) / dp;
   ps.is_delta = false;
 
   return ps;
@@ -25,14 +25,12 @@ vec4 eval_emitter_rectangle(in EmitterInfo em, in PositionSample ps, in vec4 wvl
   // If normal is not inclined along the ray, return nothing
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
-  
-  vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  return v * em.illuminant_scale;
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
 }
 
 float pdf_emitter_rectangle(in EmitterInfo em, in PositionSample ps) {
-  float dp = max(0.f, dot(ps.d, -ps.n));
-  return dp > 0.f ? em.srfc_area_inv * sdot(ps.t) / dp : 0.f;
+  float dp = abs(dot(-ps.d, ps.n));
+  return em.srfc_area_inv * sdot(ps.t) / dp;
 }
 
 #endif // RENDER_EMITTER_RECTANGLE_GLSL_GUARD
