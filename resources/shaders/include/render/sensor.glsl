@@ -2,6 +2,7 @@
 #define RENDER_SENSOR_GLSL_GUARD
 
 #include <render/ray.glsl>
+#include <spectrum.glsl>
 
 // Simple sensor definition based on matrices
 struct Sensor {
@@ -88,7 +89,7 @@ SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
   mat4  view_inv = inverse(sensor.view_trf);
 
   // Sample film position inside pixel, transform to [-1, 1]
-  vec2 xy = (vec2(sensor.pixel) + sample_3d.xy)  / vec2(sensor.film_size);
+  vec2 xy = (vec2(sensor.pixel) + sample_3d.xy) / vec2(sensor.film_size);
   xy = (xy - .5f) * 2.f;
   
   // Generate camera ray from sample
@@ -110,11 +111,11 @@ SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
 }
 
 vec3 sensor_apply(in vec4 wvls, in vec4 L) {
-  return scene_cmfs(0, wvls) * L;
+  return (scene_cmfs(0, wvls) * L) * 0.25f * float(wavelength_samples);
 }
 
 vec3 sensor_apply(in SensorSample sensor_sample, in vec4 L) {
-  return scene_cmfs(0, sensor_sample.wvls) * L;
+  return (scene_cmfs(0, sensor_sample.wvls) * L) * 0.25f * float(wavelength_samples);
 }
 
 #endif // RENDER_SENSOR_GLSL_GUARD

@@ -226,7 +226,7 @@ namespace met::detail {
 
     // Uniform layout which includes nr. of active components
     struct EmitterUniformBufferLayout {
-      alignas(4) uint n;
+      alignas(4)   uint n;
       EmitterInfoLayout data[max_supported_objects];
     };
     
@@ -297,7 +297,8 @@ namespace met::detail {
       const auto &[emitter, state] = emitters[i];
       guard_continue(emitter.is_active);
       Spec s  = scene.resources.illuminants[emitter.illuminant_i].value();
-      emitter_distr[i] = s.sum() * emitter.illuminant_scale;
+      emitter_distr[i] = 1.f / static_cast<float>(emitters.size());
+      // emitter_distr[i] = s.sum() * emitter.illuminant_scale;
     }
 
     auto distr = Distribution(cnt_span<float>(emitter_distr));
@@ -305,6 +306,7 @@ namespace met::detail {
     for (uint i = 0; i < 10; ++i) {
       auto sample = distr.sample_discrete(sampler.next_1d());
       auto pdf    = distr.pdf_discrete(sample);
+      fmt::print("Sample {}, {} : {}\n", i, sample, pdf);
     }
     
     emitter_distr_buffer = distr.to_buffer_std140();
@@ -606,11 +608,9 @@ namespace met::detail {
       const auto &[value, state] = cmfs[i];
       guard_continue(state);
 
-      // Premultiply with RGB
-      CMFS to_xyz = (value.array() /* * illuminant *//*  * wavelength_ssize */)
-                  / (value.array().col(1)  /* * illuminant */ * wavelength_ssize).sum();
-      CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-      
+      // Premultiply with RGB and normalize s.t. a unit spectrum has 1 luminance
+      ColrSystem csys = { .cmfs = value, .illuminant = Spec(1)  };
+      CMFS to_rgb = csys.finalize();
       cmfs_buffer_map[i] = to_rgb.transpose().reshaped(wavelength_samples, 3);
     }
 

@@ -9,29 +9,62 @@
 #include <random>
 
 namespace met {
+  // Encapsulation of PCG hash that conforms to std::uniform_random_bit_generator
+  class PCGEngine {
+    uint m_state;
+
+    // Underlying sequence
+    constexpr uint pcg_hash() {
+      m_state = m_state * 747796405u + 2891336453u;
+      uint v = m_state;
+      v ^= v >> ((v >> 28u) + 4u);
+      v *= 277803737u;
+      v ^= v >> 22u;
+      return v;
+    }
+
+  public:
+    // Construct the engine, optionally provide a seed
+    constexpr PCGEngine(uint seed = 0)
+    : m_state(seed) { }
+
+    // Set engine's current internal state
+    constexpr void seed(uint seed) {
+      m_state = seed;
+    }
+
+    // Advance engine's state z times and discard generated values
+    constexpr void discard(uint z = 1) { 
+      for (uint i = 0; i < z; ++i)
+        pcg_hash(); 
+    }
+    
+    // Advance engine's state and return generated value
+    constexpr uint operator()() { 
+      return pcg_hash(); 
+    }
+
+    // Return smallest and largest possible values in the output range
+    constexpr static uint min() { return 0;          }
+    constexpr static uint max() { return 4294967295; }
+  };
+  static_assert(std::uniform_random_bit_generator<PCGEngine>);
+
+  // Simple sampler class that encapsulates a random number engine
+  template <typename E = PCGEngine> requires (std::uniform_random_bit_generator<E>)
   class UniformSampler {
-    std::mt19937                          m_rng;
+    E                                     m_engine;
     std::uniform_real_distribution<float> m_distr;
     
   public:
-    UniformSampler()
-    : m_rng(std::random_device()()),
-      m_distr(0.f, 1.f) { }
+    UniformSampler(uint seed = std::random_device()())
+    : m_engine(seed), m_distr(0.f, 1.f) { }
 
-    UniformSampler(uint seed)
-    : m_rng(seed),
-      m_distr(0.f, 1.f) { }
-
-    UniformSampler(float min_v, float max_v)
-    : m_rng(std::random_device()()),
-      m_distr(min_v, max_v) { }
-
-    UniformSampler(float min_v, float max_v, uint seed)
-    : m_rng(seed),
-      m_distr(min_v, max_v) { }
+    UniformSampler(float min_v, float max_v, uint seed = std::random_device()())
+    : m_engine(seed), m_distr(min_v, max_v) { }
 
     float next_1d() {
-      return m_distr(m_rng);
+      return m_distr(m_engine);
     }
 
     template <uint N>
@@ -49,11 +82,11 @@ namespace met {
       return v;
     }
 
-  public:
+  /* public: // Conform to std::uniform_random_bit_generator<Sampler> by passthrough
     constexpr static uint32_t min() { return std::mt19937::min(); }
     constexpr static uint32_t max() { return std::mt19937::max(); }
-    uint32_t g() { return m_rng(); }
-    uint32_t operator()() { return m_rng(); }
+    uint32_t g() { return m_engine(); }
+    uint32_t operator()() { return m_engine(); } */
   };
 
   class PCGSampler {
@@ -72,21 +105,11 @@ namespace met {
     }
 
   public:
-    PCGSampler()
-    : m_state(std::random_device()()),
-      m_distr(0.f, 1.f) { }
+    PCGSampler(uint seed = std::random_device()())
+    : m_state(seed), m_distr(0.f, 1.f) { }
 
-    PCGSampler(uint seed)
-    : m_state(seed),
-      m_distr(0.f, 1.f) { }
-
-    PCGSampler(float min_v, float max_v)
-    : m_state(std::random_device()()),
-      m_distr(min_v, max_v) { }
-
-    PCGSampler(float min_v, float max_v, uint seed)
-    : m_state(seed),
-      m_distr(min_v, max_v) { }
+    PCGSampler(float min_v, float max_v, uint seed = std::random_device()())
+    : m_state(seed), m_distr(min_v, max_v) { }
     
     float next_1d() {
       return m_distr(*this);
@@ -107,8 +130,7 @@ namespace met {
       return v;
     }
     
-  // Implement conformance to std::uniform_random_bit_generator<Sampler>
-  public:
+  public: // Conform to std::uniform_random_bit_generator<Sampler> by passthrough
     constexpr static uint32_t min() { return 0; }
     constexpr static uint32_t max() { return 4294967295; }
     uint32_t g() { return pcg_hash(); }

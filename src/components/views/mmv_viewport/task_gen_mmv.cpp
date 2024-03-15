@@ -161,7 +161,7 @@ namespace met {
                        | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
-        GenerateMMVBoundaryInfo mmv_info = {
+        GenerateMismatchingOCSInfo mmv_info = {
           .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
           .systems_i = systems_i,
           .signals_i = signals_i,
@@ -171,7 +171,7 @@ namespace met {
 
         // Generate MMV spectra and append corresponding colors to current point set
         auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
-        m_points.insert_range(csys(generate_mmv_boundary_spec(mmv_info)));
+        m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Generate 6D unit vector samples
@@ -184,7 +184,7 @@ namespace met {
                        | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
-        GenerateMMVBoundaryInfo mmv_info = {
+        GenerateMismatchingOCSInfo mmv_info = {
           .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
           .systems_i = systems_i,
           .signals_i = signals_i,
@@ -194,7 +194,7 @@ namespace met {
 
         // Generate MMV spectra and append corresponding colors to current point set
         auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
-        m_points.insert_range(csys(generate_mmv_boundary_spec(mmv_info)));
+        m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
         // Generate 3D unit vector samples
@@ -220,7 +220,7 @@ namespace met {
                        | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
-        GenerateIndirectMMVBoundaryInfo mmv_info = {
+        GenerateIndirectMismatchingOCSInfo mmv_info = {
           .basis      = e_scene.resources.bases[e_uplifting.basis_i].value(),
           .systems_i  = systems_i,
           .signals_i  = signals_i,
@@ -234,7 +234,7 @@ namespace met {
           .cmfs   = e_scene.resources.observers[0].value(),
           .powers = cstr.powers
         };
-        m_points.insert_range(csys(generate_mmv_boundary_spec(mmv_info)));
+        m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const auto &) { }
     }, e_vert.constraint);

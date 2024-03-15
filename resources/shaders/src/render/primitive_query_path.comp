@@ -47,7 +47,7 @@ layout(binding = 4) uniform b_buff_textures {
 } buff_textures;
 layout(binding = 5) uniform b_buff_emitters {
   uint n;
-  EmitterInfo data[max_supported_objects];
+  EmitterInfo data[max_supported_emitters];
 } buff_emitters;
 layout(binding = 6) restrict readonly buffer b_buff_barycentrics {
   BarycentricInfo data[max_supported_objects];

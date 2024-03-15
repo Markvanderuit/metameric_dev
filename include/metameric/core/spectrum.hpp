@@ -203,4 +203,10 @@ namespace met {
   Spec safe_div(const Spec &s, const Spec &div) {
     return (s / div.NullaryExpr([](float f) { return f != 0.f ? f : 1.f; })).eval();
   }
+
+  // Luminance corresponding to a linear sRGB value
+  inline
+  float luminance(const Colr &c) {
+    return c.matrix().dot(eig::Vector3f { 0.212671f, 0.715160f, 0.072169f });
+  }
 } // namespace met

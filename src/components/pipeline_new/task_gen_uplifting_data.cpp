@@ -134,7 +134,7 @@ namespace met {
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
-      m_csys_boundary_spectra = generate_ocs_boundary_spec({ .basis   = e_basis.value(),
+      m_csys_boundary_spectra = generate_color_system_ocs({ .basis   = e_basis.value(),
                                                              .system  = csys,
                                                              .samples = m_csys_boundary_samples });
 

@@ -63,6 +63,13 @@ float pdf_emitter(in PositionSample ps) {
 }
 
 PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {
+  // // Sample emitter uniformly
+  // DistributionSampleDiscrete ds;
+  // ds.i   = 0;
+  // ds.pdf = 1.0;
+  // // ds.i   = uint(sample_3d.z * float(scene_emitter_count()));
+  // // ds.pdf = 1.f / float(scene_emitter_count());
+  
   // Sample emitter from power distribution
   DistributionSampleDiscrete ds = sample_emitters_discrete(sample_3d.z);
   ds.pdf /= float(max_supported_emitters);
@@ -77,6 +84,7 @@ PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {
 
 float pdf_emitters(in PositionSample ps) {
   float pdf = pdf_emitter(ps);
+  // pdf *= float(scene_emitter_count());
   pdf *= pdf_emitters_discrete(record_get_emitter(ps.data)) / float(max_supported_emitters);
   return pdf;
 }

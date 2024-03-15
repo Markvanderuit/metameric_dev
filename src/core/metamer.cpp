@@ -5,9 +5,53 @@
 #include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <execution>
+#include <numbers>
 #include <unordered_set>
 
 namespace met {
+  namespace detail {
+    // Given a random vector in RN bounded to [-1, 1], return a vector
+    // distributed over a gaussian distribution
+    template <uint N>
+    inline auto inv_gaussian_cdf(const eig::Array<float, N, 1> &x) {
+      auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
+      auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
+      return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
+    }
+    
+    // Given a random vector in RN bounded to [-1, 1], return a uniformly
+    // distributed point on the unit sphere
+    template <uint N>
+    inline auto inv_unit_sphere_cdf(const eig::Array<float, N, 1> &x) {
+      return inv_gaussian_cdf(x).matrix().normalized().array().eval();
+    }
+    
+    // Generate a set of random, uniformly distributed unit vectors in RN
+    template <uint N>
+    inline auto gen_unit_dirs(uint n_samples, uint seed_offs = 0) {
+      met_trace();
+
+      std::vector<eig::Array<float, N, 1>> unit_dirs(n_samples);
+
+      if (n_samples <= 128) {
+        UniformSampler sampler(-1.f, 1.f, seed_offs);
+        for (int i = 0; i < unit_dirs.size(); ++i)
+          unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd<N>());
+      } else {
+        UniformSampler sampler(-1.f, 1.f, seed_offs);
+        #pragma omp parallel
+        { // Draw samples for this thread's range with separate sampler per thread
+          UniformSampler sampler(-1.f, 1.f, seed_offs + static_cast<uint>(omp_get_thread_num()));
+          #pragma omp for
+          for (int i = 0; i < unit_dirs.size(); ++i)
+            unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd<N>());
+        }
+      }
+
+      return unit_dirs;
+    }
+  } // namespace detail
+
   Spec generate_spectrum(GenerateSpectrumInfo info) {
     met_trace();
     debug::check_expr(info.systems.size() == info.signals.size(),
@@ -140,7 +184,7 @@ namespace met {
     return (info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval();
   }
 
-  std::vector<Spec> generate_mmv_boundary_spec(const GenerateMMVBoundaryInfo &info) {
+  std::vector<Spec> generate_mismatching_ocs(const GenerateMismatchingOCSInfo &info) {
     met_trace();
 
     // Solver settings
@@ -201,7 +245,7 @@ namespace met {
     return std::vector<Spec>(range_iter(tbb_output));
   }
 
-  std::vector<Spec> generate_mmv_boundary_spec(const GenerateIndirectMMVBoundaryInfo &info) {
+  std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
     met_trace();
 
     // Solver settings
@@ -281,30 +325,31 @@ namespace met {
     return std::vector<Spec>(range_iter(tbb_output));
   }
 
-  std::vector<Spec> generate_ocs_boundary_spec(const GenerateOCSBoundaryInfo &info) {
+  std::vector<Spec> generate_color_system_ocs(const GenerateColorSystemOCSInfo &info) {
     met_trace();
 
-    // Run multithreaded spectrum generation
-    std::vector<Spec> output(info.samples.size());
-    std::transform(std::execution::par_unseq, range_iter(info.samples), output.begin(), [&](const Colr &sample) {
-      // Obtain spectrum by projecting sample onto optimal
-      Spec s = (info.system * sample.matrix()).eval();
+    // Output for parallel solve
+    tbb::concurrent_vector<Spec> tbb_output;
+    tbb_output.reserve(info.samples.size());
+
+    // Parallel solve for boundary spectra
+    #pragma omp parallel for
+    for (int i = 0; i < info.samples.size(); ++i) {
+      // Obtain actual spectrum by projecting sample onto optimal
+      Spec s = (info.system * info.samples[i].matrix()).eval();
       for (auto &f : s)
         f = f >= 0.f ? 1.f : 0.f;
-      
-      // Run solve to find nearest spectrum within the basis function set
+
+      // Run solve to find nearest valid spectrum within the basis function set
       std::vector<CMFS> systems = { info.system };
       std::vector<Colr> signals = { (info.system.transpose() * s.matrix()).eval() };
-      return generate_spectrum({  .basis = info.basis, .systems = systems, .signals = signals });
-    });
+      s = generate_spectrum({  .basis = info.basis, .systems = systems, .signals = signals });
+
+      // Store valid spectrum
+      guard_continue(!s.isNaN().any());
+      tbb_output.push_back(s);
+    }
     
-    // Filter NaNs at underconstrained output and strip redundancy from return 
-    std::erase_if(output, [](Spec &c) { return c.isNaN().any(); });
-    std::unordered_set<
-      Spec, 
-      decltype(eig::detail::matrix_hash<float>), 
-      decltype(eig::detail::matrix_equal)
-    > output_unique(range_iter(output));
-    return std::vector<Spec>(range_iter(output_unique));
+    return std::vector<Spec>(range_iter(tbb_output));
   }
 } // namespace met

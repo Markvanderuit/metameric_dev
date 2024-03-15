@@ -77,56 +77,27 @@ namespace met {
       rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
         std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
 
-      // Camera cmfs
-      CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
-      cmfs = (cmfs.array())
-           / (cmfs.array().col(1) * wavelength_ssize).sum();
-      cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
+      // Integration color matching functions, s.t. a unit spectrum integrates to 1 luminance
+      CMFS cmfs = ColrSystem {
+        .cmfs       = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
+        .illuminant = Spec(1)
+      }.finalize();
 
       // Divider by nr. of requested path samples; not total paths. Most extra paths
       // come from NEE, and further division is taken into account by probability weighintg
-      float colr_div = 1.f / static_cast<float>(m_query_spp);
+      float colr_div = 1.f / (4.f * static_cast<float>(m_query_spp));
+      colr_div *= wavelength_samples;
 
       // For each path, integrate spectral throughput into a distribution and
       // then convert this to a color.
       // Basically attempt to reproduce color output for testing
       Spec spec_distr = std::transform_reduce(std::execution::par_unseq,
         range_iter(paths), Spec(0), 
-        [](const auto &a, const auto &b) -> Spec { 
-          return (a + b).eval(); }, 
-        [&cmfs, colr_div](const auto &path) -> Spec {
-          return colr_div * accumulate_spectrum(path.wavelengths, path.L);
+        [](const auto &a, const auto &b) -> Spec { return (a + b).eval(); }, 
+        [colr_div](const auto &path) -> Spec { return colr_div * accumulate_spectrum(path.wavelengths, path.L);
       }).max(0.f).eval();
       Colr colr_lrgb_dstr = (cmfs.transpose() * spec_distr.matrix());
       Colr colr_srgb_dstr = lrgb_to_srgb(colr_lrgb_dstr);
-
-      // // For each path, integrate spectral information into a relevant color directly.
-      // // basically attempt to reproduce output color for testing
-      // Colr colr_lrgb = std::transform_reduce(std::execution::par_unseq,
-      //   range_iter(paths), Colr(0), 
-      //   [](const auto &a, const auto &b) -> Colr { 
-      //     return (a + b).eval(); }, 
-      //   [&cmfs, colr_div](const auto &path) -> Colr {
-      //     return colr_div * integrate_cmfs(cmfs, path.wavelengths, path.L);
-      // });
-      // Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
-
-      // For each path, gather relevant spectral tetrahedral uplifting data along vertices
-      // std::vector<std::vector<TetrahedronRecord>> tetr_data(paths.size());
-      // std::transform(std::execution::par_unseq, 
-      //   range_iter(paths), tetr_data.begin(), 
-      //   [&](const PathRecord &record) {
-      //     // For n-1 vertices (the last vertex necessarily hits an emitter, so we ignore it)
-      //     return record.data 
-      //       | vws::take(std::max(static_cast<int>(record.path_depth) - 1, 0))
-      //       | vws::transform([&](const auto &vt) { 
-      //         // ... find associated surface info
-      //         return e_scene.get_surface_info(vt.p, vt.record); }) 
-      //       | vws::transform([&](const auto &si) {
-      //         // ... then find surface's uplifting task, and let it generate a uplifting tetrahedron
-      //         auto handle = uplf_handles[si.object.uplifting_i];
-      //         return handle.realize<GenUpliftingDataTask>().query_tetrahedron(si.diffuse); })
-      //       | rng::to<std::vector<TetrahedronRecord>>(); });
       
       // Assume for now, only one uplifting exists
       // Continue only if there is a constraint
