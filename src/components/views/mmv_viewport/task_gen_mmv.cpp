@@ -82,7 +82,7 @@ namespace met {
     }
     
     // Only pass if metameric mismatching is possible and samples are required
-    bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_iter < mmv_samples_max;
+    bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_points.size() < mmv_samples_max;
     
     return info.parent()("is_active").getr<bool>() && (is_stale || is_mmv);
   }
@@ -144,15 +144,12 @@ namespace met {
     }
     
     // Only continue if more samples are necessary
-    if (m_iter >= mmv_samples_max)
+    if (m_points.size() >= mmv_samples_max)
       return;
 
     // Visit underlying constraint types one by one
     std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
-        // Generate 6D unit vector samples
-        auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 6, m_iter);
-        
         // Prepare input color systems and corresponding signals
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
         auto signals_i = { cstr.colr_i };
@@ -166,7 +163,8 @@ namespace met {
           .systems_i = systems_i,
           .signals_i = signals_i,
           .systems_j = systems_j,
-          .samples   = samples,
+          .seed      = m_iter,
+          .n_samples = mmv_samples_per_iter
         };
 
         // Generate MMV spectra and append corresponding colors to current point set
@@ -174,32 +172,25 @@ namespace met {
         m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const DirectSurfaceConstraint &cstr) {
-        // Generate 6D unit vector samples
-        auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 3, m_iter);
-        
         // Prepare input color systems and corresponding signals
+        auto csys      = e_scene.get_csys(cstr.csys_j[m_csys_j]);
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
         auto signals_i = { cstr.surface.diffuse };
         auto systems_j = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.get_csys(i).finalize(); })
                        | rng::to<std::vector>();
 
-        // Prepare data for MMV point generation
+        // Generate MMV spectra and append corresponding colors to current point set
         GenerateMismatchingOCSInfo mmv_info = {
           .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
           .systems_i = systems_i,
           .signals_i = signals_i,
           .systems_j = systems_j,
-          .samples   = samples,
+          .seed      = m_iter,
+          .n_samples = mmv_samples_per_iter
         };
-
-        // Generate MMV spectra and append corresponding colors to current point set
-        auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
         m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        // Generate 3D unit vector samples
-        auto samples = detail::gen_unit_dirs(mmv_samples_per_iter, 3, m_iter);
-
         // Get camera cmfs
         CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
         cmfs = (cmfs.array())
@@ -212,27 +203,20 @@ namespace met {
         auto signals_i = { cstr.surface.diffuse };
 
         // Construct objective color system spectra from power series
-        auto systems_j = cstr.powers
-                       | vws::transform([&](Spec pwr) {
-                          CMFS to_xyz = (cmfs.array().colwise() * pwr * wavelength_ssize);
-                          CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-                          return to_rgb; })
-                       | rng::to<std::vector>();
-
-        // Prepare data for MMV point generation
-        GenerateIndirectMismatchingOCSInfo mmv_info = {
-          .basis      = e_scene.resources.bases[e_uplifting.basis_i].value(),
-          .systems_i  = systems_i,
-          .signals_i  = signals_i,
-          .components = cstr.powers,
-          .systems_j  = systems_j,
-          .samples    = samples,
+        IndirectColrSystem csys = {
+          .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
+          .powers = cstr.powers
         };
+        auto systems_j = csys.finalize();
 
         // Generate MMV spectra and append corresponding colors to current point set
-        IndirectColrSystem csys = {
-          .cmfs   = e_scene.resources.observers[0].value(),
-          .powers = cstr.powers
+        GenerateIndirectMismatchingOCSInfo mmv_info = {
+          .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
+          .systems_i = systems_i,
+          .signals_i = signals_i,
+          .systems_j = systems_j,
+          .seed      = m_iter,
+          .n_samples = mmv_samples_per_iter
         };
         m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },

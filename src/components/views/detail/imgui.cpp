@@ -108,17 +108,21 @@ namespace ImGui {
     }
   }
 
-  void PlotSpectrum(const char* label, const met::Spec &sd, float min_bounds, float max_bounds) {
+  void PlotSpectrum(const char* label, const met::Spec &sd, float min_bounds, float max_bounds, const ImVec2 &size) {
     using namespace met;
 
-    if (ImPlot::BeginPlot(label, { -1, 0 }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-      eig::Array<float, wavelength_samples - 4, 1> x_values, y_values;
-      rng::copy(vws::iota(2u, wavelength_samples - 2u) | vws::transform(wavelength_at_index), x_values.begin());
-      rng::copy(sd.begin() + 2, sd.end() - 2, y_values.begin());
-      ImPlot::SetupAxesLimits(wavelength_at_index(x_values[0]), 
-                              wavelength_at_index(x_values[wavelength_samples - 5]), 
-                              min_bounds, max_bounds, ImPlotCond_Always);
-      ImPlot::PlotLine("##sd", x_values.data(), y_values.data(), wavelength_samples);
+    if (ImPlot::BeginPlot(label, size, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+      // Get wavelength values for x-axis in plot
+      Spec x_values;
+      rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+      
+      // Setup minimal format for coming line plots
+      ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+
+      // More restrained 400-700nm to ignore funky edges
+      ImPlot::SetupAxesLimits(400.f, 700.f, min_bounds, max_bounds, ImPlotCond_Always);
+    
+      ImPlot::PlotLine("", x_values.data(), sd.data(), wavelength_samples);
       ImPlot::EndPlot();
     }
   }

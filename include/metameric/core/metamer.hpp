@@ -30,9 +30,10 @@ namespace met {
   // following the method of Mackiewicz et al., 2019 
   // "Spherical sampling methods for the calculation of metamer mismatch volumes"
   struct GenerateColorSystemOCSInfo {
-    const Basis          &basis;   // Spectral basis functions
-    CMFS                  system;  // Color system describing the expected gamut
-    std::span<const Colr> samples; // Random unit vector samples in 3 dimensions
+    const Basis          &basis;          // Spectral basis functions
+    CMFS                  system;         // Color system describing the expected gamut
+    uint                  seed      = 4;  // Seed for (pcg) sampler state
+    uint                  n_samples = 32; // Nr. of samples to solve for
   };
   std::vector<Spec> generate_color_system_ocs(const GenerateColorSystemOCSInfo &info);
 
@@ -40,11 +41,12 @@ namespace met {
   // mismatching between two or more color systems, following the method of Mackiewicz et al., 2019 
   // "Spherical sampling methods for the calculation of metamer mismatch volumes"
   struct GenerateMismatchingOCSInfo {
-    const Basis                  &basis;     // Spectral basis functions
-    std::span<const CMFS>         systems_i; // Color system spectra for prior color signals
-    std::span<const Colr>         signals_i; // Color signals for prior constraints
-    std::span<const CMFS>         systems_j; // Color system spectra for objective function
-    std::span<const eig::ArrayXf> samples;   // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
+    const Basis           &basis;          // Spectral basis functions
+    std::span<const CMFS>  systems_i;      // Color system spectra for prior color signals
+    std::span<const Colr>  signals_i;      // Color signals for prior constraints
+    std::span<const CMFS>  systems_j;      // Color system spectra for objective function
+    uint                   seed      = 4;  // Seed for (pcg) sampler state
+    uint                   n_samples = 32; // Nr. of samples to solve for
   };
   std::vector<Spec> generate_mismatching_ocs(const GenerateMismatchingOCSInfo &info);
 
@@ -52,12 +54,12 @@ namespace met {
   // mismatching between signal in a number pf base color systems, and a interreflection system
   // expressed as a truncated power series
   struct GenerateIndirectMismatchingOCSInfo {
-    const Basis                  &basis;      // Spectral basis functions
-    std::span<const CMFS>         systems_i;  // Color system spectra for prior color signals
-    std::span<const Colr>         signals_i;  // Color signals for prior constraints
-    std::span<const Spec>         components; // Increasing components of the power series
-    std::span<const CMFS>         systems_j;  // Color system spectra for objective function
-    std::span<const eig::ArrayXf> samples;    // Random unit vector samples in (systems_i.size() + 1) * 3 dimensions
+    const Basis           &basis;          // Spectral basis functions
+    std::span<const CMFS>  systems_i;      // Color system spectra for prior color signals
+    std::span<const Colr>  signals_i;      // Color signals for prior constraints
+    std::span<const CMFS>  systems_j;      // Color system spectra for objective function
+    uint                   seed      = 4;  // Seed for (pcg) sampler state
+    uint                   n_samples = 32; // Nr. of samples to solve for
   };
   std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info);
 } // namespace met

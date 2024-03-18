@@ -84,9 +84,6 @@ namespace met {
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
     met_trace_full();
 
-    // Precalculate samples for finding the color system boundary
-    m_csys_boundary_samples = detail::gen_unit_dirs<3>(n_system_boundary_samples);
-
     // Initialize buffers to hold packed delaunay tesselation data; these buffers are used by
     // the gen_object_data task to generate barycentric weights for the objects' textures
     info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                                .flags = buffer_create_flags });
@@ -134,9 +131,9 @@ namespace met {
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
-      m_csys_boundary_spectra = generate_color_system_ocs({ .basis   = e_basis.value(),
-                                                             .system  = csys,
-                                                             .samples = m_csys_boundary_samples });
+      m_csys_boundary_spectra = generate_color_system_ocs({ .basis      = e_basis.value(),
+                                                             .system    = csys,
+                                                             .n_samples = n_system_boundary_samples });
 
       // For each spectrum, add a point to the set of tesselation points for later
       m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());

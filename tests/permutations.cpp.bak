@@ -109,7 +109,7 @@
 // }
 
 // TEST_CASE("Product to sum") {
-//   PCGSampler sampler(4);
+//   UniformSampler sampler(4);
 //   std::uniform_int_distribution<uint> distr(0, 10);
 
 //   // Generate inputs

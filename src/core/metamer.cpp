@@ -1,3 +1,4 @@
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/nlopt.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
@@ -28,20 +29,20 @@ namespace met {
     
     // Generate a set of random, uniformly distributed unit vectors in RN
     template <uint N>
-    inline auto gen_unit_dirs(uint n_samples, uint seed_offs = 0) {
+    inline auto gen_unit_dirs(uint n_samples, uint seed = 4) {
       met_trace();
 
       std::vector<eig::Array<float, N, 1>> unit_dirs(n_samples);
 
-      if (n_samples <= 128) {
-        UniformSampler sampler(-1.f, 1.f, seed_offs);
+      if (n_samples <= 16) {
+        UniformSampler sampler(-1.f, 1.f, seed);
         for (int i = 0; i < unit_dirs.size(); ++i)
           unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd<N>());
       } else {
-        UniformSampler sampler(-1.f, 1.f, seed_offs);
+        UniformSampler sampler(-1.f, 1.f, seed);
         #pragma omp parallel
         { // Draw samples for this thread's range with separate sampler per thread
-          UniformSampler sampler(-1.f, 1.f, seed_offs + static_cast<uint>(omp_get_thread_num()));
+          UniformSampler sampler(-1.f, 1.f, seed + static_cast<uint>(omp_get_thread_num()));
           #pragma omp for
           for (int i = 0; i < unit_dirs.size(); ++i)
             unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd<N>());
@@ -187,6 +188,9 @@ namespace met {
   std::vector<Spec> generate_mismatching_ocs(const GenerateMismatchingOCSInfo &info) {
     met_trace();
 
+    // Sample unit vectors in 3d
+    auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
       .algo         = NLOptAlgo::LD_SLSQP,
@@ -223,16 +227,16 @@ namespace met {
 
     // Parallel solve for boundary spectra
     tbb::concurrent_vector<Spec> tbb_output;
-    tbb_output.reserve(info.samples.size());
+    tbb_output.reserve(samples.size());
     #pragma omp parallel
     {
       // Per thread copy of current solver parameter set
       auto local_solver = solver;
 
       #pragma omp for
-      for (int i = 0; i < info.samples.size(); ++i) {
+      for (int i = 0; i < samples.size(); ++i) {
         // Define objective function: max (Uk)^T (Bx) -> max C^T Bx -> max ax
-        auto a = ((U * info.samples[i].matrix()).transpose() * info.basis.func).transpose().eval();
+        auto a = ((U * samples[i].matrix()).transpose() * info.basis.func).transpose().eval();
         local_solver.objective = detail::func_dot<wavelength_bases>(a, 0.f);
 
         // Run solver and store recovered spectral distribution if it is legit
@@ -247,6 +251,9 @@ namespace met {
 
   std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
     met_trace();
+
+    // Sample unit vectors in 3d
+    auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
 
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
@@ -278,17 +285,17 @@ namespace met {
 
     // Parallel solve for boundary spectra
     tbb::concurrent_vector<Spec> tbb_output;
-    tbb_output.reserve(info.samples.size());
+    tbb_output.reserve(samples.size());
     #pragma omp parallel
     {
       // Per thread copy of current solver parameter set
       auto local_solver = solver;
 
       #pragma omp for
-      for (int i = 0; i < info.samples.size(); ++i) {
+      for (int i = 0; i < samples.size(); ++i) {
         using vec = NLOptInfoT<wavelength_bases>::vec;
         auto A = info.systems_j
-               | vws::transform([s = info.samples[i]](const CMFS &cmfs) {
+               | vws::transform([s = samples[i]](const CMFS &cmfs) {
                  return (cmfs * s.matrix()).cast<double>().eval();
                }) | rng::to<std::vector>();
 
@@ -328,15 +335,18 @@ namespace met {
   std::vector<Spec> generate_color_system_ocs(const GenerateColorSystemOCSInfo &info) {
     met_trace();
 
+    // Sample unit vectors in 3d
+    auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+
     // Output for parallel solve
     tbb::concurrent_vector<Spec> tbb_output;
-    tbb_output.reserve(info.samples.size());
+    tbb_output.reserve(samples.size());
 
     // Parallel solve for boundary spectra
     #pragma omp parallel for
-    for (int i = 0; i < info.samples.size(); ++i) {
+    for (int i = 0; i < samples.size(); ++i) {
       // Obtain actual spectrum by projecting sample onto optimal
-      Spec s = (info.system * info.samples[i].matrix()).eval();
+      Spec s = (info.system * samples[i].matrix()).eval();
       for (auto &f : s)
         f = f >= 0.f ? 1.f : 0.f;
 

@@ -42,7 +42,6 @@ namespace met {
     Spec emitter_cie_ledrgb1 = io::spectrum_from_data(cie_wavelength_values, cie_ledrgb1_values);
   } // namespace models
 
-  
   Colr srgb_to_lrgb(Colr c) { rng::transform(c, c.begin(), srgb_to_lrgb_f); return c; }
   Colr lrgb_to_srgb(Colr c) { rng::transform(c, c.begin(), lrgb_to_srgb_f); return c; }
 
@@ -123,11 +122,10 @@ namespace met {
   
   std::vector<CMFS> IndirectColrSystem::finalize() const {
     met_trace();
-    CMFS to_xyz = cmfs.array() / (cmfs.array().col(1) * wavelength_ssize).sum();
+    CMFS to_xyz = cmfs.array() / cmfs.col(1).sum();
     CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
     return powers | vws::transform([&](const Spec &pwr) { 
-      return (to_rgb.array().colwise() * pwr).eval();
-    }) | rng::to<std::vector<CMFS>>();
+      return (to_rgb.array().colwise() * pwr).eval(); }) | rng::to<std::vector<CMFS>>();
   }
 
   Colr IndirectColrSystem::apply(const Spec &s) const {

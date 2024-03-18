@@ -29,7 +29,6 @@ namespace met {
 
     // Miscellaneous data
     uint              m_uplifting_i;
-    std::vector<Colr> m_csys_boundary_samples;
     std::vector<Spec> m_csys_boundary_spectra;
 
     // Delaunay tesselation connecting colors/spectra on both

@@ -9,7 +9,6 @@ constexpr static uint  n_samples = 128;
 constexpr static float eps       = 0.01f;
 
 TEST_CASE("Distribution 1D") {
-  // PCGSampler     sampler(5);
   UniformSampler sampler(5);
 
   SECTION("Sampler") {

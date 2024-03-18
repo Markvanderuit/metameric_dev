@@ -89,7 +89,7 @@ namespace ImGui {
   void CloseAllPopupsIfOpen();
   
   // Plot a spectral distribution
-  void PlotSpectrum(const char* label, const met::Spec &reflectance, float min_bounds = -0.05f, float max_bounds = 1.05f);
+  void PlotSpectrum(const char* label, const met::Spec &reflectance, float min_bounds = -0.05f, float max_bounds = 1.05f, const ImVec2 &size = { -1, 0 });
 
   /* Wrappers for std::string STL types.
      Src: https://github.com/ocornut/imgui/blob/master/misc/cpp/imgui_stdlib.h

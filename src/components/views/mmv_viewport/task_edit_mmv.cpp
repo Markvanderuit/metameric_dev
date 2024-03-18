@@ -223,20 +223,22 @@ namespace met {
             ImGui::SeparatorText("Radiance spectrum");
 
             // Plot radiance
-            if (ImPlot::BeginPlot("##output_radi_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-              // Get wavelength values for x-axis in plot
-              Spec x_values;
-              rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
+          ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 128.f * e_window.content_scale() });
 
-              // Setup minimal format for coming line plots
-              ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
-              ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
-              ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, s.maxCoeff() + 0.05f, ImPlotCond_Always);
+            // if (ImPlot::BeginPlot("##output_radi_plot", { -1.f, 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+            //   // Get wavelength values for x-axis in plot
+            //   Spec x_values;
+            //   rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
 
-              // Do the thing
-              ImPlot::PlotLine("", x_values.data(), s.data(), wavelength_samples);
-              ImPlot::EndPlot();
-            }
+            //   // Setup minimal format for coming line plots
+            //   ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
+            //   ImPlot::SetupAxes("Wavelength", "##Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+            //   ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, s.maxCoeff() + 0.05f, ImPlotCond_Always);
+
+            //   // Do the thing
+            //   ImPlot::PlotLine("", x_values.data(), s.data(), wavelength_samples);
+            //   ImPlot::EndPlot();
+            // }
           }
         },
         [&](MeasurementConstraint &cstr) {

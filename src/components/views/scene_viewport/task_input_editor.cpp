@@ -169,8 +169,10 @@ namespace met {
     // TODO parallel reduction
     for (const auto &path : paths_finalized)
       accumulate_spectrum(cstr.powers[path.power], path.wvls, path.values);
-    for (auto &power : cstr.powers)
+    for (auto &power : cstr.powers) {
+      power *= 0.25f * static_cast<float>(wavelength_samples);
       power /= static_cast<float>(n_spp);
+    }
 
     // Obtain underlying reflectance
     Spec r = e_uplf_task.query_constraint(is.constraint_i);

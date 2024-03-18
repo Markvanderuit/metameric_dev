@@ -306,14 +306,7 @@ namespace met::detail {
       // emitter_distr[i] = s.sum() * emitter.illuminant_scale;
     }
 
-    auto distr = Distribution(cnt_span<float>(emitter_distr));
-    auto sampler = PCGSampler(4);
-    for (uint i = 0; i < 10; ++i) {
-      auto sample = distr.sample_discrete(sampler.next_1d());
-      auto pdf    = distr.pdf_discrete(sample);
-      fmt::print("Sample {}, {} : {}\n", i, sample, pdf);
-    }
-    
+    auto distr = Distribution(cnt_span<float>(emitter_distr));   
     emitter_distr_buffer = distr.to_buffer_std140();
   }
 

@@ -9,11 +9,11 @@
 #include <random>
 
 namespace met {
-  // Encapsulation of PCG hash that conforms to std::uniform_random_bit_generator
+  // Encapsulation of PCG hash that 
+  // conforms to std::uniform_random_bit_generator
   class PCGEngine {
-    uint m_state;
-
     // Underlying sequence
+    uint m_state;
     constexpr uint pcg_hash() {
       m_state = m_state * 747796405u + 2891336453u;
       uint v = m_state;
@@ -70,71 +70,15 @@ namespace met {
     template <uint N>
     eig::Array<float, N, 1> next_nd() {
       eig::Array<float, N, 1> v;
-      for (float &f : v)
-        f = next_1d();
+      for (float &f : v) f = next_1d();
       return v;
     }
 
     eig::Array<float, -1, 1> next_nd(uint n) {
       eig::Array<float, -1, 1> v(n);
-      for (float &f : v)
-        f = next_1d();
+      for (float &f : v) f = next_1d();
       return v;
     }
-
-  /* public: // Conform to std::uniform_random_bit_generator<Sampler> by passthrough
-    constexpr static uint32_t min() { return std::mt19937::min(); }
-    constexpr static uint32_t max() { return std::mt19937::max(); }
-    uint32_t g() { return m_engine(); }
-    uint32_t operator()() { return m_engine(); } */
-  };
-
-  class PCGSampler {
-    using Distr = std::uniform_real_distribution<float>;
-
-    uint  m_state;
-    Distr m_distr;
-
-    uint pcg_hash() {
-        m_state = m_state * 747796405u + 2891336453u;
-        uint v = m_state;
-        v ^= v >> ((v >> 28u) + 4u);
-        v *= 277803737u;
-        v ^= v >> 22u;
-        return v;
-    }
-
-  public:
-    PCGSampler(uint seed = std::random_device()())
-    : m_state(seed), m_distr(0.f, 1.f) { }
-
-    PCGSampler(float min_v, float max_v, uint seed = std::random_device()())
-    : m_state(seed), m_distr(min_v, max_v) { }
-    
-    float next_1d() {
-      return m_distr(*this);
-    }
-
-    template <uint N>
-    eig::Array<float, N, 1> next_nd() {
-      eig::Array<float, N, 1> v;
-      for (float &f : v)
-        f = next_1d();
-      return v;
-    }
-
-    eig::Array<float, -1, 1> next_nd(uint n) {
-      eig::Array<float, -1, 1> v(n);
-      for (float &f : v)
-        f = next_1d();
-      return v;
-    }
-    
-  public: // Conform to std::uniform_random_bit_generator<Sampler> by passthrough
-    constexpr static uint32_t min() { return 0; }
-    constexpr static uint32_t max() { return 4294967295; }
-    uint32_t g() { return pcg_hash(); }
-    uint32_t operator()() { return pcg_hash(); }
   };
 
   // Simple 1d sampling distribution
