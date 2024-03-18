@@ -81,7 +81,7 @@ namespace met {
     auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
     
     // Dispatch draw information
-    // gl::dispatch_draw(e_draw_chull);
+    gl::dispatch_draw(e_draw_chull);
     gl::dispatch_draw(e_draw_points);
   }
 

@@ -189,7 +189,8 @@ namespace met {
     met_trace();
 
     // Sample unit vectors in 3d
-    auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+    auto samples    = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+    auto samples_6d = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
 
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
@@ -199,6 +200,13 @@ namespace met {
       .max_iters    = 512,  // Failsafe
       .rel_xpar_tol = 1e-2, // Threshold for objective error
     };
+
+    // This only works for the current configuration
+    auto S_ = (eig::Matrix<float, wavelength_samples, 6>()
+      << info.systems_i[0], info.systems_j[0]).finished();
+    eig::JacobiSVD<decltype(S_)> svd_;
+    svd_.compute(S_, eig::ComputeFullV);
+    auto U_ = (S_ * svd_.matrixV() * svd_.singularValues().asDiagonal().inverse()).eval();
 
     // Construct orthogonal matrix used during maximiation
     auto S = rng::fold_left_first(info.systems_j, std::plus<CMFS> {}).value().eval();
@@ -236,8 +244,14 @@ namespace met {
       #pragma omp for
       for (int i = 0; i < samples.size(); ++i) {
         // Define objective function: max (Uk)^T (Bx) -> max C^T Bx -> max ax
-        auto a = ((U * samples[i].matrix()).transpose() * info.basis.func).transpose().eval();
-        local_solver.objective = detail::func_dot<wavelength_bases>(a, 0.f);
+        // This is the 6d version
+        auto a_ = ((U_ * samples_6d[i].matrix()).transpose() * info.basis.func).transpose().eval();
+        local_solver.objective = detail::func_dot<wavelength_bases>(a_, 0.f);
+          
+        // Define objective function: max (Uk)^T (Bx) -> max C^T Bx -> max ax
+        // This is the 3d version 
+        // auto a = ((U * samples[i].matrix()).transpose() * info.basis.func).transpose().eval();
+        // local_solver.objective = detail::func_dot<wavelength_bases>(a, 0.f);
 
         // Run solver and store recovered spectral distribution if it is legit
         auto r = solve(local_solver);
@@ -253,7 +267,15 @@ namespace met {
     met_trace();
 
     // Sample unit vectors in 3d
-    auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+    auto samples    = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+    auto samples_6d = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
+
+    auto S = info.systems_j | vws::transform([&](const CMFS &cmfs) {
+      auto S_ = (eig::Matrix<float, wavelength_samples, 6>()
+        << info.systems_i[0], cmfs).finished();
+      // ...?
+      return S_;
+    }) | rng::to<std::vector>();
 
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
@@ -295,9 +317,19 @@ namespace met {
       for (int i = 0; i < samples.size(); ++i) {
         using vec = NLOptInfoT<wavelength_bases>::vec;
         auto A = info.systems_j
-               | vws::transform([s = samples[i]](const CMFS &cmfs) {
+               | vws::transform([&info, s = samples[i]](const CMFS &cmfs) {
                  return (cmfs * s.matrix()).cast<double>().eval();
                }) | rng::to<std::vector>();
+        // auto A = info.systems_j
+        //        | vws::transform([&info, s = samples[i]](const CMFS &cmfs) {
+        //           return ((cmfs.array() + info.systems_i[0].array()).matrix()
+        //             * s.matrix()).cast<double>().eval();
+        //         //  return (cmfs * s.matrix()).cast<double>().eval();
+        //        }) | rng::to<std::vector>();
+        // auto A = S
+        //        | vws::transform([s = samples_6d[i]](const auto &cmfs) {
+        //          return (cmfs * s.matrix()).cast<double>().eval();
+        //        }) | rng::to<std::vector>();
 
         local_solver.objective = 
           [A = A, B = info.basis.func.cast<double>().eval()]
