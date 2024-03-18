@@ -16,50 +16,6 @@ namespace met {
   constexpr auto buffer_create_flags  = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags  = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
 
-  namespace detail {
-    // Given a random vector in RN bounded to [-1, 1], return a vector
-    // distributed over a gaussian distribution
-    inline
-    eig::ArrayXf inv_gaussian_cdf(const eig::ArrayXf &x) {
-      auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
-      auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
-      return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
-    }
-    
-    // Given a random vector in RN bounded to [-1, 1], return a uniformly
-    // distributed point on the unit sphere
-    inline
-    eig::ArrayXf inv_unit_sphere_cdf(const eig::ArrayXf &x) {
-      met_trace();
-      return inv_gaussian_cdf(x).matrix().normalized().array().eval();
-    }
-
-    // Generate a set of random, uniformly distributed unit vectors in RN
-    inline
-    std::vector<eig::ArrayXf> gen_unit_dirs(uint n_samples, uint n_dims, uint seed_offs = 0) {
-      met_trace();
-
-      auto unit_dirs = std::vector<eig::ArrayXf>(n_samples);
-
-      if (n_samples <= 128) {
-        UniformSampler sampler(-1.f, 1.f, seed_offs);
-        for (int i = 0; i < unit_dirs.size(); ++i)
-          unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd(n_dims));
-      } else {
-        UniformSampler sampler(-1.f, 1.f, seed_offs);
-        #pragma omp parallel
-        { // Draw samples for this thread's range with separate sampler per thread
-          UniformSampler sampler(-1.f, 1.f, seed_offs + static_cast<uint>(omp_get_thread_num()));
-          #pragma omp for
-          for (int i = 0; i < unit_dirs.size(); ++i)
-            unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd(n_dims));
-        }
-      }
-
-      return unit_dirs;
-    }
-  } // namespace detail
-
   bool GenMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
 

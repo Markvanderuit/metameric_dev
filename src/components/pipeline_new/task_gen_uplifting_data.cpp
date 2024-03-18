@@ -20,53 +20,6 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
-  // Generate a transforming view that performs unsigned integer index access over a range
-  constexpr auto indexed_view(const auto &v) {
-    return vws::transform([&v](uint i) { return v[i]; });
-  };
-  
-  namespace detail {
-    // Given a point in R^N bounded to [-1, 1], return a point
-    // mapped to a gaussian distribution, uniformly distributed
-    inline
-    auto inv_gaussian_cdf(const auto &x) {
-      met_trace();
-      auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
-      auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
-      return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
-    }
-    
-    // Given a point in R^N bounded to [-1, 1], return a point
-    // mapped to the unit sphere, uniformly distributed
-    inline
-    auto inv_unit_sphere_cdf(const auto &x) {
-      met_trace();
-      return inv_gaussian_cdf(x).matrix().normalized().eval();
-    }
-
-    // Generate a set of uniformly distributed unit vectors in R^N
-    template <uint N>
-    inline
-    std::vector<eig::Array<float, N, 1>> gen_unit_dirs(uint n_samples) {
-      met_trace();
-      
-      std::vector<eig::Array<float, N, 1>> unit_dirs(n_samples);
-
-      #pragma omp parallel
-      {
-        // Draw samples for this thread's range with separate sampler per thread
-        // UniformSampler sampler(-1.f, 1.f, seeds[omp_get_thread_num()]);
-        UniformSampler sampler(-1.f, 1.f, static_cast<uint>(omp_get_thread_num()));
-
-        #pragma omp for
-        for (int i = 0; i < unit_dirs.size(); ++i)
-          unit_dirs[i] = detail::inv_unit_sphere_cdf(sampler.next_nd<N>());
-      }
-
-      return unit_dirs;
-    }
-  } // namespace detail
-
   GenUpliftingDataTask:: GenUpliftingDataTask(uint uplifting_i)
   : m_uplifting_i(uplifting_i) { }
 
@@ -187,7 +140,7 @@ namespace met {
                      range_iter(m_tesselation.elems), 
                      m_tesselation_pack_map.begin(), 
       [&](const auto &el) {
-        const auto vts = el | indexed_view(m_tesselation.verts);
+        const auto vts = el | index_into_view(m_tesselation.verts);
         MeshPackLayout pack;
         pack.inv.block<3, 3>(0, 0) = (eig::Matrix3f() 
           << vts[0] - vts[3], vts[1] - vts[3], vts[2] - vts[3]
