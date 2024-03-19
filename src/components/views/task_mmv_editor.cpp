@@ -310,7 +310,6 @@ namespace met {
             });
           }
         },
-        
         [&](const IndirectSurfaceConstraint &cstr) {
           auto p = cstr.colr;
           

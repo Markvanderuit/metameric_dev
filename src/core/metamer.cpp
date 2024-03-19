@@ -270,8 +270,8 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMaximize,
       .x_init       = 0.5,
-      .max_iters    = 512,  // Failsafe
-      .rel_xpar_tol = 1e-2, // Threshold for objective error
+      .max_iters    = 32,  // Failsafe
+      // .rel_xpar_tol = 1e-2, // Threshold for objective error
     };
 
     // This only works for the current configuration
@@ -329,6 +329,7 @@ namespace met {
         // Run solver and store recovered spectral distribution if it is legit
         auto r = solve(local_solver);
         guard_continue(!r.x.array().isNaN().any());
+        fmt::print("solve {}: {}\n", i, r.objective);
         tbb_output.push_back((info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval());
       } // for (int i)
     }
@@ -423,8 +424,8 @@ namespace met {
   std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
     met_trace();
 
-    // Sample unit vectors in 3d
-    auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
+    // Sample unit vectors in 6d
+    auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
 
     // Solver settings
     NLOptInfoT<wavelength_samples> solver = {
@@ -433,8 +434,8 @@ namespace met {
       .x_init       = 0.5,
       .upper        = 1.0,
       .lower        = 0.0,
-      .max_iters    = 512,  // Failsafe
-      .rel_xpar_tol = 1e-2, // Threshold for objective error
+      .max_iters    = 64, // Failsafe
+      // .rel_xpar_tol = 1e-3, // Threshold for objective error
     };
 
     // Add color system equality constraints, upholding spectral metamerism
@@ -455,17 +456,26 @@ namespace met {
 
       #pragma omp for
       for (int i = 0; i < samples.size(); ++i) {
+        using namespace std::placeholders; // import _1, _2, _3
         using vec = NLOptInfoT<wavelength_samples>::vec;
+        
+        constexpr auto trf_by_sample = [](const CMFS &cmfs, const eig::Vector3f &sample) {
+          return (cmfs * sample).cast<double>().eval();  };
+
+        // Indirect color system powers, mapped along unit vector
         auto A = info.systems_j
-               | vws::transform([&info, s = samples[i]](const CMFS &cmfs) {
-                 return (cmfs * s.matrix()).cast<double>().eval();
-               }) | rng::to<std::vector>();
+               | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval())) 
+               | rng::to<std::vector>();
+
+        // Direct color system, mapped along unit vector
+        auto A_ = trf_by_sample(info.systems_i[0], samples[i].tail<3>());
 
         local_solver.objective = 
-          [A = A]
+          [A = A, A_ = A_]
           (eig::Map<const vec> x, eig::Map<vec> g) -> double {
-            double diff =  A[0].sum();
-            vec grad = 0.0;
+            double diff = A[0].sum() + A_.dot(x);
+
+            vec grad = A_;
             for (uint i = 1; i < A.size(); ++i) {
               double p = static_cast<double>(i);
 
