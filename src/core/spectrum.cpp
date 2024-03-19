@@ -71,24 +71,25 @@ namespace met {
     return v;
   }
 
-  CMFS ColrSystem::finalize() const {
+  CMFS ColrSystem::finalize(bool as_rgb) const {
     met_trace();
-    CMFS to_xyz = (cmfs.array().colwise() * illuminant)
-                / (cmfs.array().col(1)    * illuminant).sum();
-    CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-    return to_rgb;
+    CMFS csys = (cmfs.array().colwise() * illuminant)
+              / (cmfs.array().col(1)    * illuminant).sum();
+    if (as_rgb)
+      csys = (models::xyz_to_srgb_transform * csys.matrix().transpose()).transpose().eval();
+    return csys;
   }
   
-  Colr ColrSystem::apply(const Spec &s) const { 
+  Colr ColrSystem::apply(const Spec &s, bool as_rgb) const { 
     met_trace();
-    return finalize().transpose() * s.matrix().eval();
+    return finalize(as_rgb).transpose() * s.matrix().eval();
   }
   
-  std::vector<Colr> ColrSystem::apply(std::span<const Spec> sd) const { 
+  std::vector<Colr> ColrSystem::apply(std::span<const Spec> sd, bool as_rgb) const { 
     met_trace();
     
     // Gather color system data into matrix
-    auto csys = finalize();
+    auto csys = finalize(as_rgb);
 
     // Transform to non-unique colors
     std::vector<Colr> out(sd.size());
@@ -120,28 +121,29 @@ namespace met {
     io::fr_stream(illuminant, str);
   }
   
-  std::vector<CMFS> IndirectColrSystem::finalize() const {
+  std::vector<CMFS> IndirectColrSystem::finalize(bool as_rgb) const {
     met_trace();
-    CMFS to_xyz = cmfs.array() / cmfs.col(1).sum();
-    CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.matrix().transpose()).transpose();
-    return powers | vws::transform([&](const Spec &pwr) { 
-      return (to_rgb.array().colwise() * pwr).eval(); }) | rng::to<std::vector<CMFS>>();
+    CMFS csys = cmfs.array() / cmfs.col(1).sum();
+    if (as_rgb)
+      csys = (models::xyz_to_srgb_transform * csys.matrix().transpose()).transpose();
+    return powers | vws::transform([&csys](const Spec &pwr) { 
+      return (csys.array().colwise() * pwr).eval(); }) | rng::to<std::vector<CMFS>>();
   }
 
-  Colr IndirectColrSystem::apply(const Spec &s) const {
+  Colr IndirectColrSystem::apply(const Spec &s, bool as_rgb) const {
     met_trace();
     Colr c = 0.f;
-    auto csys = finalize();
+    auto csys = finalize(as_rgb);
     for (auto [i, csys] : enumerate_view(csys))
       c += (csys.transpose() * s.pow(static_cast<float>(i)).matrix()).array().eval();
     return c;
   }
 
-  std::vector<Colr> IndirectColrSystem::apply(std::span<const Spec> sd) const {
+  std::vector<Colr> IndirectColrSystem::apply(std::span<const Spec> sd, bool as_rgb) const {
     met_trace();
 
     // Gather color system data into matrices
-    auto csys = finalize();
+    auto csys = finalize(as_rgb);
     
     // Transform to non-unique colors
     std::vector<Colr> out(sd.size());

@@ -128,52 +128,52 @@ namespace met {
         m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const DirectSurfaceConstraint &cstr) {
-        // Prepare input color systems and corresponding signals
-        auto csys      = e_scene.get_csys(cstr.csys_j[m_csys_j]);
-        auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
-        auto signals_i = { cstr.surface.diffuse };
-        auto systems_j = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.get_csys(i).finalize(); })
-                       | rng::to<std::vector>();
+        // Prepare input color systems and corresponding signals;
+        // note, we keep search space in XYZ
+        auto csys_base_v = { e_scene.get_csys(e_uplifting.csys_i).finalize(false) };
+        auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
+        auto csys_refl_v = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.get_csys(i).finalize(false); })
+                         | rng::to<std::vector>();
 
-        // Generate MMV spectra and append corresponding colors to current point set
+        // Assemble info object for generating MMV spectra
         GenerateMismatchingOCSInfo mmv_info = {
           .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
-          .systems_i = systems_i,
-          .signals_i = signals_i,
-          .systems_j = systems_j,
+          .systems_i = csys_base_v,
+          .signals_i = sign_base_v,
+          .systems_j = csys_refl_v,
           .seed      = m_iter,
           .n_samples = mmv_samples_per_iter
         };
-        m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
+
+        // Generate MMV spectra, convert to view color system, and append to current point set
+        auto csys_view   = e_scene.get_csys(cstr.csys_j[m_csys_j]);
+        auto points = csys_view(generate_mismatching_ocs(mmv_info));
+        m_points.insert_range(points);
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        // Get camera cmfs
-        CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
-        cmfs = (cmfs.array())
-             / (cmfs.array().col(1) * wavelength_ssize).sum();
-        cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
-
-        // Get constraint components
-        auto system_j  =  e_scene.get_csys(e_uplifting.csys_i).finalize();
-        auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
-        auto signals_i = { cstr.surface.diffuse };
-
         // Construct objective color system spectra from power series
         IndirectColrSystem csys = {
           .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
           .powers = cstr.powers
         };
-        auto systems_j = csys.finalize();
 
-        // Generate MMV spectra and append corresponding colors to current point set
+        // Prepare input color systems and corresponding signals;
+        // note, we keep search space in XYZ
+        auto csys_base_v = { e_scene.get_csys(e_uplifting.csys_i).finalize(false) };
+        auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
+        auto csys_refl_v = csys.finalize(false);
+
+        // Assemble info object for generating MMV spectra
         GenerateIndirectMismatchingOCSInfo mmv_info = {
           .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
-          .systems_i = systems_i,
-          .signals_i = signals_i,
-          .systems_j = systems_j,
+          .systems_i = csys_base_v,
+          .signals_i = sign_base_v,
+          .systems_j = csys_refl_v,
           .seed      = m_iter,
           .n_samples = mmv_samples_per_iter
         };
+
+        // Generate MMV spectra, convert to view color system, and append to current point set
         m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
       },
       [&](const auto &) { }
@@ -222,22 +222,22 @@ namespace met {
         .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
         .elements = &m_chull_elems
       }};
-      i_draw = { .type             = gl::PrimitiveType::eTriangles,
-                 .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
-                 .capabilities     = {{ gl::DrawCapability::eCullOp, false   },
-                                      { gl::DrawCapability::eDepthTest, true }},
-                 .draw_op          = gl::DrawOp::eFill,
-                 .bindable_array   = &i_array };
+      i_draw = { .type           = gl::PrimitiveType::eTriangles,
+                 .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
+                 .capabilities   = {{ gl::DrawCapability::eCullOp, false   },
+                                    { gl::DrawCapability::eDepthTest, true }},
+                 .draw_op        = gl::DrawOp::eLine,
+                 .bindable_array = &i_array };
                  
       i_points_array = {{
         .buffers  = {{ .buffer = &m_points_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
         .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
       }};
-      i_points_draw = { .type             = gl::PrimitiveType::ePoints,
-                        .vertex_count     = (uint) (m_chull_elems.size() / sizeof(uint)),
-                        .capabilities     = {{ gl::DrawCapability::eCullOp, false    },
-                                             { gl::DrawCapability::eDepthTest, false }},
-                        .bindable_array   = &i_points_array };
+      i_points_draw = { .type           = gl::PrimitiveType::ePoints,
+                        .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
+                        .capabilities   = {{ gl::DrawCapability::eCullOp, false    },
+                                           { gl::DrawCapability::eDepthTest, false }},
+                        .bindable_array = &i_points_array };
     } else {
       // Deinitialize
       i_array = {};

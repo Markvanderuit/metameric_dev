@@ -49,13 +49,13 @@ namespace met {
     Spec illuminant; // Illuminant under which observation is performed
 
   public:
-    CMFS finalize() const;                                   // Simplify the CMFS/illuminant into color system spectra
-    Colr apply(const Spec &s) const;                         // Obtain a color from a reflectance in this color system
-    std::vector<Colr> apply(std::span<const Spec> sd) const; // Obtain colors from reflectances in this color system
+    CMFS finalize(bool as_rgb = true) const;                                     // Simplify the CMFS/illuminant into color system spectra
+    Colr apply(const Spec &s, bool as_rgb = true) const;                         // Obtain a color from a reflectance in this color system
+    std::vector<Colr> apply(std::span<const Spec> sd, bool as_rgb = true) const; // Obtain colors from reflectances in this color system
     
   public: // Boilerplate
-    auto operator()(const Spec &s)           const { return apply(s); }
-    auto operator()(std::span<const Spec> s) const { return apply(s); }
+    auto operator()(const Spec &s, bool as_rgb = true) const { return apply(s, as_rgb); }
+    auto operator()(std::span<const Spec> s, bool as_rgb = true) const { return apply(s, as_rgb); }
     bool operator==(const ColrSystem &o) const;
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
@@ -68,13 +68,13 @@ namespace met {
     std::vector<Spec> powers; // Truncated power series describing partial interreflections
   
   public:
-    std::vector<CMFS> finalize() const;                      // Simplify the recrursive system into color system spectra
-    Colr apply(const Spec &s) const;                         // Obtain a color from a reflectance in this color system
-    std::vector<Colr> apply(std::span<const Spec> sd) const; // Obtain colors from reflectances in this color system
+    std::vector<CMFS> finalize(bool as_rgb = true) const;                        // Simplify the recrursive system into color system spectra
+    Colr apply(const Spec &s, bool as_rgb = true) const;                         // Obtain a color from a reflectance in this color system
+    std::vector<Colr> apply(std::span<const Spec> sd, bool as_rgb = true) const; // Obtain colors from reflectances in this color system
 
   public: // Boilerplate
-    auto operator()(const Spec &s)           const { return apply(s); }
-    auto operator()(std::span<const Spec> s) const { return apply(s); }
+    auto operator()(const Spec &s, bool as_rgb = true) const { return apply(s, as_rgb); }
+    auto operator()(std::span<const Spec> s, bool as_rgb = true) const { return apply(s, as_rgb); }
     bool operator==(const IndirectColrSystem &o) const;
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
@@ -127,10 +127,10 @@ namespace met {
   // sRGB/linear sRGB/XYZ conversion shorthands
   Colr   srgb_to_lrgb(Colr c);
   Colr   lrgb_to_srgb(Colr c);
-  inline Colr xyz_to_lrgb(Colr c)  { return models::xyz_to_srgb_transform * c.matrix();      }
-  inline Colr lrgb_to_xyz(Colr c)  { return models::srgb_to_xyz_transform * c.matrix();      }
-  inline Colr xyz_to_srgb(Colr c)  { return lrgb_to_srgb(xyz_to_lrgb(c));                    }
-  inline Colr srgb_to_xyz(Colr c)  { return lrgb_to_xyz(srgb_to_lrgb(c));                    }
+  inline Colr xyz_to_lrgb(Colr c) { return models::xyz_to_srgb_transform * c.matrix(); }
+  inline Colr lrgb_to_xyz(Colr c) { return models::srgb_to_xyz_transform * c.matrix(); }
+  inline Colr xyz_to_srgb(Colr c) { return lrgb_to_srgb(xyz_to_lrgb(c)); }
+  inline Colr srgb_to_xyz(Colr c) { return lrgb_to_xyz(srgb_to_lrgb(c)); }
 
   /* 
     Spectrum helper functions

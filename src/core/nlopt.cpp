@@ -177,5 +177,6 @@ namespace met {
   }
 
   // explicit instantiation for some numbers
-  template NLOptResultT<wavelength_bases> solve<wavelength_bases>(NLOptInfoT<wavelength_bases> &); 
+  template NLOptResultT<wavelength_bases>   solve<wavelength_bases>(NLOptInfoT<wavelength_bases> &); 
+  template NLOptResultT<wavelength_samples> solve<wavelength_samples>(NLOptInfoT<wavelength_samples> &); 
 } // namespace met
