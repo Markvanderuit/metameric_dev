@@ -11,7 +11,7 @@
 
 namespace met {
   // Constants
-  constexpr uint mmv_samples_per_iter = 32;
+  constexpr uint mmv_samples_per_iter = 16;
   constexpr uint mmv_samples_max      = 256;
   constexpr auto buffer_create_flags  = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags  = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
@@ -34,11 +34,11 @@ namespace met {
     // Reset samples if stale
     if (is_stale)  {
       m_iter = 0;
-      m_points.clear();
+      m_colr_set.clear();
     }
     
     // Only pass if metameric mismatching is possible and samples are required
-    bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_points.size() < mmv_samples_max;
+    bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_colr_set.size() < mmv_samples_max;
     
     return info.parent()("is_active").getr<bool>() && (is_stale || is_mmv);
   }
@@ -47,12 +47,13 @@ namespace met {
     met_trace();
 
     // Prepare output point set for the maximum nr. of samples
-    m_points.reserve(mmv_samples_max);
-    m_points.clear();
+    m_colr_set.reserve(mmv_samples_max);
+    m_colr_set.clear();
 
     // Reset iteration and UI values
-    m_iter   = 0;
+    m_iter = 0;
     m_csys_j = 0;
+    m_curr_deque_size = 0;
 
     // Make vertex array object available, uninitialized
     info("chull_array").set<gl::Array>({ });
@@ -82,8 +83,9 @@ namespace met {
     // Reset necessary data
     if (should_clear) {
       info("chull_array").getw<gl::Array>() = {};
-      m_points.clear();
+      m_colr_set.clear();
       m_iter = 0;
+      m_curr_deque_size = m_colr_deque.size();;
     }
 
     // Only continue for valid and mismatch-supporting constraints
@@ -94,17 +96,17 @@ namespace met {
       [](const auto &) { return false; }
     }, e_vert.constraint)) {
       info("chull_array").getw<gl::Array>() = {};
-      m_points.clear();
+      m_colr_set.clear();
       m_iter = 0;
       return;
     }
     
     // Only continue if more samples are necessary
-    if (m_points.size() >= mmv_samples_max)
+    if (m_colr_set.size() >= mmv_samples_max)
       return;
 
     // Visit underlying constraint types one by one
-    std::visit(overloaded {
+    auto new_points = std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
         // Prepare input color systems and corresponding signals
         auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
@@ -125,7 +127,7 @@ namespace met {
 
         // Generate MMV spectra and append corresponding colors to current point set
         auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
-        m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
+        return csys(generate_mismatching_ocs(mmv_info));
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Prepare input color systems and corresponding signals;
@@ -146,9 +148,8 @@ namespace met {
         };
 
         // Generate MMV spectra, convert to view color system, and append to current point set
-        auto csys_view   = e_scene.get_csys(cstr.csys_j[m_csys_j]);
-        auto points = csys_view(generate_mismatching_ocs(mmv_info));
-        m_points.insert_range(points);
+        auto csys_view = e_scene.get_csys(cstr.csys_j[m_csys_j]);
+        return csys_view(generate_mismatching_ocs(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
         // Construct objective color system spectra from power series
@@ -174,34 +175,46 @@ namespace met {
         };
 
         // Generate MMV spectra, convert to view color system, and append to current point set
-        m_points.insert_range(csys(generate_mismatching_ocs(mmv_info)));
+        return csys(generate_mismatching_ocs(mmv_info));
       },
-      [&](const auto &) { }
+      [&](const auto &) { return std::vector<Colr>(); }
     }, e_vert.constraint);
+
+    // Insert newly gathered points, and roll them into end of deque while removing front
+    m_colr_set.insert_range(std::vector(new_points));
+    if (m_curr_deque_size > 0) {
+      auto reduce_size = std::min({ static_cast<uint>(new_points.size()),
+                                    static_cast<uint>(m_colr_deque.size()), 
+                                    m_curr_deque_size });
+      m_curr_deque_size -= reduce_size;
+      m_colr_deque.erase(m_colr_deque.begin(), m_colr_deque.begin() + reduce_size);
+    }
+    m_colr_deque.append_range(new_points); // invalidates new_points
 
     // Increment iteration up to sample count
     m_iter += mmv_samples_per_iter;
 
     // Only continue if points are found
-    guard(!m_points.empty());
+    guard(!m_colr_set.empty());
 
-    // Determine extents of generated point sets
-    auto maxb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.max(b).eval(); }).value();
-    auto minb = rng::fold_left_first(m_points, [](auto a, auto b) { return a.min(b).eval(); }).value();
+    // Determine extents of current point sets
+    auto maxb = rng::fold_left_first(m_colr_deque, [](auto a, auto b) { return a.max(b).eval(); }).value();
+    auto minb = rng::fold_left_first(m_colr_deque, [](auto a, auto b) { return a.min(b).eval(); }).value();
 
     // Generate convex hulls, if the minimum nr. of points is available and
     // the pointset does not collapse to a small position;
     // QHull is rather picky and will happily tear down the application :(
-    if (m_points.size() >= 4 && (maxb - minb).minCoeff() >= 0.005f) {
-      auto points = std::vector<Colr>(range_iter(m_points));
+    if (m_colr_set.size() >= 4 && (maxb - minb).minCoeff() >= 0.005f) {
+      auto points = std::vector<Colr>(range_iter(m_colr_deque));
       m_chull = generate_convex_hull<AlMesh, Colr>(points);
     }
 
     // If a set of points is available, generate an approximate center for the camera, and update this
     // if the distance shift exceeds some threshold
     auto new_center = (minb + 0.5 * (maxb - minb)).eval();
-    if (auto &curr_center = info("chull_center").getw<eig::Array3f>(); (curr_center - new_center).matrix().norm() > 0.1f) {
+    if (auto &curr_center = info("chull_center").getw<eig::Array3f>(); (curr_center - new_center).matrix().norm() > 0.05f) {
       curr_center = new_center;
+      fmt::print("new center: {}\n", new_center);
       info.relative("viewport_camera")("arcball").getw<detail::Arcball>().set_center(curr_center);
     }
     
@@ -212,10 +225,11 @@ namespace met {
     auto &i_points_array = info("points_array").getw<gl::Array>();
     auto &i_points_draw  = info("points_draw").getw<gl::DrawInfo>();
     if (m_chull.elems.size() > 0) {
-      std::vector<eig::AlArray3f> points(range_iter(m_points));
-      m_points_verts = {{ .data = cnt_span<const std::byte>(points) }};
-      m_chull_verts  = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
-      m_chull_elems  = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
+      std::vector<eig::AlArray3f> points(range_iter(m_colr_deque));
+
+      m_colr_verts  = {{ .data = cnt_span<const std::byte>(points) }};
+      m_chull_verts = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
+      m_chull_elems = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
 
       i_array = {{
         .buffers  = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
@@ -226,11 +240,11 @@ namespace met {
                  .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
                  .capabilities   = {{ gl::DrawCapability::eCullOp, false   },
                                     { gl::DrawCapability::eDepthTest, true }},
-                 .draw_op        = gl::DrawOp::eLine,
+                 .draw_op        = gl::DrawOp::eFill,
                  .bindable_array = &i_array };
                  
       i_points_array = {{
-        .buffers  = {{ .buffer = &m_points_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
+        .buffers  = {{ .buffer = &m_colr_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
         .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
       }};
       i_points_draw = { .type           = gl::PrimitiveType::ePoints,
