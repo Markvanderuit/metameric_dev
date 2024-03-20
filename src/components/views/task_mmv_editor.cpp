@@ -1,3 +1,4 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
@@ -293,6 +294,21 @@ namespace met {
           // Register gizmo use end; apply current vertex position to scene save state
           if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
             m_is_gizmo_used = false;
+
+            // Snap vertex position to inside convex hull, if possible
+            {
+              const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
+              auto candidates = e_chull.elems
+                              | vws::transform([&](const eig::Array3u &el) {
+                                // auto a = e_chull.verts[el[0]], b = e_chull.verts[el[1]], c = e_chull.verts[el[2]];
+                                // auto ab = (b - a).eval(), bc = (c - b).eval(), ca = (a - c).eval();
+
+                                return el;
+                              });
+              // auto p_ = std::transform_reduce(std::execution::par_unseq,
+              //   range_iter(e_chull.elems), C)
+            }
+
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
               .redo = [p = p, is = e_is](auto &scene) {

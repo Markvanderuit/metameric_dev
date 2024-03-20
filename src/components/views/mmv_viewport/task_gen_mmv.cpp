@@ -56,6 +56,7 @@ namespace met {
     m_curr_deque_size = 0;
 
     // Make vertex array object available, uninitialized
+    info("chull").set<AlMesh>({ });
     info("chull_array").set<gl::Array>({ });
     info("chull_draw").set<gl::DrawInfo>({ });
     info("points_array").set<gl::Array>({ });
@@ -204,9 +205,10 @@ namespace met {
     // Generate convex hulls, if the minimum nr. of points is available and
     // the pointset does not collapse to a small position;
     // QHull is rather picky and will happily tear down the application :(
+    auto &i_chull = info("chull").getw<AlMesh>();
     if (m_colr_set.size() >= 4 && (maxb - minb).minCoeff() >= 0.005f) {
       auto points = std::vector<Colr>(range_iter(m_colr_deque));
-      m_chull = generate_convex_hull<AlMesh, Colr>(points);
+      i_chull = generate_convex_hull<AlMesh, Colr>(points);
     }
 
     // If a set of points is available, generate an approximate center for the camera, and update this
@@ -224,12 +226,12 @@ namespace met {
     auto &i_draw         = info("chull_draw").getw<gl::DrawInfo>();
     auto &i_points_array = info("points_array").getw<gl::Array>();
     auto &i_points_draw  = info("points_draw").getw<gl::DrawInfo>();
-    if (m_chull.elems.size() > 0) {
+    if (i_chull.elems.size() > 0) {
       std::vector<eig::AlArray3f> points(range_iter(m_colr_deque));
 
       m_colr_verts  = {{ .data = cnt_span<const std::byte>(points) }};
-      m_chull_verts = {{ .data = cnt_span<const std::byte>(m_chull.verts) }};
-      m_chull_elems = {{ .data = cnt_span<const std::byte>(m_chull.elems) }};
+      m_chull_verts = {{ .data = cnt_span<const std::byte>(i_chull.verts) }};
+      m_chull_elems = {{ .data = cnt_span<const std::byte>(i_chull.elems) }};
 
       i_array = {{
         .buffers  = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},

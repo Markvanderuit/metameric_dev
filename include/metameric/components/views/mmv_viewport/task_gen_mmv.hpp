@@ -21,7 +21,6 @@ namespace met {
     ColrSet     m_colr_set;        // Cached, currently unique set of boundary points on volume
     ColrDeque   m_colr_deque;      // Cached, rolling buffer of boundary points on volume
     uint        m_curr_deque_size;
-    AlMesh      m_chull;           // Current convex hull
     uint        m_iter;            // Current sampling iteration
     gl::Buffer  m_chull_verts;
     gl::Buffer  m_chull_elems;
