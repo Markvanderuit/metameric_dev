@@ -99,7 +99,7 @@ namespace met {
     return (mean + (info.basis.func * r.x.cast<float>()).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
   }
 
-  /* Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
 
     // Solver settings
@@ -107,7 +107,7 @@ namespace met {
       .algo         = NLOptAlgo::LD_SLSQP,
       .form         = NLOptForm::eMinimize,
       .x_init       = 0.5,
-      .max_iters    = 512,  // Failsafe
+      .max_iters    = 256,  // Failsafe
       .rel_xpar_tol = 1e-2, // Threshold for objective error
     };
 
@@ -183,9 +183,9 @@ namespace met {
     // Run solver and return recovered spectral distribution
     auto r = solve(solver);
     return (info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval();
-  } */
+  }
 
-  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+  /* Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
 
     // Solver settings
@@ -255,7 +255,7 @@ namespace met {
     // Run solver and return recovered spectral distribution
     auto r = solve(solver);
     return r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval();
-  }
+  } */
 
   std::vector<Spec> generate_mismatching_ocs(const GenerateMismatchingOCSInfo &info) {
     met_trace();

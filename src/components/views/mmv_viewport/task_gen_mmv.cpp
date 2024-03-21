@@ -56,6 +56,7 @@ namespace met {
     m_curr_deque_size = 0;
 
     // Make vertex array object available, uninitialized
+    info("converged").set(false);
     info("chull").set<AlMesh>({ });
     info("chull_array").set<gl::Array>({ });
     info("chull_draw").set<gl::DrawInfo>({ });
@@ -96,6 +97,7 @@ namespace met {
       [](const IndirectSurfaceConstraint &cstr) { return !cstr.is_valid() || !cstr.has_mismatching(); },
       [](const auto &) { return false; }
     }, e_vert.constraint)) {
+      info("converged").set(true);
       info("chull_array").getw<gl::Array>() = {};
       m_colr_set.clear();
       m_iter = 0;
@@ -103,8 +105,10 @@ namespace met {
     }
     
     // Only continue if more samples are necessary
-    if (m_colr_set.size() >= mmv_samples_max)
+    if (m_colr_set.size() >= mmv_samples_max) {
+      info("converged").set(true);
       return;
+    }
 
     // Visit underlying constraint types one by one
     auto new_points = std::visit(overloaded {
@@ -257,6 +261,11 @@ namespace met {
     } else {
       // Deinitialize
       i_array = {};
+    }
+    
+    // Flag convergence for following tasks
+    if (m_colr_set.size() >= mmv_samples_max) {
+      info("converged").set(true);
     }
   }
 } // namespace met

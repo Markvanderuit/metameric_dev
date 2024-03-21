@@ -5,15 +5,15 @@
 #include <render/shape/primitive.glsl>
 
 vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
-    vec3 ab = prim.v1.p - prim.v0.p;
-    vec3 ac = prim.v2.p - prim.v0.p;
+  vec3 ab = prim.v1.p - prim.v0.p;
+  vec3 ac = prim.v2.p - prim.v0.p;
 
-    float a_tri = abs(.5f * length(cross(ac,            ab           )));
-    float a_ab  = abs(.5f * length(cross(p - prim.v0.p, ab           )));
-    float a_ac  = abs(.5f * length(cross(ac,            p - prim.v0.p)));
-    float a_bc  = abs(.5f * length(cross(prim.v2.p - p, prim.v1.p - p)));
-    
-    return vec3(a_bc, a_ac, a_ab) / a_tri;
+  float a_tri = abs(.5f * length(cross(ac,            ab           )));
+  float a_ab  = abs(.5f * length(cross(p - prim.v0.p, ab           )));
+  float a_ac  = abs(.5f * length(cross(ac,            p - prim.v0.p)));
+  float a_bc  = abs(.5f * length(cross(prim.v2.p - p, prim.v1.p - p)));
+  
+  return vec3(a_bc, a_ac, a_ab) / a_tri;
 }
 
 void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {

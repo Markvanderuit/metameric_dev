@@ -28,6 +28,7 @@ namespace met {
     std::vector<txuv_type> txuvs;
 
     // Data queries for secondary mesh data, available per-vertex
+    bool empty()     const { return verts.empty() || elems.empty(); }
     bool has_norms() const { return !norms.empty(); }
     bool has_txuvs() const { return !txuvs.empty(); }
 

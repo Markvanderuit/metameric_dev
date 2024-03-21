@@ -4,6 +4,7 @@
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
+#include <metameric/components/views/mmv_viewport/task_gen_patches.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
 #include <small_gl/buffer.hpp>
@@ -20,6 +21,67 @@ namespace met {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   
+  namespace detail {
+    Colr find_closest_point_in_convex_hull(Colr p, const AlMesh &mesh) {
+      guard(!mesh.verts.empty() && !mesh.elems.empty(), p);
+      
+      // Find triangle data
+      auto tris = mesh.elems | vws::transform([&mesh](const eig::Array3u &el) {
+        return std::tuple<Colr, Colr, Colr> { mesh.verts[el[0]], mesh.verts[el[1]], mesh.verts[el[2]] }; });
+      
+      // Project point to each triangle
+      auto proj = tris | vws::transform([p](const auto &el) -> Colr {
+        // Get vertices and compute edge vectors
+        const auto &[a, b, c] = el;
+        auto ab = (b - a).matrix().eval(), bc = (c - b).matrix().eval(), ca = (a - c).matrix().eval();
+        auto ac = (c - a).matrix().eval(), ap = (p - a).matrix().eval();
+
+        // Point lies behind face, do not project, return invalid
+        auto n = ab.cross(ac).eval();
+        if (n.dot((p - (a + b + c) / 3.f).matrix()) < 0.f)
+          return std::numeric_limits<float>::infinity();
+        
+        // Compute barycentrics of point 
+        float a_tri = std::abs(.5f * ac.cross(ab).norm());
+        float a_ab  = std::abs(.5f * ap.cross(ab).norm());
+        float a_ac  = std::abs(.5f * ac.cross(ap).norm());
+        float a_bc  = std::abs(.5f * (c - p).matrix().cross((b - p).matrix()).norm());
+        auto bary = (eig::Array3f(a_bc, a_ac, a_ab) / a_tri).eval();
+        bary /= bary.abs().sum();
+
+        // Recover point on triangle's plane
+        Colr p_ = bary.x() * a + bary.y() * b + bary.z() * c;
+
+        // Either clamp barycentrics to a specific edge...
+        if (bary.x() < 0.f) { // bc
+          float t = std::clamp((p_ - b).matrix().dot(bc) / bc.squaredNorm(), 0.f, 1.f);
+          return b + t * bc.array();
+        } else if (bary.y() < 0.f) { // ca
+          float t = std::clamp((p_ - c).matrix().dot(ca) / ca.squaredNorm(), 0.f, 1.f);
+          return c + t * ca.array();
+        } else if (bary.z() < 0.f) { // ab
+          float t = std::clamp((p_ - a).matrix().dot(ab) / ab.squaredNorm(), 0.f, 1.f);
+          return a + t * ab.array();
+        } else {
+          // ... or return the actual point inside the triangle
+          return p_;
+        }
+      });
+
+      // Finalize only valid candidates and provide distance to each candidate
+      auto candidates = proj 
+                      | vws::filter([](const Colr &p_) { return !p_.isInf().all(); })
+                      | vws::transform([p](const Colr &p_) -> std::pair<float, Colr> {
+                          return { (p - p_).matrix().norm(), p_ }; })
+                      | rng::to<std::vector>();
+      
+      // If a closest reprojected point was found, override current position
+      if (auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); it != candidates.end())
+        p = it->second;
+      return p;
+    }
+  } // namespace detail
+
   struct MMVEditorBeginTask : public detail::TaskNode {
     void eval(SchedulerHandle &info) override {
       met_trace_full();
@@ -297,55 +359,7 @@ namespace met {
 
             // Snap vertex position to inside convex hull, if necessary
             const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-            if (!e_chull.verts.empty()) {
-              auto proj = e_chull.elems
-                        | vws::transform([&](const eig::Array3u &el) -> Colr {
-                          auto a = e_chull.verts[el[0]], b = e_chull.verts[el[1]], c = e_chull.verts[el[2]];
-                          auto u = (b - a).matrix().eval(), 
-                               v = (c - a).matrix().eval(), 
-                               w = (p - a).matrix().eval();
-                          auto n = u.cross(v).eval();
-
-                          // Point lies behind face, do not project
-                          if (n.dot((p - (a + b + c) / 3.f).matrix()) < 0.f)
-                            return eig::Array3f(std::numeric_limits<float>::max());
-                          
-                          // Compute barycentric coordinates of projected point in triangle
-                          eig::Array3f bary = { u.cross(w).dot(n) / n.dot(n),
-                                                w.cross(n).dot(n) / n.dot(n), 0 };
-                          bary.z() = 1.f - bary.y() - bary.x();
-
-                          Colr p_ = bary.x() * a + bary.y() * b + bary.z() * c;
-
-                          return p_;
-                          // if ((bary >= 0.f).all()) {
-                          //   // Point lies on triangle, return directly
-                          // } else {
-                          //   // Find closest point on edge
-                          //   if (bary.x() < 0.f) {
-                          //     return a + (b - a).matrix().normalized().dot(w) * (b - a);
-                          //   } else if (bary.y() < 0.f) {
-                          //     return b + (c - b).matrix().normalized().dot(w) * (c - b);
-                          //   } else {
-                          //     return c + (a - c).matrix().normalized().dot(w) * (a - c);
-                          //   }
-                          // }
-
-
-                          // // Get nearest actual point in triangle
-                          // bary = bary.cwiseMax(0.f).cwiseMin(1.f);
-                          // bary /= bary.sum();                    
-                          
-                          // // Recover point from barycentrics
-                          // return (bary.x() * a + bary.y() * b + bary.z() * c).eval(); 
-                          })
-                        | rng::to<std::vector>();
-              auto it = rng::min_element(proj, {}, [&](const Colr &c) { return (c - p).matrix().norm();  });
-
-              // Hacky; if a point was found, use it
-              if (Colr p_ = *it; (p_ < 999.f).all())
-                p = p_;
-            }
+            p = detail::find_closest_point_in_convex_hull(p, e_chull);
 
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
@@ -404,6 +418,11 @@ namespace met {
           // Register gizmo use end; apply current vertex position to scene save state
           if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
             m_is_gizmo_used = false;
+            
+            // Snap vertex position to inside convex hull, if necessary
+            const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
+            p = detail::find_closest_point_in_convex_hull(p, e_chull);
+
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
               .redo = [p = p, is = e_is](auto &scene) {
@@ -441,6 +460,7 @@ namespace met {
     info.child_task("viewport_image").init<MMVEditorImageTask>();
     info.child_task("viewport_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"));
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
+    info.child_task("viewport_gen_patches").init<GenPatchesTask>();
     info.child_task("viewport_draw_mmv").init<DrawMMVTask>();
     info.child_task("viewport_guizmo").init<MMVEditorGuizmoTask>();
     info.child_task("viewport_end").init<MMVEditorEndTask>();
