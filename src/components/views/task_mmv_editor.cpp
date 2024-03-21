@@ -295,18 +295,56 @@ namespace met {
           if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
             m_is_gizmo_used = false;
 
-            // Snap vertex position to inside convex hull, if possible
-            {
-              const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-              auto candidates = e_chull.elems
-                              | vws::transform([&](const eig::Array3u &el) {
-                                // auto a = e_chull.verts[el[0]], b = e_chull.verts[el[1]], c = e_chull.verts[el[2]];
-                                // auto ab = (b - a).eval(), bc = (c - b).eval(), ca = (a - c).eval();
+            // Snap vertex position to inside convex hull, if necessary
+            const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
+            if (!e_chull.verts.empty()) {
+              auto proj = e_chull.elems
+                        | vws::transform([&](const eig::Array3u &el) -> Colr {
+                          auto a = e_chull.verts[el[0]], b = e_chull.verts[el[1]], c = e_chull.verts[el[2]];
+                          auto u = (b - a).matrix().eval(), 
+                               v = (c - a).matrix().eval(), 
+                               w = (p - a).matrix().eval();
+                          auto n = u.cross(v).eval();
 
-                                return el;
-                              });
-              // auto p_ = std::transform_reduce(std::execution::par_unseq,
-              //   range_iter(e_chull.elems), C)
+                          // Point lies behind face, do not project
+                          if (n.dot((p - (a + b + c) / 3.f).matrix()) < 0.f)
+                            return eig::Array3f(std::numeric_limits<float>::max());
+                          
+                          // Compute barycentric coordinates of projected point in triangle
+                          eig::Array3f bary = { u.cross(w).dot(n) / n.dot(n),
+                                                w.cross(n).dot(n) / n.dot(n), 0 };
+                          bary.z() = 1.f - bary.y() - bary.x();
+
+                          Colr p_ = bary.x() * a + bary.y() * b + bary.z() * c;
+
+                          return p_;
+                          // if ((bary >= 0.f).all()) {
+                          //   // Point lies on triangle, return directly
+                          // } else {
+                          //   // Find closest point on edge
+                          //   if (bary.x() < 0.f) {
+                          //     return a + (b - a).matrix().normalized().dot(w) * (b - a);
+                          //   } else if (bary.y() < 0.f) {
+                          //     return b + (c - b).matrix().normalized().dot(w) * (c - b);
+                          //   } else {
+                          //     return c + (a - c).matrix().normalized().dot(w) * (a - c);
+                          //   }
+                          // }
+
+
+                          // // Get nearest actual point in triangle
+                          // bary = bary.cwiseMax(0.f).cwiseMin(1.f);
+                          // bary /= bary.sum();                    
+                          
+                          // // Recover point from barycentrics
+                          // return (bary.x() * a + bary.y() * b + bary.z() * c).eval(); 
+                          })
+                        | rng::to<std::vector>();
+              auto it = rng::min_element(proj, {}, [&](const Colr &c) { return (c - p).matrix().norm();  });
+
+              // Hacky; if a point was found, use it
+              if (Colr p_ = *it; (p_ < 999.f).all())
+                p = p_;
             }
 
             info.global("scene").getw<Scene>().touch({

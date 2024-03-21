@@ -242,7 +242,7 @@ namespace met {
                  .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
                  .capabilities   = {{ gl::DrawCapability::eCullOp, false   },
                                     { gl::DrawCapability::eDepthTest, true }},
-                 .draw_op        = gl::DrawOp::eFill,
+                 .draw_op        = gl::DrawOp::eLine,
                  .bindable_array = &i_array };
                  
       i_points_array = {{
