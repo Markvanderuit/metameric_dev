@@ -99,7 +99,7 @@ namespace met {
     return (mean + (info.basis.func * r.x.cast<float>()).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
   }
 
-  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+  /* Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
 
     // Solver settings
@@ -183,9 +183,9 @@ namespace met {
     // Run solver and return recovered spectral distribution
     auto r = solve(solver);
     return (info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval();
-  }
+  } */
 
-  /* Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
     met_trace();
 
     // Solver settings
@@ -255,7 +255,7 @@ namespace met {
     // Run solver and return recovered spectral distribution
     auto r = solve(solver);
     return r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval();
-  } */
+  }
 
   std::vector<Spec> generate_mismatching_ocs(const GenerateMismatchingOCSInfo &info) {
     met_trace();
@@ -321,7 +321,7 @@ namespace met {
     return std::vector<Spec>(range_iter(tbb_output));
   }
 
-  std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
+  /* std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
     met_trace();
 
     // Sample unit vectors in 6d
@@ -409,10 +409,10 @@ namespace met {
     }
 
     return std::vector<Spec>(range_iter(tbb_output));
-  }
+  } */
   
 
-  /* std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
+  std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
     met_trace();
 
     // Sample unit vectors in 6d
@@ -489,7 +489,7 @@ namespace met {
     }
 
     return std::vector<Spec>(range_iter(tbb_output));
-  } */
+  }
 
   std::vector<Spec> generate_color_system_ocs(const GenerateColorSystemOCSInfo &info) {
     met_trace();

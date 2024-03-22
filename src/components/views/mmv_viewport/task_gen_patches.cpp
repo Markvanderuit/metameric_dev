@@ -80,5 +80,8 @@ namespace met {
       // Then, recover position inside hull using the generated barycentric coordinates
       return p[0] * (1.f - x.sum()) + p[1] * x.x() + p[2] * x.y() + p[3] * x.z();
     });
+
+    // Finally, sort patches by luminance
+    rng::sort(i_patches, {}, luminance);
   }
 } // namespace met

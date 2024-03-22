@@ -47,6 +47,7 @@ namespace met {
     using ComponentType = detail::Component<Uplifting>;
 
     // Get shared resources
+    const auto &e_window  = info.global("window").getr<gl::Window>();
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_is      = info.parent()("selection").getr<InputSelection>();
     auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_is.uplifting_i)).mask(info);
@@ -55,17 +56,26 @@ namespace met {
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_is.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
-      auto &vert            = uplf.value.verts[e_is.constraint_i];
-      const auto &e_window  = info.global("window").getr<gl::Window>();
+      auto &vert = uplf.value.verts[e_is.constraint_i];
 
+      // Color patch picker
       if (!e_patches.empty()) {
+        ImGui::SeparatorText("Example colors");
+        ImGui::BeginChild("##patches", { ImGui::GetContentRegionAvail().x * 0.95f, 64.f * e_window.content_scale() }, 0, ImGuiWindowFlags_HorizontalScrollbar);
         for (uint i = 0; i < e_patches.size(); ++i) {
-          auto c = (eig::Array4f() << e_patches[i], 1).finished();
-          ImGui::ColorButton(std::format("patch_{}", i).c_str(), c);
-        }
-      }
+          // Spawn color button viewing the srgb-transformed patch color
+          auto srgb = (eig::Array4f() << lrgb_to_srgb(e_patches[i]), 1).finished();
+          if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float)) {
+            // ...
+          }
 
-      ImGui::Separator();
+          // Skip line every now and then
+          ImGui::SameLine();
+          if (i % 8 == 7 || i == e_patches.size() - 1)
+            ImGui::NewLine();
+        } // for (uint i)
+        ImGui::EndChild();
+      }
       
       // Visit the underlying constraint data
       std::visit(overloaded {
@@ -225,8 +235,7 @@ namespace met {
     // Plotter for the current constraint's resulting spectrum
     ImGui::SeparatorText("Reflectance spectrum");
     {
-      const auto &e_window  = info.global("window").getr<gl::Window>();
-      const auto &e_sd      = e_spectra[e_is.constraint_i];
+      const auto &e_sd = e_spectra[e_is.constraint_i];
       ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
     }
   }

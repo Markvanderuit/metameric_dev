@@ -227,14 +227,11 @@ namespace met {
 
     std::vector<eig::Array3f> input(range_iter(data));
 
-    std::vector<orgQhull::QhullVertex> qh_verts;
-    std::vector<orgQhull::QhullFacet>  qh_elems;
-    { // qhull
-      met_trace_n("qhull_generate_delaunay");
-      auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
-      qh_verts = qhull.vertexList().toStdVector();
-      qh_elems = qhull.facetList().toStdVector();
-    } // qhull
+    // std::vector<orgQhull::QhullVertex> qh_verts;
+    // std::vector<orgQhull::QhullFacet>  qh_elems;
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
+    auto qh_verts = qhull.vertexList().toStdVector();
+    auto qh_elems = qhull.facetList().toStdVector();
 
     // Assign incremental IDs to qh_verts; Qhull does not seem to manage removed vertices properly?
     #pragma omp parallel for
