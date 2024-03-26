@@ -87,13 +87,13 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      const auto &e_is    = info.parent()("selection").getr<InputSelection>();
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
       const auto &e_scene = info.global("scene").getr<Scene>();
-      const auto &e_vert  = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Define window name
       auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
-        e_vert.name, e_is.uplifting_i, e_is.constraint_i);  
+        e_vert.name, e_cs.uplifting_i, e_cs.constraint_i);  
       
       // Define window size on first open
       ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);
@@ -146,9 +146,9 @@ namespace met {
       met_trace();
       
       // Get shared resources
-      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
-      const auto &e_scene       = info.global("scene").getr<Scene>();
-      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Activate only if parent task triggers and vertex mismatching requires rendering
       return info.parent()("is_active").getr<bool>() && e_vert.has_mismatching();
@@ -217,9 +217,9 @@ namespace met {
       met_trace();
       
       // Get shared resources
-      const auto &e_is          = info.parent()("selection").getr<InputSelection>();
-      const auto &e_scene       = info.global("scene").getr<Scene>();
-      const auto &e_vert        = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Activate only if parent task triggers and vertex mismatching requires rendering
       return info.parent()("is_active").getr<bool>() && e_vert.has_mismatching();
@@ -294,9 +294,9 @@ namespace met {
       guard(info.parent()("is_active").getr<bool>(), false);
 
       // Get handles, shared resources, etc
-      const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &e_is      = info.parent()("selection").getr<InputSelection>();
-      const auto &e_vert    = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
       
       return ImGui::IsItemHovered() && e_vert.has_mismatching();
     }
@@ -307,8 +307,8 @@ namespace met {
       // Get handles, shared resources, etc
       const auto &e_arcball = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
       const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &e_is      = info.parent()("selection").getr<InputSelection>();
-      const auto &e_vert    = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+      const auto &e_cs      = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
 
       // Visit underlying constraints to allow guizmo editing
       std::visit(overloaded {
@@ -325,10 +325,7 @@ namespace met {
 
           // Register gizmo drag; apply world-space delta
           if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-            auto &e_scene = info.global("scene").getw<Scene>();
-            auto &e_vert  = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
-
-            // Apply world-space delta; store transformed position in surface constraint
+            auto &e_vert  = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
             apply_colr(e_vert, delta * cstr.colr_j[0]);
           }
 
@@ -341,10 +338,10 @@ namespace met {
             // Handle save
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
-              .redo = [p = cstr_colr,      is = e_is, apply_colr](auto &scene) {
-                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); },
-              .undo = [p = m_gizmo_prev_p, is = e_is, apply_colr](auto &scene) {
-                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); }
+              .redo = [p = cstr_colr,      e_cs, apply_colr](auto &scene) {
+                apply_colr(scene.uplifting_vertex(e_cs), p); },
+              .undo = [p = m_gizmo_prev_p, e_cs, apply_colr](auto &scene) {
+                apply_colr(scene.uplifting_vertex(e_cs), p); }
             });
           }
         },
@@ -362,7 +359,7 @@ namespace met {
           // Register gizmo drag; apply world-space delta
           if (auto [active, delta] = m_gizmo.eval_delta(); active) {
             auto &e_scene = info.global("scene").getw<Scene>();
-            auto &e_vert  = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+            auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
             // Apply world-space delta; store transformed position in surface constraint
             apply_colr(e_vert, delta * cstr.colr);
@@ -377,10 +374,8 @@ namespace met {
             // Handle save
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
-              .redo = [p = cstr_colr,      is = e_is, apply_colr](auto &scene) {
-                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); },
-              .undo = [p = m_gizmo_prev_p, is = e_is, apply_colr](auto &scene) {
-                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); }
+              .redo = [p = cstr_colr,      e_cs, apply_colr](auto &scene) { apply_colr(scene.uplifting_vertex(e_cs), p); },
+              .undo = [p = m_gizmo_prev_p, e_cs, apply_colr](auto &scene) { apply_colr(scene.uplifting_vertex(e_cs), p); }
             });
           }
         },
@@ -396,7 +391,7 @@ namespace met {
     info("is_active").set(true);
 
     // Make selection available
-    m_is = info("selection").set(std::move(m_is)).getr<InputSelection>();
+    m_cs = info("selection").set(std::move(m_cs)).getr<ConstraintSelection>();
 
     // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
@@ -422,7 +417,7 @@ namespace met {
     }
 
     // Ensure the selected constraint vertex exists
-    const auto &e_uplifting = e_scene.components.upliftings[m_is.uplifting_i];
+    const auto &e_uplifting = e_scene.components.upliftings[m_cs.uplifting_i];
     if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
       info("is_active").set(false);
       info.task().dstr();

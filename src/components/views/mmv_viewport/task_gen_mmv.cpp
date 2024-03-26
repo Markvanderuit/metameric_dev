@@ -21,14 +21,14 @@ namespace met {
 
     // Get shared resources
     const auto &e_scene             = info.global("scene").getr<Scene>();
-    const auto &e_is                = info.parent()("selection").getr<InputSelection>();
-    const auto &[e_object, e_state] = e_scene.components.upliftings[e_is.uplifting_i];
+    const auto &e_cs                = info.parent()("selection").getr<ConstraintSelection>();
+    const auto &[e_object, e_state] = e_scene.components.upliftings[e_cs.uplifting_i];
 
     // Stale on first run, or if specific uplifting data has changed
     bool is_stale = is_first_eval() 
       || e_state.basis_i 
       || e_state.csys_i 
-      || e_state.verts[e_is.constraint_i]
+      || e_state.verts[e_cs.constraint_i]
       || e_scene.components.colr_systems[e_object.csys_i];
 
     // Reset samples if stale
@@ -38,7 +38,7 @@ namespace met {
     }
     
     // Only pass if metameric mismatching is possible and samples are required
-    bool is_mmv = e_object.verts[e_is.constraint_i].has_mismatching() && m_colr_set.size() < mmv_samples_max;
+    bool is_mmv = e_object.verts[e_cs.constraint_i].has_mismatching() && m_colr_set.size() < mmv_samples_max;
     
     return info.parent()("is_active").getr<bool>() && (is_stale || is_mmv);
   }
@@ -70,16 +70,16 @@ namespace met {
 
     // Get shared resources
     const auto &e_scene       = info.global("scene").getr<Scene>();
-    const auto &e_is          = info.parent()("selection").getr<InputSelection>();
+    const auto &e_cs          = info.parent()("selection").getr<ConstraintSelection>();
     const auto &[e_uplifting, 
-                 e_state]     = e_scene.components.upliftings[e_is.uplifting_i];
-    const auto &e_vert        = e_uplifting.verts[e_is.constraint_i];
+                 e_state]     = e_scene.components.upliftings[e_cs.uplifting_i];
+    const auto &e_vert        = e_uplifting.verts[e_cs.constraint_i];
 
     // Determine if a reset is in order
     bool should_clear = is_first_eval() 
       || e_state.basis_i 
       || e_state.csys_i 
-      || e_state.verts[e_is.constraint_i]
+      || e_state.verts[e_cs.constraint_i]
       || e_scene.components.colr_systems[e_uplifting.csys_i];
     
     // Reset necessary data
@@ -114,10 +114,10 @@ namespace met {
     auto new_points = std::visit(overloaded {
       [&](const DirectColorConstraint &cstr) {
         // Prepare input color systems and corresponding signals
-        auto systems_i = { e_scene.get_csys(e_uplifting.csys_i).finalize() };
+        auto systems_i = { e_scene.csys(e_uplifting.csys_i).finalize() };
         auto signals_i = { cstr.colr_i };
         auto systems_j = cstr.csys_j
-                       | vws::transform([&](uint i) { return e_scene.get_csys(i).finalize(); })
+                       | vws::transform([&](uint i) { return e_scene.csys(i).finalize(); })
                        | rng::to<std::vector>();
 
         // Prepare data for MMV point generation
@@ -131,15 +131,15 @@ namespace met {
         };
 
         // Generate MMV spectra and append corresponding colors to current point set
-        auto csys = e_scene.get_csys(cstr.csys_j[m_csys_j]);
+        auto csys = e_scene.csys(cstr.csys_j[m_csys_j]);
         return csys(generate_mismatching_ocs(mmv_info));
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Prepare input color systems and corresponding signals;
         // note, we keep search space in XYZ
-        auto csys_base_v = { e_scene.get_csys(e_uplifting.csys_i).finalize(false) };
+        auto csys_base_v = { e_scene.csys(e_uplifting.csys_i).finalize(false) };
         auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
-        auto csys_refl_v = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.get_csys(i).finalize(false); })
+        auto csys_refl_v = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.csys(i).finalize(false); })
                          | rng::to<std::vector>();
 
         // Assemble info object for generating MMV spectra
@@ -153,7 +153,7 @@ namespace met {
         };
 
         // Generate MMV spectra, convert to view color system, and append to current point set
-        auto csys_view = e_scene.get_csys(cstr.csys_j[m_csys_j]);
+        auto csys_view = e_scene.csys(cstr.csys_j[m_csys_j]);
         return csys_view(generate_mismatching_ocs(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {
@@ -165,7 +165,7 @@ namespace met {
 
         // Prepare input color systems and corresponding signals;
         // note, we keep search space in XYZ
-        auto csys_base_v = { e_scene.get_csys(e_uplifting.csys_i).finalize(false) };
+        auto csys_base_v = { e_scene.csys(e_uplifting.csys_i).finalize(false) };
         auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
         auto csys_refl_v = csys.finalize(false);
 

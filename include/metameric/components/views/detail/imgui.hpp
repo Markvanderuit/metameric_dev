@@ -109,6 +109,10 @@ namespace ImGui {
 
     // eval function, s.t. the current_trf variable is modified over every frame
     void eval(const met::detail::Arcball &arcball, trf &current_trf, Operation op = Operation::eAll);
+
+    bool is_over() const;                                  // True if a active gizmo is moused over
+    bool is_active() const { return m_is_active; }         // Whether guizmo input is handled, ergo if begin_delta() was called
+    void set_active(bool active) { m_is_active = active; }
   };
 
   /* Useful shorthands */

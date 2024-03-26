@@ -130,8 +130,18 @@ namespace met {
           upl.csys_i = 0u;
       }
 
-      // Force update of stale gl-side components
-      e_scene.update();
+      // Force update of stale gl-side components and state tracking
+      e_scene.resources.meshes.update(e_scene);
+      e_scene.resources.images.update(e_scene);
+      e_scene.resources.illuminants.update(e_scene);
+      e_scene.resources.observers.update(e_scene);
+      e_scene.resources.bases.update(e_scene);
+      e_scene.components.settings.state.update(e_scene.components.settings.value);
+      e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
+      e_scene.components.colr_systems.update(e_scene);
+      e_scene.components.emitters.update(e_scene);
+      e_scene.components.objects.update(e_scene);
+      e_scene.components.upliftings.update(e_scene);
     });
 
     // Pipeline tasks generate uplifting data per object

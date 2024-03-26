@@ -7,6 +7,8 @@
 #include <execution>
 
 namespace met {
+  static constexpr float selector_near_distance = 12.f;
+
   RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
 
@@ -20,7 +22,7 @@ namespace met {
     return m_ray_prim.data();
   }
   
-  void MeshViewportEditorInputTask::eval_indirect_data(SchedulerHandle &info, const InputSelection &is, IndirectSurfaceConstraint &cstr) {
+  void MeshViewportEditorInputTask::eval_indirect_data(SchedulerHandle &info, const ConstraintSelection &is, IndirectSurfaceConstraint &cstr) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
@@ -183,31 +185,30 @@ namespace met {
     met_trace();
 
     // Record selection item; by default no selection
-    info("selection").set<InputSelection>(InputSelection::invalid());
+    info("selection").set<ConstraintSelection>(ConstraintSelection::invalid());
 
-    m_ray_prim      = {{ .cache_handle = info.global("cache") }};
-    m_path_prim     = {{ .cache_handle = info.global("cache") }};
-    m_is_gizmo_used = false;
+    m_ray_prim  = {{ .cache_handle = info.global("cache") }};
+    m_path_prim = {{ .cache_handle = info.global("cache") }};
   }
 
   void MeshViewportEditorInputTask::eval(SchedulerHandle &info) {
     met_trace();
 
     // Get handles, shared resources, modified resources
-    const auto &e_scene      = info.global("scene").getr<Scene>();
-    const auto &e_arcball    = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-    const auto &io           = ImGui::GetIO();
-    const auto &is_selection = info("selection").getr<InputSelection>();
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+    const auto &io        = ImGui::GetIO();
+    const auto &e_cs      = info("selection").getr<ConstraintSelection>();
 
     // If a constraint was deleted, reset and avoid further input
-    if (is_selection.is_valid()) {
+    if (e_cs.is_valid()) {
       if (e_scene.components.upliftings.is_resized() && !is_first_eval()) {
-        info("selection").set(InputSelection::invalid());
+        info("selection").set(ConstraintSelection::invalid());
         return;
       }
-      const auto &e_uplifting = e_scene.components.upliftings[is_selection.uplifting_i];
+      const auto &e_uplifting = e_scene.components.upliftings[e_cs.uplifting_i];
       if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
-        info("selection").set(InputSelection::invalid());
+        info("selection").set(ConstraintSelection::invalid());
         return;
       }
     }
@@ -221,8 +222,8 @@ namespace met {
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-    // Generate InputSelection for each relevant constraint
-    std::vector<InputSelection> viable_selections;
+    // Generate ConstraintSelection for each relevant constraint
+    std::vector<ConstraintSelection> viable_selections;
     for (const auto &[i, comp] : enumerate_view(e_scene.components.upliftings)) {
       const auto &uplifting = comp.value; 
       for (const auto &[j, vert] : enumerate_view(uplifting.verts)) {
@@ -234,13 +235,12 @@ namespace met {
     }
 
     // Gather relevant constraints together with enumeration data
-    auto viable_verts = viable_selections | vws::transform([&](InputSelection is) { 
-      return std::pair { is, e_scene.components.upliftings[is.uplifting_i].value.verts[is.constraint_i] };
-    });
+    auto viable_verts = viable_selections | vws::transform([&](ConstraintSelection cs) { 
+      return std::pair { cs, e_scene.uplifting_vertex(cs) }; });
 
     // Determine nearest constraint to the mouse in screen-space
-    InputSelection is_nearest = InputSelection::invalid();
-    for (const auto &[is, vert] : viable_verts) {
+    ConstraintSelection cs_nearest = ConstraintSelection::invalid();
+    for (const auto &[cs, vert] : viable_verts) {
       // Extract surface information from surface constraint
       auto si = std::visit(overloaded {
         [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
@@ -248,19 +248,17 @@ namespace met {
       }, vert.constraint);
 
       // Get screen-space position; test distance and continue if we are too far away
-      eig::Vector2f p_screen 
-        = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
+      eig::Vector2f p_screen = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
       guard_continue((p_screen - eig::Vector2f(io.MousePos)).norm() <= selector_near_distance);
       
       // The first surviving constraint is a mouseover candidate
-      is_nearest = is;
+      cs_nearest = cs;
       break;
     }
 
     // If a nearest selection is found, show tooltip with the vertex' constraint name
-    if (is_nearest.is_valid()) {
-      const auto &e_vert = info.global("scene").getr<Scene>()
-        .get_uplifting_vertex(is_nearest.uplifting_i, is_nearest.constraint_i);
+    if (cs_nearest.is_valid()) {
+      const auto &e_vert = info.global("scene").getr<Scene>().uplifting_vertex(cs_nearest);
       ImGui::BeginTooltip();
       ImGui::Text(e_vert.name.c_str());
       ImGui::EndTooltip();
@@ -268,19 +266,17 @@ namespace met {
 
     // On mouse click, and non-use of the gizmo, assign the nearest constraint
     // as the active selection
-    if (io.MouseClicked[0] && (!ImGuizmo::IsOver() || !is_selection.is_valid())) {
-      info("selection").getw<InputSelection>() = is_nearest;
-    }
+    if (io.MouseClicked[0] && (!m_gizmo.is_over() || !e_cs.is_valid()))
+      info("selection").getw<ConstraintSelection>() = cs_nearest;
     
     // Reset variables on lack of active selection
-    if (!is_selection.is_valid())
-      m_is_gizmo_used = false;
+    if (!e_cs.is_valid())
+      m_gizmo.set_active(false);
 
-    // On an active selection, draw ImGuizmo
-    if (is_selection.is_valid()) {
+    // On an active selection, draw gizmo
+    if (e_cs.is_valid()) {
       // Get readable vertex data
-      const auto &e_vert = info.global("scene").getr<Scene>()
-        .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
+      const auto &e_vert = e_scene.uplifting_vertex(e_cs);
       
       // Extract surface information from surface constraint
       auto si = std::visit(overloaded {
@@ -288,24 +284,10 @@ namespace met {
         [](const auto &) { return SurfaceInfo::invalid(); }
       }, e_vert.constraint);
 
-      // ImGuizmo manipulator operates on transforms
-      auto trf_vert  = eig::Affine3f(eig::Translation3f(si.p));
-      auto trf_delta = eig::Affine3f::Identity();
-
-      // Specify ImGuizmo enabled operation; transl for one vertex, transl/rotate for several
-      ImGuizmo::OPERATION op = ImGuizmo::OPERATION::TRANSLATE;
-
-      // Specify ImGuizmo settings for current viewport and insert the gizmo
-      ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
-      ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-      ImGuizmo::Manipulate(e_arcball.view().data(), e_arcball.proj().data(), 
-        op, ImGuizmo::MODE::LOCAL, trf_vert.data(), trf_delta.data());
-
       // Register gizmo use start; cache current vertex position
-      if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
+      if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
         m_gizmo_prev_si = si;
-        m_is_gizmo_used = true;
-        
+
         // Right at the start, we set the indirect constraint set into an invalid state
         // to prevent overhead from constraint generation
         std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
@@ -315,9 +297,9 @@ namespace met {
       }
 
       // Register continuous gizmo use
-      if (ImGuizmo::IsUsing()) {
+      if (auto [active, delta] = m_gizmo.eval_delta(); active) {
         // Apply world-space delta to constraint position
-        si.p = trf_delta * si.p;
+        si.p = delta * si.p;
 
         // Get screen-space position
         eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
@@ -330,8 +312,7 @@ namespace met {
             : SurfaceInfo { .p = si.p };
 
         // Get writable vertex data
-        auto &e_vert = info.global("scene").getw<Scene>()
-          .get_uplifting_vertex(is_selection.uplifting_i, is_selection.constraint_i);
+        auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
 
         // Store world-space position in surface constraint
         std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
@@ -340,30 +321,29 @@ namespace met {
       }
 
       // Register gizmo use end; apply current vertex position to scene savte state
-      if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
+      if (m_gizmo.end_delta()) {
         // Right at the end, we build the indirect surface constraint HERE
         // as it secretly uses previous frame data to fill in some details, and is
         // way more costly per frame than I'd like to admit
         auto vert = e_vert; // copy of vertex
         std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
           cstr.surface = si;
-          eval_indirect_data(info, is_selection, cstr);
+          eval_indirect_data(info, e_cs, cstr);
         }, [](auto &cstr) { } }, vert.constraint);
 
-        m_is_gizmo_used = false;
         info.global("scene").getw<Scene>().touch({
           .name = "Move surface constraint",
-          .redo = [si = si, vert = vert, is = is_selection](auto &scene) {
-            auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
+          .redo = [si = si, vert = vert, e_cs](auto &scene) {
+            auto &e_vert = scene.uplifting_vertex(e_cs);
             std::visit(overloaded { 
               [&](IndirectSurfaceConstraint &cstr) {
-              cstr = std::get<IndirectSurfaceConstraint>(vert.constraint);
+                cstr = std::get<IndirectSurfaceConstraint>(vert.constraint);
               }, [&](SurfaceConstraint auto &cstr) { 
-              cstr.surface = si;
+                cstr.surface = si;
             }, [](const auto &cstr) {}}, e_vert.constraint);
           },
-          .undo = [si = m_gizmo_prev_si, is = is_selection](auto &scene) {
-            auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
+          .undo = [si = m_gizmo_prev_si, e_cs](auto &scene) {
+            auto &e_vert = scene.uplifting_vertex(e_cs);
             std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
               cstr.surface = si;
             }, [](const auto &cstr) {}}, e_vert.constraint);

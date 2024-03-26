@@ -80,7 +80,7 @@ namespace met {
     bool tssl_stale = is_first_eval();
 
     // Color system spectra within which the 'uplifted' texture is defined
-    auto csys = e_scene.get_csys(e_csys).finalize();
+    auto csys = e_scene.csys(e_csys).finalize();
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
@@ -112,11 +112,10 @@ namespace met {
       // We only generate a spectrum if the specific vertex was changed,
       // or the entire underlying color system has changed
       guard_continue(e_state.verts[i] || csys_stale);
-      const auto &vert = e_uplifting.verts[i];
 
       // Generate vertex color and attached metamer;
       // this is handled in Scene object to keep it away from the pipeline
-      auto [c, s] = e_scene.get_uplifting_constraint(e_uplifting, vert);
+      auto [c, s] = e_scene.realize_constraint({ .uplifting_i = m_uplifting_i, .constraint_i = static_cast<uint>(i) });
       
       // Add to set of spectra, and to tesselation input points
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;

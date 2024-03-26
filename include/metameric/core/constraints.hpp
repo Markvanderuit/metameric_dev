@@ -6,6 +6,22 @@
 #include <metameric/core/record.hpp>
 
 namespace met {
+  // Helper object for handling selection of a specific uplifting/vertex/constraint tuple
+  // in the scene
+  struct ConstraintSelection {
+    constexpr static uint invalid_data = 0xFFFFFFFF;
+
+  public:
+    uint uplifting_i  = invalid_data;
+    uint constraint_i = 0;
+  
+  public:
+    bool is_valid() const { return uplifting_i != invalid_data; }
+    static ConstraintSelection invalid() { return ConstraintSelection(); }
+    
+    friend auto operator<=>(const ConstraintSelection &, const ConstraintSelection &) = default;
+  };
+
   // Concept defining the expected components of color-system constraints
   template <typename Ty>
   concept ColorConstraint = requires(Ty t) {

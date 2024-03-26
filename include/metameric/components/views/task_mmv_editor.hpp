@@ -5,11 +5,11 @@
 
 namespace met {
   struct MMVEditorTask : public detail::TaskNode  {
-    InputSelection m_is; // Active input selection
+    ConstraintSelection m_cs; // Active input selection
 
     // Constructor; the task is specified for a specific,
     // selected constraint for now
-    MMVEditorTask(InputSelection is) : m_is(is) { }
+    MMVEditorTask(ConstraintSelection is) : m_cs(is) { }
 
     void init(SchedulerHandle &info) override;
     void eval(SchedulerHandle &info) override;

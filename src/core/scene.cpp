@@ -235,7 +235,7 @@ namespace met {
 
     // Default color system
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };
-    components.colr_systems.push(get_csys_name(csys), csys);
+    components.colr_systems.push(csys_name(csys), csys);
     
     // Default uplifting
     components.objects.emplace("Default object", { 
@@ -630,55 +630,51 @@ namespace met {
     mod_i = -1;
   }
 
-  met::ColrSystem Scene::get_csys(uint i) const {
+  met::ColrSystem Scene::csys(uint i) const {
     met_trace();
-    return get_csys(components.colr_systems[i].value);
+    return csys(components.colr_systems[i].value);
   }
 
-  met::ColrSystem Scene::get_csys(ColorSystem c) const {
+  met::ColrSystem Scene::csys(ColorSystem c) const {
     met_trace();
     return { .cmfs       = resources.observers[c.observer_i].value(),
              .illuminant = resources.illuminants[c.illuminant_i].value() };
   }
 
-  met::Spec Scene::get_emitter_spd(uint i) const {
+  met::Spec Scene::emitter_spd(uint i) const {
     met_trace();
-    return get_emitter_spd(components.emitters[i].value);
+    return emitter_spd(components.emitters[i].value);
   }
 
-  met::Spec Scene::get_emitter_spd(Emitter e) const {
+  met::Spec Scene::emitter_spd(Emitter e) const {
     met_trace();
     return (resources.illuminants[e.illuminant_i].value() * e.illuminant_scale).eval();
   }
 
-  std::string Scene::get_csys_name(uint i) const {
+  std::string Scene::csys_name(uint i) const {
     met_trace();
-    return get_csys_name(components.colr_systems[i].value);
+    return csys_name(components.colr_systems[i].value);
   }
 
-  std::string Scene::get_csys_name(ColorSystem c) const {
+  std::string Scene::csys_name(ColorSystem c) const {
     met_trace();
     return std::format("{}, {}", 
                        resources.observers[c.observer_i].name, 
                        resources.illuminants[c.illuminant_i].name);
   }
 
-  
-  std::pair<Colr, Spec> Scene::get_uplifting_constraint(uint i, uint vert_i) const {
+  std::pair<Colr, Spec> Scene::realize_constraint(ConstraintSelection cs) const {
     met_trace();
-    return get_uplifting_constraint(components.upliftings[i].value,
-                                    components.upliftings[i].value.verts[vert_i]);
-  }
 
-  std::pair<Colr, Spec> Scene::get_uplifting_constraint(const Uplifting &u, const Uplifting::Vertex &v) const {
-    met_trace();
+    const auto &e_uplifting = components.upliftings[cs.uplifting_i].value;
+    const auto &e_vert      = e_uplifting.verts[cs.constraint_i];
 
     // Return zero constraint for inactive parts
-    if (!v.is_active)
+    if (!e_vert.is_active)
       return { Colr(0.f), Spec(0.f) };
 
     // Color system spectra within which the 'uplifted' texture is defined
-    CMFS csys_i = get_csys(u.csys_i).finalize();
+    CMFS csys_i = csys(e_uplifting.csys_i).finalize();
 
     // Output values
     Colr c;
@@ -694,12 +690,12 @@ namespace met {
         std::vector<CMFS> systems = { csys_i };
         std::vector<Colr> signals = { c      };
         rng::transform(cstr.csys_j, std::back_inserter(systems), 
-          [&](uint csys_j) { return get_csys(csys_j).finalize(); });
+          [&](uint csys_j) { return csys(csys_j).finalize(); });
         rng::copy(cstr.colr_j, std::back_inserter(signals));
 
         // Generate a metamer satisfying the system+signal constraint set
         s = generate_spectrum(GenerateSpectrumInfo {
-          .basis   = resources.bases[u.basis_i].value(),
+          .basis   = resources.bases[e_uplifting.basis_i].value(),
           .systems = systems,
           .signals = signals
         });
@@ -719,12 +715,12 @@ namespace met {
         std::vector<CMFS> systems = { csys_i };
         std::vector<Colr> signals = { c      };
         rng::transform(cstr.csys_j, std::back_inserter(systems), 
-          [&](uint csys_j) { return get_csys(csys_j).finalize(); });
+          [&](uint csys_j) { return csys(csys_j).finalize(); });
         rng::copy(cstr.colr_j, std::back_inserter(signals));
 
         // Generate a metamer satisfying the system+signal constraint set
         s = generate_spectrum(GenerateSpectrumInfo {
-          .basis   = resources.bases[u.basis_i].value(),
+          .basis   = resources.bases[e_uplifting.basis_i].value(),
           .systems = systems,
           .signals = signals
         });
@@ -750,7 +746,7 @@ namespace met {
                   
           // Generate a metamer satisfying the constraint set
           s = generate_spectrum(GenerateIndirectSpectrumInfo {
-            .basis        = resources.bases[u.basis_i].value(),
+            .basis        = resources.bases[e_uplifting.basis_i].value(),
             .base_system  = csys_i,
             .base_signal  = cstr.surface.diffuse,
             .refl_systems = refl_systems,
@@ -775,7 +771,7 @@ namespace met {
 
           // Generate a metamer satisfying the system+signal constraint set
           s = generate_spectrum(GenerateSpectrumInfo {
-            .basis   = resources.bases[u.basis_i].value(),
+            .basis   = resources.bases[e_uplifting.basis_i].value(),
             .systems = systems,
             .signals = signals
           });
@@ -788,7 +784,7 @@ namespace met {
         // The metamer's color under the uplifting's color system becomes our vertex color
         c = (csys_i.transpose() * s.matrix()).eval();
       }
-    }, v.constraint);
+    }, e_vert.constraint);
 
     return { c, s };
   }

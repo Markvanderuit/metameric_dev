@@ -12,11 +12,9 @@
 #include <variant>
 
 namespace met {
-  /* 
-    Define maximum nr. of supported components for some types
-    These aren't device limits, but mostly exist so some arrays
-    can be hardcoded shader-side
-  */
+  /* Define maximum nr. of supported components for some types
+     These aren't device limits, but mostly exist so some sizes
+     can be hardcoded shader-side */
   constexpr static uint max_supported_meshes     = MET_SUPPORTED_MESHES;
   constexpr static uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
   constexpr static uint max_supported_emitters   = MET_SUPPORTED_EMITTERS;
@@ -28,9 +26,7 @@ namespace met {
      their dependencies; responsible for most program data, as well
      as tracking of dependency modifications */
   struct Scene {
-  public: // Scene data
-    // Scene components, directly visible or influential in the scene
-    // On-disk, these are stored in json format
+    // Scene components, directly visible or influential in the scene (stored as json on disk)
     struct SceneComponents {
       detail::Components<ColorSystem> colr_systems;
       detail::Components<Emitter>     emitters;
@@ -39,25 +35,12 @@ namespace met {
       detail::Component<Settings>     settings;   // Miscellaneous settings; e.g. texture size
       detail::Component<uint>         observer_i; // Primary observer index; simple enough for now
     
-    public:
-      void update(const Scene &scene) {
-        settings.state.update(settings.value);
-        observer_i.state.update(observer_i.value);
-        colr_systems.update(scene);
-        emitters.update(scene);
-        objects.update(scene);
-        upliftings.update(scene);
-      }
-
-      constexpr bool is_mutated() const {
-        return colr_systems || emitters || objects || upliftings || settings || observer_i;
-      }
-
+      // Check if any components were changed/added/removed
+      constexpr bool is_mutated() const { return colr_systems || emitters || objects || upliftings || settings || observer_i; }
       constexpr operator bool() const { return is_mutated(); };
     } components;
 
-    // Scene resources, primarily referred to by components in the scene
-    // On-disk, these are stored in zlib-compressed binary format
+    // Scene resources, primarily referred to by components in the scene (stored in zlib on disk)
     struct SceneResources {
       detail::Resources<Mesh>  meshes;
       detail::Resources<Image> images;
@@ -65,30 +48,14 @@ namespace met {
       detail::Resources<CMFS>  observers;
       detail::Resources<Basis> bases;
 
-    public:
-      void update(const Scene &scene) {
-        meshes.update(scene);
-        images.update(scene);
-        illuminants.update(scene);
-        observers.update(scene);
-        bases.update(scene);
-      }
-
-      constexpr bool is_mutated() const {
-        return meshes || images || illuminants || observers || bases;
-      }
-
+      // Check if any resources were changed/added/removed
+      constexpr bool is_mutated() const { return meshes || images || illuminants || observers || bases; }
       constexpr operator bool() const { return is_mutated(); };
     } resources;
 
-    void update() {
-      resources.update(*this);
-      components.update(*this);
-    }
-
-    constexpr bool is_mutated() const {
-      return resources || components;
-    }
+    // Check if any components/resources were changed/added/removed
+    constexpr bool is_mutated() const { return resources || components; }
+    constexpr operator bool() const { return is_mutated(); };
     
   public: // Save state and IO handling
     enum class SaveState {
@@ -132,29 +99,27 @@ namespace met {
 
   public: // Scene data helper functions
     // Realize a pretty-printed name of a certain color system
-    std::string get_csys_name(uint i) const;
-    std::string get_csys_name(ColorSystem c) const;
+    std::string csys_name(uint i)        const;
+    std::string csys_name(ColorSystem c) const;
 
     // Realize the spectral data of a certain color system
-    ColrSystem get_csys(uint i) const;
-    ColrSystem get_csys(ColorSystem c) const;
+    ColrSystem csys(uint i)        const;
+    ColrSystem csys(ColorSystem c) const;
 
     // Realize the spectral data of a certain emitter
-    Spec get_emitter_spd(uint i) const;
-    Spec get_emitter_spd(Emitter e) const;
+    Spec emitter_spd(uint i)    const;
+    Spec emitter_spd(Emitter e) const;
     
-    // Realize the spectral data of a certain uplifting vertex,
-    // with its attached color location
-    std::pair<Colr, Spec> get_uplifting_constraint(uint i, uint vert_i) const;
-    std::pair<Colr, Spec> get_uplifting_constraint(const Uplifting &u, const Uplifting::Vertex &v) const;
+    // Realize the spectral data of a certain uplifting vertex, with its attached color location
+    std::pair<Colr, Spec> realize_constraint(ConstraintSelection cs) const;
 
     // Extract a specific uplifting vertex, given indices;
     // supplied here given the common cumbersomeness of deep access
-    const Uplifting::Vertex &get_uplifting_vertex(uint uplifting_i, uint vertex_i) const {
-      return components.upliftings[uplifting_i].value.verts[vertex_i];
+    const Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) const {
+      return components.upliftings[cs.uplifting_i].value.verts[cs.constraint_i];
     }
-    Uplifting::Vertex &get_uplifting_vertex(uint uplifting_i, uint vertex_i) {
-      return components.upliftings[uplifting_i].value.verts[vertex_i];
+    Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) {
+      return components.upliftings[cs.uplifting_i].value.verts[cs.constraint_i];
     }
 
     // Helper object 

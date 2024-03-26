@@ -259,4 +259,8 @@ namespace ImGui {
 
     }
   }
+
+  bool Gizmo::is_over() const {
+    return ImGuizmo::IsOver();
+  }
 } // namespace ImGui

@@ -187,7 +187,7 @@ namespace met {
               auto child_handle = info.child_task(child_name);
               if (!child_handle.is_init()) {
                 child_handle.init<MMVEditorTask>(
-                  InputSelection { .uplifting_i = i, .constraint_i = j });
+                  ConstraintSelection { .uplifting_i = i, .constraint_i = j });
               }
             }
             if (ImGui::IsItemHovered())
@@ -266,7 +266,7 @@ namespace met {
       push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
 
       // Force update name to adhere to [CMFS][Illuminant] naming clarity
-      component.name = scene.get_csys_name(value);
+      component.name = scene.csys_name(value);
     };
 
     // Default implementation of editing visitor for Mesh resources
