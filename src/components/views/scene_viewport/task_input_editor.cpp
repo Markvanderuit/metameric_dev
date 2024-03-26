@@ -210,15 +210,15 @@ namespace met {
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
     const auto &io        = ImGui::GetIO();
-    const auto &e_cs      = info("selection").getr<ConstraintSelection>();
+    const auto &i_cs      = info("selection").getr<ConstraintSelection>();
 
     // If a constraint was deleted, reset and avoid further input
-    if (e_cs.is_valid()) {
+    if (i_cs.is_valid()) {
       if (e_scene.components.upliftings.is_resized() && !is_first_eval()) {
         info("selection").set(ConstraintSelection::invalid());
         return;
       }
-      const auto &e_uplifting = e_scene.components.upliftings[e_cs.uplifting_i];
+      const auto &e_uplifting = e_scene.components.upliftings[i_cs.uplifting_i];
       if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
         info("selection").set(ConstraintSelection::invalid());
         return;
@@ -287,27 +287,28 @@ namespace met {
     if (cs_nearest.is_valid()) {
       const auto &e_vert = info.global("scene").getr<Scene>().uplifting_vertex(cs_nearest);
       ImGui::BeginTooltip();
-      ImGui::Text(e_vert.name.c_str());
+      ImGui::Text(e_vert.name.c_str()); // TODO update for _IndirectSurfaceConstraint
       ImGui::EndTooltip();
     }
 
     // On mouse click, and non-use of the gizmo, assign the nearest constraint
     // as the active selection
-    if (io.MouseClicked[0] && (!m_gizmo.is_over() || !e_cs.is_valid()))
+    if (io.MouseClicked[0] && (!m_gizmo.is_over() || !i_cs.is_valid()))
       info("selection").getw<ConstraintSelection>() = cs_nearest;
     
     // Reset variables on lack of active selection, and return early
-    if (!e_cs.is_valid()) {
+    if (!i_cs.is_valid()) {
       m_gizmo.set_active(false);
       return;
     }
 
     // Extract surface information from surface constraint
-    const auto &e_vert = e_scene.uplifting_vertex(e_cs);
+    const auto &e_vert = e_scene.uplifting_vertex(i_cs);
     auto si = std::visit(overloaded {
+      /* [i_cs](const _IndirectSurfaceConstraint &cstr) { return cstr.constraints[i_cs.constraint_i].surface; }, */
       [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
       [](const auto &) { return SurfaceInfo::invalid(); }
-    },  e_scene.uplifting_vertex(e_cs).constraint);
+    },  e_scene.uplifting_vertex(i_cs).constraint);
 
     // Register gizmo use start; cache current vertex position
     if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
@@ -315,11 +316,16 @@ namespace met {
 
       // Right at the start, we set the indirect constraint set into an invalid state
       // to prevent overhead from constraint generation
-      auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
-      std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+      auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
+      std::visit(overloaded { 
+      /* [&](_IndirectSurfaceConstraint &cstr) { 
+        cstr.constraints[i_cs.constraint_i].csys.powers.clear();
+        cstr.constraints[i_cs.constraint_i].colr = 0.f;
+      }, */
+      [&](IndirectSurfaceConstraint &cstr) { 
         cstr.powers.clear();
         cstr.colr = 0.f;
-      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(e_cs).constraint);
+      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(i_cs).constraint);
     }
 
     // Register continuous gizmo use
@@ -338,9 +344,13 @@ namespace met {
          : SurfaceInfo { .p = si.p };
 
       // Store world-space position in surface constraint
-      std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
+      std::visit(overloaded { 
+      /* [&](_IndirectSurfaceConstraint &cstr) { 
+        cstr.constraints[i_cs.constraint_i].surface = si;
+      }, */
+      [&](SurfaceConstraint auto &cstr) { 
         cstr.surface = si;
-      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(e_cs).constraint);
+      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(i_cs).constraint);
     }
 
     // Register gizmo use end; apply current vertex position to scene save state
@@ -349,24 +359,30 @@ namespace met {
       // as it secretly uses previous frame data to fill in some details, and is
       // way more costly per frame than I'd like to admit
       auto vert = e_vert; // copy of vertex
-      std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+      std::visit(overloaded { 
+      /* [&](_IndirectSurfaceConstraint &cstr) { 
+        cstr.constraints[i_cs.constraint_i].surface = si;
+        build_indirect_constraint(info, i_cs, cstr.constraints[i_cs.constraint_i]);
+      }, */
+      [&](IndirectSurfaceConstraint &cstr) { 
         cstr.surface = si;
-        build_indirect_constraint(info, e_cs, cstr);
+        build_indirect_constraint(info, i_cs, cstr);
       }, [](auto &cstr) { } }, vert.constraint);
 
       // Save result
       info.global("scene").getw<Scene>().touch({
         .name = "Move surface constraint",
-        .redo = [si = si, vert = vert, e_cs](auto &scene) {
+        .redo = [si = si, vert = vert, i_cs](auto &scene) {
           std::visit(overloaded { 
+            /* [&](_IndirectSurfaceConstraint &cstr) { cstr = std::get<_IndirectSurfaceConstraint>(vert.constraint); }, */
             [&](IndirectSurfaceConstraint &cstr) { cstr = std::get<IndirectSurfaceConstraint>(vert.constraint); },
             [&](SurfaceConstraint auto &cstr) {  cstr.surface = si;
-          }, [](const auto &cstr) {}}, scene.uplifting_vertex(e_cs).constraint);
+          }, [](const auto &cstr) {}}, scene.uplifting_vertex(i_cs).constraint);
         },
-        .undo = [si = m_gizmo_prev_si, e_cs](auto &scene) {
+        .undo = [si = m_gizmo_prev_si, i_cs](auto &scene) {
           std::visit(overloaded { 
             [&](SurfaceConstraint auto &cstr) { cstr.surface = si;
-          }, [](const auto &cstr) {}}, scene.uplifting_vertex(e_cs).constraint);
+          }, [](const auto &cstr) {}}, scene.uplifting_vertex(i_cs).constraint);
         }
       });
     }
