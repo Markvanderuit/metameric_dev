@@ -26,6 +26,30 @@ namespace met {
         && rng::equal(powers, o.powers, eig::safe_approx_compare<Spec>);
   }
 
+  bool _IndirectSurfaceConstraint::Constraint::operator==(const Constraint &o) const {
+    return surface == o.surface && csys == o.csys && colr.isApprox(o.colr);
+  }
+
+  bool _IndirectSurfaceConstraint::Constraint::is_valid() const {
+    return surface.is_valid() && surface.record.is_object();
+  }
+
+  bool _IndirectSurfaceConstraint::Constraint::has_mismatching() const {
+    return !csys.powers.empty() && !colr.isZero();
+  }
+
+  bool _IndirectSurfaceConstraint::operator==(const _IndirectSurfaceConstraint &o) const {
+    return rng::equal(constraints, o.constraints);
+  }
+
+  bool _IndirectSurfaceConstraint::is_valid() const {
+    return rng::all_of(constraints, [](const auto &c) { return c.is_valid(); });
+  }
+
+  bool _IndirectSurfaceConstraint::has_mismatching() const {
+    return rng::all_of(constraints, [](const auto &c) { return c.has_mismatching(); });
+  }
+
   void from_json(const json &js, DirectColorConstraint &c) {
     met_trace();
     js.at("colr_i").get_to(c.colr_i);

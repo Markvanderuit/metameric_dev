@@ -70,17 +70,35 @@ namespace met {
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
   static_assert(is_color_constraint<DirectSurfaceConstraint>);
 
-  struct _SurfaceConstraint {
-    struct ConstraintPoint {
-      SurfaceInfo        surface = SurfaceInfo::invalid();
-      IndirectColrSystem csys;
-      Colr               colr;
+  /* Constraint definition used in uplifting
+     A indirect surface constraint imposes specific color constraints
+     for several positions on scene surfaces, taking into account light transport
+     that affects each individual surface position. The reason multiple constraints
+     are used is that the underlying constraint vertex, practically, shows up
+     throughout a scene.
+  */
+  struct _IndirectSurfaceConstraint {
+    struct Constraint {
+      SurfaceInfo        surface = SurfaceInfo::invalid(); // Underlying surface data, recorded by constraint position in scene
+      IndirectColrSystem csys;                             // Color system based on light transport exitant from surface position
+      Colr               colr;                             // Constrained output color, user-specified inside a mismatch volume
+
+    public:
+      bool operator==(const Constraint &o) const;
+      bool is_valid() const;
+      bool has_mismatching() const;
     };
 
-    std::vector<ConstraintPoint> points;
+    // The set of scene constraints bound together into a single constraint vertex
+    std::vector<Constraint> constraints;
+
+  public:
+    bool operator==(const _IndirectSurfaceConstraint &o) const;
+    bool is_valid() const;
+    bool has_mismatching() const;
   };
 
-  /* Constraint definition used in upliftin
+  /* Constraint definition used in uplifting
      A indirect surface constraint imposes specific color reproduction
      for a position on a scene surface, taking into account light transport
      affecting this surface position. */

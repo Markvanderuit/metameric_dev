@@ -283,8 +283,9 @@ namespace met {
   };
 
   class MMVEditorGuizmoTask : public detail::TaskNode {
-    bool m_is_gizmo_used = false;
-    Colr m_gizmo_prev_p;
+    bool         m_is_gizmo_used = false;
+    Colr         m_gizmo_prev_p;
+    ImGui::Gizmo m_gizmo;
     
   public:
     bool is_active(SchedulerHandle &info) override {
@@ -309,134 +310,77 @@ namespace met {
       const auto &e_is      = info.parent()("selection").getr<InputSelection>();
       const auto &e_vert    = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
 
-      // Compute viewport offset and size, minus ImGui's tab bars etc
-      eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-                                 + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-      eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                 - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-
+      // Visit underlying constraints to allow guizmo editing
       std::visit(overloaded {
         [&](const ColorConstraint auto &cstr) {
-          auto p = cstr.colr_j[0];
-          
-          // ImGuizmo manipulator operates on transforms
-          auto trf_vert  = eig::Affine3f(eig::Translation3f(p));
-          auto trf_delta = eig::Affine3f::Identity();
-          
-          // Specify ImGuizmo enabled operation; transl for one vertex, transl/rotate for several
-          ImGuizmo::OPERATION op = ImGuizmo::OPERATION::TRANSLATE;
-
-          // Specify ImGuizmo settings for current viewport and insert the gizmo
-          ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
-          ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-          ImGuizmo::Manipulate(e_arcball.view().data(), e_arcball.proj().data(), 
-            op, ImGuizmo::MODE::LOCAL, trf_vert.data(), trf_delta.data());
-          
-          // Register gizmo use start; cache current vertex position
-          if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-            m_gizmo_prev_p  = p;
-            m_is_gizmo_used = true;
-          }
-
-          // Register continuous gizmo use
-          if (ImGuizmo::IsUsing()) {
-            // Apply world-space delta to constraint position
-            p = trf_delta * p;
-
-            // Get writable vertex data
-            auto &e_vert = info.global("scene").getw<Scene>()
-              .get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
-
-            // Store world-space position in surface constraint
-            std::visit(overloaded { [&](ColorConstraint auto &cstr) { 
+          // Lambda to apply a specific vertex data to the color constraint
+          auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
+            std::visit(overloaded { [p](ColorConstraint auto &cstr) { 
               cstr.colr_j[0] = p;
-            }, [](const auto &cstr) { } }, e_vert.constraint);
+            }, [](const auto &cstr) {}}, vert.constraint); };
+
+          // Register gizmo start; cache current vertex position
+          if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.colr_j[0]))))
+            m_gizmo_prev_p = cstr.colr_j[0];
+
+          // Register gizmo drag; apply world-space delta
+          if (auto [active, delta] = m_gizmo.eval_delta(); active) {
+            auto &e_scene = info.global("scene").getw<Scene>();
+            auto &e_vert  = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+
+            // Apply world-space delta; store transformed position in surface constraint
+            apply_colr(e_vert, delta * cstr.colr_j[0]);
           }
 
-          // Register gizmo use end; apply current vertex position to scene save state
-          if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
-            m_is_gizmo_used = false;
-
+          // Register gizmo end; apply vertex position to scene save state
+          if (m_gizmo.end_delta()) {
             // Snap vertex position to inside convex hull, if necessary
             const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-            p = detail::find_closest_point_in_convex_hull(p, e_chull);
+            auto cstr_colr = detail::find_closest_point_in_convex_hull(cstr.colr_j[0], e_chull);
 
+            // Handle save
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
-              .redo = [p = p, is = e_is](auto &scene) {
-                auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
-                std::visit(overloaded { [&](ColorConstraint auto &cstr) { 
-                  cstr.colr_j[0] = p;
-                }, [](const auto &cstr) {}}, e_vert.constraint);
-              },
-              .undo = [p = m_gizmo_prev_p, is = e_is](auto &scene) {
-                auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
-                std::visit(overloaded { [&](ColorConstraint auto &cstr) { 
-                  cstr.colr_j[0] = p;
-                }, [](const auto &cstr) {}}, e_vert.constraint);
-              }
+              .redo = [p = cstr_colr,      is = e_is, apply_colr](auto &scene) {
+                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); },
+              .undo = [p = m_gizmo_prev_p, is = e_is, apply_colr](auto &scene) {
+                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); }
             });
           }
         },
         [&](const IndirectSurfaceConstraint &cstr) {
-          auto p = cstr.colr;
-          
-          // ImGuizmo manipulator operates on transforms
-          auto trf_vert  = eig::Affine3f(eig::Translation3f(p));
-          auto trf_delta = eig::Affine3f::Identity();
-          
-          // Specify ImGuizmo enabled operation; transl for one vertex, transl/rotate for several
-          ImGuizmo::OPERATION op = ImGuizmo::OPERATION::TRANSLATE;
-
-          // Specify ImGuizmo settings for current viewport and insert the gizmo
-          ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
-          ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-          ImGuizmo::Manipulate(e_arcball.view().data(), e_arcball.proj().data(), 
-            op, ImGuizmo::MODE::LOCAL, trf_vert.data(), trf_delta.data());
-          
-          // Register gizmo use start; cache current vertex position
-          if (ImGuizmo::IsUsing() && !m_is_gizmo_used) {
-            m_gizmo_prev_p  = p;
-            m_is_gizmo_used = true;
-          }
-
-          // Register continuous gizmo use
-          if (ImGuizmo::IsUsing()) {
-            // Apply world-space delta to constraint position
-            p = trf_delta * p;
-
-            // Get writable vertex data
-            auto &e_vert = info.global("scene").getw<Scene>()
-              .get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
-
-            // Store world-space position in surface constraint
-            std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+          // Lambda to apply a specific vertex data to the indirect constraint
+          auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
+            std::visit(overloaded { [p](IndirectSurfaceConstraint &cstr) { 
               cstr.colr = p;
-            }, [](const auto &cstr) { } }, e_vert.constraint);
+            }, [](const auto &cstr) {}}, vert.constraint); };
+
+          // Register gizmo start; cache current vertex position
+          if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.colr))))
+            m_gizmo_prev_p = cstr.colr;
+
+          // Register gizmo drag; apply world-space delta
+          if (auto [active, delta] = m_gizmo.eval_delta(); active) {
+            auto &e_scene = info.global("scene").getw<Scene>();
+            auto &e_vert  = e_scene.get_uplifting_vertex(e_is.uplifting_i, e_is.constraint_i);
+
+            // Apply world-space delta; store transformed position in surface constraint
+            apply_colr(e_vert, delta * cstr.colr);
           }
 
-          // Register gizmo use end; apply current vertex position to scene save state
-          if (!ImGuizmo::IsUsing() && m_is_gizmo_used) {
-            m_is_gizmo_used = false;
-            
+          // Register gizmo end; apply vertex position to scene save state
+          if (m_gizmo.end_delta()) {
             // Snap vertex position to inside convex hull, if necessary
             const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-            p = detail::find_closest_point_in_convex_hull(p, e_chull);
+            auto cstr_colr = detail::find_closest_point_in_convex_hull(cstr.colr, e_chull);
 
+            // Handle save
             info.global("scene").getw<Scene>().touch({
               .name = "Move color constraint",
-              .redo = [p = p, is = e_is](auto &scene) {
-                auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
-                std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
-                  cstr.colr = p;
-                }, [](const auto &cstr) {}}, e_vert.constraint);
-              },
-              .undo = [p = m_gizmo_prev_p, is = e_is](auto &scene) {
-                auto &e_vert = scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i);
-                std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
-                  cstr.colr = p;
-                }, [](const auto &cstr) {}}, e_vert.constraint);
-              }
+              .redo = [p = cstr_colr,      is = e_is, apply_colr](auto &scene) {
+                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); },
+              .undo = [p = m_gizmo_prev_p, is = e_is, apply_colr](auto &scene) {
+                apply_colr(scene.get_uplifting_vertex(is.uplifting_i, is.constraint_i), p); }
             });
           }
         },

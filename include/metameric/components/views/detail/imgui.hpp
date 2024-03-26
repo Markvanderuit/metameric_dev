@@ -1,5 +1,6 @@
 #pragma once
 
+#include <metameric/components/views/detail/arcball.hpp>
 
 #define IM_VEC2_CLASS_EXTRA                                    \
   ImVec2(const met::eig::Vector2f &v) : x(v.x()), y(v.y()) { } \
@@ -44,6 +45,8 @@ namespace ImGui {
   void BeginFrame();
   void DrawFrame();
 
+  /* Useful objects */
+
   // Helper for RAII ImGui PushStyleVar/PopStyleVar wrapper
   struct ScopedStyleVar {
     ScopedStyleVar() = delete;
@@ -82,13 +85,37 @@ namespace ImGui {
     met_declare_noncopyable(ScopedID);
   };
 
+  // ImGuizmo wrapper object to make handling gizmos slightly easier
+  class Gizmo {
+    using trf = Eigen::Affine3f;
+
+    bool m_is_active = false;
+    trf  m_delta;
+  public:
+    // 
+    enum class Operation : met::uint {
+      eTranslate = 7u,
+      eRotate    = 120u,
+      eScale     = 896u,
+      eAll       = eTranslate | eRotate | eScale
+    };
+    
+    // Begin/eval/end functions, s.t. eval() returns a delta transform applied to the current
+    // transform over every frame, and the user can detect changes
+    bool begin_delta(const met::detail::Arcball &arcball, const trf &current_trf, Operation op = Operation::eTranslate);
+    std::pair<bool, trf> 
+         eval_delta();
+    bool end_delta();
+
+    // eval function, s.t. the current_trf variable is modified over every frame
+    void eval(const met::detail::Arcball &arcball, trf &current_trf, Operation op = Operation::eAll);
+  };
+
   /* Useful shorthands */
 
   void SpacedSeparator();
   void CloseAnyPopupIfOpen();
   void CloseAllPopupsIfOpen();
-  
-  // Plot a spectral distribution
   void PlotSpectrum(const char* label, const met::Spec &reflectance, float min_bounds = -0.05f, float max_bounds = 1.05f, const ImVec2 &size = { -1, 0 });
 
   /* Wrappers for std::string STL types.

@@ -70,7 +70,6 @@ namespace ImGui {
 
   void BeginFrame() {
     met_trace_full();
-
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -79,29 +78,26 @@ namespace ImGui {
 
   void DrawFrame() {
     met_trace_full();
-
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   }
 
   void SpacedSeparator() {
-    met_trace_full();
-
+    met_trace();
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
   }
 
   void CloseAnyPopupIfOpen() {
-    met_trace_full();
-
+    met_trace();
     guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
     ImGui::CloseCurrentPopup();
   }
 
   void CloseAllPopupsIfOpen() {
-    met_trace_full();
-    
+    met_trace();
+  
     while (true) {
       guard(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel));
       ImGui::CloseCurrentPopup();
@@ -185,5 +181,82 @@ namespace ImGui {
     cb_user_data.ChainCallback = callback;
     cb_user_data.ChainCallbackUserData = user_data;
     return InputTextWithHint(label, hint, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
+  }
+
+  bool Gizmo::begin_delta(const met::detail::Arcball &arcball, const trf &current_trf, Operation op) {
+    met_trace();
+
+    using namespace met;
+    
+    // Reset internal state
+    m_delta = trf::Identity();
+    auto current_trf_copy = current_trf;
+
+    // Compute viewport offset and size, minus ImGui's tab bars etc
+    eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                               + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    
+    // Specify ImGuizmo settings for current viewport and insert the gizmo
+    ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
+    ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+    ImGuizmo::Manipulate(arcball.view().data(), arcball.proj().data(), 
+      static_cast<ImGuizmo::OPERATION>(op), ImGuizmo::MODE::LOCAL, 
+      current_trf_copy.data(), m_delta.data());
+
+    guard(!m_is_active && ImGuizmo::IsUsing(), false);
+    m_is_active = true;
+    return true;
+  }
+
+  std::pair<bool, Gizmo::trf> Gizmo::eval_delta() {
+    met_trace();
+    guard(m_is_active && ImGuizmo::IsUsing(), {false, trf::Identity()});
+    return { true, m_delta };
+  }
+
+  bool Gizmo::end_delta() {
+    met_trace();
+    guard(m_is_active && !ImGuizmo::IsUsing(), false);
+    m_is_active = false;
+    return true;
+  }
+
+  void Gizmo::eval(const met::detail::Arcball &arcball, trf &current_trf, Operation op) {
+    met_trace();
+
+    using namespace met;
+    
+    // Reset internal state
+    m_delta = trf::Identity();
+
+    // Compute viewport offset and size, minus ImGui's tab bars etc
+    eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                               + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    
+    // Specify ImGuizmo settings for current viewport and insert the gizmo
+    ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
+    ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+    ImGuizmo::Manipulate(arcball.view().data(), arcball.proj().data(), 
+      static_cast<ImGuizmo::OPERATION>(op), ImGuizmo::MODE::LOCAL, current_trf.data(), m_delta.data());
+
+    // Setup phase
+    if (!m_is_active && ImGuizmo::IsUsing()) {
+      m_is_active = true;
+    }
+
+    // Move phase
+    if (ImGuizmo::IsUsing()) {
+
+    }
+
+    // Teardown phase
+    if (m_is_active && !ImGuizmo::IsUsing()) {
+      m_is_active = false;
+
+    }
   }
 } // namespace ImGui
