@@ -100,7 +100,7 @@ namespace met {
                    auto it = rng::find(tetr.indices, is.constraint_i);           //    and return together with tetrahedron
                    uint i =  std::distance(tetr.indices.begin(), it);            
                    return std::pair { tetr, i };  })
-                 | vws::filter([&](const auto &pair) {                           // 6. drop tetrahedra that don't touch on our selected constraint
+                 | vws::filter([&](const auto &pair) {                           // 6. drop tetrahedra that don't touch our selected constraint
                    return pair.second < 4; })                                    
                  | vws::transform([&](const auto &pair) {                        // 7. return compact representation; weight of r and summed remainder
                    auto [tetr, i] = pair;
@@ -112,16 +112,6 @@ namespace met {
                    return rc; 
                  }) | rng::to<std::vector<CompactTetrRecord>>();                 // 8. finalize to vector
       
-      /* if (verts.empty()) { 
-        // This path is either very unlikely (as first hits of each ray **should** hit the constraint itself)
-        // or just completely impossible. Either way, ignoring as it hasn't happened in any scene I've tested 
-        // If no constraint vertices were encountered, full path throughput is pushed back
-        tbb_paths.push_back(SeparationRecord {
-          .power  = 0,
-          .wvls   = path.wavelengths,
-          .values = path.L
-        });
-      } else  */
       {
         // Get the relevant constraint's current reflectance
         // at the path's wavelengths (notably, this data is from last frame)
@@ -157,7 +147,6 @@ namespace met {
 
     // Copy tbb over to single vector block
     std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
-    
     fmt::print("Separated into {} path permutations\n", paths_finalized.size());
 
     // Make space in constraint available, up to maximum power
