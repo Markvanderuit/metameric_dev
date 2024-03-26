@@ -116,10 +116,10 @@ namespace met {
     // Extract a specific uplifting vertex, given indices;
     // supplied here given the common cumbersomeness of deep access
     const Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) const {
-      return components.upliftings[cs.uplifting_i].value.verts[cs.constraint_i];
+      return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
     }
     Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) {
-      return components.upliftings[cs.uplifting_i].value.verts[cs.constraint_i];
+      return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
     }
 
     // Helper object 

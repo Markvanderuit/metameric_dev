@@ -45,9 +45,10 @@ namespace met {
     met_trace_full();
     
     // Get handles, shared resources, modified resources
-    const auto &e_scene      = info.global("scene").getr<Scene>();
-    const auto &e_arcball    = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-    const auto &is_selection = info.relative("viewport_input_editor")("selection").getr<ConstraintSelection>();
+    const auto &e_scene   = info.global("scene").getr<Scene>();
+    const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
+    const auto &e_active_constraints 
+                          = info.relative("viewport_input_editor")("active_constraints").getr<std::vector<ConstraintSelection>>();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -55,12 +56,9 @@ namespace met {
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-    // Chain of views to extract all uplifting's vertices
-    constexpr auto uplf_verts_view = vws::transform(&detail::Component<Uplifting>::value) 
-      | vws::transform(&Uplifting::verts) | vws::join;
-
     // Generate view over all SurfaceInfos for constraints that need to be drawn
-    auto surfaces = e_scene.components.upliftings | uplf_verts_view
+    auto surfaces = e_active_constraints
+                  | vws::transform([&](ConstraintSelection cs) { return e_scene.uplifting_vertex(cs); })
                   | vws::filter(&Uplifting::Vertex::is_active)
                   | vws::filter(&Uplifting::Vertex::has_surface)
                   | vws::transform([](const auto &v) { return v.surface(); });

@@ -6,14 +6,15 @@
 #include <metameric/core/record.hpp>
 
 namespace met {
-  // Helper object for handling selection of a specific uplifting/vertex/constraint tuple
-  // in the scene
+  // Helper object for handling selection of a specific uplifting/vertex/constraint in the scene
   struct ConstraintSelection {
     constexpr static uint invalid_data = 0xFFFFFFFF;
 
   public:
-    uint uplifting_i  = invalid_data;
-    uint constraint_i = 0;
+    uint uplifting_i  = invalid_data; // ID of uplifting component
+    uint vertex_i     = 0;            // ID of vertex in specific uplifting
+    uint constraint_i = 0;            // ID of constraint on constraint vertex; always 0
+                                      // except for the indirect surface constraint
   
   public:
     bool is_valid() const { return uplifting_i != invalid_data; }

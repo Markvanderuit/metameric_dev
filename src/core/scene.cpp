@@ -667,7 +667,7 @@ namespace met {
     met_trace();
 
     const auto &e_uplifting = components.upliftings[cs.uplifting_i].value;
-    const auto &e_vert      = e_uplifting.verts[cs.constraint_i];
+    const auto &e_vert      = e_uplifting.verts[cs.vertex_i];
 
     // Return zero constraint for inactive parts
     if (!e_vert.is_active)

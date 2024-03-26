@@ -115,7 +115,7 @@ namespace met {
 
       // Generate vertex color and attached metamer;
       // this is handled in Scene object to keep it away from the pipeline
-      auto [c, s] = e_scene.realize_constraint({ .uplifting_i = m_uplifting_i, .constraint_i = static_cast<uint>(i) });
+      auto [c, s] = e_scene.realize_constraint({ .uplifting_i = m_uplifting_i, .vertex_i = static_cast<uint>(i) });
       
       // Add to set of spectra, and to tesselation input points
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;

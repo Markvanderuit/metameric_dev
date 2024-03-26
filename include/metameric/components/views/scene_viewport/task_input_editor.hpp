@@ -14,14 +14,18 @@ namespace met {
   class MeshViewportEditorInputTask : public detail::TaskNode {
     ImGui::Gizmo       m_gizmo;
     SurfaceInfo        m_gizmo_prev_si;
+
     RayQueryPrimitive  m_ray_prim;
     RaySensor          m_ray_sensor;
     RayRecord          m_ray_result;
+
     PathQueryPrimitive m_path_prim;
     PixelSensor        m_path_sensor;
 
-    RayRecord eval_ray_query(SchedulerHandle &info, const Ray &ray);
-    void eval_indirect_data(SchedulerHandle &info, const ConstraintSelection &is, IndirectSurfaceConstraint &cstr);
+  private:
+    RayRecord                   eval_ray_query(SchedulerHandle &info, const Ray &ray);
+    std::span<const PathRecord> eval_path_query(SchedulerHandle &info, uint spp);
+    void build_indirect_constraint(SchedulerHandle &info, const ConstraintSelection &is, IndirectSurfaceConstraint &cstr);
 
   public:
     bool is_active(SchedulerHandle &info) override;

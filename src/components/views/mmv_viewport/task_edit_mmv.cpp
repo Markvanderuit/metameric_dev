@@ -56,7 +56,7 @@ namespace met {
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
-      auto &vert = uplf.value.verts[e_cs.constraint_i];
+      auto &vert = uplf.value.verts[e_cs.vertex_i];
 
       // Color patch picker
       if (!e_patches.empty()) {
@@ -92,7 +92,7 @@ namespace met {
             lrgb = srgb_to_lrgb(srgb);
             
             // Roundtrip error
-            Colr rtrp = e_scene.csys(0).apply(e_spectra[e_cs.constraint_i]);
+            Colr rtrp = e_scene.csys(0).apply(e_spectra[e_cs.vertex_i]);
             Colr err  = (lrgb - rtrp).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             // ImGui::ColorEdit3("Roundtrip (lrgb)", err.data(), ImGuiColorEditFlags_Float);
@@ -200,7 +200,7 @@ namespace met {
           ImGui::SeparatorText("Estimated output");
           {
             // Reconstruct radiance from truncated power series
-            Spec r = e_spectra[e_cs.constraint_i];
+            Spec r = e_spectra[e_cs.vertex_i];
             Spec s = cstr.powers[0];
             for (uint i = 1; i < cstr.powers.size(); ++i)
               s += r.pow(static_cast<float>(i)) * cstr.powers[i];
@@ -235,7 +235,7 @@ namespace met {
     // Plotter for the current constraint's resulting spectrum
     ImGui::SeparatorText("Reflectance spectrum");
     {
-      const auto &e_sd = e_spectra[e_cs.constraint_i];
+      const auto &e_sd = e_spectra[e_cs.vertex_i];
       ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
     }
   }

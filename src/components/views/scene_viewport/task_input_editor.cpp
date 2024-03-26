@@ -8,6 +8,7 @@
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
+  static constexpr uint  indirect_query_spp     = 16384;
 
   RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
@@ -21,40 +22,47 @@ namespace met {
     m_ray_prim.query(m_ray_sensor, info.global("scene").getr<Scene>());
     return m_ray_prim.data();
   }
-  
-  void MeshViewportEditorInputTask::eval_indirect_data(SchedulerHandle &info, const ConstraintSelection &is, IndirectSurfaceConstraint &cstr) {
+
+  std::span<const PathRecord> MeshViewportEditorInputTask::eval_path_query(SchedulerHandle &info, uint spp) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
     const auto &io        = ImGui::GetIO();
-
+    
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+                               + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-    
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+                
     // Update pixel sensor
     m_path_sensor.proj_trf  = e_arcball.proj().matrix();
     m_path_sensor.view_trf  = e_arcball.view().matrix();
     m_path_sensor.film_size = viewport_size.cast<uint>();
     m_path_sensor.pixel     = eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size);
-    m_path_sensor.flush();
+    m_path_sensor.flush();               
+
+    // Perform path primitive, block for results
+    m_path_prim.query(m_path_sensor, e_scene, spp);
+    return m_path_prim.data();
+  }
+
+  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintSelection &cs, IndirectSurfaceConstraint &cstr) {
+    met_trace_full();
+
+    // Get handles, shared resources, modified resources
+    const auto &e_scene = info.global("scene").getr<Scene>();
 
     // Perform path query and obtain path samples
-    uint n_spp = 16384;
-    m_path_prim.query(m_path_sensor, e_scene, n_spp);
-    auto paths = m_path_prim.data();
-
     // If no paths were found, clear data so the constraint becomes invalid for MMV/spectrum generation
+    auto paths = eval_path_query(info, indirect_query_spp);
     if (paths.empty()) {
       cstr.colr   = 0.f;
       cstr.powers = { };
       return;
     }
-
     fmt::print("Found {} paths through query\n", paths.size());
   
     // Collect handles to all uplifting tasks
@@ -63,7 +71,7 @@ namespace met {
       std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
     
     // Collect handle to relevant uplifting taslk
-    const auto &e_uplf_task = uplf_handles[is.uplifting_i].realize<GenUpliftingDataTask>();
+    const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
 
     // Collect camera cmfs
     CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
@@ -95,11 +103,11 @@ namespace met {
                  | vws::transform([&](const auto &vt) {                          // 2. generate surface info at vertex position
                    return e_scene.get_surface_info(vt.p, vt.record); })          
                  | vws::filter([&](const auto &si) {                             // 3. drop vertices on other uplifting structures
-                   return si.object.uplifting_i == is.uplifting_i; })            
+                   return si.object.uplifting_i == cs.uplifting_i; })            
                  | vws::transform([&](const auto &si) {                          // 4. generate uplifting tetrahedron from uplifting task
                    return e_uplf_task.query_tetrahedron(si.diffuse); })          
                  | vws::transform([&](const auto &tetr) {                        // 5. find index of vertex that is linked to our constraint
-                   auto it = rng::find(tetr.indices, is.constraint_i);           //    and return together with tetrahedron
+                   auto it = rng::find(tetr.indices, cs.vertex_i);           //    and return together with tetrahedron
                    uint i =  std::distance(tetr.indices.begin(), it);            
                    return std::pair { tetr, i };  })
                  | vws::filter([&](const auto &pair) {                           // 6. drop tetrahedra that don't touch our selected constraint
@@ -117,7 +125,7 @@ namespace met {
       {
         // Get the relevant constraint's current reflectance
         // at the path's wavelengths (notably, this data is from last frame)
-        eig::Array4f r = sample_spectrum(path.wavelengths, e_uplf_task.query_constraint(is.constraint_i));
+        eig::Array4f r = sample_spectrum(path.wavelengths, e_uplf_task.query_constraint(cs.vertex_i));
 
         // We get the "fixed" part of the path's throughput, by stripping all reflectances of
         // the constrained vertices through division; on div-by-0, we set a component to 0
@@ -162,11 +170,11 @@ namespace met {
       accumulate_spectrum(cstr.powers[path.power], path.wvls, path.values);
     for (auto &power : cstr.powers) {
       power *= 0.25f * static_cast<float>(wavelength_samples);
-      power /= static_cast<float>(n_spp);
+      power /= static_cast<float>(indirect_query_spp);
     }
 
     // Obtain underlying reflectance
-    Spec r = e_uplf_task.query_constraint(is.constraint_i);
+    Spec r = e_uplf_task.query_constraint(cs.vertex_i);
     
     // Generate a default color value by passing through this reflectance
     IndirectColrSystem csys = {
@@ -183,6 +191,10 @@ namespace met {
 
   void MeshViewportEditorInputTask::init(SchedulerHandle &info) {
     met_trace();
+
+    // List of surface constraints that need drawing or are selected
+    info("active_constraints").set<std::vector<ConstraintSelection>>({ });
+    info("selected_constraint").set<ConstraintSelection>(ConstraintSelection::invalid());
 
     // Record selection item; by default no selection
     info("selection").set<ConstraintSelection>(ConstraintSelection::invalid());
@@ -216,31 +228,46 @@ namespace met {
     // If window is not active, escape and avoid further input
     guard(ImGui::IsItemHovered());
 
-    // Compute viewport offset and size, minus ImGui's tab bars etc
-    eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
-                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-
-    // Generate ConstraintSelection for each relevant constraint
-    std::vector<ConstraintSelection> viable_selections;
+    // Determine active constraint vertices for the viewport
+    auto &i_active_constraints = info("active_constraints").getw<std::vector<ConstraintSelection>>();
+    i_active_constraints.clear();
     for (const auto &[i, comp] : enumerate_view(e_scene.components.upliftings)) {
       const auto &uplifting = comp.value; 
       for (const auto &[j, vert] : enumerate_view(uplifting.verts)) {
+        // Only constraints currently being edited are shown
+        auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
+        guard_continue(info.task(str).is_init());
+        
+        // Only constraints marked as active are shown
         guard_continue(vert.is_active);
+
+        // Only surface constraints are shown
         guard_continue(std::holds_alternative<DirectSurfaceConstraint>(vert.constraint)
                     || std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint));
-        viable_selections.push_back({ .uplifting_i = i, .constraint_i = j });
-      }
-    }
+
+        // Push back the nr. of underlying constraints hidden in this vertex' data
+        uint n_constraints = std::visit(overloaded {
+         /*  [](const _IndirectSurfaceConstraint &cstr) {
+            return cstr.constraints.size();
+          }, */ [](const auto &) { return 1; } }, vert.constraint);
+        for (uint i = 0; i < n_constraints; ++i)
+          i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j, .constraint_i = i });
+      } // for (j, vert)
+    } // for (i, comp)
 
     // Gather relevant constraints together with enumeration data
-    auto viable_verts = viable_selections | vws::transform([&](ConstraintSelection cs) { 
-      return std::pair { cs, e_scene.uplifting_vertex(cs) }; });
+    auto active_verts = i_active_constraints 
+                      | vws::transform([&](ConstraintSelection cs) { return std::pair { cs, e_scene.uplifting_vertex(cs) }; });
+
+    // Compute viewport offset and size, minus ImGui's tab bars etc
+    eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
+                               + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
+                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Determine nearest constraint to the mouse in screen-space
     ConstraintSelection cs_nearest = ConstraintSelection::invalid();
-    for (const auto &[cs, vert] : viable_verts) {
+    for (const auto &[cs, vert] : active_verts) {
       // Extract surface information from surface constraint
       auto si = std::visit(overloaded {
         [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
@@ -254,7 +281,7 @@ namespace met {
       // The first surviving constraint is a mouseover candidate
       cs_nearest = cs;
       break;
-    }
+    } // for (cs, vert)
 
     // If a nearest selection is found, show tooltip with the vertex' constraint name
     if (cs_nearest.is_valid()) {
@@ -269,87 +296,79 @@ namespace met {
     if (io.MouseClicked[0] && (!m_gizmo.is_over() || !e_cs.is_valid()))
       info("selection").getw<ConstraintSelection>() = cs_nearest;
     
-    // Reset variables on lack of active selection
-    if (!e_cs.is_valid())
+    // Reset variables on lack of active selection, and return early
+    if (!e_cs.is_valid()) {
       m_gizmo.set_active(false);
+      return;
+    }
 
-    // On an active selection, draw gizmo
-    if (e_cs.is_valid()) {
-      // Get readable vertex data
-      const auto &e_vert = e_scene.uplifting_vertex(e_cs);
+    // Extract surface information from surface constraint
+    const auto &e_vert = e_scene.uplifting_vertex(e_cs);
+    auto si = std::visit(overloaded {
+      [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
+      [](const auto &) { return SurfaceInfo::invalid(); }
+    },  e_scene.uplifting_vertex(e_cs).constraint);
+
+    // Register gizmo use start; cache current vertex position
+    if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
+      m_gizmo_prev_si = si;
+
+      // Right at the start, we set the indirect constraint set into an invalid state
+      // to prevent overhead from constraint generation
+      auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
+      std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+        cstr.powers.clear();
+        cstr.colr = 0.f;
+      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(e_cs).constraint);
+    }
+
+    // Register continuous gizmo use
+    if (auto [active, delta] = m_gizmo.eval_delta(); active) {
+      // Apply world-space delta to constraint position
+      si.p = delta * si.p;
+
+      // Get screen-space position
+      eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
       
-      // Extract surface information from surface constraint
-      auto si = std::visit(overloaded {
-        [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
-        [](const auto &) { return SurfaceInfo::invalid(); }
-      }, e_vert.constraint);
+      // Do a raycast, snapping the world position to the nearest surface
+      // on a surface hit, and update the local SurfaceInfo object to accomodate
+      m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
+      si = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
+         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
+         : SurfaceInfo { .p = si.p };
 
-      // Register gizmo use start; cache current vertex position
-      if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
-        m_gizmo_prev_si = si;
+      // Store world-space position in surface constraint
+      std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
+        cstr.surface = si;
+      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(e_cs).constraint);
+    }
 
-        // Right at the start, we set the indirect constraint set into an invalid state
-        // to prevent overhead from constraint generation
-        std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
-          cstr.powers.clear();
-          cstr.colr = 0.f;
-        }, [](auto &cstr) { } }, e_vert.constraint);
-      }
+    // Register gizmo use end; apply current vertex position to scene save state
+    if (m_gizmo.end_delta()) {
+      // Right at the end, we build the indirect surface constraint HERE
+      // as it secretly uses previous frame data to fill in some details, and is
+      // way more costly per frame than I'd like to admit
+      auto vert = e_vert; // copy of vertex
+      std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
+        cstr.surface = si;
+        build_indirect_constraint(info, e_cs, cstr);
+      }, [](auto &cstr) { } }, vert.constraint);
 
-      // Register continuous gizmo use
-      if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-        // Apply world-space delta to constraint position
-        si.p = delta * si.p;
-
-        // Get screen-space position
-        eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
-        
-        // Do a raycast, snapping the world position to the nearest surface
-        // on a surface hit, and update the local SurfaceInfo object to accomodate
-        m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
-        si = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-            ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
-            : SurfaceInfo { .p = si.p };
-
-        // Get writable vertex data
-        auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
-
-        // Store world-space position in surface constraint
-        std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
-          cstr.surface = si;
-        }, [](const auto &cstr) { } }, e_vert.constraint);
-      }
-
-      // Register gizmo use end; apply current vertex position to scene savte state
-      if (m_gizmo.end_delta()) {
-        // Right at the end, we build the indirect surface constraint HERE
-        // as it secretly uses previous frame data to fill in some details, and is
-        // way more costly per frame than I'd like to admit
-        auto vert = e_vert; // copy of vertex
-        std::visit(overloaded { [&](IndirectSurfaceConstraint &cstr) { 
-          cstr.surface = si;
-          eval_indirect_data(info, e_cs, cstr);
-        }, [](auto &cstr) { } }, vert.constraint);
-
-        info.global("scene").getw<Scene>().touch({
-          .name = "Move surface constraint",
-          .redo = [si = si, vert = vert, e_cs](auto &scene) {
-            auto &e_vert = scene.uplifting_vertex(e_cs);
-            std::visit(overloaded { 
-              [&](IndirectSurfaceConstraint &cstr) {
-                cstr = std::get<IndirectSurfaceConstraint>(vert.constraint);
-              }, [&](SurfaceConstraint auto &cstr) { 
-                cstr.surface = si;
-            }, [](const auto &cstr) {}}, e_vert.constraint);
-          },
-          .undo = [si = m_gizmo_prev_si, e_cs](auto &scene) {
-            auto &e_vert = scene.uplifting_vertex(e_cs);
-            std::visit(overloaded { [&](SurfaceConstraint auto &cstr) { 
-              cstr.surface = si;
-            }, [](const auto &cstr) {}}, e_vert.constraint);
-          }
-        });
-      }
+      // Save result
+      info.global("scene").getw<Scene>().touch({
+        .name = "Move surface constraint",
+        .redo = [si = si, vert = vert, e_cs](auto &scene) {
+          std::visit(overloaded { 
+            [&](IndirectSurfaceConstraint &cstr) { cstr = std::get<IndirectSurfaceConstraint>(vert.constraint); },
+            [&](SurfaceConstraint auto &cstr) {  cstr.surface = si;
+          }, [](const auto &cstr) {}}, scene.uplifting_vertex(e_cs).constraint);
+        },
+        .undo = [si = m_gizmo_prev_si, e_cs](auto &scene) {
+          std::visit(overloaded { 
+            [&](SurfaceConstraint auto &cstr) { cstr.surface = si;
+          }, [](const auto &cstr) {}}, scene.uplifting_vertex(e_cs).constraint);
+        }
+      });
     }
   }
 } // namespace met

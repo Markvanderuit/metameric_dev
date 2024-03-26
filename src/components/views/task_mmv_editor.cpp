@@ -93,7 +93,7 @@ namespace met {
 
       // Define window name
       auto name = std::format("Editing: {} (uplifting {}, vertex {})", 
-        e_vert.name, e_cs.uplifting_i, e_cs.constraint_i);  
+        e_vert.name, e_cs.uplifting_i, e_cs.vertex_i);  
       
       // Define window size on first open
       ImGui::SetNextWindowSize({ 256, 384 }, ImGuiCond_Appearing);

@@ -28,7 +28,7 @@ namespace met {
     bool is_stale = is_first_eval() 
       || e_state.basis_i 
       || e_state.csys_i 
-      || e_state.verts[e_cs.constraint_i]
+      || e_state.verts[e_cs.vertex_i]
       || e_scene.components.colr_systems[e_object.csys_i];
 
     // Reset samples if stale
@@ -38,7 +38,7 @@ namespace met {
     }
     
     // Only pass if metameric mismatching is possible and samples are required
-    bool is_mmv = e_object.verts[e_cs.constraint_i].has_mismatching() && m_colr_set.size() < mmv_samples_max;
+    bool is_mmv = e_object.verts[e_cs.vertex_i].has_mismatching() && m_colr_set.size() < mmv_samples_max;
     
     return info.parent()("is_active").getr<bool>() && (is_stale || is_mmv);
   }
@@ -73,13 +73,13 @@ namespace met {
     const auto &e_cs          = info.parent()("selection").getr<ConstraintSelection>();
     const auto &[e_uplifting, 
                  e_state]     = e_scene.components.upliftings[e_cs.uplifting_i];
-    const auto &e_vert        = e_uplifting.verts[e_cs.constraint_i];
+    const auto &e_vert        = e_uplifting.verts[e_cs.vertex_i];
 
     // Determine if a reset is in order
     bool should_clear = is_first_eval() 
       || e_state.basis_i 
       || e_state.csys_i 
-      || e_state.verts[e_cs.constraint_i]
+      || e_state.verts[e_cs.vertex_i]
       || e_scene.components.colr_systems[e_uplifting.csys_i];
     
     // Reset necessary data
