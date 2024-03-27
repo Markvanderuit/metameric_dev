@@ -70,7 +70,7 @@ namespace met::detail {
   };
 
   /* Overload of ComponentState for Uplifting::Vertex */
-  struct VertexState : public ComponentStateBase<Uplifting::Vertex> {
+  /* struct VertexState : public ComponentStateBase<Uplifting::Vertex> {
     using Base = Uplifting::Vertex;
     using ComponentStateBase<Base>::m_mutated;
 
@@ -85,6 +85,24 @@ namespace met::detail {
         name.update(o.name)   |
         is_active.update(o.is_active) | 
         constraint.update(o.constraint)
+      );
+    }
+  }; */
+  struct VertexState : public ComponentStateBase<Uplifting::Vertex> {
+    using Base = Uplifting::Vertex;
+    using ComponentStateBase<Base>::m_mutated;
+
+    ComponentState<decltype(Base::name)>                     name;
+    ComponentState<decltype(Base::is_active)>                is_active;
+    ComponentStates<decltype(Base::constraints)::value_type> constraints;
+    
+  public:
+    virtual 
+    bool update(const Base &o) override {
+      return m_mutated = (
+        name.update(o.name)   |
+        is_active.update(o.is_active) | 
+        constraints.update(o.constraints)
       );
     }
   };

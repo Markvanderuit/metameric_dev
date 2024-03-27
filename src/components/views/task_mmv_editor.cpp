@@ -312,10 +312,10 @@ namespace met {
 
       // Visit underlying constraints to allow guizmo editing
       std::visit(overloaded {
-        [&](const ColorConstraint auto &cstr) {
+        [&](const is_colr_constraint auto &cstr) {
           // Lambda to apply a specific vertex data to the color constraint
           auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
-            std::visit(overloaded { [p](ColorConstraint auto &cstr) { 
+            std::visit(overloaded { [p](is_colr_constraint auto &cstr) { 
               cstr.colr_j[0] = p;
             }, [](const auto &cstr) {}}, vert.constraint); };
 

@@ -11,7 +11,7 @@ namespace met {
   }
   
   bool MeasurementConstraint::operator==(const MeasurementConstraint &o) const {
-    return measurement.isApprox(o.measurement);
+    return measure.isApprox(o.measure);
   }
   
   bool DirectSurfaceConstraint::operator==(const DirectSurfaceConstraint &o) const {
@@ -26,7 +26,7 @@ namespace met {
         && rng::equal(powers, o.powers, eig::safe_approx_compare<Spec>);
   }
 
-  bool _IndirectSurfaceConstraint::Constraint::operator==(const Constraint &o) const {
+  /* bool _IndirectSurfaceConstraint::Constraint::operator==(const Constraint &o) const {
     return surface == o.surface && csys == o.csys && colr.isApprox(o.colr);
   }
 
@@ -48,7 +48,7 @@ namespace met {
 
   bool _IndirectSurfaceConstraint::has_mismatching() const {
     return rng::all_of(constraints, [](const auto &c) { return c.has_mismatching(); });
-  }
+  } */
 
   void from_json(const json &js, DirectColorConstraint &c) {
     met_trace();
@@ -66,12 +66,12 @@ namespace met {
 
   void from_json(const json &js, MeasurementConstraint &c) {
     met_trace();
-    js.at("measurement").get_to(c.measurement);
+    js.at("measurement").get_to(c.measure);
   }
 
   void to_json(json &js, const MeasurementConstraint &c) {
     met_trace();
-    js = {{ "measurement", c.measurement }};
+    js = {{ "measurement", c.measure }};
   }
 
   void from_json(const json &js, DirectSurfaceConstraint &c) {

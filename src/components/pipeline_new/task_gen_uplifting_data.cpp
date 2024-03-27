@@ -112,6 +112,7 @@ namespace met {
       // We only generate a spectrum if the specific vertex was changed,
       // or the entire underlying color system has changed
       guard_continue(e_state.verts[i] || csys_stale);
+      const auto &e_vert = e_uplifting.verts[i];
 
       // Generate vertex color and attached metamer;
       // this is handled in Scene object to keep it away from the pipeline

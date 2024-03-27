@@ -270,7 +270,7 @@ namespace met {
     for (const auto &[cs, vert] : active_verts) {
       // Extract surface information from surface constraint
       auto si = std::visit(overloaded {
-        [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
+        [](const is_surface_constraint auto &cstr) { return cstr.surface; },
         [](const auto &cstr) { return SurfaceInfo::invalid(); }
       }, vert.constraint);
 
@@ -306,13 +306,13 @@ namespace met {
     const auto &e_vert = e_scene.uplifting_vertex(i_cs);
     auto si = std::visit(overloaded {
       /* [i_cs](const _IndirectSurfaceConstraint &cstr) { return cstr.constraints[i_cs.constraint_i].surface; }, */
-      [](const SurfaceConstraint auto &cstr) { return cstr.surface; },
+      [](const is_surface_constraint auto &cstr) { return cstr.surface; },
       [](const auto &) { return SurfaceInfo::invalid(); }
     },  e_scene.uplifting_vertex(i_cs).constraint);
 
     // Register gizmo use start; cache current vertex position
     if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
-      m_gizmo_prev_si = si;
+      m_gizmo_prev = e_scene.uplifting_vertex(i_cs);
 
       // Right at the start, we set the indirect constraint set into an invalid state
       // to prevent overhead from constraint generation
@@ -343,14 +343,10 @@ namespace met {
          ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
          : SurfaceInfo { .p = si.p };
 
-      // Store world-space position in surface constraint
-      std::visit(overloaded { 
-      /* [&](_IndirectSurfaceConstraint &cstr) { 
-        cstr.constraints[i_cs.constraint_i].surface = si;
-      }, */
-      [&](SurfaceConstraint auto &cstr) { 
-        cstr.surface = si;
-      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(i_cs).constraint);
+      // Store surface data and extracted color in  constraint
+      auto &vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
+      visit_if([&](is_surface_constraint auto &cstr) { cstr.surface = si; }, vert.constraint);
+      visit_if([&](is_colr_constraint auto &cstr) { cstr.colr_i = si.diffuse; }, vert.constraint);
     }
 
     // Register gizmo use end; apply current vertex position to scene save state
@@ -372,18 +368,8 @@ namespace met {
       // Save result
       info.global("scene").getw<Scene>().touch({
         .name = "Move surface constraint",
-        .redo = [si = si, vert = vert, i_cs](auto &scene) {
-          std::visit(overloaded { 
-            /* [&](_IndirectSurfaceConstraint &cstr) { cstr = std::get<_IndirectSurfaceConstraint>(vert.constraint); }, */
-            [&](IndirectSurfaceConstraint &cstr) { cstr = std::get<IndirectSurfaceConstraint>(vert.constraint); },
-            [&](SurfaceConstraint auto &cstr) {  cstr.surface = si;
-          }, [](const auto &cstr) {}}, scene.uplifting_vertex(i_cs).constraint);
-        },
-        .undo = [si = m_gizmo_prev_si, i_cs](auto &scene) {
-          std::visit(overloaded { 
-            [&](SurfaceConstraint auto &cstr) { cstr.surface = si;
-          }, [](const auto &cstr) {}}, scene.uplifting_vertex(i_cs).constraint);
-        }
+        .redo = [vert = vert, i_cs](auto &scene) { scene.uplifting_vertex(i_cs) = vert; },
+        .undo = [vert = m_gizmo_prev, i_cs](auto &scene) { scene.uplifting_vertex(i_cs) = vert; }
       });
     }
   }

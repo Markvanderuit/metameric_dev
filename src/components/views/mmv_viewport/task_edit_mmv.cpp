@@ -78,18 +78,18 @@ namespace met {
       }
       
       // Visit the underlying constraint data
-      std::visit(overloaded {
+      /* std::visit(overloaded {
         [&](DirectColorConstraint &cstr) {
           // Color baseline editor
           {
             // lRGB color picker
-            Colr &lrgb = cstr.get_colr_i();
-            ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
+            Colr &lrgb = cstr.colr_i;
+            ImGui::ColorEdit3("Base color (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
             
             // sRGB color picker
             Colr srgb = lrgb_to_srgb(lrgb);
-            ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
-            lrgb = srgb_to_lrgb(srgb);
+            if (ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
+              lrgb = srgb_to_lrgb(srgb);
             
             // Roundtrip error
             Colr rtrp = e_scene.csys(0).apply(e_spectra[e_cs.vertex_i]);
@@ -152,10 +152,10 @@ namespace met {
         [&](DirectSurfaceConstraint &cstr) {
           // Color baseline value extracted from surface
           {
-            ImGui::ColorEdit3("Base color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
-            auto srgb = lrgb_to_srgb(cstr.get_colr_i());
-            ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
-            cstr.get_colr_i() = srgb_to_lrgb(srgb);
+            ImGui::ColorEdit3("Base color (lrgb)", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
+            auto srgb = lrgb_to_srgb(cstr.colr_i);
+            if (ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
+              cstr.colr_i = srgb_to_lrgb(srgb);
           }
           
           // Visual separator into constraint list
@@ -184,10 +184,9 @@ namespace met {
         [&](IndirectSurfaceConstraint &cstr) {
           // Color baseline value extracted from surface
           {
-            ImGui::ColorEdit3("Surface color (lrgb)", cstr.get_colr_i().data(), ImGuiColorEditFlags_Float);
-            auto srgb = lrgb_to_srgb(cstr.get_colr_i());
-            ImGui::ColorEdit3("Surface color (srgb)", srgb.data(), ImGuiColorEditFlags_Float);
-            cstr.get_colr_i() = srgb_to_lrgb(srgb);
+            ImGui::ColorEdit3("Surface color (lrgb)", cstr.surface.diffuse.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+            auto srgb = lrgb_to_srgb(cstr.surface.diffuse);
+            ImGui::ColorEdit3("Surface color (srgb)", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
           }
 
           // Visual separator into constraint list
@@ -229,7 +228,7 @@ namespace met {
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");
         }
-      }, vert.constraint);
+      }, vert.constraint); */
     });
 
     // Plotter for the current constraint's resulting spectrum

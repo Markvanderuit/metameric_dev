@@ -93,8 +93,8 @@ namespace met {
     // Only continue for valid and mismatch-supporting constraints
     if (std::visit(overloaded {
       [](const DirectColorConstraint &cstr)     { return !cstr.has_mismatching(); },
-      [](const DirectSurfaceConstraint &cstr)   { return !cstr.is_valid() || !cstr.has_mismatching(); },
-      [](const IndirectSurfaceConstraint &cstr) { return !cstr.is_valid() || !cstr.has_mismatching(); },
+      [](const DirectSurfaceConstraint &cstr)   { return !cstr.has_surface() || !cstr.has_mismatching(); },
+      [](const IndirectSurfaceConstraint &cstr) { return !cstr.has_surface() || !cstr.has_mismatching(); },
       [](const auto &) { return false; }
     }, e_vert.constraint)) {
       info("converged").set(true);

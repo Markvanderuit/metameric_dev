@@ -144,7 +144,7 @@ namespace met {
 
           // Type editor column
           ImGui::TableSetColumnIndex(1);
-          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+          /* ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
           {
             // Iterate over the types in the std::variant of constraints
             // for this combobox
@@ -158,14 +158,14 @@ namespace met {
               });
               ImGui::EndCombo();
             }
-          }
+          } */
           
           // Properties view column
           ImGui::TableSetColumnIndex(2);
-          std::visit(overloaded {
-            [](ColorConstraint auto &cstr) {
+          /* std::visit(overloaded {
+            [](is_colr_constraint auto &cstr) {
               // Show primary color value
-              auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.get_colr_i()), 1).finished();
+              auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.colr_i), 1).finished();
               ImGui::ColorButton("##base_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
 
               // Show secondary color constraints
@@ -176,7 +176,7 @@ namespace met {
               }
             },
             [](auto &cstr) { },
-          }, vert.constraint);
+          }, vert.constraint); */
 
           // Edit buttons
           ImGui::TableSetColumnIndex(3);
@@ -225,7 +225,7 @@ namespace met {
       } 
 
       // Add button and accompanying popup to add new constraint vertices
-      {
+      /* {
         if (ImGui::Button("New constraint")) {
           ImGui::OpenPopup("popup_add_uplifting_vertex");
         }
@@ -238,7 +238,7 @@ namespace met {
           if (ImGui::Selectable("Measurement"))
             value.verts.push_back({ 
               .name       = "Meaurement",
-              .constraint = MeasurementConstraint { .measurement = 0.5  }
+              .constraint = MeasurementConstraint { .measure = 0.5  }
             });
           if (ImGui::Selectable("Direct surface"))
             value.verts.push_back({ 
@@ -252,7 +252,7 @@ namespace met {
             });
           ImGui::EndPopup();
         } // if (BeginPopup())
-      }
+      } */
     };
 
     // Default implementation of editing visitor for ColorSystem components

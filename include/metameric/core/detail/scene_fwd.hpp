@@ -1,8 +1,7 @@
 #pragma once
 
 namespace met {
-  // FWD
-  // Scene components
+  // FWD Scene components
   struct Scene;
   struct ColorSystem;
   struct Emitter;
@@ -11,8 +10,7 @@ namespace met {
   struct Uplifting;
 
   namespace detail {
-    // FWD
-    // Overloads of component state
+    // FWD Overloads of component state
     struct UpliftingState;
     struct VertexState;
     struct ObjectState;

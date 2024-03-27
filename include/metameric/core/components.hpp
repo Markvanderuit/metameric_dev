@@ -101,7 +101,38 @@ namespace met {
   struct Uplifting {
     using state_type = detail::UpliftingState;
   
-    // Wrapper around vertex constraint data
+    struct Vertex {
+      using state_type = detail::VertexState;
+
+      // The vertex stores one or more constraints of the following types
+      using cnstr_type = std::variant<
+        MeasurementConstraint,        // At most 1
+        DirectColorConstraint,        // At most 1
+        DirectSurfaceConstraint,      // At most 1
+        IndirectSurfaceConstraint     // Several can be solved for at the same time
+      >;
+      
+    public:
+      // Associated name
+      std::string name;
+      
+      // Whether the constraint is used in the scene
+      bool is_active = true;
+
+      // Underlying, user-specified constraints
+      std::vector<cnstr_type> constraints;
+
+    public:
+      // Generate a spectrum and corresponding color, which
+      // forms the vertex' position in the uplifting tesselation
+      std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting);
+
+      bool has_mismatching() const;                     // Does the current set of constraints allow for mismatching?
+      bool has_freedom() const;                         // Can the current set of constraints be expanded?
+      bool operator==(const Vertex &o) const = default; // Default comparator
+    };
+
+    /* // Wrapper around vertex constraint data
     struct Vertex {
       using state_type = detail::VertexState;
       using cnstr_type = std::variant<DirectColorConstraint,  MeasurementConstraint,
@@ -119,7 +150,7 @@ namespace met {
       bool operator==(const Vertex &o) const = default;
       
       // Helper visitors for accessing an underlying constraint's surface
-      // data, if said constraint fulfills SurfaceConstraint; otherwise
+      // data, if said constraint fulfills is_surface_constraint; otherwise
       // a invalid static is returned
       bool has_surface() const;
       const SurfaceInfo &surface() const;
@@ -127,12 +158,12 @@ namespace met {
       
       // Test if the constraint allows editing using mismatch volumes
       bool has_mismatching() const;
-    };
+    }; */
 
   public:
     uint                csys_i  = 0; // Index of primary color system
     uint                basis_i = 0; // Index of used underlying basis
-    std::vector<Vertex> verts;       // Vertex constraints on mesh
+    std::vector<Vertex> verts;      // Vertex constraints on mesh
 
   public: // Boilerplate
     bool operator==(const Uplifting &o) const;

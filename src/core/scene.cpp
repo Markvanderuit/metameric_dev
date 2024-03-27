@@ -702,7 +702,7 @@ namespace met {
       },
       [&](const DirectSurfaceConstraint &cstr) {
         // Return zero constraint for invalid surfaces
-        if (!cstr.is_valid()) {
+        if (!cstr.has_surface()) {
           c = 0.f;
           s = 0.f;
           return;
@@ -779,7 +779,7 @@ namespace met {
       },
       [&](const MeasurementConstraint &cstr) {
         // The specified spectrum becomes our metamer
-        s = cstr.measurement;
+        s = cstr.measure;
 
         // The metamer's color under the uplifting's color system becomes our vertex color
         c = (csys_i.transpose() * s.matrix()).eval();

@@ -13,7 +13,7 @@
 namespace met {
   class MeshViewportEditorInputTask : public detail::TaskNode {
     ImGui::Gizmo       m_gizmo;
-    SurfaceInfo        m_gizmo_prev_si;
+    Uplifting::Vertex  m_gizmo_prev;
 
     RayQueryPrimitive  m_ray_prim;
     RaySensor          m_ray_sensor;
