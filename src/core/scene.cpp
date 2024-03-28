@@ -713,14 +713,14 @@ namespace met {
     si.n.normalize();
 
     // Recover surface diffuse data based on underlying object material
-    si.diffuse = std::visit(overloaded {
+    si.diffuse = object.diffuse | visit {
       [&](const uint &i) {
         const auto &txtr = resources.images[i].value();
         return txtr.sample(si.tx, Image::ColorFormat::eLRGB).head<3>().eval();
       },
       [](const Colr &c) { return c; }
-    }, object.diffuse);
-
+    };
+    
     return si;
   }
 

@@ -86,16 +86,6 @@ namespace met {
     return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
   }
 
-  // Helper type for std::visit
-  // Src: https://en.cppreference.com/w/cpp/utility/variant/visit
-  template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-  template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
-  template <class VTy, class F>
-  void visit_if(F&& f, VTy &v) {
-    return std::visit(overloaded { f, [](const auto &) {} }, v);
-  }
-
   // Helper types for tuple_visit and variant_visit
   // Src: https://stackoverflow.com/questions/57642102/how-to-iterate-over-the-types-of-stdvariant
   template <std::size_t I> using index_t = std::integral_constant<std::size_t, I>;

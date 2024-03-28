@@ -1,4 +1,5 @@
 #include <metameric/core/ranges.hpp>
+#include <metameric/core/matching.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
@@ -311,13 +312,13 @@ namespace met {
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
 
       // Visit underlying constraints to allow guizmo editing
-      std::visit(overloaded {
+      e_vert.constraint | visit {
         [&](const is_colr_constraint auto &cstr) {
           // Lambda to apply a specific vertex data to the color constraint
           auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
-            std::visit(overloaded { [p](is_colr_constraint auto &cstr) { 
+            vert.constraint | visit { [p](is_colr_constraint auto &cstr) { 
               cstr.cstr_j[0].colr_j = p;
-            }, [](const auto &cstr) {}}, vert.constraint); };
+            }, [](const auto &cstr) {}}; };
 
           // Register gizmo start; cache current vertex position
           if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.cstr_j[0].colr_j))))
@@ -348,9 +349,9 @@ namespace met {
         [&](const IndirectSurfaceConstraint &cstr) {
           // Lambda to apply a specific vertex data to the indirect constraint
           auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
-            std::visit(overloaded { [p](IndirectSurfaceConstraint &cstr) { 
+            vert.constraint | visit { [p](IndirectSurfaceConstraint &cstr) { 
               cstr.colr = p;
-            }, [](const auto &cstr) {}}, vert.constraint); };
+            }, [](const auto &cstr) {}}; };
 
           // Register gizmo start; cache current vertex position
           if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.colr))))
@@ -380,7 +381,7 @@ namespace met {
           }
         },
         [](const auto &) { /* ... */ }
-      }, e_vert.constraint);
+      };
     }
   };
 

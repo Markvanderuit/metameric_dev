@@ -27,7 +27,7 @@ namespace met {
     // Used for coming draw operation
     auto dl = ImGui::GetWindowDrawList();
     
-    std::visit(overloaded {
+    e_vert.constraint | visit_single {
       [&](const is_colr_constraint auto &cstr) {
         // TODO selectable viewed constraint
         auto p = cstr.cstr_j[0].colr_j;
@@ -47,9 +47,8 @@ namespace met {
         // Draw pair of circles with special colors
         dl->AddCircleFilled(p_window, 8.f, circle_color_border);
         dl->AddCircleFilled(p_window, 4.f, circle_color_center);
-      },
-      [](const auto &) { /* ... */ }
-    }, e_vert.constraint);
+      }
+    };
   }
 
   void DrawMMVTask::eval_draw_volume(SchedulerHandle &info) {

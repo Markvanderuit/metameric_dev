@@ -1,5 +1,6 @@
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/matching.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
@@ -91,12 +92,12 @@ namespace met {
     }
 
     // Only continue for valid and mismatch-supporting constraints
-    if (std::visit(overloaded {
+    if (e_vert.constraint | visit {
       [](const DirectColorConstraint &cstr)     { return !cstr.has_mismatching(); },
       [](const DirectSurfaceConstraint &cstr)   { return !cstr.has_surface() || !cstr.has_mismatching(); },
       [](const IndirectSurfaceConstraint &cstr) { return !cstr.has_surface() || !cstr.has_mismatching(); },
       [](const auto &) { return false; }
-    }, e_vert.constraint)) {
+    }) {
       info("converged").set(true);
       info("chull_array").getw<gl::Array>() = {};
       m_colr_set.clear();
@@ -111,7 +112,7 @@ namespace met {
     }
 
     // Visit underlying constraint types one by one
-    auto new_points = std::visit(overloaded {
+    auto new_points = e_vert.constraint | visit {
       [&](const DirectColorConstraint &cstr) {
         // Prepare input color systems and corresponding signals
         auto systems_i = { e_scene.csys(e_uplifting.csys_i).finalize() };
@@ -184,7 +185,7 @@ namespace met {
         return csys(generate_mismatching_ocs(mmv_info));
       },
       [&](const auto &) { return std::vector<Colr>(); }
-    }, e_vert.constraint);
+    };
 
     // Insert newly gathered points, and roll them into end of deque while removing front
     m_colr_set.insert_range(std::vector(new_points));

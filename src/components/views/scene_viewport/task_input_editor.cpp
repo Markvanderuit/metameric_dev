@@ -1,3 +1,4 @@
+#include <metameric/core/matching.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
@@ -246,10 +247,10 @@ namespace met {
                     || std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint));
 
         // Push back the nr. of underlying constraints hidden in this vertex' data
-        uint n_constraints = std::visit(overloaded {
+        uint n_constraints = vert.constraint | visit {
          /*  [](const _IndirectSurfaceConstraint &cstr) {
             return cstr.constraints.size();
-          }, */ [](const auto &) { return 1; } }, vert.constraint);
+          }, */ [](const auto &) { return 1; } };
         for (uint i = 0; i < n_constraints; ++i)
           i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j, .constraint_i = i });
       } // for (j, vert)
@@ -269,10 +270,10 @@ namespace met {
     ConstraintSelection cs_nearest = ConstraintSelection::invalid();
     for (const auto &[cs, vert] : active_verts) {
       // Extract surface information from surface constraint
-      auto si = std::visit(overloaded {
+      auto si = vert.constraint | visit {
         [](const is_surface_constraint auto &cstr) { return cstr.surface; },
         [](const auto &cstr) { return SurfaceInfo::invalid(); }
-      }, vert.constraint);
+      };
 
       // Get screen-space position; test distance and continue if we are too far away
       eig::Vector2f p_screen = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
@@ -304,11 +305,11 @@ namespace met {
 
     // Extract surface information from surface constraint
     const auto &e_vert = e_scene.uplifting_vertex(i_cs);
-    auto si = std::visit(overloaded {
+    auto si = e_scene.uplifting_vertex(i_cs).constraint | visit {
       /* [i_cs](const _IndirectSurfaceConstraint &cstr) { return cstr.constraints[i_cs.constraint_i].surface; }, */
       [](const is_surface_constraint auto &cstr) { return cstr.surface; },
       [](const auto &) { return SurfaceInfo::invalid(); }
-    },  e_scene.uplifting_vertex(i_cs).constraint);
+    };
 
     // Register gizmo use start; cache current vertex position
     if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
@@ -317,15 +318,16 @@ namespace met {
       // Right at the start, we set the indirect constraint set into an invalid state
       // to prevent overhead from constraint generation
       auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
-      std::visit(overloaded { 
-      /* [&](_IndirectSurfaceConstraint &cstr) { 
-        cstr.constraints[i_cs.constraint_i].csys.powers.clear();
-        cstr.constraints[i_cs.constraint_i].colr = 0.f;
-      }, */
-      [&](IndirectSurfaceConstraint &cstr) { 
-        cstr.powers.clear();
-        cstr.colr = 0.f;
-      }, [](const auto &cstr) { } }, info.global("scene").getw<Scene>().uplifting_vertex(i_cs).constraint);
+      e_vert.constraint | visit { 
+        /* [&](_IndirectSurfaceConstraint &cstr) { 
+          cstr.constraints[i_cs.constraint_i].csys.powers.clear();
+          cstr.constraints[i_cs.constraint_i].colr = 0.f;
+        }, */
+        [&](IndirectSurfaceConstraint &cstr) { 
+          cstr.powers.clear();
+          cstr.colr = 0.f;
+        }, [](const auto &cstr) { } 
+      };
     }
 
     // Register continuous gizmo use
@@ -345,8 +347,8 @@ namespace met {
 
       // Store surface data and extracted color in  constraint
       auto &vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
-      visit_if([&](is_surface_constraint auto &cstr) { cstr.surface = si; }, vert.constraint);
-      visit_if([&](is_colr_constraint auto &cstr) { cstr.colr_i = si.diffuse; }, vert.constraint);
+      vert.constraint | visit_single { [&](is_surface_constraint auto &cstr) { cstr.surface = si;     }};
+      vert.constraint | visit_single { [&](is_colr_constraint auto &cstr) { cstr.colr_i = si.diffuse; }};
     }
 
     // Register gizmo use end; apply current vertex position to scene save state
@@ -355,15 +357,17 @@ namespace met {
       // as it secretly uses previous frame data to fill in some details, and is
       // way more costly per frame than I'd like to admit
       auto vert = e_vert; // copy of vertex
-      std::visit(overloaded { 
-      /* [&](_IndirectSurfaceConstraint &cstr) { 
-        cstr.constraints[i_cs.constraint_i].surface = si;
-        build_indirect_constraint(info, i_cs, cstr.constraints[i_cs.constraint_i]);
-      }, */
-      [&](IndirectSurfaceConstraint &cstr) { 
-        cstr.surface = si;
-        build_indirect_constraint(info, i_cs, cstr);
-      }, [](auto &cstr) { } }, vert.constraint);
+      vert.constraint | visit { 
+        /* [&](_IndirectSurfaceConstraint &cstr) { 
+          cstr.constraints[i_cs.constraint_i].surface = si;
+          build_indirect_constraint(info, i_cs, cstr.constraints[i_cs.constraint_i]);
+        }, */
+        [&](IndirectSurfaceConstraint &cstr) { 
+            cstr.surface = si;
+            build_indirect_constraint(info, i_cs, cstr);
+        }, 
+        [](auto &cstr) { } 
+      };
 
       // Save result
       info.global("scene").getw<Scene>().touch({

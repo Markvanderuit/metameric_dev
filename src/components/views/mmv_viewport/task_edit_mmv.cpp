@@ -1,6 +1,7 @@
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/matching.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -78,9 +79,10 @@ namespace met {
       }
       
       // Visit the underlying constraint data
-      std::visit(overloaded {
+      vert.constraint | visit {
         [&](is_colr_constraint auto &cstr) {
-          ImGui::SeparatorText("Baseline constraint");
+          auto baseline_spr_name = std::format("Baseline ({})", e_scene.csys_name(uplf.value.csys_i));
+          ImGui::SeparatorText(baseline_spr_name.c_str());
           {
             // lRGB color picker
             Colr &lrgb = cstr.colr_i;
@@ -96,17 +98,15 @@ namespace met {
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
           }
 
-          ImGui::SeparatorText("Secondary constraints");
+          ImGui::SeparatorText("Constraints");
           {
-            if (!cstr.cstr_j.empty() && ImGui::BeginTable("##table", 5, ImGuiTableFlags_SizingStretchProp)) {
-              // Setup table header; column 4 is left without header
-              // Columns are shown without hover or color; cleaner than using header
+            if (!cstr.cstr_j.empty() && ImGui::BeginTable("##table", 4, ImGuiTableFlags_SizingStretchProp)) {
+              // Setup table header; columns are shown without hover or color; cleaner than table headers
               ImGui::TableSetupScrollFreeze(0, 1);
               ImGui::TableNextRow();
               ImGui::TableSetColumnIndex(0); ImGui::Text("Observer");
               ImGui::TableSetColumnIndex(1); ImGui::Text("Illuminant");
-              ImGui::TableSetColumnIndex(2); ImGui::Text("Value (lrgb/srgb)");
-              ImGui::TableSetColumnIndex(3); ImGui::Text("error");
+              ImGui::TableSetColumnIndex(2); ImGui::Text("Value (lrgb/srgb/err)");
               
               // Each next row is dedicated to a single color constraint
               for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
@@ -126,24 +126,24 @@ namespace met {
 
                 // lRGB/sRGB color column
                 ImGui::TableSetColumnIndex(2);
-                // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
                 ImGui::ColorEdit3("##lrgb", c.colr_j.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
-                // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                auto srgb = lrgb_to_srgb(c.colr_j);
-                if (ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
+                ImGui::SameLine();
+                if (auto srgb = lrgb_to_srgb(c.colr_j); ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
                   c.colr_j = srgb_to_lrgb(srgb);
-
-                // Error color column
-                ImGui::TableSetColumnIndex(4);
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::SameLine();
                 Colr err = (c.colr_j - e_scene.csys(c.cmfs_j, c.illm_j).apply(e_spectra[e_cs.vertex_i])).abs();
                 ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
 
-                // Delete button
-                ImGui::TableSetColumnIndex(5);
+                // Delete button; exists early to prevent iterator issues
+                ImGui::TableSetColumnIndex(3);
+                if (ImGui::Button("Edit")) {
+                  // TODO set active MMV
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("X")) {
+                  // TODO reset active MMV to 0
                   cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
-                  break; // Exit early to prevent iterator invalidation
+                  break;
                 }
                 if (ImGui::IsItemHovered())
                   ImGui::SetTooltip("Delete constraint");
@@ -152,7 +152,7 @@ namespace met {
               ImGui::EndTable();
             }
 
-            if (ImGui::Button("Add constraint")) {
+            if (ImGui::Button("New constraint")) {
               cstr.cstr_j.push_back(ColrConstraint { .cmfs_j = 0, .illm_j = 0, .colr_j = 0.f });
             }
           }
@@ -205,7 +205,7 @@ namespace met {
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");
         }
-      }, vert.constraint);
+      };
     });
 
     // Plotter for the current constraint's resulting spectrum

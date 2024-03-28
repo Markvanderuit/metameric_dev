@@ -5,32 +5,47 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/matching.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/constraints.hpp>
+#include <metameric/core/components.hpp>
 #include <metameric/core/utility.hpp>
 
 TEST_CASE("Matrix shenanigans") {
   using namespace met;
-
-  std::variant<int, float, char> v = 0.5f;
-
-  std::optional<int> o;
   
-  o | match {
-    [](const int &v) { fmt::print("optional holds {}\n", v); },
-    []()             { fmt::print("optional holds none\n"); }
+  Uplifting::Vertex v;
+  v.constraint = DirectSurfaceConstraint { };
+
+  v.constraint | visit {
+    [](auto &v) requires(is_surface_constraint<std::decay_t<decltype(v)>>) {
+    // [](is_surface_constraint auto &v) {
+      using Ty = std::decay_t<decltype(v)>;
+      fmt::print("Visited surface constraint for {}\n", typeid(Ty).name());
+    },
+    [](auto &v) {
+      using Ty = std::decay_t<decltype(v)>;
+      fmt::print("Visited remainder constraint for {}\n", typeid(Ty).name());
+    }
   };
 
-  v | match {
-    [](const int   &i) { fmt::print("int   {}\n", i); },
-    [](const float &f) { fmt::print("float {}\n", f); },
-    [](const char  &c) { fmt::print("char  {}\n", c); },
-    [](const auto  &)  { fmt::print("unknown\n");     }
-  };
-
-  v | match_type([](auto vt, bool is_match) {
-      fmt::print("holds {}: {}\n", typeid(decltype(vt)).name(), is_match);
-  });
+  std::visit(visit {
+    [](is_surface_constraint auto &v) {
+      using Ty = std::decay_t<decltype(v)>;
+      fmt::print("Visited surface constraint for {}\n", typeid(Ty).name());
+    },
+    [](auto &v) {
+      using Ty = std::decay_t<decltype(v)>;
+      fmt::print("Visited remainder constraint for {}\n", typeid(Ty).name());
+    }
+  }, v.constraint);
   
-  v | match_one([](const uint &v) {
-    fmt::print("matched one: {}\n", v);
-  });
+  v.constraint | visit {
+    [](is_surface_constraint auto &v) {
+      using Ty = std::decay_t<decltype(v)>;
+      fmt::print("Visited surface constraint for {}\n", typeid(Ty).name());
+    },
+    [](auto &v) {
+      using Ty = std::decay_t<decltype(v)>;
+      fmt::print("Visited remainder constraint for {}\n", typeid(Ty).name());
+    }
+  };
 }

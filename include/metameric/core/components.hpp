@@ -3,6 +3,7 @@
 #include <metameric/core/detail/scene_components.hpp>
 #include <metameric/core/constraints.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/matching.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <vector>
 
@@ -172,7 +173,7 @@ namespace std {
   template <>
   struct std::formatter<met::Uplifting::Vertex::cnstr_type> : std::formatter<string_view> {
     auto format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {
-      std::string s = std::visit([&](const auto &arg) { return std::format("{}", arg); }, constraint);
+      auto s = constraint | met::visit { [&](const auto &arg) { return std::format("{}", arg); } };
       return std::formatter<std::string_view>::format(s, ctx);
     }
   };

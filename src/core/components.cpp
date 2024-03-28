@@ -32,41 +32,10 @@ namespace met {
     return std::tie(type, is_active, transform, illuminant_i, illuminant_scale) 
         == std::tie(o.type, o.is_active, o.transform, o.illuminant_i, o.illuminant_scale);
   }
-
-  /* bool Uplifting::Vertex::has_surface() const {
-    return std::visit(overloaded {
-      [](const is_surface_constraint auto &c) { return true; },
-      [&](const auto &) { return false; }
-    }, constraint);
-  } */
-
-  /* bool Uplifting::Vertex::has_mismatching() const {
-    return std::visit(overloaded {
-      [](const DirectColorConstraint &c)     { return c.has_mismatching(); },
-      [](const DirectSurfaceConstraint &c)   { return c.has_mismatching(); },
-      [](const IndirectSurfaceConstraint &c) { return c.has_mismatching(); },
-      [&](const auto &)                      { return false; }
-    }, constraint);
-  } */
-
   
   bool Uplifting::operator==(const Uplifting &o) const {
     return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
   }
-
-  /* SurfaceInfo &Uplifting::Vertex::surface() {
-    return std::visit(overloaded {
-      [](is_surface_constraint auto &c) -> SurfaceInfo & { return c.surface; },
-      [&](auto &) -> SurfaceInfo & { return detail::invalid_visitor_return_si; }
-    }, constraint);
-  } */
-
-  /* const SurfaceInfo &Uplifting::Vertex::surface() const {
-    return std::visit(overloaded {
-      [](const is_surface_constraint auto &c) -> const SurfaceInfo & { return c.surface; },
-      [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
-    }, constraint);
-  } */
 
   std::pair<Colr, Spec> Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
@@ -82,38 +51,17 @@ namespace met {
     // Color system spectra within which the 'uplifted' texture is defined
     CMFS csys_i = scene.csys(uplifting.csys_i).finalize();
 
-    // Identify the type of constraint
-    // visit_overload({
-    // std::visit(overloaded {
-    auto visitors = match {
-      [&](const DirectColorConstraint &cstr) {
+    // Generate output data using a visitor for each constraint
+    // Visit the underlying constraint to generate output data
+    constraint | visit {
+      [&](const is_colr_constraint auto &cstr) {
+        // Return zero constraint for invalid surfaces, in case the type
+        // relies on underlying surface data
+        if constexpr (is_surface_constraint<std::decay_t<decltype(cstr)>>)
+          if (!cstr.has_surface())
+            return;
+
         // The specified baseline color becomes our vertex color
-        c = cstr.colr_i;
-
-        // Gather all relevant color system spectra and corresponding color signals
-        std::vector<CMFS> systems = { csys_i };
-        std::vector<Colr> signals = { c      };
-        for (const auto &c : cstr.cstr_j) {
-          systems.push_back(scene.csys(c.cmfs_j, c.illm_j).finalize());
-          signals.push_back(c.colr_j);
-        }
-
-        // Generate a metamer satisfying the system+signal constraint set
-        s = generate_spectrum(GenerateSpectrumInfo {
-          .basis   = scene.resources.bases[uplifting.basis_i].value(),
-          .systems = systems,
-          .signals = signals
-        });
-      },
-      [&](const DirectSurfaceConstraint &cstr) {
-        // Return zero constraint for invalid surfaces
-        if (!cstr.has_surface()) {
-          c = 0.f;
-          s = 0.f;
-          return;
-        }
-
-        // Color is obtained from surface information
         c = cstr.colr_i;
 
         // Gather all relevant color system spectra and corresponding color signals
@@ -189,46 +137,45 @@ namespace met {
 
         // The metamer's color under the uplifting's color system becomes our vertex color
         c = (csys_i.transpose() * s.matrix()).eval();
-      },
-      [&](const auto &) { }
+      }
     };
-
-    constraint | visitors;
-    // std::visit(visitors, constraint);
-    // }, constraint);
 
     return { c, s };
   }
 
   bool Uplifting::Vertex::has_surface() const {
     met_trace();
-    return std::visit(overloaded {
+    return constraint | visit {
       [](const is_surface_constraint auto &v) { return true; },
       [](const auto &) { return false; },
-    }, constraint);
+    };
   }
 
   SurfaceInfo &Uplifting::Vertex::surface() {
-    return std::visit(overloaded {
+    return constraint | visit {
       [](is_surface_constraint auto &c) -> SurfaceInfo & { return c.surface; },
       [&](auto &) -> SurfaceInfo & { return detail::invalid_visitor_return_si; }
-    }, constraint);
+    };
   }
 
   const SurfaceInfo &Uplifting::Vertex::surface() const {
-    return std::visit(overloaded {
+    return constraint | visit {
       [](const is_surface_constraint auto &c) -> const SurfaceInfo & { return c.surface; },
       [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
-    }, constraint);
+    };
   }
 
   bool Uplifting::Vertex::has_mismatching() const {
     met_trace();
-    return std::visit([](const is_metameric_constraint auto &v) { return v.has_mismatching(); }, constraint);
+    return constraint | visit { 
+      [](const is_metameric_constraint auto &v) { return v.has_mismatching(); }
+    };
   }
 
   bool Uplifting::Vertex::has_freedom() const {
     met_trace();
-    return std::visit([](const is_metameric_constraint auto &v) { return v.has_freedom(); }, constraint);
+    return constraint | visit { 
+      [](const is_metameric_constraint auto &v) { return v.has_freedom(); }
+    };
   }
 } // namespace met

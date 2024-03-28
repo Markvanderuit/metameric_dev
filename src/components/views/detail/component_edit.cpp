@@ -162,22 +162,20 @@ namespace met {
           
           // Properties view column
           ImGui::TableSetColumnIndex(2);
-          std::visit(overloaded {
+          vert.constraint | visit_single {
             [](is_colr_constraint auto &cstr) {
               // Show primary color value
               auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.colr_i), 1).finished();
               ImGui::ColorButton("##base_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
 
               // Show secondary color constraints
-              // TODO CSYS HERE
-              /* for (auto &colr_j : cstr.colr_j | vws::take(3ul)) {
-                auto srgb = (eig::Array4f() << lrgb_to_srgb(colr_j), 1).finished();
+              for (auto &cstr_j : cstr.cstr_j | vws::take(3ul)) {
+                auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr_j.colr_j), 1).finished();
                 ImGui::SameLine();
                 ImGui::ColorButton("##cstr_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
-              } */
-            },
-            [](auto &cstr) { },
-          }, vert.constraint);
+              }
+            }
+          };
 
           // Edit buttons
           ImGui::TableSetColumnIndex(3);
