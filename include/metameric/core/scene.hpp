@@ -99,20 +99,19 @@ namespace met {
 
   public: // Scene data helper functions
     // Realize a pretty-printed name of a certain color system
-    std::string csys_name(uint i)        const;
-    std::string csys_name(ColorSystem c) const;
+    std::string csys_name(uint i)                   const;
+    std::string csys_name(uint cmfs_i, uint illm_i) const;
+    std::string csys_name(ColorSystem c)            const;
 
     // Realize the spectral data of a certain color system
-    ColrSystem csys(uint i)        const;
-    ColrSystem csys(ColorSystem c) const;
+    ColrSystem csys(uint i)                   const;
+    ColrSystem csys(uint cmfs_i, uint illm_i) const;
+    ColrSystem csys(ColorSystem c)            const;
 
     // Realize the spectral data of a certain emitter
     Spec emitter_spd(uint i)    const;
     Spec emitter_spd(Emitter e) const;
     
-    // Realize the spectral data of a certain uplifting vertex, with its attached color location
-    std::pair<Colr, Spec> realize_constraint(ConstraintSelection cs) const;
-
     // Extract a specific uplifting vertex, given indices;
     // supplied here given the common cumbersomeness of deep access
     const Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) const {

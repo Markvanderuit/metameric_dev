@@ -5,9 +5,9 @@
 
 namespace met {
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
-    return colr_i.isApprox(o.colr_i) 
-      && rng::equal(colr_j, o.colr_j, eig::safe_approx_compare<Colr>)
-      && rng::equal(csys_j, o.csys_j);
+    return colr_i.isApprox(o.colr_i) && rng::equal(cstr_j, o.cstr_j, [](const auto &a, const auto &b) {
+      return a.cmfs_j == b.cmfs_j && a.illm_j == b.illm_j && a.colr_j.isApprox(b.colr_j);
+    });
   }
   
   bool MeasurementConstraint::operator==(const MeasurementConstraint &o) const {
@@ -15,9 +15,11 @@ namespace met {
   }
   
   bool DirectSurfaceConstraint::operator==(const DirectSurfaceConstraint &o) const {
-    return surface == o.surface
-        && rng::equal(colr_j, o.colr_j, eig::safe_approx_compare<Colr>)
-        && rng::equal(csys_j, o.csys_j);
+    return surface == o.surface 
+        && colr_i.isApprox(o.colr_i) 
+        && rng::equal(cstr_j, o.cstr_j, [](const auto &a, const auto &b) {
+            return a.cmfs_j == b.cmfs_j && a.illm_j == b.illm_j && a.colr_j.isApprox(b.colr_j);
+          });
   }
   
   bool IndirectSurfaceConstraint::operator==(const IndirectSurfaceConstraint &o) const {
@@ -26,42 +28,30 @@ namespace met {
         && rng::equal(powers, o.powers, eig::safe_approx_compare<Spec>);
   }
 
-  /* bool _IndirectSurfaceConstraint::Constraint::operator==(const Constraint &o) const {
-    return surface == o.surface && csys == o.csys && colr.isApprox(o.colr);
-  }
-
-  bool _IndirectSurfaceConstraint::Constraint::is_valid() const {
-    return surface.is_valid() && surface.record.is_object();
-  }
-
-  bool _IndirectSurfaceConstraint::Constraint::has_mismatching() const {
-    return !csys.powers.empty() && !colr.isZero();
-  }
-
-  bool _IndirectSurfaceConstraint::operator==(const _IndirectSurfaceConstraint &o) const {
-    return rng::equal(constraints, o.constraints);
-  }
-
-  bool _IndirectSurfaceConstraint::is_valid() const {
-    return rng::all_of(constraints, [](const auto &c) { return c.is_valid(); });
-  }
-
-  bool _IndirectSurfaceConstraint::has_mismatching() const {
-    return rng::all_of(constraints, [](const auto &c) { return c.has_mismatching(); });
-  } */
-
   void from_json(const json &js, DirectColorConstraint &c) {
     met_trace();
     js.at("colr_i").get_to(c.colr_i);
+    js.at("cstr_j").get_to(c.cstr_j);
+  }
+
+  void from_json(const json &js, ColrConstraint &c) {
+    met_trace();
+    js.at("cmfs_j").get_to(c.cmfs_j);
+    js.at("illm_j").get_to(c.illm_j);
     js.at("colr_j").get_to(c.colr_j);
-    js.at("csys_j").get_to(c.csys_j);
   }
 
   void to_json(json &js, const DirectColorConstraint &c) {
     met_trace();
     js = {{ "colr_i", c.colr_i },
-          { "colr_j", c.colr_j },
-          { "csys_j", c.csys_j }};
+          { "cstr_j", c.cstr_j }};
+  }
+
+  void to_json(json &js, const ColrConstraint &c) {
+    met_trace();
+    js = {{ "cmfs_j", c.cmfs_j },
+          { "illm_j", c.illm_j },
+          { "colr_j", c.colr_j }};
   }
 
   void from_json(const json &js, MeasurementConstraint &c) {
@@ -76,15 +66,15 @@ namespace met {
 
   void from_json(const json &js, DirectSurfaceConstraint &c) {
     met_trace();
-    js.at("colr_j").get_to(c.colr_j);
-    js.at("csys_j").get_to(c.csys_j);
+    js.at("colr_i").get_to(c.colr_i);
+    js.at("cstr_j").get_to(c.cstr_j);
     js.at("surface").get_to(c.surface);
   }
 
   void to_json(json &js, const DirectSurfaceConstraint &c) {
     met_trace();
-    js = {{ "colr_j",  c.colr_j  },
-          { "csys_j",  c.csys_j  },
+    js = {{ "colr_i",  c.colr_i  },
+          { "cstr_j",  c.cstr_j  },
           { "surface", c.surface }};
   }
 

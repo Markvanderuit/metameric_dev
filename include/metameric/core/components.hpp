@@ -119,46 +119,26 @@ namespace met {
       // Whether the constraint is used in the scene
       bool is_active = true;
 
-      // Underlying, user-specified constraints
-      std::vector<cnstr_type> constraints;
+      // Underlying, user-specified constraint
+      cnstr_type constraint;
 
     public:
       // Generate a spectrum and corresponding color, which
       // forms the vertex' position in the uplifting tesselation
-      std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting);
+      std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
 
-      bool has_mismatching() const;                     // Does the current set of constraints allow for mismatching?
-      bool has_freedom() const;                         // Can the current set of constraints be expanded?
-      bool operator==(const Vertex &o) const = default; // Default comparator
-    };
+    public: // underlying accessor if constraint satisifes is metamerism_constraint
+      bool has_mismatching() const; // Does the underlying constraint allow for mismatching?
+      bool has_freedom() const;     // Can the underlying constraint be expanded?
 
-    /* // Wrapper around vertex constraint data
-    struct Vertex {
-      using state_type = detail::VertexState;
-      using cnstr_type = std::variant<DirectColorConstraint,  MeasurementConstraint,
-                                      DirectSurfaceConstraint, IndirectSurfaceConstraint>;
-      // Associated name
-      std::string name;
-      
-      // Whether the constraint is used in the scene
-      bool is_active = true;
-
-      // Underlying constraint data
-      cnstr_type constraint;
-      
-    public:
-      bool operator==(const Vertex &o) const = default;
-      
-      // Helper visitors for accessing an underlying constraint's surface
-      // data, if said constraint fulfills is_surface_constraint; otherwise
-      // a invalid static is returned
-      bool has_surface() const;
+    public: // underlying accessor if constraint satisfies is_surface_constraint
+      bool has_surface() const; // Does the underlying constraint expose surface data?
       const SurfaceInfo &surface() const;
             SurfaceInfo &surface();
-      
-      // Test if the constraint allows editing using mismatch volumes
-      bool has_mismatching() const;
-    }; */
+
+    public:
+      bool operator==(const Vertex &o) const = default; // Default comparator
+    };
 
   public:
     uint                csys_i  = 0; // Index of primary color system

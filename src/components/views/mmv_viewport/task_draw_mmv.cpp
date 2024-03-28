@@ -27,31 +27,29 @@ namespace met {
     // Used for coming draw operation
     auto dl = ImGui::GetWindowDrawList();
     
-    for (const auto &cstr : e_vert.constraints) {
-      std::visit(overloaded {
-        [&](const is_colr_constraint auto &cstr) {
-          // TODO selectable viewed constraint
-          auto p = cstr.colr_j[0];
+    std::visit(overloaded {
+      [&](const is_colr_constraint auto &cstr) {
+        // TODO selectable viewed constraint
+        auto p = cstr.cstr_j[0].colr_j;
 
-          // Determine window-space position of surface point
-          eig::Vector2f p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
-            
-          // Clip vertex outside viewport
-          guard((p_window.array() >= viewport_offs).all() 
-            && (p_window.array() <= viewport_offs + viewport_size).all());
+        // Determine window-space position of surface point
+        eig::Vector2f p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
+          
+        // Clip vertex outside viewport
+        guard((p_window.array() >= viewport_offs).all() 
+          && (p_window.array() <= viewport_offs + viewport_size).all());
 
-          // Get srgb colors
-          auto circle_color_center 
-            = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(p), 1.f).finished());
-          auto circle_color_border = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f });
+        // Get srgb colors
+        auto circle_color_center 
+          = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(p), 1.f).finished());
+        auto circle_color_border = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f });
 
-          // Draw pair of circles with special colors
-          dl->AddCircleFilled(p_window, 8.f, circle_color_border);
-          dl->AddCircleFilled(p_window, 4.f, circle_color_center);
-        },
-        [](const auto &) { /* ... */ }
-      }, cstr);
-    }
+        // Draw pair of circles with special colors
+        dl->AddCircleFilled(p_window, 8.f, circle_color_border);
+        dl->AddCircleFilled(p_window, 4.f, circle_color_center);
+      },
+      [](const auto &) { /* ... */ }
+    }, e_vert.constraint);
   }
 
   void DrawMMVTask::eval_draw_volume(SchedulerHandle &info) {

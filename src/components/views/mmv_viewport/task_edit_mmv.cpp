@@ -78,107 +78,83 @@ namespace met {
       }
       
       // Visit the underlying constraint data
-      /* std::visit(overloaded {
-        [&](DirectColorConstraint &cstr) {
-          // Color baseline editor
+      std::visit(overloaded {
+        [&](is_colr_constraint auto &cstr) {
+          ImGui::SeparatorText("Baseline constraint");
           {
             // lRGB color picker
             Colr &lrgb = cstr.colr_i;
             ImGui::ColorEdit3("Base color (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
-            
+          
             // sRGB color picker
             Colr srgb = lrgb_to_srgb(lrgb);
             if (ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
               lrgb = srgb_to_lrgb(srgb);
-            
+
             // Roundtrip error
-            Colr rtrp = e_scene.csys(0).apply(e_spectra[e_cs.vertex_i]);
-            Colr err  = (lrgb - rtrp).abs();
+            Colr err = (lrgb - e_scene.csys(0).apply(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
-            // ImGui::ColorEdit3("Roundtrip (lrgb)", err.data(), ImGuiColorEditFlags_Float);
           }
 
-          // Visual separator into constraint list
-          ImGui::Separator(); 
-
-          // Maximum column width is part of available content region
-          float col_width = ImGui::GetContentRegionAvail().x;
-
-          // Color constraint; system column
-          detail::visit_range_column<uint>("Color system", col_width * 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
-            const auto &e_scene = info.global("scene").getr<Scene>();
-
-            // Spawn selector; work on a copy to detect changes
-            uint _csys_j = csys_j;
-            detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, _csys_j, 
-              [](const auto &c) { return c.name; });
-
-            // On a change, we reset the accompanying color value to a valid center
-            // by doing a quick spectral roundtrip with a known valid metamer
-            guard(csys_j != _csys_j);
-            csys_j = _csys_j;
-
-            // Gather relevant color systems
-            auto colsys_i = e_scene.csys(uplf.value.csys_i);
-            auto colsys_j = e_scene.csys(csys_j);
-            auto systems  = { colsys_i.finalize() };
-            auto signals  = { cstr.colr_i };
-
-            // Generate spectral distribution
-            Spec s = generate_spectrum(GenerateSpectrumInfo {
-              .basis   = e_scene.resources.bases[uplf.value.basis_i].value(),
-              .systems = systems,
-              .signals = signals
-            });
-            
-            // Assign the reset accompanying color
-            cstr.colr_j[i] = colsys_j.apply(s);
-          });
-          ImGui::SameLine();
-
-          // Color constraint; value column
-          detail::visit_range_column<Colr>("Color value", col_width * 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
-            // ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-            auto srgb = lrgb_to_srgb(colr_j);
-            ImGui::ColorEdit3("##color_editor", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-            colr_j = srgb_to_lrgb(srgb);
-          });
-          
-          if (ImGui::Button("Add constraint")) {
-            cstr.csys_j.push_back(0);
-            cstr.colr_j.push_back(cstr.colr_i);
-          }
-        },
-        [&](DirectSurfaceConstraint &cstr) {
-          // Color baseline value extracted from surface
+          ImGui::SeparatorText("Secondary constraints");
           {
-            ImGui::ColorEdit3("Base color (lrgb)", cstr.colr_i.data(), ImGuiColorEditFlags_Float);
-            auto srgb = lrgb_to_srgb(cstr.colr_i);
-            if (ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
-              cstr.colr_i = srgb_to_lrgb(srgb);
-          }
-          
-          // Visual separator into constraint list
-          ImGui::Separator();
+            if (!cstr.cstr_j.empty() && ImGui::BeginTable("##table", 5, ImGuiTableFlags_SizingStretchProp)) {
+              // Setup table header; column 4 is left without header
+              // Columns are shown without hover or color; cleaner than using header
+              ImGui::TableSetupScrollFreeze(0, 1);
+              ImGui::TableNextRow();
+              ImGui::TableSetColumnIndex(0); ImGui::Text("Observer");
+              ImGui::TableSetColumnIndex(1); ImGui::Text("Illuminant");
+              ImGui::TableSetColumnIndex(2); ImGui::Text("Value (lrgb/srgb)");
+              ImGui::TableSetColumnIndex(3); ImGui::Text("error");
+              
+              // Each next row is dedicated to a single color constraint
+              for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
+                ImGui::TableNextRow();
+                auto scope = ImGui::ScopedID(std::format("table_row_{}", j));
+                auto &c    = cstr.cstr_j[j];
+                
+                // CMFS editor column
+                ImGui::TableSetColumnIndex(0);
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                push_resource_selector("##cmfs", e_scene.resources.observers, c.cmfs_j);
 
-          // Maximum column width is part of available content region
-          float col_width = ImGui::GetContentRegionAvail().x;
-          
-          // Color constraint; system column
-          detail::visit_range_column<uint>("Color system", col_width * 0.35, cstr.csys_j, [&](uint i, uint &csys_j) {
-            detail::push_resource_selector<detail::Component<ColorSystem>>("##selector", e_scene.components.colr_systems, csys_j, 
-              [](const auto &c) { return c.name; });
-          });
-          ImGui::SameLine();
+                // Illuminant editor column
+                ImGui::TableSetColumnIndex(1);
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                push_resource_selector("##illm", e_scene.resources.illuminants, c.illm_j);
 
-          // Color constraint; value column
-          detail::visit_range_column<Colr>("Color value", col_width * 0.35, cstr.colr_j, [&](uint i, Colr &colr_j) {
-            ImGui::ColorEdit3("##color_editor", colr_j.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-          });
-          
-          if (ImGui::Button("Add constraint")) {
-            cstr.csys_j.push_back(0);
-            cstr.colr_j.push_back(cstr.surface.diffuse);
+                // lRGB/sRGB color column
+                ImGui::TableSetColumnIndex(2);
+                // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                ImGui::ColorEdit3("##lrgb", c.colr_j.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+                // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                auto srgb = lrgb_to_srgb(c.colr_j);
+                if (ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
+                  c.colr_j = srgb_to_lrgb(srgb);
+
+                // Error color column
+                ImGui::TableSetColumnIndex(4);
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                Colr err = (c.colr_j - e_scene.csys(c.cmfs_j, c.illm_j).apply(e_spectra[e_cs.vertex_i])).abs();
+                ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+
+                // Delete button
+                ImGui::TableSetColumnIndex(5);
+                if (ImGui::Button("X")) {
+                  cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
+                  break; // Exit early to prevent iterator invalidation
+                }
+                if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("Delete constraint");
+              } // for (uint j)
+
+              ImGui::EndTable();
+            }
+
+            if (ImGui::Button("Add constraint")) {
+              cstr.cstr_j.push_back(ColrConstraint { .cmfs_j = 0, .illm_j = 0, .colr_j = 0.f });
+            }
           }
         },
         [&](IndirectSurfaceConstraint &cstr) {
@@ -196,8 +172,9 @@ namespace met {
           ImGui::ColorEdit3("Constraint radiance (lrgb)", cstr.colr.data(), ImGuiColorEditFlags_Float);
           ImGui::ColorEdit3("Constraint radiance (srgb)", cstr_srgb.data(), ImGuiColorEditFlags_Float);
 
-          ImGui::SeparatorText("Estimated output");
-          {
+          if (!cstr.powers.empty()) {
+            ImGui::SeparatorText("Estimated output");
+
             // Reconstruct radiance from truncated power series
             Spec r = e_spectra[e_cs.vertex_i];
             Spec s = cstr.powers[0];
@@ -228,7 +205,7 @@ namespace met {
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");
         }
-      }, vert.constraint); */
+      }, vert.constraint);
     });
 
     // Plotter for the current constraint's resulting spectrum

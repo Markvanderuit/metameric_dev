@@ -3,19 +3,34 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <metameric/core/math.hpp>
 #include <metameric/core/ranges.hpp>
+#include <metameric/core/matching.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 
 TEST_CASE("Matrix shenanigans") {
   using namespace met;
 
-  CMFS cmfs = models::cmfs_cie_xyz;
-  Spec illm = models::emitter_cie_e;
+  std::variant<int, float, char> v = 0.5f;
+
+  std::optional<int> o;
   
-  CMFS to_xyz = (cmfs.array().colwise() * illm)
-              / (cmfs.array().col(1) * illm).sum();
-  CMFS to_rgb = (models::xyz_to_srgb_transform * to_xyz.transpose()).transpose();
+  o | match {
+    [](const int &v) { fmt::print("optional holds {}\n", v); },
+    []()             { fmt::print("optional holds none\n"); }
+  };
+
+  v | match {
+    [](const int   &i) { fmt::print("int   {}\n", i); },
+    [](const float &f) { fmt::print("float {}\n", f); },
+    [](const char  &c) { fmt::print("char  {}\n", c); },
+    [](const auto  &)  { fmt::print("unknown\n");     }
+  };
+
+  v | match_type([](auto vt, bool is_match) {
+      fmt::print("holds {}: {}\n", typeid(decltype(vt)).name(), is_match);
+  });
   
-  Colr c = to_rgb.transpose() * Spec(1).matrix();
-  fmt::print("Value: {}, luminance: {}\n", c, luminance(c));
+  v | match_one([](const uint &v) {
+    fmt::print("matched one: {}\n", v);
+  });
 }

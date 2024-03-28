@@ -316,24 +316,24 @@ namespace met {
           // Lambda to apply a specific vertex data to the color constraint
           auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
             std::visit(overloaded { [p](is_colr_constraint auto &cstr) { 
-              cstr.colr_j[0] = p;
+              cstr.cstr_j[0].colr_j = p;
             }, [](const auto &cstr) {}}, vert.constraint); };
 
           // Register gizmo start; cache current vertex position
-          if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.colr_j[0]))))
-            m_gizmo_prev_p = cstr.colr_j[0];
+          if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.cstr_j[0].colr_j))))
+            m_gizmo_prev_p = cstr.cstr_j[0].colr_j;
 
           // Register gizmo drag; apply world-space delta
           if (auto [active, delta] = m_gizmo.eval_delta(); active) {
             auto &e_vert  = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
-            apply_colr(e_vert, delta * cstr.colr_j[0]);
+            apply_colr(e_vert, delta * cstr.cstr_j[0].colr_j);
           }
 
           // Register gizmo end; apply vertex position to scene save state
           if (m_gizmo.end_delta()) {
             // Snap vertex position to inside convex hull, if necessary
             const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-            auto cstr_colr = detail::find_closest_point_in_convex_hull(cstr.colr_j[0], e_chull);
+            auto cstr_colr = detail::find_closest_point_in_convex_hull(cstr.cstr_j[0].colr_j, e_chull);
 
             // Handle save
             info.global("scene").getw<Scene>().touch({

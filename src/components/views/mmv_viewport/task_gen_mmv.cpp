@@ -116,9 +116,9 @@ namespace met {
         // Prepare input color systems and corresponding signals
         auto systems_i = { e_scene.csys(e_uplifting.csys_i).finalize() };
         auto signals_i = { cstr.colr_i };
-        auto systems_j = cstr.csys_j
-                       | vws::transform([&](uint i) { return e_scene.csys(i).finalize(); })
-                       | rng::to<std::vector>();
+        std::vector<CMFS> systems_j;
+        for (const auto &c : cstr.cstr_j)
+          systems_j.push_back(e_scene.csys(c.cmfs_j, c.illm_j).finalize());
 
         // Prepare data for MMV point generation
         GenerateMismatchingOCSInfo mmv_info = {
@@ -131,7 +131,7 @@ namespace met {
         };
 
         // Generate MMV spectra and append corresponding colors to current point set
-        auto csys = e_scene.csys(cstr.csys_j[m_csys_j]);
+        auto csys = e_scene.csys(cstr.cstr_j[m_csys_j].cmfs_j, cstr.cstr_j[m_csys_j].illm_j);
         return csys(generate_mismatching_ocs(mmv_info));
       },
       [&](const DirectSurfaceConstraint &cstr) {
@@ -139,9 +139,10 @@ namespace met {
         // note, we keep search space in XYZ
         auto csys_base_v = { e_scene.csys(e_uplifting.csys_i).finalize(false) };
         auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
-        auto csys_refl_v = vws::transform(cstr.csys_j, [&](uint i) { return e_scene.csys(i).finalize(false); })
+        auto csys_refl_v = vws::transform(cstr.cstr_j, 
+                           [&](auto c) { return e_scene.csys(c.cmfs_j, c.illm_j).finalize(false); })
                          | rng::to<std::vector>();
-
+        
         // Assemble info object for generating MMV spectra
         GenerateMismatchingOCSInfo mmv_info = {
           .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
@@ -153,7 +154,7 @@ namespace met {
         };
 
         // Generate MMV spectra, convert to view color system, and append to current point set
-        auto csys_view = e_scene.csys(cstr.csys_j[m_csys_j]);
+        auto csys_view = e_scene.csys(cstr.cstr_j[m_csys_j].cmfs_j, cstr.cstr_j[m_csys_j].illm_j);
         return csys_view(generate_mismatching_ocs(mmv_info));
       },
       [&](const IndirectSurfaceConstraint &cstr) {

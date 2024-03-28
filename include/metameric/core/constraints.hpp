@@ -14,8 +14,7 @@ namespace met {
   public:
     uint uplifting_i  = invalid_data; // ID of uplifting component
     uint vertex_i     = 0;            // ID of vertex in specific uplifting
-    uint constraint_i = 0;            // ID of constraint on constraint vertex; always 0
-                                      // except for the indirect surface constraint
+    uint constraint_i = 0;            // ID of constraint on constraint vertex; always 0 (except for the indirect surface constraint)
   
   public:
     bool is_valid() const { return uplifting_i != invalid_data; }
@@ -37,14 +36,27 @@ namespace met {
     { t.has_freedom() } -> std::same_as<bool>;
   };
 
+  template <typename Ty>
+  concept is_vector_constraint = requires(Ty t) {
+    { t.size()  } -> std::same_as<size_t>;
+    { t.empty() } -> std::same_as<bool>;
+  };
+
+  struct ColrConstraint {
+    uint cmfs_j = 0, illm_j = 0;
+    Colr colr_j = 0.5f;
+  };
+
   // Concept defining the expected components of color-system constraints
   template <typename Ty>
   concept is_colr_constraint = requires(Ty t) {
     // The constraint specifies base color data, which must be reproduced
     // under the uplifting's primary color system
     { t.colr_i } -> std::same_as<Colr &>;
-    { t.colr_j } -> std::same_as<std::vector<Colr> &>;
-    { t.csys_j } -> std::same_as<std::vector<uint> &>;
+
+    // The constraint specifies secondary color data, under secondary
+    // color systems assembled from scene data
+    { t.cstr_j } -> std::same_as<std::vector<ColrConstraint> &>;
   } && is_metameric_constraint<Ty>;
 
   // Concept for a constraint on metameric behavior, which bases itself on data
@@ -58,18 +70,28 @@ namespace met {
     { t.has_surface() } -> std::same_as<bool>;
   } && is_metameric_constraint<Ty>;
 
-  /* Constraint definition used in uplifting;
-     A direct constraint imposes specific color reproduction under a 
-     specified color system, i.e. direct illumination. */
+  // Constraint imposing reproduction of a specific spectral reflectance.
+  struct MeasurementConstraint {
+    // Measured spectral data
+    Spec measure = 0.5;
+
+  public:
+    constexpr bool has_mismatching() const { return false; }
+    constexpr bool has_freedom() const { return false; }
+    bool operator==(const MeasurementConstraint &o) const;
+  };
+  static_assert(is_metameric_constraint<MeasurementConstraint>);
+
+  // Constraint imposing specific color reproduction under a set of known
+  // color systems, i.e. direct illumination.
   struct DirectColorConstraint {
     // Constraint data for direct color with sensible defaults
-    Colr              colr_i = 0.5; // Expected color under uplifting's color system 
-    std::vector<Colr> colr_j = { }; // Expected colors under secondary color systems
-    std::vector<uint> csys_j = { }; // Indices of the secondary color systems
+    Colr                        colr_i = 0.5; // Expected base color
+    std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
 
   public:
     constexpr bool has_freedom() const { return false; }
-    bool has_mismatching() const { return !colr_j.empty(); }
+    bool has_mismatching() const { return !cstr_j.empty(); }
     bool operator==(const DirectColorConstraint &o) const;
   };
   static_assert(is_colr_constraint<DirectColorConstraint>);
@@ -79,17 +101,16 @@ namespace met {
      for a position on a scene surface, under a specified color system,
      given direct illumination. */
   struct DirectSurfaceConstraint {
-    // Constraint data for direct color
-    Colr              colr_i = 0.5; // Obtianed from underlying surface data
-    std::vector<Colr> colr_j = { }; // Expected colors under secondary color systems
-    std::vector<uint> csys_j = { }; // Indices of the secondary color systems
+    // Constraint data for direct color with sensible defaults
+    Colr                        colr_i = 0.5; // Expected base color, obtained from underlying surface
+    std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
 
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
     constexpr bool has_freedom() const { return false; }
-    bool has_mismatching() const { return !colr_j.empty(); }
+    bool has_mismatching() const { return !cstr_j.empty(); }
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
 
@@ -121,24 +142,11 @@ namespace met {
   };
   static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
 
-  /* Constraint definition used in uplifting;
-     A measurement constraint imposes specific spectrum reproduction
-     for some given spectra, for at the least the corresponding color
-     in the uplifting's primary color system. */
-  struct MeasurementConstraint {
-    // Measured spectral data
-    Spec measure = 0.5;
-
-  public:
-    constexpr bool has_mismatching() const { return false; }
-    constexpr bool has_freedom() const { return false; }
-    bool operator==(const MeasurementConstraint &o) const;
-  };
-  static_assert(is_metameric_constraint<MeasurementConstraint>);
-
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);
   void to_json(json &js, const DirectColorConstraint &c);
+  void from_json(const json &js, ColrConstraint &c);
+  void to_json(json &js, const ColrConstraint &c);
   void from_json(const json &js, MeasurementConstraint &c);
   void to_json(json &js, const MeasurementConstraint &c);
   void from_json(const json &js, DirectSurfaceConstraint &c);
