@@ -58,8 +58,7 @@ namespace met {
         // Return zero constraint for invalid surfaces, in case the type
         // relies on underlying surface data
         if constexpr (is_surface_constraint<std::decay_t<decltype(cstr)>>)
-          if (!cstr.has_surface())
-            return;
+          guard(cstr.has_surface());
 
         // The specified baseline color becomes our vertex color
         c = cstr.colr_i;
@@ -80,14 +79,10 @@ namespace met {
         });
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        if (cstr.has_mismatching()) {
-          // Return zero constraint for invalid surfaces
-          if (!cstr.surface.is_valid()) {
-            c = 0.f;
-            s = 0.f;
-            return;
-          }
+        // Return zero constraint for invalid surfaces
+        guard(cstr.has_surface());
 
+        if (cstr.has_mismatching()) {
           // Surface diffuse is constraint position
           c = cstr.surface.diffuse;
 
@@ -106,16 +101,7 @@ namespace met {
             .refl_systems = refl_systems,
             .refl_signal  = cstr.colr
           });
-        }
-        else 
-        { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
-          // Return zero constraint for invalid surfaces
-          if (!cstr.surface.is_valid()) {
-            c = 0.f;
-            s = 0.f;
-            return;
-          }
-          
+        } else { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
           // Surface diffuse is constraint position
           c = cstr.surface.diffuse;
 
@@ -152,6 +138,7 @@ namespace met {
   }
 
   SurfaceInfo &Uplifting::Vertex::surface() {
+    met_trace();
     return constraint | visit {
       [](is_surface_constraint auto &c) -> SurfaceInfo & { return c.surface; },
       [&](auto &) -> SurfaceInfo & { return detail::invalid_visitor_return_si; }
@@ -159,6 +146,7 @@ namespace met {
   }
 
   const SurfaceInfo &Uplifting::Vertex::surface() const {
+    met_trace();
     return constraint | visit {
       [](const is_surface_constraint auto &c) -> const SurfaceInfo & { return c.surface; },
       [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
@@ -169,13 +157,6 @@ namespace met {
     met_trace();
     return constraint | visit { 
       [](const is_metameric_constraint auto &v) { return v.has_mismatching(); }
-    };
-  }
-
-  bool Uplifting::Vertex::has_freedom() const {
-    met_trace();
-    return constraint | visit { 
-      [](const is_metameric_constraint auto &v) { return v.has_freedom(); }
     };
   }
 } // namespace met

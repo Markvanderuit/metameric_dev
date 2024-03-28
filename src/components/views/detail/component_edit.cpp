@@ -150,11 +150,11 @@ namespace met {
             // for this combobox
             auto combo_str = to_capital(std::format("{}", vert.constraint));
             if (ImGui::BeginCombo("##constraint_type", combo_str.c_str())) {
-              variant_visit<Uplifting::Vertex::cnstr_type>([&](auto v) {
-                auto selectable_str = to_capital(std::format("{}", v));
-                bool holds_ty       = std::holds_alternative<decltype(v)>(vert.constraint);
-                if (ImGui::Selectable(selectable_str.c_str(), holds_ty) && !holds_ty)
-                  vert.constraint = v;
+
+              vert.constraint | visit_types([&](auto default_v, bool holds_alternative) {
+                auto selectable_str = to_capital(std::format("{}", default_v));
+                if (ImGui::Selectable(selectable_str.c_str(), holds_alternative) && !holds_alternative)
+                  vert.constraint = default_v;
               });
               ImGui::EndCombo();
             }

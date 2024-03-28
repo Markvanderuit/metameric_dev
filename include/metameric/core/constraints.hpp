@@ -2,8 +2,8 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/json.hpp>
-#include <metameric/core/spectrum.hpp>
 #include <metameric/core/record.hpp>
+#include <metameric/core/spectrum.hpp>
 
 namespace met {
   // Helper object for handling selection of a specific 
@@ -28,12 +28,8 @@ namespace met {
   template <typename Ty>
   concept is_metameric_constraint = requires(Ty t) {
     // The constraint does or does not allow for configuration 
-    // through metameric mismatch editing
+    // through metameric mismatch editing in its current state
     { t.has_mismatching() } -> std::same_as<bool>;
-
-    // The constraint does or does not restrict the inclusion 
-    // of other metamerism constraints
-    { t.has_freedom() } -> std::same_as<bool>;
   };
 
   template <typename Ty>
@@ -42,9 +38,26 @@ namespace met {
     { t.empty() } -> std::same_as<bool>;
   };
 
+  // Small helper struct for constraints under direct color illumination;
+  // used by implementations of is_colr_constraint
   struct ColrConstraint {
-    uint cmfs_j = 0, illm_j = 0;
-    Colr colr_j = 0.5f;
+    uint cmfs_j = 0,   // Index of observer function
+         illm_j = 0;   // Index of illuminant function
+    Colr colr_j = 0.f; // Color under direct color system
+
+    bool operator==(const ColrConstraint &o) const;
+  };
+  
+  // Small helper struct for constraints under a system of light transport;
+  // used by IndirectSurfaceConstraint in particular
+  struct IndirectConstraint {
+    uint              cmfs_i = 0,   // Index of observer function
+                      illm_i = 0;   // Index of illuminant function
+    Colr              colr_i = 0.f; // Color under direct color system
+    std::vector<Spec> pwrs_j = { }; // Interreflection data
+    Colr              colr_j = 0.0; // Color under intereflection data and observer function
+
+    bool operator==(const IndirectConstraint &o) const;
   };
 
   // Concept defining the expected components of color-system constraints
@@ -77,7 +90,6 @@ namespace met {
 
   public:
     constexpr bool has_mismatching() const { return false; }
-    constexpr bool has_freedom() const { return false; }
     bool operator==(const MeasurementConstraint &o) const;
   };
   static_assert(is_metameric_constraint<MeasurementConstraint>);
@@ -86,45 +98,40 @@ namespace met {
   // color systems, i.e. direct illumination.
   struct DirectColorConstraint {
     // Constraint data for direct color with sensible defaults
-    Colr                        colr_i = 0.5; // Expected base color
+    Colr                        colr_i = 0.0; // Expected base color
     std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
 
   public:
-    constexpr bool has_freedom() const { return false; }
-    bool has_mismatching() const { return !cstr_j.empty(); }
+    bool has_mismatching() const;
     bool operator==(const DirectColorConstraint &o) const;
   };
   static_assert(is_colr_constraint<DirectColorConstraint>);
 
-  /* Constraint definition used in uplifting;
-     A direct surface constraint imposes specific color reproduction
-     for a position on a scene surface, under a specified color system,
-     given direct illumination. */
+  // Constraint imposing specific color reproduction under a set of known
+  // color systems, i.e. direct illumination. The base color is sampled
+  // from a scene surface.
   struct DirectSurfaceConstraint {
     // Constraint data for direct color with sensible defaults
-    Colr                        colr_i = 0.5; // Expected base color, obtained from underlying surface
+    Colr                        colr_i = 0.0; // Expected base color, obtained from underlying surface
     std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
 
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:
-    constexpr bool has_freedom() const { return false; }
-    bool has_mismatching() const { return !cstr_j.empty(); }
+    bool has_mismatching() const;
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
-
   };
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
   static_assert(is_colr_constraint<DirectSurfaceConstraint>);
 
-  /* Constraint definition used in uplifting
-     A indirect surface constraint imposes specific color reproduction
-     for a position on a scene surface, taking into account light transport
-     affecting this surface position. */
+  // Constraint imposing specific color reproduction under a known illuminant,
+  // accounting for interreflections. The interreflection system is based on
+  // measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
-    // Surface data recorded through user interaction
-    SurfaceInfo surface = SurfaceInfo::invalid();
+    // Constraint data with sensible defaults
+    std::vector<IndirectConstraint> cstr_j = { }; // Individual interreflection constraints
     
     // Components of power series for solving, initially recorded 
     // at time of constraint building and used for metamer generation w.r.t. scene light transport
@@ -134,9 +141,11 @@ namespace met {
     // and then moddified by the user through constraint editing
     Colr colr;
 
+    // Surface data recorded through user interaction
+    SurfaceInfo surface = SurfaceInfo::invalid();
+
   public:
-    constexpr bool has_freedom() const { return true; }
-    bool has_mismatching() const { return !powers.empty() && !colr.isZero(); }
+    bool has_mismatching() const;
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };

@@ -86,34 +86,6 @@ namespace met {
     return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
   }
 
-  // Helper types for tuple_visit and variant_visit
-  // Src: https://stackoverflow.com/questions/57642102/how-to-iterate-over-the-types-of-stdvariant
-  template <std::size_t I> using index_t = std::integral_constant<std::size_t, I>;
-  template <std::size_t I> constexpr index_t<I> index{};
-  template <std::size_t...Is> 
-  constexpr std::tuple< index_t<Is>... > make_indexes(std::index_sequence<Is...>) { return std::make_tuple(index<Is>...); }
-  template<std::size_t N>
-  constexpr auto indexing_tuple = make_indexes(std::make_index_sequence<N>{ });
-
-  template <std::size_t...Is, class T, class F>
-  auto tuple_visit(std::index_sequence<Is...>, T&& tup, F&& f ) {
-    (f(std::get<Is>(std::forward<T>(tup))), ...);
-  }
-
-  template <class T, class F>
-  auto tuple_visit(T&& tup, F&& f) {
-    auto indexes = std::make_index_sequence<std::tuple_size_v<std::decay_t<T>>>{ };
-    return tuple_visit(indexes, std::forward<T>(tup), std::forward<F>(f));
-  }
-
-  template <class VTy, class F>
-  auto variant_visit(F&& f) {
-    auto indexes = indexing_tuple<std::variant_size_v<VTy>>;
-    return tuple_visit(indexes, [f](auto I) {
-      return f(std::variant_alternative_t<I, VTy>());
-    });
-  }
-
   // Debug namespace; mostly check_expr(...) from here on
   namespace debug {
     // Evaluate a boolean expression, throwing a detailed exception pointing

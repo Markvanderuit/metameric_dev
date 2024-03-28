@@ -128,12 +128,9 @@ namespace met {
       // forms the vertex' position in the uplifting tesselation
       std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
 
-    public: // underlying accessor if constraint satisifes is metamerism_constraint
+    public: // underlying accessors if constraint satisifes is metamerism_constraint/is_surface_constraint
       bool has_mismatching() const; // Does the underlying constraint allow for mismatching?
-      bool has_freedom() const;     // Can the underlying constraint be expanded?
-
-    public: // underlying accessor if constraint satisfies is_surface_constraint
-      bool has_surface() const; // Does the underlying constraint expose surface data?
+      bool has_surface()     const; // Does the underlying constraint expose surface data?
       const SurfaceInfo &surface() const;
             SurfaceInfo &surface();
 

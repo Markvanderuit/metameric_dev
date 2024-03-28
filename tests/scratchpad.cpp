@@ -12,40 +12,12 @@
 TEST_CASE("Matrix shenanigans") {
   using namespace met;
   
-  Uplifting::Vertex v;
-  v.constraint = DirectSurfaceConstraint { };
+  std::variant<Colr,  uint> diffuse;
 
-  v.constraint | visit {
-    [](auto &v) requires(is_surface_constraint<std::decay_t<decltype(v)>>) {
-    // [](is_surface_constraint auto &v) {
-      using Ty = std::decay_t<decltype(v)>;
-      fmt::print("Visited surface constraint for {}\n", typeid(Ty).name());
-    },
-    [](auto &v) {
-      using Ty = std::decay_t<decltype(v)>;
-      fmt::print("Visited remainder constraint for {}\n", typeid(Ty).name());
-    }
-  };
+  diffuse = Colr(0.5f);
 
-  std::visit(visit {
-    [](is_surface_constraint auto &v) {
-      using Ty = std::decay_t<decltype(v)>;
-      fmt::print("Visited surface constraint for {}\n", typeid(Ty).name());
-    },
-    [](auto &v) {
-      using Ty = std::decay_t<decltype(v)>;
-      fmt::print("Visited remainder constraint for {}\n", typeid(Ty).name());
-    }
-  }, v.constraint);
-  
-  v.constraint | visit {
-    [](is_surface_constraint auto &v) {
-      using Ty = std::decay_t<decltype(v)>;
-      fmt::print("Visited surface constraint for {}\n", typeid(Ty).name());
-    },
-    [](auto &v) {
-      using Ty = std::decay_t<decltype(v)>;
-      fmt::print("Visited remainder constraint for {}\n", typeid(Ty).name());
-    }
+  diffuse | visit {
+    [&](const uint &i) { fmt::print("Integer\n"); },
+    [](const Colr &c) { fmt::print("Color\n"); }
   };
 }

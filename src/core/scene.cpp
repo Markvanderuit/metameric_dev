@@ -82,12 +82,6 @@ namespace met {
     met_trace();
     js.at("name").get_to(vert.name);
     js.at("is_active").get_to(vert.is_active);
-
-   /*  auto i = js.at("index").get<size_t>();
-    variant_visit<Uplifting::Vertex::cnstr_type>([&](auto v) {
-      if (i == std::index)
-    }); */
-
     switch (js.at("index").get<size_t>()) {
       case 0: vert.constraint = js.at("variant").get<MeasurementConstraint>(); break;
       case 1: vert.constraint = js.at("variant").get<DirectColorConstraint>(); break;
@@ -714,11 +708,8 @@ namespace met {
 
     // Recover surface diffuse data based on underlying object material
     si.diffuse = object.diffuse | visit {
-      [&](const uint &i) {
-        const auto &txtr = resources.images[i].value();
-        return txtr.sample(si.tx, Image::ColorFormat::eLRGB).head<3>().eval();
-      },
-      [](const Colr &c) { return c; }
+      [&](uint i) -> Colr { return resources.images[i].value().sample(si.tx, Image::ColorFormat::eLRGB).head<3>(); },
+      [&](Colr c) -> Colr {  return c; }
     };
     
     return si;

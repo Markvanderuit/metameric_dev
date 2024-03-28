@@ -85,7 +85,7 @@ namespace met {
   constexpr decltype(auto) operator| (std::variant<Ts...> const& v, visit_types<F> const& f) {
     using VTy = std::variant<Ts...>;
     auto indexes = detail::indexing_tuple<std::variant_size_v<VTy>>;
-    return tuple_visit(indexes, [&v, f](auto I) {
+    return detail::tuple_visit(indexes, [&v, f](auto I) {
       using ATy = std::variant_alternative_t<I, VTy>;
       return f(ATy(), std::holds_alternative<ATy>(v));
     });
@@ -94,7 +94,7 @@ namespace met {
   constexpr decltype(auto) operator| (std::variant<Ts...> & v, visit_types<F> const& f) {
     using VTy = std::variant<Ts...>;
     auto indexes = detail::indexing_tuple<std::variant_size_v<VTy>>;
-    return tuple_visit(indexes, [&v, f](auto I) {
+    return detail::tuple_visit(indexes, [&v, f](auto I) {
       using ATy = std::variant_alternative_t<I, VTy>;
       return f(ATy(), std::holds_alternative<ATy>(v));
     });
