@@ -112,6 +112,6 @@ namespace met {
   }
   template <typename... Ts, typename F>
   constexpr void operator| (std::variant<Ts...> & v, visit_single<F> const& f) {
-    v | visit { f, [](const auto &) {} };
+    v | visit { f, [](auto &) {} };
   }
 } // namespace met

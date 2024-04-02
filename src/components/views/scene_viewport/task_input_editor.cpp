@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <bitset>
 #include <execution>
+#include <numeric>
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
@@ -108,9 +109,9 @@ namespace met {
                  | vws::transform([&](const auto &si) {                          // 4. generate uplifting tetrahedron from uplifting task
                    return e_uplf_task.query_tetrahedron(si.diffuse); })          
                  | vws::transform([&](const auto &tetr) {                        // 5. find index of vertex that is linked to our constraint
-                   auto it = rng::find(tetr.indices, cs.vertex_i);           //    and return together with tetrahedron
-                   uint i =  std::distance(tetr.indices.begin(), it);            
-                   return std::pair { tetr, i };  })
+                   auto it = rng::find(tetr.indices, cs.vertex_i);               //    and return together with tetrahedron
+                   uint i  = std::distance(tetr.indices.begin(), it);            
+                   return std::pair { tetr, i }; })
                  | vws::filter([&](const auto &pair) {                           // 6. drop tetrahedra that don't touch our selected constraint
                    return pair.second < 4; })                                    
                  | vws::transform([&](const auto &pair) {                        // 7. return compact representation; weight of r and summed remainder
@@ -131,10 +132,10 @@ namespace met {
         // We get the "fixed" part of the path's throughput, by stripping all reflectances of
         // the constrained vertices through division; on div-by-0, we set a component to 0
         eig::Array4f back = path.L;
-        rng::for_each(verts, [&](const auto &vt) {
-          auto rdiv = (r * vt.r_weight + vt.remainder).eval();
+        for (const auto &vt : verts) {
+          eig::Array4f rdiv = r * vt.r_weight + vt.remainder;
           back = (rdiv != 0.f).select(back / rdiv, 0.f);
-        });
+        }
         
         // We them iterate all permutations of the current constraint vertices
         // and collapse reflectances into this value
@@ -236,19 +237,15 @@ namespace met {
       const auto &uplifting = comp.value; 
       for (const auto &[j, vert] : enumerate_view(uplifting.verts)) {
         // Only constraints currently being edited are shown
-        auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
-        guard_continue(info.task(str).is_init());
+        /* auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
+        guard_continue(info.task(str).is_init()); */
         
-        // Only constraints marked as active are shown
-        guard_continue(vert.is_active);
-
-        // Only surface constraints are shown
-        guard_continue(std::holds_alternative<DirectSurfaceConstraint>(vert.constraint)
-                    || std::holds_alternative<IndirectSurfaceConstraint>(vert.constraint));
+        // Only active surface constraints are shown
+        guard_continue(vert.is_active || vert.has_surface());
 
         // Push back the nr. of underlying constraints hidden in this vertex' data
         uint n_constraints = vert.constraint | visit {
-         /*  [](const _IndirectSurfaceConstraint &cstr) {
+         /*  [](const auto &cstr) {
             return cstr.constraints.size();
           }, */ [](const auto &) { return 1; } };
         for (uint i = 0; i < n_constraints; ++i)
@@ -288,7 +285,7 @@ namespace met {
     if (cs_nearest.is_valid()) {
       const auto &e_vert = info.global("scene").getr<Scene>().uplifting_vertex(cs_nearest);
       ImGui::BeginTooltip();
-      ImGui::Text(e_vert.name.c_str()); // TODO update for _IndirectSurfaceConstraint
+      ImGui::Text(e_vert.name.c_str());
       ImGui::EndTooltip();
     }
 
@@ -303,13 +300,9 @@ namespace met {
       return;
     }
 
-    // Extract surface information from surface constraint
+    // Extract surface information from scurrent vertex
     const auto &e_vert = e_scene.uplifting_vertex(i_cs);
-    auto si = e_scene.uplifting_vertex(i_cs).constraint | visit {
-      /* [i_cs](const _IndirectSurfaceConstraint &cstr) { return cstr.constraints[i_cs.constraint_i].surface; }, */
-      [](const is_surface_constraint auto &cstr) { return cstr.surface; },
-      [](const auto &) { return SurfaceInfo::invalid(); }
-    };
+    auto si = e_vert.surface();
 
     // Register gizmo use start; cache current vertex position
     if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
@@ -318,16 +311,10 @@ namespace met {
       // Right at the start, we set the indirect constraint set into an invalid state
       // to prevent overhead from constraint generation
       auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
-      e_vert.constraint | visit { 
-        /* [&](_IndirectSurfaceConstraint &cstr) { 
-          cstr.constraints[i_cs.constraint_i].csys.powers.clear();
-          cstr.constraints[i_cs.constraint_i].colr = 0.f;
-        }, */
-        [&](IndirectSurfaceConstraint &cstr) { 
-          cstr.powers.clear();
-          cstr.colr = 0.f;
-        }, [](const auto &cstr) { } 
-      };
+      e_vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
+        cstr.powers.clear();
+        cstr.colr = 0.f;
+      });
     }
 
     // Register continuous gizmo use
@@ -357,17 +344,10 @@ namespace met {
       // as it secretly uses previous frame data to fill in some details, and is
       // way more costly per frame than I'd like to admit
       auto vert = e_vert; // copy of vertex
-      vert.constraint | visit { 
-        /* [&](_IndirectSurfaceConstraint &cstr) { 
-          cstr.constraints[i_cs.constraint_i].surface = si;
-          build_indirect_constraint(info, i_cs, cstr.constraints[i_cs.constraint_i]);
-        }, */
-        [&](IndirectSurfaceConstraint &cstr) { 
-            cstr.surface = si;
-            build_indirect_constraint(info, i_cs, cstr);
-        }, 
-        [](auto &cstr) { } 
-      };
+      vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
+          cstr.surface = si;
+          build_indirect_constraint(info, i_cs, cstr);
+      });
 
       // Save result
       info.global("scene").getw<Scene>().touch({

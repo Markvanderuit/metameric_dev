@@ -311,77 +311,55 @@ namespace met {
       const auto &e_cs      = info.parent()("selection").getr<ConstraintSelection>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
 
-      // Visit underlying constraints to allow guizmo editing
-      e_vert.constraint | visit {
-        [&](const is_colr_constraint auto &cstr) {
-          // Lambda to apply a specific vertex data to the color constraint
-          auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
-            vert.constraint | visit { [p](is_colr_constraint auto &cstr) { 
-              cstr.cstr_j[0].colr_j = p;
-            }, [](const auto &cstr) {}}; };
-
-          // Register gizmo start; cache current vertex position
-          if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.cstr_j[0].colr_j))))
-            m_gizmo_prev_p = cstr.cstr_j[0].colr_j;
-
-          // Register gizmo drag; apply world-space delta
-          if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-            auto &e_vert  = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
-            apply_colr(e_vert, delta * cstr.cstr_j[0].colr_j);
-          }
-
-          // Register gizmo end; apply vertex position to scene save state
-          if (m_gizmo.end_delta()) {
-            // Snap vertex position to inside convex hull, if necessary
-            const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-            auto cstr_colr = detail::find_closest_point_in_convex_hull(cstr.cstr_j[0].colr_j, e_chull);
-
-            // Handle save
-            info.global("scene").getw<Scene>().touch({
-              .name = "Move color constraint",
-              .redo = [p = cstr_colr,      e_cs, apply_colr](auto &scene) {
-                apply_colr(scene.uplifting_vertex(e_cs), p); },
-              .undo = [p = m_gizmo_prev_p, e_cs, apply_colr](auto &scene) {
-                apply_colr(scene.uplifting_vertex(e_cs), p); }
-            });
-          }
-        },
-        [&](const IndirectSurfaceConstraint &cstr) {
-          // Lambda to apply a specific vertex data to the indirect constraint
-          auto apply_colr = [](Uplifting::Vertex &vert, Colr p) {
-            vert.constraint | visit { [p](IndirectSurfaceConstraint &cstr) { 
-              cstr.colr = p;
-            }, [](const auto &cstr) {}}; };
-
-          // Register gizmo start; cache current vertex position
-          if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(cstr.colr))))
-            m_gizmo_prev_p = cstr.colr;
-
-          // Register gizmo drag; apply world-space delta
-          if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-            auto &e_scene = info.global("scene").getw<Scene>();
-            auto &e_vert  = e_scene.uplifting_vertex(e_cs);
-
-            // Apply world-space delta; store transformed position in surface constraint
-            apply_colr(e_vert, delta * cstr.colr);
-          }
-
-          // Register gizmo end; apply vertex position to scene save state
-          if (m_gizmo.end_delta()) {
-            // Snap vertex position to inside convex hull, if necessary
-            const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-            auto cstr_colr = detail::find_closest_point_in_convex_hull(cstr.colr, e_chull);
-
-            // Handle save
-            info.global("scene").getw<Scene>().touch({
-              .name = "Move color constraint",
-              .redo = [p = cstr_colr,      e_cs, apply_colr](auto &scene) { apply_colr(scene.uplifting_vertex(e_cs), p); },
-              .undo = [p = m_gizmo_prev_p, e_cs, apply_colr](auto &scene) { apply_colr(scene.uplifting_vertex(e_cs), p); }
-            });
-          }
-        },
-        [](const auto &) { /* ... */ }
+      // Visitor to access underlying color value
+      auto get_colr = [](const Uplifting::Vertex &vert) -> Colr {
+        return vert.constraint | visit {
+          [](const is_colr_constraint auto &cstr) { return cstr.cstr_j[0].colr_j; },
+          [](const IndirectSurfaceConstraint &cstr) { return cstr.colr; },
+          [](const auto &) { return Colr(0); }
+        };
       };
+
+      // Visitor to set underlying color value
+      auto set_colr = [](Uplifting::Vertex &vert, Colr p) {
+        vert.constraint | visit { 
+          [p](is_colr_constraint auto &cstr)   { cstr.cstr_j[0].colr_j = p; }, 
+          [p](IndirectSurfaceConstraint &cstr) { cstr.colr = p; },
+          [](const auto &cstr) {}}; 
+      };
+
+      // Visitor handles gizmo and modifies color position
+      e_vert.constraint | visit([&](const auto &cstr) {
+        // Only continue for supported types
+        using T = std::decay_t<decltype(cstr)>;
+        guard_constexpr((std::is_same_v<T, IndirectSurfaceConstraint> || is_colr_constraint<T>));
+        
+        // Register gizmo start; cache current vertex position
+        if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(get_colr(e_vert)))))
+          m_gizmo_prev_p = get_colr(e_vert);
+
+        // Register gizmo drag; apply world-space delta
+        if (auto [active, delta] = m_gizmo.eval_delta(); active) {
+          auto &e_vert  = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
+          set_colr(e_vert, delta * get_colr(e_vert));
+        }
+
+        // Register gizmo end; apply vertex position to scene save state
+        if (m_gizmo.end_delta()) {
+          // Snap vertex position to inside convex hull, if necessary
+          const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
+          auto cstr_colr = detail::find_closest_point_in_convex_hull(get_colr(e_vert), e_chull);
+
+          // Handle save
+          info.global("scene").getw<Scene>().touch({
+            .name = "Move color constraint",
+            .redo = [p = cstr_colr,      e_cs, set_colr](auto &scene) {
+              set_colr(scene.uplifting_vertex(e_cs), p); },
+            .undo = [p = m_gizmo_prev_p, e_cs, set_colr](auto &scene) {
+              set_colr(scene.uplifting_vertex(e_cs), p); }
+          });
+        }
+      });
     }
   };
 

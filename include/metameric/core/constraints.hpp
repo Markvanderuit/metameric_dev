@@ -4,6 +4,7 @@
 #include <metameric/core/json.hpp>
 #include <metameric/core/record.hpp>
 #include <metameric/core/spectrum.hpp>
+#include <metameric/core/detail/scene_fwd.hpp>
 
 namespace met {
   // Helper object for handling selection of a specific 
@@ -26,10 +27,16 @@ namespace met {
   // spectral uplifting pipeline. Constraints can exist on their own, or together
   // with other, secondary constraints.
   template <typename Ty>
-  concept is_metameric_constraint = requires(Ty t) {
+  concept is_metameric_constraint = requires(Ty t, Scene scene, Uplifting uplifting, uint csys_i, uint seed, uint samples) {
     // The constraint does or does not allow for configuration 
     // through metameric mismatch editing in its current state
     { t.has_mismatching() } -> std::same_as<bool>;
+
+    // The constraint allows for realizing a metamer (and attached color under uplifting's color system)
+    { t.realize(scene, uplifting) } -> std::same_as<std::pair<Colr, Spec>>;
+
+    // The constraint allows for realizing mismatch volume points, if has_mismatching() is true
+    { t.realize_mismatching(scene, uplifting, csys_i, seed, samples) } -> std::same_as<std::vector<Colr>>;
   };
 
   template <typename Ty>
@@ -54,8 +61,9 @@ namespace met {
     uint              cmfs_i = 0,   // Index of observer function
                       illm_i = 0;   // Index of illuminant function
     Colr              colr_i = 0.f; // Color under direct color system
+
     std::vector<Spec> pwrs_j = { }; // Interreflection data
-    Colr              colr_j = 0.0; // Color under intereflection data and observer function
+    Colr              colr_j = 0.0; // Color under intereflection and observer
 
     bool operator==(const IndirectConstraint &o) const;
   };
@@ -83,6 +91,15 @@ namespace met {
     { t.has_surface() } -> std::same_as<bool>;
   } && is_metameric_constraint<Ty>;
 
+  template <typename Ty>
+  concept is_multi_surface_constraint = requires (Ty t) {
+    // The constraint specifies surface data, sampled from the scene.
+    { t.surfaces } -> std::same_as<std::vector<SurfaceInfo> &>;
+
+    // The surface data can be evaluated for its validity.
+    { t.has_surface() } -> std::same_as<bool>;
+  } && is_metameric_constraint<Ty>;
+
   // Constraint imposing reproduction of a specific spectral reflectance.
   struct MeasurementConstraint {
     // Measured spectral data
@@ -91,6 +108,10 @@ namespace met {
   public:
     constexpr bool has_mismatching() const { return false; }
     bool operator==(const MeasurementConstraint &o) const;
+    
+  public:
+    std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
   };
   static_assert(is_metameric_constraint<MeasurementConstraint>);
 
@@ -104,6 +125,10 @@ namespace met {
   public:
     bool has_mismatching() const;
     bool operator==(const DirectColorConstraint &o) const;
+    
+  public:
+    std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
   };
   static_assert(is_colr_constraint<DirectColorConstraint>);
 
@@ -122,6 +147,10 @@ namespace met {
     bool has_mismatching() const;
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const DirectSurfaceConstraint &o) const;
+    
+  public:
+    std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
   };
   static_assert(is_surface_constraint<DirectSurfaceConstraint>);
   static_assert(is_colr_constraint<DirectSurfaceConstraint>);
@@ -131,7 +160,8 @@ namespace met {
   // measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
     // Constraint data with sensible defaults
-    std::vector<IndirectConstraint> cstr_j = { }; // Individual interreflection constraints
+    std::vector<IndirectConstraint> cstr_j   = { }; // Individual interreflection constraints
+    std::vector<SurfaceInfo>        surfaces = { }; // Attached surface data
     
     // Components of power series for solving, initially recorded 
     // at time of constraint building and used for metamer generation w.r.t. scene light transport
@@ -148,6 +178,10 @@ namespace met {
     bool has_mismatching() const;
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
     bool operator==(const IndirectSurfaceConstraint &o) const;
+
+  public:
+    std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
   };
   static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
 
@@ -156,6 +190,8 @@ namespace met {
   void to_json(json &js, const DirectColorConstraint &c);
   void from_json(const json &js, ColrConstraint &c);
   void to_json(json &js, const ColrConstraint &c);
+  void from_json(const json &js, IndirectConstraint &c);
+  void to_json(json &js, const IndirectConstraint &c);
   void from_json(const json &js, MeasurementConstraint &c);
   void to_json(json &js, const MeasurementConstraint &c);
   void from_json(const json &js, DirectSurfaceConstraint &c);

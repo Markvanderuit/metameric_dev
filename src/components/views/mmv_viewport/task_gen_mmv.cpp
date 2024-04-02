@@ -92,12 +92,7 @@ namespace met {
     }
 
     // Only continue for valid and mismatch-supporting constraints
-    if (e_vert.constraint | visit {
-      [](const DirectColorConstraint &cstr)     { return !cstr.has_mismatching(); },
-      [](const DirectSurfaceConstraint &cstr)   { return !cstr.has_surface() || !cstr.has_mismatching(); },
-      [](const IndirectSurfaceConstraint &cstr) { return !cstr.has_surface() || !cstr.has_mismatching(); },
-      [](const auto &) { return false; }
-    }) {
+    if (e_vert.constraint | visit([](const auto &cstr) { return !cstr.has_mismatching(); })) {
       info("converged").set(true);
       info("chull_array").getw<gl::Array>() = {};
       m_colr_set.clear();
@@ -112,80 +107,9 @@ namespace met {
     }
 
     // Visit underlying constraint types one by one
-    auto new_points = e_vert.constraint | visit {
-      [&](const DirectColorConstraint &cstr) {
-        // Prepare input color systems and corresponding signals
-        auto systems_i = { e_scene.csys(e_uplifting.csys_i).finalize() };
-        auto signals_i = { cstr.colr_i };
-        std::vector<CMFS> systems_j;
-        for (const auto &c : cstr.cstr_j)
-          systems_j.push_back(e_scene.csys(c.cmfs_j, c.illm_j).finalize());
-
-        // Prepare data for MMV point generation
-        GenerateMismatchingOCSInfo mmv_info = {
-          .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
-          .systems_i = systems_i,
-          .signals_i = signals_i,
-          .systems_j = systems_j,
-          .seed      = m_iter,
-          .n_samples = mmv_samples_per_iter
-        };
-
-        // Generate MMV spectra and append corresponding colors to current point set
-        auto csys = e_scene.csys(cstr.cstr_j[m_csys_j].cmfs_j, cstr.cstr_j[m_csys_j].illm_j);
-        return csys(generate_mismatching_ocs(mmv_info));
-      },
-      [&](const DirectSurfaceConstraint &cstr) {
-        // Prepare input color systems and corresponding signals;
-        // note, we keep search space in XYZ
-        auto csys_base_v = { e_scene.csys(e_uplifting.csys_i).finalize(false) };
-        auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
-        auto csys_refl_v = vws::transform(cstr.cstr_j, 
-                           [&](auto c) { return e_scene.csys(c.cmfs_j, c.illm_j).finalize(false); })
-                         | rng::to<std::vector>();
-        
-        // Assemble info object for generating MMV spectra
-        GenerateMismatchingOCSInfo mmv_info = {
-          .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
-          .systems_i = csys_base_v,
-          .signals_i = sign_base_v,
-          .systems_j = csys_refl_v,
-          .seed      = m_iter,
-          .n_samples = mmv_samples_per_iter
-        };
-
-        // Generate MMV spectra, convert to view color system, and append to current point set
-        auto csys_view = e_scene.csys(cstr.cstr_j[m_csys_j].cmfs_j, cstr.cstr_j[m_csys_j].illm_j);
-        return csys_view(generate_mismatching_ocs(mmv_info));
-      },
-      [&](const IndirectSurfaceConstraint &cstr) {
-        // Construct objective color system spectra from power series
-        IndirectColrSystem csys = {
-          .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-          .powers = cstr.powers
-        };
-
-        // Prepare input color systems and corresponding signals;
-        // note, we keep search space in XYZ
-        auto csys_base_v = { e_scene.csys(e_uplifting.csys_i).finalize(false) };
-        auto sign_base_v = { lrgb_to_xyz(cstr.surface.diffuse) };
-        auto csys_refl_v = csys.finalize(false);
-
-        // Assemble info object for generating MMV spectra
-        GenerateIndirectMismatchingOCSInfo mmv_info = {
-          .basis     = e_scene.resources.bases[e_uplifting.basis_i].value(),
-          .systems_i = csys_base_v,
-          .signals_i = sign_base_v,
-          .systems_j = csys_refl_v,
-          .seed      = m_iter,
-          .n_samples = mmv_samples_per_iter
-        };
-
-        // Generate MMV spectra, convert to view color system, and append to current point set
-        return csys(generate_mismatching_ocs(mmv_info));
-      },
-      [&](const auto &) { return std::vector<Colr>(); }
-    };
+    auto new_points = e_vert.constraint | visit([&](const auto &cstr) { 
+      return cstr.realize_mismatching(e_scene, e_uplifting, m_csys_j, m_iter, mmv_samples_per_iter); 
+    });
 
     // Insert newly gathered points, and roll them into end of deque while removing front
     m_colr_set.insert_range(std::vector(new_points));

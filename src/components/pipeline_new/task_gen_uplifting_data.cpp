@@ -263,21 +263,16 @@ namespace met {
       guard_break(result_err > 0.f);
     }
 
+    // Assign weights to return value
+    debug::check_expr(result_i < m_tesselation.elems.size());
     TetrahedronRecord tr = { .weights = result_bary };
 
-    // First, find element indices for this tetrahedron
-    debug::check_expr(result_i < m_tesselation.elems.size());
-    auto elems = m_tesselation.elems[result_i];
-    
-    // Next, and find matching vertex colors and associated spectra
-    // rng::copy(elems | index_into_view(m_tesselation_points), tr.verts.begin());
-    rng::copy(elems | index_into_view(m_tesselation_spectra), tr.spectra.begin());
-    
-    // Then, assign constraint indices, or -1 if a constraint is a boundary vertex
-    rng::copy(elems | vws::transform([&](uint i) {
-      int j = static_cast<int>(i) - static_cast<int>(m_csys_boundary_spectra.size());
-      return std::max<int>(j, -1);
-    }), tr.indices.begin());
+    // Find element indices for this tetrahedron, and then fill per-vertex data
+    for (auto [i, elem_i] : enumerate_view(m_tesselation.elems[result_i])) {
+      int j = static_cast<int>(elem_i) - static_cast<int>(m_csys_boundary_spectra.size());
+      tr.indices[i] = std::max<int>(j, -1);          // Assign constraint index, or -1 if a constraint is a boundary vertex
+      tr.spectra[i] = m_tesselation_spectra[elem_i]; // Assign corresponding spectrum
+    }
 
     return tr;
   }

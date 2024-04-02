@@ -57,7 +57,31 @@ namespace met {
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
+      // Get modified vertex
       auto &vert = uplf.value.verts[e_cs.vertex_i];
+      
+      // Plotter for the current constraint's resulting spectrum
+      ImGui::SeparatorText("Reflectance spectrum");
+      {
+        const auto &e_sd = e_spectra[e_cs.vertex_i];
+        ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
+      }
+
+      // Plotter for the current constraint's resulting radiance
+      // (only for IndirectSurfaceConstraint, really)
+      vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) {
+        guard(!cstr.powers.empty());
+
+        // Reconstruct radiance from truncated power series
+        Spec r = e_spectra[e_cs.vertex_i];
+        Spec s = cstr.powers[0];
+        for (uint i = 1; i < cstr.powers.size(); ++i)
+          s += r.pow(static_cast<float>(i)) * cstr.powers[i];
+
+        // Plot estimated radiance
+        ImGui::SeparatorText("Radiance spectrum");
+        ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 96.f * e_window.content_scale() });
+      });
 
       // Color patch picker
       if (!e_patches.empty()) {
@@ -158,48 +182,36 @@ namespace met {
           }
         },
         [&](IndirectSurfaceConstraint &cstr) {
-          // Color baseline value extracted from surface
-          {
-            ImGui::ColorEdit3("Surface color (lrgb)", cstr.surface.diffuse.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
-            auto srgb = lrgb_to_srgb(cstr.surface.diffuse);
-            ImGui::ColorEdit3("Surface color (srgb)", srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+          if (!cstr.has_surface() || cstr.powers.empty()) {
+            ImGui::Text("Invalid constraint");
+            return;
           }
-
-          // Visual separator into constraint list
-          ImGui::Separator();
-
-          auto cstr_srgb = lrgb_to_srgb(cstr.colr);
-          ImGui::ColorEdit3("Constraint radiance (lrgb)", cstr.colr.data(), ImGuiColorEditFlags_Float);
-          ImGui::ColorEdit3("Constraint radiance (srgb)", cstr_srgb.data(), ImGuiColorEditFlags_Float);
-
-          if (!cstr.powers.empty()) {
-            ImGui::SeparatorText("Estimated output");
-
-            // Reconstruct radiance from truncated power series
-            Spec r = e_spectra[e_cs.vertex_i];
-            Spec s = cstr.powers[0];
-            for (uint i = 1; i < cstr.powers.size(); ++i)
-              s += r.pow(static_cast<float>(i)) * cstr.powers[i];
-
-            // Recover output color
+          
+          auto baseline_spr_name = std::format("Base constraint ({})", e_scene.resources.observers[e_scene.components.observer_i.value].name);
+          ImGui::SeparatorText(baseline_spr_name.c_str());
+          {
             IndirectColrSystem csys = {
               .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
               .powers = cstr.powers
             };
-            Colr colr_lrgb = csys(r);
-            Colr colr_srgb = lrgb_to_srgb(colr_lrgb);
 
-            // Plot color
-            ImGui::ColorEdit3("Roundtrip radiance (lrgb)", colr_lrgb.data(), ImGuiColorEditFlags_Float);
-            ImGui::ColorEdit3("Roundtrip radiance (srgb)", colr_srgb.data(), ImGuiColorEditFlags_Float);
+            // lRGB color picker
+            Colr &lrgb = cstr.colr;
+            ImGui::ColorEdit3("Constraint (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
 
-            Colr err = colr_lrgb - cstr.colr;
-            ImGui::ColorEdit3("Roundtrip error (lrgb)", err.data(), ImGuiColorEditFlags_Float);
+            // sRGB color picker
+            Colr srgb = lrgb_to_srgb(lrgb);
+            if (ImGui::ColorEdit3("Constraint (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
+              lrgb = srgb_to_lrgb(srgb);
+              
+            // Roundtrip error
+            Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
+            ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+          }
 
-            ImGui::SeparatorText("Radiance spectrum");
-
-            // Plot estimated radiance
-            ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 96.f * e_window.content_scale() });
+          ImGui::SeparatorText("Secondary constraints");
+          {
+            ImGui::Text("TODO"); // TODO
           }
         },
         [&](MeasurementConstraint &cstr) {
@@ -207,12 +219,5 @@ namespace met {
         }
       };
     });
-
-    // Plotter for the current constraint's resulting spectrum
-    ImGui::SeparatorText("Reflectance spectrum");
-    {
-      const auto &e_sd = e_spectra[e_cs.vertex_i];
-      ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
-    }
   }
 } // namespace met

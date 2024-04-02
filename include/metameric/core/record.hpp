@@ -130,7 +130,6 @@ namespace met {
     std::array<Spec, 4> spectra; // Associated spectra at the vertices
     std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated 
                                  // from a constraint; -1 otherwise
-    // std::array<Colr, 4> verts;   // Vertex positions forming the tetrahedron
   };
   
   // JSON (de)serialization of surface info
