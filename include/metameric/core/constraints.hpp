@@ -13,9 +13,8 @@ namespace met {
     constexpr static uint invalid_data = 0xFFFFFFFF;
 
   public:
-    uint uplifting_i  = invalid_data; // ID of uplifting component
-    uint vertex_i     = 0;            // ID of vertex in specific uplifting
-    uint constraint_i = 0;            // ID of constraint on constraint vertex; always 0 (except for the indirect surface constraint)
+    uint uplifting_i = invalid_data; // ID of uplifting component
+    uint vertex_i    = 0;            // ID of vertex in specific uplifting
   
   public:
     bool is_valid() const { return uplifting_i != invalid_data; }
@@ -35,14 +34,8 @@ namespace met {
     // The constraint allows for realizing a metamer (and attached color under uplifting's color system)
     { t.realize(scene, uplifting) } -> std::same_as<std::pair<Colr, Spec>>;
 
-    // The constraint allows for realizing mismatch volume points, if has_mismatching() is true
+    // The constraint allows for realizing mismatch volume sample points, if has_mismatching() is true
     { t.realize_mismatching(scene, uplifting, csys_i, seed, samples) } -> std::same_as<std::vector<Colr>>;
-  };
-
-  template <typename Ty>
-  concept is_vector_constraint = requires(Ty t) {
-    { t.size()  } -> std::same_as<size_t>;
-    { t.empty() } -> std::same_as<bool>;
   };
 
   // Small helper struct for constraints under direct color illumination;
@@ -53,20 +46,6 @@ namespace met {
     Colr colr_j = 0.f; // Color under direct color system
 
     bool operator==(const ColrConstraint &o) const;
-  };
-  
-  // Small helper struct for constraints under a system of light transport;
-  // used by IndirectSurfaceConstraint in particular
-  struct IndirectConstraint {
-    uint              cmfs_i = 0,   // Index of (direct) observer
-                      illm_i = 0;   // Index of (direct) illuminant
-    Colr              colr_i = 0.f; // Color under direct color system
-
-    uint              cmfs_j = 0;   // Index of (scene) observer
-    std::vector<Spec> pwrs_j = { }; // Scene interreflection data
-    Colr              colr_j = 0.0; // Color under indirect color system
-
-    bool operator==(const IndirectConstraint &o) const;
   };
 
   // Concept defining the expected components of color-system constraints
@@ -160,10 +139,6 @@ namespace met {
   // accounting for interreflections. The interreflection system is based on
   // measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
-    // Constraint data with sensible defaults
-    std::vector<IndirectConstraint> cstr_j   = { }; // Individual interreflection constraints
-    std::vector<SurfaceInfo>        surfaces = { }; // Attached surface data
-    
     // Components of power series for solving, initially recorded 
     // at time of constraint building and used for metamer generation w.r.t. scene light transport
     std::vector<Spec> powers = { };
@@ -191,8 +166,6 @@ namespace met {
   void to_json(json &js, const DirectColorConstraint &c);
   void from_json(const json &js, ColrConstraint &c);
   void to_json(json &js, const ColrConstraint &c);
-  void from_json(const json &js, IndirectConstraint &c);
-  void to_json(json &js, const IndirectConstraint &c);
   void from_json(const json &js, MeasurementConstraint &c);
   void to_json(json &js, const MeasurementConstraint &c);
   void from_json(const json &js, DirectSurfaceConstraint &c);

@@ -30,7 +30,7 @@ namespace met {
     auto &i_patches        = info("patches").getw<std::vector<Colr>>();    guard(!e_chull.empty());
     
     // Do not output any patches until the convex hull is in a converged state;
-    if (!e_converged) {
+    if (!e_converged || e_chull.verts.size() < 6) {
       i_patches.clear();
       return;
     }

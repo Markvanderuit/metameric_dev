@@ -80,19 +80,20 @@ namespace met {
     bool tssl_stale = is_first_eval();
 
     // Color system spectra within which the 'uplifted' texture is defined
-    auto csys = e_scene.csys(e_csys).finalize();
+    auto csys = e_scene.csys(e_csys);
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
-      m_csys_boundary_spectra = generate_color_system_ocs({ .basis      = e_basis.value(),
-                                                             .system    = csys,
-                                                             .n_samples = n_system_boundary_samples });
+      m_csys_boundary_spectra = generate_color_system_ocs({ .direct_objective = csys,
+                                                            .basis            = e_basis.value(),
+                                                            .seed             = 4,
+                                                            .n_samples        = n_system_boundary_samples });
 
       // For each spectrum, add a point to the set of tesselation points for later
       m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
       std::transform(std::execution::par_unseq, 
         range_iter(m_csys_boundary_spectra), m_tesselation_points.begin(),
-        [&](const Spec &s) { return (csys.transpose() * s.matrix()).eval(); });
+        [&](const Spec &s) { return (csys(s)).eval(); });
 
       fmt::print("Uplifting color system boundary, {} points\n", m_csys_boundary_spectra.size());
     }

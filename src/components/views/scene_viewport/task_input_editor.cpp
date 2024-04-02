@@ -249,7 +249,7 @@ namespace met {
             return cstr.constraints.size();
           }, */ [](const auto &) { return 1; } };
         for (uint i = 0; i < n_constraints; ++i)
-          i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j, .constraint_i = i });
+          i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j });
       } // for (j, vert)
     } // for (i, comp)
 

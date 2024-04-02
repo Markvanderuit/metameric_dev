@@ -55,14 +55,13 @@ namespace met {
     }
   } // namespace detail
 
-  Spec generate_spectrum(GenerateSpectrumInfo info) {
+  Spec generate_spectrum(DirectSpectrumInfo info) {
     met_trace();
-    debug::check_expr(info.systems.size() == info.signals.size(),
-      "Color system size not equal to color signal size");
 
     // Take a grayscale spectrum as mean to build around
-    Spec mean = Spec(luminance(xyz_to_lrgb(info.signals[0]))).cwiseMin(1.f);
+    Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
+#ifdef met_solve_using_bases
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
       .algo         = NLOptAlgo::LD_SLSQP,
@@ -77,13 +76,13 @@ namespace met {
     solver.objective = detail::func_norm<wavelength_bases>(info.basis.func, Spec::Zero());
 
     // Add color system equality constraints, upholding spectral metamerism
-    for (uint i = 0; i < info.systems.size(); ++i) {
-      auto A = (info.systems[i].transpose() * info.basis.func).eval();
-      auto o = (info.systems[i].transpose() * mean.matrix()).eval();
-      auto b = (info.signals[i] - o.array()).eval();
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
+      auto o = csys(mean, false);
+      auto b = (lrgb_to_xyz(colr) - o).eval();
       solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
                                         .tol = 1e-4 });
-    } // for (uint i)
+    }
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
     {
@@ -99,10 +98,38 @@ namespace met {
     // Run solver and return recovered spectral distribution
     auto r = solve(solver);
     return (mean + (info.basis.func * r.x.cast<float>()).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
+#else // met_solve_using_bases
+    // Solver settings
+    NLOptInfoT<wavelength_samples> solver = {
+      .algo         = NLOptAlgo::LD_SLSQP,
+      .form         = NLOptForm::eMinimize,
+      .x_init       = mean.cast<double>(),
+      .upper        = 1.0,
+      .lower        = 0.0,
+      .max_iters    = 256,
+      .rel_xpar_tol = 1e-2
+    };
+
+    // Objective function minimizes l2 norm over spectral distribution
+    auto obj = eig::Matrix<float, wavelength_samples, wavelength_samples>::Identity();
+    solver.objective = detail::func_norm<wavelength_samples>(obj, Spec::Zero());
+
+    // Add color system equality constraints, upholding spectral metamerism
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = csys.finalize(false).transpose().eval();
+      auto o = csys(mean, false);
+      auto b = (lrgb_to_xyz(colr) - o).eval();
+      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_samples>(A, b), 
+                                        .tol = 1e-4 });
+    }
+    
+    // Run solver and return recovered spectral distribution
+    auto r = solve(solver);
+    return (mean + r.x.cast<float>().array()).cwiseMax(0.f).cwiseMin(1.f).eval();
+#endif // met_solve_using_bases
   }
 
-#ifdef met_solve_using_bases
-  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+  Spec generate_spectrum(IndrctSpectrumInfo info) {
     met_trace();
 
     // Solver settings
@@ -128,169 +155,90 @@ namespace met {
                                           .tol = 1e-2 });
     }
 
-    // Add color system equality constraints, upholding spectral surface metamerism
-    {
-      auto A = (info.base_system.transpose() * info.basis.func.matrix()).eval();
-      auto b = info.base_signal;
+    // Add color system equality constraints, upholding spectral metamerism
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
+      auto b = lrgb_to_xyz(colr);
       solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
-                                        .tol = 1e-3 });
-    } // for (uint i)
-    
+                                        .tol = 1e-4 });
+    }
+
     // Add interreflection equality constraint, upholding requested output color;
     // specify three equalities for three partial derivatives
-    for (uint j = 0; j < 3; ++j) {
+    for (const auto [csys, colr] : info.indirect_constraints) {
       using vec = NLOptInfoT<wavelength_bases>::vec;
-      auto A = info.refl_systems
-             | vws::transform([j](const CMFS &cmfs) { 
-                return cmfs.col(j).transpose().cast<double>().eval(); })
-             | rng::to<std::vector>();
-      
-      solver.eq_constraints.push_back({
-        .f = [A = A, 
-              B = info.basis.func.matrix().cast<double>().eval(), 
-              b = static_cast<double>(info.refl_signal[j])]
-        (eig::Map<const vec> x, eig::Map<vec> g) {
-          // Recover spectral distribution
-          auto r = (B * x).eval();
-          
-          // f(x) = ||Ax - b||
-          // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
-          double diff = A[0].sum();
-          for (uint i = 1; i < A.size(); ++i) {
-            double p = static_cast<double>(i);
-            auto rp  = r.array().pow(p).matrix().eval();
-            diff += A[i] * rp;
-          }
-          diff -= b;
+      auto A_ = csys.finalize(false);
+      auto b_ = lrgb_to_xyz(colr);
 
-          double norm = diff; // hoboy
-          
-          // g(x) = ||Ax - b||
-          // -> (B^T*A_1*(Bx)^0 + B^T*2*A_2*(Bx) + B^T*3*a_3*(Bx)^2 + ...)
-          vec grad = 0.0;
-          for (uint i = 1; i < A.size(); ++i) {
-            double p = static_cast<double>(i);
-            auto rp  = r.array().pow(p - 1.0).matrix().eval();
-            grad += p
-                  * B.transpose()
-                  * A[i].transpose().cwiseProduct(rp);
-          }
+      for (uint j = 0; j < 3; ++j) {
+        auto A = A_
+              | vws::transform([j](const CMFS &cmfs) { 
+                  return cmfs.col(j).transpose().cast<double>().eval(); })
+              | rng::to<std::vector>();
+        solver.eq_constraints.push_back({
+          .f = [A = A, 
+                B = info.basis.func.matrix().cast<double>().eval(), 
+                b = b_[j]]
+          (eig::Map<const vec> x, eig::Map<vec> g) {
+            // Recover spectral distribution
+            auto r = (B * x).eval();
+            
+            // f(x) = ||Ax - b||
+            // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
+            double diff = A[0].sum();
+            for (uint i = 1; i < A.size(); ++i) {
+              double p = static_cast<double>(i);
+              auto rp  = r.array().pow(p).matrix().eval();
+              diff += A[i] * rp;
+            }
+            diff -= b;
 
-          if (g.data())
-            g = grad;
+            double norm = diff; // hoboy
+            
+            // g(x) = ||Ax - b||
+            // -> (B^T*A_1*(Bx)^0 + B^T*2*A_2*(Bx) + B^T*3*a_3*(Bx)^2 + ...)
+            vec grad = 0.0;
+            for (uint i = 1; i < A.size(); ++i) {
+              double p = static_cast<double>(i);
+              auto rp  = r.array().pow(p - 1.0).matrix().eval();
+              grad += p
+                    * B.transpose()
+                    * A[i].transpose().cwiseProduct(rp);
+            }
 
-          return norm;
-      }, .tol = 1e-3 });
-    } // for (uint j)
+            if (g.data())
+              g = grad;
+
+            return norm;
+        }, .tol = 1e-3 });
+      } // for (uint j)
+    }
 
     // Run solver and return recovered spectral distribution
     auto r = solve(solver);
     return (info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval();
   }
-#else // met_solve_using_bases
-  Spec generate_spectrum(GenerateIndirectSpectrumInfo info) {
+
+  std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info) {
     met_trace();
-
-    // Solver settings
-    NLOptInfoT<wavelength_samples> solver = {
-      .algo      = NLOptAlgo::LD_SLSQP,
-      .form      = NLOptForm::eMinimize,
-      .x_init    = 0.5,
-      .upper     = 1.0,
-      .lower     = 0.0,
-      .max_iters = 48
-    };
-
-    // Objective function minimizes l2 norm over spectral distribution
-    auto obj = eig::Matrix<float, wavelength_samples, wavelength_samples>::Identity();
-    solver.objective = detail::func_norm<wavelength_samples>(obj, Spec::Zero());
-
-    // Add color system equality constraints, upholding spectral surface metamerism
-    {
-      auto A = info.base_system.transpose().eval();
-      auto b = info.base_signal;
-      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_samples>(A, b), 
-                                        .tol = 1e-3 });
-    } // for (uint i)
     
-    // Add interreflection equality constraint, upholding requested output color;
-    // specify three equalities for three partial derivatives
-    for (uint j = 0; j < 3; ++j) {
-      using vec = NLOptInfoT<wavelength_samples>::vec;
-      auto A = info.refl_systems
-             | vws::transform([j](const CMFS &cmfs) { 
-                return cmfs.col(j).transpose().cast<double>().eval(); })
-             | rng::to<std::vector>();
-      
-      solver.eq_constraints.push_back({
-        .f = [A = A, 
-              b = static_cast<double>(info.refl_signal[j])]
-        (eig::Map<const vec> x, eig::Map<vec> g) {
-          // f(x) = ||Ax - b||
-          // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
-          double diff = A[0].sum();
-          for (uint i = 1; i < A.size(); ++i) {
-            double p = static_cast<double>(i);
-            auto xp  = x.array().pow(p).matrix().eval();
-            diff += A[i] * xp;
-          }
-          diff -= b;
-
-          double norm = diff; // hoboy
-          
-          // g(x) = ||Ax - b||
-          // -> (B^T*A_1*(Bx)^0 + B^T*2*A_2*(Bx) + B^T*3*a_3*(Bx)^2 + ...)
-          vec grad = 0.0;
-          for (uint i = 1; i < A.size(); ++i) {
-            double p = static_cast<double>(i);
-            auto xp  = x.array().pow(p - 1.0).matrix().eval();
-            grad += p
-                  * A[i].transpose().cwiseProduct(xp);
-          }
-
-          if (g.data())
-            g = grad;
-
-          return norm;
-      }, .tol = 1e-3 });
-    } // for (uint j)
-
-    // Run solver and return recovered spectral distribution
-    auto r = solve(solver);
-    return r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval();
-  }
-#endif // met_solve_using_bases
-
-  std::vector<Spec> generate_mismatching_ocs(const GenerateMismatchingOCSInfo &info) {
-    met_trace();
-
-    // Sample unit vectors in 3d
+    // Sample unit vectors in 6d
     auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
 
+    // Output data structure 
+    tbb::concurrent_vector<Spec> tbb_output;
+    tbb_output.reserve(samples.size());
+
+#ifdef met_solve_using_bases
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
       .algo      = NLOptAlgo::LD_SLSQP,
-      .form      = NLOptForm::eMaximize,
+      .form      = NLOptForm::eMinimize,
       .x_init    = 0.5,
       .max_iters = 32
     };
 
-    // This only works for the current configuration
-    auto S = (eig::Matrix<float, wavelength_samples, 6>()
-      << info.systems_i[0], info.systems_j[0]).finished();
-    eig::JacobiSVD<decltype(S)> svd;
-    svd.compute(S, eig::ComputeFullV);
-    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
-
-    // Add color system equality constraints, upholding spectral metamerism
-    for (uint i = 0; i < info.systems_i.size(); ++i) {
-      auto A = (info.systems_i[i].transpose() * info.basis.func).eval();
-      auto b = info.signals_i[i];
-      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
-                                        .tol = 1e-4 });
-    } // for (uint i)
-
-    // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
+    // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
     {
       auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
         << info.basis.func, -info.basis.func).finished();
@@ -301,9 +249,23 @@ namespace met {
                                           .tol = 1e-2 });
     }
 
+    // Add direct color system equality constraints, upholding uplifting roundtrip
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
+      auto b = lrgb_to_xyz(colr);
+      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
+                                        .tol = 1e-4 });
+    }
+
+    // This only works for the current configuration
+    auto S = (eig::Matrix<float, wavelength_samples, 6>()
+      << info.direct_objectives[0].finalize(false), 
+         info.direct_objectives[1].finalize(false)).finished();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
     // Parallel solve for boundary spectra
-    tbb::concurrent_vector<Spec> tbb_output;
-    tbb_output.reserve(samples.size());
     #pragma omp parallel
     {
       // Per thread copy of current solver parameter set
@@ -321,17 +283,67 @@ namespace met {
         tbb_output.push_back((info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval());
       } // for (int i)
     }
+#else  // met_solve_using_bases
+    // Solver settings
+    NLOptInfoT<wavelength_samples> solver = {
+      .algo      = NLOptAlgo::LD_SLSQP,
+      .form      = NLOptForm::eMinimize,
+      .x_init    = 0.5,
+      .upper     = 1.0,
+      .lower     = 0.0,
+      .max_iters = 32
+    };
+
+    // Add direct color system equality constraints, upholding uplifting roundtrip
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = csys.finalize(false).transpose().eval();
+      auto b = lrgb_to_xyz(colr);
+      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_samples>(A, b), 
+                                        .tol = 1e-4 });
+    }
+
+    // This only works for the current configuration
+    auto S = (eig::Matrix<float, wavelength_samples, 6>()
+      << info.direct_objectives[0].finalize(false), 
+         info.direct_objectives[1].finalize(false)).finished();
+    eig::JacobiSVD<decltype(S)> svd;
+    svd.compute(S, eig::ComputeFullV);
+    auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+    // Parallel solve for boundary spectra
+    #pragma omp parallel
+    {
+      // Per thread copy of current solver parameter set
+      auto local_solver = solver;
+
+      #pragma omp for
+      for (int i = 0; i < samples.size(); ++i) {
+        // Define objective function: max (Uk)^T (Bx) -> max C^T Bx -> max ax
+        auto a = (U * samples[i].matrix()).eval();
+        local_solver.objective = detail::func_dot<wavelength_samples>(a, 0.f);
+          
+        // Run solver and store recovered spectral distribution if it is legit
+        auto r = solve(local_solver);
+        guard_continue(!r.x.array().isNaN().any());
+        tbb_output.push_back(r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval());
+      } // for (int i)
+    }
+#endif // met_solve_using_bases
 
     return std::vector<Spec>(range_iter(tbb_output));
   }
 
-#ifdef met_solve_using_bases
-  std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
+  std::vector<Spec> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info) {
     met_trace();
 
     // Sample unit vectors in 6d
     auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
 
+    // Output data structure 
+    tbb::concurrent_vector<Spec> tbb_output;
+    tbb_output.reserve(samples.size());
+    
+#ifdef met_solve_using_bases
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
       .algo      = NLOptAlgo::LD_SLSQP,
@@ -340,15 +352,7 @@ namespace met {
       .max_iters = 64
     };
 
-    // Add color system equality constraints, upholding spectral metamerism
-    for (uint i = 0; i < info.systems_i.size(); ++i) {
-      auto A = (info.systems_i[i].transpose() * info.basis.func.matrix()).eval();
-      auto b = info.signals_i[i];
-      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
-                                        .tol = 1e-4 });
-    } // for (uint i)
-
-    // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
+    // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
     {
       auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
         << info.basis.func, -info.basis.func).finished();
@@ -359,10 +363,16 @@ namespace met {
                                           .tol = 1e-2 });
     }
 
+    // Add direct color system equality constraints, upholding uplifting roundtrip
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
+      auto b = lrgb_to_xyz(colr);
+      solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
+                                        .tol = 1e-4 });
+    }
+    
     // Parallel solve for boundary spectra
-    tbb::concurrent_vector<Spec> tbb_output;
-    tbb_output.reserve(samples.size());
-    #pragma omp parallel
+    #pragma omp parallel 
     {
       // Per thread copy of current solver parameter set
       auto local_solver = solver;
@@ -371,39 +381,37 @@ namespace met {
       for (int i = 0; i < samples.size(); ++i) {
         using namespace std::placeholders; // import _1, _2, _3
         using vec = NLOptInfoT<wavelength_bases>::vec;
-        
+
+        // Helper lambda to map along unit vector
         constexpr auto trf_by_sample = [](const CMFS &cmfs, const eig::Vector3f &sample) {
           return (cmfs * sample).cast<double>().eval();  };
 
-        // Indirect color system powers, mapped along unit vector
-        auto A = info.systems_j
-               | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval()))              
-               | rng::to<std::vector>();
+        // Map color systems along unit vector
+        auto A_direct = trf_by_sample(info.direct_objective.finalize(false), samples[i].head<3>());
+        auto A_indrct = info.indirect_objective.finalize(false)
+                      | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval()))              
+                      | rng::to<std::vector>();
 
-        // Direct color system, mapped along unit vector
-        auto A_ = trf_by_sample(info.systems_i[0], samples[i].tail<3>());
+        local_solver.objective =
+        [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
+        (eig::Map<const vec> x, eig::Map<vec> g) -> double {
+          auto r = (B * x).eval();
 
-        local_solver.objective = 
-          [A, A_, B = info.basis.func.cast<double>().eval()]
-          (eig::Map<const vec> x, eig::Map<vec> g) -> double {
-            // Recover spectral distribution
-            auto r = (B * x).eval();
+          double diff = A_indrct[0].sum() + A_direct.dot(r);
+          vec grad = B.transpose() * A_direct;
+          for (uint i = 1; i < A_indrct.size(); ++i) {
+            double p = static_cast<double>(i);
 
-            double diff = A[0].sum() + A_.dot(r);
-            vec grad = B.transpose() * A_;
-            for (uint i = 1; i < A.size(); ++i) {
-              double p = static_cast<double>(i);
+            auto fr = r.array().pow(p).matrix().eval();
+            auto dr = r.array().pow(p - 1.0).matrix().eval();
+            
+            diff += A_indrct[i].dot(fr);
+            grad += p * B.transpose() * A_indrct[i].cwiseProduct(dr).eval();
+          }
 
-              auto fr = r.array().pow(p).matrix().eval();
-              auto dr = r.array().pow(p - 1.0).matrix().eval();
-              
-              diff += A[i].dot(fr);
-              grad += p * B.transpose() * A[i].cwiseProduct(dr).eval();
-            }
-
-            if (g.data())
-              g = grad;
-            return diff;
+          if (g.data())
+            g = grad;
+          return diff;
         };
 
         // Run solver and store recovered spectral distribution if it is safe
@@ -412,16 +420,7 @@ namespace met {
         tbb_output.push_back((info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval());
       } // for (int i)
     }
-
-    return std::vector<Spec>(range_iter(tbb_output));
-  }
-#else // met_solve_using_bases
-  std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info) {
-    met_trace();
-
-    // Sample unit vectors in 6d
-    auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
-
+#else  // met_solve_using_bases
     // Solver settings
     NLOptInfoT<wavelength_samples> solver = {
       .algo         = NLOptAlgo::LD_SLSQP,
@@ -432,18 +431,17 @@ namespace met {
       .max_iters    = 48
     };
 
-    // Add color system equality constraints, upholding spectral metamerism
-    for (uint i = 0; i < info.systems_i.size(); ++i) {
-      auto A = info.systems_i[i].transpose().eval();
-      auto b = info.signals_i[i];
+
+    // Add direct color system equality constraints, upholding uplifting roundtrip
+    for (const auto [csys, colr] : info.direct_constraints) {
+      auto A = csys.finalize(false).transpose().eval();
+      auto b = lrgb_to_xyz(colr);
       solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_samples>(A, b), 
                                         .tol = 1e-4 });
-    } // for (uint i)
-
+    }
+    
     // Parallel solve for boundary spectra
-    tbb::concurrent_vector<Spec> tbb_output;
-    tbb_output.reserve(samples.size());
-    #pragma omp parallel
+    #pragma omp parallel 
     {
       // Per thread copy of current solver parameter set
       auto local_solver = solver;
@@ -452,37 +450,35 @@ namespace met {
       for (int i = 0; i < samples.size(); ++i) {
         using namespace std::placeholders; // import _1, _2, _3
         using vec = NLOptInfoT<wavelength_samples>::vec;
-        
+
+        // Helper lambda to map along unit vector
         constexpr auto trf_by_sample = [](const CMFS &cmfs, const eig::Vector3f &sample) {
           return (cmfs * sample).cast<double>().eval();  };
 
-        // Indirect color system powers, mapped along unit vector
-        auto A = info.systems_j
-               | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval())) 
-               | rng::to<std::vector>();
+        // Map color systems along unit vector
+        auto A_direct = trf_by_sample(info.direct_objective.finalize(false), samples[i].head<3>());
+        auto A_indrct = info.indirect_objective.finalize(false)
+                      | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval()))              
+                      | rng::to<std::vector>();
 
-        // Direct color system, mapped along unit vector
-        auto A_ = trf_by_sample(info.systems_i[0], samples[i].tail<3>());
+        local_solver.objective =
+        [A_direct, A_indrct]
+        (eig::Map<const vec> r, eig::Map<vec> g) -> double {
+          double diff = A_indrct[0].sum() + A_direct.dot(r);
+          vec grad = A_direct;
+          for (uint i = 1; i < A_indrct.size(); ++i) {
+            double p = static_cast<double>(i);
 
-        local_solver.objective = 
-          [A, A_]
-          (eig::Map<const vec> x, eig::Map<vec> g) -> double {
-            double diff = A[0].sum() + A_.dot(x);
+            auto fr = r.array().pow(p).matrix().eval();
+            auto dr = r.array().pow(p - 1.0).matrix().eval();
+            
+            diff += A_indrct[i].dot(fr);
+            grad += p * A_indrct[i].cwiseProduct(dr).eval();
+          }
 
-            vec grad = A_;
-            for (uint i = 1; i < A.size(); ++i) {
-              double p = static_cast<double>(i);
-
-              auto fx = x.array().pow(p).matrix().eval();
-              auto dx = x.array().pow(p - 1.0).matrix().eval();
-              
-              diff += A[i].dot(fx);
-              grad += p * A[i].cwiseProduct(dx).eval();
-            }
-
-            if (g.data())
-              g = grad;
-            return diff;
+          if (g.data())
+            g = grad;
+          return diff;
         };
 
         // Run solver and store recovered spectral distribution if it is safe
@@ -491,12 +487,12 @@ namespace met {
         tbb_output.push_back(r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval());
       } // for (int i)
     }
-
+#endif // met_solve_using_bases
+    
     return std::vector<Spec>(range_iter(tbb_output));
   }
-#endif // met_solve_using_bases
 
-  std::vector<Spec> generate_color_system_ocs(const GenerateColorSystemOCSInfo &info) {
+  std::vector<Spec> generate_color_system_ocs(const DirectColorSystemOCSInfo &info) {
     met_trace();
 
     // Sample unit vectors in 3d
@@ -506,19 +502,22 @@ namespace met {
     tbb::concurrent_vector<Spec> tbb_output;
     tbb_output.reserve(samples.size());
 
+    auto A = info.direct_objective.finalize();
+
     // Parallel solve for boundary spectra
     #pragma omp parallel for
     for (int i = 0; i < samples.size(); ++i) {
       // Obtain actual spectrum by projecting sample onto optimal
-      Spec s = (info.system * samples[i].matrix()).eval();
+      Spec s = (A * samples[i].matrix()).eval();
       for (auto &f : s)
         f = f >= 0.f ? 1.f : 0.f;
 
       // Run solve to find nearest valid spectrum within the basis function set
-      std::vector<CMFS> systems = { info.system };
-      std::vector<Colr> signals = { (info.system.transpose() * s.matrix()).eval() };
-      s = generate_spectrum({  .basis = info.basis, .systems = systems, .signals = signals });
-
+      s = generate_spectrum(DirectSpectrumInfo {
+        .direct_constraints = {{ info.direct_objective, info.direct_objective(s) }},
+        .basis = info.basis
+      });
+      
       // Store valid spectrum
       guard_continue(!s.isNaN().any());
       tbb_output.push_back(s);

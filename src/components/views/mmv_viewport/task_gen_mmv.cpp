@@ -93,7 +93,7 @@ namespace met {
 
     // Only continue for valid and mismatch-supporting constraints
     if (e_vert.constraint | visit([](const auto &cstr) { return !cstr.has_mismatching(); })) {
-      info("converged").set(true);
+      info("converged").set(false);
       info("chull_array").getw<gl::Array>() = {};
       m_colr_set.clear();
       m_iter = 0;
@@ -102,8 +102,9 @@ namespace met {
     
     // Only continue if more samples are necessary
     if (m_colr_set.size() >= mmv_samples_max) {
-      info("converged").set(true);
       return;
+    } else {
+      info("converged").set(false);
     }
 
     // Visit underlying constraint types one by one
@@ -136,8 +137,8 @@ namespace met {
     // the pointset does not collapse to a small position;
     // QHull is rather picky and will happily tear down the application :(
     auto &i_chull = info("chull").getw<AlMesh>();
+    auto points   = std::vector<Colr>(range_iter(m_colr_deque));
     if (m_colr_set.size() >= 4 && (maxb - minb).minCoeff() >= 0.005f) {
-      auto points = std::vector<Colr>(range_iter(m_colr_deque));
       i_chull = generate_convex_hull<AlMesh, Colr>(points);
     }
 
@@ -189,9 +190,12 @@ namespace met {
       i_array = {};
     }
     
-    // Flag convergence for following tasks
-    if (m_colr_set.size() >= mmv_samples_max) {
-      info("converged").set(true);
+    // Determine extents of total point sets before flagging convergence
+    if (points.size() >= mmv_samples_max) {
+      maxb = rng::fold_left_first(points, [](auto a, auto b) { return a.max(b).eval(); }).value();
+      minb = rng::fold_left_first(points, [](auto a, auto b) { return a.min(b).eval(); }).value();
+      if ((maxb - minb).minCoeff() >= 0.005f)
+        info("converged").set(true);
     }
   }
 } // namespace met
