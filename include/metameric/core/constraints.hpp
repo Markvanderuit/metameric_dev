@@ -58,12 +58,13 @@ namespace met {
   // Small helper struct for constraints under a system of light transport;
   // used by IndirectSurfaceConstraint in particular
   struct IndirectConstraint {
-    uint              cmfs_i = 0,   // Index of observer function
-                      illm_i = 0;   // Index of illuminant function
+    uint              cmfs_i = 0,   // Index of (direct) observer
+                      illm_i = 0;   // Index of (direct) illuminant
     Colr              colr_i = 0.f; // Color under direct color system
 
-    std::vector<Spec> pwrs_j = { }; // Interreflection data
-    Colr              colr_j = 0.0; // Color under intereflection and observer
+    uint              cmfs_j = 0;   // Index of (scene) observer
+    std::vector<Spec> pwrs_j = { }; // Scene interreflection data
+    Colr              colr_j = 0.0; // Color under indirect color system
 
     bool operator==(const IndirectConstraint &o) const;
   };

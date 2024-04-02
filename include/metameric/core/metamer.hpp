@@ -62,4 +62,37 @@ namespace met {
     uint                   n_samples = 32; // Nr. of samples to solve for
   };
   std::vector<Spec> generate_mismatching_ocs(const GenerateIndirectMismatchingOCSInfo &info);
+
+  struct DirectConstraintInfo {
+    // Direct color system and matching color
+    ColrSystem direct;
+    ColrSystem direct_colr;
+  };
+
+  struct IndirectConstraintInfo {
+    // Direct color system and matching color
+    ColrSystem direct;
+    Colr       direct_colr;
+
+    // Indirect color system and matching output
+    IndirectColrSystem indirect;
+    Colr               indirect_colr;
+  };
+
+  struct DirectMismatchingOCSInfo {
+    const DirectConstraintInfo           &direct_objective;
+    std::span<const DirectConstraintInfo> direct_constraints;
+
+    uint seed      = 4;  // Seed for (pcg) sampler state
+    uint n_samples = 32; // Nr. of samples to solve for
+  };
+
+  struct IndirectMismatchingOCSInfo {
+    const IndirectConstraintInfo           &indirect_objective;
+    std::span<const IndirectConstraintInfo> direct_constraints;
+    std::span<const IndirectConstraintInfo> indirect_constraints;
+
+    uint seed      = 4;  // Seed for (pcg) sampler state
+    uint n_samples = 32; // Nr. of samples to solve for
+  };
 } // namespace met

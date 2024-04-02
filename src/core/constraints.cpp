@@ -26,6 +26,7 @@ namespace met {
     return cmfs_i == o.cmfs_i
         && illm_i == o.illm_i
         && colr_i.isApprox(o.colr_i)
+        && cmfs_j == o.cmfs_j
         && colr_j.isApprox(o.colr_j) 
         && rng::equal(pwrs_j, o.pwrs_j, eig::safe_approx_compare<Spec>);
   }
@@ -84,6 +85,7 @@ namespace met {
     js.at("cmfs_i").get_to(c.cmfs_i);
     js.at("illm_i").get_to(c.illm_i);
     js.at("colr_i").get_to(c.colr_i);
+    js.at("cmfs_j").get_to(c.cmfs_j);
     js.at("pwrs_j").get_to(c.pwrs_j);
     js.at("colr_j").get_to(c.colr_j);
   }
@@ -106,6 +108,7 @@ namespace met {
     js = {{ "cmfs_i", c.cmfs_i },
           { "illm_i", c.illm_i },
           { "colr_i", c.colr_i },
+          { "cmfs_j", c.cmfs_j },
           { "colr_j", c.colr_j },
           { "pwrs_j", c.pwrs_j }};
   }
