@@ -186,7 +186,7 @@ namespace met {
               auto child_handle = info.child_task(child_name);
               if (!child_handle.is_init()) {
                 child_handle.init<MMVEditorTask>(
-                  ConstraintSelection { .uplifting_i = i, .vertex_i = j });
+                  ConstraintRecord { .uplifting_i = i, .vertex_i = j });
               }
             }
             if (ImGui::IsItemHovered())

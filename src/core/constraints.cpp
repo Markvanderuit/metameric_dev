@@ -122,13 +122,13 @@ namespace met {
           { "surface", c.surface }};
   }
 
-  std::pair<Colr, Spec> MeasurementConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  Colr MeasurementConstraint::position(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
     CMFS csys = scene.csys(uplifting.csys_i).finalize();
-    return { (csys.transpose() * measure.matrix()).eval(), measure };
+    return (csys.transpose() * measure.matrix()).eval();
   }
 
-  std::pair<Colr, Spec> DirectColorConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  Spec DirectColorConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
 
     // Gather all relevant color system spectra and corresponding color signals
@@ -140,14 +140,14 @@ namespace met {
       spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    return { colr_i, generate_spectrum(spec_info) };
+    return generate_spectrum(spec_info);
   }
 
-  std::pair<Colr, Spec> DirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  Spec DirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
 
     // Return zero constraint for invalid surfaces
-    guard(has_surface(), { Colr(0), Spec(0) });
+    guard(has_surface(), Spec(0));
 
     // Gather all relevant color system spectra and corresponding color signals
     DirectSpectrumInfo spec_info = {
@@ -158,14 +158,14 @@ namespace met {
       spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    return { colr_i, generate_spectrum(spec_info) };
+    return generate_spectrum(spec_info);
   }
 
-  std::pair<Colr, Spec> IndirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  Spec IndirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
     
     // Return zero constraint for invalid surfaces
-    guard(has_surface(), { Colr(0), Spec(0) });
+    guard(has_surface(), Spec(0));
 
     if (has_mismatching()) {
       // Gather all relevant color system spectra and corresponding color signals
@@ -179,7 +179,7 @@ namespace met {
         .basis                = scene.resources.bases[uplifting.basis_i].value()
       };
 
-      return { surface.diffuse, generate_spectrum(spec_info) };
+      return generate_spectrum(spec_info);
     } else { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
       // Gather all relevant color system spectra and corresponding color signals
       DirectSpectrumInfo spec_info = {
@@ -188,13 +188,8 @@ namespace met {
       };
 
       // Generate a metamer satisfying the system+signal constraint set and return as pair
-      return { surface.diffuse, generate_spectrum(spec_info) };
+      return generate_spectrum(spec_info);
     }
-  }
-
-  std::vector<Colr> MeasurementConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
-    met_trace();
-    return { };
   }
 
   std::vector<Colr> DirectColorConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {

@@ -22,7 +22,7 @@ namespace met {
 
     // Get shared resources
     const auto &e_scene             = info.global("scene").getr<Scene>();
-    const auto &e_cs                = info.parent()("selection").getr<ConstraintSelection>();
+    const auto &e_cs                = info.parent()("selection").getr<ConstraintRecord>();
     const auto &[e_object, e_state] = e_scene.components.upliftings[e_cs.uplifting_i];
 
     // Stale on first run, or if specific uplifting data has changed
@@ -71,7 +71,7 @@ namespace met {
 
     // Get shared resources
     const auto &e_scene       = info.global("scene").getr<Scene>();
-    const auto &e_cs          = info.parent()("selection").getr<ConstraintSelection>();
+    const auto &e_cs          = info.parent()("selection").getr<ConstraintRecord>();
     const auto &[e_uplifting, 
                  e_state]     = e_scene.components.upliftings[e_cs.uplifting_i];
     const auto &e_vert        = e_uplifting.verts[e_cs.vertex_i];

@@ -125,16 +125,6 @@ namespace met::detail {
     } // for (uint i)
   }
 
-  /* uint GLPacking<met::Uplifting>::get_texture_offset(uint uplifting_i) {
-    met_trace();
-
-    uint supported_layers = 
-      std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
-    uint layer_size = supported_layers / max_supported_upliftings;
-    
-    return layer_size * uplifting_i;
-  } */
-
   GLPacking<met::Uplifting>::GLPacking() {
     met_trace_full();
     
@@ -173,7 +163,6 @@ namespace met::detail {
           scene.components.settings.state.texture_size ||
           !texture_barycentrics.texture().is_init()    ||
           !texture_barycentrics.buffer().is_init()     );
-    // fmt::print("Type updated: {}\n", typeid(decltype(upliftings)::value_type).name());
     
     // Gather necessary texture sizes for each object
     std::vector<eig::Array2u> inputs(e_objects.size());
@@ -320,8 +309,7 @@ namespace met::detail {
     };
 
     // Preallocate up to a number of meshes
-    mesh_info = {{ .size  = sizeof(MeshUniformBufferLayout),
-                       .flags = buffer_create_flags }};
+    mesh_info = {{ .size  = sizeof(MeshUniformBufferLayout), .flags = buffer_create_flags }};
 
     // Obtain writeable, flushable mapping of nr. of meshes and individual mesh data
     auto *map = mesh_info.map_as<MeshUniformBufferLayout>(buffer_access_flags).data();
@@ -341,22 +329,25 @@ namespace met::detail {
     m_bvhs.resize(meshes.size());
     transforms.resize(meshes.size());
 
+    // Keep around old, unparameterized texture coordinates for now
+    std::vector<std::vector<eig::Array2f>> txuvs(meshes.size());
+
     // Generate cleaned, simplified mesh data
     #pragma omp parallel for
     for (int i = 0; i < meshes.size(); ++i) {
       const auto &[value, state] = meshes[i];
       guard_continue(state);
-      
-      // Simplified copy of mesh, inverse matrix to undo [0, 1] packing, and acceleration structure
-      // auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 65536, 1e-3));
-      auto [copy, trf] = unitized_mesh<met::Mesh>(simplified_mesh<met::Mesh>(value, 16384, 1e-3));
-      auto bvh         = create_bvh({ .mesh = copy, .n_node_children = 8, .n_leaf_children = 3 });
 
-      // Store both processed mesh and bvh
-      m_meshes[i]   = copy;
-      m_bvhs[i]     = bvh;
-      transforms[i] = trf;
-      m_buffer_layout_map_data[i].trf = trf;
+      // We simplify a copy of the mesh, reparameterize it so texture UVs are
+      // unique and non-overlapping, unitize it to a [0, 1] cube, and finally
+      // build a bvh acceleration structure over this mess
+      m_meshes[i]   = simplified_mesh<met::Mesh>(value, 16384, 1e-3);\
+      txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
+      transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
+      m_bvhs[i]     = create_bvh({ .mesh = m_meshes[i], .n_node_children = 8, .n_leaf_children = 3 });
+            
+      // Set appropriate mesh transform in buffer
+      m_buffer_layout_map_data[i].trf = transforms[i];
     }
 
     // Set appropriate mesh count in buffer
@@ -391,14 +382,14 @@ namespace met::detail {
         layout.elems_size = elems_size[i];
       }
 
-      // Temporary pack data vectors
-      std::vector<VertexPack>     verts_packed(verts_size.back() + verts_offs.back());
-      std::vector<PrimitivePack>  prims_packed(elems_size.back() + elems_offs.back());
-      std::vector<NodePack>       nodes_packed(nodes_size.back() + nodes_offs.back());
-      std::vector<eig::Array3u>   elems_packed(elems_size.back() + elems_offs.back()); // Not packed
-      std::vector<eig::AlArray3u> elems_packed_al(elems_packed.size());                // Not packed
+      // Temporary pack data vectors; will be copied to gpu-side buffers after
+      std::vector<VertexPack>     verts_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
+      std::vector<PrimitivePack>  prims_packed(elems_size.back() + elems_offs.back()); // Compressed and packed
+      std::vector<NodePack>       nodes_packed(nodes_size.back() + nodes_offs.back()); // Compressed and packed
+      std::vector<uint>           txuvs_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
+      std::vector<eig::Array3u>   elems_packed(elems_size.back() + elems_offs.back()); // Not compressed, just packed
 
-      // Pack mesh/bvh data tightly into pack data vectors
+      // Pack data tightly into pack data vectors
       #pragma omp parallel for
       for (int i = 0; i < meshes.size(); ++i) {
         const auto &bvh  = m_bvhs[i];
@@ -409,8 +400,13 @@ namespace met::detail {
         for (int j = 0; j < mesh.verts.size(); ++j) {
           auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
           auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
+
+          // Vertices are compressed as well as packed
           Vertex v = { .p = mesh.verts[j], .n = norm, .tx = txuv };
           verts_packed[verts_offs[i] + j] = v.pack();
+
+          // We keep the unparameterized texture UVs around; set to 0.5 if not present
+          txuvs_packed[verts_offs[i] + j] = pack_unorm_2x16(mesh.has_txuvs() ? txuvs[i][j] : eig::Array2f(.5f));
         }
 
         // Pack node data tightly and copy to the correctly offset range
@@ -437,15 +433,12 @@ namespace met::detail {
           [o = verts_offs[i]](const auto &v) -> eig::AlArray3u { return v + o; });
       }
 
-      // Keep around aligned element data for some fringe cases
-      rng::copy(elems_packed, elems_packed_al.begin());
-
       // Copy data to buffers
-      mesh_verts    = {{ .data = cnt_span<const std::byte>(verts_packed)    }};
-      bvh_prims     = {{ .data = cnt_span<const std::byte>(prims_packed)    }};
-      bvh_nodes     = {{ .data = cnt_span<const std::byte>(nodes_packed)    }};
-      mesh_elems    = {{ .data = cnt_span<const std::byte>(elems_packed)    }};
-      mesh_elems_al = {{ .data = cnt_span<const std::byte>(elems_packed_al) }};
+      mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed) }};
+      mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed) }};
+      mesh_txuvs = {{ .data = cnt_span<const std::byte>(txuvs_packed) }};
+      bvh_prims  = {{ .data = cnt_span<const std::byte>(prims_packed) }};
+      bvh_nodes  = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
 
       // Keep packed primitive data around for cpu-side access with gpu-side
       // data
@@ -455,8 +448,10 @@ namespace met::detail {
 
     // Define corresponding vertex array object and generate multidraw command info
     array = {{
-      .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)      }},
-      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 }},
+      .buffers = {{ .buffer = &mesh_verts, .index = 0, .stride = sizeof(eig::Array4u)      },
+                  { .buffer = &mesh_txuvs, .index = 1, .stride = sizeof(uint)              }},
+      .attribs = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e4 },
+                  { .attrib_index = 1, .buffer_index = 1, .size = gl::VertexAttribSize::e1 }},
       .elements = &mesh_elems
     }};
     draw_commands.resize(meshes.size());

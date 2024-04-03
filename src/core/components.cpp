@@ -43,7 +43,9 @@ namespace met {
     guard(is_active, { Colr(0), Spec(0) });
     
     // Visit the underlying constraint to generate output data
-    return constraint | visit([&](const auto &cstr) { return cstr.realize(scene, uplifting); });
+    return constraint | visit([&](const auto &cstr) -> std::pair<Colr, Spec> { 
+      return { cstr.position(scene, uplifting), cstr.realize(scene, uplifting) }; 
+    });
   }
 
   bool Uplifting::Vertex::has_surface() const {

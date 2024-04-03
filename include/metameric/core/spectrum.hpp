@@ -20,8 +20,9 @@ namespace met {
   constexpr static float wavelength_ssinv = static_cast<float>(wavelength_samples) / wavelength_range;
 
   /* Define maximum nr. of spectral uplifting constraints supported per uplifting. 
-     This includes boundary and additional points inserted by the tesselation. */
-  constexpr static uint max_supported_spectra = 512u;
+     This includes boundary and additional points inserted by the tesselation. 
+     This nr. times max_supported_upliftings may not exceed GL_MAX_ARRAY_TEXTURE_LAYERS */
+  constexpr static uint max_supported_spectra = 256u;
 
   /* Define program's underlying spectrum/cmfs/color types as renamed Eigen types */
   using CMFS = eig::Matrix<float, wavelength_samples, 3>; // Color matching function matrix

@@ -332,7 +332,7 @@ namespace met::detail {
 
   // Packed primitive struct data
   struct alignas(64) PrimitivePack {
-    VertexPack v0, v1, v2;
+    VertexPack v0, v1, v2; // 16by remainder. Can we fill in something here?
   
   public:
     Primitive unpack() const;

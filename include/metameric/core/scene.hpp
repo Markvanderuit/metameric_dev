@@ -112,24 +112,25 @@ namespace met {
     Spec emitter_spd(uint i)    const;
     Spec emitter_spd(Emitter e) const;
     
+  public:
     // Extract a specific uplifting vertex, given indices;
     // supplied here given the common cumbersomeness of deep access
-    const Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) const {
+    const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const {
       return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
     }
-    Uplifting::Vertex &uplifting_vertex(ConstraintSelection cs) {
+    Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) {
       return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
     }
 
-    // Helper object 
-    struct SceneSurfaceInfo : public SurfaceInfo {
-      // Direct references to related underlying objects
+  public:
+    // Helper object; SurfaceInfo with references to relevant underlying objects
+    struct SurfaceInfo : public met::SurfaceInfo {
       const Object    &object;
       const Uplifting &uplifting;
     };
 
-    // Given a RayRecord, recover underlying SurfaceInfo
-    SceneSurfaceInfo get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const;
+    // From a RayRecord, recover underlying surface information
+    SurfaceInfo get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const;
 
   public: // Serialization
     void to_stream(std::ostream &str) const;

@@ -15,7 +15,7 @@ namespace met {
     // Get handles, shared resources, modified resources
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_arcball = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
-    const auto &e_cs      = info.parent()("selection").getr<ConstraintSelection>();
+    const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
     const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
 
     // Compute viewport offset and size, minus ImGui's tab bars etc

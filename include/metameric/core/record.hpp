@@ -67,6 +67,10 @@ namespace met {
     }
   };
 
+  // JSON (de)serialization of surface info
+  void from_json(const json &js, SurfaceInfo &si);
+  void to_json(json &js, const SurfaceInfo &si);
+
   // Ray with a surface record packed inside
   // returned by some render queries
   struct RayRecord {
@@ -132,7 +136,18 @@ namespace met {
                                  // from a constraint; -1 otherwise
   };
   
-  // JSON (de)serialization of surface info
-  void from_json(const json &js, SurfaceInfo &si);
-  void to_json(json &js, const SurfaceInfo &si);
+  // Helper object for handling selection of a specific 
+  // uplifting/vertex/constraint in the scene data
+  struct ConstraintRecord {
+    constexpr static uint invalid_data = 0xFFFFFFFF;
+
+  public:
+    uint uplifting_i = invalid_data; // ID of uplifting component
+    uint vertex_i    = 0;            // ID of vertex in specific uplifting
+  
+  public:
+    bool is_valid() const { return uplifting_i != invalid_data; }
+    static auto invalid() { return ConstraintRecord(); }
+    friend auto operator<=>(const ConstraintRecord &, const ConstraintRecord &) = default;
+  };
 } // namespace met

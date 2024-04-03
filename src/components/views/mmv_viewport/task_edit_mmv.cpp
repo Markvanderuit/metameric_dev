@@ -50,7 +50,7 @@ namespace met {
     // Get shared resources
     const auto &e_window  = info.global("window").getr<gl::Window>();
     const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_cs      = info.parent()("selection").getr<ConstraintSelection>();
+    const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
     auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
     const auto &e_patches = info.relative("viewport_gen_patches")("patches").getr<std::vector<Colr>>();

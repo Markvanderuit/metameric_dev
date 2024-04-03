@@ -88,7 +88,7 @@ namespace met {
       met_trace_full();
 
       // Get shared resources
-      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_scene = info.global("scene").getr<Scene>();
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
@@ -147,7 +147,7 @@ namespace met {
       met_trace();
       
       // Get shared resources
-      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_scene = info.global("scene").getr<Scene>();
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
@@ -218,7 +218,7 @@ namespace met {
       met_trace();
       
       // Get shared resources
-      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_scene = info.global("scene").getr<Scene>();
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
@@ -296,7 +296,7 @@ namespace met {
 
       // Get handles, shared resources, etc
       const auto &e_scene = info.global("scene").getr<Scene>();
-      const auto &e_cs    = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
       
       return ImGui::IsItemHovered() && e_vert.has_mismatching();
@@ -308,7 +308,7 @@ namespace met {
       // Get handles, shared resources, etc
       const auto &e_arcball = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
       const auto &e_scene   = info.global("scene").getr<Scene>();
-      const auto &e_cs      = info.parent()("selection").getr<ConstraintSelection>();
+      const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
 
       // Visitor to access underlying color value
@@ -370,7 +370,7 @@ namespace met {
     info("is_active").set(true);
 
     // Make selection available
-    m_cs = info("selection").set(std::move(m_cs)).getr<ConstraintSelection>();
+    m_cs = info("selection").set(std::move(m_cs)).getr<ConstraintRecord>();
 
     // Spawn subtasks
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();

@@ -93,7 +93,7 @@ namespace met::detail {
     using atlas_type   = TextureAtlas<float, 4>;
 
   public:
-    // Atlas texture; each per-object texture stored in this atlas holds barycentric
+    // Atlas texture; each per-object patch stored in this atlas holds barycentric
     // weights and an index, referring to one set of four spectra in `texture_spectra`
     atlas_type texture_barycentrics;
 
@@ -162,12 +162,12 @@ namespace met::detail {
     // of MeshInfoLayout per mesh resource
     gl::Buffer mesh_info;
 
-    // Packed indexed mesh data
-    gl::Buffer mesh_verts;
-    gl::Buffer mesh_elems;
-    gl::Buffer mesh_elems_al;
+    // Packed mesh data, used in gen_object_data and miscellaneous operations
+    gl::Buffer mesh_verts; // Mesh vertices; packed position, normal, and reparameterized texture uvs
+    gl::Buffer mesh_elems; // Mesh elements/indexes
+    gl::Buffer mesh_txuvs; // Original texture coordinates, kept around for spectral texture baking
 
-    // Packed BVH data
+    // Packed BVH data, used during render/query operations
     gl::Buffer bvh_nodes;
     gl::Buffer bvh_prims;
 

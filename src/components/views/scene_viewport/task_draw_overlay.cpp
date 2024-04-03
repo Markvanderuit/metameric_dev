@@ -48,7 +48,7 @@ namespace met {
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
     const auto &e_active_constraints 
-                          = info.relative("viewport_input_editor")("active_constraints").getr<std::vector<ConstraintSelection>>();
+                          = info.relative("viewport_input_editor")("active_constraints").getr<std::vector<ConstraintRecord>>();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -58,7 +58,7 @@ namespace met {
 
     // Generate view over all SurfaceInfos for constraints that need to be drawn
     auto surfaces = e_active_constraints
-                  | vws::transform([&](ConstraintSelection cs) { return e_scene.uplifting_vertex(cs); })
+                  | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
                   | vws::filter(&Uplifting::Vertex::is_active)
                   | vws::filter(&Uplifting::Vertex::has_surface)
                   | vws::transform([](const auto &v) { return v.surface(); });

@@ -51,7 +51,7 @@ namespace met {
     return m_path_prim.data();
   }
 
-  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintSelection &cs, IndirectSurfaceConstraint &cstr) {
+  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, IndirectSurfaceConstraint &cstr) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
@@ -195,11 +195,11 @@ namespace met {
     met_trace();
 
     // List of surface constraints that need drawing or are selected
-    info("active_constraints").set<std::vector<ConstraintSelection>>({ });
-    info("selected_constraint").set<ConstraintSelection>(ConstraintSelection::invalid());
+    info("active_constraints").set<std::vector<ConstraintRecord>>({ });
+    info("selected_constraint").set<ConstraintRecord>(ConstraintRecord::invalid());
 
     // Record selection item; by default no selection
-    info("selection").set<ConstraintSelection>(ConstraintSelection::invalid());
+    info("selection").set<ConstraintRecord>(ConstraintRecord::invalid());
 
     m_ray_prim  = {{ .cache_handle = info.global("cache") }};
     m_path_prim = {{ .cache_handle = info.global("cache") }};
@@ -212,17 +212,17 @@ namespace met {
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
     const auto &io        = ImGui::GetIO();
-    const auto &i_cs      = info("selection").getr<ConstraintSelection>();
+    const auto &i_cs      = info("selection").getr<ConstraintRecord>();
 
     // If a constraint was deleted, reset and avoid further input
     if (i_cs.is_valid()) {
       if (e_scene.components.upliftings.is_resized() && !is_first_eval()) {
-        info("selection").set(ConstraintSelection::invalid());
+        info("selection").set(ConstraintRecord::invalid());
         return;
       }
       const auto &e_uplifting = e_scene.components.upliftings[i_cs.uplifting_i];
       if (e_uplifting.state.verts.is_resized() && !is_first_eval()) {
-        info("selection").set(ConstraintSelection::invalid());
+        info("selection").set(ConstraintRecord::invalid());
         return;
       }
     }
@@ -231,7 +231,7 @@ namespace met {
     guard(ImGui::IsItemHovered());
 
     // Determine active constraint vertices for the viewport
-    auto &i_active_constraints = info("active_constraints").getw<std::vector<ConstraintSelection>>();
+    auto &i_active_constraints = info("active_constraints").getw<std::vector<ConstraintRecord>>();
     i_active_constraints.clear();
     for (const auto &[i, comp] : enumerate_view(e_scene.components.upliftings)) {
       const auto &uplifting = comp.value; 
@@ -255,7 +255,7 @@ namespace met {
 
     // Gather relevant constraints together with enumeration data
     auto active_verts = i_active_constraints 
-                      | vws::transform([&](ConstraintSelection cs) { return std::pair { cs, e_scene.uplifting_vertex(cs) }; });
+                      | vws::transform([&](ConstraintRecord cs) { return std::pair { cs, e_scene.uplifting_vertex(cs) }; });
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -264,7 +264,7 @@ namespace met {
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
     // Determine nearest constraint to the mouse in screen-space
-    ConstraintSelection cs_nearest = ConstraintSelection::invalid();
+    ConstraintRecord cs_nearest = ConstraintRecord::invalid();
     for (const auto &[cs, vert] : active_verts) {
       // Extract surface information from surface constraint
       auto si = vert.constraint | visit {
@@ -292,7 +292,7 @@ namespace met {
     // On mouse click, and non-use of the gizmo, assign the nearest constraint
     // as the active selection
     if (io.MouseClicked[0] && (!m_gizmo.is_over() || !i_cs.is_valid()))
-      info("selection").getw<ConstraintSelection>() = cs_nearest;
+      info("selection").getw<ConstraintRecord>() = cs_nearest;
     
     // Reset variables on lack of active selection, and return early
     if (!i_cs.is_valid()) {

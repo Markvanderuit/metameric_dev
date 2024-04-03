@@ -15,8 +15,8 @@
 #include <metameric/components/views/task_uplifting_viewer.hpp>
 
 namespace met {
-  constexpr uint n_system_boundary_samples    = 64u;
-  constexpr uint max_supported_delaunay_elems = 512u;
+  // Nr. of points on the color system boundary; lower means more space available for constraints
+  constexpr uint n_system_boundary_samples = 48;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -39,8 +39,8 @@ namespace met {
 
     // Initialize buffers to hold packed delaunay tesselation data; these buffers are used by
     // the gen_object_data task to generate barycentric weights for the objects' textures
-    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                                .flags = buffer_create_flags });
-    info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * max_supported_delaunay_elems, .flags = buffer_create_flags });
+    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                         .flags = buffer_create_flags });
+    info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * max_supported_spectra, .flags = buffer_create_flags });
     m_tesselation_data_map = info("tesselation_data").getw<gl::Buffer>().map_as<MeshDataLayout>(buffer_access_flags).data();
     m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<MeshPackLayout>(buffer_access_flags);
 
@@ -60,7 +60,7 @@ namespace met {
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
 
-    // Get unmodifiable external uplifting; note that mutable caches are accessible
+    // Get const external uplifting; note that mutable caches are accessible
     const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &[e_uplifting, e_state] 
       = info.global("scene").getw<Scene>().components.upliftings[m_uplifting_i];
@@ -150,6 +150,7 @@ namespace met {
         return pack;
       });
 
+      // Print size of new tesselation
       fmt::print("Uplifting tesselation: {} verts, {} elems\n", 
         m_tesselation.verts.size(), m_tesselation.elems.size());
 
