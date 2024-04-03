@@ -22,7 +22,7 @@ set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supp
 set(MET_SUPPORTED_MESHES      16)
 set(MET_SUPPORTED_OBJECTS     16)
 set(MET_SUPPORTED_EMITTERS    16)
-set(MET_SUPPORTED_UPLIFTINGS   4)
+set(MET_SUPPORTED_UPLIFTINGS   8)
 set(MET_SUPPORTED_TEXTURES   256)
 
 # Print configuration info
@@ -87,12 +87,13 @@ find_program(glslangValidator NAMES glslangValidator PATHS ${CMAKE_PROGRAM_PATH}
 find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
 
-# Include small_gl/small_gl_parser libraries directly; forward exceptions/tracy options
-option(glp_enable_exceptions "" ${met_enable_exceptions})
+# Include small_gl library; forward exceptions/tracy options
 option(gl_enable_exceptions  "" ${met_enable_exceptions})
 option(gl_enable_tracy       "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
-add_subdirectory(third_party/small_gl_parser)
+
+# Include xAtlas
+add_subdirectory(third_party/xatlas)
 
 # Include Intel Embree, compiled from scratch
 set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
@@ -114,7 +115,7 @@ set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
 # TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
 add_subdirectory(third_party/embree)
 
-# Add together arguments to pass into small_gl_parser when processing shaders
+# Add together arguments to pass to shader compilation
 set(glsl_defines
   -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
   -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
@@ -286,7 +287,6 @@ add_library_r(core core)
 target_link_libraries(core PUBLIC
   assimp::assimp
   small_gl
-  small_gl_parser_lib
   Eigen3::Eigen
   fmt::fmt-header-only
   embree
@@ -298,6 +298,7 @@ target_link_libraries(core PUBLIC
   Qhull::qhullcpp
   Qhull::qhull_r
   TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy
+  xatlas
   ZLIB::ZLIB
 )
 target_include_directories(core PUBLIC
