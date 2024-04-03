@@ -128,7 +128,7 @@ namespace met::detail {
   GLPacking<met::Uplifting>::GLPacking() {
     met_trace_full();
     
-    const uint requested_layers = max_supported_spectra * max_supported_upliftings;
+    const uint requested_layers = max_supported_constraints * max_supported_upliftings;
 
     // Ensure nr. of allocated layers remains below what the device supports
     const uint supported_layers = 
@@ -341,7 +341,7 @@ namespace met::detail {
       // We simplify a copy of the mesh, reparameterize it so texture UVs are
       // unique and non-overlapping, unitize it to a [0, 1] cube, and finally
       // build a bvh acceleration structure over this mess
-      m_meshes[i]   = simplified_mesh<met::Mesh>(value, 16384, 1e-3);\
+      m_meshes[i]   = simplified_mesh<met::Mesh>(value, 16384, 1e-3);
       txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
       transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
       m_bvhs[i]     = create_bvh({ .mesh = m_meshes[i], .n_node_children = 8, .n_leaf_children = 3 });
@@ -349,6 +349,8 @@ namespace met::detail {
       // Set appropriate mesh transform in buffer
       m_buffer_layout_map_data[i].trf = transforms[i];
     }
+
+    fmt::print("{}\n", txuvs);
 
     // Set appropriate mesh count in buffer
     *m_buffer_layout_map_size = static_cast<uint>(meshes.size());
@@ -400,13 +402,17 @@ namespace met::detail {
         for (int j = 0; j < mesh.verts.size(); ++j) {
           auto norm = mesh.has_norms() ? mesh.norms[j] : eig::Array3f(0, 0, 1);
           auto txuv = mesh.has_txuvs() ? mesh.txuvs[j] : eig::Array2f(0.5);
+          txuv = txuv.unaryExpr([](float f) {
+            int i = static_cast<int>(f);
+            return (i % 2) ? 1.f - (f - i) : f - i;
+          });
 
           // Vertices are compressed as well as packed
           Vertex v = { .p = mesh.verts[j], .n = norm, .tx = txuv };
           verts_packed[verts_offs[i] + j] = v.pack();
 
           // We keep the unparameterized texture UVs around; set to 0.5 if not present
-          txuvs_packed[verts_offs[i] + j] = pack_unorm_2x16(mesh.has_txuvs() ? txuvs[i][j] : eig::Array2f(.5f));
+          txuvs_packed[verts_offs[i] + j] = pack_unorm_2x16(!txuvs[i].empty() ? txuvs[i][j] : txuv);
         }
 
         // Pack node data tightly and copy to the correctly offset range
@@ -558,7 +564,7 @@ namespace met::detail {
 
   GLPacking<met::Spec>::GLPacking() {
     met_trace_full();
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_spectra);
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
     spec_texture    = {{ .size = { wavelength_samples, n_layers } }};
     spec_buffer     = {{ .size = spec_texture.size().prod() * sizeof(float), .flags = buffer_create_flags }};
     spec_buffer_map = spec_buffer.map_as<Spec>(buffer_access_flags);
@@ -582,7 +588,7 @@ namespace met::detail {
 
   GLPacking<met::CMFS>::GLPacking() {
     met_trace_full();
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_spectra);
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
     cmfs_texture    = {{ .size = { wavelength_samples, n_layers } }};
     cmfs_buffer     = {{ .size = cmfs_texture.size().prod() * sizeof(eig::Array3f), .flags = buffer_create_flags }};
     cmfs_buffer_map = cmfs_buffer.map_as<CMFS>(buffer_access_flags);

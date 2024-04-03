@@ -3,8 +3,6 @@
 #include <metameric/render/primitives_render.hpp>
 
 namespace met {
-  static gl::ProgramCache program_cache;
-
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
   

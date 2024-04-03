@@ -2,11 +2,12 @@
 #define RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD
 
 // Define metameric's scene layout
-const uint max_supported_meshes     = MET_SUPPORTED_MESHES;
-const uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
-const uint max_supported_emitters   = MET_SUPPORTED_EMITTERS;
-const uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
-const uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
+const uint max_supported_meshes      = MET_SUPPORTED_MESHES;
+const uint max_supported_objects     = MET_SUPPORTED_OBJECTS;
+const uint max_supported_emitters    = MET_SUPPORTED_EMITTERS;
+const uint max_supported_upliftings  = MET_SUPPORTED_UPLIFTINGS;
+const uint max_supported_constraints = MET_SUPPORTED_CONSTRAINTS;
+const uint max_supported_textures    = MET_SUPPORTED_TEXTURES;
 
 // Info object to gather Scene::Object data
 struct ObjectInfo {

@@ -4,21 +4,29 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <small_gl/buffer.hpp>
-#include <small_gl/program.hpp>
 #include <small_gl/dispatch.hpp>
+#include <small_gl/framebuffer.hpp>
+#include <small_gl/program.hpp>
 
 namespace met {
   class GenObjectDataTask : public detail::TaskNode {
     struct UnifLayout {
       alignas(4) uint         object_i;
-      alignas(8) eig::Array2u dispatch_n;
+      // alignas(8) eig::Array2u dispatch_n;
     };
 
-    uint         m_object_i;
-    gl::Program  m_program_txtr; // Program for texture handling
-    gl::Program  m_program_colr; // Program for single-color handling
-    gl::Buffer   m_unif_buffer;
-    UnifLayout  *m_unif_map;
+    uint             m_object_i;
+    uint             m_atlas_layer_i;
+    gl::Program      m_program_txtr; // Program for texture handling
+    gl::Program      m_program_colr; // Program for single-color handling
+    gl::Buffer       m_unif_buffer;
+    UnifLayout      *m_unif_map;
+    gl::Framebuffer  m_fbo;
+
+    // Keys for program caches
+    std::string m_cache_key_txtr; // Program for texture handling
+    std::string m_cache_key_colr; // Program for single-color handling
+
 
   public:
     GenObjectDataTask(uint object_i);

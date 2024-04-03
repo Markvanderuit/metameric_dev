@@ -205,7 +205,7 @@ namespace met::detail {
     };
 
   public:
-    // This bufer contains offsets/sizes, ergo layout info necessary to
+    // This buffer contains offsets/sizes, ergo layout info necessary to
     // sample relevant parts of the texture atlases, storing one instance
     // of TextureInfoLayout per image resource
     gl::Buffer texture_info;

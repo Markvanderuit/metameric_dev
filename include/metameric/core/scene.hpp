@@ -15,11 +15,12 @@ namespace met {
   /* Define maximum nr. of supported components for some types
      These aren't device limits, but mostly exist so some sizes
      can be hardcoded shader-side */
-  constexpr static uint max_supported_meshes     = MET_SUPPORTED_MESHES;
-  constexpr static uint max_supported_objects    = MET_SUPPORTED_OBJECTS;
-  constexpr static uint max_supported_emitters   = MET_SUPPORTED_EMITTERS;
-  constexpr static uint max_supported_upliftings = MET_SUPPORTED_UPLIFTINGS;
-  constexpr static uint max_supported_textures   = MET_SUPPORTED_TEXTURES;
+  constexpr static uint max_supported_meshes      = MET_SUPPORTED_MESHES;
+  constexpr static uint max_supported_objects     = MET_SUPPORTED_OBJECTS;
+  constexpr static uint max_supported_emitters    = MET_SUPPORTED_EMITTERS;
+  constexpr static uint max_supported_upliftings  = MET_SUPPORTED_UPLIFTINGS;
+  constexpr static uint max_supported_constraints = MET_SUPPORTED_CONSTRAINTS;
+  constexpr static uint max_supported_textures    = MET_SUPPORTED_TEXTURES;
 
   /* Scene data layout.
      Simple indexed scene; no graph, just a library of objects and 

@@ -19,11 +19,12 @@ set(MET_WAVELENGTH_BASES    24) # Maximum nr. of bases used in generative functi
 set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported TODO remove
 
 # Define some constants as available on both shader and program side
-set(MET_SUPPORTED_MESHES      16)
-set(MET_SUPPORTED_OBJECTS     16)
-set(MET_SUPPORTED_EMITTERS    16)
-set(MET_SUPPORTED_UPLIFTINGS   8)
-set(MET_SUPPORTED_TEXTURES   256)
+set(MET_SUPPORTED_MESHES       16) # Maximum supported scene meshes
+set(MET_SUPPORTED_OBJECTS      16) # Maximum supported scene objects
+set(MET_SUPPORTED_EMITTERS     16) # Maximum supported scene emitters
+set(MET_SUPPORTED_UPLIFTINGS    8) # Maximum supported individual uplifting textures
+set(MET_SUPPORTED_CONSTRAINTS 256) # Maximum supported boundary spectra + constraint spectra
+set(MET_SUPPORTED_TEXTURES    256) # Maximum supported scene textures
 
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")
@@ -126,6 +127,7 @@ set(glsl_defines
   -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
   -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
+  -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
   -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
 
@@ -315,6 +317,7 @@ target_compile_definitions(core PUBLIC
   MET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   MET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
   MET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
+  MET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
   MET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc

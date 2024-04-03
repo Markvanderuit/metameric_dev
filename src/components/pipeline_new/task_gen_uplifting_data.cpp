@@ -39,14 +39,14 @@ namespace met {
 
     // Initialize buffers to hold packed delaunay tesselation data; these buffers are used by
     // the gen_object_data task to generate barycentric weights for the objects' textures
-    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                         .flags = buffer_create_flags });
-    info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * max_supported_spectra, .flags = buffer_create_flags });
+    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                             .flags = buffer_create_flags });
+    info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * max_supported_constraints, .flags = buffer_create_flags });
     m_tesselation_data_map = info("tesselation_data").getw<gl::Buffer>().map_as<MeshDataLayout>(buffer_access_flags).data();
     m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<MeshPackLayout>(buffer_access_flags);
 
     // Initialize buffer to hold packed spectral data; this buffer is copied over to a texture
     // in <scene.components.upliftings.gl.*> for fast access during rendering
-    m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_spectra, .flags = buffer_create_flags  }};
+    m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_constraints, .flags = buffer_create_flags  }};
     m_buffer_spec_pack_map = m_buffer_spec_pack.map_as<SpecPackLayout>(buffer_access_flags);
 
     // Specify spectrum cache, for plotting of generated constraint spectra
@@ -155,7 +155,7 @@ namespace met {
         m_tesselation.verts.size(), m_tesselation.elems.size());
 
       // Update packing layout data
-      m_tesselation_data_map->elem_offs = max_supported_spectra * m_uplifting_i;
+      m_tesselation_data_map->elem_offs = max_supported_constraints * m_uplifting_i;
       m_tesselation_data_map->elem_size = m_tesselation.elems.size();
 
       // Get writeable buffers and flush changes

@@ -462,7 +462,8 @@ namespace met {
       if (mesh.has_norms())
         mesh_.norms[i] = mesh.norms[vt.xref];
       if (mesh.has_txuvs()) {
-        mesh_.txuvs[i] = { vt.uv[0], vt.uv[1] };
+        mesh_.txuvs[i] = { vt.uv[0] / atlas->width, 
+                           vt.uv[1] / atlas->height };
         old_txuvs[i]   = mesh.txuvs[vt.xref];
       }
     }
