@@ -2,6 +2,7 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
+#include <xatlas.h>
 #include <meshoptimizer.h>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullVertexSet.h>
@@ -399,6 +400,83 @@ namespace met {
     mesh.elems.shrink_to_fit();
     compact_mesh(mesh);
   }
+
+  
+  template <typename MeshTy>
+  std::vector<typename MeshTy::txuv_type> parameterize_mesh(MeshTy &mesh) {
+    met_trace();
+
+    // Instantiate empty objects
+    xatlas::Atlas *atlas = xatlas::Create();
+    xatlas::MeshDecl mesh_decl;
+
+    // Add mesh vertex data
+    mesh_decl.vertexCount          = mesh.verts.size();
+    mesh_decl.vertexPositionData   = reinterpret_cast<float *>(mesh.verts.data());
+    mesh_decl.vertexPositionStride = sizeof(MeshTy::vert_type);
+
+    // Add mesh normal data
+    if (mesh.has_norms()) {
+      mesh_decl.vertexNormalData   = reinterpret_cast<float *>(mesh.norms.data());
+      mesh_decl.vertexNormalStride = sizeof(MeshTy::norm_type);
+    }
+
+    // Add mesh texcoord data
+    if (mesh.has_txuvs()) {
+      mesh_decl.vertexUvData   = reinterpret_cast<float *>(mesh.txuvs.data());
+      mesh_decl.vertexUvStride = sizeof(MeshTy::txuv_type);
+    }
+
+    // Add mesh element data
+    mesh_decl.indexCount  = mesh.elems.size() * MeshTy::elem_type::RowsAtCompileTime;
+    mesh_decl.indexData   = reinterpret_cast<uint *>(mesh.elems.data());
+    mesh_decl.indexFormat = xatlas::IndexFormat::UInt32;
+
+    // Forward mesh data to atlas
+    auto err = xatlas::AddMesh(atlas, mesh_decl, 1);
+    debug::check_expr(!err, std::format("xatlas::Addmesh(...) returned error code {}", static_cast<uint>(err)));   
+
+    // Finally, generate atlas
+    xatlas::Generate(atlas);
+    const auto &parm = atlas->meshes[0];
+
+    // Return value; old UVs are translated to new mesh and returned separately
+    std::vector<typename MeshTy::txuv_type> old_txuvs;
+
+    // Create appropriately sized placeholder mesh
+    MeshTy mesh_;
+    mesh_.verts.resize(parm.vertexCount);
+    mesh_.elems.resize(parm.indexCount / 3);
+    if (mesh.has_norms())
+      mesh_.norms.resize(parm.vertexCount);
+    if (mesh.has_txuvs()) {
+      mesh_.txuvs.resize(parm.vertexCount);
+      old_txuvs.resize(parm.vertexCount);
+    }
+
+    // Process atlas vertex data
+    #pragma omp parallel for
+    for (int i = 0; i < parm.vertexCount; ++i) {
+      const auto &vt = parm.vertexArray[i];
+      mesh_.verts[i] = mesh.verts[vt.xref];
+      if (mesh.has_norms())
+        mesh_.norms[i] = mesh.norms[vt.xref];
+      if (mesh.has_txuvs()) {
+        mesh_.txuvs[i] = { vt.uv[0], vt.uv[1] };
+        old_txuvs[i]   = mesh.txuvs[vt.xref];
+      }
+    }
+
+    // Copy over atlas index data
+    rng::copy(cast_span<typename MeshTy::elem_type>(std::span { parm.indexArray, parm.indexCount }), mesh_.elems.begin());
+
+    // Cleanup objects
+    xatlas::Destroy(atlas);
+
+    // Input mesh becomes placeholder mesh, and old (remapped) UVs are returned
+    mesh = mesh_;
+    return old_txuvs;
+  }
   
   template <typename MeshTy>
   eig::Matrix4f unitize_mesh(MeshTy &mesh) {
@@ -453,9 +531,11 @@ namespace met {
     template                                                                                          \
     void optimize_mesh<OutputMesh>(OutputMesh &);                                                     \
     template                                                                                          \
-    void renormalize_mesh<OutputMesh>(OutputMesh &);                                                      \
+    void renormalize_mesh<OutputMesh>(OutputMesh &);                                                  \
     template                                                                                          \
-    eig::Matrix4f unitize_mesh<OutputMesh>(OutputMesh &);                                                 \
+    std::vector<typename OutputMesh::txuv_type> parameterize_mesh<OutputMesh>(OutputMesh &);          \
+    template                                                                                          \
+    eig::Matrix4f unitize_mesh<OutputMesh>(OutputMesh &);                                             \
     template                                                                                          \
     OutputMesh generate_convex_hull<OutputMesh, eig::Array3f>(std::span<const eig::Array3f>);         \
     template                                                                                          \

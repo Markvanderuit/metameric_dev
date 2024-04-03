@@ -256,7 +256,7 @@ namespace met {
                             .rotation = { 90.f * std::numbers::pi_v<float> / 180.f, 0.f, 0.f },
                             .scaling  = .5f },
       .illuminant_i     = 0,
-      .illuminant_scale = 1.f
+      .illuminant_scale = 1e-1
     });
     
     // Set state to fresh create
@@ -511,9 +511,10 @@ namespace met {
           [](const aiFace &v) { return Mesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
       }
 
-      // Ensure mesh data is properly corrected and redundant vertices are stripped
+      // Ensure mesh data is properly mapped, redundant vertices are stripped where possible
       remap_mesh(m);
       compact_mesh(m);
+      // TODO perhaps move reparameterization here
 
       scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));
     }
@@ -674,7 +675,7 @@ namespace met {
                        resources.illuminants[c.illuminant_i].name);
   }
 
-  Scene::SceneSurfaceInfo Scene::get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const {
+  Scene::SurfaceInfo Scene::get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const {
     met_trace();
 
     // Get relevant resources; mostly gl-side resources
@@ -684,26 +685,22 @@ namespace met {
     const auto &prim      = resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
   
     // Return object; fill in often accessed indices
-    SceneSurfaceInfo si = {
+    SurfaceInfo si = {
       .object    = object,
       .uplifting = uplifting
     };
     si.record = rc;
 
-    // Get transforms used for gl-side world-model space
-    auto trf = object_gl.trf_mesh;
-    auto inv = object_gl.trf_mesh_inv;
-
     // Generate barycentric coordinates
-    eig::Vector3f pinv = (inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
+    eig::Vector3f pinv = (object_gl.trf_mesh_inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
     auto bary = detail::gen_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
 
     // Recover surface geometric data
     si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
     si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
     si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
-    si.p  = (trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
-    si.n  = (trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
+    si.p  = (object_gl.trf_mesh * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
+    si.n  = (object_gl.trf_mesh * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
     si.n.normalize();
 
     // Recover surface diffuse data based on underlying object material
