@@ -7,17 +7,22 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/constraints.hpp>
 #include <metameric/core/components.hpp>
+#include <metameric/core/moments.hpp>
 #include <metameric/core/utility.hpp>
 
-TEST_CASE("Matrix shenanigans") {
+TEST_CASE("Spectrum shenanigans") {
   using namespace met;
+
+  // Spec spec_gt = (models::emitter_cie_d65
+               //  / models::emitter_cie_d65.maxCoeff()) * 0.75f;
   
-  std::variant<Colr,  uint> diffuse;
+  Spec spec_gt = 0.5f;
 
-  diffuse = Colr(0.5f);
+  auto moment = spectrum_to_moments(spec_gt);
+  auto spec_m = moments_to_spectrum(moment);
 
-  diffuse | visit {
-    [&](const uint &i) { fmt::print("Integer\n"); },
-    [](const Colr &c) { fmt::print("Color\n"); }
-  };
+  fmt::print("---\n", spec_gt);
+  fmt::print("Ground {}\n", spec_gt);
+  fmt::print("Moment {}\n", moment);
+  fmt::print("Rntrip {}\n", spec_m);
 }

@@ -21,25 +21,11 @@ layout(location = 0) out vec2 out_txuv;     // Per-vertex original texture UVs
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
   AtlasLayout data[];
 } buff_atlas;
-layout(binding = 1) restrict readonly buffer b_buff_textures {
-  TextureInfo[] data;
-} buff_textures;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint object_i;
 } unif;
-layout(binding = 1) uniform b_buff_uplift_data {
-  uint offs;
-  uint size;
-} buff_uplift_data;
-layout(binding = 2) uniform b_buff_uplift_pack { 
-  Elem data[max_supported_constraints]; 
-} buff_uplift_pack;
-layout(binding = 3) uniform b_buff_objects {
-  uint n;
-  ObjectInfo data[max_supported_objects];
-} buff_objects;
 
 void main() {
   // UV coordinates are directly unpacked and forwarded
