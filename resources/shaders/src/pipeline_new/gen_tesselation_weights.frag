@@ -30,7 +30,6 @@ layout(binding = 1) restrict readonly buffer b_buff_textures {
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint object_i;
-  uint n;
 } unif;
 layout(binding = 1) uniform b_buff_uplift_data {
   uint offs;

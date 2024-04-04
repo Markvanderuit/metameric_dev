@@ -437,7 +437,9 @@ namespace met {
     debug::check_expr(!err, std::format("xatlas::Addmesh(...) returned error code {}", static_cast<uint>(err)));   
 
     // Finally, generate atlas
-    xatlas::Generate(atlas);
+    xatlas::Generate(atlas, {}, {
+      .padding = 2 // pixel padding, outside of bilinear padding
+    });
     const auto &parm = atlas->meshes[0];
 
     // Return value; old UVs are translated to new mesh and returned separately

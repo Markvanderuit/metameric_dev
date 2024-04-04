@@ -12,7 +12,6 @@ namespace met {
   class GenObjectDataTask : public detail::TaskNode {
     struct UnifLayout {
       alignas(4) uint         object_i;
-      // alignas(8) eig::Array2u dispatch_n;
     };
 
     uint             m_object_i;

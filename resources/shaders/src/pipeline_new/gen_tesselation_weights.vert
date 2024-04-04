@@ -12,9 +12,6 @@ struct Elem {
 layout(std430) buffer;
 layout(std140) uniform;
 
-// Specialization constant declarations
-layout(constant_id = 0) const bool sample_albedo = true;
-
 // Vertex stage declarations
 layout(location = 0) in uvec4 in_vert_pack; // Packed (reparameterized) vertex data
 layout(location = 1) in uint  in_txuv_pack; // Packed (original) texture UVs
@@ -31,7 +28,6 @@ layout(binding = 1) restrict readonly buffer b_buff_textures {
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint object_i;
-  uint n;
 } unif;
 layout(binding = 1) uniform b_buff_uplift_data {
   uint offs;
@@ -46,18 +42,10 @@ layout(binding = 3) uniform b_buff_objects {
 } buff_objects;
 
 void main() {
-  // Load relevant atlas data
+  // UV coordinates are directly unpacked and forwarded
+  out_txuv = unpackUnorm2x16(in_txuv_pack);
+
+  // Vertex position becomes reparatemerized texture coordinates in relevant atlas patch
   AtlasLayout atlas = buff_atlas.data[unif.object_i];
-
-  // We compile-time select between single-color and texture
-  // cases to avoid excessive warnings  when there is an 
-  // unbound sampler object floating around
-  if (sample_albedo) { // Texture case
-    out_txuv = unpackUnorm2x16(in_txuv_pack); // Unpack position and forward
-  } else { // Single-color case
-    out_txuv = vec2(.5f); // Ignored
-  }
-
-  // Vertex position becomes reparatemerized texture coordinates
   gl_Position = vec4(atlas.uv0 + atlas.uv1 * unpackUnorm2x16(in_vert_pack.w), 0, 1) * 2.f - 1.f;
 }
