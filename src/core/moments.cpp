@@ -81,9 +81,9 @@ namespace met {
     // Get vector of wavelength phases // TODO extract from computation
     Spec input_phase;
     rng::copy(vws::iota(0u, wavelength_samples) 
-      // | vws::transform(wavelength_at_index)
-      | vws::transform([](uint i) {
-        return wavelength_min + wavelength_ssize * static_cast<float>(i); })
+      | vws::transform(wavelength_at_index)
+      // | vws::transform([](uint i) {
+      //   return wavelength_min + wavelength_ssize * static_cast<float>(i); })
       | vws::transform(std::bind(wavelength_to_phase, _1, true)), input_phase.begin());
 
     // Expand out of range values 
@@ -132,9 +132,9 @@ namespace met {
     // Get vector of wavelength phases // TODO extract from computation
     eig::Array<double, wavelength_samples, 1> input_phase;
     rng::copy(vws::iota(0u, wavelength_samples) 
-      // | vws::transform(wavelength_at_index)
-      | vws::transform([](uint i) {
-        return wavelength_min + wavelength_ssize * static_cast<float>(i); })
+      | vws::transform(wavelength_at_index)
+      // | vws::transform([](uint i) {
+      //   return wavelength_min + wavelength_ssize * static_cast<float>(i); })
       | vws::transform(std::bind(wavelength_to_phase, _1, true)), input_phase.begin());
 
     // Get exponential moments
@@ -146,10 +146,7 @@ namespace met {
     auto eval_polynm   = detail::levisons_algorithm(toepl_first_col);
     auto point_in_disk = (1.0i * input_phase).exp().eval();
 
-    em[0] *= 2.0;
-
-    auto trf = detail::herglotz_transform(point_in_disk, em, eval_polynm);
-    
+    auto trf = detail::herglotz_transform(point_in_disk, 2.0 * em, eval_polynm);    
     return (trf.arg() * std::numbers::inv_pi + 0.5).cast<float>().eval();
   }
 } // namespace met

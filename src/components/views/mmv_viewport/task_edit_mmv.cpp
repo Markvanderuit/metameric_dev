@@ -67,15 +67,6 @@ namespace met {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
         ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
       }
-
-      ImGui::SeparatorText("Moment reconstruction");
-      {
-        const auto &e_sd = e_spectra[e_cs.vertex_i];
-        auto coeff = spectrum_to_moments(e_sd);
-        auto rtrip = moments_to_spectrum(coeff);
-        ImGui::PlotSpectrum("##output_rtrp_plot", rtrip, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
-      }
-
       // Plotter for the current constraint's resulting radiance
       // (only for IndirectSurfaceConstraint, really)
       vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) {
@@ -127,8 +118,24 @@ namespace met {
               lrgb = srgb_to_lrgb(srgb);
 
             // Roundtrip error
-            Colr err = (lrgb - e_scene.csys(0).apply(e_spectra[e_cs.vertex_i])).abs();
+            Colr err = (lrgb - e_scene.csys(0)(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+            
+
+            ImGui::SeparatorText("Moment reconstruction");
+            {
+              const auto &e_sd = e_spectra[e_cs.vertex_i];
+              auto coeff = spectrum_to_moments(e_sd);
+              auto rtrip = moments_to_spectrum(coeff);
+              ImGui::PlotSpectrum("##output_rtrp_plot", rtrip, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
+
+              Colr a = e_scene.csys(0)(e_sd);
+              Colr b = e_scene.csys(0)(rtrip);
+              Colr err = (b - a).abs();
+              ImGui::InputFloat3("Moment error (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            }
+
           }
 
           ImGui::SeparatorText("Constraints");
