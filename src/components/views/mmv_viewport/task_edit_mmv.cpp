@@ -2,6 +2,7 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/matching.hpp>
+#include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -65,6 +66,14 @@ namespace met {
       {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
         ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
+      }
+
+      ImGui::SeparatorText("Moment reconstruction");
+      {
+        const auto &e_sd = e_spectra[e_cs.vertex_i];
+        auto coeff = spectrum_to_moments(e_sd);
+        auto rtrip = moments_to_spectrum(coeff);
+        ImGui::PlotSpectrum("##output_rtrp_plot", rtrip, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
       }
 
       // Plotter for the current constraint's resulting radiance
