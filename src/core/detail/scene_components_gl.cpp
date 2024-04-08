@@ -349,9 +349,7 @@ namespace met::detail {
       // Set appropriate mesh transform in buffer
       m_buffer_layout_map_data[i].trf = transforms[i];
     }
-
-    fmt::print("{}\n", txuvs);
-
+    
     // Set appropriate mesh count in buffer
     *m_buffer_layout_map_size = static_cast<uint>(meshes.size());
 
@@ -384,12 +382,13 @@ namespace met::detail {
         layout.elems_size = elems_size[i];
       }
 
-      // Temporary pack data vectors; will be copied to gpu-side buffers after
+      // Mostly temporary data packing vectors; will be copied to gpu-side buffers after
       std::vector<VertexPack>     verts_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
-      std::vector<PrimitivePack>  prims_packed(elems_size.back() + elems_offs.back()); // Compressed and packed
       std::vector<NodePack>       nodes_packed(nodes_size.back() + nodes_offs.back()); // Compressed and packed
       std::vector<uint>           txuvs_packed(verts_size.back() + verts_offs.back()); // Compressed and packed
       std::vector<eig::Array3u>   elems_packed(elems_size.back() + elems_offs.back()); // Not compressed, just packed
+      bvh_prims_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
+      bvh_txuvs_cpu.resize(elems_size.back() + elems_offs.back());                     // Compressed and packed
 
       // Pack data tightly into pack data vectors
       #pragma omp parallel for
@@ -427,10 +426,15 @@ namespace met::detail {
         for (int j = 0; j < bvh.prims.size(); ++j) {
           // BVH primitives are packed in bvh order
           auto el = mesh.elems[bvh.prims[j]];
-          prims_packed[elems_offs[i] + j] = PrimitivePack {
+          bvh_prims_cpu[elems_offs[i] + j] = PrimitivePack {
             .v0 = verts_packed[verts_offs[i] + el[0]],
             .v1 = verts_packed[verts_offs[i] + el[1]],
             .v2 = verts_packed[verts_offs[i] + el[2]]
+          };
+          bvh_txuvs_cpu[elems_offs[i] + j] = eig::Array3u {
+            txuvs_packed[verts_offs[i] + el[0]],
+            txuvs_packed[verts_offs[i] + el[1]],
+            txuvs_packed[verts_offs[i] + el[2]]
           };
         }
         
@@ -440,16 +444,11 @@ namespace met::detail {
       }
 
       // Copy data to buffers
-      mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed) }};
-      mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed) }};
-      mesh_txuvs = {{ .data = cnt_span<const std::byte>(txuvs_packed) }};
-      bvh_prims  = {{ .data = cnt_span<const std::byte>(prims_packed) }};
-      bvh_nodes  = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
-
-      // Keep packed primitive data around for cpu-side access with gpu-side
-      // data
-      bvh_prims_cpu = prims_packed;
-      fmt::print("Primitive count: {}\n", bvh_prims_cpu.size());
+      mesh_verts = {{ .data = cnt_span<const std::byte>(verts_packed)  }};
+      mesh_elems = {{ .data = cnt_span<const std::byte>(elems_packed)  }};
+      mesh_txuvs = {{ .data = cnt_span<const std::byte>(txuvs_packed)  }};
+      bvh_nodes  = {{ .data = cnt_span<const std::byte>(nodes_packed)  }};
+      bvh_prims  = {{ .data = cnt_span<const std::byte>(bvh_prims_cpu) }};
     }
 
     // Define corresponding vertex array object and generate multidraw command info

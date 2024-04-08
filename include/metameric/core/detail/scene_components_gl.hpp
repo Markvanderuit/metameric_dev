@@ -171,9 +171,10 @@ namespace met::detail {
     gl::Buffer bvh_nodes;
     gl::Buffer bvh_prims;
 
-    // CPU-side packed bvh data
+    // CPU-side packed bvh data and original texture coordinates
     // Useful for ray interaction recovery that mirrors the gpu-side precision issues
-    std::vector<PrimitivePack> bvh_prims_cpu;
+    std::vector<PrimitivePack>  bvh_prims_cpu;
+    std::vector<eig::Array3u>   bvh_txuvs_cpu; // unparameterized texture coordinates per bvh prim
 
     // Draw array referencing packed, indexed mesh data
     // and a set of draw commands for assembling multidraw operations over this array;

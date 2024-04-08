@@ -11,34 +11,36 @@
 #include <metameric/core/utility.hpp>
 #include <complex>
 
-TEST_CASE("Spectrum shenanigans") {
-  using namespace met;
+// TEST_CASE("Spectrum shenanigans") {
+//   using namespace met;
 
-  /* {
-    using namespace std::complex_literals;
-    eig::Array<uint, 8, 1> v = { 0, 1, 2, 3, 4, 5, 6, 7 };
-    uint j = 5;
+//   {
+//     using namespace std::complex_literals;
+//     eig::Array<uint, 8, 1> v = { 0, 1, 2, 3, 4, 5, 6, 7 };
+//     uint i = 7;
 
-    fmt::print("{}\n", v(eig::seq(j, 1, eig::fix<-1>))); // [j:0:-1]
-    // fmt::print("{}\n", v(eig::seq(0, j - 1)));           // [0:j]
-    // fmt::print("{}\n", v.head(j));                       // [0:j]
-    // fmt::print("{}\n", v.head(j + 1).reverse());         // [j::-1]
+//     fmt::print("{}\n", v(eig::seq(1, i - 1))); // [j:0:-1]
+//     fmt::print("{}\n", v(eig::seq(i - 1, 1, eig::fix<-1>))); // [j:0:-1]
 
-    // fmt::print("{}\n", v.head(j + 1));         // [0:j+1]
+//     // fmt::print("{}\n", v(eig::seq(0, j - 1)));           // [0:j]
+//     // fmt::print("{}\n", v.head(j));                       // [0:j]
+//     // fmt::print("{}\n", v.head(j + 1).reverse());         // [j::-1]
 
-    std::exit(0);
-  } */
+//     // fmt::print("{}\n", v.head(j + 1));         // [0:j+1]
 
-  Spec spec_gt = (models::emitter_cie_d65
-                / models::emitter_cie_d65.maxCoeff()) * 0.75f;
+//     std::exit(0);
+//   }
+
+//   /* Spec spec_gt = (models::emitter_cie_d65
+//                 / models::emitter_cie_d65.maxCoeff()) * 0.75f;
   
-  // Spec spec_gt = 0.5f;
+//   // Spec spec_gt = 0.5f;
 
-  auto moment = spectrum_to_moments(spec_gt);
-  auto spec_m = moments_to_spectrum(moment);
+//   auto moment = spectrum_to_moments(spec_gt);
+//   auto spec_m = moments_to_spectrum(moment);
 
-  fmt::print("---\n");
-  fmt::print("Ground {}\n", spec_gt);
-  fmt::print("Moment {}\n", moment);
-  fmt::print("Rntrip {}\n", spec_m);
-}
+//   fmt::print("---\n");
+//   fmt::print("Ground {}\n", spec_gt);
+//   fmt::print("Moment {}\n", moment);
+//   fmt::print("Rntrip {}\n", spec_m); */
+// }

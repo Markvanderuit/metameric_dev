@@ -334,7 +334,7 @@ namespace met {
 
     if constexpr (output_moment_limited_ocs) {
       return tbb_output | vws::transform(spectrum_to_moments)
-                        | vws::transform(peters::moments_to_spectrum)
+                        | vws::transform(moments_to_spectrum)
                         | rng::to<std::vector>();
     } else {
       return std::vector<Spec>(range_iter(tbb_output));
@@ -499,7 +499,7 @@ namespace met {
     
     if constexpr (output_moment_limited_ocs) {
       return tbb_output | vws::transform(spectrum_to_moments)
-                        | vws::transform(peters::moments_to_spectrum)
+                        | vws::transform(moments_to_spectrum)
                         | rng::to<std::vector>();
     } else {
       return std::vector<Spec>(range_iter(tbb_output));
@@ -539,7 +539,7 @@ namespace met {
     
     if constexpr (output_moment_limited_ocs) {
       return tbb_output | vws::transform(spectrum_to_moments)
-                        | vws::transform(peters::moments_to_spectrum)
+                        | vws::transform(moments_to_spectrum)
                         | rng::to<std::vector>();
     } else {
       return std::vector<Spec>(range_iter(tbb_output));

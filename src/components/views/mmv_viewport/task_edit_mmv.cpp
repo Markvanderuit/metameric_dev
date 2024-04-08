@@ -69,8 +69,12 @@ namespace met {
         ImGui::SameLine();
         if (ImGui::SmallButton("Print"))
           fmt::print("{}\n", e_sd);
-        ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
+
+        std::vector<std::string> legend = { "Reflectance", "MESE" };
+        std::vector<Spec>        data   = { e_sd, moments_to_spectrum(spectrum_to_moments(e_sd)) };
+        ImGui::PlotSpectra("##output_refl_plot", legend, data, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
       }
+
       // Plotter for the current constraint's resulting radiance
       // (only for IndirectSurfaceConstraint, really)
       vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) {
@@ -86,25 +90,6 @@ namespace met {
         ImGui::SeparatorText("Radiance spectrum");
         ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 96.f * e_window.content_scale() });
       });
-
-      // Color patch picker
-      if (!e_patches.empty()) {
-        ImGui::SeparatorText("Example colors");
-        ImGui::BeginChild("##patches", { ImGui::GetContentRegionAvail().x * 0.95f, 64.f * e_window.content_scale() }, 0, ImGuiWindowFlags_HorizontalScrollbar);
-        for (uint i = 0; i < e_patches.size(); ++i) {
-          // Spawn color button viewing the srgb-transformed patch color
-          auto srgb = (eig::Array4f() << lrgb_to_srgb(e_patches[i]), 1).finished();
-          if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float)) {
-            // ...
-          }
-
-          // Skip line every now and then
-          ImGui::SameLine();
-          if (i % 8 == 7 || i == e_patches.size() - 1)
-            ImGui::NewLine();
-        } // for (uint i)
-        ImGui::EndChild();
-      }
       
       // Visit the underlying constraint data
       vert.constraint | visit {
@@ -125,12 +110,10 @@ namespace met {
             Colr err = (lrgb - e_scene.csys(0)(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
 
-            ImGui::SeparatorText("Moment reconstruction");
             {
               const auto &e_sd = e_spectra[e_cs.vertex_i];
               auto coeff = spectrum_to_moments(e_sd);
-              auto rtrip = peters::moments_to_spectrum(coeff);
-              ImGui::PlotSpectrum("##output_rtrp_plot", rtrip, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
+              auto rtrip = moments_to_spectrum(coeff);
 
               Colr a = e_scene.csys(0)(e_sd);
               Colr b = e_scene.csys(0)(rtrip);
@@ -236,6 +219,25 @@ namespace met {
           ImGui::Text("Not implemented");
         }
       };
+
+      // Color patch picker
+      if (!e_patches.empty()) {
+        ImGui::SeparatorText("Example colors");
+        ImGui::BeginChild("##patches", { ImGui::GetContentRegionAvail().x * 0.95f, 64.f * e_window.content_scale() }, 0, ImGuiWindowFlags_HorizontalScrollbar);
+        for (uint i = 0; i < e_patches.size(); ++i) {
+          // Spawn color button viewing the srgb-transformed patch color
+          auto srgb = (eig::Array4f() << lrgb_to_srgb(e_patches[i]), 1).finished();
+          if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float)) {
+            // ...
+          }
+
+          // Skip line every now and then
+          ImGui::SameLine();
+          if (i % 8 == 7 || i == e_patches.size() - 1)
+            ImGui::NewLine();
+        } // for (uint i)
+        ImGui::EndChild();
+      }
     });
   }
 } // namespace met

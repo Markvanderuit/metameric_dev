@@ -7,6 +7,7 @@
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/packing.hpp>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -682,8 +683,15 @@ namespace met {
     const auto &object    = components.objects[rc.object_i()].value;
     const auto &object_gl = components.objects.gl.objects()[rc.object_i()];
     const auto &uplifting = components.upliftings[object.uplifting_i].value;
-    const auto &prim      = resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
-  
+
+    // Unpack relevant primitive data, and restore old, non-reparameterized UV coordinates
+    // so we can sample image data cpu-side
+    auto prim = resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
+    auto txuv = resources.meshes.gl.bvh_txuvs_cpu[rc.primitive_i()];
+    prim.v0.tx = detail::unpack_unorm_2x16(txuv[0]);
+    prim.v1.tx = detail::unpack_unorm_2x16(txuv[1]);
+    prim.v2.tx = detail::unpack_unorm_2x16(txuv[2]);
+
     // Return object; fill in often accessed indices
     SurfaceInfo si = {
       .object    = object,
@@ -706,7 +714,7 @@ namespace met {
     // Recover surface diffuse data based on underlying object material
     si.diffuse = object.diffuse | visit {
       [&](uint i) -> Colr { return resources.images[i].value().sample(si.tx, Image::ColorFormat::eLRGB).head<3>(); },
-      [&](Colr c) -> Colr {  return c; }
+      [&](Colr c) -> Colr { return c; }
     };
     
     return si;
