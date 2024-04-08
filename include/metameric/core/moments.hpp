@@ -19,6 +19,11 @@ namespace met {
     return /* 2.f * */ std::numbers::pi_v<float> * wvl - std::numbers::pi_v<float>;
   }
 
+  namespace peters {
+    // Compute a discrete spectral reflectance given trigonometric moments
+    Spec moments_to_spectrum(const Moments &m);
+  } // namespace peters
+
   // Compute trigonometric moments representing a given discrete spectral reflectance
   Moments spectrum_to_moments(const Spec &s);
 

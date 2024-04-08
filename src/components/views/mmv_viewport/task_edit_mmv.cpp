@@ -65,6 +65,10 @@ namespace met {
       ImGui::SeparatorText("Reflectance spectrum");
       {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
+        
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Print"))
+          fmt::print("{}\n", e_sd);
         ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
       }
       // Plotter for the current constraint's resulting radiance
@@ -121,13 +125,11 @@ namespace met {
             Colr err = (lrgb - e_scene.csys(0)(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
 
-            
-
             ImGui::SeparatorText("Moment reconstruction");
             {
               const auto &e_sd = e_spectra[e_cs.vertex_i];
               auto coeff = spectrum_to_moments(e_sd);
-              auto rtrip = moments_to_spectrum(coeff);
+              auto rtrip = peters::moments_to_spectrum(coeff);
               ImGui::PlotSpectrum("##output_rtrp_plot", rtrip, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
 
               Colr a = e_scene.csys(0)(e_sd);
