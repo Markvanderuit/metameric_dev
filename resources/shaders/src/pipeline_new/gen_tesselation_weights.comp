@@ -1,6 +1,7 @@
 #include <preamble.glsl>
 #include <render/detail/scene_types.glsl>
 #include <math.glsl>
+#include <moments.glsl>
 
 // Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
 struct Elem {

@@ -6,29 +6,28 @@
 #include <numbers>
 
 namespace met {
-  /* Note; most code in this file is based on or a rewrite of
-     this src: https://momentsingraphics.de/Siggraph2019.html, following
-     "Using Moments to Represent Bounded Signals for Spectral Rendering",Peters et al., 2019. */
+  // Mostly copied from https://momentsingraphics.de/Siggraph2019.html -> MomentBasedSpectra.hlsl, 
+  // following the paper "Using Moments to Represent Bounded Signals for Spectral Rendering", 
+  // Peters et al., 2019.
 
   using MomentsRN = eig::Array<float, moment_samples + 1, 1>;
   using MomentsCN = eig::Array<eig::scomplex, moment_samples + 1, 1>;
 
   namespace detail {
-    MomentsCN trigonometric_to_exponential_moments(const MomentsRN &bm) {
+    MomentsCN trigonometric_to_exponential_moments(const MomentsRN &tm) {
       MomentsCN em = MomentsCN::Zero();
       
-      float zeroeth_phase = bm[0] * std::numbers::pi_v<float> - 0.5f * std::numbers::pi_v<float>;
+      float zeroeth_phase = tm[0] * std::numbers::pi_v<float> - 0.5f * std::numbers::pi_v<float>;
       em[0] = .0795774715f * eig::scomplex(std::cos(zeroeth_phase), std::sin(zeroeth_phase));
       
       for (uint i = 1; i < MomentsCN::RowsAtCompileTime; ++i) {
-        for (uint j = 0; j < i; ++j)
-          em[i] += bm[i - j] 
+        for (uint j = 0; j < i; ++j) {
+          em[i] += tm[i - j] 
                  * em[j] 
-                 * eig::scomplex(0.f, static_cast<float>(i - j));
-
-        em[i] *= 2.f 
-               * std::numbers::pi_v<float> 
-               / static_cast<float>(i);
+                 * eig::scomplex(0.f, 
+                    std::numbers::pi_v<float> * 2.f *
+                    static_cast<float>(i - j) / static_cast<float>(i));
+        } // for (uint j)
       } // for (uint i)
 
       em[0] = 2.0f * em[0];
@@ -60,14 +59,6 @@ namespace met {
       return rm;
     }
 
-    std::pair<MomentsCN, MomentsCN> prepare_reflectance(const MomentsRN &bm) {
-      auto em = trigonometric_to_exponential_moments(bm);
-      auto pm = levinsons_algorithm(em);
-      for (uint i = 0; i < MomentsCN::RowsAtCompileTime; ++i)
-        pm[i] = 2.f * std::numbers::pi_v<float> * pm[i];
-      return { em, pm };
-    }
-
     eig::scomplex fast_herglotz_trf(const eig::scomplex &circle_point, const MomentsCN &em, const MomentsCN &pm) {
       eig::scomplex conj_circle_point = std::conj(circle_point);
       
@@ -82,11 +73,19 @@ namespace met {
 
       return em[0] + 2.f * dp / polynomial[MomentsCN::RowsAtCompileTime - 1];
     }
+
+    std::pair<MomentsCN, MomentsCN> prepare_reflectance(const MomentsRN &bm) {
+      auto em = trigonometric_to_exponential_moments(bm);
+      auto pm = levinsons_algorithm(em);
+      for (uint i = 0; i < MomentsCN::RowsAtCompileTime; ++i)
+        pm[i] = 2.f * std::numbers::pi_v<float> * pm[i];
+      return { em, pm };
+    }
     
     float evaluate_reflectance(float phase,const MomentsCN &em, const MomentsCN &pm){
       eig::scomplex circle_point = { std::cos(phase), std::sin(phase) };
-      auto herglots_trf = fast_herglotz_trf(circle_point, em, pm);
-      return std::atan2(herglots_trf.imag(), herglots_trf.real()) * std::numbers::inv_pi_v<float> + 0.5f;
+      auto trf = fast_herglotz_trf(circle_point, em, pm);
+      return std::atan2(trf.imag(), trf.real()) * std::numbers::inv_pi_v<float> + 0.5f;
     }
       
     // If normalize_wvl is set, maps [wvl_min, wvl_max] to [0, 1] first. Otherwise

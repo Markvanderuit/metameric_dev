@@ -8,6 +8,7 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/utility.hpp>
 #include <complex>
+#include <numbers>
 
 namespace met {
   // Templated moment code
