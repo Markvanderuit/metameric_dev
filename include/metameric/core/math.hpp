@@ -1,8 +1,6 @@
 #pragma once
 
 #include <metameric/core/detail/eigen.hpp>
-#include <fmt/core.h>
-#include <fmt/ranges.h>
 
 namespace met {
   // Shorthand unsigned types

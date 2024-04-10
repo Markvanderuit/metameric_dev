@@ -1,6 +1,6 @@
+#include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <nfd.h>
-#include <fmt/core.h>
 
 namespace met::detail {
   bool load_dialog(fs::path &path, const std::string &type_filter) {

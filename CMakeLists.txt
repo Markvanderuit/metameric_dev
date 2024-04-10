@@ -345,13 +345,17 @@ add_dependencies(components shaders misc_copy)
 # Setup executables
 add_executable_r(metameric_editor src/app/metameric_editor.cpp)
 target_link_libraries(metameric_editor PRIVATE core render components)
+add_executable_r(moment_testing src/app/moment_testing.cpp)
+target_link_libraries(moment_testing PRIVATE core render components)
+add_executable_r(noise_testing src/app/noise_testing.cpp)
+target_link_libraries(noise_testing PRIVATE core render components)
 
 # Optionally setup Catch2 tests
 if (met_enable_tests)
   file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
 
   add_executable(metameric_tests ${srcs})
-  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core components)
+  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core components small_gl)
   target_compile_features(metameric_tests PUBLIC cxx_std_23)
   
   include(CTest)

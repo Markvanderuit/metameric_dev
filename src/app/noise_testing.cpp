@@ -22,7 +22,6 @@
 #include <small_gl/window.hpp>
 #include <small_gl/utility.hpp>
 #include <implot.h>
-#include <fmt/core.h>
 #include <nlohmann/json.hpp>
 #include <omp.h>
 #include <algorithm>

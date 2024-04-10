@@ -1,8 +1,8 @@
 #include <metameric/core/scene.hpp>
+#include <metameric/core/utility.hpp>
 #include <metameric/components/schedule.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/program.hpp>
-#include <fmt/core.h>
 #include <cstdlib>
 #include <exception>
 

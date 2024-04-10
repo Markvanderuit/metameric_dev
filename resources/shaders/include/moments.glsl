@@ -18,11 +18,12 @@ vec2[moment_coeffs] trigonometric_to_exponential_moments(in float[moment_coeffs]
   float zeroeth_phase = tm[0] * M_PI - 0.5f * M_PI;
   em[0] = 0.0795774715f * vec2(cos(zeroeth_phase), sin(zeroeth_phase));
 
-  for (uint i = 0; i <moment_coeffs; ++i) {
-    em[0] = vec2(0);
+  for (uint i = 1; i < moment_coeffs; ++i) {
+    em[i] = vec2(0);
     for (uint j = 0; j < i; ++j) {
       em[i] += tm[i - j] 
-             * complex_mult(em[j], vec2(0, 2.f * M_PI * float(i - j) / float(i)));
+             * complex_mult(em[j], 
+                            vec2(0, 2.f * M_PI * float(i - j) / float(i)));
     } // for (uint j)
   } // for (uint i)
 
@@ -62,7 +63,7 @@ vec2 fast_herglotz_trf(in vec2 circle_point, in vec2[moment_coeffs] em, in vec2[
 
   pm[0] = vec2(pm[0].x, 0);
   for (uint j = 1; j < moment_coeffs; ++j)
-    pm[j] = pm[j] + complex_mult(pm[j - 1], conj_circle_point);
+    pm[j] = pm[j] + complex_mult(conj_circle_point, pm[j - 1]);
   
   vec2 dp = vec2(0);
   for (uint j = 1; j < moment_coeffs; ++j)
@@ -79,7 +80,8 @@ void prepare_reflectance(in float[moment_coeffs] bm, out vec2[moment_coeffs] em,
 }
 
 float evaluate_reflectance(in float phase, in vec2[moment_coeffs] em, in vec2[moment_coeffs] pm) {
-  vec2 trf = fast_herglotz_trf(vec2(cos(phase), sin(phase)), em, pm);
+  vec2 circle_point = vec2(cos(phase), sin(phase));
+  vec2 trf = fast_herglotz_trf(circle_point, em, pm);
   return atan(trf.y, trf.x) * M_PI_INV + .5f;
 }
 
@@ -90,15 +92,45 @@ vec4 evaluate_reflectance(in vec4 phase, in vec2[moment_coeffs] em, in vec2[mome
   return rv;
 }
 
+float wvl_to_phase(in float wvl) { // wvls is [0, 1]-bound already during rendering
+  return M_PI * wvl - M_PI;
+}
+
 vec4 wvls_to_phase(in vec4 wvls) { // wvls is [0, 1]-bound already during rendering
   return M_PI * wvls - vec4(M_PI);
 }
+
+/* float moment_to_spectrum(in float wvl, in float[moment_coeffs] bm) {
+  vec2[moment_coeffs] em;
+  vec2[moment_coeffs] pm;
+  prepare_reflectance(bm, em, pm);
+  return evaluate_reflectance(wvl_to_phase(wvl), em, pm);
+} */
 
 vec4 moment_to_spectrum(in vec4 wvls, in float[moment_coeffs] bm) {
   vec2[moment_coeffs] em;
   vec2[moment_coeffs] pm;
   prepare_reflectance(bm, em, pm);
   return evaluate_reflectance(wvls_to_phase(wvls), em, pm);
+}
+
+float[moment_coeffs] unpack_moments_12x10(in ivec4 p) {
+  float[moment_coeffs] m;
+
+  m[0]  = (float(bitfieldExtract(p[0], 0,  10)) / 512.f);
+  m[1]  = (float(bitfieldExtract(p[0], 10, 10)) / 512.f);
+  m[2]  = (float(bitfieldExtract(p[0], 20, 10)) / 512.f);
+  m[3]  = (float(bitfieldExtract(p[1], 0,  10)) / 512.f);
+  m[4]  = (float(bitfieldExtract(p[1], 10, 10)) / 512.f);
+  m[5]  = (float(bitfieldExtract(p[1], 20, 10)) / 512.f);
+  m[6]  = (float(bitfieldExtract(p[2], 0,  10)) / 512.f);
+  m[7]  = (float(bitfieldExtract(p[2], 10, 10)) / 512.f);
+  m[8]  = (float(bitfieldExtract(p[2], 20, 10)) / 512.f);
+  m[9]  = (float(bitfieldExtract(p[3], 0,  10)) / 512.f);
+  m[10] = (float(bitfieldExtract(p[3], 10, 10)) / 512.f);
+  m[11] = (float(bitfieldExtract(p[3], 20, 10)) / 512.f);
+
+  return m;
 }
 
 #endif // MOMENTS_GLSL_GUARD
