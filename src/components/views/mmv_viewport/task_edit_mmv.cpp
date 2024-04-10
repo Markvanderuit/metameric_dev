@@ -70,9 +70,14 @@ namespace met {
         if (ImGui::SmallButton("Print"))
           fmt::print("{}\n", e_sd);
 
+        auto moment_coeffs              = spectrum_to_moments(e_sd);
+        moment_coeffs = unpack_moments_12x10(pack_moments_12x10(moment_coeffs));
         std::vector<std::string> legend = { "Reflectance", "MESE" };
-        std::vector<Spec>        data   = { e_sd, moments_to_spectrum(spectrum_to_moments(e_sd)) };
+        std::vector<Spec>        data   = { e_sd, moments_to_spectrum(moment_coeffs) };
+
         ImGui::PlotSpectra("##output_refl_plot", legend, data, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
+
+        ImGui::Text(fmt::format("{}", moment_coeffs).c_str());
       }
 
       // Plotter for the current constraint's resulting radiance
