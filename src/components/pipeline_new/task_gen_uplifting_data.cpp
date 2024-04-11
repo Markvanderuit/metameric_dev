@@ -41,8 +41,10 @@ namespace met {
     // the gen_object_data task to generate barycentric weights for the objects' textures
     info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                             .flags = buffer_create_flags });
     info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * max_supported_constraints, .flags = buffer_create_flags });
+    info("tesselation_coef").init<gl::Buffer>({ .size = sizeof(SpecCoefLayout) * max_supported_constraints, .flags = buffer_create_flags });
     m_tesselation_data_map = info("tesselation_data").getw<gl::Buffer>().map_as<MeshDataLayout>(buffer_access_flags).data();
     m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<MeshPackLayout>(buffer_access_flags);
+    m_tesselation_coef_map = info("tesselation_coef").getw<gl::Buffer>().map_as<SpecCoefLayout>(buffer_access_flags);
 
     // Initialize buffer to hold packed spectral data; this buffer is copied over to a texture
     // in <scene.components.upliftings.gl.*> for fast access during rendering
@@ -89,6 +91,11 @@ namespace met {
                                                             .seed             = 4,
                                                             .n_samples        = n_system_boundary_samples });
 
+      // For each spectrum, generate coefficients for moment-based representation
+      m_csys_boundary_coeffs.resize(m_csys_boundary_spectra.size());
+      std::transform(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), 
+                     m_csys_boundary_coeffs.begin(), spectrum_to_moments);
+
       // For each spectrum, add a point to the set of tesselation points for later
       m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
       std::transform(std::execution::par_unseq, 
@@ -102,9 +109,11 @@ namespace met {
     // total nr. of vertices = boundary vertices + inner constraint vertices
     m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
     m_tesselation_spectra.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
+    m_tesselation_coeffs.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
 
-    // Copy boundary spectra over to vertex spectra
+    // Copy boundary spectra over to vertex spectra, generate corresponding moment coefficients, and update
     std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), m_tesselation_spectra.begin());
+    std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_coeffs),  m_tesselation_coeffs.begin());
 
     // 2. Generate constraint spectra
     // Iterate over stale constraint data, and generate corresponding spectra
@@ -119,8 +128,9 @@ namespace met {
       // this is handled in Scene object to keep it away from the pipeline
       auto [c, s] = e_vert.realize(e_scene, e_uplifting);
       
-      // Add to set of spectra, and to tesselation input points
+      // Add to set of spectra and coefficients
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
+      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = spectrum_to_moments(s);
 
       // We only update vertices in the tesselation if the 'primary' has updated
       // as otherwise we'd trigger re-tesselation on every constraint modification
@@ -175,14 +185,20 @@ namespace met {
         
         // Data is transposed and reshaped into a [wvls, 4]-shaped object for gpu-side layout
         SpecPackLayout pack;
-        for (uint i = 0; i < 4; ++i) {
+        for (uint i = 0; i < 4; ++i)
           pack.col(i) = m_tesselation_spectra[el[i]];
-        }
         m_buffer_spec_pack_map[i] = pack.transpose().reshaped(wavelength_samples, 4);
+
+        // Moment coefficients are stored directly
+        SpecCoefLayout coeffs;
+        for (uint i = 0; i < 4; ++i)
+          coeffs.col(i) = m_tesselation_coeffs[el[i]];
+        m_tesselation_coef_map[i] = coeffs;
       }
 
       // Flush changes to GL-side 
       m_buffer_spec_pack.flush();
+      info("tesselation_coef").getw<gl::Buffer>().flush();
       
       // Do pixel-buffer copy of packed spectra to sampleable texture
       e_scene.components.upliftings.gl.texture_spectra.set(m_buffer_spec_pack, 0, { wavelength_samples, m_tesselation_data_map->elem_size },
@@ -213,7 +229,7 @@ namespace met {
           .type           = gl::PrimitiveType::eTriangles,
           .vertex_count   = (uint) (m_buffer_viewer_elems.size() / sizeof(uint)),
           .capabilities   = {{ gl::DrawCapability::eDepthTest, true },
-                            { gl::DrawCapability::eCullOp,   false }},
+                             { gl::DrawCapability::eCullOp,   false }},
           .draw_op        = gl::DrawOp::eLine,
           .bindable_array = &m_buffer_viewer_array
         });

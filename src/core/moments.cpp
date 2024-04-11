@@ -108,8 +108,9 @@ namespace met {
     // TODO extract from computation as hardcoded table
     Spec input_phase;
     rng::copy(vws::iota(0u, wavelength_samples) 
-      | vws::transform(wavelength_at_index)
-      | vws::transform(std::bind(detail::wavelength_to_phase, _1, true)), 
+      | vws::transform([](uint i) {
+        return (static_cast<float>(i) + .5f) / static_cast<float>(wavelength_samples); })
+      | vws::transform(std::bind(detail::wavelength_to_phase, _1, false)), 
       input_phase.begin());
 
     // Expand out of range values 
@@ -132,7 +133,7 @@ namespace met {
         auto flt_j  = static_cast<float>(j);
 
         auto common_summands = gradient * rcp_j2
-                             + y_inscpt * (1.0if / flt_j);
+                            + y_inscpt * (1.0if / flt_j);
         moments[j] += (common_summands + gradient * 1.0if * flt_j * phase[i + 1] * rcp_j2)
                     * std::exp(-1.0if * flt_j * phase[i + 1]);
         moments[j] -= (common_summands + gradient * 1.0if * flt_j * phase[i] * rcp_j2)
@@ -156,8 +157,9 @@ namespace met {
     // TODO extract from computation as hardcoded table
     Spec phase;
     rng::copy(vws::iota(0u, wavelength_samples) 
-      | vws::transform(wavelength_at_index)
-      | vws::transform(std::bind(detail::wavelength_to_phase, _1, true)), 
+      | vws::transform([](uint i) {
+        return (static_cast<float>(i) + .5f) / static_cast<float>(wavelength_samples); })
+      | vws::transform(std::bind(detail::wavelength_to_phase, _1, false)), 
       phase.begin());
 
     auto [em, pm] = detail::prepare_reflectance(bm);

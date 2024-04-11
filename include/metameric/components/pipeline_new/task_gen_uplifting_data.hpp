@@ -2,6 +2,7 @@
 
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/record.hpp>
+#include <metameric/core/moments.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <small_gl/array.hpp>
@@ -23,26 +24,34 @@ namespace met {
       eig::Matrix<float, 4, 1> sub; // Last value is padding
     };
 
+    // Helper data for four coefficients vectors, describing the four spectra generated
+    // for the four vertices of a tetrahedron. Used in gen_object_data to determine the
+    // per-pixel coefficients on a parameterized texture over the object surface.
+    using SpecCoefLayout = eig::Array<float, moment_coeffs, 4>;
+
     // Packed spectrum representation; four spectra interleaved per tetrahedron
     // ensure we can access all four spectra as one texture sample during rendering
-    using SpecPackLayout = eig::Array<float, wavelength_samples, 4>;
+    using SpecPackLayout  = eig::Array<float, wavelength_samples, 4>;
 
     // Miscellaneous data
-    uint              m_uplifting_i;
-    std::vector<Spec> m_csys_boundary_spectra;
+    uint                 m_uplifting_i;
+    std::vector<Spec>    m_csys_boundary_spectra;
+    std::vector<Moments> m_csys_boundary_coeffs;
 
     // Delaunay tesselation connecting colors/spectra on both
     // the boundary and interally in the color space, as well
     // as access to the packed gl-side data, which is used in
     // gen_objects_data to generate barycentric weights
-    AlDelaunay                 m_tesselation;
-    std::span<MeshPackLayout>  m_tesselation_pack_map;
-    MeshDataLayout            *m_tesselation_data_map;
+    AlDelaunay                m_tesselation;
+    std::span<MeshPackLayout> m_tesselation_pack_map;
+    MeshDataLayout           *m_tesselation_data_map;
+    std::span<SpecCoefLayout> m_tesselation_coef_map;
 
-    // Color positions and corresponding assigned spectra in the 
-    // delaunay tesselation
-    std::vector<Colr> m_tesselation_points;
-    std::vector<Spec> m_tesselation_spectra;
+    // Color positions, corresponding assigned spectra, and derived coefficients
+    // in the delaunay tesselation
+    std::vector<Colr>    m_tesselation_points;
+    std::vector<Spec>    m_tesselation_spectra;
+    std::vector<Moments> m_tesselation_coeffs;
 
     // Buffer and accompanying mapping, store per-tetrahedron spectra
     // in an interleaved format. This data is copied to upliftings.gl

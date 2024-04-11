@@ -92,45 +92,45 @@ vec4 evaluate_reflectance(in vec4 phase, in vec2[moment_coeffs] em, in vec2[mome
   return rv;
 }
 
-float wvl_to_phase(in float wvl) { // wvls is [0, 1]-bound already during rendering
-  return M_PI * wvl - M_PI;
-}
+// Wavelengths are [0, 1] already during rendering
+float wvl_to_phase(in float wvl) { return M_PI * wvl - M_PI;       }
+vec4  wvl_to_phase(in vec4 wvl)  { return M_PI * wvl - vec4(M_PI); }
 
-vec4 wvls_to_phase(in vec4 wvls) { // wvls is [0, 1]-bound already during rendering
-  return M_PI * wvls - vec4(M_PI);
-}
-
-/* float moment_to_spectrum(in float wvl, in float[moment_coeffs] bm) {
-  vec2[moment_coeffs] em;
-  vec2[moment_coeffs] pm;
+float moments_to_reflectance(in float wvl, in float[moment_coeffs] bm) {
+  vec2[moment_coeffs] em, pm;
   prepare_reflectance(bm, em, pm);
   return evaluate_reflectance(wvl_to_phase(wvl), em, pm);
-} */
-
-vec4 moment_to_spectrum(in vec4 wvls, in float[moment_coeffs] bm) {
-  vec2[moment_coeffs] em;
-  vec2[moment_coeffs] pm;
-  prepare_reflectance(bm, em, pm);
-  return evaluate_reflectance(wvls_to_phase(wvls), em, pm);
 }
 
-float[moment_coeffs] unpack_moments_12x10(in ivec4 p) {
+vec4 moments_to_reflectance(in vec4 wvls, in float[moment_coeffs] bm) {
+  vec2[moment_coeffs] em, pm;
+  prepare_reflectance(bm, em, pm);
+  return evaluate_reflectance(wvl_to_phase(wvls), em, pm);
+}
+
+float[moment_coeffs] unpack_moments_12x10(in uvec4 p) {
   float[moment_coeffs] m;
-
-  m[0]  = (float(bitfieldExtract(p[0], 0,  10)) / 512.f);
-  m[1]  = (float(bitfieldExtract(p[0], 10, 10)) / 512.f);
-  m[2]  = (float(bitfieldExtract(p[0], 20, 10)) / 512.f);
-  m[3]  = (float(bitfieldExtract(p[1], 0,  10)) / 512.f);
-  m[4]  = (float(bitfieldExtract(p[1], 10, 10)) / 512.f);
-  m[5]  = (float(bitfieldExtract(p[1], 20, 10)) / 512.f);
-  m[6]  = (float(bitfieldExtract(p[2], 0,  10)) / 512.f);
-  m[7]  = (float(bitfieldExtract(p[2], 10, 10)) / 512.f);
-  m[8]  = (float(bitfieldExtract(p[2], 20, 10)) / 512.f);
-  m[9]  = (float(bitfieldExtract(p[3], 0,  10)) / 512.f);
-  m[10] = (float(bitfieldExtract(p[3], 10, 10)) / 512.f);
-  m[11] = (float(bitfieldExtract(p[3], 20, 10)) / 512.f);
-
+  for (int i = 0; i < moment_coeffs; ++i) {
+    uint j = bitfieldExtract(p[i / 3],              // 0,  0,  0,  1,  1,  1,  ...
+                             i % 3 * 11,            // 0,  11, 22, 0,  11, 22, ...
+                             i % 3 == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
+    float scale = i % 3 == 2 ? 0.0009765625f : 0.0004882813f;
+    m[i] = (float(j) * scale) * 2.f - 1.f;
+  }
   return m;
+}
+
+uvec4 pack_moments_12x10(in float[moment_coeffs] m) {
+  uvec4 p;
+  for (int i = 0; i < moment_coeffs; ++i) {
+    float scale = i % 3 == 2 ? 512.f : 1024.f;
+    uint j = uint(round((m[i] + 1.f) * .5f * scale));
+    p[i / 3] = bitfieldInsert(p[i / 3],
+                              j,
+                              i % 3 * 11,
+                              i % 3 == 2 ? 10 : 11);
+  }
+  return p;
 }
 
 #endif // MOMENTS_GLSL_GUARD

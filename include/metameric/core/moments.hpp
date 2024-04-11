@@ -18,27 +18,29 @@ namespace met {
   // Bit packing helper
   inline
   eig::Array4u pack_moments_12x10(const Moments &m) {
-    constexpr auto pack = [](float f) -> int {
-      return static_cast<int>(std::round((std::clamp(f, -1.f, 1.f) * 512.f)));
+    constexpr auto pack = [](float f, float scale) -> uint { 
+      return static_cast<uint>(std::round((std::clamp(f, -1.f, 1.f) + 1.f) * 0.5f * scale));
     };
+    constexpr auto pack_11 = std::bind(pack, std::placeholders::_1, 2048.f);
+    constexpr auto pack_10 = std::bind(pack, std::placeholders::_1, 1024.f);
     
     union pack_t { 
       struct {
-        int b0 : 10 = 0; int b1  : 10 = 0; int b2  : 10 = 0; int p0 : 2 = 0;
-        int b3 : 10 = 0; int b4  : 10 = 0; int b5  : 10 = 0; int p1 : 2 = 0;
-        int b6 : 10 = 0; int b7  : 10 = 0; int b8  : 10 = 0; int p2 : 2 = 0;
-        int b9 : 10 = 0; int b10 : 10 = 0; int b11 : 10 = 0; int p3 : 2 = 0;
+        uint b0 : 11; uint b1  : 11; uint b2  : 10; /* uint p0 : 2; */
+        uint b3 : 11; uint b4  : 11; uint b5  : 10; /* uint p1 : 2; */
+        uint b6 : 11; uint b7  : 11; uint b8  : 10; /* uint p2 : 2; */
+        uint b9 : 11; uint b10 : 11; uint b11 : 10; /* uint p3 : 2; */
       } in;
       
       eig::Array4u out; 
       
-      pack_t() { std::memset(&in, 0, sizeof(pack_t::in)); };
+      pack_t() { std::memset(&in, 0u, sizeof(pack_t::in)); };
     } u;
 
-    u.in.b0  = pack(m[0]); u.in.b1  = pack(m[1]);  u.in.b2  = pack(m[2]);
-    u.in.b3  = pack(m[3]); u.in.b4  = pack(m[4]);  u.in.b5  = pack(m[5]);
-    u.in.b6  = pack(m[6]); u.in.b7  = pack(m[7]);  u.in.b8  = pack(m[8]);
-    u.in.b9  = pack(m[9]); u.in.b10 = pack(m[10]); u.in.b11 = pack(m[11]);
+    u.in.b0  = pack_11(m[0]); u.in.b1  = pack_11(m[1]);  u.in.b2  = pack_10(m[2]);
+    u.in.b3  = pack_11(m[3]); u.in.b4  = pack_11(m[4]);  u.in.b5  = pack_10(m[5]);
+    u.in.b6  = pack_11(m[6]); u.in.b7  = pack_11(m[7]);  u.in.b8  = pack_10(m[8]);
+    u.in.b9  = pack_11(m[9]); u.in.b10 = pack_11(m[10]); u.in.b11 = pack_10(m[11]);
 
     return u.out;
   }
@@ -46,18 +48,23 @@ namespace met {
   // Bit unpacking helper
   inline
   Moments unpack_moments_12x10(const eig::Array4u &p) {
-    constexpr auto unpack = [](int i) -> float {
-      return static_cast<float>(i) / 512.f;
+    constexpr auto unpack_11 = [](uint i) -> float { 
+      float f = static_cast<float>(i) / 2048.f;
+      return f * 2.f - 1.f;
+    };
+    constexpr auto unpack_10 = [](uint i) -> float {
+      float f = static_cast<float>(i) / 1024.f;
+      return f * 2.f - 1.f;
     };
     
     union pack_t { 
       eig::Array4u in; 
 
       struct {
-        int b0 : 10 = 0; int b1  : 10 = 0; int b2  : 10 = 0; int p0 : 2 = 0;
-        int b3 : 10 = 0; int b4  : 10 = 0; int b5  : 10 = 0; int p1 : 2 = 0;
-        int b6 : 10 = 0; int b7  : 10 = 0; int b8  : 10 = 0; int p2 : 2 = 0;
-        int b9 : 10 = 0; int b10 : 10 = 0; int b11 : 10 = 0; int p3 : 2 = 0;
+        uint b0 : 11; uint b1  : 11; uint b2  : 10;
+        uint b3 : 11; uint b4  : 11; uint b5  : 10;
+        uint b6 : 11; uint b7  : 11; uint b8  : 10;
+        uint b9 : 11; uint b10 : 11; uint b11 : 10;
       } out;
       
       pack_t() { std::memset(&in, 0, sizeof(pack_t::in)); };
@@ -65,11 +72,11 @@ namespace met {
 
     u.in = p;
 
-    return Moments({
-      unpack(u.out.b0), unpack(u.out.b1),  unpack(u.out.b2),  
-      unpack(u.out.b3), unpack(u.out.b4),  unpack(u.out.b5),  
-      unpack(u.out.b6), unpack(u.out.b7),  unpack(u.out.b8),  
-      unpack(u.out.b9), unpack(u.out.b10), unpack(u.out.b11),  
-    });
+    return Moments {
+      unpack_11(u.out.b0), unpack_11(u.out.b1),  unpack_10(u.out.b2),  
+      unpack_11(u.out.b3), unpack_11(u.out.b4),  unpack_10(u.out.b5),  
+      unpack_11(u.out.b6), unpack_11(u.out.b7),  unpack_10(u.out.b8),  
+      unpack_11(u.out.b9), unpack_11(u.out.b10), unpack_10(u.out.b11),  
+    };
   }
 } // namespace met

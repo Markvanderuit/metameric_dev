@@ -1,5 +1,6 @@
 #include <preamble.glsl>
 #include <math.glsl>
+#include <moments.glsl>
 #include <render/detail/scene_types.glsl>
 
 // Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
@@ -16,8 +17,9 @@ layout(std140) uniform;
 layout(constant_id = 0) const bool sample_albedo = true;
 
 // Fragment stage declarations
-layout(location = 0) in  vec2 in_txuv;    // Per-fragment original texture UVs, adjusted to atlas
-layout(location = 0) out vec4 out_weight; // Per fragment barycentric coordinates and spectrum index
+layout(location = 0) in  vec2 in_txuv;   // Per-fragment original texture UVs, adjusted to atlas
+// layout(location = 0) out vec4 out_coeff; // Per fragment MESE representations of texel spectra
+layout(location = 0) out vec4  out_weight; // Per fragment barycentric coordinates and spectrum index
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
@@ -26,6 +28,9 @@ layout(binding = 0) restrict readonly buffer b_buff_atlas {
 layout(binding = 1) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
+layout(binding = 2) restrict readonly buffer b_buff_uplift_coef { 
+  float[moment_coeffs][4][max_supported_constraints] data; 
+} buff_uplift_coef;
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
@@ -65,7 +70,7 @@ void main() {
     p = object.albedo_v;
   }
   
-  // Next, brute-force search for the corresponding barycentric weights
+  // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
   float result_err = FLT_MAX;
   vec4  result_bary;
   uint  result_indx;
@@ -84,6 +89,16 @@ void main() {
     result_indx = j + buff_uplift_data.offs;
   } // for (uint j)
 
+  // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
+  float[moment_coeffs] coeffs;
+  for (uint i = 0; i < moment_coeffs; ++i) {
+    coeffs[i] = 0.f;
+    for (uint j = 0; j < 4; ++j)
+      coeffs[i] += result_bary[j] * buff_uplift_coef.data[result_indx][j][i];
+  } // for (uint i)
+
+  out_weight = uintBitsToFloat(pack_moments_12x10(coeffs));
+
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
-  out_weight = vec4(result_bary.xyz, float(result_indx));
+  // out_weight = vec4(result_bary.xyz, float(result_indx));
 }
