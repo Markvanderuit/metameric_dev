@@ -128,6 +128,21 @@ namespace Eigen {
     }
   };
 
+  /* Define useful functions */
+
+  // One-dimensional piecewise linear interpolation:
+  // x  - array of sample points in [0, 1]
+  // xp - array of data values to sample
+  template <typename T, typename Tp>
+  T interp(const T &x, const Tp &xp) {
+    return x.unaryExpr([&xp](const float x) {
+      float xa = (x * Tp::RowsAtCompileTime);
+      float xl = static_cast<unsigned>(std::max(std::floor(xa), 0.f));
+      float xu = static_cast<unsigned>(std::min(std::ceil(xa), Tp::RowsAtCompileTime - 1));
+      return std::lerp(xp[xl], xp[xu], xa - static_cast<float>(xl));
+    }).eval();
+  }
+
   /* Define useful integer types */
 
   using Array1us = Array<unsigned short, 1, 1>;
