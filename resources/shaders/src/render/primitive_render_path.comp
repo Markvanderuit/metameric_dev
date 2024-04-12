@@ -68,7 +68,8 @@ layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack dat
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler2DArray   b_txtr_1f; // Alpha texture atlas
 layout(binding = 1)          uniform sampler2DArray   b_txtr_3f; // RGB texture atlas
-layout(binding = 2)          uniform sampler2DArray   b_bary_4f; // Uplifting weight atlas
+// layout(binding = 2)          uniform sampler2DArray   b_bary_4f; // Uplifting weight atlas
+layout(binding = 2)          uniform usampler2DArray  b_bary_4f; // Uplifting weight atlas
 layout(binding = 3)          uniform sampler1DArray   b_spec_4f; // Uplifting spectral atlas
 layout(binding = 4)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 5)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components

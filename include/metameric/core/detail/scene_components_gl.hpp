@@ -90,7 +90,8 @@ namespace met::detail {
   template <>
   class GLPacking<met::Uplifting> {
     using texture_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
-    using atlas_type   = TextureAtlas<float, 4>;
+    // using atlas_type   = TextureAtlas<float, 4>;
+    using atlas_type   = TextureAtlas<uint, 4>;
 
   public:
     // Atlas texture; each per-object patch stored in this atlas holds barycentric

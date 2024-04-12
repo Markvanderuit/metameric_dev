@@ -18,7 +18,8 @@
     return textureGather(scene_txtr_bary_data, p, 3);                 \
   }                                                                   \
                                                                       \
-  vec4 scene_barycentric_data_texture(vec3 p) {                       \
+  // vec4 scene_barycentric_data_texture(vec3 p) {                      \
+  uvec4 scene_barycentric_data_texture(vec3 p) {                      \
     return texture(scene_txtr_bary_data, p);                          \
   }                                                                   \
                                                                       \

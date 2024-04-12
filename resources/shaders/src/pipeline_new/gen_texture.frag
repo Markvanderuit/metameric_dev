@@ -18,8 +18,8 @@ layout(constant_id = 0) const bool sample_albedo = true;
 
 // Fragment stage declarations
 layout(location = 0) in  vec2 in_txuv;   // Per-fragment original texture UVs, adjusted to atlas
-// layout(location = 0) out vec4 out_coeff; // Per fragment MESE representations of texel spectra
-layout(location = 0) out vec4  out_weight; // Per fragment barycentric coordinates and spectrum index
+// layout(location = 0) out vec4  out_weight; // Per fragment barycentric coordinates and spectrum index
+layout(location = 0) out uvec4 out_weight; // Per fragment MESE representations of texel spectra
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
@@ -29,7 +29,7 @@ layout(binding = 1) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
 layout(binding = 2) restrict readonly buffer b_buff_uplift_coef { 
-  float[moment_coeffs][4][max_supported_constraints] data; 
+  float[max_supported_constraints][4][moment_coeffs] data; 
 } buff_uplift_coef;
 
 // Uniform buffer declarations
@@ -97,7 +97,8 @@ void main() {
       coeffs[i] += result_bary[j] * buff_uplift_coef.data[result_indx][j][i];
   } // for (uint i)
 
-  out_weight = uintBitsToFloat(pack_moments_12x10(coeffs));
+  // Store result, outputting packed moment coefficients
+  out_weight = pack_moments_12x10(coeffs);
 
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   // out_weight = vec4(result_bary.xyz, float(result_indx));
