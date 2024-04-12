@@ -124,7 +124,7 @@ namespace met::detail {
   uint pack_half_2x16(const eig::Array2f &v) {
     union { short in[2]; uint out; } u;
     u.in[0] = detail::to_float16(v.x());
-    u.in[0] = detail::to_float16(v.y());
+    u.in[1] = detail::to_float16(v.y());
     return u.out;
   }
 

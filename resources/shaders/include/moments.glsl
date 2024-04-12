@@ -8,9 +8,10 @@
 
 #include <complex.glsl>
 
-#define moment_coeffs 12
-#define Moments_Comp vec2[moment_coeffs]
-#define Moments_Real float[moment_coeffs]
+const uint moment_coeffs = MET_MOMENT_COEFFICIENTS;
+
+#define Moments_Comp  vec2[moment_coeffs]
+#define Moments_Real  float[moment_coeffs]
 
 vec2[moment_coeffs] trigonometric_to_exponential_moments(in float[moment_coeffs] tm) {
   vec2[moment_coeffs] em;
@@ -109,28 +110,36 @@ vec4 moments_to_reflectance(in vec4 wvls, in float[moment_coeffs] bm) {
 }
 
 float[moment_coeffs] unpack_moments_12x10(in uvec4 p) {
-  float[moment_coeffs] m;
-  for (int i = 0; i < moment_coeffs; ++i) {
-    uint j = bitfieldExtract(p[i / 3],              // 0,  0,  0,  1,  1,  1,  ...
-                             i % 3 * 11,            // 0,  11, 22, 0,  11, 22, ...
-                             i % 3 == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
-    float scale = i % 3 == 2 ? 0.0009765625f : 0.0004882813f;
-    m[i] = (float(j) * scale) * 2.f - 1.f;
-  }
-  return m;
+  vec2 a = unpackHalf2x16(p[0]), b = unpackHalf2x16(p[1]),
+       c = unpackHalf2x16(p[2]), d = unpackHalf2x16(p[3]);
+  return float[moment_coeffs](a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]);
+
+  // float[moment_coeffs] m;
+  // for (int i = 0; i < moment_coeffs; ++i) {
+  //   uint j = bitfieldExtract(p[i / 3],              // 0,  0,  0,  1,  1,  1,  ...
+  //                            i % 3 * 11,            // 0,  11, 22, 0,  11, 22, ...
+  //                            i % 3 == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
+  //   float scale = i % 3 == 2 ? 0.0009765625f : 0.0004882813f;
+  //   m[i] = (float(j) * scale) * 2.f - 1.f;
+  // }
+  // return m;
 }
 
 uvec4 pack_moments_12x10(in float[moment_coeffs] m) {
-  uvec4 p;
-  for (int i = 0; i < moment_coeffs; ++i) {
-    float scale = i % 3 == 2 ? 512.f : 1024.f;
-    uint j = uint(round((m[i] + 1.f) * .5f * scale));
-    p[i / 3] = bitfieldInsert(p[i / 3],
-                              j,
-                              i % 3 * 11,
-                              i % 3 == 2 ? 10 : 11);
-  }
-  return p;
+  return uvec4(packHalf2x16(vec2(m[0], m[1])), packHalf2x16(vec2(m[2], m[3])),
+               packHalf2x16(vec2(m[4], m[5])), packHalf2x16(vec2(m[6], m[7])));
+  
+  // TODO
+  // uvec4 p;
+  // for (int i = 0; i < moment_coeffs; ++i) {
+  //   float scale = i % 3 == 2 ? 512.f : 1024.f;
+  //   uint j = uint(round((m[i] + 1.f) * .5f * scale));
+  //   p[i / 3] = bitfieldInsert(p[i / 3],
+  //                             j,
+  //                             i % 3 * 11,
+  //                             i % 3 == 2 ? 10 : 11);
+  // }
+  // return p;
 }
 
 #endif // MOMENTS_GLSL_GUARD

@@ -16,9 +16,12 @@ set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
 set(MET_WAVELENGTH_BASES    16) # Maximum nr. of bases used in generative functions
+
+# TODO remove
 set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported TODO remove
 
 # Define some constants as available on both shader and program side
+set(MET_MOMENT_COEFFICIENTS     8) # Nr. of coeffs used for moment-based spectral representation
 set(MET_SUPPORTED_MESHES       16) # Maximum supported scene meshes
 set(MET_SUPPORTED_OBJECTS      16) # Maximum supported scene objects
 set(MET_SUPPORTED_EMITTERS     16) # Maximum supported scene emitters
@@ -123,6 +126,7 @@ set(glsl_defines
   -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
   -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
   -DMET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}
+  -DMET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
   -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
   -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
@@ -313,6 +317,7 @@ target_compile_definitions(core PUBLIC
   MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
   MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES}
   MET_GENERALIZED_WEIGHTS=${MET_GENERALIZED_WEIGHTS}
+  MET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
   MET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
   MET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
   MET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}

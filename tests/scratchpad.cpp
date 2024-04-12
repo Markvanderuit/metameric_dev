@@ -9,10 +9,20 @@
 #include <metameric/core/components.hpp>
 #include <metameric/core/moments.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/core/detail/packing.hpp>
 #include <complex>
 
-// TEST_CASE("Spectrum shenanigans") {
-//   using namespace met;
+TEST_CASE("Spectrum shenanigans") {
+  using namespace met;
+  
+  eig::Array2f floats = { 0.12345, 0.54321 };
+  uint pack = detail::pack_half_2x16(floats);
+  eig::Array2f rtrip = detail::unpack_half_2x16(pack);
+
+  fmt::print("input : {}\n", floats);
+  fmt::print("rtrip : {}\n", rtrip);
+
+  
 
 //   {
 //     using namespace std::complex_literals;
@@ -43,4 +53,4 @@
 //   fmt::print("Ground {}\n", spec_gt);
 //   fmt::print("Moment {}\n", moment);
 //   fmt::print("Rntrip {}\n", spec_m); */
-// }
+}

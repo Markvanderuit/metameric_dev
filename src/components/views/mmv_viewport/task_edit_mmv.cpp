@@ -60,20 +60,28 @@ namespace met {
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
       // Get modified vertex
       auto &vert = uplf.value.verts[e_cs.vertex_i];
+
+      if (ImGui::Button("Print range")) {
+        Spec phase;
+        rng::copy(vws::iota(0u, wavelength_samples)| vws::transform(wavelength_at_index), phase.begin());
+        fmt::print("{}\n", phase);
+      }
       
       // Plotter for the current constraint's resulting spectrum
       ImGui::SeparatorText("Reflectance spectrum");
       {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
+
         
         ImGui::SameLine();
         if (ImGui::SmallButton("Print"))
           fmt::print("{}\n", e_sd);
 
-        auto moment_coeffs              = spectrum_to_moments(e_sd);
+        auto moment_coeffs = spectrum_to_moments(e_sd);
         moment_coeffs = unpack_moments_12x10(pack_moments_12x10(moment_coeffs));
+
         std::vector<std::string> legend = { "Reflectance", "MESE" };
-        std::vector<Spec>        data   = { e_sd, moments_to_spectrum(moment_coeffs) };
+        std::vector<Spec>        data   = { e_sd, moments_to_spectrum/* _lagrange */(moment_coeffs) };
 
         ImGui::PlotSpectra("##output_refl_plot", legend, data, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
 
