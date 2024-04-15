@@ -90,17 +90,24 @@ namespace met::detail {
   template <>
   class GLPacking<met::Uplifting> {
     using texture_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
-    // using atlas_type   = TextureAtlas<float, 4>;
-    using atlas_type   = TextureAtlas<uint, 4>;
+    using atlas_type_f = TextureAtlas<float, 4>;
+    using atlas_type_u = TextureAtlas<uint, 4>;
 
   public:
     // Atlas texture; each per-object patch stored in this atlas holds barycentric
     // weights and an index, referring to one set of four spectra in `texture_spectra`
-    atlas_type texture_barycentrics;
+    atlas_type_f texture_barycentrics;
+    
+    // Atlas texture; each per-object patch stored in this atlas holds moment coefficients
+    // for spectral MESE method
+    atlas_type_u texture_coefficients;
 
     // Array texture; each layer holds one set of four spectra, packed together s.t.
     // one texture sample equates four reflectances at a single wavelength
     texture_type texture_spectra;
+
+    // Warped phase data for spectral MESE method
+    gl::Texture1d1f texture_warp;
 
   public:
     GLPacking();

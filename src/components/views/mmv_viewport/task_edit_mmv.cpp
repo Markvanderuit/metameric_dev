@@ -76,7 +76,7 @@ namespace met {
         ImGui::SameLine();
         if (ImGui::SmallButton("Print"))
           fmt::print("{}\n", e_sd);
-
+        
         auto moment_coeffs = spectrum_to_moments(e_sd);
         moment_coeffs = unpack_moments_12x10(pack_moments_12x10(moment_coeffs));
 

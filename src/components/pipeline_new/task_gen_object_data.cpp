@@ -83,14 +83,20 @@ namespace met {
 
     // Find relevant patch in texture atlas
     const auto &e_barycentrics = e_scene.components.upliftings.gl.texture_barycentrics;
+    const auto &e_coefficients = e_scene.components.upliftings.gl.texture_coefficients;
     const auto &e_patch        = e_barycentrics.patch(m_object_i);
 
     // Rebuild framebuffer if necessary
     if (is_first_eval() || e_barycentrics.is_invalitated() || m_atlas_layer_i != e_patch.layer_i) {
       m_atlas_layer_i = e_patch.layer_i;
       m_fbo = {{ .type       = gl::FramebufferType::eColor,
+                 .index      = 0,
                  .attachment = &e_barycentrics.texture(),
-                 .layer      = m_atlas_layer_i }}; // Should be zero, but depends on if we used the layered atlas or not
+                 .layer      = m_atlas_layer_i },
+               { .type       = gl::FramebufferType::eColor,
+                 .index      = 1,
+                 .attachment = &e_coefficients.texture(),
+                 .layer      = m_atlas_layer_i }};
     } 
     
     // Get external resources from object's corresponding, selected uplifting
@@ -128,7 +134,8 @@ namespace met {
 
       // Prepare framebuffer, clear relevant patch (not necessary actually)
       m_fbo.bind();
-      m_fbo.clear(gl::FramebufferType::eColor, 0);
+      m_fbo.clear(gl::FramebufferType::eColor, 0, 0);
+      m_fbo.clear(gl::FramebufferType::eColor, 0, 1);
 
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
@@ -140,7 +147,7 @@ namespace met {
       }
 
       // Dispatch draw call
-      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
+      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer       | 
                               gl::BarrierFlags::eTextureFetch       |
                               gl::BarrierFlags::eClientMappedBuffer |
                               gl::BarrierFlags::eStorageBuffer      | 
@@ -150,8 +157,8 @@ namespace met {
         .vertex_count   = command.vertex_count,
         .vertex_first   = command.vertex_first,
         .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
-                          { gl::DrawCapability::eCullOp,    false },
-                          { gl::DrawCapability::eBlendOp,   false }},
+                           { gl::DrawCapability::eCullOp,    false },
+                           { gl::DrawCapability::eBlendOp,   false }},
         .draw_op        = gl::DrawOp::eFill,
         .bindable_array = &e_scene.resources.meshes.gl.array
       });

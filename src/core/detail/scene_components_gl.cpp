@@ -1,5 +1,6 @@
 #include <metameric/core/detail/scene_components_gl.hpp>
 #include <metameric/core/distribution.hpp>
+#include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/scene.hpp>
@@ -145,6 +146,12 @@ namespace met::detail {
     // Initialize texture atlas to hold per-object barycentric weights, for
     // fast access during rendering; this is resized when necessary in update()
     texture_barycentrics = {{ .levels  = 1, .padding = 0 }};
+    texture_coefficients = {{ .levels  = 1, .padding = 0 }};
+
+    // Initialize warped phase data for spectral MESE method
+    auto warp_data = generate_warped_phase();
+    texture_warp = {{ .size = { static_cast<uint>(warp_data.size()) },
+                      .data = cnt_span<const float>(warp_data)      }};
   }
 
   void GLPacking<met::Uplifting>::update(std::span<const detail::Component<met::Uplifting>> upliftings, const Scene &scene) {
@@ -155,6 +162,7 @@ namespace met::detail {
     
     // Barycentric texture has not been touched yet
     scene.components.upliftings.gl.texture_barycentrics.set_invalitated(false);
+    scene.components.upliftings.gl.texture_coefficients.set_invalitated(false);
 
     // Only rebuild if there are upliftings and objects
     guard(!upliftings.empty() && !e_objects.empty());
@@ -196,6 +204,7 @@ namespace met::detail {
     // Note; barycentric weights will need a full rebuild, which is detected
     //       by the nr. of objects changing or the texture setting changing. A bit spaghetti.
     texture_barycentrics.resize(inputs);
+    texture_coefficients.resize(inputs);
     if (texture_barycentrics.is_invalitated()) {
       // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
       // So in a case of really bad spaghetti-code, we force object-dependent parts of the pipeline 
@@ -203,7 +212,7 @@ namespace met::detail {
       auto &e_scene = const_cast<Scene &>(scene);
       e_scene.components.objects.set_mutated(true);
 
-      fmt::print("Rebuilt texture weights atlas\n");
+      fmt::print("Rebuilt texture atlases\n");
       for (const auto &patch : texture_barycentrics.patches()) {
         fmt::print("\toffs = {}, size = {}, uv0 = {}, uv1 = {}\n", patch.offs, patch.size, patch.uv0, patch.uv1);
       }

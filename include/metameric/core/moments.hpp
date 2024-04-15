@@ -17,7 +17,8 @@ namespace met {
   float        moments_to_reflectance(float wvl, const Moments &m);
   eig::Array4f moments_to_reflectance(const eig::Array4f &wvls, const Moments &m);
   
-  Spec get_space_warp();
+  Spec generate_uniform_phase();
+  Spec generate_warped_phase();
 
   // Bit packing helper
   inline

@@ -2,6 +2,7 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
+#include <array>
 #include <complex>
 #include <numbers>
 
@@ -11,6 +12,32 @@ namespace met {
   // Peters et al., 2019.
 
   using MomentsCN = eig::Array<eig::scomplex, moment_coeffs, 1>;
+
+  // Helpers to convert wavelengths in this program's smaller wavelength range
+  // to the correct phase warp in the full CIE range.
+  constexpr float warp_wavelength_min = 360.f;
+  constexpr float warp_wavelength_max = 830.f;
+  constexpr float warp_offs = (static_cast<float>(wavelength_min) - warp_wavelength_min) 
+                            / (warp_wavelength_max - warp_wavelength_min);
+  constexpr float warp_mult = (static_cast<float>(wavelength_max - wavelength_min)) 
+                            / (warp_wavelength_max - warp_wavelength_min);
+
+  // Fitted phase warp data for the full CIE range.
+  const eig::Array<float, 95, 1> warp_data = { 
+    -3.141592654, -3.141592654, -3.141592654, -3.141592654, -3.141591857, -3.141590597, -3.141590237,
+    -3.141432053, -3.140119041, -3.137863071, -3.133438967, -3.123406739, -3.106095749, -3.073470612,
+    -3.024748900, -2.963566246, -2.894461907, -2.819659701, -2.741784136, -2.660533432, -2.576526605,
+    -2.490368187, -2.407962868, -2.334138406, -2.269339880, -2.213127747, -2.162806279, -2.114787412,
+    -2.065873394, -2.012511127, -1.952877310, -1.886377224, -1.813129945, -1.735366957, -1.655108108,
+    -1.573400329, -1.490781436, -1.407519056, -1.323814008, -1.239721795, -1.155352390, -1.071041833,
+    -0.986956525, -0.903007113, -0.819061538, -0.735505101, -0.653346027, -0.573896987, -0.498725202,
+    -0.428534515, -0.363884284, -0.304967687, -0.251925536, -0.205301867, -0.165356255, -0.131442191,
+    -0.102998719, -0.079687644, -0.061092401, -0.046554594, -0.035419229, -0.027113640, -0.021085743,
+    -0.016716885, -0.013468661, -0.011125245, -0.009497032, -0.008356318, -0.007571826, -0.006902676,
+    -0.006366945, -0.005918355, -0.005533442, -0.005193920, -0.004886397, -0.004601975, -0.004334090,
+    -0.004077698, -0.003829183, -0.003585923, -0.003346286, -0.003109231, -0.002873996, -0.002640047,
+    -0.002406990, -0.002174598, -0.001942639, -0.001711031, -0.001479624, -0.001248405, -0.001017282,
+    -0.000786134, -0.000557770, -0.000332262,  0.000000000 };
 
   namespace detail {
     MomentsCN trigonometric_to_exponential_moments(const Moments &tm) {
@@ -135,20 +162,30 @@ namespace met {
     }
   } // namespace detail
 
-  // TODO; add warp
-  Moments spectrum_to_moments(const Spec &input_signal) {
+
+  Moments spectrum_to_moments(const Spec &s) {
     met_trace();
 
     using namespace std::complex_literals;
-    using namespace std::placeholders;
+    using BSpec = eig::Array<double, wavelength_samples + 2, 1>;
+    using DMomn = eig::Array<eig::dcomplex, moment_coeffs, 1>;
 
+    eig::Array<float, wavelength_samples, 1> phase_samples;
+    rng::copy(vws::iota(0u, wavelength_samples) 
+      | vws::transform([](auto i) { return (static_cast<float>(i) + .5f) / static_cast<float>(wavelength_samples); })
+      | vws::transform([](auto f) { return (f * warp_mult) + warp_offs; }),
+      phase_samples.begin());
+    
     // Expand out of range values for phase and signal 
-    using BSpec = eig::Array<float, wavelength_samples + 2, 1>;
-    auto phase  = (BSpec() << -std::numbers::pi_v<float>, get_space_warp(), 0.0).finished();
-    auto signal = (BSpec() << input_signal.head<1>(), input_signal, input_signal.tail<1>()).finished();
+    auto phase  = (BSpec() << -std::numbers::pi, 
+                              eig::interp(phase_samples, warp_data).cast<double>(), 
+                              0.0).finished();
+    auto signal = (BSpec() << s.cast<double>().head<1>(), 
+                              s.cast<double>(), 
+                              s.cast<double>().tail<1>()).finished();
 
     // Initialize real/complex parts of value as all zeroes
-    MomentsCN moments = MomentsCN::Zero();
+    DMomn moments = DMomn::Zero();
 
     // Handle integration
     for (uint i = 0; i < BSpec::RowsAtCompileTime - 1; ++i) {
@@ -158,23 +195,23 @@ namespace met {
       auto y_inscpt = signal[i] - gradient * phase[i];
 
       for (uint j = 1; j < moment_coeffs; ++j) {
-        auto rcp_j2 = 1.f / static_cast<float>(j * j);
-        auto flt_j  = static_cast<float>(j);
+        auto rcp_j2 = 1.0 / static_cast<double>(j * j);
+        auto flt_j  = static_cast<double>(j);
 
         auto common_summands = gradient * rcp_j2 
-                             + y_inscpt * (1.0if / flt_j);
-        moments[j] += (common_summands + gradient * 1.0if * flt_j * phase[i + 1] * rcp_j2)
-                    * std::exp(-1.0if * flt_j * phase[i + 1]);
-        moments[j] -= (common_summands + gradient * 1.0if * flt_j * phase[i] * rcp_j2)
-                    * std::exp(-1.0if * flt_j * phase[i]);
+                             + y_inscpt * (1.0i / flt_j);
+        moments[j] += (common_summands + gradient * 1.0i * flt_j * phase[i + 1] * rcp_j2)
+                    * std::exp(-1.0i * flt_j * phase[i + 1]);
+        moments[j] -= (common_summands + gradient * 1.0i * flt_j * phase[i] * rcp_j2)
+                    * std::exp(-1.0i * flt_j * phase[i]);
       } // for (uint j)
 
-      moments[0] += .5f * gradient * (phase[i + 1] * phase[i + 1]) + y_inscpt * phase[i + 1];
-      moments[0] -= .5f * gradient * (phase[i] * phase[i]) + y_inscpt * phase[i];
+      moments[0] += 0.5 * gradient * (phase[i + 1] * phase[i + 1]) + y_inscpt * phase[i + 1];
+      moments[0] -= 0.5 * gradient * (phase[i] * phase[i]) + y_inscpt * phase[i];
     } // for (uint i)
 
-    moments *= .5f * std::numbers::inv_pi_v<float>;
-    return (2.f * moments.real()).eval();
+    moments *= 0.5 * std::numbers::inv_pi;
+    return (2.0 * moments.real()).cast<float>().eval();
   }
 
   Spec moments_to_spectrum(const Moments &bm) {
@@ -182,7 +219,7 @@ namespace met {
     using namespace std::placeholders;
     auto [em, pm] = detail::prepare_reflectance(bm);
     Spec s;
-    rng::transform(get_space_warp(), s.begin(), std::bind(detail::evaluate_reflectance, _1, em, pm));
+    rng::transform(generate_warped_phase(), s.begin(), std::bind(detail::evaluate_reflectance, _1, em, pm));
     return s;
   }
 
@@ -191,7 +228,7 @@ namespace met {
     using namespace std::placeholders;
     auto lagrange = detail::prepare_reflectance_lagrange(m);
     Spec s;
-    rng::transform(get_space_warp(), s.begin(), std::bind(detail::evaluate_reflectance_lagrange, _1, lagrange));
+    rng::transform(generate_warped_phase(), s.begin(), std::bind(detail::evaluate_reflectance_lagrange, _1, lagrange));
     return s;
   }
   
@@ -218,21 +255,22 @@ namespace met {
     return s;
   }
 
-  Spec get_space_warp() {
-    static_assert(wavelength_min == 380.f && wavelength_max == 780.f && wavelength_samples == 64,
-                  "This space warp for wavelength-to-phase needs to be updated for the current spectral layout");
-    return { -3.1415926540f, -3.1415926540f, -3.1415921185f, -3.1415905464f, -3.1414938436f,
-             -3.1399427933f, -3.1354436391f, -3.1231362548f, -3.0902929483f, -3.0270327303f,
-             -2.9344128530f, -2.8278411923f, -2.7125846642f, -2.5909652784f, -2.4659041079f,
-             -2.3514410143f, -2.2561651613f, -2.1777454648f, -2.1063803152f, -2.0316881917f,
-             -1.9456038631f, -1.8440311408f, -1.7316048235f, -1.6129775345f, -1.4920723562f,
-             -1.3695902061f, -1.2462914991f, -1.1224185787f, -0.9987810214f, -0.8754624712f,
-             -0.7524775023f, -0.6322423757f, -0.5186927074f, -0.4154024368f, -0.3242996954f,
-             -0.2453690825f, -0.1809600097f, -0.1292200447f, -0.0902504749f, -0.0608652478f,
-             -0.0411609016f, -0.0275029645f, -0.0192426310f, -0.0138239355f, -0.0105401060f,
-             -0.0085523782f, -0.0073731721f, -0.0064925070f, -0.0058281410f, -0.0052947156f,
-             -0.0048375120f, -0.0044303612f, -0.0040505167f, -0.0036885483f, -0.0033351740f,
-             -0.0029879380f, -0.0026437025f, -0.0023016874f, -0.0019607608f, -0.0016206376f,
-             -0.0012809202f, -0.0009414366f, -0.0006041564f, -0.0002440049f };
+  Spec generate_uniform_phase() {
+    Spec x;
+    rng::copy(vws::iota(0u, wavelength_samples) 
+      | vws::transform([](uint i) { return (static_cast<float>(i) + .5f) / static_cast<float>(wavelength_samples); })
+      | vws::transform(std::bind(detail::wavelength_to_phase, std::placeholders::_1, false)),
+      x.begin());
+    return x;
+  }
+
+  Spec generate_warped_phase() {
+    Spec x;
+    eig::Array<float, wavelength_samples, 1> phase_samples;
+    rng::copy(vws::iota(0u, wavelength_samples) 
+      | vws::transform([](auto i) { return (static_cast<float>(i) + .5f) / static_cast<float>(wavelength_samples); })
+      | vws::transform([](auto f) { return (f * warp_mult) + warp_offs; }),
+      phase_samples.begin());
+    return eig::interp(phase_samples, warp_data);
   }
 } // namespace met

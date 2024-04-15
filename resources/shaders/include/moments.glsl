@@ -1,11 +1,13 @@
 #ifndef MOMENTS_GLSL_GUARD
 #define MOMENTS_GLSL_GUARD
 
+
 // Mostly copied from https://momentsingraphics.de/Siggraph2019.html -> MomentBasedSpectra.hlsl, 
 // following the paper "Using Moments to Represent Bounded Signals for Spectral Rendering", 
 // Peters et al., 2019.
 // See also include/metameric/core/moments.hpp, where things are a little more readable
 
+#include <spectrum.glsl>
 #include <complex.glsl>
 
 const uint moment_coeffs = MET_MOMENT_COEFFICIENTS;
@@ -94,19 +96,29 @@ vec4 evaluate_reflectance(in vec4 phase, in vec2[moment_coeffs] em, in vec2[mome
 }
 
 // Wavelengths are [0, 1] already during rendering
-float wvl_to_phase(in float wvl) { return M_PI * wvl - M_PI;       }
-vec4  wvl_to_phase(in vec4 wvl)  { return M_PI * wvl - vec4(M_PI); }
-
-float moments_to_reflectance(in float wvl, in float[moment_coeffs] bm) {
-  vec2[moment_coeffs] em, pm;
-  prepare_reflectance(bm, em, pm);
-  return evaluate_reflectance(wvl_to_phase(wvl), em, pm);
+/* float wvl_to_phase(in float wvl) { 
+  return scene_phase_warp_data_texture(wvl);
+  // return M_PI * wvl - M_PI;
 }
 
-vec4 moments_to_reflectance(in vec4 wvls, in float[moment_coeffs] bm) {
+vec4 wvl_to_phase(in vec4 wvl) { 
+  vec4 v;
+  for (uint i = 0; i < 4; ++i)
+    v[i] = wvl_to_phase(wvl[i]);
+  return v;
+  // return M_PI * wvl - vec4(M_PI);
+} */
+
+float moments_to_reflectance(in float phase, in float[moment_coeffs] bm) {
   vec2[moment_coeffs] em, pm;
   prepare_reflectance(bm, em, pm);
-  return evaluate_reflectance(wvl_to_phase(wvls), em, pm);
+  return evaluate_reflectance(phase, em, pm);
+}
+
+vec4 moments_to_reflectance(in vec4 phase, in float[moment_coeffs] bm) {
+  vec2[moment_coeffs] em, pm;
+  prepare_reflectance(bm, em, pm);
+  return evaluate_reflectance(phase, em, pm);
 }
 
 float[moment_coeffs] unpack_moments_12x10(in uvec4 p) {
@@ -140,6 +152,47 @@ uvec4 pack_moments_12x10(in float[moment_coeffs] m) {
   //                             i % 3 == 2 ? 10 : 11);
   // }
   // return p;
+}
+
+float[moment_coeffs] spectrum_to_moment(in float[wavelength_samples] p, 
+                                        in float[wavelength_samples] s) {
+  vec2[moment_coeffs] moments;
+  moments[0] = vec2(0);
+
+  { // phase of -pi
+    float gradient = (s[1] - s[0]) / (p[1] - p[0]);
+    float y_inscpt = s[0] - gradient * p[0];
+
+    for (uint j = 1; j < moment_coeffs; ++j) {
+      float rcp_j2 = 1.f / float(j * j);
+      float flt_j  = float(j);
+
+      vec2 common_summands = gradient * rcp_j2
+                           + y_inscpt * (vec2(0, 1) / flt_j);
+      moments[j] += (common_summands + gradient * vec2(0, 1) * flt_j * p[i + 1] * rcp_j2)
+                  * exp(vec2(0, -1) * flt_j * phase[i + 1]);
+      moments[j] -= (common_summands + gradient * vec2(0, 1) * flt_j * p[i] * rcp_j2)
+                  * exp(vec2(0, -1) * flt_j * phase[i]);
+    } // for (uint j)
+
+    moments[0] += .5f * gradient * (p[i + 1] * p[i + 1]) + y_inscpt * p[i + 1];
+    moments[0] -= .5f * gradient * (p[i] * p[i]) + y_inscpt * p[i];
+  }
+  
+  for (uint i = 0; i < wavelength_samples; ++i) {
+    for (uint j = 1; j < moment_coeffs; ++j) {
+
+    } // for (uint j)
+  } // for (uint i)
+
+  { // phase of 0
+
+  }
+  
+  float[moment_coeffs] r;
+  for (uint i = 0; i < moment_coeffs; ++i)
+    r[i] = moments[i].x;
+  return r;
 }
 
 #endif // MOMENTS_GLSL_GUARD

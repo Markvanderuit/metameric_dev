@@ -10,8 +10,8 @@
 #include <numbers>
 #include <unordered_set>
 
-constexpr static bool solve_using_basis         = true; // Use basis functions to reduce solver complexity (and color system size)
-constexpr static bool output_moment_limited_ocs = true; // Use moment conversion to reduce color system size
+constexpr static bool solve_using_basis         = true;  // Use basis functions to reduce solver complexity (and color system size)
+constexpr static bool output_moment_limited_ocs = false; // Use moment conversion to reduce color system size
 
 namespace met {
   namespace detail {
@@ -63,7 +63,7 @@ namespace met {
     // Take a grayscale spectrum as mean to build around
     Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
-    if constexpr (output_moment_limited_ocs) {
+    if constexpr (solve_using_basis) {
       // Solver settings
       NLOptInfoT<wavelength_bases> solver = {
         .algo         = NLOptAlgo::LD_SLSQP,
@@ -231,7 +231,7 @@ namespace met {
     tbb::concurrent_vector<Spec> tbb_output;
     tbb_output.reserve(samples.size());
 
-    if constexpr (output_moment_limited_ocs) {
+    if constexpr (solve_using_basis) {
       // Solver settings
       NLOptInfoT<wavelength_bases> solver = {
         .algo      = NLOptAlgo::LD_SLSQP,

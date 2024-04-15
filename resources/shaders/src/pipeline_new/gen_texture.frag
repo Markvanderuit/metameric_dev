@@ -17,9 +17,9 @@ layout(std140) uniform;
 layout(constant_id = 0) const bool sample_albedo = true;
 
 // Fragment stage declarations
-layout(location = 0) in  vec2 in_txuv;   // Per-fragment original texture UVs, adjusted to atlas
-// layout(location = 0) out vec4  out_weight; // Per fragment barycentric coordinates and spectrum index
-layout(location = 0) out uvec4 out_weight; // Per fragment MESE representations of texel spectra
+layout(location = 0) in  vec2  in_txuv;    // Per-fragment original texture UVs, adjusted to atlas
+layout(location = 0) out vec4  out_barycs; // Per fragment barycentric coordinates and spectrum index
+layout(location = 1) out uvec4 out_coeffs; // Per fragment MESE representations of texel spectra
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
@@ -89,17 +89,18 @@ void main() {
     result_indx = j + buff_uplift_data.offs;
   } // for (uint j)
 
+  // Store result, packing 3/4th of the weights together with the tetrahedron's index
+  out_barycs = vec4(result_bary.xyz, float(result_indx));
+
   // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[moment_coeffs] coeffs;
   for (uint i = 0; i < moment_coeffs; ++i) {
     coeffs[i] = 0.f;
     for (uint j = 0; j < 4; ++j)
-      coeffs[i] += result_bary[j] * buff_uplift_coef.data[result_indx][j][i];
+      coeffs[i] += result_bary[j] 
+                 * buff_uplift_coef.data[result_indx][j][i];
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients
-  out_weight = pack_moments_12x10(coeffs);
-
-  // Store result, packing 3/4th of the weights together with the tetrahedron's index
-  // out_weight = vec4(result_bary.xyz, float(result_indx));
+  out_coeffs = pack_moments_12x10(coeffs);
 }

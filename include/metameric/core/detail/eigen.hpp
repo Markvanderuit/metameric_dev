@@ -136,9 +136,9 @@ namespace Eigen {
   template <typename T, typename Tp>
   T interp(const T &x, const Tp &xp) {
     return x.unaryExpr([&xp](const float x) {
-      float xa = (x * Tp::RowsAtCompileTime);
+      float xa = (x * static_cast<float>(Tp::RowsAtCompileTime));
       float xl = static_cast<unsigned>(std::max(std::floor(xa), 0.f));
-      float xu = static_cast<unsigned>(std::min(std::ceil(xa), Tp::RowsAtCompileTime - 1));
+      float xu = static_cast<unsigned>(std::min(std::ceil(xa), static_cast<float>(Tp::RowsAtCompileTime - 1)));
       return std::lerp(xp[xl], xp[xu], xa - static_cast<float>(xl));
     }).eval();
   }
