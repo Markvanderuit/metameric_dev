@@ -162,12 +162,36 @@ namespace met {
     }
   } // namespace detail
 
+  eig::Vector2d complex_conj(eig::Vector2d v) {
+    return eig::Vector2d(v.x(), -v.y());
+  }
+
+  eig::Vector2d complex_mult(eig::Vector2d lhs, eig::Vector2d rhs) {
+    return eig::Vector2d(lhs.x() * rhs.x() - lhs.y() * rhs.y(),
+                lhs.x() * rhs.y() + lhs.y() * rhs.x());
+  }
+
+  // Note; denom must be non-zero
+  eig::Vector2d complex_divd(eig::Vector2d num, eig::Vector2d denom) {
+    return eig::Vector2d(num.x() * denom.x() + num.y() * denom.y(),
+              -num.x() * denom.y() + num.y() * denom.x()) / denom.dot(denom);
+  }
+
+  // Note; must be non-zero
+  eig::Vector2d complex_rcp(eig::Vector2d v) {
+    return eig::Vector2d(v.x(), -v.y()) / v.dot(v);
+  }
+
+  eig::Vector2d complex_exp(eig::Vector2d v) {
+    return eig::Vector2d(std::exp(v.x()) * std::cos(v.y()), 
+                         std::exp(v.x()) * std::sin(v.y()));
+  }
 
   Moments spectrum_to_moments(const Spec &s) {
     met_trace();
 
     using namespace std::complex_literals;
-    using BSpec = eig::Array<double, wavelength_samples + 2, 1>;
+    // using BSpec = eig::Array<double, wavelength_samples + 2, 1>;
     using DMomn = eig::Array<eig::dcomplex, moment_coeffs, 1>;
 
     eig::Array<float, wavelength_samples, 1> phase_samples;
@@ -176,39 +200,54 @@ namespace met {
       | vws::transform([](auto f) { return (f * warp_mult) + warp_offs; }),
       phase_samples.begin());
     
-    // Expand out of range values for phase and signal 
-    auto phase  = (BSpec() << -std::numbers::pi, 
-                              eig::interp(phase_samples, warp_data).cast<double>(), 
-                              0.0).finished();
-    auto signal = (BSpec() << s.cast<double>().head<1>(), 
-                              s.cast<double>(), 
-                              s.cast<double>().tail<1>()).finished();
+    // Expand out of range values for phase and signal
+    auto phase  = eig::interp(phase_samples, warp_data).cast<double>().eval();
+    auto signal = s.cast<double>().eval();
 
     // Initialize real/complex parts of value as all zeroes
     DMomn moments = DMomn::Zero();
 
-    // Handle integration
-    for (uint i = 0; i < BSpec::RowsAtCompileTime - 1; ++i) {
-      guard_continue(phase[i] < phase[i + 1]);
+    auto eval_i = [&](double phase, double phase_next, double signal, double signal_next) {
+      guard(phase < phase_next);
 
-      auto gradient = (signal[i + 1] - signal[i]) / (phase[i + 1]  - phase[i]);      
-      auto y_inscpt = signal[i] - gradient * phase[i];
+      auto gradient = (signal_next - signal) / (phase_next  - phase);      
+      auto y_inscpt = signal - gradient * phase;
 
       for (uint j = 1; j < moment_coeffs; ++j) {
         auto rcp_j2 = 1.0 / static_cast<double>(j * j);
         auto flt_j  = static_cast<double>(j);
 
-        auto common_summands = gradient * rcp_j2 
-                             + y_inscpt * (1.0i / flt_j);
-        moments[j] += (common_summands + gradient * 1.0i * flt_j * phase[i + 1] * rcp_j2)
-                    * std::exp(-1.0i * flt_j * phase[i + 1]);
-        moments[j] -= (common_summands + gradient * 1.0i * flt_j * phase[i] * rcp_j2)
-                    * std::exp(-1.0i * flt_j * phase[i]);
+        auto common_summands_ = eig::Vector2d { gradient * rcp_j2, y_inscpt / flt_j };
+                                                                                      
+        auto moment_add_ = (complex_mult(
+          common_summands_ + eig::Vector2d { 0, gradient * flt_j * phase_next * rcp_j2 },
+          { std::cos(-flt_j * phase_next), std::sin(-flt_j * phase_next) }
+        )).eval();
+        auto moment_sub_ = (complex_mult(
+          common_summands_ + eig::Vector2d { 0, gradient * flt_j * phase * rcp_j2 },
+          { std::cos(-flt_j * phase), std::sin(-flt_j * phase) }
+        )).eval();
+
+        auto common_summands = eig::dcomplex { gradient * rcp_j2, y_inscpt / flt_j };
+        auto moment_add = (common_summands 
+                        + eig::dcomplex{ 0, gradient * flt_j * phase_next * rcp_j2 })
+                        * eig::dcomplex { std::cos(-flt_j * phase_next), std::sin(-flt_j * phase_next) };
+        auto moment_sub = (common_summands 
+                        + eig::dcomplex{ 0, gradient * flt_j * phase * rcp_j2 })
+                        * eig::dcomplex { std::cos(-flt_j * phase), std::sin(-flt_j * phase) };
+
+        moments[j] += moment_add;
+        moments[j] -= moment_sub;
       } // for (uint j)
 
-      moments[0] += 0.5 * gradient * (phase[i + 1] * phase[i + 1]) + y_inscpt * phase[i + 1];
-      moments[0] -= 0.5 * gradient * (phase[i] * phase[i]) + y_inscpt * phase[i];
-    } // for (uint i)
+      moments[0] += 0.5 * gradient * (phase_next * phase_next) + y_inscpt * phase_next;
+      moments[0] -= 0.5 * gradient * (phase      * phase)      + y_inscpt * phase;
+    };
+
+    eval_i(-std::numbers::pi, phase[0], signal[0], signal[0]);
+    for (uint i = 0; i < wavelength_samples - 1; ++i)
+      eval_i(phase[i], phase[i + 1], signal[i], signal[i + 1]);
+    eval_i(phase[wavelength_samples - 1], 0.0, signal[wavelength_samples - 1], signal[wavelength_samples - 1]);
 
     moments *= 0.5 * std::numbers::inv_pi;
     return (2.0 * moments.real()).cast<float>().eval();

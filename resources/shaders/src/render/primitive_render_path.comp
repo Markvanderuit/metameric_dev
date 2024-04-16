@@ -72,7 +72,7 @@ layout(binding = 2)          uniform sampler2DArray   b_bary_4f; // Uplifting we
 layout(binding = 3)          uniform sampler1DArray   b_spec_4f; // Uplifting spectral atlas
 layout(binding = 4)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 5)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 6)          uniform usampler2DArray  b_coef_4f; // Warp data for spectral MESE
+layout(binding = 6)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
 layout(binding = 7)          uniform sampler1D        b_warp_1f; // Warp data for spectral MESE
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 

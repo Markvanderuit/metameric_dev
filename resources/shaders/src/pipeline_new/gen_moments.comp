@@ -1,0 +1,105 @@
+#include <preamble.glsl>
+#include <math.glsl>
+#include <moments.glsl>
+#include <spectrum.glsl>
+#include <render/detail/scene_types.glsl>
+
+extension(GL_KHR_shader_subgroup_basic,     require)
+extension(GL_KHR_shader_subgroup_ballot,    require)
+extension(GL_KHR_shader_subgroup_clustered, require)
+extension(GL_KHR_shader_subgroup_shuffle,   require)
+
+// General layout rule declarations
+layout(local_size_x = 256) in;
+layout(std430) buffer;
+layout(std140) uniform;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  uint object_i;
+} unif;
+
+// Storage buffer declarations
+layout(binding = 0) restrict readonly buffer b_buff_atlas {
+  AtlasLayout data[];
+} buff_atlas;
+
+// Image/sampler binding declarations
+layout(binding = 0, rgba32f)  uniform readonly image1DArray b_spec_4f; // Uplifting spectrum data
+layout(binding = 1, rgba32f)  uniform readonly      image1D b_warp_1f; // Warp data for spectral MESE
+layout(binding = 2, rgba32f)  uniform readonly      image2D b_bary_4f; // Uplifting barycentrics data
+layout(binding = 3, rgba32ui) uniform writeonly    uimage2D b_coef_4f; // Output coefficients for spectral MESE
+
+// Moment coefficients are stored in shared memory
+shared float[256 / 32][moment_coeffs] s_coeffs;
+
+void eval(float phase, float phase_next, float signal, float signal_next) {
+  guard(phase < phase_next);
+
+  float gradient = (signal_next - signal) / (phase_next  - phase);      
+  float y_inscpt = signal - gradient * phase;
+  
+  for (uint j = 1; j < moment_coeffs; ++j) {
+    float rcp_j2 = 1.f / float(j * j);
+    float flt_j  = float(j);
+
+    // return vec2(num.x * denom.x + num.y * denom.y,
+    //            -num.x * denom.y + num.y * denom.x) / sdot(denom);
+    // vec2(0, flt_j) / (flt_j * flt_j)
+    vec2 common_summands = vec2(gradient * rcp_j2, 0)
+                         + complex_mult(
+                             vec2(y_inscpt, 0),
+                             complex_divd(
+                               vec2(0, 1),
+                               vec2(flt_j, 0)    
+                             )
+                           );
+  } // for (uint j = 1)
+
+  // TODO ...
+}
+
+void main() {
+  uint i = gl_GlobalInvocationID.x / gl_SubgroupSize;
+
+  // Determine wavelengths and their respective indices for each thread
+  ivec2 wvls_i = ivec2(2 * gl_SubgroupInvocationID) + ivec2(0, 1);
+  vec2 wvls    = (vec2(wvls_i) + .5f) / float(wavelength_samples);
+
+  // Load barycentric coordinates using subgroup broadcast
+  vec4 bary;  // Barycentric coordinates describing recombined spectrum in tesselation
+  uint index; // Index of relevant tetrahedron inside tesselation
+  if (subgroupElect()) {
+    AtlasLayout atlas = buff_atlas.data[unif.object_i];
+    uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
+    bary = imageLoad(b_bary_4f, ivec2(px));
+  }
+  bary = subgroupBroadcastFirst(bary);
+  guard(!all(is_zero(bary)));
+  index = uint(bary.w);
+  bary.w = 1.f - hsum(bary.xyz);
+  
+  // Load phase and signal data for this invocation; the subgroup together
+  // describes a full spectral range
+  // TODO: handle outer two phases
+  vec2 phase  = vec2(
+    imageLoad(b_warp_1f, int(wvls_i.x)).x,
+    imageLoad(b_warp_1f, int(wvls_i.y)).x);
+  vec2 signal = vec2(
+    dot(imageLoad(b_spec_4f, ivec2(wvls_i.x, index)), bary),
+    dot(imageLoad(b_spec_4f, ivec2(wvls_i.y, index)), bary));
+  
+  // Determine phase and signal one index to the right, taking into account end-caps
+  vec2 phase_next  = vec2(phase.y, 0.0);
+  vec2 signal_next = vec2(signal.y);
+  if (gl_SubgroupInvocationID < gl_SubgroupSize - 1) {
+    phase_next.y  = subgroupShuffle(phase_next.x,  gl_SubgroupInvocationID + 1);
+    signal_next.y = subgroupShuffle(signal_next.x, gl_SubgroupInvocationID + 1);
+  }
+
+  // Fit coefficients
+  if (subgroupElect())
+    eval(-M_PI, phase.x, signal.x, signal.x);
+  eval(phase.x, phase_next.x, signal.x, signal_next.x);
+  eval(phase.y, phase_next.y, signal.y, signal_next.y);
+}

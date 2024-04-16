@@ -62,8 +62,8 @@ namespace met {
         .spec_const = {{ 0, false }} }});
     std::tie(m_cache_key_bake, std::ignore) = e_cache.set(
      {{ .type       = gl::ShaderType::eCompute,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.comp.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.comp.json" }});
+        .spirv_path = "resources/shaders/pipeline_new/gen_moments.comp.spv",
+        .cross_path = "resources/shaders/pipeline_new/gen_moments.comp.json" }});
                                 
     // Initialize uniform buffer and writeable, flushable mapping
     m_unif_buffer = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
@@ -148,10 +148,10 @@ namespace met {
 
       // Dispatch draw call
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer       | 
-                              gl::BarrierFlags::eTextureFetch       |
-                              gl::BarrierFlags::eClientMappedBuffer |
-                              gl::BarrierFlags::eStorageBuffer      | 
-                              gl::BarrierFlags::eUniformBuffer      );
+                               gl::BarrierFlags::eTextureFetch       |
+                               gl::BarrierFlags::eClientMappedBuffer |
+                               gl::BarrierFlags::eStorageBuffer      | 
+                               gl::BarrierFlags::eUniformBuffer      );
       gl::dispatch_draw({
         .type           = gl::PrimitiveType::eTriangles,
         .vertex_count   = command.vertex_count,
@@ -165,6 +165,8 @@ namespace met {
     }
 
     { // Second dispatch, bake spectral moment coefficients
+      auto &program = e_cache.at(m_cache_key_bake);
+
 
     }
   }

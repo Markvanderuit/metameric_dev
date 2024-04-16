@@ -26,4 +26,10 @@ vec2 complex_rcp(vec2 v) {
   return vec2(v.x, -v.y) / sdot(v);
 }
 
+// Lacks precision, yuck
+vec2 complex_exp(vec2 v) {
+  float e = exp(v.x);
+  return vec2(e * cos(v.y), e * sin(v.y));
+}
+
 #endif // COMPLEX_GLSL_GUARD

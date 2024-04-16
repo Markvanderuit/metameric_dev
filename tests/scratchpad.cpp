@@ -14,43 +14,43 @@
 
 TEST_CASE("Spectrum shenanigans") {
   using namespace met;
+  using namespace std::complex_literals;
+
+
+  constexpr double y_inscpt = 3.0;
+  constexpr double flt_j    = 2.0;
+  constexpr double phase_next = -0.15;
+  // constexpr auto common_summands = y_inscpt * (1.0if / flt_j); 
+  // constexpr eig::scomplex v = { 0.f, y_inscpt / flt_j };
+
+  auto vd = std::exp(-1.0i * flt_j * phase_next);
+  auto vr = eig::dcomplex { std::cos(flt_j * phase_next), std::sin(flt_j * phase_next) };
+
+  fmt::print("{}+{}j vs {}+{}j\n", vd.real(), vd.imag(), vr.real(), vr.imag());
+
+  // vec2(0, - 1 * flt_j * phase_next)
+
+  // vec2(0, 1) * vec2(v, 0)
+  //       return vec2(0, v);
+  // vec2(v, 0) * vec2(0, 1)
+  //   return vec2(0, v);
+
+
+// vec2 complex_mult(vec2 lhs, vec2 rhs) {
+//   return vec2(lhs.x * rhs.x - lhs.y * rhs.y,
+//               lhs.x * rhs.y + lhs.y * rhs.x);
+// }
   
-  eig::Array2f floats = { 0.12345, 0.54321 };
-  uint pack = detail::pack_half_2x16(floats);
-  eig::Array2f rtrip = detail::unpack_half_2x16(pack);
+  // vec2 complex_exp(vec2 v) {
+    // float e = exp(v.x);
+    // return vec2(e * cos(v.y), e * sin(v.y));
+  // }
 
-  fmt::print("input : {}\n", floats);
-  fmt::print("rtrip : {}\n", rtrip);
+  // return vec2(lhs.x * rhs.x - lhs.y * rhs.y,
+  //             lhs.x * rhs.y + lhs.y * rhs.x);
 
-  
-
-//   {
-//     using namespace std::complex_literals;
-//     eig::Array<uint, 8, 1> v = { 0, 1, 2, 3, 4, 5, 6, 7 };
-//     uint i = 7;
-
-//     fmt::print("{}\n", v(eig::seq(1, i - 1))); // [j:0:-1]
-//     fmt::print("{}\n", v(eig::seq(i - 1, 1, eig::fix<-1>))); // [j:0:-1]
-
-//     // fmt::print("{}\n", v(eig::seq(0, j - 1)));           // [0:j]
-//     // fmt::print("{}\n", v.head(j));                       // [0:j]
-//     // fmt::print("{}\n", v.head(j + 1).reverse());         // [j::-1]
-
-//     // fmt::print("{}\n", v.head(j + 1));         // [0:j+1]
-
-//     std::exit(0);
-//   }
-
-//   /* Spec spec_gt = (models::emitter_cie_d65
-//                 / models::emitter_cie_d65.maxCoeff()) * 0.75f;
-  
-//   // Spec spec_gt = 0.5f;
-
-//   auto moment = spectrum_to_moments(spec_gt);
-//   auto spec_m = moments_to_spectrum(moment);
-
-//   fmt::print("---\n");
-//   fmt::print("Ground {}\n", spec_gt);
-//   fmt::print("Moment {}\n", moment);
-//   fmt::print("Rntrip {}\n", spec_m); */
+  // return vec2(num.x * denom.x + num.y * denom.y,
+  //            -num.x * denom.y + num.y * denom.x) / sdot(denom);
+  // vec2(0, flt_j) / sdot()
+  // vec2)
 }

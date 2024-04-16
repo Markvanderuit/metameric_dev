@@ -154,45 +154,45 @@ uvec4 pack_moments_12x10(in float[moment_coeffs] m) {
   // return p;
 }
 
-float[moment_coeffs] spectrum_to_moment(in float[wavelength_samples] p, 
-                                        in float[wavelength_samples] s) {
-  vec2[moment_coeffs] moments;
-  moments[0] = vec2(0);
+// float[moment_coeffs] spectrum_to_moment(in float[wavelength_samples] p, 
+//                                         in float[wavelength_samples] s) {
+//   vec2[moment_coeffs] moments;
+//   moments[0] = vec2(0);
 
-  { // phase of -pi
-    float gradient = (s[1] - s[0]) / (p[1] - p[0]);
-    float y_inscpt = s[0] - gradient * p[0];
+//   { // phase of -pi
+//     float gradient = (s[1] - s[0]) / (p[1] - p[0]);
+//     float y_inscpt = s[0] - gradient * p[0];
 
-    for (uint j = 1; j < moment_coeffs; ++j) {
-      float rcp_j2 = 1.f / float(j * j);
-      float flt_j  = float(j);
+//     for (uint j = 1; j < moment_coeffs; ++j) {
+//       float rcp_j2 = 1.f / float(j * j);
+//       float flt_j  = float(j);
 
-      vec2 common_summands = gradient * rcp_j2
-                           + y_inscpt * (vec2(0, 1) / flt_j);
-      moments[j] += (common_summands + gradient * vec2(0, 1) * flt_j * p[i + 1] * rcp_j2)
-                  * exp(vec2(0, -1) * flt_j * phase[i + 1]);
-      moments[j] -= (common_summands + gradient * vec2(0, 1) * flt_j * p[i] * rcp_j2)
-                  * exp(vec2(0, -1) * flt_j * phase[i]);
-    } // for (uint j)
+//       vec2 common_summands = gradient * rcp_j2
+//                            + y_inscpt * (vec2(0, 1) / flt_j);
+//       moments[j] += (common_summands + gradient * vec2(0, 1) * flt_j * p[i + 1] * rcp_j2)
+//                   * exp(vec2(0, -1) * flt_j * phase[i + 1]);
+//       moments[j] -= (common_summands + gradient * vec2(0, 1) * flt_j * p[i] * rcp_j2)
+//                   * exp(vec2(0, -1) * flt_j * phase[i]);
+//     } // for (uint j)
 
-    moments[0] += .5f * gradient * (p[i + 1] * p[i + 1]) + y_inscpt * p[i + 1];
-    moments[0] -= .5f * gradient * (p[i] * p[i]) + y_inscpt * p[i];
-  }
+//     moments[0] += .5f * gradient * (p[i + 1] * p[i + 1]) + y_inscpt * p[i + 1];
+//     moments[0] -= .5f * gradient * (p[i] * p[i]) + y_inscpt * p[i];
+//   }
   
-  for (uint i = 0; i < wavelength_samples; ++i) {
-    for (uint j = 1; j < moment_coeffs; ++j) {
+//   for (uint i = 0; i < wavelength_samples; ++i) {
+//     for (uint j = 1; j < moment_coeffs; ++j) {
 
-    } // for (uint j)
-  } // for (uint i)
+//     } // for (uint j)
+//   } // for (uint i)
 
-  { // phase of 0
+//   { // phase of 0
 
-  }
+//   }
   
-  float[moment_coeffs] r;
-  for (uint i = 0; i < moment_coeffs; ++i)
-    r[i] = moments[i].x;
-  return r;
-}
+//   float[moment_coeffs] r;
+//   for (uint i = 0; i < moment_coeffs; ++i)
+//     r[i] = moments[i].x;
+//   return r;
+// }
 
 #endif // MOMENTS_GLSL_GUARD
