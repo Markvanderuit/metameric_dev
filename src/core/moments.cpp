@@ -249,8 +249,7 @@ namespace met {
       eval_i(phase[i], phase[i + 1], signal[i], signal[i + 1]);
     eval_i(phase[wavelength_samples - 1], 0.0, signal[wavelength_samples - 1], signal[wavelength_samples - 1]);
 
-    moments *= 0.5 * std::numbers::inv_pi;
-    return (2.0 * moments.real()).cast<float>().eval();
+    return (moments.real() * std::numbers::inv_pi).cast<float>().eval();
   }
 
   Spec moments_to_spectrum(const Moments &bm) {

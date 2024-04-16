@@ -35,6 +35,8 @@ TEST_CASE("Spectrum shenanigans") {
   // vec2(v, 0) * vec2(0, 1)
   //   return vec2(0, v);
 
+  // { x, y } * { P, 0 }
+  // { x * P, y * P }
 
 // vec2 complex_mult(vec2 lhs, vec2 rhs) {
 //   return vec2(lhs.x * rhs.x - lhs.y * rhs.y,

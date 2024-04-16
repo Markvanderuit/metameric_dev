@@ -160,7 +160,7 @@ uvec4 pack_moments_12x10(in float[moment_coeffs] m) {
 //   moments[0] = vec2(0);
 
 //   { // phase of -pi
-//     float gradient = (s[1] - s[0]) / (p[1] - p[0]);
+//     float gradient = (s[1] - s[0]) / (p[1] - p[0]);mome
 //     float y_inscpt = s[0] - gradient * p[0];
 
 //     for (uint j = 1; j < moment_coeffs; ++j) {

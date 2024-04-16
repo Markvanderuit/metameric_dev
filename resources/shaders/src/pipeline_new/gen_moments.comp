@@ -4,10 +4,10 @@
 #include <spectrum.glsl>
 #include <render/detail/scene_types.glsl>
 
-extension(GL_KHR_shader_subgroup_basic,     require)
-extension(GL_KHR_shader_subgroup_ballot,    require)
-extension(GL_KHR_shader_subgroup_clustered, require)
-extension(GL_KHR_shader_subgroup_shuffle,   require)
+extension(GL_KHR_shader_subgroup_arithmetic, require)
+extension(GL_KHR_shader_subgroup_ballot,     require)
+extension(GL_KHR_shader_subgroup_clustered,  require)
+extension(GL_KHR_shader_subgroup_shuffle,    require)
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -31,9 +31,9 @@ layout(binding = 2, rgba32f)  uniform readonly      image2D b_bary_4f; // Uplift
 layout(binding = 3, rgba32ui) uniform writeonly    uimage2D b_coef_4f; // Output coefficients for spectral MESE
 
 // Moment coefficients are stored in shared memory
-shared float[256 / 32][moment_coeffs] s_coeffs;
+shared vec2[256 / 32][moment_coeffs] s_coeffs;
 
-void eval(float phase, float phase_next, float signal, float signal_next) {
+void eval(float phase, float phase_next, float signal, float signal_next, bool insert_barriers) {
   guard(phase < phase_next);
 
   float gradient = (signal_next - signal) / (phase_next  - phase);      
@@ -43,20 +43,39 @@ void eval(float phase, float phase_next, float signal, float signal_next) {
     float rcp_j2 = 1.f / float(j * j);
     float flt_j  = float(j);
 
-    // return vec2(num.x * denom.x + num.y * denom.y,
-    //            -num.x * denom.y + num.y * denom.x) / sdot(denom);
-    // vec2(0, flt_j) / (flt_j * flt_j)
-    vec2 common_summands = vec2(gradient * rcp_j2, 0)
-                         + complex_mult(
-                             vec2(y_inscpt, 0),
-                             complex_divd(
-                               vec2(0, 1),
-                               vec2(flt_j, 0)    
-                             )
-                           );
+    vec2 common_summands = vec2(gradient * rcp_j2, y_inscpt / flt_j);
+    vec2 moment_add = subgroupAdd(complex_mult(
+      common_summands + vec2(0, gradient * flt_j * phase_next * rcp_j2 ),
+      vec2(cos(-flt_j * phase_next), sin(-flt_j * phase_next))
+    ));
+    vec2 moment_sub = subgroupAdd(complex_mult(
+      common_summands + vec2(0, gradient * flt_j * phase * rcp_j2 ),
+      vec2(cos(-flt_j * phase), sin(-flt_j * phase))
+    ));
+
+    if (subgroupElect()) {
+      s_coeffs[gl_SubgroupID][j] += moment_add;
+      s_coeffs[gl_SubgroupID][j] -= moment_sub;
+    }
+
+    if (insert_barriers) {
+      memoryBarrierShared();
+      barrier();
+    }
   } // for (uint j = 1)
 
-  // TODO ...
+  float moment_add = subgroupAdd(.5f * gradient * sdot(phase_next) + y_inscpt * phase_next);
+  float moment_sub = subgroupAdd(.5f * gradient * sdot(phase)      + y_inscpt * phase);
+
+  if (subgroupElect()) {
+    s_coeffs[gl_SubgroupID][0] += moment_add;
+    s_coeffs[gl_SubgroupID][0] -= moment_sub;
+  }
+
+  if (insert_barriers) {
+    memoryBarrierShared();
+    barrier();
+  }
 }
 
 void main() {
@@ -81,7 +100,6 @@ void main() {
   
   // Load phase and signal data for this invocation; the subgroup together
   // describes a full spectral range
-  // TODO: handle outer two phases
   vec2 phase  = vec2(
     imageLoad(b_warp_1f, int(wvls_i.x)).x,
     imageLoad(b_warp_1f, int(wvls_i.y)).x);
@@ -97,9 +115,29 @@ void main() {
     signal_next.y = subgroupShuffle(signal_next.x, gl_SubgroupInvocationID + 1);
   }
 
+  // Set coefficients to zero
+  if (gl_SubgroupInvocationID < moment_coeffs)
+    s_coeffs[gl_SubgroupID][gl_SubgroupInvocationID] = vec2(0);
+  memoryBarrierShared();
+  barrier();
+
   // Fit coefficients
   if (subgroupElect())
-    eval(-M_PI, phase.x, signal.x, signal.x);
-  eval(phase.x, phase_next.x, signal.x, signal_next.x);
-  eval(phase.y, phase_next.y, signal.y, signal_next.y);
+    eval(-M_PI, phase.x, signal.x, signal.x, false);
+  memoryBarrierShared();
+  barrier();
+  eval(phase.x, phase_next.x, signal.x, signal_next.x, true);
+  eval(phase.y, phase_next.y, signal.y, signal_next.y, true);
+
+  // Store coefficients
+  if (subgroupElect()) {
+    AtlasLayout atlas = buff_atlas.data[unif.object_i];
+    uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
+
+    float[moment_coeffs] v;
+    for (uint i = 0; i < moment_coeffs; ++i)
+      v[i] = s_coeffs[gl_SubgroupID][i].x * M_PI_INV;
+
+    imageStore(b_coef_4f, ivec2(px), pack_moments_12x10(v));
+  }
 }
