@@ -30,14 +30,22 @@ namespace met {
       ImGui::End();
 
       // Spawn view of weight atlas interiors
-      if (ImGui::Begin("Bary atlas")) {
-        const auto &e_bary_data = e_scene.components.upliftings.gl;
-        for (uint i = 0; i < e_bary_data.texture_barycentrics.capacity().z(); ++i) {
-          const auto &view = e_bary_data.texture_barycentrics.view(i, 0);
-          ImGui::Image(ImGui::to_ptr(view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
-        }
+      if (ImGui::Begin("Barycentrics atlas")) {
+        const auto &e_txtr = e_scene.components.upliftings.gl.texture_barycentrics;
+        const auto &view = e_txtr.view(0);
+        ImGui::Image(ImGui::to_ptr(view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
       }
       ImGui::End();
+
+      // Spawn view of weight atlas interiors
+      if (ImGui::Begin("Coefficients atlas")) {
+        const auto &e_txtr = e_scene.components.upliftings.gl.texture_coefficients;
+        const auto &view = e_txtr.view(0);
+        ImGui::Image(ImGui::to_ptr(view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+      }
+      ImGui::End();
+
+      return; // TODO implement below
 
       if (ImGui::Begin("Scene resources")) {
         // Get external resources

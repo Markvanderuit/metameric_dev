@@ -191,65 +191,45 @@ namespace met {
     met_trace();
 
     using namespace std::complex_literals;
-    // using BSpec = eig::Array<double, wavelength_samples + 2, 1>;
-    using DMomn = eig::Array<eig::dcomplex, moment_coeffs, 1>;
+    using T         = float; // TODO reverse
+    using complex_t = std::complex<T>;
+    using moments_t = eig::Array<complex_t, moment_coeffs, 1>; 
 
-    eig::Array<float, wavelength_samples, 1> phase_samples;
-    rng::copy(vws::iota(0u, wavelength_samples) 
-      | vws::transform([](auto i) { return (static_cast<float>(i) + .5f) / static_cast<float>(wavelength_samples); })
-      | vws::transform([](auto f) { return (f * warp_mult) + warp_offs; }),
-      phase_samples.begin());
-    
-    // Expand out of range values for phase and signal
-    auto phase  = eig::interp(phase_samples, warp_data).cast<double>().eval();
-    auto signal = s.cast<double>().eval();
+    auto phase  = generate_warped_phase().cast<T>().eval();
+    auto signal = s.cast<T>().eval();
 
     // Initialize real/complex parts of value as all zeroes
-    DMomn moments = DMomn::Zero();
+    moments_t moments = moments_t::Zero();
 
-    auto eval_i = [&](double phase, double phase_next, double signal, double signal_next) {
+    auto eval_i = [&](T phase, T phase_next, T signal, T signal_next) {
       guard(phase < phase_next);
 
-      auto gradient = (signal_next - signal) / (phase_next  - phase);      
+      auto gradient = (signal_next - signal) / (phase_next - phase);      
       auto y_inscpt = signal - gradient * phase;
 
       for (uint j = 1; j < moment_coeffs; ++j) {
-        auto rcp_j2 = 1.0 / static_cast<double>(j * j);
-        auto flt_j  = static_cast<double>(j);
+        auto rcp_j2 = static_cast<T>(1) / static_cast<T>(j * j);
+        auto flt_j  = static_cast<T>(j);
 
-        auto common_summands_ = eig::Vector2d { gradient * rcp_j2, y_inscpt / flt_j };
-                                                                                      
-        auto moment_add_ = (complex_mult(
-          common_summands_ + eig::Vector2d { 0, gradient * flt_j * phase_next * rcp_j2 },
-          { std::cos(-flt_j * phase_next), std::sin(-flt_j * phase_next) }
-        )).eval();
-        auto moment_sub_ = (complex_mult(
-          common_summands_ + eig::Vector2d { 0, gradient * flt_j * phase * rcp_j2 },
-          { std::cos(-flt_j * phase), std::sin(-flt_j * phase) }
-        )).eval();
+        auto common_summands = complex_t { gradient * rcp_j2, y_inscpt / flt_j };
+        auto moment_add = (common_summands + complex_t { 0, gradient * flt_j * phase_next * rcp_j2 })
+                        * complex_t { std::cos(-flt_j * phase_next), std::sin(-flt_j * phase_next) };
+        auto moment_sub = (common_summands + complex_t { 0, gradient * flt_j * phase * rcp_j2 })
+                        * complex_t { std::cos(-flt_j * phase), std::sin(-flt_j * phase) };
 
-        auto common_summands = eig::dcomplex { gradient * rcp_j2, y_inscpt / flt_j };
-        auto moment_add = (common_summands 
-                        + eig::dcomplex{ 0, gradient * flt_j * phase_next * rcp_j2 })
-                        * eig::dcomplex { std::cos(-flt_j * phase_next), std::sin(-flt_j * phase_next) };
-        auto moment_sub = (common_summands 
-                        + eig::dcomplex{ 0, gradient * flt_j * phase * rcp_j2 })
-                        * eig::dcomplex { std::cos(-flt_j * phase), std::sin(-flt_j * phase) };
-
-        moments[j] += moment_add;
-        moments[j] -= moment_sub;
+        moments[j] += moment_add - moment_sub;
       } // for (uint j)
 
       moments[0] += 0.5 * gradient * (phase_next * phase_next) + y_inscpt * phase_next;
       moments[0] -= 0.5 * gradient * (phase      * phase)      + y_inscpt * phase;
     };
 
-    eval_i(-std::numbers::pi, phase[0], signal[0], signal[0]);
+    eval_i(-std::numbers::pi_v<T>, phase[0], signal[0], signal[0]);
     for (uint i = 0; i < wavelength_samples - 1; ++i)
       eval_i(phase[i], phase[i + 1], signal[i], signal[i + 1]);
     eval_i(phase[wavelength_samples - 1], 0.0, signal[wavelength_samples - 1], signal[wavelength_samples - 1]);
 
-    return (moments.real() * std::numbers::inv_pi).cast<float>().eval();
+    return (moments.real() * std::numbers::inv_pi_v<T>).cast<float>().eval();
   }
 
   Spec moments_to_spectrum(const Moments &bm) {

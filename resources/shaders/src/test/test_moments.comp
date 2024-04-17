@@ -3,21 +3,155 @@
 #include <moments.glsl>
 #include <spectrum.glsl>
 
+extension(GL_KHR_shader_subgroup_arithmetic,       require)
+extension(GL_KHR_shader_subgroup_ballot,           require)
+extension(GL_KHR_shader_subgroup_clustered,        require)
+extension(GL_KHR_shader_subgroup_shuffle,          require)
+extension(GL_KHR_shader_subgroup_shuffle_relative, require)
+
 // General layout rule declarations
-layout(local_size_x = 256) in;
+layout(local_size_x = 32) in;
 layout(std140) uniform;
 layout(std430) buffer;
 
-// Specialization constant declarations
-layout(constant_id = 0) const uint n = 1;
-
 // Shader storage declaration
-layout(binding = 0) restrict readonly  buffer b_in  { uvec4 data; } in_buffer;
-layout(binding = 1) restrict readonly  buffer b_wvl { vec4 data;  } wvl_buffer;
-layout(binding = 2) restrict writeonly buffer b_out { vec4 data;  } out_buffer;
+layout(binding = 0) restrict readonly  buffer b_phase  { 
+  float[wavelength_samples] data; 
+} buff_phase;
+layout(binding = 1) restrict readonly  buffer b_signal  { 
+  float[wavelength_samples] data; 
+} buff_signal;
+layout(binding = 2) restrict writeonly buffer b_output { 
+  uvec4 data;  
+} buff_output;
+
+// Source for cos/sin approximations:
+// https://www.ganssle.com/approx.htm
+// https://www.ganssle.com/approx/sincos.cpp
+
+double cos_121s(double x) {
+	const double c1 = 0.99999999999925182;
+	const double c2 =-0.49999999997024012;
+	const double c3 = 0.041666666473384543;
+	const double c4 =-0.001388888418000423;
+	const double c5 = 0.0000248010406484558;
+	const double c6 =-0.0000002752469638432;
+	const double c7 = 0.0000000019907856854;
+	double x2 = x * x;
+	return (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * (c5 + x2 * (c6 + c7 * x2))))));
+}
+
+double cos_121(double x){
+	int quad;						            // what quadrant are we in?
+	x = mod(x, 2.0 * M_PI);	        // Get rid of values > 2* pi
+  x = abs(x);                     // cos(-x) = cos(x)
+	quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
+	switch (quad){
+    case 0: return  cos_121s(x);
+    case 1: return -cos_121s(M_PI - x);
+    case 2: return -cos_121s(x - M_PI);
+    case 3: return  cos_121s(2.0 * M_PI - x);
+	}
+}
+
+double sin_121(double x){
+	return cos_121(0.5 * M_PI - x);
+}
+
+#define float_t   float
+#define complex_t vec2
+
+// complex_t complex_mult(complex_t lhs, complex_t rhs) {
+//   return complex_t(lhs.x * rhs.x - lhs.y * rhs.y,
+//                    lhs.x * rhs.y + lhs.y * rhs.x);
+// }
+
+// Moment coefficients are stored in shared memory
+shared complex_t s_coeffs[moment_coeffs];
+
+void eval(float_t phase, float_t phase_next, float_t signal, float_t signal_next, in bool mask) {
+  if (phase >= phase_next)
+    mask = false;
+
+  float_t gradient = (signal_next - signal) / (phase_next - phase);      
+  float_t y_inscpt = signal - gradient * phase;
+  
+  for (uint j = 1; j < moment_coeffs; ++j) {
+    float_t rcp_j2 = float_t(1) / float_t(j * j);
+    float_t flt_j  = float_t(j);
+
+    complex_t common_summands = complex_t(gradient * rcp_j2, y_inscpt / flt_j);
+
+    complex_t moment_add = complex_mult(
+      common_summands + complex_t(0, gradient * flt_j * phase_next * rcp_j2 ),
+      complex_t(cos/* _121 */(-flt_j * phase_next), sin/* _121 */(-flt_j * phase_next))
+    );
+    complex_t moment_sub = complex_mult(
+      common_summands + complex_t(0, gradient * flt_j * phase * rcp_j2 ),
+      complex_t(cos/* _121 */(-flt_j * phase), sin/* _121 */(-flt_j * phase))
+    );
+
+    moment_add = subgroupAdd(mask ? moment_add : vec2(0));
+    moment_sub = subgroupAdd(mask ? moment_sub : vec2(0));
+    
+    if (subgroupElect())
+      s_coeffs[j] += moment_add - moment_sub;
+    memoryBarrierShared();
+    barrier();
+  } // for (uint j = 1)
+
+  float_t moment_add = .5f * gradient * (phase_next * phase_next) + y_inscpt * phase_next;
+  float_t moment_sub = .5f * gradient * (phase * phase)           + y_inscpt * phase;
+  moment_add = subgroupAdd(mask ? moment_add : 0.0);
+  moment_sub = subgroupAdd(mask ? moment_sub : 0.0);
+  if (subgroupElect())
+    s_coeffs[0] += moment_add - moment_sub;
+  memoryBarrierShared();
+  barrier();
+}
 
 void main() {
-  guard(gl_GlobalInvocationID.x == 0);
-  float[moment_coeffs] tm = unpack_moments_12x10(in_buffer.data);
-  out_buffer.data = moments_to_reflectance(wvl_buffer.data, tm);
+  guard(gl_SubgroupID == 0); // One warp shader
+
+  // Determine wavelengths and their respective indices for each thread;
+  // assumes wavelength_samples == 64
+  ivec2 wvls_i = ivec2(2 * gl_SubgroupInvocationID) + ivec2(0, 1); // [0, 1], [2, 3], ..., [62, 63]
+  
+  // Load phase and signal data for this invocation; the subgroup together
+  // describes a full spectral range
+  vec2 phase  = vec2(buff_phase.data[wvls_i[0]],  buff_phase.data[wvls_i[1]]);
+  vec2 signal = vec2(buff_signal.data[wvls_i[0]], buff_signal.data[wvls_i[1]]);
+  
+  // Set coefficients to zero
+  if (gl_SubgroupInvocationID < moment_coeffs)
+    s_coeffs[gl_SubgroupInvocationID] = complex_t(0);
+  memoryBarrierShared();
+  barrier();
+  
+  // Fit coefficients
+  eval(-M_PI,     phase[0],      
+       signal[0], signal[0], 
+       gl_SubgroupInvocationID == 0);
+  eval(phase[0],  phase[1], 
+       signal[0], signal[1], 
+       true);
+  eval(phase[1],  subgroupShuffleDown(phase[0],  1), 
+       signal[1], subgroupShuffleDown(signal[0], 1),
+       gl_SubgroupInvocationID < gl_SubgroupSize - 1);
+  eval(phase[1],  0.0,
+       signal[1], signal[1],
+       gl_SubgroupInvocationID == gl_SubgroupSize - 1);
+
+  // Store packed coefficients
+  if (gl_SubgroupInvocationID < moment_coeffs) {
+    float coeff = float(s_coeffs[gl_SubgroupInvocationID].x * M_PI_INV);
+    uint pack   = packHalf2x16(vec2(coeff, subgroupShuffleDown(coeff, 1)));
+
+    uvec4 v = uvec4(0);
+    v[gl_SubgroupInvocationID / 2] += gl_SubgroupInvocationID % 2 == 0 ? pack : 0u;
+    v = subgroupAdd(v);
+    
+    if (subgroupElect())    
+      buff_output.data = v;
+  }
 }

@@ -17,7 +17,7 @@ layout(std140) uniform;
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uint object_i;
-} unif;
+} buff_unif;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
@@ -25,35 +25,68 @@ layout(binding = 0) restrict readonly buffer b_buff_atlas {
 } buff_atlas;
 
 // Image/sampler binding declarations
-layout(binding = 0, rgba32f)  uniform readonly image1DArray b_spec_4f; // Uplifting spectrum data
-layout(binding = 1, rgba32f)  uniform readonly      image1D b_warp_1f; // Warp data for spectral MESE
-layout(binding = 2, rgba32f)  uniform readonly      image2D b_bary_4f; // Uplifting barycentrics data
-layout(binding = 3, rgba32ui) uniform writeonly    uimage2D b_coef_4f; // Output coefficients for spectral MESE
+layout(binding = 1, rgba32f)  uniform readonly  image1DArray  b_spec_4f; // Uplifting spectrum data
+layout(binding = 2, rgba32f)  uniform readonly       image1D  b_warp_1f; // Warp data for spectral MESE
+layout(binding = 3, rgba32f)  uniform readonly  image2DArray  b_bary_4f; // Uplifting barycentrics data
+layout(binding = 4, rgba32ui) uniform writeonly uimage2DArray b_coef_4f; // Output coefficients for spectral MESE
 
 // Moment coefficients are stored in shared memory
-shared vec2[256 / 32][moment_coeffs] s_coeffs;
+shared vec2 s_coeffs[256 / 32][moment_coeffs];
+
+// Source for cos/sin approximations:
+// https://www.ganssle.com/approx.htm
+// https://www.ganssle.com/approx/sincos.cpp
+
+double cos_121s(double x) {
+	const double c1 = 0.99999999999925182;
+	const double c2 =-0.49999999997024012;
+	const double c3 = 0.041666666473384543;
+	const double c4 =-0.001388888418000423;
+	const double c5 = 0.0000248010406484558;
+	const double c6 =-0.0000002752469638432;
+	const double c7 = 0.0000000019907856854;
+	double x2 = x * x;
+	return (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * (c5 + x2 * (c6 + c7 * x2))))));
+}
+
+double cos_121(double x){
+	int quad;						            // what quadrant are we in?
+	x = mod(x, 2.0 * M_PI);	        // Get rid of values > 2* pi
+  x = abs(x);                     // cos(-x) = cos(x)
+	quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
+	switch (quad){
+    case 0: return  cos_121s(x);
+    case 1: return -cos_121s(M_PI - x);
+    case 2: return -cos_121s(x - M_PI);
+    case 3: return  cos_121s(2.0 * M_PI - x);
+	}
+}
+
+double sin_121(double x){
+	return cos_121(0.5 * M_PI - x);
+}
 
 void eval(float phase, float phase_next, float signal, float signal_next, bool insert_barriers) {
   guard(phase < phase_next);
 
-  float gradient = (signal_next - signal) / (phase_next  - phase);      
+  float gradient = (signal_next - signal) / (phase_next - phase);      
   float y_inscpt = signal - gradient * phase;
   
+  vec2 coeff = vec2(0);
+
   for (uint j = 1; j < moment_coeffs; ++j) {
     float rcp_j2 = 1.f / float(j * j);
     float flt_j  = float(j);
 
     vec2 common_summands = vec2(gradient * rcp_j2, y_inscpt / flt_j);
     vec2 moment_add = subgroupAdd(complex_mult(
-      common_summands + vec2(0, gradient * flt_j * phase_next * rcp_j2 ),
-      vec2(cos(-flt_j * phase_next), sin(-flt_j * phase_next))
-    ));
+                                  common_summands + vec2(0, gradient * flt_j * phase_next * rcp_j2 ),
+                                  vec2(cos(-flt_j * phase_next), sin(-flt_j * phase_next))));
     vec2 moment_sub = subgroupAdd(complex_mult(
-      common_summands + vec2(0, gradient * flt_j * phase * rcp_j2 ),
-      vec2(cos(-flt_j * phase), sin(-flt_j * phase))
-    ));
-
-    if (subgroupElect()) {
+                                  common_summands + vec2(0, gradient * flt_j * phase * rcp_j2 ),
+                                  vec2(cos(-flt_j * phase), sin(-flt_j * phase))));
+    
+    if (subgroupElect() || !insert_barriers) {
       s_coeffs[gl_SubgroupID][j] += moment_add;
       s_coeffs[gl_SubgroupID][j] -= moment_sub;
     }
@@ -67,9 +100,9 @@ void eval(float phase, float phase_next, float signal, float signal_next, bool i
   float moment_add = subgroupAdd(.5f * gradient * sdot(phase_next) + y_inscpt * phase_next);
   float moment_sub = subgroupAdd(.5f * gradient * sdot(phase)      + y_inscpt * phase);
 
-  if (subgroupElect()) {
-    s_coeffs[gl_SubgroupID][0] += moment_add;
-    s_coeffs[gl_SubgroupID][0] -= moment_sub;
+  if (subgroupElect() || !insert_barriers) {
+    s_coeffs[gl_SubgroupID][0].x += moment_add;
+    s_coeffs[gl_SubgroupID][0].x -= moment_sub;
   }
 
   if (insert_barriers) {
@@ -81,17 +114,17 @@ void eval(float phase, float phase_next, float signal, float signal_next, bool i
 void main() {
   uint i = gl_GlobalInvocationID.x / gl_SubgroupSize;
 
-  // Determine wavelengths and their respective indices for each thread
-  ivec2 wvls_i = ivec2(2 * gl_SubgroupInvocationID) + ivec2(0, 1);
-  vec2 wvls    = (vec2(wvls_i) + .5f) / float(wavelength_samples);
+  // Determine wavelengths and their respective indices for each thread;
+  // assumes wavelength_samples == 64
+  ivec2 wvls_i = ivec2(2 * gl_SubgroupInvocationID) + ivec2(0, 1); // [0, 1], [2, 3], ..., [62, 63]
 
   // Load barycentric coordinates using subgroup broadcast
   vec4 bary;  // Barycentric coordinates describing recombined spectrum in tesselation
   uint index; // Index of relevant tetrahedron inside tesselation
   if (subgroupElect()) {
-    AtlasLayout atlas = buff_atlas.data[unif.object_i];
+    AtlasLayout atlas = buff_atlas.data[buff_unif.object_i];
     uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
-    bary = imageLoad(b_bary_4f, ivec2(px));
+    bary = imageLoad(b_bary_4f, ivec3(px, 0));
   }
   bary = subgroupBroadcastFirst(bary);
   guard(!all(is_zero(bary)));
@@ -100,19 +133,17 @@ void main() {
   
   // Load phase and signal data for this invocation; the subgroup together
   // describes a full spectral range
-  vec2 phase  = vec2(
-    imageLoad(b_warp_1f, int(wvls_i.x)).x,
-    imageLoad(b_warp_1f, int(wvls_i.y)).x);
-  vec2 signal = vec2(
-    dot(imageLoad(b_spec_4f, ivec2(wvls_i.x, index)), bary),
-    dot(imageLoad(b_spec_4f, ivec2(wvls_i.y, index)), bary));
+  vec2 phase  = vec2(imageLoad(b_warp_1f, int(wvls_i[0])).x,
+                     imageLoad(b_warp_1f, int(wvls_i[1])).x);
+  vec2 signal = vec2(dot(imageLoad(b_spec_4f, ivec2(wvls_i[0], index)), bary),
+                     dot(imageLoad(b_spec_4f, ivec2(wvls_i[1], index)), bary));
   
   // Determine phase and signal one index to the right, taking into account end-caps
-  vec2 phase_next  = vec2(phase.y, 0.0);
-  vec2 signal_next = vec2(signal.y);
+  vec2 phase_next  = vec2(phase[1], 0.0);
+  vec2 signal_next = vec2(signal[1], signal[1]);
   if (gl_SubgroupInvocationID < gl_SubgroupSize - 1) {
-    phase_next.y  = subgroupShuffle(phase_next.x,  gl_SubgroupInvocationID + 1);
-    signal_next.y = subgroupShuffle(signal_next.x, gl_SubgroupInvocationID + 1);
+    phase_next[1]  = subgroupShuffle(phase[0],  gl_SubgroupInvocationID + 1);
+    signal_next[1] = subgroupShuffle(signal[0], gl_SubgroupInvocationID + 1);
   }
 
   // Set coefficients to zero
@@ -123,21 +154,22 @@ void main() {
 
   // Fit coefficients
   if (subgroupElect())
-    eval(-M_PI, phase.x, signal.x, signal.x, false);
+    eval(-M_PI, phase[0], signal[0], signal[0], false);
   memoryBarrierShared();
   barrier();
-  eval(phase.x, phase_next.x, signal.x, signal_next.x, true);
-  eval(phase.y, phase_next.y, signal.y, signal_next.y, true);
+  eval(phase[0], phase_next[0], signal[0], signal_next[0], true);
+  eval(phase[1], phase_next[1], signal[1], signal_next[1], true);
 
   // Store coefficients
   if (subgroupElect()) {
-    AtlasLayout atlas = buff_atlas.data[unif.object_i];
+    AtlasLayout atlas = buff_atlas.data[buff_unif.object_i];
     uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
 
     float[moment_coeffs] v;
     for (uint i = 0; i < moment_coeffs; ++i)
       v[i] = s_coeffs[gl_SubgroupID][i].x * M_PI_INV;
 
-    imageStore(b_coef_4f, ivec2(px), pack_moments_12x10(v));
+    imageStore(b_coef_4f, ivec3(px, 0), pack_moments_12x10(v));
+    // imageStore(b_coef_4f, ivec3(px, 0), floatBitsToUint(vec4(v[0], v[1], v[2], 1)));
   }
 }

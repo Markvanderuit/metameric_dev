@@ -92,7 +92,7 @@ void main() {
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   out_barycs = vec4(result_bary.xyz, float(result_indx));
 
-  // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
+  /* // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[moment_coeffs] coeffs;
   for (uint i = 0; i < moment_coeffs; ++i) {
     coeffs[i] = 0.f;
@@ -102,5 +102,5 @@ void main() {
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients
-  out_coeffs = pack_moments_12x10(coeffs);
+  out_coeffs = pack_moments_12x10(coeffs); */
 }

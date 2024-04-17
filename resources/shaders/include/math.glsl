@@ -8,9 +8,9 @@
 #define FLT_MIN  1.175494351e-38
 
 // Define math constants
-#define M_PI      3.14159265358979323846f
-#define M_PI_INV  0.31830988618379067154f
-#define M_EPS     5.9604645e-8f
+#define M_PI      3.14159265358979323846
+#define M_PI_INV  0.31830988618379067154
+#define M_EPS     5.9604645e-8
 #define M_RAY_EPS 5e3 * M_EPS
 
 // Rounded-up division functions

@@ -61,7 +61,7 @@
     vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
     vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
 
-    // Fill atlas texture coordinates, and spectral index
+    /* // Fill atlas texture coordinates, and spectral index
     vec4 r = vec4(0); 
     if (is_all_equal(ivec4(scene_barycentric_data_gather_w(tx_uv)))) { // Hot path; all element indices are the same, so use the one index for texture lookups
       // Sample barycentric weights
@@ -89,10 +89,10 @@
         r += hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i]))) 
            * detail_mix_reflectances(wvls, bary, elem_i);
       } // for (uint i)
-    }
+    } */
 
-    return r;
-    // return scene_sample_reflectance_moments(object_i, tx, wvls);
+    // return r;
+    return scene_sample_reflectance_moments(object_i, tx, wvls);
     // return max(vec4(0), r - scene_sample_reflectance_moments(object_i, tx, wvls));
   }
 
