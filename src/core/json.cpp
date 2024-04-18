@@ -15,7 +15,7 @@ namespace met {
 
   void from_json(const met::json &js, met::Basis &b) {
     b.mean = js.at("mean").get<Spec>();
-    b.func = js.at("func").get<met::Basis::BMat>();
+    b.func = js.at("func").get<met::Basis::mat_type>();
   }
 
   void to_json(met::json &js, const met::Basis &b) {
@@ -107,13 +107,13 @@ namespace Eigen {
     js = std::vector<met::CMFS::value_type>(r.begin(), r.end());
   }
   
-  void from_json(const met::json &js, met::Basis::BMat &b) {
+  void from_json(const met::json &js, met::Basis::mat_type &b) {
     std::ranges::copy(js, b.reshaped().begin());
   }
 
-  void to_json(met::json &js, const met::Basis::BMat &b) {
+  void to_json(met::json &js, const met::Basis::mat_type &b) {
     auto r = b.reshaped();
-    js = std::vector<met::Basis::BMat::value_type>(r.begin(), r.end());
+    js = std::vector<met::Basis::mat_type::value_type>(r.begin(), r.end());
   }
   
   void from_json(const met::json& js, Array2f &v) {

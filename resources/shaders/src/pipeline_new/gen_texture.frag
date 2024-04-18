@@ -89,10 +89,15 @@ void main() {
     result_indx = j + buff_uplift_data.offs;
   } // for (uint j)
 
+  // Force clamp; if the corresponding barycentric weights are partially negative - which
+  // indicates a lack of precision in the surrounding tesselation structure - this will
+  // introduce reconstruction error but avoid negative spectra
+  result_bary = clamp(result_bary, 0, 1);
+
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   out_barycs = vec4(result_bary.xyz, float(result_indx));
 
-  /* // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
+  // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[moment_coeffs] coeffs;
   for (uint i = 0; i < moment_coeffs; ++i) {
     coeffs[i] = 0.f;
@@ -102,5 +107,5 @@ void main() {
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients
-  out_coeffs = pack_moments_12x10(coeffs); */
+  out_coeffs = pack_half_8x16(coeffs);
 }

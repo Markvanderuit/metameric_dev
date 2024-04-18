@@ -290,6 +290,95 @@ namespace met::detail {
     return n.matrix().normalized().eval();
   }
 
+  /* 
+    The following focuses on specific 8/12-component eigen packs, which come up when dealing
+    with moment/basis coefficients.
+   */
+
+  inline
+  eig::Array4u pack_half_8x16(const eig::Vector<float, 8> &v) {
+    eig::Array4u p;
+    p[0] = pack_half_2x16(v(eig::seqN(0, 2)));
+    p[1] = pack_half_2x16(v(eig::seqN(2, 2)));
+    p[2] = pack_half_2x16(v(eig::seqN(4, 2)));
+    p[3] = pack_half_2x16(v(eig::seqN(6, 2)));
+    return p;
+  }
+
+  inline
+  eig::Vector<float, 8> unpack_half_8x16(const eig::Array4u &p) {
+    eig::Vector<float, 8> v;
+    v(eig::seqN(0, 2)) = detail::unpack_half_2x16(p[0]);
+    v(eig::seqN(2, 2)) = detail::unpack_half_2x16(p[1]);
+    v(eig::seqN(4, 2)) = detail::unpack_half_2x16(p[2]);
+    v(eig::seqN(6, 2)) = detail::unpack_half_2x16(p[3]);
+    return v;
+  }
+
+  // Pack 12 signed norm-bounded values into 11 and 10 bits, respectively
+  inline
+  eig::Array4u pack_snorm_12(const eig::Vector<float, 12> &v) {
+    constexpr auto pack = [](float f, float scale) -> uint { 
+      return static_cast<uint>(std::round((std::clamp(f, -1.f, 1.f) + 1.f) * 0.5f * scale));
+    };
+    constexpr auto pack_11 = std::bind(pack, std::placeholders::_1, 2048.f);
+    constexpr auto pack_10 = std::bind(pack, std::placeholders::_1, 1024.f);
+
+    union pack_t { 
+      struct {
+        uint b0 : 11; uint b1  : 11; uint b2  : 10; /* uint p0 : 2; */
+        uint b3 : 11; uint b4  : 11; uint b5  : 10; /* uint p1 : 2; */
+        uint b6 : 11; uint b7  : 11; uint b8  : 10; /* uint p2 : 2; */
+        uint b9 : 11; uint b10 : 11; uint b11 : 10; /* uint p3 : 2; */
+      } in;
+      
+      eig::Array4u out; 
+      
+      pack_t() { std::memset(&in, 0u, sizeof(pack_t::in)); };
+    } u;
+
+    u.in.b0  = pack_11(v[0]); u.in.b1  = pack_11(v[1]);  u.in.b2  = pack_10(v[2]);
+    u.in.b3  = pack_11(v[3]); u.in.b4  = pack_11(v[4]);  u.in.b5  = pack_10(v[5]);
+    u.in.b6  = pack_11(v[6]); u.in.b7  = pack_11(v[7]);  u.in.b8  = pack_10(v[8]);
+    u.in.b9  = pack_11(v[9]); u.in.b10 = pack_11(v[10]); u.in.b11 = pack_10(v[11]);
+
+    return u.out;
+  }
+  
+  inline
+  eig::Vector<float, 12> unpack_snorm_12(const eig::Array4u &p) {
+    constexpr auto unpack_11 = [](uint i) -> float { 
+      float f = static_cast<float>(i) / 2048.f;
+      return f * 2.f - 1.f;
+    };
+    constexpr auto unpack_10 = [](uint i) -> float {
+      float f = static_cast<float>(i) / 1024.f;
+      return f * 2.f - 1.f;
+    };
+    
+    union pack_t { 
+      eig::Array4u in; 
+
+      struct {
+        uint b0 : 11; uint b1  : 11; uint b2  : 10;
+        uint b3 : 11; uint b4  : 11; uint b5  : 10;
+        uint b6 : 11; uint b7  : 11; uint b8  : 10;
+        uint b9 : 11; uint b10 : 11; uint b11 : 10;
+      } out;
+      
+      pack_t() { std::memset(&in, 0, sizeof(pack_t::in)); };
+    } u;
+
+    u.in = p;
+
+    return eig::Vector<float, 12> {
+      unpack_11(u.out.b0), unpack_11(u.out.b1),  unpack_10(u.out.b2),  
+      unpack_11(u.out.b3), unpack_11(u.out.b4),  unpack_10(u.out.b5),  
+      unpack_11(u.out.b6), unpack_11(u.out.b7),  unpack_10(u.out.b8),  
+      unpack_11(u.out.b9), unpack_11(u.out.b10), unpack_10(u.out.b11),  
+    };
+  }
+
   /*
     The rest of this header focuses on bvh/mesh data packing. 
    */

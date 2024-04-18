@@ -139,7 +139,7 @@ namespace ImGui {
 
       // More restrained 400-700nm to ignore funky edges
       ImPlot::SetupAxesLimits(400.f, 700.f, min_bounds, max_bounds, ImPlotCond_Always);
-    
+
       ImPlot::PlotLine("", x_values.data(), sd.data(), wavelength_samples);
       ImPlot::EndPlot();
     }

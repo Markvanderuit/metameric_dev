@@ -26,14 +26,16 @@ namespace met {
 
   /* Basis function object, using a offset around its mean */
   struct Basis {
-    using BMat = eig::Matrix<float, wavelength_samples, wavelength_bases>;
-    using BVec = eig::Array<float, wavelength_bases, 1>;
+    using mat_type = eig::Matrix<float, wavelength_samples, wavelength_bases>;
+    using vec_type = eig::Vector<float, wavelength_bases>;
 
   public:
-    Spec mean; // Mean offset
-    BMat func; // Basis functions around mean ooffset
+    Spec     mean; // Mean offset
+    mat_type func; // Basis functions around mean ooffset
 
   public: // Boilerplate
+    Spec apply(const vec_type &c) const { return (func * c).eval(); }
+    Spec operator()(const vec_type &c) const { return apply(c); }
     bool operator==(const Basis &o) const;
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);

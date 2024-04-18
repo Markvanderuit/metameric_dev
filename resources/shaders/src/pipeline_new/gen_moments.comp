@@ -4,10 +4,11 @@
 #include <spectrum.glsl>
 #include <render/detail/scene_types.glsl>
 
-extension(GL_KHR_shader_subgroup_arithmetic, require)
-extension(GL_KHR_shader_subgroup_ballot,     require)
-extension(GL_KHR_shader_subgroup_clustered,  require)
-extension(GL_KHR_shader_subgroup_shuffle,    require)
+extension(GL_KHR_shader_subgroup_arithmetic,       require)
+extension(GL_KHR_shader_subgroup_ballot,           require)
+extension(GL_KHR_shader_subgroup_clustered,        require)
+extension(GL_KHR_shader_subgroup_shuffle,          require)
+extension(GL_KHR_shader_subgroup_shuffle_relative, require)
 
 // General layout rule declarations
 layout(local_size_x = 256) in;
@@ -26,34 +27,32 @@ layout(binding = 0) restrict readonly buffer b_buff_atlas {
 
 // Image/sampler binding declarations
 layout(binding = 1, rgba32f)  uniform readonly  image1DArray  b_spec_4f; // Uplifting spectrum data
-layout(binding = 2, rgba32f)  uniform readonly       image1D  b_warp_1f; // Warp data for spectral MESE
+layout(binding = 2,    r32f)  uniform readonly       image1D  b_warp_1f; // Warp data for spectral MESE
 layout(binding = 3, rgba32f)  uniform readonly  image2DArray  b_bary_4f; // Uplifting barycentrics data
 layout(binding = 4, rgba32ui) uniform writeonly uimage2DArray b_coef_4f; // Output coefficients for spectral MESE
 
-// Moment coefficients are stored in shared memory
-shared vec2 s_coeffs[256 / 32][moment_coeffs];
+// Some moment types are elevated to double precision
+#define float_t   float // double
+#define complex_t vec2  // dvec2
 
 // Source for cos/sin approximations:
 // https://www.ganssle.com/approx.htm
 // https://www.ganssle.com/approx/sincos.cpp
 
-double cos_121s(double x) {
-	const double c1 = 0.99999999999925182;
-	const double c2 =-0.49999999997024012;
-	const double c3 = 0.041666666473384543;
-	const double c4 =-0.001388888418000423;
-	const double c5 = 0.0000248010406484558;
-	const double c6 =-0.0000002752469638432;
-	const double c7 = 0.0000000019907856854;
+/* double cos_121s(in double x) {
 	double x2 = x * x;
-	return (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * (c5 + x2 * (c6 + c7 * x2))))));
+	return   ( 0.99999999999925182 
+    + x2 * (-0.49999999997024012 
+    + x2 * ( 0.041666666473384543 
+    + x2 * (-0.001388888418000423 
+    + x2 * ( 0.0000248010406484558 
+    + x2 * (-0.0000002752469638432 
+    + x2 *   0.0000000019907856854))))));
 }
 
-double cos_121(double x){
-	int quad;						            // what quadrant are we in?
-	x = mod(x, 2.0 * M_PI);	        // Get rid of values > 2* pi
-  x = abs(x);                     // cos(-x) = cos(x)
-	quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
+double cos_121(in double x){
+	x = abs(mod(x, 2.0 * M_PI));	      // Get rid of values > 2* pi, and set cos(-x) = cos(x)
+	int quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
 	switch (quad){
     case 0: return  cos_121s(x);
     case 1: return -cos_121s(M_PI - x);
@@ -62,50 +61,62 @@ double cos_121(double x){
 	}
 }
 
-double sin_121(double x){
+double sin_121(in double x){
 	return cos_121(0.5 * M_PI - x);
-}
+} */
 
-void eval(float phase, float phase_next, float signal, float signal_next, bool insert_barriers) {
-  guard(phase < phase_next);
+/* complex_t complex_mult(complex_t lhs, complex_t rhs) {
+  return complex_t(lhs.x * rhs.x - lhs.y * rhs.y,
+                   lhs.x * rhs.y + lhs.y * rhs.x);
+} */
+
+// Moment coefficients are assembled per warp in shared memory
+shared complex_t s_coeffs[256 / 32][moment_coeffs];
+
+void eval(in float phase,  in float phase_next, 
+          in float signal, in float signal_next, 
+          in bool  mask) {
+  if (phase >= phase_next)
+    mask = false;
 
   float gradient = (signal_next - signal) / (phase_next - phase);      
   float y_inscpt = signal - gradient * phase;
   
-  vec2 coeff = vec2(0);
-
   for (uint j = 1; j < moment_coeffs; ++j) {
     float rcp_j2 = 1.f / float(j * j);
-    float flt_j  = float(j);
+    float flt_j  = j;
+ 
+    vec2 common_summands = { gradient * rcp_j2, y_inscpt / flt_j };
 
-    vec2 common_summands = vec2(gradient * rcp_j2, y_inscpt / flt_j);
-    vec2 moment_add = subgroupAdd(complex_mult(
-                                  common_summands + vec2(0, gradient * flt_j * phase_next * rcp_j2 ),
-                                  vec2(cos(-flt_j * phase_next), sin(-flt_j * phase_next))));
-    vec2 moment_sub = subgroupAdd(complex_mult(
-                                  common_summands + vec2(0, gradient * flt_j * phase * rcp_j2 ),
-                                  vec2(cos(-flt_j * phase), sin(-flt_j * phase))));
+    // Elevate to double precision from this point onward
+    complex_t moment_add = complex_mult(
+      common_summands + complex_t(0, gradient * flt_j * phase_next * rcp_j2 ),
+      complex_t(cos/* _121 */(-flt_j * phase_next), sin/* _121 */(-flt_j * phase_next))
+    );
+    complex_t moment_sub = complex_mult(
+      common_summands + complex_t(0, gradient * flt_j * phase * rcp_j2 ),
+      complex_t(cos/* _121 */(-flt_j * phase), sin/* _121 */(-flt_j * phase))
+    );
+
+    moment_add = subgroupAdd(mask ? moment_add : vec2(0));
+    moment_sub = subgroupAdd(mask ? moment_sub : vec2(0));
     
-    if (subgroupElect() || !insert_barriers) {
-      s_coeffs[gl_SubgroupID][j] += moment_add;
-      s_coeffs[gl_SubgroupID][j] -= moment_sub;
-    }
-
-    if (insert_barriers) {
-      memoryBarrierShared();
-      barrier();
-    }
+    if (subgroupElect())
+      s_coeffs[gl_SubgroupID][j] += moment_add - moment_sub;
+    memoryBarrierShared();
+    barrier();
   } // for (uint j = 1)
 
-  float moment_add = subgroupAdd(.5f * gradient * sdot(phase_next) + y_inscpt * phase_next);
-  float moment_sub = subgroupAdd(.5f * gradient * sdot(phase)      + y_inscpt * phase);
+  // j = 0
+  {
+    float moment_add = .5f * gradient * (phase_next * phase_next) + y_inscpt * phase_next;
+    float moment_sub = .5f * gradient * (phase * phase)           + y_inscpt * phase;
 
-  if (subgroupElect() || !insert_barriers) {
-    s_coeffs[gl_SubgroupID][0].x += moment_add;
-    s_coeffs[gl_SubgroupID][0].x -= moment_sub;
-  }
+    moment_add = subgroupAdd(mask ? moment_add : 0.0);
+    moment_sub = subgroupAdd(mask ? moment_sub : 0.0);
 
-  if (insert_barriers) {
+    if (subgroupElect())
+      s_coeffs[gl_SubgroupID][0] += moment_add - moment_sub;
     memoryBarrierShared();
     barrier();
   }
@@ -115,61 +126,62 @@ void main() {
   uint i = gl_GlobalInvocationID.x / gl_SubgroupSize;
 
   // Determine wavelengths and their respective indices for each thread;
-  // assumes wavelength_samples == 64
-  ivec2 wvls_i = ivec2(2 * gl_SubgroupInvocationID) + ivec2(0, 1); // [0, 1], [2, 3], ..., [62, 63]
+  // assumes wavelength_samples == 64, then goes [0, 1], [2, 3], ..., [62, 63]
+  ivec2 wvls_i = { int(gl_SubgroupInvocationID) * 2, int(gl_SubgroupInvocationID) * 2 + 1 };
 
-  // Load barycentric coordinates using subgroup broadcast
-  vec4 bary;  // Barycentric coordinates describing recombined spectrum in tesselation
-  uint index; // Index of relevant tetrahedron inside tesselation
+  // Load barycentric pack data using subgroup broadcast
+  vec4 bary_pack;
   if (subgroupElect()) {
     AtlasLayout atlas = buff_atlas.data[buff_unif.object_i];
     uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
-    bary = imageLoad(b_bary_4f, ivec3(px, 0));
+    bary_pack = imageLoad(b_bary_4f, ivec3(px, 0));
   }
-  bary = subgroupBroadcastFirst(bary);
-  guard(!all(is_zero(bary)));
-  index = uint(bary.w);
-  bary.w = 1.f - hsum(bary.xyz);
+  bary_pack = subgroupBroadcastFirst(bary_pack);
+  guard(!all(is_zero(bary_pack)));
+
+  // Index of relevant tetrahedron is last coordinate, barycentrics are recovered due to convexity
+  uint index = uint(bary_pack.w);
+  vec4 bary  = vec4(bary_pack.xyz, 1.f - hsum(bary_pack.xyz));
   
-  // Load phase and signal data for this invocation; the subgroup together
-  // describes a full spectral range
-  vec2 phase  = vec2(imageLoad(b_warp_1f, int(wvls_i[0])).x,
-                     imageLoad(b_warp_1f, int(wvls_i[1])).x);
-  vec2 signal = vec2(dot(imageLoad(b_spec_4f, ivec2(wvls_i[0], index)), bary),
-                     dot(imageLoad(b_spec_4f, ivec2(wvls_i[1], index)), bary));
-  
-  // Determine phase and signal one index to the right, taking into account end-caps
-  vec2 phase_next  = vec2(phase[1], 0.0);
-  vec2 signal_next = vec2(signal[1], signal[1]);
-  if (gl_SubgroupInvocationID < gl_SubgroupSize - 1) {
-    phase_next[1]  = subgroupShuffle(phase[0],  gl_SubgroupInvocationID + 1);
-    signal_next[1] = subgroupShuffle(signal[0], gl_SubgroupInvocationID + 1);
-  }
+  // Load phase and signal data for this invocation; a warp then collectively
+  // describes the full spectral range
+  vec2 phase  = { imageLoad(b_warp_1f, wvls_i[0]).x, imageLoad(b_warp_1f, wvls_i[1]).x };
+  vec2 signal = { dot(imageLoad(b_spec_4f, ivec2(wvls_i[0], index)), bary),
+                  dot(imageLoad(b_spec_4f, ivec2(wvls_i[1], index)), bary) };
 
   // Set coefficients to zero
   if (gl_SubgroupInvocationID < moment_coeffs)
-    s_coeffs[gl_SubgroupID][gl_SubgroupInvocationID] = vec2(0);
+    s_coeffs[gl_SubgroupID][gl_SubgroupInvocationID] = complex_t(0);
   memoryBarrierShared();
   barrier();
-
+  
   // Fit coefficients
-  if (subgroupElect())
-    eval(-M_PI, phase[0], signal[0], signal[0], false);
-  memoryBarrierShared();
-  barrier();
-  eval(phase[0], phase_next[0], signal[0], signal_next[0], true);
-  eval(phase[1], phase_next[1], signal[1], signal_next[1], true);
+  eval(-M_PI,     phase[0],      
+       signal[0], signal[0], 
+       gl_SubgroupInvocationID == 0);
+  eval(phase[0],  phase[1], 
+       signal[0], signal[1], 
+       true);
+  eval(phase[1],  subgroupShuffleDown(phase[0],  1), 
+       signal[1], subgroupShuffleDown(signal[0], 1),
+       gl_SubgroupInvocationID < gl_SubgroupSize - 1);
+  eval(phase[1],  0.0,
+       signal[1], signal[1],
+       gl_SubgroupInvocationID == gl_SubgroupSize - 1);
 
-  // Store coefficients
-  if (subgroupElect()) {
-    AtlasLayout atlas = buff_atlas.data[buff_unif.object_i];
-    uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
+  // Store packed coefficients
+  if (gl_SubgroupInvocationID < moment_coeffs) {
+    float coeff = s_coeffs[gl_SubgroupID][gl_SubgroupInvocationID].x * M_PI_INV;
+    uint pack   = packHalf2x16(vec2(coeff, subgroupShuffleDown(coeff, 1)));
 
-    float[moment_coeffs] v;
-    for (uint i = 0; i < moment_coeffs; ++i)
-      v[i] = s_coeffs[gl_SubgroupID][i].x * M_PI_INV;
-
-    imageStore(b_coef_4f, ivec3(px, 0), pack_moments_12x10(v));
-    // imageStore(b_coef_4f, ivec3(px, 0), floatBitsToUint(vec4(v[0], v[1], v[2], 1)));
+    uvec4 v = { 0, 0, 0, 0 };
+    v[gl_SubgroupInvocationID / 2] += gl_SubgroupInvocationID % 2 == 0 ? pack : 0u;
+    v = subgroupAdd(v);
+    
+    if (subgroupElect()) {
+      AtlasLayout atlas = buff_atlas.data[buff_unif.object_i];
+      uvec2 px = atlas.offs + uvec2(i % atlas.size.x, i / atlas.size.x);
+      // imageStore(b_coef_4f, ivec3(px, 0), v);
+    } 
   }
 }

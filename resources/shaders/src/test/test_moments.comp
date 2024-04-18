@@ -25,27 +25,29 @@ layout(binding = 2) restrict writeonly buffer b_output {
   uvec4 data;  
 } buff_output;
 
+// Some moment types are elevated to double precision
+#define float_t   double
+#define complex_t dvec2
+
 // Source for cos/sin approximations:
 // https://www.ganssle.com/approx.htm
 // https://www.ganssle.com/approx/sincos.cpp
 
 double cos_121s(double x) {
-	const double c1 = 0.99999999999925182;
-	const double c2 =-0.49999999997024012;
-	const double c3 = 0.041666666473384543;
-	const double c4 =-0.001388888418000423;
-	const double c5 = 0.0000248010406484558;
-	const double c6 =-0.0000002752469638432;
-	const double c7 = 0.0000000019907856854;
 	double x2 = x * x;
-	return (c1 + x2 * (c2 + x2 * (c3 + x2 * (c4 + x2 * (c5 + x2 * (c6 + c7 * x2))))));
+	return   ( 0.99999999999925182 
+    + x2 * (-0.49999999997024012 
+    + x2 * ( 0.041666666473384543 
+    + x2 * (-0.001388888418000423 
+    + x2 * ( 0.0000248010406484558 
+    + x2 * (-0.0000002752469638432 
+    + x2 *   0.0000000019907856854))))));
 }
 
 double cos_121(double x){
-	int quad;						            // what quadrant are we in?
-	x = mod(x, 2.0 * M_PI);	        // Get rid of values > 2* pi
-  x = abs(x);                     // cos(-x) = cos(x)
-	quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
+	x = mod(x, 2.0 * M_PI);	            // Get rid of values > 2* pi
+  x = abs(x);                         // cos(-x) = cos(x)
+	int quad = int(x * 2.0 * M_PI_INV);	// Get quadrant # (0 to 3) below
 	switch (quad){
     case 0: return  cos_121s(x);
     case 1: return -cos_121s(M_PI - x);
@@ -58,37 +60,37 @@ double sin_121(double x){
 	return cos_121(0.5 * M_PI - x);
 }
 
-#define float_t   float
-#define complex_t vec2
-
-// complex_t complex_mult(complex_t lhs, complex_t rhs) {
-//   return complex_t(lhs.x * rhs.x - lhs.y * rhs.y,
-//                    lhs.x * rhs.y + lhs.y * rhs.x);
-// }
+complex_t complex_mult(complex_t lhs, complex_t rhs) {
+  return complex_t(lhs.x * rhs.x - lhs.y * rhs.y,
+                   lhs.x * rhs.y + lhs.y * rhs.x);
+}
 
 // Moment coefficients are stored in shared memory
 shared complex_t s_coeffs[moment_coeffs];
 
-void eval(float_t phase, float_t phase_next, float_t signal, float_t signal_next, in bool mask) {
+void eval(in float phase,  in float phase_next, 
+          in float signal, in float signal_next, 
+          in bool  mask) {
   if (phase >= phase_next)
     mask = false;
 
-  float_t gradient = (signal_next - signal) / (phase_next - phase);      
-  float_t y_inscpt = signal - gradient * phase;
+  float gradient = (signal_next - signal) / (phase_next - phase);      
+  float y_inscpt = signal - gradient * phase;
   
   for (uint j = 1; j < moment_coeffs; ++j) {
-    float_t rcp_j2 = float_t(1) / float_t(j * j);
-    float_t flt_j  = float_t(j);
+    float rcp_j2 = 1.f / float(j * j);
+    float flt_j  = float(j);
+ 
+    vec2 common_summands = vec2(gradient * rcp_j2, y_inscpt / flt_j);
 
-    complex_t common_summands = complex_t(gradient * rcp_j2, y_inscpt / flt_j);
-
+    // Elevate to double precision from this point onward
     complex_t moment_add = complex_mult(
       common_summands + complex_t(0, gradient * flt_j * phase_next * rcp_j2 ),
-      complex_t(cos/* _121 */(-flt_j * phase_next), sin/* _121 */(-flt_j * phase_next))
+      complex_t(cos_121(-flt_j * phase_next), sin_121(-flt_j * phase_next))
     );
     complex_t moment_sub = complex_mult(
       common_summands + complex_t(0, gradient * flt_j * phase * rcp_j2 ),
-      complex_t(cos/* _121 */(-flt_j * phase), sin/* _121 */(-flt_j * phase))
+      complex_t(cos_121(-flt_j * phase), sin_121(-flt_j * phase))
     );
 
     moment_add = subgroupAdd(mask ? moment_add : vec2(0));
@@ -100,14 +102,19 @@ void eval(float_t phase, float_t phase_next, float_t signal, float_t signal_next
     barrier();
   } // for (uint j = 1)
 
-  float_t moment_add = .5f * gradient * (phase_next * phase_next) + y_inscpt * phase_next;
-  float_t moment_sub = .5f * gradient * (phase * phase)           + y_inscpt * phase;
-  moment_add = subgroupAdd(mask ? moment_add : 0.0);
-  moment_sub = subgroupAdd(mask ? moment_sub : 0.0);
-  if (subgroupElect())
-    s_coeffs[0] += moment_add - moment_sub;
-  memoryBarrierShared();
-  barrier();
+  // j = 0
+  {
+    float moment_add = .5f * gradient * (phase_next * phase_next) + y_inscpt * phase_next;
+    float moment_sub = .5f * gradient * (phase * phase)           + y_inscpt * phase;
+
+    moment_add = subgroupAdd(mask ? moment_add : 0.0);
+    moment_sub = subgroupAdd(mask ? moment_sub : 0.0);
+
+    if (subgroupElect())
+      s_coeffs[0] += moment_add - moment_sub;
+    memoryBarrierShared();
+    barrier();
+  }
 }
 
 void main() {
@@ -120,7 +127,7 @@ void main() {
   // Load phase and signal data for this invocation; the subgroup together
   // describes a full spectral range
   vec2 phase  = vec2(buff_phase.data[wvls_i[0]],  buff_phase.data[wvls_i[1]]);
-  vec2 signal = vec2(buff_signal.data[wvls_i[0]], buff_signal.data[wvls_i[1]]);
+  vec2 signal = clamp(vec2(buff_signal.data[wvls_i[0]], buff_signal.data[wvls_i[1]]), vec2(0), vec2(1)); // clamp in case mixture shits the bed, though this shouldn't happen
   
   // Set coefficients to zero
   if (gl_SubgroupInvocationID < moment_coeffs)

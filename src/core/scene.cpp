@@ -322,6 +322,10 @@ namespace met {
     save_path  = io::path_with_ext(path, ".json");
     save_state = SaveState::eSaved;
     clear_mods();
+
+    /* // TODO remove this override that forces a reload of basis functions from disk
+    auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
+    resources.bases[0].value() = loaded_tree.basis; */
   }
 
   void Scene::import_scene(const fs::path &path) {

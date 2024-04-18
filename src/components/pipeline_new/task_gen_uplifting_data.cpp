@@ -16,7 +16,7 @@
 
 namespace met {
   // Nr. of points on the color system boundary; lower means more space available for constraints
-  constexpr uint n_system_boundary_samples = 48;
+  constexpr uint n_system_boundary_samples = 96;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -247,6 +247,21 @@ namespace met {
   Spec GenUpliftingDataTask::query_constraint(uint i) const {
     met_trace();
     return m_tesselation_spectra[m_csys_boundary_spectra.size() + i];
+  }
+
+  TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(uint i) const {
+    met_trace();
+
+    TetrahedronRecord tr = { .weights = 0.f }; // no weights known
+
+    // Find element indices for this tetrahedron, and then fill per-vertex data
+    for (auto [i, elem_i] : enumerate_view(m_tesselation.elems[i])) {
+      int j = static_cast<int>(elem_i) - static_cast<int>(m_csys_boundary_spectra.size());
+      tr.indices[i] = std::max<int>(j, -1);          // Assign constraint index, or -1 if a constraint is a boundary vertex
+      tr.spectra[i] = m_tesselation_spectra[elem_i]; // Assign corresponding spectrum
+    }
+
+    return tr;
   }
 
   TetrahedronRecord GenUpliftingDataTask::query_tetrahedron(const Colr &c) const {

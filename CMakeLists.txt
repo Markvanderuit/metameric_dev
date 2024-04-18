@@ -15,7 +15,7 @@ option(met_enable_tests      "Build tests"                  ON)
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
-set(MET_WAVELENGTH_BASES    16) # Maximum nr. of bases used in generative functions
+set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
 
 # TODO remove
 set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported TODO remove

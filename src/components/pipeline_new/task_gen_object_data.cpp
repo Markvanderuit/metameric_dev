@@ -129,13 +129,14 @@ namespace met {
       // test to restrict all operations in this scope to the relevant texture patch
       gl::state::ScopedSet scope(gl::DrawCapability::eScissorTest, true);
       gl::state::set(gl::DrawCapability::eScissorTest, true);
+      gl::state::set(gl::DrawCapability::eDither,     false);
       gl::state::set_scissor(e_patch.size, e_patch.offs);
       gl::state::set_viewport(e_barycentrics.texture().size().head<2>());
 
       // Prepare framebuffer, clear relevant patch (not necessary actually)
       m_fbo.bind();
-      m_fbo.clear(gl::FramebufferType::eColor, 0, 0);
-      m_fbo.clear(gl::FramebufferType::eColor, 0, 1);
+      m_fbo.clear(gl::FramebufferType::eColor, 0.f, 0);
+      m_fbo.clear(gl::FramebufferType::eColor, 0.f, 1);
 
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch
@@ -164,7 +165,7 @@ namespace met {
       });
     }
 
-    { // Second dispatch, bake spectral moment coefficients
+    /* { // Second dispatch, bake spectral moment coefficients
       auto &program = e_cache.at(m_cache_key_bake);
 
       // Prepare program state
@@ -181,7 +182,7 @@ namespace met {
                                gl::BarrierFlags::eImageAccess   |
                                gl::BarrierFlags::eStorageBuffer | 
                                gl::BarrierFlags::eUniformBuffer );
-      gl::dispatch_compute({ .groups_x = ceil_div(e_patch.size.prod(), 8u) }); // one warp per pixel
-    }
+      gl::dispatch_compute({ .groups_x = ceil_div(e_patch.size.prod() * 32u, 256u) }); // one warp per pixel
+    } */
   }
 } // namespace met

@@ -36,6 +36,10 @@
     return texture(scene_txtr_coef_data, p);                          \
   }                                                                   \
                                                                       \
+  uvec4 scene_coefficients_data_fetch(ivec3 p) {                      \
+    return texelFetch(scene_txtr_coef_data, p, 0);                    \
+  }                                                                   \
+                                                                      \
   float scene_phase_warp_data_texture(float p) {                      \
     return texture(scene_txtr_warp_data, p).x;                        \
   }

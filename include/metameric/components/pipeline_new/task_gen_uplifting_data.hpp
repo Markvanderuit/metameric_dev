@@ -74,6 +74,7 @@ namespace met {
   public:
     // Accessors to some internal data; used by indirect surface constraints
     Spec              query_constraint(uint i)         const;
+    TetrahedronRecord query_tetrahedron(uint i)        const;
     TetrahedronRecord query_tetrahedron(const Colr &c) const;
   };
 

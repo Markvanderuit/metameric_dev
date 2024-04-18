@@ -191,7 +191,7 @@ namespace met {
     met_trace();
 
     using namespace std::complex_literals;
-    using T         = float; // TODO reverse
+    using T         = double; // TODO reverse
     using complex_t = std::complex<T>;
     using moments_t = eig::Array<complex_t, moment_coeffs, 1>; 
 

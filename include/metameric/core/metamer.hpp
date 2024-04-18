@@ -15,7 +15,8 @@ namespace met {
     std::vector<DirectConstraint> direct_constraints = { }; // Direct metamerism constraints
     const Basis &basis;                                     // Spectral basis functions
   };
-  Spec generate_spectrum(DirectSpectrumInfo info);
+  Basis::vec_type generate_spectrum_coeffs(DirectSpectrumInfo info);
+  Spec            generate_spectrum(DirectSpectrumInfo info);
 
   // Argument struct and method for generating a spectral reflectance, given a system of
   // interreflections expressed as a truncated power series
@@ -28,7 +29,8 @@ namespace met {
     std::vector<IndrctConstraint> indirect_constraints = { }; // Indirect metamerism constraints
     const Basis &basis;                                       // Spectral basis functions
   };
-  Spec generate_spectrum(IndrctSpectrumInfo info);
+  Basis::vec_type generate_spectrum_coeffs(IndrctSpectrumInfo info);
+  Spec            generate_spectrum(IndrctSpectrumInfo info);
 
   // Argument struct and method for generating points on the object color solid of a color system,
   // following the method of Mackiewicz et al., 2019 
@@ -40,7 +42,8 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Spec> generate_color_system_ocs(const DirectColorSystemOCSInfo &info);
+  std::vector<Basis::vec_type> generate_color_system_ocs_coeffs(const DirectColorSystemOCSInfo &info);
+  std::vector<Spec>            generate_color_system_ocs(const DirectColorSystemOCSInfo &info);
 
   // Argument struct and method for generating points on the object color solid of a metameric
   // mismatching between two or more color systems, following the method of Mackiewicz et al., 2019 
@@ -56,7 +59,8 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
+  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info);
+  std::vector<Spec>            generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
 
   // Argument struct and method for generating points on the object color solid of a metameric
   // mismatching between signal in a number of base color systems, and a interreflection system
@@ -75,5 +79,6 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Spec> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
+  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info);
+  std::vector<Spec>            generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
 } // namespace met

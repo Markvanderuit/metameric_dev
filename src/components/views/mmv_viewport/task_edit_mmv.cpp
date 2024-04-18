@@ -78,7 +78,7 @@ namespace met {
           fmt::print("{}\n", e_sd);
         
         auto moment_coeffs = spectrum_to_moments(e_sd);
-        moment_coeffs = unpack_moments_12x10(pack_moments_12x10(moment_coeffs));
+        moment_coeffs = detail::unpack_half_8x16(detail::pack_half_8x16(moment_coeffs));
 
         std::vector<std::string> legend = { "Reflectance", "MESE" };
         std::vector<Spec>        data   = { e_sd, moments_to_spectrum/* _lagrange */(moment_coeffs) };
@@ -123,17 +123,19 @@ namespace met {
             Colr err = (lrgb - e_scene.csys(0)(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
 
+            // Moment roundtrip error
             {
               const auto &e_sd = e_spectra[e_cs.vertex_i];
-              auto coeff = spectrum_to_moments(e_sd);
-              auto rtrip = moments_to_spectrum(coeff);
+              auto rtrip = moments_to_spectrum(spectrum_to_moments(e_sd));
+              auto _lrgb = e_scene.csys(0)(rtrip);
+              Colr _err  = (lrgb - _lrgb).abs();
+              Colr _srgb = lrgb_to_srgb(_lrgb);
 
-              Colr a = e_scene.csys(0)(e_sd);
-              Colr b = e_scene.csys(0)(rtrip);
-              Colr err = (b - a).abs();
-              ImGui::InputFloat3("Moment error (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+              ImGui::SeparatorText("Moment reconstruction");
+              ImGui::ColorEdit3("Base color (lrgb)", _lrgb.data(), ImGuiColorEditFlags_Float);
+              ImGui::ColorEdit3("Base color (srgb)", _srgb.data(), ImGuiColorEditFlags_Float);
+              ImGui::InputFloat3("Roundtrip (lrgb)", _err.data(),  "%.3f", ImGuiInputTextFlags_ReadOnly);
             }
-
           }
 
           ImGui::SeparatorText("Constraints");
