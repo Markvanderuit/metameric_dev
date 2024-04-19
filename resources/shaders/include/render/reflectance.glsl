@@ -24,22 +24,6 @@
   // Cold path; element indices differ. Do costly interpolation manually :(
   const ivec2 reflectance_tx_offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
 
-  // No interpolation
-  /* vec4 scene_sample_reflectance_moments(in uint object_i, in vec2 tx, in vec4 wvls) {
-    // Load relevant info objects
-    ObjectInfo      object_info       = scene_object_info(object_i);
-    BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(object_i);
-
-    // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
-    // also handle single-color objects by sampling the center of their patch
-    vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
-    vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
-
-    uvec4 v = scene_coefficients_data_texture(tx_uv);
-    vec4  r = moments_to_reflectance(wvls_to_phase(wvls), unpack_half_8x16(v));
-    return mix(r, vec4(0), isnan(r)); // Catch all-black glitching out during mixing
-  } */
-
   vec4 scene_sample_reflectance_moments(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
     ObjectInfo      object_info       = scene_object_info(object_i);
@@ -68,6 +52,37 @@
     } // for (uint i)
 
     return mix(r, vec4(0), isnan(r)); // Catch all-black glitching out during mixing
+  }
+  
+  vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
+    // Load relevant info objects
+    ObjectInfo      object_info       = scene_object_info(object_i);
+    BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(object_i);
+
+    // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
+    // also handle single-color objects by sampling the center of their patch
+    vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
+    vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
+
+    // Scale up to full texture size
+    vec3 tx_3d = tx_uv * vec3(scene_barycentric_data_size(), 1) - vec3(0.5, 0.5, 0);
+    vec2 alpha = mod(tx_3d.xy, 1.f);
+
+    // Return value; reflectance for four wavelengths
+    vec4 r = vec4(0); 
+
+    // Mix four texels appropriately, sampling each of four wavelengths independently
+    for (uint i = 0; i < 4; ++i) { // four texel corners
+      float[wavelength_bases] c = unpack_snorm_12(scene_coefficients_data_fetch(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0)));
+      float w = hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i])));
+      for (uint j = 0; j < 4; ++j) { // four wavelengths
+        for (uint k = 0; k < wavelength_bases; ++k) // n bases
+          r[j] += w * clamp(c[k], -1.f, 1.f) * scene_basis_func(wvls[j], k);
+      }
+    }
+
+    return r;
+    // return min(mix(r, vec4(0), isnan(r)), vec4(1)); // Catch all-black glitching out during mixing
   }
 
 // #else // SCENE_REFLECTANCE_MESE
@@ -127,7 +142,8 @@
   
   // Forward to whatever sampler we're experimenting with today
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
-    return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
+    // return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
+    return scene_sample_reflectance_bases(object_i, tx, wvls);
     // return scene_sample_reflectance_moments(object_i, tx, wvls);
   }
 

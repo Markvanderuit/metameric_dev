@@ -152,6 +152,9 @@ namespace met::detail {
     auto warp_data = generate_warped_phase();
     texture_warp = {{ .size = { static_cast<uint>(warp_data.size()) },
                       .data = cnt_span<const float>(warp_data)      }};
+
+    // Initialize basis function data
+    buffer_basis = {{ .size = sizeof(BasisInfoLayout), .flags = gl::BufferCreateFlags::eStorageDynamic }};
   }
 
   void GLPacking<met::Uplifting>::update(std::span<const detail::Component<met::Uplifting>> upliftings, const Scene &scene) {
@@ -216,6 +219,14 @@ namespace met::detail {
       for (const auto &patch : texture_barycentrics.patches()) {
         fmt::print("\toffs = {}, size = {}, uv0 = {}, uv1 = {}\n", patch.offs, patch.size, patch.uv0, patch.uv1);
       }
+    }
+
+    // Push basis function data, just default set for now, padded to 16 values for alignment
+    {
+      const auto &basis = scene.resources.bases[0].value();
+      BasisInfoLayout data = { .mean = basis.mean, .func = basis.func };
+      // data.func.block<wavelength_bases, wavelength_samples>(0, 0) = basis.func.transpose();
+      buffer_basis.set(obj_span<const std::byte>(data), sizeof(BasisInfoLayout));
     }
   }
 

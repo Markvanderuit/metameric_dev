@@ -36,15 +36,16 @@ namespace met {
     return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
   }
 
-  std::pair<Colr, Spec> Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {
+  std::tuple<Colr, Spec, Basis::vec_type> Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
 
     // Return zero constraint for inactive vertices
-    guard(is_active, { Colr(0), Spec(0) });
+    guard(is_active, { Colr(0), Spec(0), Basis::vec_type(0) });
     
     // Visit the underlying constraint to generate output data
-    return constraint | visit([&](const auto &cstr) -> std::pair<Colr, Spec> { 
-      return { cstr.position(scene, uplifting), cstr.realize(scene, uplifting) }; 
+    return constraint | visit([&](const auto &cstr) -> std::tuple<Colr, Spec, Basis::vec_type> { 
+      auto [s, c] = cstr.realize(scene, uplifting);
+      return { cstr.position(scene, uplifting), s, c  }; 
     });
   }
 

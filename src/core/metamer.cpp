@@ -61,7 +61,7 @@ namespace met {
     met_trace();
 
     // Take a grayscale spectrum as mean to build around
-    Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
+    Spec mean = info.basis.mean; // Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
     // Solver settings
     NLOptInfoT<wavelength_bases> solver = {
@@ -106,7 +106,7 @@ namespace met {
     met_trace();
 
     // Take a grayscale spectrum as mean to build around
-    Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
+    Spec mean = info.basis.mean; // Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
     if constexpr (solve_using_basis) {
       auto x = generate_spectrum_coeffs(info);
@@ -142,7 +142,7 @@ namespace met {
     }
   }
 
-  Spec generate_spectrum(IndrctSpectrumInfo info) {
+  Basis::vec_type generate_spectrum_coeffs(IndrctSpectrumInfo info) {
     met_trace();
 
     // Solver settings
@@ -229,11 +229,15 @@ namespace met {
       } // for (uint j)
     }
 
-    // Run solver and return recovered spectral distribution
-    auto r = solve(solver);
-    return (info.basis.func * r.x.cast<float>()).cwiseMax(0.f).cwiseMin(1.f).eval();
+    return solve(solver).x.cast<float>().eval();
   }
 
+  Spec generate_spectrum(IndrctSpectrumInfo info) {
+    met_trace();
+    auto x = generate_spectrum_coeffs(info);
+    return info.basis(x).cwiseMax(0.f).cwiseMin(1.f).eval();
+  }
+  
   std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info) {
     met_trace();
     
@@ -372,8 +376,8 @@ namespace met {
         .algo      = NLOptAlgo::LD_SLSQP,
         .form      = NLOptForm::eMinimize,
         .x_init    = 0.5,
-        .upper     = 1.0,
-        .lower     =-1.0,
+        /* .upper     = 1.0,
+        .lower     =-1.0, */
         .max_iters = 64
       };
 
@@ -522,14 +526,14 @@ namespace met {
     }
   }
 
-  std::vector<Spec> generate_color_system_ocs(const DirectColorSystemOCSInfo &info) {
+  std::vector<Basis::vec_type> generate_color_system_ocs_coeffs(const DirectColorSystemOCSInfo &info) {
     met_trace();
 
     // Sample unit vectors in 3d
     auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
 
     // Output for parallel solve
-    tbb::concurrent_vector<Spec> tbb_output;
+    tbb::concurrent_vector<Basis::vec_type> tbb_output;
     tbb_output.reserve(samples.size());
 
     auto A = info.direct_objective.finalize();
@@ -543,22 +547,27 @@ namespace met {
         f = f >= 0.f ? 1.f : 0.f;
 
       // Run solve to find nearest valid spectrum within the basis function set
-      s = generate_spectrum(DirectSpectrumInfo {
+      auto c = generate_spectrum_coeffs(DirectSpectrumInfo {
         .direct_constraints = {{ info.direct_objective, info.direct_objective(s) }},
         .basis = info.basis
       });
       
       // Store valid spectrum
-      guard_continue(!s.isNaN().any());
-      tbb_output.push_back(s);
+      guard_continue(!c.array().isNaN().any());
+      tbb_output.push_back(c);
     }
     
-    if constexpr (output_moment_limited_ocs) {
-      return tbb_output | vws::transform(spectrum_to_moments)
-                        | vws::transform(moments_to_spectrum)
-                        | rng::to<std::vector>();
-    } else {
-      return std::vector<Spec>(range_iter(tbb_output));
-    }
+    return std::vector<Basis::vec_type>(range_iter(tbb_output));
+  }
+
+  std::vector<Spec> generate_color_system_ocs(const DirectColorSystemOCSInfo &info) {
+    met_trace();
+    auto coeffs = generate_color_system_ocs_coeffs(info);
+    std::vector<Spec> s(coeffs.size());
+    std::transform(std::execution::par_unseq,
+                   range_iter(coeffs),
+                   s.begin(),
+                   [&](const auto &coef) { return info.basis(coef); });
+    return s;
   }
 } // namespace met

@@ -75,6 +75,11 @@ layout(binding = 2) restrict coherent buffer b_buff_output {
   uint padd[3]; /* align head to 16 bytes */ 
   Path data[];
 } buff_output;
+layout(binding = 3) restrict readonly buffer b_buff_basis {
+  float mean[wavelength_samples];
+  float func[wavelength_bases][wavelength_samples];
+  // float[wavelength_samples][wavelength_bases] func;
+} buff_basis;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0) uniform sampler2DArray  b_txtr_1f; // Alpha texture atlas
@@ -103,7 +108,7 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
-declare_scene_reflectance_data(s_bary_info, b_bary_4f, b_spec_4f, b_coef_4f, b_warp_1f);
+declare_scene_reflectance_data(s_bary_info, buff_basis, b_bary_4f, b_spec_4f, b_coef_4f, b_warp_1f);
 declare_scene_traversal_stack(8); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)

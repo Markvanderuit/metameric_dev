@@ -93,6 +93,12 @@ namespace met::detail {
     using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
 
+    struct BasisInfoLayout {
+      Spec                                                    mean;
+      Basis::mat_type func;
+      // eig::Array<float, /* wavelength_bases */ 16, wavelength_samples> func;
+    };
+
   public:
     // Atlas texture; each per-object patch stored in this atlas holds barycentric
     // weights and an index, referring to one set of four spectra in `texture_spectra`
@@ -105,6 +111,9 @@ namespace met::detail {
     // Array texture; each layer holds one set of four spectra, packed together s.t.
     // one texture sample equates four reflectances at a single wavelength
     texture_type texture_spectra;
+
+    // Basis functions; holds basis function components
+    gl::Buffer buffer_basis;
 
     // Warped phase data for spectral MESE method
     gl::Texture1d1f texture_warp;

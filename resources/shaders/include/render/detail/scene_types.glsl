@@ -1,6 +1,8 @@
 #ifndef RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD
 #define RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD
 
+#include <spectrum.glsl>
+
 // Define metameric's scene layout
 const uint max_supported_meshes      = MET_SUPPORTED_MESHES;
 const uint max_supported_objects     = MET_SUPPORTED_OBJECTS;

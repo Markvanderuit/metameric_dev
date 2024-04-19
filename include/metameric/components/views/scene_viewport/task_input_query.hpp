@@ -120,23 +120,9 @@ namespace met {
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
         ImGui::Value("Maximum", spec_distr.maxCoeff());
 
-        ImGui::Separator();
-
-        // Get wavelength values for x-axis in plot
-        Spec x_values;
-        rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
-
         // Run a spectrum plot for the accumulated radiance
-        if (ImPlot::BeginPlot("##rad_plot", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-          // Setup minimal format for coming line plots
-          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
-          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05f, spec_distr.maxCoeff() + 0.05f, ImPlotCond_Always);
-
-          // Iterate tetrahedron data and plot it
-          ImPlot::PlotLine("##rad_line", x_values.data(), spec_distr.data(), wavelength_samples);
-
-          ImPlot::EndPlot();
-        }
+        ImGui::Separator();
+        ImGui::PlotSpectrum("##rad_plot", spec_distr, -0.05f, spec_distr.maxCoeff() + 0.05f, { -1, 128.f * e_window.content_scale() });
 
         // Run a spectrum plot for encountered spectra
         /* if (ImPlot::BeginPlot("Reflectances", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {

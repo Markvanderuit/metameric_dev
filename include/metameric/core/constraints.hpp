@@ -5,6 +5,7 @@
 #include <metameric/core/record.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/detail/scene_fwd.hpp>
+#include <utility>
 
 namespace met {
   // Small helper struct for implementations of is_colr_constraint
@@ -24,7 +25,7 @@ namespace met {
     { t.position(scene, uplifting) } -> std::same_as<Colr>;
 
     // The constraint allows for realizing a metamer (and attached color under uplifting's color system)
-    { t.realize(scene, uplifting) } -> std::same_as<Spec>;
+    { t.realize(scene, uplifting) } -> std::same_as<std::pair<Spec, Basis::vec_type>>;
 
     // The constraint does or does not allow for configuration 
     // through metameric mismatch editing in its current state
@@ -66,8 +67,8 @@ namespace met {
     Colr position(const Scene &scene, const Uplifting &uplifting) const;
 
     // Simply return the constraint's measure
-    Spec realize(const Scene &scene, const Uplifting &uplifting) const { 
-      return measure;
+    std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const { 
+      return { measure, Basis::vec_type(0) }; // TODO fit basis to reproduce measure
     }
 
     // Generate points on the constraint's metamer mismatching volume
@@ -100,7 +101,7 @@ namespace met {
     }
 
     // Solve for the constraint's metamer based on its current configuration
-    Spec realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
     std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
@@ -139,7 +140,7 @@ namespace met {
     }
 
     // Solve for the constraint's metamer based on its current configuration
-    Spec realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
     std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
@@ -179,7 +180,7 @@ namespace met {
     }
 
     // Solve for the constraint's metamer based on its current configuration
-    Spec realize(const Scene &scene, const Uplifting &uplifting) const;
+    std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
     std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;

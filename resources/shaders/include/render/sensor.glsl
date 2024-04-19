@@ -72,6 +72,8 @@ SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in vec3 sample_3d) {
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
   for (uint i = 0; i < 4; ++i) {
+    // ss.wvls[i] = rotate_sample_1d(sample_3d.z, i, 4);
+    // ss.pdfs[i] = 1.f;
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;

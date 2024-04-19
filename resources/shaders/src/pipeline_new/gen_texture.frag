@@ -29,7 +29,7 @@ layout(binding = 1) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
 layout(binding = 2) restrict readonly buffer b_buff_uplift_coef { 
-  float[max_supported_constraints][4][moment_coeffs] data; 
+  float[max_supported_constraints][4][wavelength_bases] data;
 } buff_uplift_coef;
 
 // Uniform buffer declarations
@@ -72,8 +72,8 @@ void main() {
   
   // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index
   float result_err = FLT_MAX;
-  vec4  result_bary;
-  uint  result_indx;
+  vec4  result_bary = vec4(0);
+  uint  result_indx = 0;
   for (uint j = 0; j < buff_uplift_data.size; ++j) {
     // Compute barycentric weights using packed element data
     vec3 xyz  = buff_uplift_pack.data[j].inv * (p - buff_uplift_pack.data[j].sub);
@@ -92,12 +92,25 @@ void main() {
   // Force clamp; if the corresponding barycentric weights are partially negative - which
   // indicates a lack of precision in the surrounding tesselation structure - this will
   // introduce reconstruction error but avoid negative spectra
-  result_bary = clamp(result_bary, 0, 1);
+  // result_bary = clamp(result_bary, 0, 1);
 
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   out_barycs = vec4(result_bary.xyz, float(result_indx));
 
-  // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
+  // Gather basis coefficients representing tetrahedron's spectra, mix them, and store packed result
+  float[wavelength_bases] coeffs;
+  for (uint i = 0; i < wavelength_bases; ++i) {
+    coeffs[i] = 0.f;
+    for (uint j = 0; j < 4; ++j)
+      coeffs[i] += result_bary[j] 
+                 * buff_uplift_coef.data[result_indx][j][i];
+    coeffs[i] = clamp(coeffs[i], -1, 1);
+  } // for (uint i)
+
+  // Store result, outputting packed moment coefficients
+  out_coeffs = pack_snorm_12(coeffs);
+
+  /* // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[moment_coeffs] coeffs;
   for (uint i = 0; i < moment_coeffs; ++i) {
     coeffs[i] = 0.f;
@@ -107,5 +120,5 @@ void main() {
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients
-  out_coeffs = pack_half_8x16(coeffs);
+  out_coeffs = pack_half_8x16(coeffs); */
 }

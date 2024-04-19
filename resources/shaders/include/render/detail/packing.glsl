@@ -43,15 +43,14 @@ float[12] unpack_snorm_12(in uvec4 p) {
 }
 
 uvec4 pack_snorm_12(in float[12] v) {
-  // TODO not correct
   uvec4 p;
   for (int i = 0; i < 12; ++i) {
-    float scale = i % 3 == 2 ? 512.f : 1024.f;
+    float scale = i % 3 == 2 ? 1024.f : 2048.f;
     uint j = uint(round((v[i] + 1.f) * .5f * scale));
-    p[i / 3] = bitfieldInsert(p[i / 3],
+    p[i / 3] = bitfieldInsert(p[i / 3],              // 0,  0,  0,  1,  1,  1,  ...
                               j,
-                              i % 3 * 11,
-                              i % 3 == 2 ? 10 : 11);
+                              i % 3 * 11,            // 0,  11, 22, 0,  11, 22, ...
+                              i % 3 == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
   }
   return p;
 }

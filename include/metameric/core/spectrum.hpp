@@ -34,7 +34,10 @@ namespace met {
     mat_type func; // Basis functions around mean ooffset
 
   public: // Boilerplate
-    Spec apply(const vec_type &c) const { return (func * c).eval(); }
+    Spec apply(const vec_type &c) const { 
+      return (mean + (func * c).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
+    }
+
     Spec operator()(const vec_type &c) const { return apply(c); }
     bool operator==(const Basis &o) const;
     void to_stream(std::ostream &str) const;

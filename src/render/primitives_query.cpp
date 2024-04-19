@@ -67,6 +67,7 @@ namespace met {
     program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
     program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_buff_basis",          scene.components.upliftings.gl.buffer_basis);
     program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture());
     program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);

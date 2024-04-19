@@ -128,47 +128,52 @@ namespace met {
     return (csys.transpose() * measure.matrix()).eval();
   }
 
-  Spec DirectColorConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  std::pair<Spec, Basis::vec_type> DirectColorConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
 
     // Gather all relevant color system spectra and corresponding color signals
+    auto basis = scene.resources.bases[uplifting.basis_i].value();
     DirectSpectrumInfo spec_info = {
       .direct_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
-      .basis              = scene.resources.bases[uplifting.basis_i].value()
+      .basis              = basis
     };
     for (const auto &c : cstr_j)
       spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    return generate_spectrum(spec_info);
+    auto c = generate_spectrum_coeffs(spec_info);
+    return { basis(c), c };
   }
 
-  Spec DirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  std::pair<Spec, Basis::vec_type> DirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
 
     // Return zero constraint for invalid surfaces
-    guard(has_surface(), Spec(0));
+    guard(has_surface(), { Spec(0), Basis::vec_type(0) });
 
     // Gather all relevant color system spectra and corresponding color signals
+    auto basis = scene.resources.bases[uplifting.basis_i].value();
     DirectSpectrumInfo spec_info = {
       .direct_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
-      .basis              = scene.resources.bases[uplifting.basis_i].value()
+      .basis              = basis
     };
     for (const auto &c : cstr_j)
       spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    return generate_spectrum(spec_info);
+    auto c = generate_spectrum_coeffs(spec_info);
+    return { basis(c), c };
   }
 
-  Spec IndirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
+  std::pair<Spec, Basis::vec_type> IndirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
     
     // Return zero constraint for invalid surfaces
-    guard(has_surface(), Spec(0));
+    guard(has_surface(), { Spec(0), Basis::vec_type(0) });
 
     if (has_mismatching()) {
       // Gather all relevant color system spectra and corresponding color signals
+      auto basis = scene.resources.bases[uplifting.basis_i].value();
       IndirectColrSystem csys = {
         .cmfs   = scene.resources.observers[scene.components.observer_i.value].value(),
         .powers = powers
@@ -176,19 +181,23 @@ namespace met {
       IndrctSpectrumInfo spec_info = {
         .direct_constraints   = {{ scene.csys(uplifting.csys_i), surface.diffuse }},
         .indirect_constraints = {{ csys, colr }},
-        .basis                = scene.resources.bases[uplifting.basis_i].value()
-      };
-
-      return generate_spectrum(spec_info);
-    } else { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
-      // Gather all relevant color system spectra and corresponding color signals
-      DirectSpectrumInfo spec_info = {
-        .direct_constraints = {{ scene.csys(uplifting.csys_i), surface.diffuse }},
-        .basis              = scene.resources.bases[uplifting.basis_i].value()
+        .basis                = basis
       };
 
       // Generate a metamer satisfying the system+signal constraint set and return as pair
-      return generate_spectrum(spec_info);
+      auto c = generate_spectrum_coeffs(spec_info);
+      return { basis(c), c };
+    } else { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
+      // Gather all relevant color system spectra and corresponding color signals
+      auto basis = scene.resources.bases[uplifting.basis_i].value();
+      DirectSpectrumInfo spec_info = {
+        .direct_constraints = {{ scene.csys(uplifting.csys_i), surface.diffuse }},
+        .basis              = basis
+      };
+
+      // Generate a metamer satisfying the system+signal constraint set and return as pair
+      auto c = generate_spectrum_coeffs(spec_info);
+      return { basis(c), c };
     }
   }
 

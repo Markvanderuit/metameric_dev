@@ -54,6 +54,7 @@ namespace met {
     const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
     auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
+    const auto &e_coeffs  = uplf_handle("constraint_coeffs").getr<std::vector<Basis::vec_type>>();
     const auto &e_patches = info.relative("viewport_gen_patches")("patches").getr<std::vector<Colr>>();
     
     // Encapsulate editable data, so changes are saved in an undoable manner
@@ -71,7 +72,7 @@ namespace met {
       ImGui::SeparatorText("Reflectance spectrum");
       {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
-
+        const auto &e_sc = e_coeffs[e_cs.vertex_i];
         
         ImGui::SameLine();
         if (ImGui::SmallButton("Print"))
@@ -85,7 +86,7 @@ namespace met {
 
         ImGui::PlotSpectra("##output_refl_plot", legend, data, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
 
-        ImGui::Text(fmt::format("{}", moment_coeffs).c_str());
+        ImGui::Text(fmt::format("{}", e_sc).c_str());
       }
 
       // Plotter for the current constraint's resulting radiance

@@ -126,7 +126,7 @@ namespace met {
     public:
       // Generate a spectrum and corresponding color, which
       // forms the vertex' position in the uplifting tesselation
-      std::pair<Colr, Spec> realize(const Scene &scene, const Uplifting &uplifting) const;
+      std::tuple<Colr, Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     public: // underlying accessors if constraint satisifes is metamerism_constraint/is_surface_constraint
       bool has_mismatching() const; // Does the underlying constraint allow for mismatching?

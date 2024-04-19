@@ -53,6 +53,7 @@ namespace met {
 
     // Specify spectrum cache, for plotting of generated constraint spectra
     info("constraint_spectra").set<std::vector<Spec>>({});
+    info("constraint_coeffs").set<std::vector<Basis::vec_type>>({});
 
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
@@ -86,15 +87,25 @@ namespace met {
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
-      m_csys_boundary_spectra = generate_color_system_ocs({ .direct_objective = csys,
-                                                            .basis            = e_basis.value(),
-                                                            .seed             = 4,
-                                                            .n_samples        = n_system_boundary_samples });
+      m_csys_boundary_coeffs = generate_color_system_ocs_coeffs({ .direct_objective = csys,
+                                                                  .basis            = e_basis.value(),
+                                                                  .seed             = 4,
+                                                                  .n_samples        = n_system_boundary_samples });
+      m_csys_boundary_spectra.resize(m_csys_boundary_coeffs.size());
+      std::transform(std::execution::par_unseq, 
+                     range_iter(m_csys_boundary_coeffs), 
+                     m_csys_boundary_spectra.begin(), 
+                     [&](const auto &coef) { return e_basis.value()(coef); });
 
-      // For each spectrum, generate coefficients for moment-based representation
-      m_csys_boundary_coeffs.resize(m_csys_boundary_spectra.size());
-      std::transform(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), 
-                     m_csys_boundary_coeffs.begin(), spectrum_to_moments);
+      // m_csys_boundary_spectra = generate_color_system_ocs({ .direct_objective = csys,
+      //                                                       .basis            = e_basis.value(),
+      //                                                       .seed             = 4,
+      //                                                       .n_samples        = n_system_boundary_samples });
+
+      // // For each spectrum, generate coefficients for moment-based representation
+      // m_csys_boundary_coeffs.resize(m_csys_boundary_spectra.size());
+      // std::transform(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), 
+      //                m_csys_boundary_coeffs.begin(), spectrum_to_moments);
 
       // For each spectrum, add a point to the set of tesselation points for later
       m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());
@@ -124,13 +135,13 @@ namespace met {
       guard_continue(e_state.verts[i] || csys_stale);
       const auto &e_vert = e_uplifting.verts[i];
 
-      // Generate vertex color and attached metamer;
+      // Generate vertex color, attached metamer, and its originating coefficients
       // this is handled in Scene object to keep it away from the pipeline
-      auto [c, s] = e_vert.realize(e_scene, e_uplifting);
+      auto [c, s, coef] = e_vert.realize(e_scene, e_uplifting);
       
       // Add to set of spectra and coefficients
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
-      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = spectrum_to_moments(s);
+      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = coef; // spectrum_to_moments(s);
 
       // We only update vertices in the tesselation if the 'primary' has updated
       // as otherwise we'd trigger re-tesselation on every constraint modification
@@ -238,9 +249,14 @@ namespace met {
 
     // 6. Expose a copy of generated constraint spectra for visualization
     {
-      auto &constraint_spectra = info("constraint_spectra").getw<std::vector<Spec>>();
-      constraint_spectra.resize(e_uplifting.verts.size());      
-      rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), constraint_spectra.begin());
+      auto &i_constraint_spectra = info("constraint_spectra").getw<std::vector<Spec>>();
+      auto &i_constraint_coeffs = info("constraint_coeffs").getw<std::vector<Basis::vec_type>>();
+      i_constraint_spectra.resize(e_uplifting.verts.size());      
+      rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), 
+                i_constraint_spectra.begin());
+      i_constraint_coeffs.resize(e_uplifting.verts.size());      
+      rng::copy(m_tesselation_coeffs  | vws::drop(m_csys_boundary_coeffs.size()), 
+                i_constraint_coeffs.begin());
     }
   }
 

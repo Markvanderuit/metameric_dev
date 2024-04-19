@@ -323,9 +323,28 @@ namespace met {
     save_state = SaveState::eSaved;
     clear_mods();
 
-    /* // TODO remove this override that forces a reload of basis functions from disk
-    auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
-    resources.bases[0].value() = loaded_tree.basis; */
+    // TODO remove this override that forces a reload of basis functions from disk
+    auto basis = io::load_json("resources/misc/tree.json").get<BasisTreeNode>().basis;
+
+    basis.func.block<wavelength_samples, wavelength_bases - 1>(0, 1)
+      = basis.func.block<wavelength_samples, wavelength_bases - 1>(0, 0).eval();
+    basis.func.block<wavelength_samples, 1>(0, 0) = Spec(1);
+
+    for (uint i = 1; i < basis.func.cols(); ++i) {
+      auto col = basis.func.col(i).array().eval();
+      col -= col.minCoeff();
+      col /= col.maxCoeff();
+      basis.func.col(i) = col;
+      // basis.func.col(i) = (basis.func.col(i).array()    - basis.func.col(i).minCoeff()).eval()
+      //                   / (basis.func.col(i).maxCoeff() - basis.func.col(i).minCoeff());
+    }
+      // basis.func.col(i) /= basis.func.col(i).maxCoeff();
+    
+    // for (uint i = 0; i < basis.func.rows(); ++i)
+    //   fmt::print("{}\n", basis.func.row(i));
+    
+    basis.mean = Spec(0);
+    resources.bases[0].value() = basis;
   }
 
   void Scene::import_scene(const fs::path &path) {

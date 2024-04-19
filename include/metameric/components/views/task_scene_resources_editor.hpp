@@ -33,6 +33,7 @@ namespace met {
         }
       }
       ImGui::End(); */
+
       // Spawn view of weight atlas interiors
       if (ImGui::Begin("Barycentrics atlas")) {
         const auto &e_txtr = e_scene.components.upliftings.gl.texture_barycentrics;
@@ -77,14 +78,21 @@ namespace met {
           ImGui::Separator();
 
           // Recover and plot spectrum
-          auto moment          = detail::unpack_half_8x16(coef_data);
-          auto moment_spectrum = moments_to_spectrum(moment);
+          auto coeffs = detail::unpack_snorm_12(coef_data);
           auto interp_spectrum =(tetr.spectra[0] * bary[0]
                                + tetr.spectra[1] * bary[1]
                                + tetr.spectra[2] * bary[2]
                                + tetr.spectra[3] * bary[3]).eval();
-          auto moment_rtrip   = detail::unpack_half_8x16(detail::pack_half_8x16(spectrum_to_moments(interp_spectrum)));
-          auto rtrip_spectrum = moments_to_spectrum(moment_rtrip);
+          auto coeffs_spectrum = e_scene.resources.bases[0].value()(coeffs);
+          
+          // auto moment          = detail::unpack_half_8x16(coef_data);
+          // auto moment_spectrum = moments_to_spectrum(moment);
+          // auto interp_spectrum =(tetr.spectra[0] * bary[0]
+          //                      + tetr.spectra[1] * bary[1]
+          //                      + tetr.spectra[2] * bary[2]
+          //                      + tetr.spectra[3] * bary[3]).eval();
+          // auto moment_rtrip   = detail::unpack_half_8x16(detail::pack_half_8x16(spectrum_to_moments(interp_spectrum)));
+          // auto rtrip_spectrum = moments_to_spectrum(moment_rtrip);
 
           // Plot the mixed spectra
           {
@@ -96,12 +104,12 @@ namespace met {
 
           // Plot the reconstructed spectra
           {
-            std::vector<std::string> legend = { "Baseline", "Moment", "Roundtrip" };
-            std::vector<Spec>        spectra = { interp_spectrum, moment_spectrum, rtrip_spectrum };
+            std::vector<std::string> legend = { "Baseline", "Basis" };
+            std::vector<Spec>        spectra = { interp_spectrum, coeffs_spectrum };
             ImGui::PlotSpectra("Reconstruction", legend, spectra, -0.05, 1.05, { 0.f, 128.f });
           }
 
-          ImGui::Separator();
+          /* ImGui::Separator();
 
           // Print moment coefficients
           {
@@ -109,23 +117,26 @@ namespace met {
             ImGui::InputFloat4("##coeffs_0", moment.data(),     "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::SetNextItemWidth(256.f * e_window.content_scale());
             ImGui::InputFloat4("##coeffs_1", moment.data() + 4, "%.3f", ImGuiInputTextFlags_ReadOnly);
-          }
+          } */
 
           ImGui::Separator();
 
-          // Print moment coefficients
+          /* // Print moment coefficients
           {
             ImGui::SetNextItemWidth(256.f * e_window.content_scale());
             ImGui::InputFloat4("##coeffs_rtrip_0", moment_rtrip.data(),     "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::SetNextItemWidth(256.f * e_window.content_scale());
             ImGui::InputFloat4("##coeffs_rtrip_1", moment_rtrip.data() + 4, "%.3f", ImGuiInputTextFlags_ReadOnly);
-          }
+          } */
 
           // Print some minima/maxima
           {
             ImGui::LabelText("Min coeff", "%.3f", interp_spectrum.minCoeff());
             ImGui::LabelText("Max coeff", "%.3f", interp_spectrum.maxCoeff());
-            ImGui::InputFloat4("Bary", bary.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat4("Barycentrics", bary.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat4("Coeffs (r1)", coeffs.data(),     "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat4("Coeffs (r2)", coeffs.data() + 4, "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat4("Coeffs (r3)", coeffs.data() + 8, "%.3f", ImGuiInputTextFlags_ReadOnly);
           }
 
           ImGui::EndTooltip();
@@ -133,45 +144,15 @@ namespace met {
       }
       ImGui::End();
 
-      // Spawn view of weight atlas interiors
-      // if (ImGui::Begin("Coefficients atlas")) {
-      //   const auto &e_txtr = e_scene.components.upliftings.gl.texture_coefficients;
+      /* // Spawn view of weight atlas interiors
+      if (ImGui::Begin("Coefficients atlas")) {
+        const auto &e_txtr = e_scene.components.upliftings.gl.texture_coefficients;
 
-      //   // Spawn image over texture view
-      //   const auto &e_view = e_txtr.view(0);
-      //   ImGui::Image(ImGui::to_ptr(e_view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
-
-      //   // Compute sample position in texture dependent on mouse position in image
-      //   eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
-      //                          - static_cast<eig::Array2f>(ImGui::GetItemRectMin()))
-      //                          / static_cast<eig::Array2f>(ImGui::GetItemRectSize());
-      //   auto tooltip_pos = (mouse_pos * e_txtr.texture().size().head<2>().cast<float>()).cast<uint>().eval();
-      //        tooltip_pos = tooltip_pos.cwiseMin(e_txtr.texture().size().head<2>() - 1);
-      //   const size_t pos = e_txtr.texture().size().x() * tooltip_pos.y() + tooltip_pos.x();
-
-      //   // Spawn tooltip on m-over
-      //   if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
-      //     // Hard-stop copy image data to cpu
-      //     eig::Array4u data;
-      //     e_txtr.texture().get(cnt_span<uint>(data), 0u, 
-      //                          eig::Array3u { 1, 1, 1 }, 
-      //                          eig::Array3u { tooltip_pos.x(), tooltip_pos.y(), 0 });
-
-      //     // Intro info
-      //     ImGui::SetNextItemWidth(256.f * e_window.content_scale());
-      //     ImGui::Text("Inspecting pixel (%i, %i)", tooltip_pos.x(), tooltip_pos.y());
-
-      //     ImGui::Separator();
-
-      //     // Recover and plot spectrum
-      //     auto moment = unpack_moments_12x10(data);
-      //     auto signal = moments_to_spectrum(moment);
-      //     ImGui::PlotSpectrum("##unpacked_moments", signal, -0.05, 1.05, { 0.f, 64.f });
-
-      //     ImGui::EndTooltip();
-      //   }
-      // }
-      // ImGui::End();
+        // Spawn image over texture view
+        const auto &e_view = e_txtr.view(0);
+        ImGui::Image(ImGui::to_ptr(e_view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+      }
+      ImGui::End(); */
 
       return; // TODO implement below
 

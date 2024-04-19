@@ -27,16 +27,18 @@ namespace met {
     // Helper data for four coefficients vectors, describing the four spectra generated
     // for the four vertices of a tetrahedron. Used in gen_object_data to determine the
     // per-pixel coefficients on a parameterized texture over the object surface.
-    using SpecCoefLayout = eig::Array<float, moment_coeffs, 4>;
+    using SpecCoefLayout = eig::Array<float, wavelength_bases, 4>;
+    // using SpecCoefLayout = eig::Array<float, moment_coeffs, 4>;
 
     // Packed spectrum representation; four spectra interleaved per tetrahedron
     // ensure we can access all four spectra as one texture sample during rendering
     using SpecPackLayout  = eig::Array<float, wavelength_samples, 4>;
 
     // Miscellaneous data
-    uint                 m_uplifting_i;
-    std::vector<Spec>    m_csys_boundary_spectra;
-    std::vector<Moments> m_csys_boundary_coeffs;
+    uint                         m_uplifting_i;
+    std::vector<Spec>            m_csys_boundary_spectra;
+    std::vector<Basis::vec_type> m_csys_boundary_coeffs;
+    // std::vector<Moments> m_csys_boundary_coeffs;
 
     // Delaunay tesselation connecting colors/spectra on both
     // the boundary and interally in the color space, as well
@@ -49,9 +51,10 @@ namespace met {
 
     // Color positions, corresponding assigned spectra, and derived coefficients
     // in the delaunay tesselation
-    std::vector<Colr>    m_tesselation_points;
-    std::vector<Spec>    m_tesselation_spectra;
-    std::vector<Moments> m_tesselation_coeffs;
+    std::vector<Colr>            m_tesselation_points;
+    std::vector<Spec>            m_tesselation_spectra;
+    std::vector<Basis::vec_type> m_tesselation_coeffs;
+    // std::vector<Moments> m_tesselation_coeffs;
 
     // Buffer and accompanying mapping, store per-tetrahedron spectra
     // in an interleaved format. This data is copied to upliftings.gl
