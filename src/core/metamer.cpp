@@ -74,8 +74,7 @@ namespace met {
       .rel_xpar_tol = 1e-2, // Threshold for objective error
     };
     
-    // Objective function minimizes l2 norm over difference from mean of spectral distr.,
-    // as a simple way to get relatively smooth functions
+    // Objective function minimizes l2 norm as a simple way to get relatively coeffs
     solver.objective = detail::func_norm<wavelength_bases>(info.basis.func, Spec::Zero());
 
     // Add color system equality constraints, upholding spectral metamerism
@@ -85,6 +84,34 @@ namespace met {
       auto b = (lrgb_to_xyz(colr) - o).eval();
       solver.eq_constraints.push_back({ .f   = detail::func_norm<wavelength_bases>(A, b), 
                                         .tol = 1e-4 });
+      using vec = NLOptInfoT<wavelength_bases>::vec;
+                                        
+      // solver.eq_constraints.push_back({ 
+      //   .f  = [A = csys.finalize(false).transpose().cast<double>().eval(), 
+      //          B = info.basis.func.cast<double>().eval(),
+      //          b = b.cast<double>().eval(), 
+      //          max_v = 1.0, 
+      //          min_v = 0.0]
+      //     (eig::Map<const vec> x, eig::Map<vec> g) {
+      //       auto r    = (B * x).eval();
+      //       auto mask = (r.array() >= min_v && r.array() <= max_v).eval();
+
+
+
+      //       // // shorthands for Ax - b and ||(Ax - b)||
+      //       // auto Ax   = (A * x).eval();
+      //       // auto diff = (Ax.array().cwiseMax(min_v).cwiseMin(max_v) - b).matrix().eval();
+      //       // auto norm = diff.norm();
+
+      //       // // g(x) = A^T * (Ax - b) / ||(Ax - b)||
+      //       // if (g.data())
+      //       //   g = mask.select(A.transpose() * (diff.array() / norm).matrix(), vec(0)).eval();
+
+      //       // // f(x) = ||(Ax - b)||
+      //       // return norm;
+      //   }, 
+      //   .tol = 1e-4 
+      // });
     }
 
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1

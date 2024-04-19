@@ -145,6 +145,29 @@ namespace met {
       };
     };
 
+    // Describes f(x) = ||(Ax - b)|| with corresponding gradient
+    template <uint N>
+    auto func_norm(const auto &Af, const auto &bf, float max_vf, const float min_vf) -> NLOptInfoT<N>::Constraint::Capture {
+      using vec = NLOptInfoT<N>::vec;
+
+      return 
+        [A = Af.cast<double>().eval(), b = bf.cast<double>().eval(), max_v = static_cast<double>(max_vf), min_v = static_cast<double>(min_vf)]
+        (eig::Map<const vec> x, eig::Map<vec> g) {
+          // shorthands for Ax - b and ||(Ax - b)||
+          auto Ax   = (A * x).eval();
+          auto mask = (Ax.array() >= min_v) && (Ax.array() <= max_v).eval();
+          auto diff = (Ax.array().cwiseMax(min_v).cwiseMin(max_v) - b).matrix().eval();
+          auto norm = diff.norm();
+
+          // g(x) = A^T * (Ax - b) / ||(Ax - b)||
+          if (g.data())
+            g = mask.select(A.transpose() * (diff.array() / norm).matrix(), vec(0)).eval();
+
+          // f(x) = ||(Ax - b)||
+          return norm;
+      };
+    };
+
     // Describes f(x) = ||(Ax - b)||^2 with corresponding gradient
     template <uint N>
     auto func_squared_norm(const auto &Af, const auto &bf) -> NLOptInfoT<N>::Constraint::Capture {
