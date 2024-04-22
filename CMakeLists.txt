@@ -119,6 +119,9 @@ set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
 # TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
 add_subdirectory(third_party/embree)
 
+# Include Autodiff library, compiled from scratch
+add_subdirectory(third_party/autodiff)
+
 # Add together arguments to pass to shader compilation
 set(glsl_defines
   -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
@@ -292,6 +295,7 @@ endfunction()
 add_library_r(core core)
 target_link_libraries(core PUBLIC
   assimp::assimp
+  autodiff::autodiff
   small_gl
   Eigen3::Eigen
   fmt::fmt-header-only
@@ -326,6 +330,7 @@ target_compile_definitions(core PUBLIC
   MET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
+add_dependencies(core misc_copy)
 
 # Set up render library
 add_library_r(render render)
@@ -333,7 +338,7 @@ target_link_libraries(render PUBLIC
   core
   imgui::imgui
 )
-add_dependencies(render shaders misc_copy)
+add_dependencies(render shaders)
 
 # Set up components library
 add_library_r(components components)
@@ -345,7 +350,7 @@ target_link_libraries(components PUBLIC
   implot::implot
   unofficial::nativefiledialog::nfd
 )
-add_dependencies(components shaders misc_copy)
+add_dependencies(components shaders)
 
 # Setup executables
 add_executable_r(metameric_editor src/app/metameric_editor.cpp)
@@ -360,7 +365,8 @@ if (met_enable_tests)
   file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
 
   add_executable(metameric_tests ${srcs})
-  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core components small_gl)
+  # target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core components small_gl)
+  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core)
   target_compile_features(metameric_tests PUBLIC cxx_std_23)
   
   include(CTest)
