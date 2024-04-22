@@ -1,5 +1,6 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/trace.hpp>
 #include <assimp/Importer.hpp>
@@ -414,17 +415,16 @@ namespace met::io {
                       spectrum_from_data(wvls, values_z)).finished();
   }
 
-  Basis basis_from_data(std::span<const float> wvls_, 
+  Basis basis_from_data(std::span<const float> wvls, 
                         std::span<std::array<float, wavelength_bases>> values) {
     met_trace();
 
-    // Generate extended wavelengths for now, fitting current spectral range
-    std::vector<float> wvls(values.size() + 1);
-    for (int i = 0; i < wvls.size(); ++i)
-      wvls[i] = wavelength_min + i * (wavelength_range / static_cast<float>(values.size()));
+    // // Generate extended wavelengths for now, fitting current spectral range
+    // std::vector<float> wvls(values.size() + 1);
+    // for (int i = 0; i < wvls.size(); ++i)
+    //   wvls[i] = wavelength_min + i * (wavelength_range / static_cast<float>(values.size()));
   
-    float data_wvl_min = wvls[0],
-          data_wvl_max = wvls[wvls.size() - 1];
+    float data_wvl_min = wvls.front(), data_wvl_max = wvls.back();
 
     Basis s = { .func = 0.f };
 

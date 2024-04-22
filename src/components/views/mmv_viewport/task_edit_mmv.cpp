@@ -2,7 +2,6 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/matching.hpp>
-#include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
@@ -72,21 +71,10 @@ namespace met {
       ImGui::SeparatorText("Reflectance spectrum");
       {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
-        const auto &e_sc = e_coeffs[e_cs.vertex_i];
-        
         ImGui::SameLine();
         if (ImGui::SmallButton("Print"))
           fmt::print("{}\n", e_sd);
-        
-        auto moment_coeffs = spectrum_to_moments(e_sd);
-        moment_coeffs = detail::unpack_half_8x16(detail::pack_half_8x16(moment_coeffs));
-
-        std::vector<std::string> legend = { "Reflectance", "MESE" };
-        std::vector<Spec>        data   = { e_sd, moments_to_spectrum/* _lagrange */(moment_coeffs) };
-
-        ImGui::PlotSpectra("##output_refl_plot", legend, data, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
-
-        ImGui::Text(fmt::format("{}", e_sc).c_str());
+        ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 96.f * e_window.content_scale() });
       }
 
       // Plotter for the current constraint's resulting radiance
@@ -123,20 +111,6 @@ namespace met {
             // Roundtrip error
             Colr err = (lrgb - e_scene.csys(0)(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
-
-            // Moment roundtrip error
-            {
-              const auto &e_sd = e_spectra[e_cs.vertex_i];
-              auto rtrip = moments_to_spectrum(spectrum_to_moments(e_sd));
-              auto _lrgb = e_scene.csys(0)(rtrip);
-              Colr _err  = (lrgb - _lrgb).abs();
-              Colr _srgb = lrgb_to_srgb(_lrgb);
-
-              ImGui::SeparatorText("Moment reconstruction");
-              ImGui::ColorEdit3("Base color (lrgb)", _lrgb.data(), ImGuiColorEditFlags_Float);
-              ImGui::ColorEdit3("Base color (srgb)", _srgb.data(), ImGuiColorEditFlags_Float);
-              ImGui::InputFloat3("Roundtrip (lrgb)", _err.data(),  "%.3f", ImGuiInputTextFlags_ReadOnly);
-            }
           }
 
           ImGui::SeparatorText("Constraints");

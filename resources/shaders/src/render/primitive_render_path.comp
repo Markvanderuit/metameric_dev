@@ -64,10 +64,6 @@ layout(binding = 8) uniform b_buff_emitters_distr {
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
-layout(binding = 2) restrict readonly buffer b_buff_basis {
-  float func[wavelength_bases][wavelength_samples];
-} buff_basis;
-
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler2DArray   b_txtr_1f; // Alpha texture atlas
@@ -76,8 +72,9 @@ layout(binding = 2)          uniform sampler2DArray   b_bary_4f; // Uplifting we
 layout(binding = 3)          uniform sampler1DArray   b_spec_4f; // Uplifting spectral atlas
 layout(binding = 4)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
 layout(binding = 5)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 6)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
-layout(binding = 7)          uniform sampler1D        b_warp_1f; // Warp data for spectral MESE
+layout(binding = 6)          uniform sampler1DArray   b_bsis_1f; // Basis function data, 1 component
+layout(binding = 7)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
+layout(binding = 8)          uniform sampler1D        b_warp_1f; // Warp data for spectral MESE
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
 // Shared memory declarations
@@ -100,7 +97,7 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
-declare_scene_reflectance_data(s_bary_info, buff_basis, b_bary_4f, b_spec_4f, b_coef_4f, b_warp_1f);
+declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_bary_4f, b_spec_4f, b_coef_4f, b_warp_1f);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/path.glsl>

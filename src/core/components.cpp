@@ -46,6 +46,7 @@ namespace met {
     return constraint | visit([&](const auto &cstr) -> std::tuple<Colr, Spec, Basis::vec_type> { 
       auto [s, c] = cstr.realize(scene, uplifting);
       return { cstr.position(scene, uplifting), s, c  }; 
+      // return { scene.csys(uplifting.csys_i)(s), s, c  }; 
     });
   }
 

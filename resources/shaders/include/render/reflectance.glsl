@@ -75,13 +75,13 @@
     for (uint i = 0; i < 4; ++i) { // four texel corners
       float[wavelength_bases] c = unpack_snorm_12(scene_coefficients_data_fetch(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0)));
       float w = hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i])));
-      for (uint j = 0; j < 4; ++j) { // four wavelengths
+      for (uint j = 0; j < 4; ++j) {                // four wavelengths
         for (uint k = 0; k < wavelength_bases; ++k) // n bases
           r[j] += w * c[k] * scene_basis_func(wvls[j], k);
       }
     }
 
-    return clamp(r, 0.f, 1.f);
+    return clamp(r, 0, 1);
   }
 
 // #else // SCENE_REFLECTANCE_MESE
@@ -141,8 +141,8 @@
   
   // Forward to whatever sampler we're experimenting with today
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
-    // return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
-    return scene_sample_reflectance_bases(object_i, tx, wvls);
+    return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
+    // return scene_sample_reflectance_bases(object_i, tx, wvls);
     // return scene_sample_reflectance_moments(object_i, tx, wvls);
   }
 

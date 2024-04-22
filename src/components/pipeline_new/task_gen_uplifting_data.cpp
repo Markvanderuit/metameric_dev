@@ -67,8 +67,28 @@ namespace met {
           = info.global("scene").getw<Scene>().components.upliftings[m_uplifting_i];
         const auto &e_basis = e_scene.resources.bases[e_uplifting.basis_i].value();
 
-        ImGui::PlotSpectra("Basis",    { },   e_basis.func.colwise() | rng::to<std::vector<Spec>>(), -1.f, 1.f);
-        ImGui::PlotSpectra("Boundary", { }, m_csys_boundary_spectra);
+        static bool im_show_all_bases = true;
+        static bool im_show_all_bound = true;
+        static uint im_basis_i = 0;
+        static uint im_bound_i = 0;
+        
+        ImGui::Checkbox("Show all bases", &im_show_all_bases);
+        if (im_show_all_bases) {
+          ImGui::PlotSpectra("##basis", { },  e_basis.func.colwise() | rng::to<std::vector<Spec>>(), -1.f, 1.f);
+        } else {
+          constexpr uint im_basis_min = 0, im_basis_max = wavelength_bases - 1;
+          ImGui::SliderScalar("Basis index", ImGuiDataType_U32, &im_basis_i, &im_basis_min, &im_basis_max);
+          ImGui::PlotSpectrum("##basis", Spec(e_basis.func.col(im_basis_i)), -1.f, 1.f);
+        }
+        ImGui::Separator();
+        ImGui::Checkbox("Show all boundaries", &im_show_all_bound);
+        if (im_show_all_bound) {
+          ImGui::PlotSpectra("##bounds", { }, m_csys_boundary_spectra, 0., 1.f);
+        } else {
+          uint im_bound_min = 0, im_bound_max = m_csys_boundary_spectra.size() - 1;
+          ImGui::SliderScalar("Boundary index", ImGuiDataType_U32, &im_bound_i, &im_bound_min, &im_bound_max);
+          ImGui::PlotSpectrum("##bounds", m_csys_boundary_spectra[im_bound_i]);
+        }
       }
       ImGui::End();
     });
@@ -155,7 +175,7 @@ namespace met {
       
       // Add to set of spectra and coefficients
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
-      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = coef; // spectrum_to_moments(s);
+      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = coef;
 
       // We only update vertices in the tesselation if the 'primary' has updated
       // as otherwise we'd trigger re-tesselation on every constraint modification

@@ -154,7 +154,7 @@ namespace met::detail {
                       .data = cnt_span<const float>(warp_data)      }};
 
     // Initialize basis function data
-    buffer_basis = {{ .size = sizeof(Basis::mat_type), .flags = gl::BufferCreateFlags::eStorageDynamic }};
+    texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
   }
 
   void GLPacking<met::Uplifting>::update(std::span<const detail::Component<met::Uplifting>> upliftings, const Scene &scene) {
@@ -224,7 +224,8 @@ namespace met::detail {
     // Push basis function data, just default set for now
     {
       const auto &basis = scene.resources.bases[0].value();
-      buffer_basis.set(obj_span<const std::byte>(basis.func), sizeof(Basis::mat_type));
+      texture_basis.set(obj_span<const float>(basis));
+      // buffer_basis.set(obj_span<const std::byte>(basis.func), sizeof(Basis::mat_type));
     }
   }
 

@@ -4,7 +4,7 @@
 #define SCENE_DATA_REFLECTANCE
                       
 #define declare_scene_reflectance_data(scene_buff_bary_info,                     \
-                                       scene_buff_bsis_data,                     \
+                                       scene_txtr_bsis_data,                     \
                                        scene_txtr_bary_data,                     \
                                        scene_txtr_spec_data,                     \
                                        scene_txtr_coef_data,                     \
@@ -46,10 +46,6 @@
   }                                                                              \
                                                                                  \
   float scene_basis_func(float wvl, uint j) {                                    \
-    float a = wvl * (wavelength_samples - 1) + .5f;                              \
-    uint  i = uint(a);                                                           \
-    return mix(scene_buff_bsis_data.func[j][min(i,     wavelength_samples - 1)], \
-               scene_buff_bsis_data.func[j][min(i + 1, wavelength_samples - 1)], \
-               a - float(i));                                                    \
+    return texture(scene_txtr_bsis_data, vec2(wvl, j)).x;                        \
   }
 #endif // LOAD_REFLECTANCE_GLSL_GUARD

@@ -89,9 +89,10 @@ namespace met::detail {
   // uplifting pipeline, which is part of the program pipeline 
   template <>
   class GLPacking<met::Uplifting> {
-    using texture_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
     using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
+    using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
+    using spectra_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
 
   public:
     // Atlas texture; each per-object patch stored in this atlas holds barycentric
@@ -104,10 +105,10 @@ namespace met::detail {
 
     // Array texture; each layer holds one set of four spectra, packed together s.t.
     // one texture sample equates four reflectances at a single wavelength
-    texture_type texture_spectra;
+    spectra_type texture_spectra;
 
-    // Basis functions; holds basis function components
-    gl::Buffer buffer_basis;
+    // Basis functions; each layer holds a basis function
+    basis_type texture_basis;
 
     // Warped phase data for spectral MESE method
     gl::Texture1d1f texture_warp;

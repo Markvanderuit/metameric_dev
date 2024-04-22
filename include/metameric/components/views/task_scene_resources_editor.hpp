@@ -19,7 +19,6 @@ namespace met {
       const auto &e_scene  = info.global("scene").getr<Scene>();
       const auto &e_window = info.global("window").getr<gl::Window>();
 
-
       /* // Spawn view of texture atlas interiors
       if (ImGui::Begin("Texture atlas")) {
         const auto &e_atlas = e_scene.resources.images.gl.texture_atlas_3f;
@@ -84,15 +83,6 @@ namespace met {
                                + tetr.spectra[2] * bary[2]
                                + tetr.spectra[3] * bary[3]).eval();
           auto coeffs_spectrum = e_scene.resources.bases[0].value()(coeffs);
-          
-          // auto moment          = detail::unpack_half_8x16(coef_data);
-          // auto moment_spectrum = moments_to_spectrum(moment);
-          // auto interp_spectrum =(tetr.spectra[0] * bary[0]
-          //                      + tetr.spectra[1] * bary[1]
-          //                      + tetr.spectra[2] * bary[2]
-          //                      + tetr.spectra[3] * bary[3]).eval();
-          // auto moment_rtrip   = detail::unpack_half_8x16(detail::pack_half_8x16(spectrum_to_moments(interp_spectrum)));
-          // auto rtrip_spectrum = moments_to_spectrum(moment_rtrip);
 
           // Plot the mixed spectra
           {

@@ -234,15 +234,12 @@ namespace met {
     resources.meshes.push("Rectangle",     models::unit_rect,           false);
 
     // Load default basis from file and normalize if not already normalized
-    auto default_basis = io::load_basis("resources/misc/basis_262144.txt");
-    for (uint i = 0; i < default_basis.func.cols(); ++i) {
-      auto col = default_basis.func.col(i).array().eval();
-      auto min_coeff = col.minCoeff();
-      auto max_coeff = col.maxCoeff();
-      default_basis.func.col(i) = (col / std::max(std::abs(max_coeff), std::abs(min_coeff)));
-      // default_basis.func.col(i) = (col - min_coeff) / (max_coeff - min_coeff);
+    auto basis = io::load_basis("resources/misc/basis_262144.txt");
+    for (auto col : basis.func.colwise()) {
+      auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+      col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
     }
-    resources.bases.push("Default basis",  default_basis, false);
+    resources.bases.push("Default basis", basis, false);
 
     // Default color system
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };
@@ -335,17 +332,13 @@ namespace met {
     // TODO remove this override that forces a reload of basis functions from disk
       
     // Load spectral basis
+    // Normalize if they not already normalized
     auto basis = io::load_basis("resources/misc/basis_262144.txt");
-    
-    // Normalize bases if they are not already normalized
-    for (uint i = 0; i < basis.func.cols(); ++i) {
-      auto col = basis.func.col(i).array().eval();
-      auto min_coeff = col.minCoeff();
-      auto max_coeff = col.maxCoeff();
-      // basis.func.col(i) = (col - min_coeff) / (max_coeff - min_coeff);
-      basis.func.col(i) = (col / std::max(std::abs(max_coeff), std::abs(min_coeff)));
+    for (auto col : basis.func.colwise()) {
+      auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+      col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
     }
-
+    
     resources.bases[0].value() = basis;
   }
 
