@@ -45,23 +45,11 @@
     return texture(scene_txtr_warp_data, p).x;                                   \
   }                                                                              \
                                                                                  \
-  float scene_basis_mean(uint i) {                                               \
-    return scene_buff_bsis_data.mean[i];                                         \
-  }                                                                              \
-                                                                                 \
   float scene_basis_func(float wvl, uint j) {                                    \
     float a = wvl * (wavelength_samples - 1) + .5f;                              \
     uint  i = uint(a);                                                           \
     return mix(scene_buff_bsis_data.func[j][min(i,     wavelength_samples - 1)], \
                scene_buff_bsis_data.func[j][min(i + 1, wavelength_samples - 1)], \
-               a - float(i));                                                    \
-  }                                                                              \
-                                                                                 \
-  float scene_basis_mean(float wvl) {                                            \
-    float a = wvl * (wavelength_samples - 1) + .5f;                              \
-    uint  i = uint(a);                                                           \
-    return mix(scene_buff_bsis_data.mean[min(i,     wavelength_samples - 1)],    \
-               scene_buff_bsis_data.mean[min(i + 1, wavelength_samples - 1)],    \
                a - float(i));                                                    \
   }
 #endif // LOAD_REFLECTANCE_GLSL_GUARD

@@ -24,22 +24,18 @@
 
 TEST_CASE("Interpolation") {
   using namespace met;
-
-  /* float a = 0.5f;
-  eig::Array2f va = { 0.75, 0.25 };
-  eig::Array2f vb = { 0.33, 0.66 };
-  eig::Array2f vc = a * va + (1.f - a) * vb;
-
-  auto pa = detail::pack_snorm_2x16(va);
-  auto pb = detail::pack_snorm_2x16(vb);
-  auto pc = std::bit_cast<uint>(a * std::bit_cast<float>(pa)
-                      + (1.f - a) * std::bit_cast<float>(pb));
-
-  eig::Array2f rc = detail::unpack_snorm_2x16(pc).unaryExpr([](float f) { return std::fmod(f, 1.f); });
-  fmt::print("{} - {}\n", vc, rc); */
   
-  /* // Load spectral basis
-  auto basis = io::load_json("resources/misc/tree.json").get<BasisTreeNode>().basis;
+  // Load spectral basis
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  
+  // Normalize bases if they are not already normalized
+  for (uint i = 0; i < basis.func.cols(); ++i) {
+    auto col = basis.func.col(i).array().eval();
+    auto min_coeff = col.minCoeff();
+    auto max_coeff = col.maxCoeff();
+    basis.func.col(i) = (col / std::max(std::abs(max_coeff), std::abs(min_coeff)));
+    // basis.func.col(i) = (col - min_coeff) / (max_coeff - min_coeff);
+  }
 
   // Define base color system
   auto csys = ColrSystem {
@@ -48,41 +44,40 @@ TEST_CASE("Interpolation") {
   };
 
   // Define base colors
-  Colr colr_a = { 0.5, 0.25, 0.1 };
-  Colr colr_b = { 0.25, 0.75, 0.25};
-  
-  // Generate coefficients
-  auto coef_a = generate_spectrum_coeffs(DirectSpectrumInfo {
-    .direct_constraints = {{ csys, colr_a }},
-    .basis              = basis
-  }).array().eval();
-  auto coef_b = generate_spectrum_coeffs(DirectSpectrumInfo {
-    .direct_constraints = {{ csys, colr_b }},
-    .basis              = basis
-  }).array().eval();
+  std::vector<std::pair<std::string, Colr>> test_data = {
+    { "red",    Colr { 1.f,  0.f,  0.f  }},
+    { "green",  Colr { 0.f,  1.f,  0.f  }},
+    { "blue",   Colr { 0.f,  0.f,  1.f  }},
+    { "black",  Colr { 0.f,  0.f,  0.f  }},
+    { "white",  Colr { 1.f,  1.f,  1.f  }},
+    { "random", Colr { .25f, .75f, .25f }},
+    { "random", Colr { .33f, .33f, .33f }},
+  };
 
-  // Define valid interpolation output
-  float alpha = .33f;
-  Colr colr_c = alpha * colr_a + (1.f - alpha) * colr_b;
+  for (const auto &[name, colr] : test_data) {
+    auto coef = generate_spectrum_coeffs(DirectSpectrumInfo {
+      .direct_constraints = {{ csys, colr }},
+      .basis              = basis
+    }).array().eval();
+    Spec uncl = basis(coef);
+    Spec spec = uncl.cwiseMax(0.f).cwiseMin(1.f).eval();
+    Colr rtrp = csys(spec);
 
-  // Placeholder additive means
-  Spec mean_a = Spec(luminance(colr_a)).cwiseMin(1.f);
-  Spec mean_b = Spec(luminance(colr_b)).cwiseMin(1.f);
-  Spec mean_c = alpha * mean_a + (1.f - alpha) * mean_b;
+    Colr err      = (colr - rtrp).abs();
+    auto err_pass = (err <= 1e-3).all();
+    auto bnd_pass = (spec >= 0.f && spec <= 1.f).all();
 
-  auto pack_a = detail::pack_snorm_12(coef_a);
-  auto pack_b = detail::pack_snorm_12(coef_b);
-  auto pack_c_= (alpha        * *reinterpret_cast<eig::Array4f*>(&pack_a) 
-              + (1.f - alpha) * *reinterpret_cast<eig::Array4f*>(&pack_b)).eval();
-  auto pack_c = *reinterpret_cast<eig::Array4u*>(&pack_c_);
-  
-  // Perform interpolation on coefficients or their packing
-  auto coef_c = detail::unpack_snorm_12(pack_c);
-  // auto coef_c = (alpha * coef_a + (1.f - alpha) * coef_b).eval();
-  
-  // Recover result from mixed coefficients
-  auto spec_c = (basis(coef_c.matrix()) + mean_c).eval();
-  auto rtrp_c = csys(spec_c);
-
-  fmt::print("colr_c : {}\nrtrp_c : {}\n", colr_c, rtrp_c); */
+    fmt::print("{}:"
+               "\n\tcoeffs: {}"
+               "\n\tinput:  {}"
+               "\n\toutput: {}"
+               "\n\terror:  {} ({})"
+               "\n\tbounds: {} (unclamped {} <= x <= {}) -> (clamped {} <= x <= {})\n", 
+      name,
+      coef.head<6>(), colr, rtrp, 
+      err_pass ? "pass" : "fail", err, 
+      bnd_pass ? "pass" : "fail", 
+      uncl.minCoeff(), uncl.maxCoeff(),
+      spec.minCoeff(), spec.maxCoeff());
+  } // for (...)
 }

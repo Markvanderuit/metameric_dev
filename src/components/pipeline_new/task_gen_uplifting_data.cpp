@@ -5,6 +5,8 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/misc/task_lambda.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/utility.hpp>
 #include <omp.h>
@@ -58,6 +60,18 @@ namespace met {
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
+    info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
+      if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
+        const auto &e_scene = info.global("scene").getr<Scene>();
+        const auto &[e_uplifting, e_state] 
+          = info.global("scene").getw<Scene>().components.upliftings[m_uplifting_i];
+        const auto &e_basis = e_scene.resources.bases[e_uplifting.basis_i].value();
+
+        ImGui::PlotSpectra("Basis",    { },   e_basis.func.colwise() | rng::to<std::vector<Spec>>(), -1.f, 1.f);
+        ImGui::PlotSpectra("Boundary", { }, m_csys_boundary_spectra);
+      }
+      ImGui::End();
+    });
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
@@ -250,7 +264,7 @@ namespace met {
     // 6. Expose a copy of generated constraint spectra for visualization
     {
       auto &i_constraint_spectra = info("constraint_spectra").getw<std::vector<Spec>>();
-      auto &i_constraint_coeffs = info("constraint_coeffs").getw<std::vector<Basis::vec_type>>();
+      auto &i_constraint_coeffs  = info("constraint_coeffs").getw<std::vector<Basis::vec_type>>();
       i_constraint_spectra.resize(e_uplifting.verts.size());      
       rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), 
                 i_constraint_spectra.begin());

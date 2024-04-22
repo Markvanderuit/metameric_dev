@@ -30,12 +30,11 @@ namespace met {
     using vec_type = eig::Vector<float, wavelength_bases>;
 
   public:
-    Spec     mean; // Mean offset
     mat_type func; // Basis functions around mean ooffset
 
   public: // Boilerplate
     Spec apply(const vec_type &c) const { 
-      return (mean + (func * c).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
+      return ((func * c).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
     }
 
     Spec operator()(const vec_type &c) const { return apply(c); }

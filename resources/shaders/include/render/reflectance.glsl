@@ -77,12 +77,11 @@
       float w = hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i])));
       for (uint j = 0; j < 4; ++j) { // four wavelengths
         for (uint k = 0; k < wavelength_bases; ++k) // n bases
-          r[j] += w * clamp(c[k], -1.f, 1.f) * scene_basis_func(wvls[j], k);
+          r[j] += w * c[k] * scene_basis_func(wvls[j], k);
       }
     }
 
-    return r;
-    // return min(mix(r, vec4(0), isnan(r)), vec4(1)); // Catch all-black glitching out during mixing
+    return clamp(r, 0.f, 1.f);
   }
 
 // #else // SCENE_REFLECTANCE_MESE

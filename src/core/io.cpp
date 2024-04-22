@@ -329,8 +329,6 @@ namespace met::io {
     return basis_from_data(wvls, values);
   }
 
-
-
   void save_spectral_data(const SpectralData &data, const fs::path &path) {
     met_trace();
     
@@ -428,7 +426,7 @@ namespace met::io {
     float data_wvl_min = wvls[0],
           data_wvl_max = wvls[wvls.size() - 1];
 
-    Basis s = { .mean = 0.f, .func = 0.f };
+    Basis s = { .func = 0.f };
 
     for (size_t j = 0; j < wavelength_bases; ++j) {
       for (size_t i = 0; i < wavelength_samples; ++i) {

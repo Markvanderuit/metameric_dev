@@ -119,8 +119,13 @@ namespace ImGui {
       ImPlot::SetupAxesLimits(400.f, 700.f, min_bounds, max_bounds, ImPlotCond_Always);
 
       // Plot data lines
-      for (const auto &[text, sd] : met::vws::zip(legend, reflectances))
-        ImPlot::PlotLine(text.c_str(), x_values.data(), sd.data(), wavelength_samples);
+      if (legend.empty()) {
+        for (const auto &[i, sd] : met::enumerate_view(reflectances))
+          ImPlot::PlotLine(std::format("##line_{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
+      } else {
+        for (const auto &[text, sd] : met::vws::zip(legend, reflectances))
+          ImPlot::PlotLine(text.c_str(), x_values.data(), sd.data(), wavelength_samples);
+      }
     
       ImPlot::EndPlot();
     }

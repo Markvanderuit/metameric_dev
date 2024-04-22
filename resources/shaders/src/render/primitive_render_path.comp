@@ -65,9 +65,7 @@ layout(binding = 8) uniform b_buff_emitters_distr {
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
 layout(binding = 2) restrict readonly buffer b_buff_basis {
-  float mean[wavelength_samples];
   float func[wavelength_bases][wavelength_samples];
-  // float[wavelength_samples][wavelength_bases] func;
 } buff_basis;
 
 

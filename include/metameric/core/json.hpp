@@ -16,10 +16,6 @@ namespace met {
   }
 
   /* json (de)serialization for BasisTreeNode type must be declared in met scope */
-  void from_json(const json &js, BasisTreeNode &b);
-  void to_json(json &js, const BasisTreeNode &b);
-
-  /* json (de)serialization for BasisTreeNode type must be declared in met scope */
   void from_json(const json &js, Basis &b);
   void to_json(json &js, const Basis &b);
 

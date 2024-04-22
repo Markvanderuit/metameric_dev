@@ -220,12 +220,10 @@ namespace met {
     *this = { };
 
     // Pre-supply some data for an initial scene
-    auto loaded_tree = io::load_json("resources/misc/tree.json").get<BasisTreeNode>();
     components.settings   = { .name  = "Settings", 
                               .value = { .texture_size = Settings::TextureSize::eHigh }};
     components.observer_i = { .name  = "Default observer", 
                               .value = 0 };
-    resources.bases.push("Default basis",  loaded_tree.basis,           false);
     resources.illuminants.push("D65",      models::emitter_cie_d65,     false);
     resources.illuminants.push("E",        models::emitter_cie_e,       false);
     resources.illuminants.push("FL2",      models::emitter_cie_fl2,     false);
@@ -234,6 +232,17 @@ namespace met {
     resources.illuminants.push("LED-B1",   models::emitter_cie_ledb1,   false);
     resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
     resources.meshes.push("Rectangle",     models::unit_rect,           false);
+
+    // Load default basis from file and normalize if not already normalized
+    auto default_basis = io::load_basis("resources/misc/basis_262144.txt");
+    for (uint i = 0; i < default_basis.func.cols(); ++i) {
+      auto col = default_basis.func.col(i).array().eval();
+      auto min_coeff = col.minCoeff();
+      auto max_coeff = col.maxCoeff();
+      default_basis.func.col(i) = (col / std::max(std::abs(max_coeff), std::abs(min_coeff)));
+      // default_basis.func.col(i) = (col - min_coeff) / (max_coeff - min_coeff);
+    }
+    resources.bases.push("Default basis",  default_basis, false);
 
     // Default color system
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };
@@ -324,26 +333,19 @@ namespace met {
     clear_mods();
 
     // TODO remove this override that forces a reload of basis functions from disk
-    auto basis = io::load_json("resources/misc/tree.json").get<BasisTreeNode>().basis;
-
-    basis.func.block<wavelength_samples, wavelength_bases - 1>(0, 1)
-      = basis.func.block<wavelength_samples, wavelength_bases - 1>(0, 0).eval();
-    basis.func.block<wavelength_samples, 1>(0, 0) = Spec(1);
-
-    for (uint i = 1; i < basis.func.cols(); ++i) {
+      
+    // Load spectral basis
+    auto basis = io::load_basis("resources/misc/basis_262144.txt");
+    
+    // Normalize bases if they are not already normalized
+    for (uint i = 0; i < basis.func.cols(); ++i) {
       auto col = basis.func.col(i).array().eval();
-      col -= col.minCoeff();
-      col /= col.maxCoeff();
-      basis.func.col(i) = col;
-      // basis.func.col(i) = (basis.func.col(i).array()    - basis.func.col(i).minCoeff()).eval()
-      //                   / (basis.func.col(i).maxCoeff() - basis.func.col(i).minCoeff());
+      auto min_coeff = col.minCoeff();
+      auto max_coeff = col.maxCoeff();
+      // basis.func.col(i) = (col - min_coeff) / (max_coeff - min_coeff);
+      basis.func.col(i) = (col / std::max(std::abs(max_coeff), std::abs(min_coeff)));
     }
-      // basis.func.col(i) /= basis.func.col(i).maxCoeff();
-    
-    // for (uint i = 0; i < basis.func.rows(); ++i)
-    //   fmt::print("{}\n", basis.func.row(i));
-    
-    basis.mean = Spec(0);
+
     resources.bases[0].value() = basis;
   }
 

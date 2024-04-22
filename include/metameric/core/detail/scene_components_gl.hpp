@@ -93,12 +93,6 @@ namespace met::detail {
     using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
 
-    struct BasisInfoLayout {
-      Spec                                                    mean;
-      Basis::mat_type func;
-      // eig::Array<float, /* wavelength_bases */ 16, wavelength_samples> func;
-    };
-
   public:
     // Atlas texture; each per-object patch stored in this atlas holds barycentric
     // weights and an index, referring to one set of four spectra in `texture_spectra`

@@ -30,8 +30,8 @@ struct BVHNodePack {
   uint child_aabb1[4]; // per child: lo.z | hi.z
 };
 
-float[12] unpack_snorm_12(in uvec4 p) {
-  float[12] m;
+float[wavelength_bases] unpack_snorm_12(in uvec4 p) {
+  float[wavelength_bases] m;
   for (int i = 0; i < 12; ++i) {
     uint j = bitfieldExtract(p[i / 3],              // 0,  0,  0,  1,  1,  1,  ...
                              i % 3 * 11,            // 0,  11, 22, 0,  11, 22, ...
@@ -42,7 +42,7 @@ float[12] unpack_snorm_12(in uvec4 p) {
   return m;
 }
 
-uvec4 pack_snorm_12(in float[12] v) {
+uvec4 pack_snorm_12(in float[wavelength_bases] v) {
   uvec4 p;
   for (int i = 0; i < 12; ++i) {
     float scale = i % 3 == 2 ? 1024.f : 2048.f;

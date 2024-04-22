@@ -14,42 +14,11 @@ namespace met {
   } // namespace io
 
   void from_json(const met::json &js, met::Basis &b) {
-    b.mean = js.at("mean").get<Spec>();
     b.func = js.at("func").get<met::Basis::mat_type>();
   }
 
   void to_json(met::json &js, const met::Basis &b) {
-    js["mean"] = b.mean;
     js["func"] = b.func;
-  }
-
-  void from_json(const json &js, BasisTreeNode &b) {
-    // Extract structure data
-    if (js.contains("children"))
-      b.children = js.at("children").get<std::vector<BasisTreeNode>>();
-    b.bbox_min = js.at("bbox_min").get<eig::Array2f>();
-    b.bbox_max = js.at("bbox_max").get<eig::Array2f>();
-    b.depth    = js.at("depth").get<uint>();
-
-    // Extract node data
-    constexpr uint data_wvls = 31;
-    auto [wvls, mean, basis] = js.at("data").get<std::tuple<
-      eig::Array<float, data_wvls, 1>, 
-      eig::Array<float, data_wvls, 1>, 
-      eig::Array<float, data_wvls, data_wvls>>
-    >();
-
-    // Format node data
-    auto block = basis.eval().block<data_wvls, wavelength_bases>(0, 0).transpose().eval();
-    // auto block = basis.transpose().eval().block<data_wvls, wavelength_bases>(0, 0).eval();
-    for (uint i = 0; i < wavelength_bases; ++i) {
-      b.basis.func.col(i) = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(block.row(i).eval()), true);
-    }
-    b.basis.mean = io::spectrum_from_data(cnt_span<const float>(wvls), cnt_span<const float>(mean), true);
-  }
-  
-  void to_json(json &js, const BasisTreeNode &b) {
-    debug::check_expr(false, "Not imeplemented!");
   }
   
   void from_json(const met::json &js, met::Transform &trf) {

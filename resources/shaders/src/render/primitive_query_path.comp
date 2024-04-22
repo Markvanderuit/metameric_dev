@@ -76,9 +76,7 @@ layout(binding = 2) restrict coherent buffer b_buff_output {
   Path data[];
 } buff_output;
 layout(binding = 3) restrict readonly buffer b_buff_basis {
-  float mean[wavelength_samples];
   float func[wavelength_bases][wavelength_samples];
-  // float[wavelength_samples][wavelength_bases] func;
 } buff_basis;
 
 // Texture/image units, ergo samplers and output images

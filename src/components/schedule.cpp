@@ -61,7 +61,7 @@ namespace met {
       ImGui::End();
     });
 
-    // Temporary window to plot pca components
+    /* // Temporary window to plot pca components
     scheduler.task("plot_models").init<LambdaTask>([](auto &info) {
       if (ImGui::Begin("PCA plots")) {
         eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
@@ -70,14 +70,10 @@ namespace met {
         
         // Do some stuff with the PCA bases
         const auto &basis = info.global("scene").getr<Scene>().resources.bases[0].value().func;
-        // const auto &pca = info.global("appl_data").getr<ApplicationData>().loaded_basis;
-        for (uint i = 0; i < basis.cols(); ++i) {
-          ImGui::PlotLines(fmt::format("Component {}", i).c_str(), basis.col(i).data(), 
-            wavelength_samples, 0, nullptr, FLT_MAX, FLT_MAX, plot_size);
-        }
+        ImGui::PlotSpectra("##basis_plot", { }, basis.colwise() | rng::to<std::vector<Spec>>(), -1.f, 1.f);
       }
       ImGui::End();
-    });
+    }); */
   }
 
   void submit_metameric_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
