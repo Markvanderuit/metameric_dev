@@ -82,21 +82,23 @@ namespace met {
                                + tetr.spectra[1] * bary[1]
                                + tetr.spectra[2] * bary[2]
                                + tetr.spectra[3] * bary[3]).eval();
-          auto coeffs_spectrum = e_scene.resources.bases[0].value()(coeffs);
+          if constexpr (wavelength_bases == decltype(coeffs)::RowsAtCompileTime) {
+            auto coeffs_spectrum = e_scene.resources.bases[0].value()(coeffs);
 
-          // Plot the mixed spectra
-          {
-            std::vector<std::string> legend = { "a", "b", "c", "d" };
-            ImGui::PlotSpectra("Tetrahedron", legend, tetr.spectra, -0.05, 1.05, { 0.f, 128.f });
-          }
+            // Plot the mixed spectra
+            {
+              std::vector<std::string> legend = { "a", "b", "c", "d" };
+              ImGui::PlotSpectra("Tetrahedron", legend, tetr.spectra, -0.05, 1.05, { 0.f, 128.f });
+            }
 
-          ImGui::Separator();
+            ImGui::Separator();
 
-          // Plot the reconstructed spectra
-          {
-            std::vector<std::string> legend = { "Baseline", "Basis" };
-            std::vector<Spec>        spectra = { interp_spectrum, coeffs_spectrum };
-            ImGui::PlotSpectra("Reconstruction", legend, spectra, -0.05, 1.05, { 0.f, 128.f });
+            // Plot the reconstructed spectra
+            {
+              std::vector<std::string> legend = { "Baseline", "Basis" };
+              std::vector<Spec>        spectra = { interp_spectrum, coeffs_spectrum };
+              ImGui::PlotSpectra("Reconstruction", legend, spectra, -0.05, 1.05, { 0.f, 128.f });
+            }
           }
 
           /* ImGui::Separator();

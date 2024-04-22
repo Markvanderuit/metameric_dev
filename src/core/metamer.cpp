@@ -173,7 +173,7 @@ namespace met {
       .upper        = 1.0,
       .lower        =-1.0,
       .max_iters    = 256,  // Failsafe
-      .rel_xpar_tol = 1e-2, // Threshold for objective error
+      .rel_xpar_tol = 1e-3, // Threshold for objective error
     };
 
     // Objective function minimizes l2 norm over spectral distribution
@@ -206,12 +206,38 @@ namespace met {
       auto A_ = csys.finalize(false);
       auto b_ = lrgb_to_xyz(colr);
 
+      {
+        using vec = eig::Vector<ad::real1st, wavelength_bases>;
+        solver.eq_constraints.push_back({
+        .f   = ad::wrap_capture<wavelength_bases>(
+        [A = A_
+              | vws::transform([](const CMFS &cmfs) { 
+                  return cmfs.transpose().cast<double>().eval(); })
+              | rng::to<std::vector>(), 
+         B = info.basis.func.matrix().cast<double>().eval(), 
+         b = b_.cast<double>().eval()](const vec &x) {
+          // Recover spectral distribution
+          auto r = (B * x.matrix()).eval();
+
+          // f(x) = ||Ax - b||
+          // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
+          auto Ax = (A[0] * r.array().pow(0.0).matrix()).eval();
+          for (uint i = 1; i < A.size(); ++i) {
+            auto rp  = r.array().pow(static_cast<double>(i)).matrix().eval();
+            Ax += A[i] * rp;
+          }
+          return (Ax.array() - b).matrix().norm();
+        }), .tol = 1e-3 });
+      }
+
       for (uint j = 0; j < 3; ++j) {
         auto A = A_
               | vws::transform([j](const CMFS &cmfs) { 
                   return cmfs.col(j).transpose().cast<double>().eval(); })
               | rng::to<std::vector>();
-        solver.eq_constraints.push_back({
+
+        
+        /* solver.eq_constraints.push_back({
           .f = [A = A, 
                 B = info.basis.func.matrix().cast<double>().eval(), 
                 b = b_[j]]
@@ -246,7 +272,31 @@ namespace met {
               g = grad;
 
             return norm;
-        }, .tol = 1e-3 });
+        }, .tol = 1e-3 }); */
+
+        /* {
+          using vec = eig::Vector<ad::real1st, wavelength_bases>;
+          solver.eq_constraints.push_back({
+          .f   = ad::wrap_capture<wavelength_bases>(
+          [A = A, 
+           B = info.basis.func.matrix().cast<double>().eval(), 
+           b = b_[j]](const vec &x) {
+            // Recover spectral distribution
+            auto r = (B * x.matrix()).eval();
+
+            // f(x) = ||Ax - b||
+            // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
+            ad::real1st diff = A[0].sum();
+            for (uint i = 1; i < A.size(); ++i) {
+              double p = static_cast<double>(i);
+              auto rp  = r.array().pow(p).matrix().eval();
+              diff += A[i] * rp;
+            }
+            diff -= b;
+
+            return diff;
+          }), .tol = 1e-3 });
+        } */
       } // for (uint j)
     }
 
@@ -435,7 +485,7 @@ namespace met {
                         | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval()))              
                         | rng::to<std::vector>();
 
-          local_solver.objective =
+          /* local_solver.objective =
           [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
           (eig::Map<const vec> x, eig::Map<vec> g) -> double {
             auto r = (B * x).eval();
@@ -455,7 +505,24 @@ namespace met {
             if (g.data())
               g = grad;
             return diff;
-          };
+          }; */
+
+          {
+            using vec = eig::Vector<ad::real1st, wavelength_bases>;
+            local_solver.objective = ad::wrap_capture<wavelength_bases>(
+            [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
+            (const vec &x) {
+              auto r = (B * x.matrix()).eval();
+              auto diff = A_direct.dot(r)
+                        + A_indrct[0].sum();
+              for (uint i = 1; i < A_indrct.size(); ++i) {
+                double p = static_cast<double>(i);
+                auto fr = r.array().pow(p).matrix().eval();
+                diff += A_indrct[i].dot(fr);
+              }
+              return diff;
+            });
+          }
 
           // Run solver and store recovered spectral distribution if it is safe
           auto r = solve(local_solver);

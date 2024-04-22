@@ -141,8 +141,8 @@
   
   // Forward to whatever sampler we're experimenting with today
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
-    return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
-    // return scene_sample_reflectance_bases(object_i, tx, wvls);
+    // return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
+    return scene_sample_reflectance_bases(object_i, tx, wvls);
     // return scene_sample_reflectance_moments(object_i, tx, wvls);
   }
 

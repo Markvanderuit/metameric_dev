@@ -181,29 +181,55 @@ namespace met {
           auto baseline_spr_name = std::format("Base constraint ({})", e_scene.resources.observers[e_scene.components.observer_i.value].name);
           ImGui::SeparatorText(baseline_spr_name.c_str());
           {
-            IndirectColrSystem csys = {
-              .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-              .powers = cstr.powers
-            };
-
-            // lRGB color picker
-            Colr &lrgb = cstr.colr;
-            ImGui::ColorEdit3("Constraint (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
-
-            // sRGB color picker
-            Colr srgb = lrgb_to_srgb(lrgb);
-            if (ImGui::ColorEdit3("Constraint (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
-              lrgb = srgb_to_lrgb(srgb);
+            {
+              auto csys = e_scene.csys(0);
               
-            // Roundtrip error
-            Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
-            ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+              // lRGB color picker
+              Colr &lrgb = cstr.surface.diffuse;
+              ImGui::ColorEdit3("Surface (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
+
+              // sRGB color picker
+              Colr srgb = lrgb_to_srgb(lrgb);
+              if (ImGui::ColorEdit3("Surface (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
+                lrgb = srgb_to_lrgb(srgb);
+                
+              // Roundtrip error
+              Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
+              ImGui::InputFloat3("Surface (error)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            }
+            {
+              IndirectColrSystem csys = {
+                .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
+                .powers = cstr.powers
+              };
+
+              // lRGB color picker
+              Colr &lrgb = cstr.colr;
+              ImGui::ColorEdit3("Constraint (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
+
+              // sRGB color picker
+              Colr srgb = lrgb_to_srgb(lrgb);
+              if (ImGui::ColorEdit3("Constraint (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
+                lrgb = srgb_to_lrgb(srgb);
+                
+              // Roundtrip error
+              Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
+              ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            }
           }
 
-          ImGui::SeparatorText("Secondary constraints");
+          /* ImGui::SeparatorText("Secondary constraints");
           {
             ImGui::Text("TODO"); // TODO
-          }
+          } */
+
+          /* {
+            auto max_coeff = rng::fold_left_first(
+              cstr.powers | vws::transform([](const auto &s) -> float { return s.maxCoeff(); }),
+              std::plus<float>()).value();
+
+            ImGui::PlotSpectra("##powers_plot", { }, cstr.powers, -0.05f, max_coeff + 0.05f);
+          } */
         },
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");
