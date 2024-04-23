@@ -181,16 +181,22 @@ namespace met {
   }
   
   bool Basis::operator==(const Basis &o) const {
-    return func.isApprox(o.func);
+    return scale == o.scale
+           && mean.isApprox(o.mean)
+           && func.isApprox(o.func);
   }
 
   void Basis::to_stream(std::ostream &str) const {
     met_trace();
+    io::to_stream(mean, str);
+    io::to_stream(scale, str);
     io::to_stream(func, str);
   }
 
   void Basis::fr_stream(std::istream &str) {
     met_trace();
-    io::fr_stream(func, str);
+    io::fr_stream(mean,  str);
+    io::fr_stream(scale, str);
+    io::fr_stream(func,  str);
   }
 } // namespace met

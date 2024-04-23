@@ -224,8 +224,7 @@ namespace met::detail {
     // Push basis function data, just default set for now
     {
       const auto &basis = scene.resources.bases[0].value();
-      texture_basis.set(obj_span<const float>(basis));
-      // buffer_basis.set(obj_span<const std::byte>(basis.func), sizeof(Basis::mat_type));
+      texture_basis.set(obj_span<const float>(basis.func));
     }
   }
 

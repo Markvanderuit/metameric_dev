@@ -30,7 +30,9 @@ namespace met {
     using vec_type = eig::Vector<float, wavelength_bases>;
 
   public:
-    mat_type func; // Basis functions around mean ooffset
+    Spec     mean;  // Ignored r.n.
+    float    scale; // Ignored r.n.
+    mat_type func;  // Basis functions around mean offset
 
   public: // Boilerplate
     Spec apply(const vec_type &c) const { 

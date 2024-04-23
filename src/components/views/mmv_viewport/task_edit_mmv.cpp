@@ -223,13 +223,13 @@ namespace met {
             ImGui::Text("TODO"); // TODO
           } */
 
-          /* {
+          {
             auto max_coeff = rng::fold_left_first(
               cstr.powers | vws::transform([](const auto &s) -> float { return s.maxCoeff(); }),
               std::plus<float>()).value();
 
             ImGui::PlotSpectra("##powers_plot", { }, cstr.powers, -0.05f, max_coeff + 0.05f);
-          } */
+          }
         },
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");

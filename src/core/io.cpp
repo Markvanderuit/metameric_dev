@@ -10,12 +10,15 @@
 #include <zstr.hpp>
 #include <algorithm>
 #include <execution>
+#include <functional>
 #include <fstream>
 #include <unordered_map>
 #include <unordered_set>
 #include <deque>
 
 namespace met::io {
+  using namespace std::placeholders;
+
   std::string load_string(const fs::path &path) {
     met_trace();
 
@@ -60,9 +63,9 @@ namespace met::io {
     std::vector<float> wvls, values;
 
     // Read spectrum file as string, and parse line by line
-    std::stringstream line__ss(load_string(path));
+    std::stringstream ss(load_string(path));
     std::string line;
-    while (std::getline(line__ss, line)) {
+    while (std::getline(ss, line)) {
       std::ranges::replace(line, '\t', ' ');
       auto split_vect = line 
                       | std::views::split(' ') 
@@ -99,11 +102,13 @@ namespace met::io {
     // Output data blocks
     std::vector<float> wvls, values_x, values_y, values_z;
 
-    // Read spectrum file as string, and parse line by line
-    std::stringstream line__ss(load_string(path));
+    // Read spectrum file as string into stringstream
+    std::stringstream ss(load_string(path));
+
+    // Parse line by line
     std::string line;
-    uint line_nr = 0;
-    while (std::getline(line__ss, line)) {
+    uint        line_nr = 0;
+    while (std::getline(ss, line)) {
       auto split_vect = line 
                       | std::views::split(' ') 
                       | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
@@ -293,41 +298,76 @@ namespace met::io {
 
   Basis load_basis(const fs::path &path) {
     met_trace();
+    
+    // Lambda shorthand for overload of std::stof
+    constexpr auto stof = [](const std::string &s) -> float { return std::stof(s); };
 
-    // Output data blocks
-    std::vector<float> wvls;
-    std::vector<std::array<float, wavelength_bases>> values; 
+    // Different read modes while parsing the file; by default, no read is performed
+    enum class read_mode {  eNone, eMean, eFunc } mode = read_mode::eNone;
 
-    // Read spectrum file as string, and parse line by line
-    std::stringstream line__ss(load_string(path));
+    // Output data blocks; 
+    // we later generate spectrum and basis data for the given wavelength/signal
+    std::vector<float>           wvls_mean, 
+                                 sgnl_mean,
+                                 wvls_func;
+    std::vector<Basis::vec_type> sgnl_func;
+
+    // Read spectrum file as string
+    std::stringstream ss(load_string(path));
+
+    // Parse string line by line
     std::string line;
-    uint line_nr = 0;
-    while (std::getline(line__ss, line)) {
-      auto split_vect = line 
-                      | std::views::split(' ') 
-                      | std::views::transform([](auto &&r) { return std::string(r.begin(), r.end()); })
-                      | std::ranges::to<std::vector>();
+    uint        line_nr = 0;
+    while (std::getline(ss, line)) {
+      // Test for mean/func heading comments, setting mean/func read mode
+      if (line == "# mean") {
+        line_nr++;
+        mode = read_mode::eMean;
+        continue;
+      } else if (line == "# func") {
+        line_nr++;
+        mode = read_mode::eFunc;
+        continue;
+      } else if (mode == read_mode::eNone) {
+        line_nr++;
+        continue;
+      }
 
-      // Skip empty and commented lines
-      guard_continue(!split_vect.empty() && split_vect[0][0] != '#');
+      // Separate current line by spaces
+      auto split = line 
+                 | vws::split(' ') 
+                 | vws::transform([](auto &&r) { return std::string(range_iter(r)); })
+                 | rng::to<std::vector>();
+      auto data = std::span(split); // span representation for slicing
 
-      // Throw on incorrect input data 
-      debug::check_expr(split_vect.size() >= wavelength_bases + 1,
-        fmt::format("Basis function data too short on line {}\n", line_nr));
+      // Skip empty or commented lines
+      guard_continue(!data.empty() && data[0][0] != '#');
 
-      std::array<float, wavelength_bases> split_values;
-      std::transform(split_vect.begin() + 1, 
-                     split_vect.begin() + 1 + wavelength_bases, 
-                     split_values.begin(), 
-                     [](const auto &s) { return std::stof(s); });
-
-      wvls.push_back(std::stof(split_vect[0]));
-      values.push_back(split_values);
+      if (mode == read_mode::eMean) {
+        debug::check_expr(data.size() >= 2,
+          fmt::format("Basis mean data too short on line {}\n", line_nr));
+        
+        // String-to-float the first two values, as wavelength and 
+        // corresponding signal
+        wvls_mean.push_back(stof(data[0]));
+        sgnl_mean.push_back(stof(data[1]));
+      } else if (mode == read_mode::eFunc) {
+        // Throw on incorrect input data length
+        debug::check_expr(data.size() >= wavelength_bases + 1,
+          fmt::format("Basis func data too short on line {}\n", line_nr));
+        
+        // String-to-float the first value, which describes wavelength, 
+        // and the following N characters, which describe 
+        Basis::vec_type signal;
+        rng::transform(data.subspan(1, wavelength_bases), signal.begin(), stof);
+        wvls_func.push_back(stof(data[0]));
+        sgnl_func.push_back(signal);
+      }
 
       line_nr++;
     }
 
-    return basis_from_data(wvls, values);
+    return basis_from_data(wvls_mean, sgnl_mean, wvls_func, sgnl_func);
   }
 
   void save_spectral_data(const SpectralData &data, const fs::path &path) {
@@ -353,11 +393,11 @@ namespace met::io {
   }
 
   // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::average(...) from libcore/spectrum.cpp
-  Spec spectrum_from_data(std::span<const float> wvls_, std::span<const float> values, bool remap) {
+  Spec spectrum_from_data(std::span<const float> wvls, std::span<const float> values, bool remap) {
     met_trace();
 
     // Generate extended wavelengths for now, fitting current spectral range
-    std::vector<float> wvls;
+    /* std::vector<float> wvls;
     if (remap) {
       wvls.resize(values.size());
       for (int i = 0; i < wvls.size(); ++i) {
@@ -365,12 +405,11 @@ namespace met::io {
       }
     } else {
       wvls = std::vector<float>(range_iter(wvls_));
-    }
+    } */
 
     Spec s = 0.f;
 
-    float data_wvl_min = wvls[0],
-          data_wvl_max = wvls[wvls.size() - 1];
+    float data_wvl_min = wvls.front(), data_wvl_max = wvls.back();
 
     for (size_t i = 0; i < wavelength_samples; ++i) {
       float spec_wvl_min = wavelength_min + i * wavelength_ssize,
@@ -415,18 +454,20 @@ namespace met::io {
                       spectrum_from_data(wvls, values_z)).finished();
   }
 
-  Basis basis_from_data(std::span<const float> wvls, 
-                        std::span<std::array<float, wavelength_bases>> values) {
+  Basis basis_from_data(std::span<const float>     wvls_mean, 
+                        std::span<const float>     sgnl_mean, 
+                        std::span<const float>     wvls_func, 
+                        std::span<Basis::vec_type> sgnl_func) {
     met_trace();
 
-    // // Generate extended wavelengths for now, fitting current spectral range
-    // std::vector<float> wvls(values.size() + 1);
-    // for (int i = 0; i < wvls.size(); ++i)
-    //   wvls[i] = wavelength_min + i * (wavelength_range / static_cast<float>(values.size()));
-  
-    float data_wvl_min = wvls.front(), data_wvl_max = wvls.back();
+    // Output data
+    Basis s = {
+      .mean = spectrum_from_data(wvls_mean, sgnl_mean),
+      .func = 0.f
+    };
+    s.scale = 1.f / std::max(s.mean.array().maxCoeff(), std::abs(s.mean.array().minCoeff()));
 
-    Basis s = { .func = 0.f };
+    float data_wvl_min = wvls_func.front(), data_wvl_max = wvls_func.back();
 
     for (size_t j = 0; j < wavelength_bases; ++j) {
       for (size_t i = 0; i < wavelength_samples; ++i) {
@@ -439,16 +480,16 @@ namespace met::io {
         guard_continue(wvl_max > wvl_min);
 
         // Find the starting index using binary search (Thanks for the idea, Mitsuba people!)
-        ptrdiff_t pos = std::max(std::ranges::lower_bound(wvls, wvl_min) - wvls.begin(),
+        ptrdiff_t pos = std::max(std::ranges::lower_bound(wvls_func, wvl_min) - wvls_func.begin(),
                                 static_cast<ptrdiff_t>(1)) - 1;
         
         // Step through the provided data and integrate trapezoids
-        for (; pos + 1 < wvls.size() && wvls[pos] < wvl_max; ++pos) {
-          float wvl_a   = wvls[pos],
-                value_a = values[pos][j],
+        for (; pos + 1 < wvls_func.size() && wvls_func[pos] < wvl_max; ++pos) {
+          float wvl_a   = wvls_func[pos],
+                value_a = sgnl_func[pos][j],
                 clamp_a = std::max(wvl_a, wvl_min);
-          float wvl_b   = wvls[pos + 1],
-                value_b = values[pos + 1][j],
+          float wvl_b   = wvls_func[pos + 1],
+                value_b = sgnl_func[pos + 1][j],
                 clamp_b = std::min(wvl_b, wvl_max);
           guard_continue(clamp_b > clamp_a);
 

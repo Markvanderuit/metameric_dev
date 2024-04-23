@@ -69,8 +69,10 @@ namespace met {
                         std::span<const float> values_y, std::span<const float> values_z);
 
     // Load a set of basis functions from sequentially increasing wvl/value data
-    Basis basis_from_data(std::span<const float> wvls, 
-                          std::span<std::array<float, wavelength_bases>> values);
+    Basis basis_from_data(std::span<const float>     wvls_mean, 
+                          std::span<const float>     sgnl_mean, 
+                          std::span<const float>     wvls_func, 
+                          std::span<Basis::vec_type> sgnl_func);
 
     // Split a discrete spectral distribution or color matching functions into sequentially 
     // increasing wvl/value/*/* data

@@ -10,8 +10,11 @@
 #include <numbers>
 #include <unordered_set>
 
-constexpr static bool solve_using_basis         = true;  // Use basis functions to reduce solver complexity (and color system size)
-constexpr static bool output_moment_limited_ocs = false; // Use moment conversion to reduce color system size
+// Use basis functions to reduce solver complexity (and color system size),
+// or generate in full spectral resolution, and then project result back
+// into basis. The former is much faster, but introduces non-convexity issues
+// for indirect reflectance and mismatching computations.
+constexpr static bool solve_using_basis = false;  
 
 namespace met {
   namespace detail {
@@ -63,76 +66,41 @@ namespace met {
     // Take a grayscale spectrum as mean to build around
     Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
     
-    // Solver settings
-    opt::Wrapper<wavelength_bases> solver = {
-      .x_init       = 0.05,
-      .upper        = 1.0,
-      .lower        =-1.0,
-      .max_iters    = 256,  // Failsafe
-      .rel_xpar_tol = 1e-3, // Threshold for objective error
-    };
-
-    
-    // Objective function minimizes l2 norm as a simple way to get relatively smooth coeffs
-    solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, mean);
-    // solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, Spec::Zero());
-
-    // solver.objective = opt::func_norm<wavelength_bases>(eig::Matrix<float, wavelength_bases, wavelength_bases>::Identity(), 
-    //                                                     eig::Array<float, wavelength_bases, 1>::Zero());
-    // solver.objective = opt::func_dot<wavelength_bases>(opt::OptInfoT<wavelength_bases>::vec(1), 0.f);
-
-    // solver.objective = opt::func_norm<wavelength_bases>(Basis::mat_type::Identity(), Spec::Zero());
-
-    // solver.objective = ad::wrap_capture<wavelength_bases>([
-    //   A = info.basis.func.cast<double>().eval()
-    // ](const vec &x) {
-    //   return (A * x.matrix())/* .cwiseMax(0.0).cwiseMin(1.0) */.norm();
-    // });
-
-    // Add color system equality constraints, upholding spectral metamerism
-    for (const auto [csys, colr] : info.direct_constraints) {
-      auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
-      auto b = lrgb_to_xyz(colr);
-
-      solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
-                                        .tol = 1e-4 });
-      
-      /* 
-      using vec = eig::Vector<ad::real1st, wavelength_bases>;
-      solver.eq_constraints.push_back({ 
-        .f = ad::wrap_capture<wavelength_bases>([
-          A = csys.finalize(false).transpose().cast<double>().eval(), 
-          B = info.basis.func.cast<double>().eval(),
-          b = b.cast<double>().eval()
-        ](const vec &x) {
-          auto r = (B * x.matrix())
-                    .cwiseMax(0.0).cwiseMin(1.0).eval(); // Clamped outputs
-          return ((A * r).array() - b).matrix().norm();
-        }),
-        .tol = 1e-4 
-      }); */
-    }
-
-    // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    {
-      auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
-        << info.basis.func, -info.basis.func).finished();
-      auto b = (eig::Array<float, 2 * wavelength_samples, 1>()
-        << Spec(1.f), Spec(0.f)).finished();
-      solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b), 
-                                          .n   = 2 * wavelength_samples, 
-                                          .tol = 1e-2 });
-    }
-
-    // Run solver and return recovered coefficients
-    return solve(solver).x.cast<float>().eval();
-  }
-
-  Spec generate_spectrum(DirectSpectrumInfo info) {
-    met_trace();
-
     if constexpr (solve_using_basis) {
-      return info.basis(generate_spectrum_coeffs(info));
+      // Solver settings
+      opt::Wrapper<wavelength_bases> solver = {
+        .x_init       = 0.05,
+        .upper        = 1.0,
+        .lower        =-1.0,
+        .max_iters    = 256,  // Failsafe
+        .rel_xpar_tol = 1e-3, // Threshold for objective error
+      };
+      
+      // Objective function minimizes l2 norm as a simple way to get relatively smooth coeffs
+      solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, mean);
+
+      // Add color system equality constraints, upholding spectral metamerism
+      for (const auto [csys, colr] : info.direct_constraints) {
+        auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
+        auto b = lrgb_to_xyz(colr);
+
+        solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
+                                          .tol = 1e-4 });
+      }
+
+      // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
+      {
+        auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
+          << info.basis.func, -info.basis.func).finished();
+        auto b = (eig::Array<float, 2 * wavelength_samples, 1>()
+          << Spec(1.f), Spec(0.f)).finished();
+        solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b), 
+                                            .n   = 2 * wavelength_samples, 
+                                            .tol = 1e-2 });
+      }
+
+      // Run solver and return recovered coefficients
+      return solve(solver).x.cast<float>().eval();
     } else {
       // Solver settings
       opt::Wrapper<wavelength_samples> solver = {
@@ -145,7 +113,7 @@ namespace met {
 
       // Objective function minimizes l2 norm over spectral distribution
       auto obj = eig::Matrix<float, wavelength_samples, wavelength_samples>::Identity();
-      solver.objective = opt::func_norm<wavelength_samples>(obj, Spec::Zero());
+      solver.objective = opt::func_norm<wavelength_samples>(obj, mean);
 
       // Add color system equality constraints, upholding spectral metamerism
       for (const auto [csys, colr] : info.direct_constraints) {
@@ -156,151 +124,137 @@ namespace met {
       }
       
       // Run solver and return recovered spectral distribution
-      auto r = solve(solver);
-      return r.x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
+      auto r = solve(solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
+      return generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis });
     }
+  }
+
+  Spec generate_spectrum(DirectSpectrumInfo info) {
+    met_trace();
+    return info.basis(generate_spectrum_coeffs(info));
   }
 
   Basis::vec_type generate_spectrum_coeffs(IndrctSpectrumInfo info) {
     met_trace();
-
+    
     // Take a grayscale spectrum as mean to build around
     Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
-    // Solver settings
-    opt::Wrapper<wavelength_bases> solver = {
-      .x_init       = 0.05,
-      .upper        = 1.0,
-      .lower        =-1.0,
-      .max_iters    = 256,  // Failsafe
-      .rel_xpar_tol = 1e-3, // Threshold for objective error
-    };
+    if constexpr (solve_using_basis) {
+      // Solver settings
+      opt::Wrapper<wavelength_bases> solver = {
+        .x_init       = 0.05,
+        .upper        = 1.0,
+        .lower        =-1.0,
+        .max_iters    = 256,  // Failsafe
+        .rel_xpar_tol = 1e-3, // Threshold for objective error
+      };
 
-    // Objective function minimizes l2 norm over spectral distribution
-    // solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, mean);
-    solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, Spec(0));
+      // Objective function minimizes l2 norm over spectral distribution
+      solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, mean);
 
-    // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
-    {
-      auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
-        << info.basis.func, -info.basis.func).finished();
-      auto b = (eig::Array<float, 2 * wavelength_samples, 1>()
-        << Spec(1.f), Spec(0.f)).finished();
-      solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b),
-                                          .n   = 2 * wavelength_samples, 
-                                          .tol = 1e-2 });
-    }
-
-    // Add color system equality constraints, upholding spectral metamerism
-    for (const auto [csys, colr] : info.direct_constraints) {
-      auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
-      auto b = lrgb_to_xyz(colr);
-      solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
-                                        .tol = 1e-4 });
-    }
-
-    // Add interreflection equality constraint, upholding requested output color;
-    // specify three equalities for three partial derivatives
-    for (const auto [csys, colr] : info.indirect_constraints) {
-      using vec = opt::Wrapper<wavelength_bases>::vec;
-      auto A_ = csys.finalize(false);
-      auto b_ = lrgb_to_xyz(colr);
-
+      // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
       {
-        using vec = eig::Vector<ad::real1st, wavelength_bases>;
+        auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
+          << info.basis.func, -info.basis.func).finished();
+        auto b = (eig::Array<float, 2 * wavelength_samples, 1>()
+          << Spec(1.f), Spec(0.f)).finished();
+        solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b),
+                                            .n   = 2 * wavelength_samples, 
+                                            .tol = 1e-2 });
+      }
+
+      // Add color system equality constraints, upholding spectral metamerism
+      for (const auto [csys, colr] : info.direct_constraints) {
+        auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
+        auto b = lrgb_to_xyz(colr);
+        solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
+                                          .tol = 1e-2 });
+      }
+
+      // Add interreflection equality constraint, upholding requested output color;
+      // specify three equalities for three partial derivatives
+      for (const auto [csys, colr] : info.indirect_constraints) {
+        using vec = opt::Wrapper<wavelength_bases>::vec;
+        auto A_ = csys.finalize(false);
+        auto b_ = lrgb_to_xyz(colr);
+
+        {
+          using vec = eig::Vector<ad::real1st, wavelength_bases>;
+          solver.eq_constraints.push_back({
+          .f   = ad::wrap_capture<wavelength_bases>(
+          [A = A_
+                | vws::transform([](const CMFS &cmfs) { 
+                    return cmfs.transpose().cast<double>().eval(); })
+                | rng::to<std::vector>(), 
+          B = info.basis.func.matrix().cast<double>().eval(), 
+          b = b_.cast<double>().eval()](const vec &x) {
+            // Recover spectral distribution
+            auto r = (B * x.matrix()).eval();
+
+            // f(x) = ||Ax - b||; A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
+            auto Ax = (A[0].rowwise().sum() + A[1] * r).eval();
+            for (uint i = 2; i < A.size(); ++i) {
+              r.array() *= r.array();
+              Ax        += A[i] * r;
+            }
+            return (Ax.array() - b).matrix().norm();
+          }), .tol = 1e-2 });
+        }
+      }
+
+      return solve(solver).x.cast<float>().eval();
+    } else {
+      // Solver settings
+      opt::Wrapper<wavelength_samples> solver = {
+        .x_init       = 0.5,
+        .upper        = 1.0,
+        .lower        = 0.0,
+        .max_iters    = 256,  // Failsafe
+        .rel_xpar_tol = 1e-3, // Threshold for objective error
+      };
+
+      // Objective function minimizes l2 norm over spectral distribution
+      auto obj = eig::Matrix<float, wavelength_samples, wavelength_samples>::Identity();
+      solver.objective = opt::func_norm<wavelength_samples>(obj, mean);
+
+      // Add color system equality constraints, upholding spectral metamerism
+      for (const auto [csys, colr] : info.direct_constraints) {
+        auto A = csys.finalize(false).transpose().eval();
+        auto b = lrgb_to_xyz(colr);
+        solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
+                                          .tol = 1e-2 });
+      }
+      
+      // Add interreflection equality constraint, upholding requested output color;
+      // specify three equalities for three partial derivatives
+      for (const auto [csys, colr] : info.indirect_constraints) {
+        using vec = eig::Vector<ad::real1st, wavelength_samples>;
+        auto A_ = csys.finalize(false);
+        auto b_ = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({
-        .f   = ad::wrap_capture<wavelength_bases>(
+        .f   = ad::wrap_capture<wavelength_samples>(
         [A = A_
               | vws::transform([](const CMFS &cmfs) { 
                   return cmfs.transpose().cast<double>().eval(); })
               | rng::to<std::vector>(), 
-         B = info.basis.func.matrix().cast<double>().eval(), 
          b = b_.cast<double>().eval()](const vec &x) {
           // Recover spectral distribution
-          auto r = (B * x.matrix()).eval();
+          auto r = x;
 
-          // f(x) = ||Ax - b||
-          // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
-          auto Ax = (A[0] * r.array().pow(0.0).matrix()).eval();
-          for (uint i = 1; i < A.size(); ++i) {
-            auto rp  = r.array().pow(static_cast<double>(i)).matrix().eval();
-            Ax += A[i] * rp;
+          // f(x) = ||Ax - b||; A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
+          auto Ax = (A[0].rowwise().sum() + A[1] * r).eval();
+          for (uint i = 2; i < A.size(); ++i) {
+            r.array() *= r.array();
+            Ax        += A[i] * r;
           }
           return (Ax.array() - b).matrix().norm();
-        }), .tol = 1e-3 });
+        }), .tol = 1e-2 });
       }
-
-      for (uint j = 0; j < 3; ++j) {
-        auto A = A_
-              | vws::transform([j](const CMFS &cmfs) { 
-                  return cmfs.col(j).transpose().cast<double>().eval(); })
-              | rng::to<std::vector>();
-
-        
-        /* solver.eq_constraints.push_back({
-          .f = [A = A, 
-                B = info.basis.func.matrix().cast<double>().eval(), 
-                b = b_[j]]
-          (eig::Map<const vec> x, eig::Map<vec> g) {
-            // Recover spectral distribution
-            auto r = (B * x).eval();
-            
-            // f(x) = ||Ax - b||
-            // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
-            double diff = A[0].sum();
-            for (uint i = 1; i < A.size(); ++i) {
-              double p = static_cast<double>(i);
-              auto rp  = r.array().pow(p).matrix().eval();
-              diff += A[i] * rp;
-            }
-            diff -= b;
-
-            double norm = diff; // hoboy
-            
-            // g(x) = ||Ax - b||
-            // -> (B^T*A_1*(Bx)^0 + B^T*2*A_2*(Bx) + B^T*3*a_3*(Bx)^2 + ...)
-            vec grad = 0.0;
-            for (uint i = 1; i < A.size(); ++i) {
-              double p = static_cast<double>(i);
-              auto rp  = r.array().pow(p - 1.0).matrix().eval();
-              grad += p
-                    * B.transpose()
-                    * A[i].transpose().cwiseProduct(rp);
-            }
-
-            if (g.data())
-              g = grad;
-
-            return norm;
-        }, .tol = 1e-3 }); */
-
-        /* {
-          using vec = eig::Vector<ad::real1st, wavelength_bases>;
-          solver.eq_constraints.push_back({
-          .f   = ad::wrap_capture<wavelength_bases>(
-          [A = A, 
-           B = info.basis.func.matrix().cast<double>().eval(), 
-           b = b_[j]](const vec &x) {
-            // Recover spectral distribution
-            auto r = (B * x.matrix()).eval();
-
-            // f(x) = ||Ax - b||
-            // -> a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ... - b
-            ad::real1st diff = A[0].sum();
-            for (uint i = 1; i < A.size(); ++i) {
-              double p = static_cast<double>(i);
-              auto rp  = r.array().pow(p).matrix().eval();
-              diff += A[i] * rp;
-            }
-            diff -= b;
-
-            return diff;
-          }), .tol = 1e-3 });
-        } */
-      } // for (uint j)
+      
+      auto r = solve(solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
+      return generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis });
     }
-
-    return solve(solver).x.cast<float>().eval();
   }
 
   Spec generate_spectrum(IndrctSpectrumInfo info) {
@@ -321,10 +275,11 @@ namespace met {
     if constexpr (solve_using_basis) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
+        .dirc      = opt::direction::eMaximize,
         .x_init    = 0.05,
         .upper     = 1.0,
         .lower     =-1.0,
-        .max_iters = 32
+        .max_iters = 64
       };
 
       // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
@@ -349,7 +304,7 @@ namespace met {
       // This only works for the current configuration
       auto S = (eig::Matrix<float, wavelength_samples, 6>()
         << info.direct_objectives[0].finalize(false), 
-          info.direct_objectives[1].finalize(false)).finished();
+           info.direct_objectives[1].finalize(false)).finished();
       eig::JacobiSVD<decltype(S)> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
@@ -410,20 +365,15 @@ namespace met {
           local_solver.objective = opt::func_dot<wavelength_samples>(a, 0.f);
             
           // Run solver and store recovered spectral distribution if it is legit
-          auto r = solve(local_solver);
-          guard_continue(!r.x.array().isNaN().any());
-          tbb_output.push_back(r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval());
+          auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
+          guard_continue(!r.isNaN().any());
+          tbb_output.push_back(info.basis(generate_spectrum_coeffs(SpectrumCoeffsInfo {
+            .spec = r, .basis = info.basis })));
         } // for (int i)
       }
     }
 
-    if constexpr (output_moment_limited_ocs) {
-      return tbb_output | vws::transform(spectrum_to_moments)
-                        | vws::transform(moments_to_spectrum)
-                        | rng::to<std::vector>();
-    } else {
-      return std::vector<Spec>(range_iter(tbb_output));
-    }
+    return std::vector<Spec>(range_iter(tbb_output));
   }
 
   std::vector<Spec> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info) {
@@ -473,7 +423,7 @@ namespace met {
         #pragma omp for
         for (int i = 0; i < samples.size(); ++i) {
           using namespace std::placeholders; // import _1, _2, _3
-          using vec = opt::Wrapper<wavelength_bases>::vec;
+          using vec = eig::Vector<ad::real1st, wavelength_bases>;
 
           // Helper lambda to map along unit vector
           constexpr auto trf_by_sample = [](const CMFS &cmfs, const eig::Vector3f &sample) {
@@ -482,47 +432,20 @@ namespace met {
           // Map color systems along unit vector
           auto A_direct = trf_by_sample(info.direct_objective.finalize(false), samples[i].head<3>());
           auto A_indrct = info.indirect_objective.finalize(false)
-                        | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval()))              
+                        | vws::transform(std::bind(trf_by_sample, _1, samples[i].tail<3>().eval()))              
                         | rng::to<std::vector>();
 
-          /* local_solver.objective =
+          local_solver.objective = ad::wrap_capture<wavelength_bases>(
           [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
-          (eig::Map<const vec> x, eig::Map<vec> g) -> double {
-            auto r = (B * x).eval();
-
-            double diff = A_indrct[0].sum() + A_direct.dot(r);
-            vec grad = B.transpose() * A_direct;
-            for (uint i = 1; i < A_indrct.size(); ++i) {
-              double p = static_cast<double>(i);
-
-              auto fr = r.array().pow(p).matrix().eval();
-              auto dr = r.array().pow(p - 1.0).matrix().eval();
-              
-              diff += A_indrct[i].dot(fr);
-              grad += p * B.transpose() * A_indrct[i].cwiseProduct(dr).eval();
+          (const vec &x) {
+            auto r = (B * x.matrix()).eval();
+            auto diff = A_direct.dot(r) + A_indrct[0].sum() + A_indrct[1].dot(r);
+            for (uint i = 2; i < A_indrct.size(); ++i) {
+              r.array() *= r.array();
+              diff      += A_indrct[i].dot(r);
             }
-
-            if (g.data())
-              g = grad;
             return diff;
-          }; */
-
-          {
-            using vec = eig::Vector<ad::real1st, wavelength_bases>;
-            local_solver.objective = ad::wrap_capture<wavelength_bases>(
-            [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
-            (const vec &x) {
-              auto r = (B * x.matrix()).eval();
-              auto diff = A_direct.dot(r)
-                        + A_indrct[0].sum();
-              for (uint i = 1; i < A_indrct.size(); ++i) {
-                double p = static_cast<double>(i);
-                auto fr = r.array().pow(p).matrix().eval();
-                diff += A_indrct[i].dot(fr);
-              }
-              return diff;
-            });
-          }
+          });
 
           // Run solver and store recovered spectral distribution if it is safe
           auto r = solve(local_solver);
@@ -536,7 +459,7 @@ namespace met {
         .x_init       = 0.5,
         .upper        = 1.0,
         .lower        = 0.0,
-        .max_iters    = 48
+        .max_iters    = 64
       };
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
@@ -556,7 +479,7 @@ namespace met {
         #pragma omp for
         for (int i = 0; i < samples.size(); ++i) {
           using namespace std::placeholders; // import _1, _2, _3
-          using vec = opt::Wrapper<wavelength_samples>::vec;
+          using vec = eig::Vector<ad::real1st, wavelength_samples>;
 
           // Helper lambda to map along unit vector
           constexpr auto trf_by_sample = [](const CMFS &cmfs, const eig::Vector3f &sample) {
@@ -565,44 +488,31 @@ namespace met {
           // Map color systems along unit vector
           auto A_direct = trf_by_sample(info.direct_objective.finalize(false), samples[i].head<3>());
           auto A_indrct = info.indirect_objective.finalize(false)
-                        | vws::transform(std::bind(trf_by_sample, _1, samples[i].head<3>().eval()))              
+                        | vws::transform(std::bind(trf_by_sample, _1, samples[i].tail<3>().eval()))              
                         | rng::to<std::vector>();
 
-          local_solver.objective =
+          local_solver.objective = ad::wrap_capture<wavelength_samples>(
           [A_direct, A_indrct]
-          (eig::Map<const vec> r, eig::Map<vec> g) -> double {
-            double diff = A_indrct[0].sum() + A_direct.dot(r);
-            vec grad = A_direct;
-            for (uint i = 1; i < A_indrct.size(); ++i) {
-              double p = static_cast<double>(i);
-
-              auto fr = r.array().pow(p).matrix().eval();
-              auto dr = r.array().pow(p - 1.0).matrix().eval();
-              
-              diff += A_indrct[i].dot(fr);
-              grad += p * A_indrct[i].cwiseProduct(dr).eval();
+          (const vec &x) {
+            auto r = x;
+            auto diff = A_direct.dot(r) + A_indrct[0].sum() + A_indrct[1].dot(r);
+            for (uint i = 2; i < A_indrct.size(); ++i) {
+              r.array() *= r.array();
+              diff      += A_indrct[i].dot(r);
             }
-
-            if (g.data())
-              g = grad;
             return diff;
-          };
+          });
 
-          // Run solver and store recovered spectral distribution if it is safe
-          auto r = solve(local_solver);
-          guard_continue(!r.x.array().isNaN().any());
-          tbb_output.push_back(r.x.cast<float>().cwiseMax(0.f).cwiseMin(1.f).eval());
+          // Run solver and store recovered spectral distribution if it is legit
+          auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
+          guard_continue(!r.isNaN().any());
+          tbb_output.push_back(info.basis(
+            generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis })));
         } // for (int i)
       }
     }
     
-    if constexpr (output_moment_limited_ocs) {
-      return tbb_output | vws::transform(spectrum_to_moments)
-                        | vws::transform(moments_to_spectrum)
-                        | rng::to<std::vector>();
-    } else {
-      return std::vector<Spec>(range_iter(tbb_output));
-    }
+    return std::vector<Spec>(range_iter(tbb_output));
   }
 
   std::vector<Basis::vec_type> generate_color_system_ocs_coeffs(const DirectColorSystemOCSInfo &info) {
@@ -626,8 +536,8 @@ namespace met {
         f = f >= 0.f ? 1.f : 0.f;
 
       // Run solve to find nearest valid spectrum within the basis function set
-      auto c = generate_spectrum_coeffs(DirectSpectrumInfo {
-        .direct_constraints = {{ info.direct_objective, info.direct_objective(s) }},
+      auto c = generate_spectrum_coeffs(SpectrumCoeffsInfo {
+        .spec  = s,
         .basis = info.basis
       });
       
@@ -648,5 +558,33 @@ namespace met {
                    s.begin(),
                    [&](const auto &coef) { return info.basis(coef); });
     return s;
+  }
+
+  Basis::vec_type generate_spectrum_coeffs(const SpectrumCoeffsInfo &info) {
+    met_trace();
+    
+    opt::Wrapper<wavelength_bases> solver = {
+      .x_init       = 0.05,
+      .upper        = 1.0,
+      .lower        =-1.0,
+      .max_iters    = 64,   // Failsafe
+      .rel_xpar_tol = 1e-2, // Threshold for objective error
+    };
+
+    // Objective function minimizes l2 norm over spectral distribution differences
+    solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, info.spec);
+
+    // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
+    {
+      auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
+        << info.basis.func, -info.basis.func).finished();
+      auto b = (eig::Array<float, 2 * wavelength_samples, 1>()
+        << Spec(1.f), Spec(0.f)).finished();
+      solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b),
+                                          .n   = 2 * wavelength_samples, 
+                                          .tol = 1e-2 });
+    }
+    
+    return solve(solver).x.cast<float>().cwiseMax(-1.f).cwiseMin(1.f).eval();
   }
 } // namespace met

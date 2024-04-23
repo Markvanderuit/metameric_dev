@@ -194,8 +194,7 @@ namespace met {
     if (points.size() >= mmv_samples_max) {
       maxb = rng::fold_left_first(points, [](auto a, auto b) { return a.max(b).eval(); }).value();
       minb = rng::fold_left_first(points, [](auto a, auto b) { return a.min(b).eval(); }).value();
-      if ((maxb - minb).minCoeff() >= 0.005f)
-        info("converged").set(true);
+      info("converged").set((maxb - minb).minCoeff() >= 0.0075f);
     }
   }
 } // namespace met

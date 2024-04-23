@@ -14,11 +14,15 @@ namespace met {
   } // namespace io
 
   void from_json(const met::json &js, met::Basis &b) {
-    b.func = js.at("func").get<met::Basis::mat_type>();
+    b.scale = js.at("scale").get<float>();
+    b.mean  = js.at("mean").get<Spec>();
+    b.func  = js.at("func").get<met::Basis::mat_type>();
   }
 
   void to_json(met::json &js, const met::Basis &b) {
-    js["func"] = b.func;
+    js["scale"] = b.scale;
+    js["mean"]  = b.mean;
+    js["func"]  = b.func;
   }
   
   void from_json(const met::json &js, met::Transform &trf) {

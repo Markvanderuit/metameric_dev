@@ -80,9 +80,9 @@ namespace met {
       program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
     }
     if (!scene.resources.meshes.empty()) {
-      program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
-      program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);
-      program.bind("b_buff_bvhs_prim",     scene.resources.meshes.gl.bvh_prims);
+      program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
+      program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
+      program.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
     }
 
     // Dispatch compute shader

@@ -1,13 +1,13 @@
 #ifndef REFLECTANCE_GLSL_GUARD
 #define REFLECTANCE_GLSL_GUARD
+#ifdef  SCENE_DATA_REFLECTANCE
 
-#ifdef SCENE_DATA_REFLECTANCE
-
-// #define SCENE_REFLECTANCE_MESE
-// #ifdef SCENE_REFLECTANCE_MESE
   #include <moments.glsl>
 
-  // Helpers to convert wavelengths in this program's smaller wavelength range
+  // If element indices differ. Do costly interpolation manually :(
+  const ivec2 reflectance_tx_offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
+
+  /* // Helpers to convert wavelengths in this program's smaller wavelength range
   // to the correct phase warp in the full CIE range.
   const float warp_wavelength_min = 360.f;
   const float warp_wavelength_max = 830.f;
@@ -19,12 +19,8 @@
     for (uint i = 0; i < 4; ++i)
       wvls[i] = scene_phase_warp_data_texture(fma(wvls[i], warp_mult, warp_offs));
     return wvls;
-  }
-
-  // Cold path; element indices differ. Do costly interpolation manually :(
-  const ivec2 reflectance_tx_offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
-
-  vec4 scene_sample_reflectance_moments(in uint object_i, in vec2 tx, in vec4 wvls) {
+  } */
+  /* vec4 scene_sample_reflectance_moments(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
     ObjectInfo      object_info       = scene_object_info(object_i);
     BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(object_i);
@@ -52,7 +48,7 @@
     } // for (uint i)
 
     return mix(r, vec4(0), isnan(r)); // Catch all-black glitching out during mixing
-  }
+  } */
   
   vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
@@ -83,8 +79,6 @@
 
     return clamp(r, 0, 1);
   }
-
-// #else // SCENE_REFLECTANCE_MESE
 
   // Helper to perform spectrum interpolation given all relevant information;
   // - what tetrahedron of spectra to access
@@ -136,7 +130,7 @@
       } // for (uint i)
     }
 
-    return r;
+    return clamp(r, 0, 1);
   }
   
   // Forward to whatever sampler we're experimenting with today
@@ -145,8 +139,6 @@
     return scene_sample_reflectance_bases(object_i, tx, wvls);
     // return scene_sample_reflectance_moments(object_i, tx, wvls);
   }
-
-// #endif // SCENE_REFLECTANCE_MESE
 #else  // SCENE_DATA_REFLECTANCE
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) { return vec4(1); }
 #endif // SCENE_DATA_REFLECTANCE

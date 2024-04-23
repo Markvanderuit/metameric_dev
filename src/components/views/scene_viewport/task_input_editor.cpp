@@ -78,7 +78,7 @@ namespace met {
     // Collect camera cmfs
     CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
     cmfs = (cmfs.array())
-          / (cmfs.array().col(1) * wavelength_ssize).sum();
+         / (cmfs.array().col(1) * wavelength_ssize).sum();
     cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
 
     // Helper structs
@@ -128,13 +128,13 @@ namespace met {
         // Get the relevant constraint's current reflectance
         // at the path's wavelengths (notably, this data is from last frame)
         eig::Array4f r = sample_spectrum(path.wavelengths, e_uplf_task.query_constraint(cs.vertex_i));
-
+        
         // We get the "fixed" part of the path's throughput, by stripping all reflectances of
         // the constrained vertices through division; on div-by-0, we set a component to 0
         eig::Array4f back = path.L;
         for (const auto &vt : verts) {
           eig::Array4f rdiv = r * vt.r_weight + vt.remainder;
-          back = (rdiv != 0.f).select(back / rdiv, 0.f);
+          back = (rdiv > 0.0001f).select(back / rdiv, 0.f); // we clamp small values to zero, to prevent fireflies from mucking up a measurement
         }
         
         // We them iterate all permutations of the current constraint vertices
@@ -173,6 +173,13 @@ namespace met {
     for (auto &power : cstr.powers) {
       power *= 0.25f * static_cast<float>(wavelength_samples);
       power /= static_cast<float>(indirect_query_spp);
+      power = power.cwiseMax(0.f);
+      if ((power <= 5e-3).all())
+        power = 0.f;
+    }
+
+    for (auto &power : cstr.powers) {
+      fmt::print("{}\n", power);
     }
 
     // Obtain underlying reflectance
@@ -184,6 +191,9 @@ namespace met {
       .powers = cstr.powers
     };
     cstr.colr = csys(r);
+
+    // TODO remove
+    fmt::print("Added constraint: {}\n", cstr.colr);
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {

@@ -113,7 +113,7 @@ namespace ImGui {
       rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
       
       // Setup minimal format for coming line plots
-      ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+      ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoGridLines /* ImPlotAxisFlags_NoDecorations */);
 
       // More restrained 400-700nm to ignore funky edges
       ImPlot::SetupAxesLimits(400.f, 700.f, min_bounds, max_bounds, ImPlotCond_Always);
@@ -121,7 +121,7 @@ namespace ImGui {
       // Plot data lines
       if (legend.empty()) {
         for (const auto &[i, sd] : met::enumerate_view(reflectances))
-          ImPlot::PlotLine(std::format("##line_{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
+          ImPlot::PlotLine(std::format("{}", i).c_str(), x_values.data(), sd.data(), wavelength_samples);
       } else {
         for (const auto &[text, sd] : met::vws::zip(legend, reflectances))
           ImPlot::PlotLine(text.c_str(), x_values.data(), sd.data(), wavelength_samples);

@@ -59,8 +59,7 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info);
-  std::vector<Spec>            generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
+  std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
 
   // Argument struct and method for generating points on the object color solid of a metameric
   // mismatching between signal in a number of base color systems, and a interreflection system
@@ -79,6 +78,11 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info);
-  std::vector<Spec>            generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
+  std::vector<Spec> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
+
+  struct SpectrumCoeffsInfo {
+    const Spec  &spec;  // Input spectrum to fit
+    const Basis &basis; // Spectral basis functions
+  };
+  Basis::vec_type generate_spectrum_coeffs(const SpectrumCoeffsInfo &info);
 } // namespace met

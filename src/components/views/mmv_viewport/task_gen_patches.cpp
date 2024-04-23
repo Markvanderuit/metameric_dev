@@ -30,7 +30,7 @@ namespace met {
     auto &i_patches        = info("patches").getw<std::vector<Colr>>();    guard(!e_chull.empty());
     
     // Do not output any patches until the convex hull is in a converged state;
-    if (!e_converged || e_chull.verts.size() < 6) {
+    if (!e_converged || e_chull.verts.size() < 8) {
       i_patches.clear();
       return;
     }
@@ -50,7 +50,7 @@ namespace met {
     });
 
     // Prepare for uniform sampling of the delaunay structure
-    UniformSampler sampler;
+    UniformSampler sampler(4);
     Distribution distr(volumes);
 
     // Generate patches by sampling random positions inside delaunay, which equate random 

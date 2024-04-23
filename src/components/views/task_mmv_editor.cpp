@@ -76,9 +76,10 @@ namespace met {
                           return { (p - p_).matrix().norm(), p_ }; })
                       | rng::to<std::vector>();
       
+      // TODO reenable
       // If a closest reprojected point was found, override current position
-      if (auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); it != candidates.end())
-        p = it->second;
+      // if (auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); it != candidates.end())
+      //   p = it->second;
       return p;
     }
   } // namespace detail
