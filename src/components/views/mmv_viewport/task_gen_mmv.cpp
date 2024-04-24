@@ -23,7 +23,11 @@ namespace met {
     // Get shared resources
     const auto &e_scene             = info.global("scene").getr<Scene>();
     const auto &e_cs                = info.parent()("selection").getr<ConstraintRecord>();
+    const auto &e_gizmo_active      = info.relative("viewport_guizmo")("is_active").getr<bool>();
     const auto &[e_object, e_state] = e_scene.components.upliftings[e_cs.uplifting_i];
+
+    // Skip on gizmo input
+    guard(!e_gizmo_active, false);
 
     // Stale on first run, or if specific uplifting data has changed
     bool is_stale = is_first_eval() 
@@ -52,17 +56,14 @@ namespace met {
     m_colr_set.clear();
 
     // Reset iteration and UI values
-    m_iter = 0;
-    m_csys_j = 0;
+    m_iter            = 0;
+    m_csys_j          = 0;
     m_curr_deque_size = 0;
 
     // Make vertex array object available, uninitialized
-    info("converged").set(false);
     info("chull").set<AlMesh>({ });
     info("chull_array").set<gl::Array>({ });
     info("chull_draw").set<gl::DrawInfo>({ });
-    info("points_array").set<gl::Array>({ });
-    info("points_draw").set<gl::DrawInfo>({ });
     info("chull_center").set<eig::Array3f>(0.f);
   }
 
@@ -70,11 +71,11 @@ namespace met {
     met_trace();
 
     // Get shared resources
-    const auto &e_scene       = info.global("scene").getr<Scene>();
-    const auto &e_cs          = info.parent()("selection").getr<ConstraintRecord>();
+    const auto &e_scene      = info.global("scene").getr<Scene>();
+    const auto &e_cs         = info.parent()("selection").getr<ConstraintRecord>();
     const auto &[e_uplifting, 
-                 e_state]     = e_scene.components.upliftings[e_cs.uplifting_i];
-    const auto &e_vert        = e_uplifting.verts[e_cs.vertex_i];
+                 e_state]    = e_scene.components.upliftings[e_cs.uplifting_i];
+    const auto &e_vert       = e_uplifting.verts[e_cs.vertex_i];
 
     // Determine if a reset is in order
     bool should_clear = is_first_eval() 
@@ -88,12 +89,11 @@ namespace met {
       info("chull_array").getw<gl::Array>() = {};
       m_colr_set.clear();
       m_iter = 0;
-      m_curr_deque_size = m_colr_deque.size();;
+      m_curr_deque_size = m_colr_deque.size();
     }
 
     // Only continue for valid and mismatch-supporting constraints
     if (e_vert.constraint | visit([](const auto &cstr) { return !cstr.has_mismatching(); })) {
-      info("converged").set(false);
       info("chull_array").getw<gl::Array>() = {};
       m_colr_set.clear();
       m_iter = 0;
@@ -101,11 +101,7 @@ namespace met {
     }
     
     // Only continue if more samples are necessary
-    if (m_colr_set.size() >= mmv_samples_max) {
-      return;
-    } else {
-      info("converged").set(false);
-    }
+    guard(m_colr_set.size() < mmv_samples_max);
 
     // Visit underlying constraint types one by one
     auto new_points = e_vert.constraint | visit([&](const auto &cstr) { 
@@ -155,12 +151,9 @@ namespace met {
     // for rendering purposes
     auto &i_array        = info("chull_array").getw<gl::Array>();
     auto &i_draw         = info("chull_draw").getw<gl::DrawInfo>();
-    auto &i_points_array = info("points_array").getw<gl::Array>();
-    auto &i_points_draw  = info("points_draw").getw<gl::DrawInfo>();
     if (i_chull.elems.size() > 0) {
       std::vector<eig::AlArray3f> points(range_iter(m_colr_deque));
 
-      m_colr_verts  = {{ .data = cnt_span<const std::byte>(points) }};
       m_chull_verts = {{ .data = cnt_span<const std::byte>(i_chull.verts) }};
       m_chull_elems = {{ .data = cnt_span<const std::byte>(i_chull.elems) }};
 
@@ -175,26 +168,9 @@ namespace met {
                                     { gl::DrawCapability::eDepthTest, true }},
                  .draw_op        = gl::DrawOp::eLine,
                  .bindable_array = &i_array };
-                 
-      i_points_array = {{
-        .buffers  = {{ .buffer = &m_colr_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
-        .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-      }};
-      i_points_draw = { .type           = gl::PrimitiveType::ePoints,
-                        .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
-                        .capabilities   = {{ gl::DrawCapability::eCullOp, false    },
-                                           { gl::DrawCapability::eDepthTest, false }},
-                        .bindable_array = &i_points_array };
     } else {
       // Deinitialize
       i_array = {};
-    }
-    
-    // Determine extents of total point sets before flagging convergence
-    if (points.size() >= mmv_samples_max) {
-      maxb = rng::fold_left_first(points, [](auto a, auto b) { return a.max(b).eval(); }).value();
-      minb = rng::fold_left_first(points, [](auto a, auto b) { return a.min(b).eval(); }).value();
-      info("converged").set((maxb - minb).minCoeff() >= 0.0075f);
     }
   }
 } // namespace met

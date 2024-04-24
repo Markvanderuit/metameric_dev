@@ -24,7 +24,6 @@ namespace met {
     uint        m_iter;            // Current sampling iteration
     gl::Buffer  m_chull_verts;
     gl::Buffer  m_chull_elems;
-    gl::Buffer  m_colr_verts;
 
   public:
     bool is_active(SchedulerHandle &info) override;

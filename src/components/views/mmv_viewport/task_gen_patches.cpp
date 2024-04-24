@@ -13,7 +13,10 @@ namespace met {
   bool GenPatchesTask::is_active(SchedulerHandle &info) {
     met_trace();
     auto chull_handle = info.relative("viewport_gen_mmv")("chull");
-    return chull_handle.is_mutated() && !chull_handle.getr<AlMesh>().empty();
+    auto gizmo_active = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    return chull_handle.is_mutated() 
+      && !chull_handle.getr<AlMesh>().empty() 
+      && !gizmo_active;
   }
 
   void GenPatchesTask::init(SchedulerHandle &info) {
@@ -25,12 +28,11 @@ namespace met {
     met_trace();
 
     // Get shared resources
-    const auto e_converged = info.relative("viewport_gen_mmv")("converged").getr<bool>();
-    const auto &e_chull    = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-    auto &i_patches        = info("patches").getw<std::vector<Colr>>();    guard(!e_chull.empty());
+    const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
+    auto &i_patches     = info("patches").getw<std::vector<Colr>>();    guard(!e_chull.empty());
     
     // Do not output any patches until the convex hull is in a converged state;
-    if (!e_converged || e_chull.verts.size() < 8) {
+    if (e_chull.verts.size() < 8) {
       i_patches.clear();
       return;
     }

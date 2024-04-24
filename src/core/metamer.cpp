@@ -75,7 +75,7 @@ namespace met {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 256,  // Failsafe
+        .max_iters    = 128,  // Failsafe
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
       
@@ -110,7 +110,7 @@ namespace met {
         .x_init       = 0.5,
         .upper        = 1.0,
         .lower        = 0.0,
-        .max_iters    = 256,
+        .max_iters    = 128,
         .rel_xpar_tol = 1e-2
       };
 
@@ -144,7 +144,7 @@ namespace met {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 128,  // Failsafe
+        .max_iters    = 64,  // Failsafe
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
@@ -208,7 +208,7 @@ namespace met {
         .x_init       = 0.5,
         .upper        = 1.0,
         .lower        = 0.0,
-        .max_iters    = 128,  // Failsafe
+        .max_iters    = 64,  // Failsafe
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 

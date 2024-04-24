@@ -218,18 +218,13 @@ namespace met {
             }
           }
 
-          /* ImGui::SeparatorText("Secondary constraints");
-          {
-            ImGui::Text("TODO"); // TODO
-          } */
-
-          {
+          /* {
             auto max_coeff = rng::fold_left_first(
               cstr.powers | vws::transform([](const auto &s) -> float { return s.maxCoeff(); }),
               std::plus<float>()).value();
 
             ImGui::PlotSpectra("##powers_plot", { }, cstr.powers, -0.05f, max_coeff + 0.05f);
-          }
+          } */
         },
         [&](MeasurementConstraint &cstr) {
           ImGui::Text("Not implemented");
@@ -249,7 +244,7 @@ namespace met {
 
           // Skip line every now and then
           ImGui::SameLine();
-          if (i % 8 == 7 || i == e_patches.size() - 1)
+          if (i % 16 == 15 || i == e_patches.size() - 1)
             ImGui::NewLine();
         } // for (uint i)
         ImGui::EndChild();

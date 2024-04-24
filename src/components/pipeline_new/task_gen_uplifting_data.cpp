@@ -114,7 +114,7 @@ namespace met {
 
     // Flag tells if the resulting tesselation has, in any way, been modified;
     // this is set to true in step 2 if necessary
-    bool tssl_stale = is_first_eval();
+    bool tssl_stale = is_first_eval() || e_state.verts.is_resized();
 
     // Color system spectra within which the 'uplifted' texture is defined
     auto csys = e_scene.csys(e_csys);
@@ -130,16 +130,6 @@ namespace met {
                      range_iter(m_csys_boundary_coeffs), 
                      m_csys_boundary_spectra.begin(), 
                      [&](const auto &coef) { return e_basis.value()(coef); });
-
-      // m_csys_boundary_spectra = generate_color_system_ocs({ .direct_objective = csys,
-      //                                                       .basis            = e_basis.value(),
-      //                                                       .seed             = 4,
-      //                                                       .n_samples        = n_system_boundary_samples });
-
-      // // For each spectrum, generate coefficients for moment-based representation
-      // m_csys_boundary_coeffs.resize(m_csys_boundary_spectra.size());
-      // std::transform(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), 
-      //                m_csys_boundary_coeffs.begin(), spectrum_to_moments);
 
       // For each spectrum, add a point to the set of tesselation points for later
       m_tesselation_points.resize(m_csys_boundary_spectra.size() + e_uplifting.verts.size());

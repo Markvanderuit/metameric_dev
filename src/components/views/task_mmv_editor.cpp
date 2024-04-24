@@ -78,8 +78,8 @@ namespace met {
       
       // TODO reenable
       // If a closest reprojected point was found, override current position
-      // if (auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); it != candidates.end())
-      //   p = it->second;
+      if (auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); it != candidates.end())
+        p = it->second;
       return p;
     }
   } // namespace detail
@@ -302,6 +302,11 @@ namespace met {
       
       return ImGui::IsItemHovered() && e_vert.has_mismatching();
     }
+
+    void init(SchedulerHandle &info) override {
+      met_trace();
+      info("is_active").set(false); // Make is_active available to detect guizmo edit
+    }
   
     void eval(SchedulerHandle &info) override {
       met_trace();
@@ -360,6 +365,9 @@ namespace met {
               set_colr(scene.uplifting_vertex(e_cs), p); }
           });
         }
+
+        // Expose whether gizmo input is being handled for other tasks
+        info("is_active").set(m_gizmo.is_active());
       });
     }
   };
@@ -367,8 +375,7 @@ namespace met {
   void MMVEditorTask::init(SchedulerHandle &info) {
     met_trace();
 
-    // Make is_active available
-    info("is_active").set(true);
+    info("is_active").set(true); // Make is_active available to detect window presence
 
     // Make selection available
     m_cs = info("selection").set(std::move(m_cs)).getr<ConstraintRecord>();
@@ -377,7 +384,8 @@ namespace met {
     info.child_task("viewport_begin").init<MMVEditorBeginTask>();
     info.child_task("viewport_edit_mmv").init<EditMMVTask>();
     info.child_task("viewport_image").init<MMVEditorImageTask>();
-    info.child_task("viewport_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"));
+    info.child_task("viewport_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"), 
+      detail::ArcballInputTask::InfoType { .dist = 1.f, .e_center = .5f, .zoom_delta_mult = 0.025f });
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
     info.child_task("viewport_gen_patches").init<GenPatchesTask>();
     info.child_task("viewport_draw_mmv").init<DrawMMVTask>();

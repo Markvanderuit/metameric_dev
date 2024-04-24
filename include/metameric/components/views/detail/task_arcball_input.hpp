@@ -8,9 +8,10 @@
 #include <small_gl/window.hpp>
 
 namespace met::detail {
-  class ArcballInputTask : public detail::TaskNode {
+  struct ArcballInputTask : public detail::TaskNode {
     using InfoType = detail::ArcballInfo;
     
+  private:
     InfoType       m_info;
     ResourceHandle m_view_handle;
 

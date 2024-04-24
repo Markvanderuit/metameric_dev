@@ -1,6 +1,5 @@
 #include <preamble.glsl>
 #include <math.glsl>
-#include <moments.glsl>
 #include <render/detail/scene_types.glsl>
 
 // Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
@@ -89,11 +88,6 @@ void main() {
     result_indx = j + buff_uplift_data.offs;
   } // for (uint j)
 
-  // Force clamp; if the corresponding barycentric weights are partially negative - which
-  // indicates a lack of precision in the surrounding tesselation structure - this will
-  // introduce reconstruction error but avoid negative spectra
-  // result_bary = clamp(result_bary, 0, 1);
-
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   out_barycs = vec4(result_bary.xyz, float(result_indx));
 
@@ -109,16 +103,4 @@ void main() {
 
   // Store result, outputting packed moment coefficients
   out_coeffs = pack_snorm_12(coeffs);
-
-  /* // Gather moment coefficients representing tetrahedron's spectra, mix them, and store packed result
-  float[moment_coeffs] coeffs;
-  for (uint i = 0; i < moment_coeffs; ++i) {
-    coeffs[i] = 0.f;
-    for (uint j = 0; j < 4; ++j)
-      coeffs[i] += result_bary[j] 
-                 * buff_uplift_coef.data[result_indx][j][i];
-  } // for (uint i)
-
-  // Store result, outputting packed moment coefficients
-  out_coeffs = pack_half_8x16(coeffs); */
 }
