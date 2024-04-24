@@ -135,57 +135,14 @@ namespace met {
     return convert_mesh<AlMesh>(convert_mesh<Delaunay>(mesh));
   }
 
- /*  template <typename MeshTy>
-  MeshTy generate_octahedron() {
-    met_trace();
-    
-    using V = eig::Array3f;
-    using E = eig::Array3u;
-    
-    std::vector<V> verts = { V(-1.f, 0.f, 0.f ), V( 0.f,-1.f, 0.f ), V( 0.f, 0.f,-1.f ),
-                             V( 1.f, 0.f, 0.f ), V( 0.f, 1.f, 0.f ), V( 0.f, 0.f, 1.f ) };
-    std::vector<E> elems = { E(0, 2, 1), E(3, 1, 2), E(0, 1, 5), E(3, 5, 1),
-                             E(0, 5, 4), E(3, 4, 5), E(0, 4, 2), E(3, 2, 4) };
-
-    return convert_mesh<MeshTy>(Mesh { verts, elems });
-  } */
-  
-  /* template <typename MeshTy>
-  MeshTy generate_spheroid(uint n_subdivs) {
-    met_trace();
-
-    // Start with an octahedron; doing loop subdivision and normalizing the resulting vertices
-    // naturally leads to a spheroid with unit vectors as its vertices
-    auto mesh = generate_octahedron<HalfedgeMeshData>();
-    
-    // Construct loop subdivider
-    omesh::Subdivider::Uniform::LoopT<
-      decltype(mesh), 
-      decltype(mesh)::Point::value_type
-    > subdivider;
-
-    // Perform subdivision n times
-    subdivider.attach(mesh);
-    subdivider(n_subdivs);
-    subdivider.detach();
-
-    // Normalize each resulting vertex point
-    std::for_each(std::execution::par_unseq, range_iter(mesh.vertices()),
-      [&](auto vh) { mesh.point(vh).normalize(); });
-    
-    return convert_mesh<MeshTy>(mesh);
-  } */
-
   template <typename MeshTy, typename Vector>
   MeshTy generate_convex_hull(std::span<const Vector> data) {
     met_trace();
 
     // Query qhull for a convex hull structure
     std::vector<eig::Array3f> input(range_iter(data));
-    auto qhull = orgQhull::Qhull(
-      "", 3, input.size(), cnt_span<const float>(input).data(), "Qt Qx C-0"
-      // "", 3, input.size(), cnt_span<const float>(input).data(), "QJ Q0 Po Pp"
-    );
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "Qt Qx C-0");
+    qhull.setErrorStream(&std::cout);
       
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_elems = qhull.facetList().toStdVector();
@@ -228,9 +185,9 @@ namespace met {
 
     std::vector<eig::Array3f> input(range_iter(data));
 
-    // std::vector<orgQhull::QhullVertex> qh_verts;
-    // std::vector<orgQhull::QhullFacet>  qh_elems;
     auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
+    qhull.setErrorStream(&std::cout);
+
     auto qh_verts = qhull.vertexList().toStdVector();
     auto qh_elems = qhull.facetList().toStdVector();
 

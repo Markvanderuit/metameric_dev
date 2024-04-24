@@ -71,22 +71,29 @@ namespace nlopt {
     if (info.max_iters)    desc.set_maxeval(*info.max_iters);
     if (info.stopval)      desc.set_stopval(*info.stopval);
 
-    // Placeholder for 'x' because the library enforces std::vector :S
-    std::vector<double> x(range_iter(info.x_init));
-
+    // Return value
     Result<N> result;
-    try {
-      result.code = desc.optimize(x, result.objective);
-    } catch (const nlopt::roundoff_limited &e) {
-      // ... fails silently for now
-    } catch (const nlopt::forced_stop &e) {
-      // ... fails silently for now
-    } catch (const std::exception &e) {
-      fmt::print("{}\n", e.what());
-    }
 
-    // Copy over solution to return value
-    rng::copy(x, result.x.begin());
+    { // optimize
+      met_trace_n("optimize");
+
+      // Placeholder for 'x' because the library enforces std::vector :S
+      std::vector<double> x(range_iter(info.x_init));
+
+      try {
+        result.code = desc.optimize(x, result.objective);
+      } catch (const nlopt::roundoff_limited &e) {
+        // ... fails silently for now
+      } catch (const nlopt::forced_stop &e) {
+        // ... fails silently for now
+      } catch (const std::exception &e) {
+        fmt::print("{}\n", e.what());
+      }
+
+      // Copy over potential solution to return value
+      rng::copy(x, result.x.begin());
+    } // optimize
+
     return result;
   }
 

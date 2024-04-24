@@ -24,6 +24,7 @@ namespace met {
   
   namespace detail {
     Colr find_closest_point_in_convex_hull(Colr p, const AlMesh &mesh) {
+      met_trace();
       guard(!mesh.verts.empty() && !mesh.elems.empty(), p);
       
       // Find triangle data
@@ -34,24 +35,32 @@ namespace met {
       auto proj = tris | vws::transform([p](const auto &el) -> Colr {
         // Get vertices and compute edge vectors
         const auto &[a, b, c] = el;
-        auto ab = (b - a).matrix().eval(), bc = (c - b).matrix().eval(), ca = (a - c).matrix().eval();
-        auto ac = (c - a).matrix().eval(), ap = (p - a).matrix().eval();
+        eig::Array3f cent = ((a + b + c) / 3.f).eval();
+        eig::Vector3f ab  = (b - a).eval(), 
+                      bc  = (c - b).eval(), 
+                      ca  = (a - c).eval(),
+                      ac  = (c - a).eval();
 
-        // Point lies behind face, do not project, return invalid
-        auto n = ab.cross(ac).eval();
-        if (n.dot((p - (a + b + c) / 3.f).matrix()) < 0.f)
-          return std::numeric_limits<float>::infinity();
+        // Normal on plane defined by triangle
+        eig::Vector3f n = ab.cross(ac).normalized().eval();
+
+        // Displacement to move point onto plane
+        // If point lies behind plane, return bad value
+        float ndiff = n.dot((p - cent).matrix());
+        guard(ndiff > 0.f, std::numeric_limits<float>::infinity())
+
+        // Project point onto plane
+        Colr p_ = (p - (n * ndiff).array()).eval();
+        auto ap = (p_ - a).matrix().eval();
         
-        // Compute barycentrics of point 
+        // Compute barycentrics of point on plane
         float a_tri = std::abs(.5f * ac.cross(ab).norm());
         float a_ab  = std::abs(.5f * ap.cross(ab).norm());
         float a_ac  = std::abs(.5f * ac.cross(ap).norm());
-        float a_bc  = std::abs(.5f * (c - p).matrix().cross((b - p).matrix()).norm());
+        float a_bc  = std::abs(.5f * (c - p_).matrix().cross((b - p_).matrix()).norm());
         auto bary = (eig::Array3f(a_bc, a_ac, a_ab) / a_tri).eval();
         bary /= bary.abs().sum();
-
-        // Recover point on triangle's plane
-        Colr p_ = bary.x() * a + bary.y() * b + bary.z() * c;
+        p_ = bary.x() * a + bary.y() * b + bary.z() * c;
 
         // Either clamp barycentrics to a specific edge...
         if (bary.x() < 0.f) { // bc
@@ -76,11 +85,9 @@ namespace met {
                           return { (p - p_).matrix().norm(), p_ }; })
                       | rng::to<std::vector>();
       
-      // TODO reenable
-      // If a closest reprojected point was found, override current position
-      if (auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); it != candidates.end())
-        p = it->second;
-      return p;
+      // If reprojected points was found, override return position
+      auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); 
+      return it != candidates.end() ? it->second : p;
     }
   } // namespace detail
 
@@ -305,7 +312,8 @@ namespace met {
 
     void init(SchedulerHandle &info) override {
       met_trace();
-      info("is_active").set(false); // Make is_active available to detect guizmo edit
+      info("is_active").set(false);       // Make is_active available to detect guizmo edit
+      info("closest_point").set<Colr>(0); // Expose closest point in convex hull to other tasks
     }
   
     void eval(SchedulerHandle &info) override {
@@ -346,8 +354,14 @@ namespace met {
 
         // Register gizmo drag; apply world-space delta
         if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-          auto &e_vert  = info.global("scene").getw<Scene>().uplifting_vertex(e_cs);
-          set_colr(e_vert, delta * get_colr(e_vert));
+          const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
+
+          // Apply delta to color value
+          auto trf_colr = (delta * get_colr(e_vert)).eval();
+
+          // Store color and expose clamped color to other tasks
+          set_colr(info.global("scene").getw<Scene>().uplifting_vertex(e_cs), trf_colr);
+          info("closest_point").set<Colr>(detail::find_closest_point_in_convex_hull(trf_colr, e_chull));
         }
 
         // Register gizmo end; apply vertex position to scene save state
@@ -367,7 +381,7 @@ namespace met {
         }
 
         // Expose whether gizmo input is being handled for other tasks
-        info("is_active").set(m_gizmo.is_active());
+        info("is_active").set( m_gizmo.is_active());
       });
     }
   };

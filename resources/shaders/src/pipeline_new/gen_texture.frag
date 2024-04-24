@@ -98,7 +98,7 @@ void main() {
     for (uint j = 0; j < 4; ++j)
       coeffs[i] += result_bary[j] 
                  * buff_uplift_coef.data[result_indx][j][i];
-    coeffs[i] = clamp(coeffs[i], -1, 1);
+    // coeffs[i] = clamp(coeffs[i], -1, 1);
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients

@@ -191,9 +191,6 @@ namespace met {
       .powers = cstr.powers
     };
     cstr.colr = csys(r);
-
-    // TODO remove
-    fmt::print("Added constraint: {}\n", cstr.colr);
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {
@@ -237,9 +234,6 @@ namespace met {
       }
     }
 
-    // If window is not active, escape and avoid further input
-    guard(ImGui::IsItemHovered());
-
     // Determine active constraint vertices for the viewport
     auto &i_active_constraints = info("active_constraints").getw<std::vector<ConstraintRecord>>();
     i_active_constraints.clear();
@@ -247,21 +241,19 @@ namespace met {
       const auto &uplifting = comp.value; 
       for (const auto &[j, vert] : enumerate_view(uplifting.verts)) {
         // Only constraints currently being edited are shown
-        /* auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
-        guard_continue(info.task(str).is_init()); */
+        auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
+        guard_continue(info.task(str).is_init());
         
         // Only active surface constraints are shown
         guard_continue(vert.is_active || vert.has_surface());
 
-        // Push back the nr. of underlying constraints hidden in this vertex' data
-        uint n_constraints = vert.constraint | visit {
-         /*  [](const auto &cstr) {
-            return cstr.constraints.size();
-          }, */ [](const auto &) { return 1; } };
-        for (uint i = 0; i < n_constraints; ++i)
-          i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j });
+        // Push back relevant constraints
+        i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j });
       } // for (j, vert)
     } // for (i, comp)
+
+    // If window is not active, escape and avoid further input
+    guard(ImGui::IsItemHovered());
 
     // Gather relevant constraints together with enumeration data
     auto active_verts = i_active_constraints 

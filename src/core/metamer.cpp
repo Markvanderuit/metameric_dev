@@ -517,9 +517,12 @@ namespace met {
     tbb::concurrent_vector<Basis::vec_type> tbb_output;
     tbb_output.reserve(samples.size());
 
-    auto A = info.direct_objective.finalize();
+    // Populate with extremas 
+    // tbb_output.push_back(Basis::vec_type(-1));
+    // tbb_output.push_back(Basis::vec_type(1));
 
     // Parallel solve for boundary spectra
+    auto A = info.direct_objective.finalize();
     #pragma omp parallel for
     for (int i = 0; i < samples.size(); ++i) {
       // Obtain actual spectrum by projecting sample onto optimal
@@ -528,8 +531,8 @@ namespace met {
         f = f >= 0.f ? 1.f : 0.f;
 
       // Run solve to find nearest valid spectrum within the basis function set
-      auto c = generate_spectrum_coeffs(SpectrumCoeffsInfo {
-        .spec  = s,
+      auto c = generate_spectrum_coeffs(DirectSpectrumInfo {
+        .direct_constraints = {{ info.direct_objective, info.direct_objective(s) }},
         .basis = info.basis
       });
       
@@ -537,6 +540,7 @@ namespace met {
       guard_continue(!c.array().isNaN().any());
       tbb_output.push_back(c);
     }
+    
     
     return std::vector<Basis::vec_type>(range_iter(tbb_output));
   }

@@ -1,3 +1,4 @@
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_draw_mmv.hpp>
@@ -9,14 +10,15 @@ namespace met {
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
   
-  void DrawMMVTask::eval_draw_constraints(SchedulerHandle &info) {
-    met_trace_full();
+  void DrawMMVTask::eval_draw_constraint(SchedulerHandle &info) {
+    met_trace();
     
     // Get handles, shared resources, modified resources
-    const auto &e_scene   = info.global("scene").getr<Scene>();
-    const auto &e_arcball = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
-    const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
-    const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
+    const auto &e_scene         = info.global("scene").getr<Scene>();
+    const auto &e_vert          = e_scene.uplifting_vertex(info.parent()("selection").getr<ConstraintRecord>());
+    const auto &e_arcball       = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
+    const auto &e_gizmo_active  = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    const auto &e_closest_point = info.relative("viewport_guizmo")("closest_point").getr<Colr>();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -26,29 +28,40 @@ namespace met {
     
     // Used for coming draw operation
     auto dl = ImGui::GetWindowDrawList();
-    
-    e_vert.constraint | visit_single {
-      [&](const is_colr_constraint auto &cstr) {
-        // TODO selectable viewed constraint
-        auto p = cstr.cstr_j[0].colr_j;
 
-        // Determine window-space position of surface point
-        eig::Vector2f p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
-          
-        // Clip vertex outside viewport
-        guard((p_window.array() >= viewport_offs).all() 
-          && (p_window.array() <= viewport_offs + viewport_size).all());
-
-        // Get srgb colors
-        auto circle_color_center 
-          = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(p), 1.f).finished());
-        auto circle_color_border = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f });
-
-        // Draw pair of circles with special colors
-        dl->AddCircleFilled(p_window, 8.f, circle_color_border);
-        dl->AddCircleFilled(p_window, 4.f, circle_color_center);
-      }
+    // Visit underlying color constraint to extract edit position
+    auto p = e_vert.constraint | visit {
+      [](const is_colr_constraint auto &cstr) { return cstr.cstr_j[0].colr_j; }, // TODO selectable viewed constraint
+      [](const IndirectSurfaceConstraint &cstr) { return cstr.colr; },
+      [](const auto &) { return Colr(0); }
     };
+    
+    // Determine window-space position of surface point
+    eig::Vector2f p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
+      
+    // Clip vertex outside viewport
+    guard((p_window.array() >= viewport_offs).all() 
+       && (p_window.array() <= viewport_offs + viewport_size).all());
+
+    // If closest-projected-point information is available, and the gizmo is being dragged,
+    // draw a helper line towards it
+    if (e_gizmo_active) {
+      eig::Vector2f p_closest = eig::world_to_window_space(e_closest_point, e_arcball.full(), viewport_offs, viewport_size);
+
+      auto closest_colr_line = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 0.5f });
+      auto closest_colr_mark = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 0.5f });
+      
+      dl->AddCircleFilled(p_closest, 8.f, closest_colr_mark);
+      dl->AddLine(p_closest, p_window, closest_colr_line, 2.f);
+    }
+
+    // Get srgb colors for constraint
+    auto circle_colr_border = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f });
+    auto circle_colr_center = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(p), 1.f).finished());
+
+    // Draw pair of circles with special colors
+    dl->AddCircleFilled(p_window, 8.f, circle_colr_border);
+    dl->AddCircleFilled(p_window, 4.f, circle_colr_center);
   }
 
   void DrawMMVTask::eval_draw_volume(SchedulerHandle &info) {
@@ -76,10 +89,21 @@ namespace met {
     gl::state::set_op(gl::CullOp::eBack);
     gl::state::set_op(gl::DepthOp::eLessOrEqual);
     gl::state::set_op(gl::BlendOp::eSrcAlpha, gl::BlendOp::eOneMinusSrcAlpha);
-    auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eBlendOp, true) };
     
-    // Dispatch draw information
-    gl::dispatch_draw(e_draw_chull);
+    // Dispatch draw information; draw twice, once with fill, then with lines overlaying these
+    auto draw = e_draw_chull;
+    {
+      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true), 
+                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, true) };
+      draw.draw_op = gl::DrawOp::eFill;
+      gl::dispatch_draw(draw);
+    }
+    {
+      auto draw_capabilities = { gl::state::ScopedSet(gl::DrawCapability::eBlendOp,   true), 
+                                 gl::state::ScopedSet(gl::DrawCapability::eDepthTest, false) };
+      draw.draw_op = gl::DrawOp::eLine;
+      gl::dispatch_draw(draw);
+    }
   }
 
   bool DrawMMVTask::is_active(SchedulerHandle &info) {
@@ -107,6 +131,6 @@ namespace met {
 
   void DrawMMVTask::eval(SchedulerHandle &info) {
     eval_draw_volume(info);
-    eval_draw_constraints(info);
+    eval_draw_constraint(info);
   }
 } // namespace met

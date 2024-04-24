@@ -18,7 +18,7 @@ namespace met {
     gl::Program  m_program;
     gl::DrawInfo m_dispatch;
 
-    void eval_draw_constraints(SchedulerHandle &info);
+    void eval_draw_constraint(SchedulerHandle &info);
     void eval_draw_volume(SchedulerHandle &info);
 
   public:
