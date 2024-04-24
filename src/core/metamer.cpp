@@ -11,10 +11,13 @@
 #include <unordered_set>
 
 // Use basis functions to reduce solver complexity (and color system size),
-// or generate in full spectral resolution, and then project result back
-// into basis. The former is much faster, but introduces non-convexity issues
-// for indirect reflectance and mismatching computations.
-constexpr static bool solve_using_basis = false;  
+// or run solve on full spectral values, and then project result back
+// into basis. The former is much faster, but introduces non-convexity
+// into indirect reflectance and mismatching computations, breaking these in some cases.
+constexpr static bool use_basis_direct_spectrum   = true;
+constexpr static bool use_basis_direct_mismatch   = true;
+constexpr static bool use_basis_indirect_spectrum = false;
+constexpr static bool use_basis_indirect_mismatch = false;
 
 namespace met {
   namespace detail {
@@ -60,13 +63,13 @@ namespace met {
     }
   } // namespace detail
 
-  Basis::vec_type generate_spectrum_coeffs(DirectSpectrumInfo info) {
+  Basis::vec_type generate_spectrum_coeffs(const DirectSpectrumInfo &info) {
     met_trace();
     
     // Take a grayscale spectrum as mean to build around
     Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
     
-    if constexpr (solve_using_basis) {
+    if constexpr (use_basis_direct_spectrum) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init       = 0.05,
@@ -129,24 +132,19 @@ namespace met {
     }
   }
 
-  Spec generate_spectrum(DirectSpectrumInfo info) {
-    met_trace();
-    return info.basis(generate_spectrum_coeffs(info));
-  }
-
-  Basis::vec_type generate_spectrum_coeffs(IndrctSpectrumInfo info) {
+  Basis::vec_type generate_spectrum_coeffs(const IndirectSpectrumInfo &info) {
     met_trace();
     
     // Take a grayscale spectrum as mean to build around
     Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
-    if constexpr (solve_using_basis) {
+    if constexpr (use_basis_indirect_spectrum) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 256,  // Failsafe
+        .max_iters    = 128,  // Failsafe
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
@@ -210,7 +208,7 @@ namespace met {
         .x_init       = 0.5,
         .upper        = 1.0,
         .lower        = 0.0,
-        .max_iters    = 256,  // Failsafe
+        .max_iters    = 128,  // Failsafe
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
@@ -253,13 +251,8 @@ namespace met {
       }
       
       auto r = solve(solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
-      return generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis });
+      return generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis });
     }
-  }
-
-  Spec generate_spectrum(IndrctSpectrumInfo info) {
-    met_trace();
-    return info.basis(generate_spectrum_coeffs(info));
   }
   
   std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info) {
@@ -272,7 +265,7 @@ namespace met {
     tbb::concurrent_vector<Spec> tbb_output;
     tbb_output.reserve(samples.size());
 
-    if constexpr (solve_using_basis) {
+    if constexpr (use_basis_direct_mismatch) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .dirc      = opt::direction::eMaximize,
@@ -298,7 +291,7 @@ namespace met {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
-                                          .tol = 1e-4 });
+                                          .tol = 1e-3 });
       }
 
       // This only works for the current configuration
@@ -333,7 +326,7 @@ namespace met {
         .x_init    = 0.5,
         .upper     = 1.0,
         .lower     = 0.0,
-        .max_iters = 32
+        .max_iters = 64
       };
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
@@ -341,13 +334,13 @@ namespace met {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
-                                          .tol = 1e-4 });
+                                          .tol = 1e-3 });
       }
 
       // This only works for the current configuration
       auto S = (eig::Matrix<float, wavelength_samples, 6>()
         << info.direct_objectives[0].finalize(false), 
-          info.direct_objectives[1].finalize(false)).finished();
+           info.direct_objectives[1].finalize(false)).finished();
       eig::JacobiSVD<decltype(S)> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
@@ -364,11 +357,10 @@ namespace met {
           auto a = (U * samples[i].matrix()).eval();
           local_solver.objective = opt::func_dot<wavelength_samples>(a, 0.f);
             
-          // Run solver and store recovered spectral distribution if it is legit
+          // Run solver and obtain recovered spectral distribution if it is legit
           auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
           guard_continue(!r.isNaN().any());
-          tbb_output.push_back(info.basis(generate_spectrum_coeffs(SpectrumCoeffsInfo {
-            .spec = r, .basis = info.basis })));
+          tbb_output.push_back(info.basis(generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis })));
         } // for (int i)
       }
     }
@@ -386,13 +378,13 @@ namespace met {
     tbb::concurrent_vector<Spec> tbb_output;
     tbb_output.reserve(samples.size());
     
-    if constexpr (solve_using_basis) {
+    if constexpr (use_basis_indirect_mismatch) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init    = 0.05,
         .upper     = 1.0,
         .lower     =-1.0,
-        .max_iters = 64
+        .max_iters = 48
       };
 
       // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
@@ -411,7 +403,7 @@ namespace met {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
-                                          .tol = 1e-4 });
+                                          .tol = 1e-3 });
       }
       
       // Parallel solve for boundary spectra
@@ -459,7 +451,7 @@ namespace met {
         .x_init       = 0.5,
         .upper        = 1.0,
         .lower        = 0.0,
-        .max_iters    = 64
+        .max_iters    = 48
       };
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
@@ -467,7 +459,7 @@ namespace met {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
-                                          .tol = 1e-4 });
+                                          .tol = 1e-3 });
       }
       
       // Parallel solve for boundary spectra
@@ -567,8 +559,8 @@ namespace met {
       .x_init       = 0.05,
       .upper        = 1.0,
       .lower        =-1.0,
-      .max_iters    = 64,   // Failsafe
-      .rel_xpar_tol = 1e-2, // Threshold for objective error
+      .max_iters    = 128,   // Failsafe
+      .rel_xpar_tol = 1e-3, // Threshold for objective error
     };
 
     // Objective function minimizes l2 norm over spectral distribution differences

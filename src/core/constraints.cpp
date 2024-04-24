@@ -141,8 +141,7 @@ namespace met {
       spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    auto c = generate_spectrum_coeffs(spec_info);
-    return { basis(c), c };
+    return generate_spectrum(spec_info);
   }
 
   std::pair<Spec, Basis::vec_type> DirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
@@ -161,8 +160,7 @@ namespace met {
       spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
-    auto c = generate_spectrum_coeffs(spec_info);
-    return { basis(c), c };
+    return generate_spectrum(spec_info);
   }
 
   std::pair<Spec, Basis::vec_type> IndirectSurfaceConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {
@@ -178,15 +176,14 @@ namespace met {
         .cmfs   = scene.resources.observers[scene.components.observer_i.value].value(),
         .powers = powers
       };
-      IndrctSpectrumInfo spec_info = {
+      IndirectSpectrumInfo spec_info = {
         .direct_constraints   = {{ scene.csys(uplifting.csys_i), surface.diffuse }},
         .indirect_constraints = {{ csys, colr }},
         .basis                = basis
       };
 
       // Generate a metamer satisfying the system+signal constraint set and return as pair
-      auto c = generate_spectrum_coeffs(spec_info);
-      return { basis(c), c };
+      return generate_spectrum(spec_info);
     } else { // We attempt to fill in a default spectrum, which is necessary to establish the initial system
       // Gather all relevant color system spectra and corresponding color signals
       auto basis = scene.resources.bases[uplifting.basis_i].value();
@@ -196,8 +193,7 @@ namespace met {
       };
 
       // Generate a metamer satisfying the system+signal constraint set and return as pair
-      auto c = generate_spectrum_coeffs(spec_info);
-      return { basis(c), c };
+      return generate_spectrum(spec_info);
     }
   }
 
