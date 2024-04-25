@@ -38,11 +38,23 @@ namespace met {
     Spec apply(const vec_type &c) const { 
       return ((func * c).array()).cwiseMax(0.f).cwiseMin(1.f).eval();
     }
+    std::vector<Spec> apply(std::span<const vec_type> cs) const;
 
-    Spec operator()(const vec_type &c) const { return apply(c); }
+    auto operator()(const vec_type &c) const { return apply(c); }
+    auto operator()(std::span<const vec_type> cs) const { return apply(cs); }
     bool operator==(const Basis &o) const;
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
+  };
+
+  // Concept for a color system, which can take a spectral distribution or set of spectra,
+  // and output one or more color signals in response
+  template <typename Ty>
+  concept is_colr_system = requires(Ty t, std::span<const Spec> sds, bool as_rgb) {
+    { t.apply(sds.front(), as_rgb)      } -> std::same_as<Colr>;
+    { t.apply(sds, as_rgb)              } -> std::same_as<std::vector<Colr>>;
+    { t.operator()(sds.front(), as_rgb) } -> std::same_as<Colr>;
+    { t.operator()(sds, as_rgb)         } -> std::same_as<std::vector<Colr>>;
   };
 
   /* Object defining how a reflectance-to-color conversion is performed */
@@ -62,6 +74,7 @@ namespace met {
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
   };
+  static_assert(is_colr_system<ColrSystem>);
 
   /* Object defining how a reflectance-to-color conversion is performed,
      given a truncated power series describing interreflections */
@@ -81,6 +94,7 @@ namespace met {
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
   };
+  static_assert(is_colr_system<IndirectColrSystem>);
 
   /* 
     Hardcoded model data.

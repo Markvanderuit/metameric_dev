@@ -1,4 +1,5 @@
 #include <metameric/core/distribution.hpp>
+#include <metameric/core/convex.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
@@ -12,11 +13,15 @@ namespace met {
   
   bool GenPatchesTask::is_active(SchedulerHandle &info) {
     met_trace();
-    auto chull_handle = info.relative("viewport_gen_mmv")("chull");
-    auto gizmo_active = info.relative("viewport_guizmo")("is_active").getr<bool>();
-    return chull_handle.is_mutated() 
-      && !chull_handle.getr<AlMesh>().empty() 
-      && !gizmo_active;
+    
+    // Get shared resources
+    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
+    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
+    const auto &e_hull  = e_hulls[e_cs.vertex_i];
+
+    return e_hull.has_delaunay() && !gizmo_active;
   }
 
   void GenPatchesTask::init(SchedulerHandle &info) {
@@ -28,27 +33,31 @@ namespace met {
     met_trace();
 
     // Get shared resources
-    const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-    auto &i_patches     = info("patches").getw<std::vector<Colr>>();    guard(!e_chull.empty());
-    
+    auto gizmo_active   = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
+    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+    const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
+    const auto &e_hull  = e_hulls[e_cs.vertex_i];
+    auto &i_patches     = info("patches").getw<std::vector<Colr>>();
+
     // Do not output any patches until the convex hull is in a converged state;
-    if (e_chull.verts.size() < 8) {
+    if (!e_hull.has_delaunay()) {
       i_patches.clear();
       return;
     }
 
-    // Generate delaunay tesselation for uniform sampling of hull interior
-    auto delaunay = generate_delaunay<Delaunay, eig::AlArray3f>(e_chull.verts);
+    // Exit early unless inputs have changed somehow
+    guard(is_first_eval() || uplf_handle("mismatch_hulls").is_mutated());
     
     // Compute volume of each tetrahedron in delaunay
-    std::vector<float> volumes(delaunay.elems.size());
-    std::transform(std::execution::par_unseq, range_iter(delaunay.elems), volumes.begin(),  [&](const eig::Array4u &el) {
+    std::vector<float> volumes(e_hull.deln.elems.size());
+    std::transform(std::execution::par_unseq, range_iter(e_hull.deln.elems), volumes.begin(),
+    [&](const eig::Array4u &el) {
       // Get vertex positions for this tetrahedron
-      std::array<eig::Vector3f, 4> p;
-      rng::transform(el, p.begin(), [&](uint i) { return delaunay.verts[i]; });
+      auto p = el | index_into_view(e_hull.deln.verts);
 
       // Compute tetrahedral volume
-      return std::abs((p[0] - p[3]).dot((p[1] - p[3]).cross(p[2] - p[3]))) / 6.f;
+      return std::abs((p[0] - p[3]).matrix().dot((p[1] - p[3]).matrix().cross((p[2] - p[3]).matrix()))) / 6.f;
     });
 
     // Prepare for uniform sampling of the delaunay structure
@@ -75,12 +84,14 @@ namespace met {
       }
 
       // Next, sample a tetrahedron uniformly based on volume, and grab its vertices
-      std::array<eig::Vector3f, 4> p;
-      rng::transform(delaunay.elems[distr.sample_discrete(sampler.next_1d())], p.begin(),
-        [&](uint i) { return delaunay.verts[i]; });
+      auto el = e_hull.deln.elems[distr.sample_discrete(sampler.next_1d())];
+      auto p = el | index_into_view(e_hull.deln.verts);
         
       // Then, recover position inside hull using the generated barycentric coordinates
-      return p[0] * (1.f - x.sum()) + p[1] * x.x() + p[2] * x.y() + p[3] * x.z();
+      return p[0] * (1.f - x.sum()) 
+           + p[1] * x.x() 
+           + p[2] * x.y() 
+           + p[3] * x.z();
     });
 
     // Finally, sort patches by luminance

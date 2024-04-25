@@ -126,11 +126,27 @@ namespace met {
     public:
       // Generate a spectrum and corresponding color, which
       // forms the vertex' position in the uplifting tesselation
-      std::tuple<Colr, Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
+      std::tuple<Colr, Spec, Basis::vec_type>              realize(const Scene     &scene,
+                                                                   const Uplifting &uplifting) const;
+      
+      // Generate a set of spectra and corresponding colors on
+      // a constraint's current mismatch boundary, w.r.t. internal constraint csys_i;
+      std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene     &scene, 
+                                                                               const Uplifting &uplifting,
+                                                                               uint csys_i,
+                                                                               uint seed, 
+                                                                               uint samples) const;
+
+      // Given internal constraint csys_i, return the constraint value
+      Colr get_mismatching_position(uint csys_i) const;
+
+      // Test whether this vertex' constraint would generate the same mismatch
+      // volume as another, prior constraint
+      bool has_equal_mismatching(const cnstr_type &other, uint csys_i) const;
 
     public: // underlying accessors if constraint satisifes is metamerism_constraint/is_surface_constraint
-      bool has_mismatching() const; // Does the underlying constraint allow for mismatching?
-      bool has_surface()     const; // Does the underlying constraint expose surface data?
+      bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const; // Does the underlying constraint allow for mismatching?
+      bool has_surface()                                                   const; // Does the underlying constraint expose surface data?
       const SurfaceInfo &surface() const;
             SurfaceInfo &surface();
 

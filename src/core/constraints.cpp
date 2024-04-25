@@ -11,15 +11,20 @@ namespace met {
   namespace detail {
     bool has_duplicates(const rng::range auto &r) {
       for (auto i = r.begin(); i != r.end(); ++i)
-        for (auto j = r.begin(); j != r.end(); ++j)
+        for (auto j = i + 1; j != r.end(); ++j) {
           if (*i == *j)
             return true;
+        }
       return false;
     }
   } // namespace detail
 
   bool ColrConstraint::operator==(const ColrConstraint &o) const {
     return cmfs_j == o.cmfs_j && illm_j == o.illm_j && colr_j.isApprox(o.colr_j);
+  }
+
+  bool ColrConstraint::is_similar(const ColrConstraint &o) const {
+    return cmfs_j == o.cmfs_j && illm_j == o.illm_j;
   }
 
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
@@ -46,15 +51,31 @@ namespace met {
         && rng::equal(powers, o.powers, eig::safe_approx_compare<Spec>);
   }
 
-  bool DirectColorConstraint::has_mismatching() const { 
-    return !cstr_j.empty() && detail::has_duplicates(cstr_j);
+  bool DirectColorConstraint::has_mismatching(const Scene &scene, const Uplifting &uplifting) const { 
+    // Merge all known color system data
+    auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
+    auto cstr = cstr_j
+              | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
+              | rng::to<std::vector>();
+    cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
+    
+    // Mismatching only occurs if there are two or more color systems, and all are unique
+    return cstr.size() > 1 && !detail::has_duplicates(cstr);
   }
 
-  bool DirectSurfaceConstraint::has_mismatching() const { 
-    return !cstr_j.empty() && detail::has_duplicates(cstr_j) && has_surface();
+  bool DirectSurfaceConstraint::has_mismatching(const Scene &scene, const Uplifting &uplifting) const { 
+    // Merge all known color system data
+    auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
+    auto cstr = cstr_j
+              | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
+              | rng::to<std::vector>();
+    cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
+    
+    // Mismatching only occurs if there are two or more color systems, and all are unique
+    return has_surface() && cstr.size() > 1 && !detail::has_duplicates(cstr);
   }
 
-  bool IndirectSurfaceConstraint::has_mismatching() const { 
+  bool IndirectSurfaceConstraint::has_mismatching(const Scene &scene, const Uplifting &uplifting) const { 
     return !powers.empty() && !colr.isZero() && !colr.isOnes() && has_surface();
   }
 
@@ -169,7 +190,7 @@ namespace met {
     // Return zero constraint for invalid surfaces
     guard(has_surface(), { Spec(0), Basis::vec_type(0) });
 
-    if (has_mismatching()) {
+    if (has_mismatching(scene, uplifting)) {
       // Gather all relevant color system spectra and corresponding color signals
       auto basis = scene.resources.bases[uplifting.basis_i].value();
       IndirectColrSystem csys = {
@@ -197,7 +218,7 @@ namespace met {
     }
   }
 
-  std::vector<Colr> DirectColorConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> DirectColorConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
     met_trace();
     
     // Assemble info object for generating boundary spectra
@@ -222,10 +243,10 @@ namespace met {
     }
 
     // Output color values
-    return ocs_info.direct_objectives[1](generate_mismatching_ocs(ocs_info));
+    return generate_mismatching_ocs(ocs_info);
   }
 
-  std::vector<Colr> DirectSurfaceConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> DirectSurfaceConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
     met_trace();
     
     // Assemble info object for generating boundary spectra
@@ -250,10 +271,10 @@ namespace met {
     }
 
     // Output color values
-    return ocs_info.direct_objectives[1](generate_mismatching_ocs(ocs_info));
+    return generate_mismatching_ocs(ocs_info);
   }
 
-  std::vector<Colr> IndirectSurfaceConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> IndirectSurfaceConstraint::realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
     met_trace();
 
     // Construct indirect color system using scene observer
@@ -275,6 +296,6 @@ namespace met {
     ocs_info.direct_constraints = {{ ocs_info.direct_objective, surface.diffuse }};
 
     // Output color values
-    return ocs_info.indirect_objective(generate_mismatching_ocs(ocs_info));
+    return generate_mismatching_ocs(ocs_info);
   }
 } // namespace met

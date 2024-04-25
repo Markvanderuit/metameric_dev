@@ -20,32 +20,10 @@ namespace met {
   bool GenMMVTask::is_active(SchedulerHandle &info) {
     met_trace();
 
-    // Get shared resources
-    const auto &e_scene             = info.global("scene").getr<Scene>();
-    const auto &e_cs                = info.parent()("selection").getr<ConstraintRecord>();
-    const auto &e_gizmo_active      = info.relative("viewport_guizmo")("is_active").getr<bool>();
-    const auto &[e_object, e_state] = e_scene.components.upliftings[e_cs.uplifting_i];
-
-    // Skip on gizmo input
-    guard(!e_gizmo_active, false);
-
-    // Stale on first run, or if specific uplifting data has changed
-    bool is_stale = is_first_eval() 
-      || e_state.basis_i 
-      || e_state.csys_i 
-      || e_state.verts[e_cs.vertex_i]
-      || e_scene.components.colr_systems[e_object.csys_i];
-
-    // Reset samples if stale
-    if (is_stale)  {
-      m_iter = 0;
-      m_colr_set.clear();
-    }
-    
-    // Only pass if metameric mismatching is possible and samples are required
-    bool is_mmv = e_object.verts[e_cs.vertex_i].has_mismatching() && m_colr_set.size() < mmv_samples_max;
-    
-    return info.parent()("is_active").getr<bool>() && (is_stale || is_mmv);
+    // // Get shared resources
+    // const auto &e_gizmo_active = info.relative("viewport_guizmo")("is_active").getr<bool>();
+    // return info.parent()("is_active").getr<bool>() && !e_gizmo_active;
+    return true;
   }
 
   void GenMMVTask::init(SchedulerHandle &info) {
@@ -61,7 +39,6 @@ namespace met {
     m_curr_deque_size = 0;
 
     // Make vertex array object available, uninitialized
-    info("chull").set<AlMesh>({ });
     info("chull_array").set<gl::Array>({ });
     info("chull_draw").set<gl::DrawInfo>({ });
     info("chull_center").set<eig::Array3f>(0.f);
@@ -71,103 +48,47 @@ namespace met {
     met_trace();
 
     // Get shared resources
-    const auto &e_scene      = info.global("scene").getr<Scene>();
-    const auto &e_cs         = info.parent()("selection").getr<ConstraintRecord>();
-    const auto &[e_uplifting, 
-                 e_state]    = e_scene.components.upliftings[e_cs.uplifting_i];
-    const auto &e_vert       = e_uplifting.verts[e_cs.vertex_i];
+    const auto &e_scene = info.global("scene").getr<Scene>();
+    const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
+    auto uplf_handle    = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
 
-    // Determine if a reset is in order
-    bool should_clear = is_first_eval() 
-      || e_state.basis_i 
-      || e_state.csys_i 
-      || e_state.verts[e_cs.vertex_i]
-      || e_scene.components.colr_systems[e_uplifting.csys_i];
+    // Exit early unless inputs have changed somehow
+    guard(is_first_eval() || uplf_handle("mismatch_hulls").is_mutated());
+
+    // Get list of convex hulls for this uplifting; exit early if it doesn't exist
+    auto &i_array       = info("chull_array").getw<gl::Array>();
+    auto &i_draw        = info("chull_draw").getw<gl::DrawInfo>();
+    const auto &e_hulls = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
+    const auto &e_hull  = e_hulls[e_cs.vertex_i];
     
-    // Reset necessary data
-    if (should_clear) {
-      info("chull_array").getw<gl::Array>() = {};
-      m_colr_set.clear();
-      m_iter = 0;
-      m_curr_deque_size = m_colr_deque.size();
-    }
-
-    // Only continue for valid and mismatch-supporting constraints
-    if (e_vert.constraint | visit([](const auto &cstr) { return !cstr.has_mismatching(); })) {
-      info("chull_array").getw<gl::Array>() = {};
-      m_colr_set.clear();
-      m_iter = 0;
+    // Get specific convex hull; exit early and reset if it is empty
+    if (e_hull.hull.empty()) {
+      i_array = {};
+      i_draw  = {};
       return;
     }
-    
-    // Only continue if more samples are necessary
-    guard(m_colr_set.size() < mmv_samples_max);
-
-    // Visit underlying constraint types one by one
-    auto new_points = e_vert.constraint | visit([&](const auto &cstr) { 
-      return cstr.realize_mismatching(e_scene, e_uplifting, m_csys_j, m_iter, mmv_samples_per_iter); 
-    });
-
-    // Insert newly gathered points, and roll them into end of deque while removing front
-    m_colr_set.insert_range(std::vector(new_points));
-    if (m_curr_deque_size > 0) {
-      auto reduce_size = std::min({ static_cast<uint>(new_points.size()),
-                                    static_cast<uint>(m_colr_deque.size()), 
-                                    m_curr_deque_size });
-      m_curr_deque_size -= reduce_size;
-      m_colr_deque.erase(m_colr_deque.begin(), m_colr_deque.begin() + reduce_size);
-    }
-    m_colr_deque.append_range(new_points); // invalidates new_points
-
-    // Increment iteration up to sample count
-    m_iter += mmv_samples_per_iter;
-
-    // Only continue if points are found
-    guard(!m_colr_set.empty());
 
     // Determine extents of current point sets
-    auto maxb = rng::fold_left_first(m_colr_deque, [](auto a, auto b) { return a.max(b).eval(); }).value();
-    auto minb = rng::fold_left_first(m_colr_deque, [](auto a, auto b) { return a.min(b).eval(); }).value();
+    auto maxb = rng::fold_left_first(e_hull.hull.verts, [](auto a, auto b) { return a.max(b).eval(); }).value();
+    auto minb = rng::fold_left_first(e_hull.hull.verts, [](auto a, auto b) { return a.min(b).eval(); }).value();
 
-    // Generate convex hulls, if the minimum nr. of points is available and
-    // the pointset does not collapse to a small position;
-    // QHull is rather picky and will happily tear down the application :(
-    auto &i_chull = info("chull").getw<AlMesh>();
-    auto points   = std::vector<Colr>(range_iter(m_colr_deque));
-    if (m_colr_set.size() >= 4 && (maxb - minb).minCoeff() >= 0.005f) {
-      i_chull = generate_convex_hull<AlMesh, Colr>(points);
-    }
-
-    // If a set of points is available, generate an approximate center for the camera, and update this
-    // if the distance shift exceeds some threshold
+    // If a set of points is available, generate an approximate center for the camera
     auto new_center = (minb + 0.5 * (maxb - minb)).eval();
-    if (auto &curr_center = info("chull_center").getw<eig::Array3f>(); (curr_center - new_center).matrix().norm() > 0.05f) {
-      curr_center = new_center;
-      fmt::print("new center: {}\n", new_center);
-      info.relative("viewport_camera")("arcball").getw<detail::Arcball>().set_center(curr_center);
-    }
+    info.relative("viewport_camera")("arcball").getw<detail::Arcball>().set_center(new_center);
     
-    // If a convex hull is available, generate a vertex array object
+    // If a convex hull is available, generate a vertex array object and corresponding draw obj
     // for rendering purposes
-    auto &i_array        = info("chull_array").getw<gl::Array>();
-    auto &i_draw         = info("chull_draw").getw<gl::DrawInfo>();
-    if (i_chull.elems.size() > 0) {
-      std::vector<eig::AlArray3f> points(range_iter(m_colr_deque));
-
-      m_chull_verts = {{ .data = cnt_span<const std::byte>(i_chull.verts) }};
-      m_chull_elems = {{ .data = cnt_span<const std::byte>(i_chull.elems) }};
-
-      i_array = {{
-        .buffers  = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
-        .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
-        .elements = &m_chull_elems
-      }};
-      i_draw = { .type           = gl::PrimitiveType::eTriangles,
-                 .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
-                 .bindable_array = &i_array };
-    } else {
-      // Deinitialize
-      i_array = {};
-    }
+    std::vector<eig::AlArray3f> hull_verts_aligned(range_iter(e_hull.hull.verts));
+    m_chull_verts = {{ .data = cnt_span<const std::byte>(hull_verts_aligned) }};
+    m_chull_elems = {{ .data = cnt_span<const std::byte>(e_hull.hull.elems) }};
+    i_array = {{
+      .buffers  = {{ .buffer = &m_chull_verts, .index = 0, .stride = sizeof(eig::Array4f)   }},
+      .attribs  = {{ .attrib_index = 0, .buffer_index = 0, .size = gl::VertexAttribSize::e3 }},
+      .elements = &m_chull_elems
+    }};
+    i_draw = { .type           = gl::PrimitiveType::eTriangles,
+               .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
+               .bindable_array = &i_array };
+    fmt::print("Pushed mismatch data to gpu\n");
   }
 } // namespace met

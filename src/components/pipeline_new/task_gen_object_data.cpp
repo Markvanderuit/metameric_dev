@@ -164,25 +164,5 @@ namespace met {
         .bindable_array = &e_scene.resources.meshes.gl.array
       });
     }
-
-    /* { // Second dispatch, bake spectral moment coefficients
-      auto &program = e_cache.at(m_cache_key_bake);
-
-      // Prepare program state
-      program.bind();
-      program.bind("b_buff_unif",  m_unif_buffer);
-      program.bind("b_buff_atlas", e_barycentrics.buffer());
-      program.bind("b_spec_4f",    e_scene.components.upliftings.gl.texture_spectra);
-      program.bind("b_warp_1f",    e_scene.components.upliftings.gl.texture_warp);
-      program.bind("b_bary_4f",    e_scene.components.upliftings.gl.texture_barycentrics.texture());
-      program.bind("b_coef_4f",    e_scene.components.upliftings.gl.texture_coefficients.texture());
-      
-      // Dispatch compute call
-      gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer   | 
-                               gl::BarrierFlags::eImageAccess   |
-                               gl::BarrierFlags::eStorageBuffer | 
-                               gl::BarrierFlags::eUniformBuffer );
-      gl::dispatch_compute({ .groups_x = ceil_div(e_patch.size.prod() * 32u, 256u) }); // one warp per pixel
-    } */
   }
 } // namespace met

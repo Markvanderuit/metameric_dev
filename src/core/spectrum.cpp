@@ -199,4 +199,13 @@ namespace met {
     io::fr_stream(scale, str);
     io::fr_stream(func,  str);
   }
+  
+  std::vector<Spec> Basis::apply(std::span<const Basis::vec_type> cs) const { 
+    met_trace();
+    
+    std::vector<Spec> out(cs.size());
+    std::transform(std::execution::par_unseq, range_iter(cs), out.begin(), 
+      [&](const auto &c) { return apply(c); });
+    return out;
+  }
 } // namespace met

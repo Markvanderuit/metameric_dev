@@ -3,10 +3,8 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
-#include <array>
 #include <span>
 #include <vector>
-#include <unordered_map>
 #include <utility>
 
 namespace met {
@@ -63,6 +61,7 @@ namespace met {
   Mesh generate_convex_hull(std::span<const Vector> data);
 
   // Returns a set of simplices representing a delaunay triangulation of a set of points in 3D
+  // and writes a list of integer indices to scratch_list, of deleted vertices
   template <typename Mesh, typename Vector>
   Mesh generate_delaunay(std::span<const Vector> data);
   

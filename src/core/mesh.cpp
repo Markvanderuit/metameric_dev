@@ -8,6 +8,7 @@
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/QhullPoints.h>
 #include <fmt/ranges.h>
+#include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <execution>
 #include <ranges>
@@ -139,9 +140,12 @@ namespace met {
   MeshTy generate_convex_hull(std::span<const Vector> data) {
     met_trace();
 
+    std::vector<eig::Array3d> input(data.size());
+    std::transform(std::execution::par_unseq, range_iter(data), input.begin(),
+      [](const auto &v) { return v.cast<double>().eval(); }); 
+
     // Query qhull for a convex hull structure
-    std::vector<eig::Array3f> input(range_iter(data));
-    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "Qt Qx C-0");
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const double>(input).data(), "Qt Qx C-0");
     qhull.setErrorStream(&std::cout);
       
     auto qh_verts = qhull.vertexList().toStdVector();
@@ -162,7 +166,10 @@ namespace met {
       return el_;
     });
     std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
-      [](const auto &vt) { return eig::Array3f(vt.point().constBegin()); });
+      [](const orgQhull::QhullVertex &vt) { 
+        eig::Array3d v(vt.point().constBegin());
+        return v.cast<float>().eval();
+      });
 
     // Handle flipped triangles; Qhull sorts vertices by index, but we need consistent CW orientation 
     // to have outward normals for culled rendering; not to mention potential mesh simplification
@@ -183,9 +190,11 @@ namespace met {
   MeshTy generate_delaunay(std::span<const Vector> data) {
     met_trace();
 
-    std::vector<eig::Array3f> input(range_iter(data));
-
-    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const float>(input).data(), "d Qbb Qt");
+    std::vector<eig::Array3d> input(data.size());
+    std::transform(std::execution::par_unseq, range_iter(data), input.begin(),
+      [](const auto &v) { return v.cast<double>().eval(); }); 
+    
+    auto qhull = orgQhull::Qhull("", 3, input.size(), cnt_span<const double>(input).data(), "d Qbb Qt");
     qhull.setErrorStream(&std::cout);
 
     auto qh_verts = qhull.vertexList().toStdVector();
@@ -199,23 +208,25 @@ namespace met {
     // Assemble indexed data from qhull format
     std::vector<eig::Array3f> verts(qh_verts.size());
     std::transform(std::execution::par_unseq, range_iter(qh_verts), verts.begin(), 
-      [](const auto &vt) { return Mesh::vert_type(vt.point().constBegin()); });
+    [](const orgQhull::QhullVertex &vt) { 
+      eig::Array3d v(vt.point().constBegin());
+      return v.cast<float>().eval();
+    });
 
     // Undo QHull's unnecessary scatter-because-screw-you-aaaaaargh
-    std::vector<uint> vertex_idx(data.size());
+    std::vector<uint> vertex_idx(qh_verts.size());
     #pragma omp parallel for
-    for (int i = 0; i < vertex_idx.size(); ++i) {
+    for (int i = 0; i < verts.size(); ++i) {
       auto it = rng::find_if(data, [&](const auto &v) { return v.isApprox(verts[i]); });
-      guard_continue(it != data.end());
-      vertex_idx[i] = std::distance(data.begin(), it);
+      if (it != data.end())
+        vertex_idx[i] = std::distance(data.begin(), it);
     }
     
     // Build element data
     std::vector<eig::Array4u> elems(qh_elems.size());
     std::transform(std::execution::par_unseq, range_iter(qh_elems), elems.begin(), [&](const auto &el) {
       eig::Array4u el_;
-      std::ranges::transform(el.vertices().toStdVector(), el_.begin(), 
-        [&](const auto &v) { return vertex_idx[v.id()]; });
+      rng::transform(el.vertices().toStdVector(), el_.begin(), [&](const auto &v) { return vertex_idx[v.id()]; });
       return el_;
     });
 

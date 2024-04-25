@@ -63,6 +63,8 @@ namespace met {
 
       i_pathr.reset(i_sensor, e_scene);
 
+      fmt::print("reset render\n");
+
       // Build new gbuffer for hacky denoising
       // i_gbuffer.render(i_sensor, e_scene);
       // i_pathr.render(i_gbuffer, i_sensor, e_scene);

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <metameric/core/distribution.hpp>
 #include <metameric/core/math.hpp>
+#include <metameric/core/convex.hpp>
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/tree.hpp>
 
 namespace met {
   // Argument struct and method for generating a spectral reflectance, given one or more
@@ -29,14 +28,6 @@ namespace met {
     const Basis &basis;                                         // Spectral basis functions
   };
   Basis::vec_type generate_spectrum_coeffs(const IndirectSpectrumInfo &info);
-  
-  // Helper; generate coefficients producing a spectrum in a basis, and return said spectrum
-  // plus the coefficients 
-  std::pair<Spec, Basis::vec_type> generate_spectrum(const auto &info) {
-    met_trace();
-    auto c = generate_spectrum_coeffs(info);
-    return { info.basis(c), c };
-  }
 
   // Argument struct and method for generating points on the object color solid of a metameric
   // mismatching between two or more color systems, following the method of Mackiewicz et al., 2019 
@@ -52,7 +43,7 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
+  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info);
   
   // Argument struct and method for generating points on the object color solid of a metameric
   // mismatching between signal in a number of base color systems, and a interreflection system
@@ -71,7 +62,7 @@ namespace met {
     uint seed      = 4;  // Seed for (pcg) sampler state
     uint n_samples = 32; // Nr. of samples to solve for
   };
-  std::vector<Spec> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
+  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info);
 
   // Argument struct and method for generating points on the object color solid of a color system,
   // following the method of Mackiewicz et al., 2019 
@@ -93,4 +84,15 @@ namespace met {
     const Basis &basis; // Spectral basis functions
   };
   Basis::vec_type generate_spectrum_coeffs(const SpectrumCoeffsInfo &info);
+
+  
+  // Helpers; generate coefficients producing a spectrum in a basis, and return said spectrum
+  // plus the coefficients 
+  std::pair<Spec, Basis::vec_type> generate_spectrum(const auto &info) {
+    met_trace();
+    auto c = generate_spectrum_coeffs(info);
+    return { info.basis(c), c };
+  }
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
 } // namespace met

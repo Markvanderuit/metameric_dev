@@ -1,4 +1,5 @@
 #include <metameric/core/distribution.hpp>
+#include <metameric/core/convex.hpp>
 #include <metameric/core/solver.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/moments.hpp>
@@ -16,8 +17,8 @@
 // into indirect reflectance and mismatching computations, breaking these in some cases.
 constexpr static bool use_basis_direct_spectrum   = true;
 constexpr static bool use_basis_direct_mismatch   = true;
-constexpr static bool use_basis_indirect_spectrum = false;
-constexpr static bool use_basis_indirect_mismatch = false;
+constexpr static bool use_basis_indirect_spectrum = true;
+constexpr static bool use_basis_indirect_mismatch = true;
 
 namespace met {
   namespace detail {
@@ -135,6 +136,27 @@ namespace met {
   Basis::vec_type generate_spectrum_coeffs(const IndirectSpectrumInfo &info) {
     met_trace();
     
+    // Generate surrounding boundary spectra
+    IndirectMismatchingOCSInfo ocs_info = {
+      .direct_objective   = info.direct_constraints[0].first,
+      .indirect_objective = info.indirect_constraints[0].first,
+      .direct_constraints = info.direct_constraints,
+      .basis              = info.basis,
+      .n_samples          = 8
+    };
+    auto coeffs = generate_mismatching_ocs_coeffs(ocs_info);
+    auto verts  = ocs_info.indirect_objective(ocs_info.basis(coeffs));
+
+    auto chull          = ConvexHull::build(std::span(verts), ConvexHull::BuildOptions::eDelaunay);
+    auto [bary, bary_i] = chull.find_enclosing_elem(info.indirect_constraints[0].second);
+    
+    return (bary[0] * coeffs[0] + bary[1] * coeffs[1] +
+            bary[2] * coeffs[2] + bary[3] * coeffs[3]).eval();
+  }
+
+  Basis::vec_type generate_spectrum_coeffs_2(const IndirectSpectrumInfo &info) {
+    met_trace();
+    
     // Take a grayscale spectrum as mean to build around
     Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
 
@@ -144,47 +166,45 @@ namespace met {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 64,  // Failsafe
+        .max_iters    = 128,  // Failsafe
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
       // Objective function minimizes l2 norm over spectral distribution
       solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, mean);
 
-      // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
+      // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
       {
         auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
           << info.basis.func, -info.basis.func).finished();
         auto b = (eig::Array<float, 2 * wavelength_samples, 1>()
           << Spec(1.f), Spec(0.f)).finished();
-        solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b),
+        solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b), 
                                             .n   = 2 * wavelength_samples, 
                                             .tol = 1e-2 });
       }
 
-      // Add color system equality constraints, upholding spectral metamerism
+      // Add direct color system equality constraints, upholding surface metamerism
       for (const auto [csys, colr] : info.direct_constraints) {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
-                                          .tol = 1e-2 });
+                                          .tol = 1e-3 });
       }
 
       // Add interreflection equality constraint, upholding requested output color;
       // specify three equalities for three partial derivatives
       for (const auto [csys, colr] : info.indirect_constraints) {
-        using vec = opt::Wrapper<wavelength_bases>::vec;
         auto A_ = csys.finalize(false);
         auto b_ = lrgb_to_xyz(colr);
-
+        /* for (uint j = 0; j < 3; ++j)  */
         {
           using vec = eig::Vector<ad::real1st, wavelength_bases>;
           solver.eq_constraints.push_back({
-          .f   = ad::wrap_capture<wavelength_bases>(
+          .f = ad::wrap_capture<wavelength_bases>(
           [A = A_
-                | vws::transform([](const CMFS &cmfs) { 
-                    return cmfs.transpose().cast<double>().eval(); })
-                | rng::to<std::vector>(), 
+             | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
+             | rng::to<std::vector>(), 
           B = info.basis.func.matrix().cast<double>().eval(), 
           b = b_.cast<double>().eval()](const vec &x) {
             // Recover spectral distribution
@@ -197,8 +217,8 @@ namespace met {
               Ax        += A[i] * r;
             }
             return (Ax.array() - b).matrix().norm();
-          }), .tol = 1e-2 });
-        }
+          }), .tol = 1e-3 });
+        } // for (uint j)
       }
 
       return solve(solver).x.cast<float>().eval();
@@ -221,7 +241,7 @@ namespace met {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
-                                          .tol = 1e-2 });
+                                          .tol = 1e-3 });
       }
       
       // Add interreflection equality constraint, upholding requested output color;
@@ -247,7 +267,7 @@ namespace met {
             Ax        += A[i] * r;
           }
           return (Ax.array() - b).matrix().norm();
-        }), .tol = 1e-2 });
+        }), .tol = 1e-3 });
       }
       
       auto r = solve(solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
@@ -255,24 +275,24 @@ namespace met {
     }
   }
   
-  std::vector<Spec> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info) {
+  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info) {
     met_trace();
     
     // Sample unit vectors in 6d
     auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
 
     // Output data structure 
-    tbb::concurrent_vector<Spec> tbb_output;
+    tbb::concurrent_vector<Basis::vec_type> tbb_output;
     tbb_output.reserve(samples.size());
 
     if constexpr (use_basis_direct_mismatch) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
-        .dirc      = opt::direction::eMaximize,
-        .x_init    = 0.05,
-        .upper     = 1.0,
-        .lower     =-1.0,
-        .max_iters = 64
+        .x_init       = 0.05,
+        .upper        = 1.0,
+        .lower        =-1.0,
+        .max_iters    = 96,
+        .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
       // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
@@ -317,7 +337,7 @@ namespace met {
           // Run solver and store recovered spectral distribution if it is legit
           auto r = solve(local_solver);
           guard_continue(!r.x.array().isNaN().any());
-          tbb_output.push_back((info.basis(r.x.cast<float>().eval())));
+          tbb_output.push_back((r.x.cast<float>().eval()));
         } // for (int i)
       }
     } else {
@@ -360,31 +380,32 @@ namespace met {
           // Run solver and obtain recovered spectral distribution if it is legit
           auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
           guard_continue(!r.isNaN().any());
-          tbb_output.push_back(info.basis(generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis })));
+          tbb_output.push_back(generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis }));
         } // for (int i)
       }
     }
 
-    return std::vector<Spec>(range_iter(tbb_output));
+    return std::vector<Basis::vec_type>(range_iter(tbb_output));
   }
 
-  std::vector<Spec> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info) {
+  std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info) {
     met_trace();
 
     // Sample unit vectors in 6d
     auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
 
     // Output data structure 
-    tbb::concurrent_vector<Spec> tbb_output;
+    tbb::concurrent_vector<Basis::vec_type> tbb_output;
     tbb_output.reserve(samples.size());
     
     if constexpr (use_basis_indirect_mismatch) {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
-        .x_init    = 0.05,
-        .upper     = 1.0,
-        .lower     =-1.0,
-        .max_iters = 48
+        .x_init       = 0.05,
+        .upper        = 1.0,
+        .lower        =-1.0,
+        .max_iters    = 96,
+        .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
       // Add boundary inequality constraints; upholding 0 <= x <= 1 for reflectances
@@ -440,9 +461,9 @@ namespace met {
           });
 
           // Run solver and store recovered spectral distribution if it is safe
-          auto r = solve(local_solver);
-          guard_continue(!r.x.array().isNaN().any());
-          tbb_output.push_back((info.basis(r.x.cast<float>().eval())));
+          auto r = solve(local_solver).x.cast<float>().eval();
+          guard_continue(!r.array().isNaN().any());
+          tbb_output.push_back(r);
         } // for (int i)
       }
     } else {
@@ -498,13 +519,12 @@ namespace met {
           // Run solver and store recovered spectral distribution if it is legit
           auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
           guard_continue(!r.isNaN().any());
-          tbb_output.push_back(info.basis(
-            generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis })));
+          tbb_output.push_back(generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis }));
         } // for (int i)
       }
     }
     
-    return std::vector<Spec>(range_iter(tbb_output));
+    return std::vector<Basis::vec_type>(range_iter(tbb_output));
   }
 
   std::vector<Basis::vec_type> generate_color_system_ocs_coeffs(const DirectColorSystemOCSInfo &info) {
@@ -564,7 +584,7 @@ namespace met {
       .upper        = 1.0,
       .lower        =-1.0,
       .max_iters    = 128,   // Failsafe
-      .rel_xpar_tol = 1e-3, // Threshold for objective error
+      .rel_xpar_tol = 1e-5, // Threshold for objective error
     };
 
     // Objective function minimizes l2 norm over spectral distribution differences
@@ -578,9 +598,33 @@ namespace met {
         << Spec(1.f), Spec(0.f)).finished();
       solver.nq_constraints_v.push_back({ .f   = opt::func_dot_v<wavelength_bases>(A, b),
                                           .n   = 2 * wavelength_samples, 
-                                          .tol = 1e-2 });
+                                          .tol = 1e-3 });
     }
     
     return solve(solver).x.cast<float>().cwiseMax(-1.f).cwiseMin(1.f).eval();
+  }
+  
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info) {
+    met_trace();
+    auto c = generate_mismatching_ocs_coeffs(info);
+    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> v(c.size());
+    std::transform(std::execution::par_unseq,
+                   range_iter(c), v.begin(),
+                   [&info](const auto &c) { 
+                    auto s = info.basis(c);
+                    return std::tuple { info.direct_objectives.back()(s), s, c }; }); // the differentiating color system generates output
+    return v;
+  }
+  
+  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info) {
+    met_trace();
+    auto c = generate_mismatching_ocs_coeffs(info);
+    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> v(c.size());
+    std::transform(std::execution::par_unseq,
+                   range_iter(c), v.begin(),
+                   [&info](const auto &c) { 
+                    auto s = info.basis(c);
+                    return std::tuple { info.indirect_objective(s), s, c }; }); // the differentiating color system generates output
+    return v;
   }
 } // namespace met

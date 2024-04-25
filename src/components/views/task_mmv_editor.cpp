@@ -1,5 +1,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/matching.hpp>
+#include <metameric/core/convex.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_mmv.hpp>
@@ -21,75 +22,6 @@ namespace met {
   // Constants
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-  
-  namespace detail {
-    Colr find_closest_point_in_convex_hull(Colr p, const AlMesh &mesh) {
-      met_trace();
-      guard(!mesh.verts.empty() && !mesh.elems.empty(), p);
-      
-      // Find triangle data
-      auto tris = mesh.elems | vws::transform([&mesh](const eig::Array3u &el) {
-        return std::tuple<Colr, Colr, Colr> { mesh.verts[el[0]], mesh.verts[el[1]], mesh.verts[el[2]] }; });
-      
-      // Project point to each triangle
-      auto proj = tris | vws::transform([p](const auto &el) -> Colr {
-        // Get vertices and compute edge vectors
-        const auto &[a, b, c] = el;
-        eig::Array3f cent = ((a + b + c) / 3.f).eval();
-        eig::Vector3f ab  = (b - a).eval(), 
-                      bc  = (c - b).eval(), 
-                      ca  = (a - c).eval(),
-                      ac  = (c - a).eval();
-
-        // Normal on plane defined by triangle
-        eig::Vector3f n = ab.cross(ac).normalized().eval();
-
-        // Displacement to move point onto plane
-        // If point lies behind plane, return bad value
-        float ndiff = n.dot((p - cent).matrix());
-        guard(ndiff > 0.f, std::numeric_limits<float>::infinity())
-
-        // Project point onto plane
-        Colr p_ = (p - (n * ndiff).array()).eval();
-        auto ap = (p_ - a).matrix().eval();
-        
-        // Compute barycentrics of point on plane
-        float a_tri = std::abs(.5f * ac.cross(ab).norm());
-        float a_ab  = std::abs(.5f * ap.cross(ab).norm());
-        float a_ac  = std::abs(.5f * ac.cross(ap).norm());
-        float a_bc  = std::abs(.5f * (c - p_).matrix().cross((b - p_).matrix()).norm());
-        auto bary = (eig::Array3f(a_bc, a_ac, a_ab) / a_tri).eval();
-        bary /= bary.abs().sum();
-        p_ = bary.x() * a + bary.y() * b + bary.z() * c;
-
-        // Either clamp barycentrics to a specific edge...
-        if (bary.x() < 0.f) { // bc
-          float t = std::clamp((p_ - b).matrix().dot(bc) / bc.squaredNorm(), 0.f, 1.f);
-          return b + t * bc.array();
-        } else if (bary.y() < 0.f) { // ca
-          float t = std::clamp((p_ - c).matrix().dot(ca) / ca.squaredNorm(), 0.f, 1.f);
-          return c + t * ca.array();
-        } else if (bary.z() < 0.f) { // ab
-          float t = std::clamp((p_ - a).matrix().dot(ab) / ab.squaredNorm(), 0.f, 1.f);
-          return a + t * ab.array();
-        } else {
-          // ... or return the actual point inside the triangle
-          return p_;
-        }
-      });
-
-      // Finalize only valid candidates and provide distance to each candidate
-      auto candidates = proj 
-                      | vws::filter([](const Colr &p_) { return !p_.isInf().all(); })
-                      | vws::transform([p](const Colr &p_) -> std::pair<float, Colr> {
-                          return { (p - p_).matrix().norm(), p_ }; })
-                      | rng::to<std::vector>();
-      
-      // If reprojected points was found, override return position
-      auto it = rng::min_element(candidates, {}, &std::pair<float, Colr>::first); 
-      return it != candidates.end() ? it->second : p;
-    }
-  } // namespace detail
 
   struct MMVEditorBeginTask : public detail::TaskNode {
     void eval(SchedulerHandle &info) override {
@@ -157,10 +89,12 @@ namespace met {
       // Get shared resources
       const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &e_uplf  = e_scene.components.upliftings[e_cs.uplifting_i].value;
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Activate only if parent task triggers and vertex mismatching requires rendering
-      return info.parent()("is_active").getr<bool>() && e_vert.has_mismatching();
+      return info.parent()("is_active").getr<bool>() 
+          && e_vert.has_mismatching(e_scene, e_uplf);
     }
 
     void init(SchedulerHandle &info) override {
@@ -177,15 +111,21 @@ namespace met {
       
       // Get shared resources
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
+      auto &e_clip              = info.relative("viewport_guizmo")("clip_point").getw<bool>();
       
       // Visual separator from editing components drawn in previous tasks
       ImGui::SeparatorText("Mismatch Volume");
+
+      // Toggle button for clipping
+      ImGui::Checkbox("Clip to volume", &e_clip);
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Metamers can only be correctly generated inside the volume");
       
       // Declare scoped ImGui style state to remove border padding
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f), 
                            ImGui::ScopedStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f })};
-                          
+      
       ImGui::BeginChild("##viewport_image_view");
 
       // Compute viewport size s.t. texture fills rest of window
@@ -228,10 +168,12 @@ namespace met {
       // Get shared resources
       const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_scene = info.global("scene").getr<Scene>();
+      const auto &e_uplf  = e_scene.components.upliftings[e_cs.uplifting_i].value;
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
 
       // Activate only if parent task triggers and vertex mismatching requires rendering
-      return info.parent()("is_active").getr<bool>() && e_vert.has_mismatching();
+      return info.parent()("is_active").getr<bool>() 
+          && e_vert.has_mismatching(e_scene, e_uplf);
     }
 
     void init(SchedulerHandle &info) override {
@@ -305,15 +247,18 @@ namespace met {
       // Get handles, shared resources, etc
       const auto &e_scene = info.global("scene").getr<Scene>();
       const auto &e_cs    = info.parent()("selection").getr<ConstraintRecord>();
+      const auto &e_uplf  = e_scene.components.upliftings[e_cs.uplifting_i].value;
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
       
-      return ImGui::IsItemHovered() && e_vert.has_mismatching();
+      return ImGui::IsItemHovered() 
+          && e_vert.has_mismatching(e_scene, e_uplf);
     }
 
     void init(SchedulerHandle &info) override {
       met_trace();
       info("is_active").set(false);       // Make is_active available to detect guizmo edit
       info("closest_point").set<Colr>(0); // Expose closest point in convex hull to other tasks
+      info("clip_point").set<bool>(true);
     }
   
     void eval(SchedulerHandle &info) override {
@@ -324,6 +269,10 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
+      auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
+      const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
+      const auto &e_hull    = e_hulls[e_cs.vertex_i];
+      const auto &i_clip    = info("clip_point").getr<bool>();
 
       // Visitor to access underlying color value
       auto get_colr = [](const Uplifting::Vertex &vert) -> Colr {
@@ -354,21 +303,23 @@ namespace met {
 
         // Register gizmo drag; apply world-space delta
         if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-          const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-
           // Apply delta to color value
           auto trf_colr = (delta * get_colr(e_vert)).eval();
 
           // Store color and expose clamped color to other tasks
           set_colr(info.global("scene").getw<Scene>().uplifting_vertex(e_cs), trf_colr);
-          info("closest_point").set<Colr>(detail::find_closest_point_in_convex_hull(trf_colr, e_chull));
+
+          // Expose a marker point for the snap position inside the convex hull;
+          // don't snap as it feels weird while moving the point
+          info("closest_point").set<Colr>(e_hull.find_closest_interior(trf_colr));
         }
 
         // Register gizmo end; apply vertex position to scene save state
         if (m_gizmo.end_delta()) {
-          // Snap vertex position to inside convex hull, if necessary
-          const auto &e_chull = info.relative("viewport_gen_mmv")("chull").getr<AlMesh>();
-          auto cstr_colr = detail::find_closest_point_in_convex_hull(get_colr(e_vert), e_chull);
+          // Clip vertex position to inside convex hull, if enabled
+          auto cstr_colr = i_clip
+                         ? e_hull.find_closest_interior(get_colr(e_vert))
+                         : get_colr(e_vert);
 
           // Handle save
           info.global("scene").getw<Scene>().touch({
@@ -390,7 +341,7 @@ namespace met {
     met_trace();
 
     info("is_active").set(true); // Make is_active available to detect window presence
-
+    
     // Make selection available
     m_cs = info("selection").set(std::move(m_cs)).getr<ConstraintRecord>();
 

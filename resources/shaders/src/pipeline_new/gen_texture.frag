@@ -85,7 +85,7 @@ void main() {
     guard_continue(err < result_err);
     result_err  = err;
     result_bary = bary;
-    result_indx = j + buff_uplift_data.offs;
+    result_indx = j; // + buff_uplift_data.offs;
   } // for (uint j)
 
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
@@ -97,8 +97,7 @@ void main() {
     coeffs[i] = 0.f;
     for (uint j = 0; j < 4; ++j)
       coeffs[i] += result_bary[j] 
-                 * buff_uplift_coef.data[result_indx][j][i];
-    // coeffs[i] = clamp(coeffs[i], -1, 1);
+                 * buff_uplift_coef.data[result_indx][j][i]; // TODO get the coefficients of the correct constraints here
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients

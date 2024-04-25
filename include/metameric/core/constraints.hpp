@@ -8,12 +8,15 @@
 #include <utility>
 
 namespace met {
+  using MetamerSample = std::pair<Spec, Basis::vec_type>;
+
   // Small helper struct for implementations of is_colr_constraint
   struct ColrConstraint {
     uint cmfs_j = 0, illm_j = 0; // Index of observer and illuminant functions in scene data
     Colr colr_j = 0.f;           // Color under this direct color system
 
     bool operator==(const ColrConstraint &o) const;
+    bool is_similar(const ColrConstraint &o) const;
   };
 
   // Concept for a constraint on metameric behavior used throughout the application's
@@ -29,10 +32,10 @@ namespace met {
 
     // The constraint does or does not allow for configuration 
     // through metameric mismatch editing in its current state
-    { t.has_mismatching() } -> std::same_as<bool>;
+    { t.has_mismatching(scene, uplifting) } -> std::same_as<bool>;
 
     // The constraint allows for realizing mismatch volume sample points, if has_mismatching() is true
-    { t.realize_mismatching(scene, uplifting, csys_i, seed, samples) } -> std::same_as<std::vector<Colr>>;
+    { t.realize_mismatching(scene, uplifting, csys_i, seed, samples) } -> std::same_as<std::vector<std::tuple<Colr, Spec, Basis::vec_type>>>;
   };
 
   // Concept defining the expected components of color-system constraints
@@ -72,14 +75,19 @@ namespace met {
     }
 
     // Generate points on the constraint's metamer mismatching volume
-    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
+    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
       return { };
     }
 
   public:
-    // The constraint data is in a valid state for metameric mismatching
-    bool has_mismatching() const {
+    // The constraint data is in a invalid state for metameric mismatching
+    bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const {
       return false;
+    }
+
+    // The constraint always produces the same mismatching; none
+    bool equal_mismatching(const Scene &scene, const Uplifting &uplifting, const MeasurementConstraint &o, uint csys_i) {
+      return true;
     }
 
   public:
@@ -104,11 +112,11 @@ namespace met {
     std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
-    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
+    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
 
   public:
     // The constraint data is in a valid state for metameric mismatching
-    bool has_mismatching() const;
+    bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const;
     
   public:
     bool operator==(const DirectColorConstraint &o) const;
@@ -130,7 +138,7 @@ namespace met {
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
 
     // The constraint data is in a valid state for metameric mismatching
-    bool has_mismatching() const;
+    bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const;
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
@@ -143,7 +151,7 @@ namespace met {
     std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
-    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
+    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
 
   public:
     bool operator==(const DirectSurfaceConstraint &o) const;
@@ -170,7 +178,7 @@ namespace met {
     bool has_surface() const { return surface.is_valid() && surface.record.is_object(); }
 
     // The constraint data is in a valid state for metameric mismatching
-    bool has_mismatching() const;
+    bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const;
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
@@ -183,7 +191,7 @@ namespace met {
     std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
-    std::vector<Colr> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
+    std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const;
 
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;

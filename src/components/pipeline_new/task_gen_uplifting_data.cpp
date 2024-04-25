@@ -32,8 +32,12 @@ namespace met {
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_uplifting = e_scene.components.upliftings[m_uplifting_i];
 
-     // Force on first run, then make dependent on uplifting only
-    return is_first_eval() || e_uplifting;
+    // Force on first run, then make dependent on uplifting only, or
+    // if some uplifting is still in progress
+    return is_first_eval() 
+        || e_uplifting
+        || rng::any_of(m_mismatch_builders, 
+                       [](const auto &builder) { return builder.needs_increment(); });
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -59,8 +63,9 @@ namespace met {
 
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
+    info("mismatch_hulls").set<std::vector<ConvexHull>>({});
     info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
-    info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
+    /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
       if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
         const auto &e_scene = info.global("scene").getr<Scene>();
         const auto &[e_uplifting, e_state] 
@@ -91,11 +96,22 @@ namespace met {
         }
       }
       ImGui::End();
-    });
+    }); */
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
+
+    /* 
+      Gameplan
+      1.  [X] Generate color system boundary
+      1a. [X] Generate spectra + coeffs along boundary
+      2.  [ ] Per constraint
+      2a. [ ] If there is no mismatching, realize spectrum
+      2b. [ ] If there is mismatching, realize N boundary spectra (given necessity)
+      2c. [ ] Given boundary spectra, reconstruct spectra + coeffs at correct position
+      3.  [X] Push stuff to GPU for fun and profit
+     */
 
     // Get const external uplifting; note that mutable caches are accessible
     const auto &e_scene = info.global("scene").getr<Scene>();
@@ -150,7 +166,41 @@ namespace met {
     std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_spectra), m_tesselation_spectra.begin());
     std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_coeffs),  m_tesselation_coeffs.begin());
 
-    // 2. Generate constraint spectra
+    // 2. Generate constraint spectra;
+    // We rely on MismatchingConstraintBuilder to make a nice shortcut
+    if (e_state.verts.is_resized())
+      m_mismatch_builders.resize(e_uplifting.verts.size());
+
+    // Note; disable top-level parallellism, as typically the user modified only one constraint,
+    // and this way parallellism at the solver level remains... functional
+    // #pragma omp parallel for
+    for (int i = 0; i < e_uplifting.verts.size(); ++i) {
+      // If a state change occurred, restart incremental mmv build
+      if (!m_mismatch_builders[i].has_equal_mismatching(e_uplifting.verts[i]) || csys_stale)
+        m_mismatch_builders[i].clear_increment(e_uplifting.verts[i]);
+        
+      // If the incremental mmv build has stopped running, we can exit early
+      guard_continue(e_state.verts[i] || m_mismatch_builders[i].needs_increment());
+
+      // Generate vertex color, attached metamer, and its originating coefficients
+      // This is handled by a MismatchingConstraintBuilder object, which implements
+      // a nice shortcut to avoid expensive solver calls especially for indirect mmvs
+      auto [c, s, coef] = m_mismatch_builders[i].generate(e_uplifting.verts[i], e_scene, e_uplifting);
+      
+      // Add to set of spectra and coefficients
+      m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
+      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = coef;
+
+      // We only update vertices in the tesselation if the 'primary' has updated
+      // as otherwise we'd trigger re-tesselation on every constraint modification
+      Colr prev_c = m_tesselation_points[m_csys_boundary_spectra.size() + i];
+      if (!prev_c.isApprox(c)) {
+        m_tesselation_points[m_csys_boundary_spectra.size() + i] = c;
+        tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
+      }
+    }
+
+    /* // 2. Generate constraint spectra
     // Iterate over stale constraint data, and generate corresponding spectra
     #pragma omp parallel for
     for (int i = 0; i < e_uplifting.verts.size(); ++i) {
@@ -174,7 +224,7 @@ namespace met {
         m_tesselation_points[m_csys_boundary_spectra.size() + i] = c;
         tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
       }
-    } // for (int i)
+    } // for (int i) */
 
     // 3. Generate color system tesselation
     if (tssl_stale) {
@@ -281,6 +331,15 @@ namespace met {
       i_constraint_coeffs.resize(e_uplifting.verts.size());      
       rng::copy(m_tesselation_coeffs  | vws::drop(m_csys_boundary_coeffs.size()), 
                 i_constraint_coeffs.begin());
+    }
+
+    // 7. Expose mismatch volume hull data for visualization and UI parts
+    if (!m_mismatch_builders.empty() && rng::any_of(m_mismatch_builders, [](const auto &m) {
+      return m.did_increment();
+    })) {
+      auto &i_mismatch_hull = info("mismatch_hulls").getw<std::vector<ConvexHull>>();
+      i_mismatch_hull.resize(m_mismatch_builders.size());
+      rng::transform(m_mismatch_builders, i_mismatch_hull.begin(), &MismatchingConstraintBuilder::chull);
     }
   }
 
