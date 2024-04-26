@@ -124,8 +124,8 @@ namespace met {
   bool Uplifting::Vertex::has_surface() const {
     met_trace();
     return constraint | visit {
-      [](const is_surface_constraint auto &v) { return true; },
-      [](const auto &) { return false; },
+      [](const is_surface_constraint auto &) { return true;  },
+      [](const auto &)                       { return false; },
     };
   }
 

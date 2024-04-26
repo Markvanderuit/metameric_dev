@@ -59,8 +59,6 @@ namespace met {
     // Generate view over all SurfaceInfos for constraints that need to be drawn
     auto surfaces = e_active_constraints
                   | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
-                  | vws::filter(&Uplifting::Vertex::is_active)
-                  | vws::filter(&Uplifting::Vertex::has_surface)
                   | vws::transform([](const auto &v) { return v.surface(); });
 
     // Draw vertex for each visible vertex at its surface

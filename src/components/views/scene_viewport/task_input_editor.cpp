@@ -245,7 +245,7 @@ namespace met {
         guard_continue(info.task(str).is_init());
         
         // Only active surface constraints are shown
-        guard_continue(vert.is_active || vert.has_surface());
+        guard_continue(vert.is_active && vert.has_surface());
 
         // Push back relevant constraints
         i_active_constraints.push_back({ .uplifting_i = i, .vertex_i = j });
