@@ -75,7 +75,7 @@ namespace met {
               lrgb = srgb_to_lrgb(srgb);
 
             // Roundtrip error
-            Colr err = (lrgb - e_scene.csys(0)(e_spectra[e_cs.vertex_i])).abs();
+            Colr err = (lrgb - e_scene.csys(uplf.value.csys_i)(e_spectra[e_cs.vertex_i])).abs();
             ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
           }
 
@@ -147,9 +147,7 @@ namespace met {
           auto baseline_spr_name = std::format("Base constraint ({})", e_scene.resources.observers[e_scene.components.observer_i.value].name);
           ImGui::SeparatorText(baseline_spr_name.c_str());
           {
-            {
-              auto csys = e_scene.csys(0);
-              
+            {            
               // lRGB color picker
               Colr &lrgb = cstr.surface.diffuse;
               ImGui::ColorEdit3("Base color (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
@@ -160,7 +158,7 @@ namespace met {
                 lrgb = srgb_to_lrgb(srgb);
                 
               // Roundtrip error
-              Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
+              Colr err = (lrgb - e_scene.csys(uplf.value.csys_i)(e_spectra[e_cs.vertex_i])).abs();
               ImGui::InputFloat3("Base color (error)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             }
             {

@@ -145,8 +145,14 @@ namespace met {
 
   Colr MeasurementConstraint::position(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
-    CMFS csys = scene.csys(uplifting.csys_i).finalize();
-    return (csys.transpose() * measure.matrix()).eval();
+    return scene.csys(uplifting.csys_i)(measure);
+  }
+  
+  std::pair<Spec, Basis::vec_type> MeasurementConstraint::realize(const Scene &scene, const Uplifting &uplifting) const { 
+    auto basis = scene.resources.bases[uplifting.basis_i].value();
+    SpectrumCoeffsInfo spec_info = { .spec = measure, .basis = basis };
+    return generate_spectrum(spec_info); // fit basis to reproduce measure
+    // return { measure, Basis::vec_type(0) }; 
   }
 
   std::pair<Spec, Basis::vec_type> DirectColorConstraint::realize(const Scene &scene, const Uplifting &uplifting) const {

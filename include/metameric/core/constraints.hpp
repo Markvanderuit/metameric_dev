@@ -70,9 +70,7 @@ namespace met {
     Colr position(const Scene &scene, const Uplifting &uplifting) const;
 
     // Simply return the constraint's measure
-    std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const { 
-      return { measure, Basis::vec_type(0) }; // TODO fit basis to reproduce measure
-    }
+    std::pair<Spec, Basis::vec_type> realize(const Scene &scene, const Uplifting &uplifting) const;
 
     // Generate points on the constraint's metamer mismatching volume
     std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene &scene, const Uplifting &uplifting, uint csys_i, uint seed, uint samples) const {
@@ -104,7 +102,6 @@ namespace met {
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
     Colr position(const Scene &scene, const Uplifting &uplifting) const { 
-      met_trace();
       return colr_i;
     }
 

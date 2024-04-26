@@ -561,7 +561,6 @@ namespace met {
       tbb_output.push_back(c);
     }
     
-    
     return std::vector<Basis::vec_type>(range_iter(tbb_output));
   }
 

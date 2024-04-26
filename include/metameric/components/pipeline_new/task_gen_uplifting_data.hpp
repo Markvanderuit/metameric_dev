@@ -10,55 +10,82 @@
 #include <small_gl/buffer.hpp>
 #include <queue>
 #include <unordered_set>
-#include <unordered_map>
 
 namespace met {
   constexpr static uint mmv_uplift_samples_max  = 256u;
   constexpr static uint mmv_uplift_samples_iter = 16u;
 
-  // Helper struct to recover spectra by "rolling" mismatch volume generation, which
-  // seems to be much simpler than solving for spectra directly, at least in the
-  // indirect case.
-  struct MismatchingConstraintBuilder {
-    using map_type      = std::unordered_map<Colr, 
-                                             Basis::vec_type, 
-                                             eig::detail::matrix_hash_t<Colr>,
-                                             eig::detail::matrix_equal_t<Colr>>;
-    using set_colr_type = std::unordered_set<Colr, eig::detail::matrix_hash_t<Colr>, eig::detail::matrix_equal_t<Colr> >;
-    using deq_colr_type = std::deque<Colr>;
-    using deq_coef_type = std::deque<Basis::vec_type>;
-    using cnstr_type    = typename Uplifting::Vertex::cnstr_type;
-    
+  // Helper struct to recover spectra by "rolling" mismatch volume generation. The resulting
+  // convex structure is then sampled for interior spectra. This is much faster than solving
+  // for metamers inside the convex structure directly.
+  struct MetamerConstraintBuilder {
+    ConvexHull chull; // Convex hull data is exposed for UI components to use
+  
   private:
-    set_colr_type m_colr_set      = { };                     // For tracking overlapping or collapsed volume samples
-    deq_colr_type m_colr_deq      = { };                     // For tracking incoming and exiting samples' positions
-    deq_coef_type m_coef_deq      = { };                     // For tracking incoming and exiting samples' coefficeints
-    uint          m_seed          = 0;                       // For progressive sampling
-    uint          m_curr_deq_size = 0;                       // For tracking how many points in the deque are "active"
-    bool          m_did_increment = false;                   // Cache; did we increment?
-    cnstr_type    m_cstr_cache    = DirectColorConstraint(); // Cache of vertex constraint, prevent unnecessary changes
-    
-  public:
-    ConvexHull chull;
+    using cnstr_type = typename Uplifting::Vertex::cnstr_type;
 
-    std::tuple<Colr, Spec, Basis::vec_type> generate(const Uplifting::Vertex &vert, const Scene &scene, const Uplifting &uplifting) {
+    bool                        m_did_sample    = false;                   // Cache; did we gene this iteration?
+    std::deque<Colr>            m_colr_samples  = { };                     // For tracking incoming and exiting samples' positions
+    std::deque<Basis::vec_type> m_coef_samples  = { };                     // For tracking incoming and exiting samples' coefficeints
+    uint                        m_curr_samples  = 0;                       // How many samples are of the current vertex constraint
+    uint                        m_prev_samples  = 0;                       // How many samples are of an old vertex constriant
+    cnstr_type                  m_cstr_cache    = DirectColorConstraint(); // Cache of current vertex constraint, to detect mismatch volume change
+
+    void insert(std::span<const std::tuple<Colr, Spec, Basis::vec_type>> samples) {
+      met_trace();
+      // If old samples exist, these need to be incrementally discarded,
+      // figure out which parts to discard at the front before adding new samples
+      if (m_prev_samples > 0) {
+        auto reduce_size = std::min({ static_cast<uint>(samples.size()),
+                                      static_cast<uint>(m_colr_samples.size()),
+                                      m_prev_samples });
+        m_prev_samples -= reduce_size;
+        m_colr_samples.erase(m_colr_samples.begin(), m_colr_samples.begin() + reduce_size);
+        m_coef_samples.erase(m_coef_samples.begin(), m_coef_samples.begin() + reduce_size);
+      }
+
+      // Add new samples to the end of the queue
+      m_colr_samples.append_range(samples | vws::elements<0>);
+      m_coef_samples.append_range(samples | vws::elements<2>);
+
+      // Determine extents of current full point set
+      auto maxb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.max(b).eval(); }).value();
+      auto minb = rng::fold_left_first(m_colr_samples, [](auto a, auto b) { return a.min(b).eval(); }).value();
+
+      // Minimum threshold for convex hull generation exceeds simplex size,
+      // because QHull can throw a fit on small inputs
+      if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
+        chull = ConvexHull::build(m_colr_samples | rng::to<std::vector>());
+      } else {
+        chull = { };
+      }
+    }
+
+  public: // Public methods
+    // Generate a spectrum and matching color in the uplifting's color system
+    std::tuple<Colr, Spec, Basis::vec_type> realize(const Uplifting::Vertex &vert, const Scene &scene, const Uplifting &uplifting) {
       met_trace();
 
       constexpr static uint hardcoded_csys_j = 0u;
 
-      // Update convex hull samples
+      // Update convex hull samples, or discard them if mismatching is not possible
       if (vert.has_mismatching(scene, uplifting)) {
-        if (needs_increment()) {
-          increment(vert.realize_mismatching(scene, uplifting, hardcoded_csys_j, m_seed, mmv_uplift_samples_iter));
-          m_seed += mmv_uplift_samples_iter;
-          m_did_increment = true;
-        } else {
-          m_did_increment = false;
+        if (m_did_sample = !is_converged(); m_did_sample) {
+          auto samples = vert.realize_mismatching(scene, uplifting, hardcoded_csys_j, m_curr_samples, mmv_uplift_samples_iter);
+          insert(samples);
+          m_curr_samples += mmv_uplift_samples_iter;
         }
       } else {
-        clear_all();
+        // If mismatching is not possible, clear internal state entirely
+        chull          = { };
+        m_curr_samples = 0;
+        m_prev_samples = 0;
+        m_did_sample   = true;
+        m_colr_samples.clear();
+        m_coef_samples.clear();
       }
 
+      // If a mismatch volume exists
       if (chull.has_delaunay()) {
         // We use the convex hull to quickly find a metamer, instead of doing costly
         // nonlinear solver runs
@@ -67,83 +94,43 @@ namespace met {
         // Find the best enclosing simplex in the convex hull, and then find
         // the coefficients for that mismatching
         auto [bary, elem] = chull.find_enclosing_elem(p);
-        auto coeffs       = elem | index_into_view(m_coef_deq) | rng::to<std::vector>();
+        auto coeffs       = elem | index_into_view(m_coef_samples) | rng::to<std::vector>();
 
         // Linear combination reconstructs coefficients for this metamer
-        auto coef =(bary[0] * coeffs[0]
-                  + bary[1] * coeffs[1]
-                  + bary[2] * coeffs[2]
-                  + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
+        auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
+                  + bary[2] * coeffs[2] + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
         auto spec = scene.resources.bases[uplifting.basis_i].value()(coef);
         auto colr = scene.csys(uplifting.csys_i)(spec);
         return { colr, spec, coef };
       } else {
-        // Fall back; let vertex' underlying solver handle constraint, probably
-        // outputting a default metamer that does not satisfy constraints. Either
+        // Fallback; let a solver handle the constraint, potentially
+        // outputting a metamer that does not satisfy all constraints. Either
         // there are no constraints, or the constraints conflict somehow
         return vert.realize(scene, uplifting);
       }
     }
 
-    void increment(std::span<const std::tuple<Colr, Spec, Basis::vec_type>> new_data) {
-      met_trace();
-      
-      m_colr_set.insert_range(new_data | vws::elements<0>);
-
-      // If old, stale samples exist and need to be incrementally discarded,
-      // figure out which parts to discard as new samples come in
-      if (m_curr_deq_size > 0) {
-        auto reduce_size = std::min({ static_cast<uint>(new_data.size()),
-                                      static_cast<uint>(m_colr_deq.size()),
-                                      m_curr_deq_size });
-        m_curr_deq_size -= reduce_size;
-        m_colr_deq.erase(m_colr_deq.begin(), m_colr_deq.begin() + reduce_size);
-        m_coef_deq.erase(m_coef_deq.begin(), m_coef_deq.begin() + reduce_size);
-      }
-      m_colr_deq.append_range(new_data | vws::elements<0>);
-      m_coef_deq.append_range(new_data | vws::elements<2>);
-
-      // Determine extents of current point sets
-      auto maxb = rng::fold_left_first(m_colr_deq, [](auto a, auto b) { return a.max(b).eval(); }).value();
-      auto minb = rng::fold_left_first(m_colr_deq, [](auto a, auto b) { return a.min(b).eval(); }).value();
-
-      // Minimum threshold for convex hull generation exceeds simplex size,
-      // because QHull can throw a fit on small inputs
-      if (m_colr_set.size() <= 6 || (maxb - minb).minCoeff() <= .005f) {
-        chull = { };
-      } else {
-        chull = ConvexHull::build(std::vector(range_iter(m_colr_deq)));
-      }
+    // Does the builder need to do any sampling work still? Otherwise, generate() just spits out the previous result
+    bool is_converged() const {
+      return (chull.deln.verts.size() - m_prev_samples) >= mmv_uplift_samples_max;
+    }
+    
+    // Did generate() do sampling, thereby making changes
+    bool did_sample() const {
+      return m_did_sample;
     }
 
-    bool has_equal_mismatching(const Uplifting::Vertex &v) const {
+    // Does the underlying cached constraint match that of the current vertex, w.r.t. a generated mismatch region?
+    bool matches_vertex(const Uplifting::Vertex &v) const {
       return v.has_equal_mismatching(m_cstr_cache, 0);
     }
-
-    bool needs_increment() const {
-      return m_colr_set.size() < mmv_uplift_samples_max;
-    }
     
-    bool did_increment() const {
-      return m_did_increment;
-    }
-    
-    void clear_increment(const Uplifting::Vertex &v) {
+    // Set the underlying cached constriant that a mismatch region is built for. Resets sampling.
+    void assign_vertex(const Uplifting::Vertex &v) {
       m_cstr_cache    = v.constraint;
-      m_seed          = 0;
-      m_did_increment = true;
-      m_curr_deq_size = m_colr_deq.size();
-      m_colr_set.clear();
-    }
-
-    void clear_all() {
-      m_seed          = 0;
-      m_curr_deq_size = 0;
-      chull           = { };
-      m_did_increment = true;
-      m_colr_set.clear();
-      m_colr_deq.clear();
-      m_coef_deq.clear();
+      m_curr_samples  = 0;
+      m_did_sample    = true;
+      m_prev_samples  = m_colr_samples.size();
     }
   };
 
@@ -171,7 +158,7 @@ namespace met {
     // ensure we can access all four spectra as one texture sample during rendering
     using SpecPackLayout  = eig::Array<float, wavelength_samples, 4>;
 
-    std::vector<MismatchingConstraintBuilder> m_mismatch_builders;
+    std::vector<MetamerConstraintBuilder> m_mismatch_builders;
 
     // Miscellaneous data
     uint                         m_uplifting_i;

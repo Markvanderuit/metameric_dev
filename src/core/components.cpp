@@ -73,48 +73,47 @@ namespace met {
       [](const auto &) { return Colr(0); },
     };
   }
-
   
-    bool Uplifting::Vertex::has_equal_mismatching(const cnstr_type &other_v, uint csys_i) const {
-      met_trace();
-      guard(constraint.index() == other_v.index(), false);
-      return constraint | visit {
-        [&](const DirectColorConstraint &cstr) {
-          const auto &other = std::get<DirectColorConstraint>(other_v);
-          guard(cstr.colr_i.isApprox(other.colr_i), false);
-          guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
-          if (!cstr.cstr_j.empty()) {
-            guard(cstr.cstr_j[csys_i].is_similar(other.cstr_j[csys_i]), false);
-            for (const auto &[i, cstr_j] : enumerate_view(cstr.cstr_j)) {
-              guard_continue(i != csys_i);
-              if (cstr_j != other.cstr_j[i])
-                return false;
-            }
+  bool Uplifting::Vertex::has_equal_mismatching(const cnstr_type &other_v, uint csys_i) const {
+    met_trace();
+    guard(constraint.index() == other_v.index(), false);
+    return constraint | visit {
+      [&](const DirectColorConstraint &cstr) {
+        const auto &other = std::get<DirectColorConstraint>(other_v);
+        guard(cstr.colr_i.isApprox(other.colr_i), false);
+        guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
+        if (!cstr.cstr_j.empty()) {
+          guard(cstr.cstr_j[csys_i].is_similar(other.cstr_j[csys_i]), false);
+          for (const auto &[i, cstr_j] : enumerate_view(cstr.cstr_j)) {
+            guard_continue(i != csys_i);
+            if (cstr_j != other.cstr_j[i])
+              return false;
           }
-          return true; // only the constraint value differs, same MMV
-        },
-        [&](const DirectSurfaceConstraint &cstr) {
-          const auto &other = std::get<DirectSurfaceConstraint>(other_v);
-          guard(cstr.colr_i.isApprox(other.colr_i), false);
-          guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
-          if (!cstr.cstr_j.empty()) {
-            guard(cstr.cstr_j[csys_i].is_similar(other.cstr_j[csys_i]), false);
-            for (const auto &[i, cstr_j] : enumerate_view(cstr.cstr_j)) {
-              guard_continue(i != csys_i);
-              if (cstr_j != other.cstr_j[i])
-                return false;
-            }
+        }
+        return true; // only the constraint value differs, same MMV
+      },
+      [&](const DirectSurfaceConstraint &cstr) {
+        const auto &other = std::get<DirectSurfaceConstraint>(other_v);
+        guard(cstr.colr_i.isApprox(other.colr_i), false);
+        guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
+        if (!cstr.cstr_j.empty()) {
+          guard(cstr.cstr_j[csys_i].is_similar(other.cstr_j[csys_i]), false);
+          for (const auto &[i, cstr_j] : enumerate_view(cstr.cstr_j)) {
+            guard_continue(i != csys_i);
+            if (cstr_j != other.cstr_j[i])
+              return false;
           }
-          return true; // only the constraint value differs, same MMV
-        },
-        [&](const IndirectSurfaceConstraint &cstr) {
-          const auto &other = std::get<IndirectSurfaceConstraint>(other_v);
-          guard(rng::equal(cstr.powers, other.powers, eig::safe_approx_compare<Spec>), false);
-          return true; // only the constraint value differs, same MMV
-        },
-        [](const auto &) { return true; },
-      };
-    }
+        }
+        return true; // only the constraint value differs, same MMV
+      },
+      [&](const IndirectSurfaceConstraint &cstr) {
+        const auto &other = std::get<IndirectSurfaceConstraint>(other_v);
+        guard(rng::equal(cstr.powers, other.powers, eig::safe_approx_compare<Spec>), false);
+        return true; // only the constraint value differs, same MMV
+      },
+      [](const auto &) { return true; },
+    };
+  }
 
   bool Uplifting::Vertex::has_surface() const {
     met_trace();

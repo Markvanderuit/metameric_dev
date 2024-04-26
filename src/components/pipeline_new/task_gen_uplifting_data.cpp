@@ -37,7 +37,7 @@ namespace met {
     return is_first_eval() 
         || e_uplifting
         || rng::any_of(m_mismatch_builders, 
-                       [](const auto &builder) { return builder.needs_increment(); });
+                       [](const auto &builder) { return !builder.is_converged(); });
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -65,7 +65,7 @@ namespace met {
     info("tesselation_draw").set<gl::DrawInfo>({});
     info("mismatch_hulls").set<std::vector<ConvexHull>>({});
     info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
-    /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
+    info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
       if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
         const auto &e_scene = info.global("scene").getr<Scene>();
         const auto &[e_uplifting, e_state] 
@@ -96,22 +96,11 @@ namespace met {
         }
       }
       ImGui::End();
-    }); */
+    });
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
     met_trace_full();
-
-    /* 
-      Gameplan
-      1.  [X] Generate color system boundary
-      1a. [X] Generate spectra + coeffs along boundary
-      2.  [ ] Per constraint
-      2a. [ ] If there is no mismatching, realize spectrum
-      2b. [ ] If there is mismatching, realize N boundary spectra (given necessity)
-      2c. [ ] Given boundary spectra, reconstruct spectra + coeffs at correct position
-      3.  [X] Push stuff to GPU for fun and profit
-     */
 
     // Get const external uplifting; note that mutable caches are accessible
     const auto &e_scene = info.global("scene").getr<Scene>();
@@ -126,11 +115,11 @@ namespace met {
     const auto &e_images  = e_scene.resources.images;
     
     // Flag tells if the color system spectra have, in any way, been modified
-    bool csys_stale = is_first_eval() || e_state.basis_i || e_basis || e_state.csys_i  || e_csys;
+    bool csys_stale = is_first_eval() || e_state.basis_i || e_basis || e_state.csys_i || e_csys;
 
     // Flag tells if the resulting tesselation has, in any way, been modified;
     // this is set to true in step 2 if necessary
-    bool tssl_stale = is_first_eval() || e_state.verts.is_resized();
+    bool tssl_stale = is_first_eval() || e_state.verts.is_resized() || csys_stale;
 
     // Color system spectra within which the 'uplifted' texture is defined
     auto csys = e_scene.csys(e_csys);
@@ -167,7 +156,7 @@ namespace met {
     std::copy(std::execution::par_unseq, range_iter(m_csys_boundary_coeffs),  m_tesselation_coeffs.begin());
 
     // 2. Generate constraint spectra;
-    // We rely on MismatchingConstraintBuilder to make a nice shortcut
+    // We rely on MetamerConstraintBuilder to make a nice shortcut
     if (e_state.verts.is_resized())
       m_mismatch_builders.resize(e_uplifting.verts.size());
 
@@ -175,17 +164,17 @@ namespace met {
     // and this way parallellism at the solver level remains... functional
     // #pragma omp parallel for
     for (int i = 0; i < e_uplifting.verts.size(); ++i) {
-      // If a state change occurred, restart incremental mmv build
-      if (!m_mismatch_builders[i].has_equal_mismatching(e_uplifting.verts[i]) || csys_stale)
-        m_mismatch_builders[i].clear_increment(e_uplifting.verts[i]);
+      auto &builder = m_mismatch_builders[i];
+      
+      // If a state change occurred, restart spectrum builder
+      if (csys_stale || !builder.matches_vertex(e_uplifting.verts[i]))
+        builder.assign_vertex(e_uplifting.verts[i]);
         
-      // If the incremental mmv build has stopped running, we can exit early
-      guard_continue(e_state.verts[i] || m_mismatch_builders[i].needs_increment());
+      // If the vertex was not edited, or the metamer builder has converged, we can exit early
+      guard_continue(e_state.verts[i] || !builder.is_converged());
 
       // Generate vertex color, attached metamer, and its originating coefficients
-      // This is handled by a MismatchingConstraintBuilder object, which implements
-      // a nice shortcut to avoid expensive solver calls especially for indirect mmvs
-      auto [c, s, coef] = m_mismatch_builders[i].generate(e_uplifting.verts[i], e_scene, e_uplifting);
+      auto [c, s, coef] = builder.realize(e_uplifting.verts[i], e_scene, e_uplifting);
       
       // Add to set of spectra and coefficients
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
@@ -246,8 +235,7 @@ namespace met {
       });
 
       // Print size of new tesselation
-      fmt::print("Uplifting tesselation: {} verts, {} elems\n", 
-        m_tesselation.verts.size(), m_tesselation.elems.size());
+      fmt::print("Uplifting tesselation: {} verts, {} elems\n", m_tesselation.verts.size(), m_tesselation.elems.size());
 
       // Update packing layout data
       m_tesselation_data_map->elem_offs = max_supported_constraints * m_uplifting_i;
@@ -335,11 +323,11 @@ namespace met {
 
     // 7. Expose mismatch volume hull data for visualization and UI parts
     if (!m_mismatch_builders.empty() && rng::any_of(m_mismatch_builders, [](const auto &m) {
-      return m.did_increment();
+      return m.did_sample();
     })) {
       auto &i_mismatch_hull = info("mismatch_hulls").getw<std::vector<ConvexHull>>();
       i_mismatch_hull.resize(m_mismatch_builders.size());
-      rng::transform(m_mismatch_builders, i_mismatch_hull.begin(), &MismatchingConstraintBuilder::chull);
+      rng::transform(m_mismatch_builders, i_mismatch_hull.begin(), &MetamerConstraintBuilder::chull);
     }
   }
 
