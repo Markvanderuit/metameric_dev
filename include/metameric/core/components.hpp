@@ -136,7 +136,7 @@ namespace met {
       bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const; // Does the underlying constraint allow for mismatching?
       bool has_surface()                                                   const; // Does the underlying constraint expose surface data?
       const SurfaceInfo &surface() const;
-            SurfaceInfo &surface();
+      void set_surface(const SurfaceInfo &sr);
     };
 
   public: // Public members

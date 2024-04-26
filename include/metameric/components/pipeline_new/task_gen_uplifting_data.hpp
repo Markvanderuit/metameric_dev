@@ -54,7 +54,8 @@ namespace met {
 
       // Minimum threshold for convex hull generation exceeds simplex size,
       // because QHull can throw a fit on small inputs
-      if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
+      // if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
+      if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
         chull = ConvexHull::build(m_colr_samples | rng::to<std::vector>());
       } else {
         chull = { };
@@ -71,6 +72,8 @@ namespace met {
         if (m_did_sample = !is_converged(); m_did_sample) {
           auto samples = vert.realize_mismatch(scene, uplifting, m_curr_samples, mmv_uplift_samples_iter);
           insert(samples);
+          fmt::print("Sampled: {}\n", samples.size());
+          fmt::print("Samples: {}\n", samples | vws::elements<0> | rng::to<std::vector>());
           m_curr_samples += mmv_uplift_samples_iter;
         }
       } else {

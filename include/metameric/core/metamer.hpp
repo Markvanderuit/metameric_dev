@@ -36,7 +36,7 @@ namespace met {
     using DirectConstraint = std::pair<ColrSystem, Colr>;
 
   public:
-    std::vector<ColrSystem>       direct_objectives  = { }; // Direct objective function in two parts
+    std::vector<ColrSystem>       direct_objectives  = { }; // Direct objective functions
     std::vector<DirectConstraint> direct_constraints = { }; // Direct metamerism constraints
 
     const Basis &basis;  // Spectral basis functions
@@ -49,12 +49,12 @@ namespace met {
   // mismatching between signal in a number of base color systems, and a interreflection system
   // expressed as a truncated power series
   struct IndirectMismatchingOCSInfo {
-    using DirectConstraint = std::pair<ColrSystem,         Colr>;
+    using DirectConstraint   = std::pair<ColrSystem,         Colr>;
     using IndirectConstraint = std::pair<IndirectColrSystem, Colr>;
       
   public:
-    ColrSystem                      direct_objective;           // Direct part of the objective function
-    IndirectColrSystem              indirect_objective;         // Indirect part of the objective function
+    std::vector<ColrSystem>         direct_objectives    = { }; // Direct parts of the objective function
+    std::vector<IndirectColrSystem> indirect_objectives  = { }; // Indirect parts of the objective function
     std::vector<DirectConstraint>   direct_constraints   = { }; // Direct metamerism constraints
     std::vector<IndirectConstraint> indirect_constraints = { }; // Indirect metamerism constraints
 

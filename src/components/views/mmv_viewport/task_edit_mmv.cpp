@@ -44,17 +44,21 @@ namespace met {
       // Plotter for the current constraint's resulting radiance
       // (only for IndirectSurfaceConstraint, really)
       vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) {
-        guard(!cstr.powers.empty());
+        guard(!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty());
 
         // Reconstruct radiance from truncated power series
         Spec r = e_spectra[e_cs.vertex_i];
-        Spec s = cstr.powers[0];
-        for (uint i = 1; i < cstr.powers.size(); ++i)
-          s += r.pow(static_cast<float>(i)) * cstr.powers[i];
+        Spec s = cstr.cstr_j.back().powr_j[0];
+        float s_max = 0.f;
+        for (uint i = 1; i < cstr.cstr_j.back().powr_j.size(); ++i) {
+          s += r.pow(static_cast<float>(i)) * cstr.cstr_j.back().powr_j[i];
+          s_max = std::max(s_max, cstr.cstr_j.back().powr_j[i].maxCoeff());
+        }
 
         // Plot estimated radiance
-        ImGui::SeparatorText("Radiance spectrum");
+        ImGui::SeparatorText("Radiance and powers");
         ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 80.f * e_window.content_scale() });
+        ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 120.f * e_window.content_scale() });
       });
       
       // Visit the underlying constraint data
@@ -132,12 +136,16 @@ namespace met {
             }
 
             if (ImGui::Button("New constraint")) {
-              cstr.cstr_j.push_back(ColrConstraint { .cmfs_j = 0, .illm_j = 0, .colr_j = 0.f });
+              cstr.cstr_j.push_back(ColrConstraint { });
             }
           }
         },
         [&](IndirectSurfaceConstraint &cstr) {
-          if (!cstr.has_surface() || cstr.powers.empty()) {
+          if (ImGui::Button("New constraint")) {
+            cstr.cstr_j.push_back(IndirectSurfaceConstraint::PowrConstraint { });
+          }
+          
+          if (cstr.cstr_j.empty() || !cstr.cstr_j.back().surface.is_valid()) {
             ImGui::Text("Invalid constraint");
             return;
           }
@@ -147,7 +155,7 @@ namespace met {
           {
             {            
               // lRGB color picker
-              Colr &lrgb = cstr.surface.diffuse;
+              Colr &lrgb = cstr.colr_i;
               ImGui::ColorEdit3("Base color (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
 
               // sRGB color picker
@@ -159,24 +167,23 @@ namespace met {
               Colr err = (lrgb - e_scene.csys(uplf.value.csys_i)(e_spectra[e_cs.vertex_i])).abs();
               ImGui::InputFloat3("Base color (error)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             }
-            {
-              IndirectColrSystem csys = {
-                .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-                .powers = cstr.powers
-              };
+            for (uint i = 0; i < cstr.cstr_j.size(); ++i) {
+              // Assemble non-linear color system
+              auto &c = cstr.cstr_j[i];
+              IndirectColrSystem csys = { .cmfs = e_scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j };
 
               // lRGB color picker
-              Colr &lrgb = cstr.colr;
-              ImGui::ColorEdit3("Constraint (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
-
+              Colr &lrgb = c.colr_j;
+              ImGui::ColorEdit3(std::format("Constraint {} (lrgb)", i).c_str(), lrgb.data(), ImGuiColorEditFlags_Float);
+              
               // sRGB color picker
               Colr srgb = lrgb_to_srgb(lrgb);
-              if (ImGui::ColorEdit3("Constraint (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
+              if (ImGui::ColorEdit3(std::format("Constraint {} (srgb)", i).c_str(), srgb.data(), ImGuiColorEditFlags_Float));
                 lrgb = srgb_to_lrgb(srgb);
                 
               // Roundtrip error
               Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
-              ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+              ImGui::InputFloat3(std::format("Constraint {} (error)", i).c_str(), err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             }
           }
 

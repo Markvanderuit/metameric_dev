@@ -25,7 +25,7 @@ namespace met {
   private:
     RayRecord                   eval_ray_query(SchedulerHandle &info, const Ray &ray);
     std::span<const PathRecord> eval_path_query(SchedulerHandle &info, uint spp);
-    void build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &is, IndirectSurfaceConstraint &cstr);
+    void build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &is, IndirectSurfaceConstraint::PowrConstraint &cstr);
 
   public:
     bool is_active(SchedulerHandle &info) override;

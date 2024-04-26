@@ -150,8 +150,11 @@ namespace met {
 
   Basis::vec_type generate_spectrum_coeffs(const IndirectSpectrumInfo &info) {
     met_trace();
+
+    // TODO not implemented, not used; we really want to avoid solving this problem here
+    return Basis::vec_type(0);
     
-    // Generate surrounding boundary spectra
+    /* // Generate surrounding boundary spectra
     IndirectMismatchingOCSInfo ocs_info = {
       .direct_objective   = info.direct_constraints[0].first,
       .indirect_objective = info.indirect_constraints[0].first,
@@ -166,7 +169,7 @@ namespace met {
     auto [bary, bary_i] = chull.find_enclosing_elem(info.indirect_constraints[0].second);
     
     return (bary[0] * coeffs[0] + bary[1] * coeffs[1] +
-            bary[2] * coeffs[2] + bary[3] * coeffs[3]).eval();
+            bary[2] * coeffs[2] + bary[3] * coeffs[3]).eval(); */
   }
 
   Basis::vec_type generate_spectrum_coeffs_2(const IndirectSpectrumInfo &info) {
@@ -416,14 +419,16 @@ namespace met {
   std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info) {
     met_trace();
 
-    // Sample unit vectors in 6d
-    auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
-
     // Output data structure 
     tbb::concurrent_vector<Basis::vec_type> tbb_output;
-    tbb_output.reserve(samples.size());
+    tbb_output.reserve(info.n_samples);
     
     if constexpr (use_basis_indirect_mismatch) {
+      // Sample unit vectors in nd; total nr. of objectives is counted
+      auto samples_nd = detail::gen_unit_dirs(info.direct_objectives.size() + 
+                                              info.indirect_objectives.size(),
+                                              info.n_samples, info.seed);
+      
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init       = 0.05,
@@ -451,7 +456,66 @@ namespace met {
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
                                           .tol = 1e-3 });
       }
-      
+
+      // Add indirect color system equality constraints, upholding uplifting roundtrip
+      for (const auto [csys, colr] : info.indirect_constraints) {
+        using vec = eig::Vector<ad::real1st, wavelength_bases>;
+
+        auto A = csys.finalize(false)
+               | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
+               | rng::to<std::vector>();
+        auto b = lrgb_to_xyz(colr).cast<double>().eval();
+
+        for (uint j = 0; j < 3; ++j) {
+          solver.eq_constraints.push_back({ .f = ad::wrap_capture<wavelength_bases>(
+          [A = A
+             | vws::transform([j](const auto &cmfs) { return cmfs.row(j).transpose().eval(); })
+             | rng::to<std::vector>(), 
+           b = b[j], 
+           B = info.basis.func.matrix().cast<double>().eval()](const vec &x) {
+            auto r = (B * x.matrix()).eval(); // Compute full reflectance
+
+            // A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
+            auto Ax = A[0].sum() 
+                    + A[1].dot(r);
+            for (uint i = 2; i < A.size(); ++i) {
+              r.array() *= r.array();
+              Ax        += A[i].dot(r);
+            }
+
+            // f(x) = ||Ax - b||; 
+            return Ax - b;
+
+            /* // A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
+            auto Ax = (A[0].rowwise().sum() + A[1] * r).eval();
+            for (uint i = 2; i < A.size(); ++i) {
+              r.array() *= r.array();
+              Ax        += A[i] * r;
+            }
+
+            // f(x) = ||Ax - b||; 
+            return (Ax.array() - b).matrix().norm(); */
+          }), .tol = 1e-3 });
+        } // for (uint j)
+      }
+
+      // Helper fill value
+      eig::MatrixXf S_indrct_zero(wavelength_samples, 3 * info.indirect_objectives.size());
+      S_indrct_zero.fill(0.f);
+
+      // Construct objective matrices
+      eig::MatrixXf              S_direct(wavelength_samples, 3 * info.direct_objectives.size());
+      std::vector<eig::MatrixXf> S_indrct;
+      for (uint i = 0; i < info.direct_objectives.size(); ++i)
+        S_direct.block<wavelength_samples, 3>(0, 3 * i) = info.direct_objectives[i].finalize(false);
+      for (uint i = 0; i < info.indirect_objectives.size(); ++i) {
+        auto powers = info.indirect_objectives[i].finalize(false);
+        if (S_indrct.size() < powers.size())
+          S_indrct.resize(powers.size(), S_indrct_zero);
+        for (uint j = 0; j < powers.size(); ++j)
+          S_indrct[j].block<wavelength_samples, 3>(0, 3 * i) = powers[j];
+      }
+
       // Parallel solve for boundary spectra
       #pragma omp parallel 
       {
@@ -459,30 +523,39 @@ namespace met {
         auto local_solver = solver;
 
         #pragma omp for
-        for (int i = 0; i < samples.size(); ++i) {
+        for (int i = 0; i < samples_nd.size(); ++i) {
           using namespace std::placeholders; // import _1, _2, _3
           using vec = eig::Vector<ad::real1st, wavelength_bases>;
 
           // Helper lambda to map along unit vector
-          constexpr auto trf_by_sample = [](const CMFS &cmfs, const eig::Vector3f &sample) {
+          constexpr auto trf_by_sample = [](const eig::MatrixXf &cmfs, const eig::VectorXf &sample) {
             return (cmfs * sample).cast<double>().eval();  };
-
+        
           // Map color systems along unit vector
-          auto A_direct = trf_by_sample(info.direct_objective.finalize(false), samples[i].head<3>());
-          auto A_indrct = info.indirect_objective.finalize(false)
-                        | vws::transform(std::bind(trf_by_sample, _1, samples[i].tail<3>().eval()))              
-                        | rng::to<std::vector>();
+          auto sample_head = samples_nd[i].head(3 * info.direct_objectives.size()).eval();
+          auto sample_tail = samples_nd[i].tail(3 * info.indirect_objectives.size()).eval();
+          eig::Vector<double, wavelength_samples> A_direct 
+            = trf_by_sample(S_direct, sample_head);
+          std::vector<eig::Vector<double, wavelength_samples>> A_indrct 
+            = S_indrct
+            | vws::transform(std::bind(trf_by_sample, _1, sample_tail))
+            | vws::transform([](const auto &v) { return eig::Vector<double, wavelength_samples>(v); })
+            | rng::to<std::vector>();
 
+          // Specify objective
           local_solver.objective = ad::wrap_capture<wavelength_bases>(
-          [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
-          (const vec &x) {
-            auto r = (B * x.matrix()).eval();
-            auto diff = A_direct.dot(r) + A_indrct[0].sum() + A_indrct[1].dot(r);
-            for (uint i = 2; i < A_indrct.size(); ++i) {
-              r.array() *= r.array();
-              diff      += A_indrct[i].dot(r);
-            }
-            return diff;
+            [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
+            (const vec &x) {
+              auto r = (B * x.matrix()).eval();            // Compute full reflectance
+              auto diff = A_direct.dot(r)                  // Linear objective
+                        + A_indrct[0].sum()                // Nonlinear objective, 0th component
+                        + A_indrct[1].dot(r);              // Nonlinear objective, 1st component
+              for (uint i = 2; i < A_indrct.size(); ++i) { // Nonlinear objective, nth objectives
+                r.array() *= r.array();
+                diff      += A_indrct[i].dot(r);
+              }
+              
+              return diff;
           });
 
           // Run solver and store recovered spectral distribution if it is safe
@@ -492,6 +565,9 @@ namespace met {
         } // for (int i)
       }
     } else {
+      /* // Sample unit vectors in 6d
+      auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
+      
       // Solver settings
       opt::Wrapper<wavelength_samples> solver = {
         .x_init       = 0.5,
@@ -546,7 +622,7 @@ namespace met {
           guard_continue(!r.isNaN().any());
           tbb_output.push_back(generate_spectrum_coeffs(SpectrumCoeffsInfo { .spec = r, .basis = info.basis }));
         } // for (int i)
-      }
+      } */
     }
     
     return std::vector<Basis::vec_type>(range_iter(tbb_output));
@@ -648,7 +724,7 @@ namespace met {
                    range_iter(c), v.begin(),
                    [&info](const auto &c) { 
                     auto s = info.basis(c);
-                    return std::tuple { info.indirect_objective(s), s, c }; }); // the differentiating color system generates output
+                    return std::tuple { info.indirect_objectives.back()(s), s, c }; }); // the differentiating color system generates output
     return v;
   }
 } // namespace met

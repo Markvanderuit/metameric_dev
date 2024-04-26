@@ -51,7 +51,7 @@ namespace met {
     return m_path_prim.data();
   }
 
-  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, IndirectSurfaceConstraint &cstr) {
+  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, IndirectSurfaceConstraint::PowrConstraint &cstr) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
@@ -61,8 +61,8 @@ namespace met {
     // If no paths were found, clear data so the constraint becomes invalid for MMV/spectrum generation
     auto paths = eval_path_query(info, indirect_query_spp);
     if (paths.empty()) {
-      cstr.colr   = 0.f;
-      cstr.powers = { };
+      cstr.colr_j = 0.f;
+      cstr.powr_j = { };
       return;
     }
     fmt::print("Found {} paths through query\n", paths.size());
@@ -163,14 +163,14 @@ namespace met {
 
     // Make space in constraint available, up to maximum power
     // and set everything to zero for now
-    cstr.powers.resize(1 + rng::max_element(paths_finalized, {}, &SeparationRecord::power)->power);
-    rng::fill(cstr.powers, Spec(0));
+    cstr.powr_j.resize(1 + rng::max_element(paths_finalized, {}, &SeparationRecord::power)->power);
+    rng::fill(cstr.powr_j, Spec(0));
 
     // Reduce spectral data into its respective power bracket and divide by sample count
     // TODO parallel reduction
     for (const auto &path : paths_finalized)
-      accumulate_spectrum(cstr.powers[path.power], path.wvls, path.values);
-    for (auto &power : cstr.powers) {
+      accumulate_spectrum(cstr.powr_j[path.power], path.wvls, path.values);
+    for (auto &power : cstr.powr_j) {
       power *= 0.25f * static_cast<float>(wavelength_samples);
       power /= static_cast<float>(indirect_query_spp);
       power = power.cwiseMax(0.f);
@@ -178,7 +178,7 @@ namespace met {
         power = 0.f;
     }
 
-    for (auto &power : cstr.powers) {
+    for (auto &power : cstr.powr_j) {
       fmt::print("{}\n", power);
     }
 
@@ -188,9 +188,9 @@ namespace met {
     // Generate a default color value by passing through this reflectance
     IndirectColrSystem csys = {
       .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-      .powers = cstr.powers
+      .powers = cstr.powr_j
     };
-    cstr.colr = csys(r);
+    cstr.colr_j = csys(r);
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {
@@ -314,8 +314,8 @@ namespace met {
       // to prevent overhead from constraint generation
       auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
       e_vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
-        cstr.powers.clear();
-        cstr.colr = 0.f;
+        cstr.cstr_j.back().powr_j.clear();
+        cstr.cstr_j.back().colr_j = 0.f;
       });
     }
 
@@ -336,8 +336,20 @@ namespace met {
 
       // Store surface data and extracted color in  constraint
       auto &vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
-      vert.constraint | visit_single { [&](is_surface_constraint auto &cstr) { cstr.surface = si;     }};
-      vert.constraint | visit_single { [&](is_colr_constraint auto &cstr) { cstr.colr_i = si.diffuse; }};
+
+      vert.constraint | visit {
+        [&](DirectSurfaceConstraint &c) { 
+          c.surface = si;
+          c.colr_i  = si.diffuse;
+        },
+        [&](IndirectSurfaceConstraint &c) { 
+          guard(!c.cstr_j.empty());
+          c.cstr_j.back().surface = si;
+          if (c.cstr_j.size() == 1)
+            c.colr_i = c.cstr_j.back().surface.diffuse;
+        },
+        [&](auto &) { /* ... */ }
+      };
     }
 
     // Register gizmo use end; apply current vertex position to scene save state
@@ -346,9 +358,13 @@ namespace met {
       // as it secretly uses previous frame data to fill in some details, and is
       // way more costly per frame than I'd like to admit
       auto vert = e_vert; // copy of vertex
-      vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
-          cstr.surface = si;
-          build_indirect_constraint(info, i_cs, cstr);
+      vert.constraint | visit_single([&](IndirectSurfaceConstraint &c) { 
+          // First constraint handles base color
+          if (c.cstr_j.size() == 1)
+            c.colr_i = c.cstr_j.back().surface.diffuse;
+          
+          // Last constraint gets indirect network
+          build_indirect_constraint(info, i_cs, c.cstr_j.back());
       });
 
       // Save result
