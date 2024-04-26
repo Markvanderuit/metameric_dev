@@ -36,22 +36,21 @@ namespace met {
     return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
   }
 
-  std::tuple<Colr, Spec, Basis::vec_type> Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {
+  MismatchSample Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
 
     // Return zero constraint for inactive vertices
     guard(is_active, { Colr(0), Spec(0), Basis::vec_type(0) });
     
     // Visit the underlying constraint to generate output data
-    return constraint | visit([&](const auto &cstr) -> std::tuple<Colr, Spec, Basis::vec_type> { 
+    return constraint | visit([&](const auto &cstr) -> MismatchSample { 
       auto [s, c] = cstr.realize(scene, uplifting);
       return { cstr.position(scene, uplifting), s, c  }; 
     });
   }
 
-  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> Uplifting::Vertex::realize_mismatching(const Scene     &scene, 
+  std::vector<MismatchSample> Uplifting::Vertex::realize_mismatch(const Scene     &scene, 
                                                                                               const Uplifting &uplifting,
-                                                                                              uint csys_i,
                                                                                               uint seed,
                                                                                               uint samples) const {
     met_trace();
@@ -59,55 +58,62 @@ namespace met {
     // Return zero constraint for inactive vertices or those without mismatching
     guard(is_active && has_mismatching(scene, uplifting), { });
 
-    // Visit the underlying constraint to generate output data
-    return constraint | visit([&](const auto &cstr) { 
-      return cstr.realize_mismatching(scene, uplifting, csys_i, seed, samples); 
-    });
+    // Otherwise, visit the underlying constraint to generate output data
+    return constraint | visit([&](const auto &cstr) { return cstr.realize_mismatch(scene, uplifting, seed, samples); });
   }
 
-  Colr Uplifting::Vertex::get_mismatching_position(uint csys_i) const {
+  void Uplifting::Vertex::set_mismatch_position(const Colr &c) {
+    met_trace();
+    constraint | visit { 
+      [c](is_colr_constraint auto &cstr)   { cstr.cstr_j.back().colr_j = c; }, 
+      [c](IndirectSurfaceConstraint &cstr) { cstr.colr = c; },
+      [](const auto &cstr) {}
+    };
+  }
+
+  Colr Uplifting::Vertex::get_mismatch_position() const {
     met_trace();
     return constraint | visit {
-      [csys_i](const is_colr_constraint auto &v) { return v.cstr_j[csys_i].colr_j; },
-      [csys_i](const IndirectSurfaceConstraint &v) { return v.colr; },
-      [](const auto &) { return Colr(0); },
+      [](const is_colr_constraint auto &v)   { return v.cstr_j.back().colr_j; },
+      [](const IndirectSurfaceConstraint &v) { return v.colr; },
+      [](const auto &)                       { return Colr(0); },
     };
   }
   
-  bool Uplifting::Vertex::has_equal_mismatching(const cnstr_type &other_v, uint csys_i) const {
+  bool Uplifting::Vertex::has_equal_mismatching(const cnstr_type &other_v) const {
     met_trace();
     guard(constraint.index() == other_v.index(), false);
     return constraint | visit {
       [&](const DirectColorConstraint &cstr) {
-        const auto &other = std::get<DirectColorConstraint>(other_v);
+        const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
         guard(cstr.colr_i.isApprox(other.colr_i), false);
         guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
         if (!cstr.cstr_j.empty()) {
-          guard(cstr.cstr_j[csys_i].is_similar(other.cstr_j[csys_i]), false);
-          for (const auto &[i, cstr_j] : enumerate_view(cstr.cstr_j)) {
-            guard_continue(i != csys_i);
-            if (cstr_j != other.cstr_j[i])
-              return false;
-          }
+          // The "known" connstraints should be identical
+          guard(rng::equal(cstr.cstr_j  | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::take(cstr.cstr_j.size() - 1)), false);
+          
+          // The "free variable" should be identical outside of the specified color value
+          guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
         }
-        return true; // only the constraint value differs, same MMV
+        return true; // only the free variable differs
       },
       [&](const DirectSurfaceConstraint &cstr) {
-        const auto &other = std::get<DirectSurfaceConstraint>(other_v);
+        const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
         guard(cstr.colr_i.isApprox(other.colr_i), false);
         guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
         if (!cstr.cstr_j.empty()) {
-          guard(cstr.cstr_j[csys_i].is_similar(other.cstr_j[csys_i]), false);
-          for (const auto &[i, cstr_j] : enumerate_view(cstr.cstr_j)) {
-            guard_continue(i != csys_i);
-            if (cstr_j != other.cstr_j[i])
-              return false;
-          }
+          // The "known" connstraints should be identical
+          guard(rng::equal(cstr.cstr_j  | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::take(cstr.cstr_j.size() - 1)), false);
+          
+          // The "free variable" constraint should be identical outside of the specified color value
+          guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
         }
-        return true; // only the constraint value differs, same MMV
+        return true; // only the free variable differs
       },
       [&](const IndirectSurfaceConstraint &cstr) {
-        const auto &other = std::get<IndirectSurfaceConstraint>(other_v);
+        const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
         guard(rng::equal(cstr.powers, other.powers, eig::safe_approx_compare<Spec>), false);
         return true; // only the constraint value differs, same MMV
       },

@@ -103,58 +103,43 @@ namespace met {
     using state_type = detail::UpliftingState;
   
     struct Vertex {
+    public: // Public members
       using state_type = detail::VertexState;
+      using cnstr_type = std::variant<MeasurementConstraint,   DirectColorConstraint,
+                                      DirectSurfaceConstraint, IndirectSurfaceConstraint>;
+                                      
+      std::string name;             // Associated name
+      cnstr_type  constraint;       // Underlying, user-specified constraint
+      bool        is_active = true; // Whether the constraint is used in the scene
 
-      // The vertex stores one or more constraints of the following types
-      using cnstr_type = std::variant<
-        MeasurementConstraint,        // At most 1
-        DirectColorConstraint,        // At most 1
-        DirectSurfaceConstraint,      // At most 1
-        IndirectSurfaceConstraint     // Several can be solved for at the same time
-      >;
+    public: // Public methods
+      // Realize a spectral metamer, which forms the vertex' position in the uplifting tesselation,
+      // and attempts to satisfy the vertex' attached constraint
+      MismatchSample realize(const Scene &scene, const Uplifting &uplifting) const;
       
-    public:
-      // Associated name
-      std::string name;
-      
-      // Whether the constraint is used in the scene
-      bool is_active = true;
+      // Realize N spectral metamers on the constraint's current mismatch boundary, 
+      // w.r.t. the last internal constraint, which is a "free variable"
+      std::vector<MismatchSample> realize_mismatch(const Scene &scene, const Uplifting &uplifting, uint seed, uint n) const;
 
-      // Underlying, user-specified constraint
-      cnstr_type constraint;
+      // Set/get the color value of the last constraint; this is the "free variable"
+      // which the mismatch boundary encloses
+      void set_mismatch_position(const Colr &c);
+      Colr get_mismatch_position() const;
 
-    public:
-      // Generate a spectrum and corresponding color, which
-      // forms the vertex' position in the uplifting tesselation
-      std::tuple<Colr, Spec, Basis::vec_type>              realize(const Scene     &scene,
-                                                                   const Uplifting &uplifting) const;
-      
-      // Generate a set of spectra and corresponding colors on
-      // a constraint's current mismatch boundary, w.r.t. internal constraint csys_i;
-      std::vector<std::tuple<Colr, Spec, Basis::vec_type>> realize_mismatching(const Scene     &scene, 
-                                                                               const Uplifting &uplifting,
-                                                                               uint csys_i,
-                                                                               uint seed, 
-                                                                               uint samples) const;
+      // Test whether this vertex' constraint would generate the exact same mismatch
+      // boundary as another, prior constraint. This way, we can avoid regenerating volumes
+      // if only the "free variable" differs
+      bool has_equal_mismatching(const cnstr_type &other) const;
 
-      // Given internal constraint csys_i, return the constraint value
-      Colr get_mismatching_position(uint csys_i) const;
-
-      // Test whether this vertex' constraint would generate the same mismatch
-      // volume as another, prior constraint
-      bool has_equal_mismatching(const cnstr_type &other, uint csys_i) const;
-
-    public: // underlying accessors if constraint satisifes is metamerism_constraint/is_surface_constraint
+    public: // Constraint-specific boilerplate; depend on which constraint is used
+      bool operator==(const Vertex &o) const = default;
       bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const; // Does the underlying constraint allow for mismatching?
       bool has_surface()                                                   const; // Does the underlying constraint expose surface data?
       const SurfaceInfo &surface() const;
             SurfaceInfo &surface();
-
-    public:
-      bool operator==(const Vertex &o) const = default; // Default comparator
     };
 
-  public:
+  public: // Public members
     uint                csys_i  = 0; // Index of primary color system
     uint                basis_i = 0; // Index of used underlying basis
     std::vector<Vertex> verts;      // Vertex constraints on mesh

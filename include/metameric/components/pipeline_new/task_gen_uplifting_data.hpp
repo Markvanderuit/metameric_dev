@@ -22,7 +22,7 @@ namespace met {
     ConvexHull chull; // Convex hull data is exposed for UI components to use
   
   private:
-    using cnstr_type = typename Uplifting::Vertex::cnstr_type;
+    using cnstr_type  = typename Uplifting::Vertex::cnstr_type;
 
     bool                        m_did_sample    = false;                   // Cache; did we gene this iteration?
     std::deque<Colr>            m_colr_samples  = { };                     // For tracking incoming and exiting samples' positions
@@ -31,7 +31,7 @@ namespace met {
     uint                        m_prev_samples  = 0;                       // How many samples are of an old vertex constriant
     cnstr_type                  m_cstr_cache    = DirectColorConstraint(); // Cache of current vertex constraint, to detect mismatch volume change
 
-    void insert(std::span<const std::tuple<Colr, Spec, Basis::vec_type>> samples) {
+    void insert(std::span<const MismatchSample> samples) {
       met_trace();
       // If old samples exist, these need to be incrementally discarded,
       // figure out which parts to discard at the front before adding new samples
@@ -63,15 +63,13 @@ namespace met {
 
   public: // Public methods
     // Generate a spectrum and matching color in the uplifting's color system
-    std::tuple<Colr, Spec, Basis::vec_type> realize(const Uplifting::Vertex &vert, const Scene &scene, const Uplifting &uplifting) {
+    MismatchSample realize(const Uplifting::Vertex &vert, const Scene &scene, const Uplifting &uplifting) {
       met_trace();
-
-      constexpr static uint hardcoded_csys_j = 0u;
 
       // Update convex hull samples, or discard them if mismatching is not possible
       if (vert.has_mismatching(scene, uplifting)) {
         if (m_did_sample = !is_converged(); m_did_sample) {
-          auto samples = vert.realize_mismatching(scene, uplifting, hardcoded_csys_j, m_curr_samples, mmv_uplift_samples_iter);
+          auto samples = vert.realize_mismatch(scene, uplifting, m_curr_samples, mmv_uplift_samples_iter);
           insert(samples);
           m_curr_samples += mmv_uplift_samples_iter;
         }
@@ -88,12 +86,9 @@ namespace met {
       // If a mismatch volume exists
       if (chull.has_delaunay()) {
         // We use the convex hull to quickly find a metamer, instead of doing costly
-        // nonlinear solver runs
-        Colr p = vert.get_mismatching_position(hardcoded_csys_j);
-
-        // Find the best enclosing simplex in the convex hull, and then find
-        // the coefficients for that mismatching
-        auto [bary, elem] = chull.find_enclosing_elem(p);
+        // nonlinear solver runs. Find the best enclosing simplex, and then mix the
+        // attached coefficients to generate a spectrum at said position
+        auto [bary, elem] = chull.find_enclosing_elem(vert.get_mismatch_position());
         auto coeffs       = elem | index_into_view(m_coef_samples) | rng::to<std::vector>();
 
         // Linear combination reconstructs coefficients for this metamer
@@ -101,6 +96,8 @@ namespace met {
                   + bary[2] * coeffs[2] + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
         auto spec = scene.resources.bases[uplifting.basis_i].value()(coef);
         auto colr = scene.csys(uplifting.csys_i)(spec);
+
+        // Return all three
         return { colr, spec, coef };
       } else {
         // Fallback; let a solver handle the constraint, potentially
@@ -122,7 +119,7 @@ namespace met {
 
     // Does the underlying cached constraint match that of the current vertex, w.r.t. a generated mismatch region?
     bool matches_vertex(const Uplifting::Vertex &v) const {
-      return v.has_equal_mismatching(m_cstr_cache, 0);
+      return v.has_equal_mismatching(m_cstr_cache);
     }
     
     // Set the underlying cached constriant that a mismatch region is built for. Resets sampling.

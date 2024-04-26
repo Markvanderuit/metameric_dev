@@ -274,23 +274,6 @@ namespace met {
       const auto &e_hull    = e_hulls[e_cs.vertex_i];
       const auto &i_clip    = info("clip_point").getr<bool>();
 
-      // Visitor to access underlying color value
-      auto get_colr = [](const Uplifting::Vertex &vert) -> Colr {
-        return vert.constraint | visit {
-          [](const is_colr_constraint auto &cstr) { return cstr.cstr_j[0].colr_j; },
-          [](const IndirectSurfaceConstraint &cstr) { return cstr.colr; },
-          [](const auto &) { return Colr(0); }
-        };
-      };
-
-      // Visitor to set underlying color value
-      auto set_colr = [](Uplifting::Vertex &vert, Colr p) {
-        vert.constraint | visit { 
-          [p](is_colr_constraint auto &cstr)   { cstr.cstr_j[0].colr_j = p; }, 
-          [p](IndirectSurfaceConstraint &cstr) { cstr.colr = p; },
-          [](const auto &cstr) {}}; 
-      };
-
       // Visitor handles gizmo and modifies color position
       e_vert.constraint | visit([&](const auto &cstr) {
         // Only continue for supported types
@@ -298,16 +281,16 @@ namespace met {
         guard_constexpr((std::is_same_v<T, IndirectSurfaceConstraint> || is_colr_constraint<T>));
         
         // Register gizmo start; cache current vertex position
-        if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(get_colr(e_vert)))))
-          m_gizmo_prev_p = get_colr(e_vert);
+        if (auto p = e_vert.get_mismatch_position(); m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(p))))
+          m_gizmo_prev_p = p;
 
         // Register gizmo drag; apply world-space delta
         if (auto [active, delta] = m_gizmo.eval_delta(); active) {
           // Apply delta to color value
-          auto trf_colr = (delta * get_colr(e_vert)).eval();
+          auto trf_colr = (delta * e_vert.get_mismatch_position()).eval();
 
           // Store color and expose clamped color to other tasks
-          set_colr(info.global("scene").getw<Scene>().uplifting_vertex(e_cs), trf_colr);
+          info.global("scene").getw<Scene>().uplifting_vertex(e_cs).set_mismatch_position(trf_colr);
 
           // Expose a marker point for the snap position inside the convex hull;
           // don't snap as it feels weird while moving the point
@@ -317,17 +300,15 @@ namespace met {
         // Register gizmo end; apply vertex position to scene save state
         if (m_gizmo.end_delta()) {
           // Clip vertex position to inside convex hull, if enabled
-          auto cstr_colr = i_clip
-                         ? e_hull.find_closest_interior(get_colr(e_vert))
-                         : get_colr(e_vert);
+          auto cstr_colr = e_vert.get_mismatch_position();
+          if (i_clip)
+            cstr_colr = e_hull.find_closest_interior(cstr_colr);
 
           // Handle save
           info.global("scene").getw<Scene>().touch({
             .name = "Move color constraint",
-            .redo = [p = cstr_colr,      e_cs, set_colr](auto &scene) {
-              set_colr(scene.uplifting_vertex(e_cs), p); },
-            .undo = [p = m_gizmo_prev_p, e_cs, set_colr](auto &scene) {
-              set_colr(scene.uplifting_vertex(e_cs), p); }
+            .redo = [p = cstr_colr,      e_cs](auto &scene) { scene.uplifting_vertex(e_cs).set_mismatch_position(p); },
+            .undo = [p = m_gizmo_prev_p, e_cs](auto &scene) { scene.uplifting_vertex(e_cs).set_mismatch_position(p); }
           });
         }
 

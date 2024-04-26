@@ -314,11 +314,9 @@ namespace met {
       auto &i_constraint_spectra = info("constraint_spectra").getw<std::vector<Spec>>();
       auto &i_constraint_coeffs  = info("constraint_coeffs").getw<std::vector<Basis::vec_type>>();
       i_constraint_spectra.resize(e_uplifting.verts.size());      
-      rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), 
-                i_constraint_spectra.begin());
       i_constraint_coeffs.resize(e_uplifting.verts.size());      
-      rng::copy(m_tesselation_coeffs  | vws::drop(m_csys_boundary_coeffs.size()), 
-                i_constraint_coeffs.begin());
+      rng::copy(m_tesselation_spectra | vws::drop(m_csys_boundary_spectra.size()), i_constraint_spectra.begin());
+      rng::copy(m_tesselation_coeffs  | vws::drop(m_csys_boundary_coeffs.size()),  i_constraint_coeffs.begin());
     }
 
     // 7. Expose mismatch volume hull data for visualization and UI parts

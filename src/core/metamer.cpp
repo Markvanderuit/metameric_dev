@@ -35,7 +35,7 @@ namespace met {
     // distributed point on the unit sphere
     template <uint N>
     inline auto inv_unit_sphere_cdf(const eig::Array<float, N, 1> &x) {
-      return inv_gaussian_cdf(x).matrix().normalized().array().eval();
+      return inv_gaussian_cdf<N>(x).matrix().normalized().array().eval();
     }
     
     // Generate a set of random, uniformly distributed unit vectors in RN
@@ -48,7 +48,7 @@ namespace met {
       if (n_samples <= 16) {
         UniformSampler sampler(-1.f, 1.f, seed);
         for (int i = 0; i < unit_dirs.size(); ++i)
-          unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd<N>());
+          unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.next_nd<N>());
       } else {
         UniformSampler sampler(-1.f, 1.f, seed);
         #pragma omp parallel
@@ -56,11 +56,26 @@ namespace met {
           UniformSampler sampler(-1.f, 1.f, seed + static_cast<uint>(omp_get_thread_num()));
           #pragma omp for
           for (int i = 0; i < unit_dirs.size(); ++i)
-            unit_dirs[i] = inv_unit_sphere_cdf(sampler.next_nd<N>());
+            unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.next_nd<N>());
         }
       }
 
       return unit_dirs;
+    }
+
+    // Mapping from static to dynamic, so we can vary the nr. of objectives for which samples are generated
+    auto gen_unit_dirs(uint n_objectives, uint n_samples, uint seed = 4) {
+      constexpr auto eig_static_to_dynamic = [](const auto &v) { return (eig::ArrayXf(v.size()) << v).finished(); };
+      std::vector<eig::ArrayXf> X(n_samples);
+      switch (n_objectives) {
+        case 1: rng::transform(gen_unit_dirs<3>(n_samples, seed),  X.begin(), eig_static_to_dynamic); break;
+        case 2: rng::transform(gen_unit_dirs<6>(n_samples, seed),  X.begin(), eig_static_to_dynamic); break;
+        case 3: rng::transform(gen_unit_dirs<9>(n_samples, seed),  X.begin(), eig_static_to_dynamic); break;
+        case 4: rng::transform(gen_unit_dirs<12>(n_samples, seed), X.begin(), eig_static_to_dynamic); break;
+        case 5: rng::transform(gen_unit_dirs<15>(n_samples, seed), X.begin(), eig_static_to_dynamic); break;
+        default: debug::check_expr(false, "Not implemented!");
+      }
+      return X;
     }
   } // namespace detail
 
@@ -277,21 +292,20 @@ namespace met {
   
   std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info) {
     met_trace();
-    
-    // Sample unit vectors in 6d
-    auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
-
     // Output data structure 
     tbb::concurrent_vector<Basis::vec_type> tbb_output;
-    tbb_output.reserve(samples.size());
+    tbb_output.reserve(info.n_samples);
 
     if constexpr (use_basis_direct_mismatch) {
+      // Sample unit vectors in nd
+      auto samples_nd = detail::gen_unit_dirs(info.direct_objectives.size(), info.n_samples, info.seed);
+
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 96,
+        .max_iters    = 128,
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
@@ -314,13 +328,22 @@ namespace met {
                                           .tol = 1e-3 });
       }
 
+      // Dynamic case
+      eig::MatrixXf S(wavelength_samples, 3 * info.direct_objectives.size());
+      for (uint i = 0; i < info.direct_objectives.size(); ++i)
+        S.block<wavelength_samples, 3>(0, 3 * i) = info.direct_objectives[i].finalize(false);
+      eig::JacobiSVD<decltype(S)> svd;
+      svd.compute(S, eig::ComputeFullV);
+      auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+
+      /* // Static case
       // This only works for the current configuration
       auto S = (eig::Matrix<float, wavelength_samples, 6>()
         << info.direct_objectives[0].finalize(false), 
            info.direct_objectives[1].finalize(false)).finished();
       eig::JacobiSVD<decltype(S)> svd;
       svd.compute(S, eig::ComputeFullV);
-      auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
+      auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval(); */
 
       // Parallel solve for boundary spectra
       #pragma omp parallel
@@ -329,9 +352,9 @@ namespace met {
         auto local_solver = solver;
 
         #pragma omp for
-        for (int i = 0; i < samples.size(); ++i) {
-          // Define objective function: max (Uk)^T (Bx) -> max C^T Bx -> max ax
-          auto a = ((U * samples[i].matrix()).transpose() * info.basis.func).transpose().eval();
+        for (int i = 0; i < samples_nd.size(); ++i) {
+          // Define objective function: max (Uk)^T (B x -> max (C^T B) x -> max dot(a, x)
+          Basis::vec_type a = ((U * samples_nd[i].matrix()).transpose().eval() * info.basis.func).transpose().eval();
           local_solver.objective = opt::func_dot<wavelength_bases>(a, 0.f);
             
           // Run solver and store recovered spectral distribution if it is legit
@@ -341,6 +364,8 @@ namespace met {
         } // for (int i)
       }
     } else {
+      auto samples = detail::gen_unit_dirs<6>(info.n_samples, info.seed);
+
       // Solver settings
       opt::Wrapper<wavelength_samples> solver = {
         .x_init    = 0.5,
@@ -404,7 +429,7 @@ namespace met {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 96,
+        .max_iters    = 128,
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 

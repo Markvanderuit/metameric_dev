@@ -37,9 +37,7 @@ namespace met {
       ImGui::SeparatorText("Reflectance spectrum");
       {
         const auto &e_sd = e_spectra[e_cs.vertex_i];
-        /* ImGui::SameLine();
-        if (ImGui::SmallButton("Print"))
-          fmt::print("{}\n", e_sd); */
+        /* ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", e_sd); */ // Reenable for printing
         ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
       }
 
@@ -197,21 +195,15 @@ namespace met {
 
       // Color patch picker
       if (!e_patches.empty()) {
-        // Visitor to set underlying color value
-        auto set_colr = [](Uplifting::Vertex &vert, Colr p) {
-          vert.constraint | visit { 
-            [p](is_colr_constraint auto &cstr)   { cstr.cstr_j[0].colr_j = p; }, 
-            [p](IndirectSurfaceConstraint &cstr) { cstr.colr = p; },
-            [](const auto &cstr) {}}; 
-        };
-
         ImGui::SeparatorText("Interior colors");
         ImGui::BeginChild("##patches", { ImGui::GetContentRegionAvail().x * 0.95f, 32 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
         for (uint i = 0; i < e_patches.size(); ++i) {
           // Spawn color button viewing the srgb-transformed patch color
           auto srgb = (eig::Array4f() << lrgb_to_srgb(e_patches[i]), 1).finished();
           if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
-            set_colr(vert, e_patches[i]);
+            vert.set_mismatch_position(e_patches[i]);
+          
+          // Keep all patches on the same line for now
           if (i < e_patches.size() - 1)
             ImGui::SameLine();
         } // for (uint i)

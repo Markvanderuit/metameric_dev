@@ -36,7 +36,7 @@ namespace met {
     using DirectConstraint = std::pair<ColrSystem, Colr>;
 
   public:
-    std::array<ColrSystem, 2>     direct_objectives  = { }; // Direct objective function in two parts
+    std::vector<ColrSystem>       direct_objectives  = { }; // Direct objective function in two parts
     std::vector<DirectConstraint> direct_constraints = { }; // Direct metamerism constraints
 
     const Basis &basis;  // Spectral basis functions
@@ -85,14 +85,20 @@ namespace met {
   };
   Basis::vec_type generate_spectrum_coeffs(const SpectrumCoeffsInfo &info);
 
-  
+  // Return type shorthands for metamer generation
+  using SpectrumSample = std::pair<Spec, Basis::vec_type>;
+  using MismatchSample = std::tuple<Colr, Spec, Basis::vec_type>;
+
   // Helpers; generate coefficients producing a spectrum in a basis, and return said spectrum
   // plus the coefficients 
-  std::pair<Spec, Basis::vec_type> generate_spectrum(const auto &info) {
+  SpectrumSample generate_spectrum(const auto &info) {
     met_trace();
     auto c = generate_spectrum_coeffs(info);
     return { info.basis(c), c };
   }
-  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
-  std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
+
+  // Helpers; generate coefficients, the resulting spectrum, and the mismatched color, assuming
+  // the last constraint is a "free variable"
+  std::vector<MismatchSample> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info);
+  std::vector<MismatchSample> generate_mismatching_ocs(const IndirectMismatchingOCSInfo &info);
 } // namespace met

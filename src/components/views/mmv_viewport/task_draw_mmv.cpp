@@ -29,15 +29,10 @@ namespace met {
     // Used for coming draw operation
     auto dl = ImGui::GetWindowDrawList();
 
-    // Visit underlying color constraint to extract edit position
-    auto p = e_vert.constraint | visit {
-      [](const is_colr_constraint auto &cstr) { return cstr.cstr_j[0].colr_j; }, // TODO selectable viewed constraint
-      [](const IndirectSurfaceConstraint &cstr) { return cstr.colr; },
-      [](const auto &) { return Colr(0); }
-    };
-    
-    // Determine window-space position of surface point
-    eig::Vector2f p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
+    // Visit underlying color constraint to extract edit position, then
+    // determine window-space position of surface point
+    auto p        = e_vert.get_mismatch_position();
+    auto p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
       
     // Clip vertex outside viewport
     guard((p_window.array() >= viewport_offs).all() 
