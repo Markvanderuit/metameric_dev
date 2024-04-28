@@ -210,14 +210,16 @@ namespace ImGui {
     return InputTextWithHint(label, hint, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
   }
 
-  bool Gizmo::begin_delta(const met::detail::Arcball &arcball, const trf &current_trf, Operation op) {
+  bool Gizmo::begin_delta(const met::detail::Arcball &arcball, trf init_trf, Operation op) {
     met_trace();
 
     using namespace met;
     
     // Reset internal state
-    m_delta = trf::Identity();
-    auto current_trf_copy = current_trf;
+    if (!m_is_active) {
+      m_init_trf  = init_trf;
+      m_delta_trf = trf::Identity();
+    }
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -230,7 +232,7 @@ namespace ImGui {
     ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
     ImGuizmo::Manipulate(arcball.view().data(), arcball.proj().data(), 
       static_cast<ImGuizmo::OPERATION>(op), ImGuizmo::MODE::LOCAL, 
-      current_trf_copy.data(), m_delta.data());
+      m_init_trf.data(), m_delta_trf.data());
 
     guard(!m_is_active && ImGuizmo::IsUsing(), false);
     m_is_active = true;
@@ -240,7 +242,7 @@ namespace ImGui {
   std::pair<bool, Gizmo::trf> Gizmo::eval_delta() {
     met_trace();
     guard(m_is_active && ImGuizmo::IsUsing(), {false, trf::Identity()});
-    return { true, m_delta };
+    return { true, m_delta_trf };
   }
 
   bool Gizmo::end_delta() {
@@ -256,7 +258,7 @@ namespace ImGui {
     using namespace met;
     
     // Reset internal state
-    m_delta = trf::Identity();
+    m_delta_trf = trf::Identity();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -268,7 +270,7 @@ namespace ImGui {
     ImGuizmo::SetRect(viewport_offs[0], viewport_offs[1], viewport_size[0], viewport_size[1]);
     ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
     ImGuizmo::Manipulate(arcball.view().data(), arcball.proj().data(), 
-      static_cast<ImGuizmo::OPERATION>(op), ImGuizmo::MODE::LOCAL, current_trf.data(), m_delta.data());
+      static_cast<ImGuizmo::OPERATION>(op), ImGuizmo::MODE::LOCAL, current_trf.data(), m_delta_trf.data());
 
     // Setup phase
     if (!m_is_active && ImGuizmo::IsUsing()) {

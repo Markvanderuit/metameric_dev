@@ -460,12 +460,10 @@ namespace met {
       // Add indirect color system equality constraints, upholding uplifting roundtrip
       for (const auto [csys, colr] : info.indirect_constraints) {
         using vec = eig::Vector<ad::real1st, wavelength_bases>;
-
         auto A = csys.finalize(false)
                | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
                | rng::to<std::vector>();
         auto b = lrgb_to_xyz(colr).cast<double>().eval();
-
         for (uint j = 0; j < 3; ++j) {
           solver.eq_constraints.push_back({ .f = ad::wrap_capture<wavelength_bases>(
           [A = A
@@ -485,16 +483,6 @@ namespace met {
 
             // f(x) = ||Ax - b||; 
             return Ax - b;
-
-            /* // A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
-            auto Ax = (A[0].rowwise().sum() + A[1] * r).eval();
-            for (uint i = 2; i < A.size(); ++i) {
-              r.array() *= r.array();
-              Ax        += A[i] * r;
-            }
-
-            // f(x) = ||Ax - b||; 
-            return (Ax.array() - b).matrix().norm(); */
           }), .tol = 1e-3 });
         } // for (uint j)
       }
@@ -554,7 +542,6 @@ namespace met {
                 r.array() *= r.array();
                 diff      += A_indrct[i].dot(r);
               }
-              
               return diff;
           });
 

@@ -74,8 +74,15 @@ namespace met {
   void Uplifting::Vertex::set_mismatch_position(const Colr &c) {
     met_trace();
     constraint | visit { 
-      [c](is_colr_constraint auto &cstr)   { cstr.cstr_j.back().colr_j = c; }, 
-      [c](IndirectSurfaceConstraint &cstr) { cstr.cstr_j.back().colr_j = c; },
+      [c](is_colr_constraint auto &cstr) { 
+        cstr.cstr_j.back().colr_j = c; 
+      }, 
+      [c](IndirectSurfaceConstraint &cstr) { 
+        if (cstr.target_direct)
+          cstr.cstr_j_direct.back().colr_j = c; 
+        else
+          cstr.cstr_j_indrct.back().colr_j = c; 
+      },
       [](const auto &cstr) {}
     };
   }
@@ -83,9 +90,16 @@ namespace met {
   Colr Uplifting::Vertex::get_mismatch_position() const {
     met_trace();
     return constraint | visit {
-      [](const is_colr_constraint auto &v)   { return v.cstr_j.back().colr_j; },
-      [](const IndirectSurfaceConstraint &v) { return v.cstr_j.back().colr_j; },
-      [](const auto &)                       { return Colr(0); },
+      [](const is_colr_constraint auto &cstr) { 
+        return cstr.cstr_j.back().colr_j; 
+      },
+      [](const IndirectSurfaceConstraint &cstr) { 
+        if (cstr.target_direct)
+          return cstr.cstr_j_direct.back().colr_j; 
+        else
+          return cstr.cstr_j_indrct.back().colr_j; 
+      },
+      [](const auto &) { return Colr(0); },
     };
   }
   
@@ -123,15 +137,28 @@ namespace met {
       },
       [&](const IndirectSurfaceConstraint &cstr) {
         const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
+        
         guard(cstr.colr_i.isApprox(other.colr_i), false);
-        guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
-        if (!cstr.cstr_j.empty()) {
+        guard(cstr.target_direct == other.target_direct, false);
+        guard(cstr.cstr_j_direct.size() == other.cstr_j_direct.size(), false);
+        guard(cstr.cstr_j_indrct.size() == other.cstr_j_indrct.size(), false);
+        
+        if (cstr.target_direct && !cstr.cstr_j_direct.empty()) {
           // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j  | vws::take(cstr.cstr_j.size() - 1),
-                           other.cstr_j | vws::take(cstr.cstr_j.size() - 1)), false);
-                           
+          guard(rng::equal(cstr.cstr_j_indrct, other.cstr_j_indrct), false);
+          guard(rng::equal(cstr.cstr_j_direct  | vws::take(cstr.cstr_j_direct.size() - 1),
+                           other.cstr_j_direct | vws::take(cstr.cstr_j_direct.size() - 1)), false);
+
           // The "free variable" constraint should be identical outside of the specified color value
-          guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
+          guard(cstr.cstr_j_direct.back().is_similar(other.cstr_j_direct.back()), false);
+        } else if (!cstr.target_direct && !cstr.cstr_j_indrct.empty()) {
+          // The "known" connstraints should be identical
+          guard(rng::equal(cstr.cstr_j_direct, other.cstr_j_direct), false);
+          guard(rng::equal(cstr.cstr_j_indrct  | vws::take(cstr.cstr_j_indrct.size() - 1),
+                           other.cstr_j_indrct | vws::take(cstr.cstr_j_indrct.size() - 1)), false);
+
+          // The "free variable" constraint should be identical outside of the specified color value
+          guard(cstr.cstr_j_indrct.back().is_similar(other.cstr_j_indrct.back()), false);
         }
         return true; // only the free variable differs
       },
@@ -142,21 +169,31 @@ namespace met {
   bool Uplifting::Vertex::has_surface() const {
     met_trace();
     return constraint | visit {
-      [](const DirectSurfaceConstraint &)       { return true;                 },
-      [](const IndirectSurfaceConstraint &cstr) { return !cstr.cstr_j.empty(); },
-      [](const auto &)                          { return false;                },
+      [](const DirectSurfaceConstraint &) {
+        return true;
+      },
+      [](const IndirectSurfaceConstraint &cstr) { 
+        return !cstr.target_direct && !cstr.cstr_j_indrct.empty(); 
+      },
+      [](const auto &) { 
+        return false;
+      },
     };
   }
   
   void Uplifting::Vertex::set_surface(const SurfaceInfo &si) {
     met_trace();
     constraint | visit {
-      [si](DirectSurfaceConstraint &c) { 
-        c.surface = si;
+      [si](DirectSurfaceConstraint &cstr) { 
+        cstr.surface = si;
+        cstr.colr_i  = si.diffuse;
       },
-      [si](IndirectSurfaceConstraint &c) { 
-        guard(!c.cstr_j.empty());
-        c.cstr_j.back().surface = si;
+      [si](IndirectSurfaceConstraint &cstr) { 
+        guard(!cstr.target_direct);
+        guard(!cstr.cstr_j_indrct.empty());
+        cstr.cstr_j_indrct.back().surface = si;
+        if (cstr.cstr_j_indrct.size() == 1)
+          cstr.colr_i = si.diffuse;
       },
       [&](auto &) { /* ... */ }
     };
@@ -170,8 +207,8 @@ namespace met {
         return c.surface; 
       },
       [](const IndirectSurfaceConstraint &c) -> const SurfaceInfo & { 
-        return !c.cstr_j.empty() 
-          ? c.cstr_j.back().surface 
+        return !c.cstr_j_indrct.empty() 
+          ? c.cstr_j_indrct.back().surface 
           : detail::invalid_visitor_return_si; 
       },
       [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
@@ -204,8 +241,9 @@ namespace met {
         return cstr.size() > 1 && !detail::has_duplicates(cstr);
       },
       [&](const IndirectSurfaceConstraint &c) {
-        return !c.cstr_j.empty()
-            && !c.cstr_j.back().powr_j.empty();
+        return (!c.cstr_j_indrct.empty()
+            && !c.cstr_j_indrct.back().powr_j.empty())
+            || !c.cstr_j_direct.empty();
       },
       [&](const MeasurementConstraint &v) { 
         return false;

@@ -44,21 +44,21 @@ namespace met {
       // Plotter for the current constraint's resulting radiance
       // (only for IndirectSurfaceConstraint, really)
       vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) {
-        guard(!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty());
+        guard(!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty());
 
         // Reconstruct radiance from truncated power series
         Spec r = e_spectra[e_cs.vertex_i];
-        Spec s = cstr.cstr_j.back().powr_j[0];
+        Spec s = cstr.cstr_j_indrct.back().powr_j[0];
         float s_max = 0.f;
-        for (uint i = 1; i < cstr.cstr_j.back().powr_j.size(); ++i) {
-          s += r.pow(static_cast<float>(i)) * cstr.cstr_j.back().powr_j[i];
-          s_max = std::max(s_max, cstr.cstr_j.back().powr_j[i].maxCoeff());
+        for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i) {
+          s += r.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
+          s_max = std::max(s_max, cstr.cstr_j_indrct.back().powr_j[i].maxCoeff());
         }
 
         // Plot estimated radiance
         ImGui::SeparatorText("Radiance and powers");
         ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 80.f * e_window.content_scale() });
-        ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 120.f * e_window.content_scale() });
+        ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 120.f * e_window.content_scale() });
       });
       
       // Visit the underlying constraint data
@@ -142,10 +142,10 @@ namespace met {
         },
         [&](IndirectSurfaceConstraint &cstr) {
           if (ImGui::Button("New constraint")) {
-            cstr.cstr_j.push_back(IndirectSurfaceConstraint::PowrConstraint { });
+            cstr.cstr_j_indrct.push_back(IndirectSurfaceConstraint::PowrConstraint { });
           }
           
-          if (cstr.cstr_j.empty() || !cstr.cstr_j.back().surface.is_valid()) {
+          if (cstr.cstr_j_indrct.empty() || !cstr.cstr_j_indrct.back().surface.is_valid()) {
             ImGui::Text("Invalid constraint");
             return;
           }
@@ -167,9 +167,9 @@ namespace met {
               Colr err = (lrgb - e_scene.csys(uplf.value.csys_i)(e_spectra[e_cs.vertex_i])).abs();
               ImGui::InputFloat3("Base color (error)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             }
-            for (uint i = 0; i < cstr.cstr_j.size(); ++i) {
+            for (uint i = 0; i < cstr.cstr_j_indrct.size(); ++i) {
               // Assemble non-linear color system
-              auto &c = cstr.cstr_j[i];
+              auto &c = cstr.cstr_j_indrct[i];
               IndirectColrSystem csys = { .cmfs = e_scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j };
 
               // lRGB color picker

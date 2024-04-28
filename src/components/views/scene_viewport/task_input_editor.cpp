@@ -282,74 +282,69 @@ namespace met {
 
     // Extract surface information from scurrent vertex
     const auto &e_vert = e_scene.uplifting_vertex(i_cs);
-    auto si = e_vert.surface();
 
     // Register gizmo use start; cache current vertex position
-    if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(si.p)))) {
-      m_gizmo_prev = e_scene.uplifting_vertex(i_cs);
+    if (m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(e_vert.surface().p)))) {
+      m_gizmo_prev_v = e_vert;
+      m_gizmo_curr_p = e_vert.surface();
 
       // Right at the start, we set the indirect constraint set into an invalid state
       // to prevent overhead from constraint generation
       auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
       e_vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
-        cstr.cstr_j.back().powr_j.clear();
-        cstr.cstr_j.back().colr_j = 0.f;
+        cstr.cstr_j_indrct.back().powr_j.clear();
+        cstr.cstr_j_indrct.back().colr_j = 0.f;
       });
     }
 
     // Register continuous gizmo use
     if (auto [active, delta] = m_gizmo.eval_delta(); active) {
       // Apply world-space delta to constraint position
-      si.p = delta * si.p;
+      m_gizmo_curr_p.p = (delta * m_gizmo_curr_p.p).eval();
 
       // Get screen-space position
-      eig::Vector2f p_screen = eig::world_to_screen_space(si.p, e_arcball.full());
+      eig::Vector2f p_screen = eig::world_to_screen_space(m_gizmo_curr_p.p, e_arcball.full());
       
       // Do a raycast, snapping the world position to the nearest surface
       // on a surface hit, and update the local SurfaceInfo object to accomodate
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
-      si = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
+      auto gizmo_cast_p 
+         = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
          ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
-         : SurfaceInfo { .p = si.p };
+         : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Store surface data and extracted color in  constraint
-      auto &vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
-
-      vert.constraint | visit {
-        [&](DirectSurfaceConstraint &c) { 
-          c.surface = si;
-          c.colr_i  = si.diffuse;
-        },
-        [&](IndirectSurfaceConstraint &c) { 
-          guard(!c.cstr_j.empty());
-          c.cstr_j.back().surface = si;
-          if (c.cstr_j.size() == 1)
-            c.colr_i = c.cstr_j.back().surface.diffuse;
-        },
-        [&](auto &) { /* ... */ }
-      };
+      info.global("scene").getw<Scene>()
+          .uplifting_vertex(i_cs).set_surface(gizmo_cast_p);
     }
 
     // Register gizmo use end; apply current vertex position to scene save state
     if (m_gizmo.end_delta()) {
+      // Get screen-space position
+      eig::Vector2f p_screen = eig::world_to_screen_space(m_gizmo_curr_p.p, e_arcball.full());
+
+      // Do a raycast, snapping the world position to the nearest surface
+      // on a surface hit, and update the local SurfaceInfo object to accomodate
+      m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
+      auto gizmo_cast_p 
+         = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
+         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
+         : SurfaceInfo { .p = m_gizmo_curr_p.p };
+
       // Right at the end, we build the indirect surface constraint HERE
       // as it secretly uses previous frame data to fill in some details, and is
       // way more costly per frame than I'd like to admit
-      auto vert = e_vert; // copy of vertex
-      vert.constraint | visit_single([&](IndirectSurfaceConstraint &c) { 
-          // First constraint handles base color
-          if (c.cstr_j.size() == 1)
-            c.colr_i = c.cstr_j.back().surface.diffuse;
-          
-          // Last constraint gets indirect network
-          build_indirect_constraint(info, i_cs, c.cstr_j.back());
+      auto gizmo_curr_v = e_vert; // copy of vertex
+      gizmo_curr_v.set_surface(gizmo_cast_p);
+      gizmo_curr_v.constraint | visit_single([&](IndirectSurfaceConstraint &c) { 
+          build_indirect_constraint(info, i_cs, c.cstr_j_indrct.back());
       });
 
       // Save result
       info.global("scene").getw<Scene>().touch({
         .name = "Move surface constraint",
-        .redo = [vert = vert, i_cs](auto &scene) { scene.uplifting_vertex(i_cs) = vert; },
-        .undo = [vert = m_gizmo_prev, i_cs](auto &scene) { scene.uplifting_vertex(i_cs) = vert; }
+        .redo = [v = gizmo_curr_v,   i_cs](auto &scene) { scene.uplifting_vertex(i_cs) = v; },
+        .undo = [v = m_gizmo_prev_v, i_cs](auto &scene) { scene.uplifting_vertex(i_cs) = v; }
       });
     }
   }

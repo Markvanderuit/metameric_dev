@@ -19,11 +19,12 @@ namespace met {
     const auto &e_arcball       = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
     const auto &e_gizmo_active  = info.relative("viewport_guizmo")("is_active").getr<bool>();
     const auto &e_closest_point = info.relative("viewport_guizmo")("closest_point").getr<Colr>();
+    const auto &io              = ImGui::GetIO();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
                                + static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
-    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui:: GetWindowContentRegionMax())
+    eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
     
     // Used for coming draw operation
@@ -32,6 +33,7 @@ namespace met {
     // Visit underlying color constraint to extract edit position, then
     // determine window-space position of surface point
     auto p        = e_vert.get_mismatch_position();
+    auto p_mouse  = eig::Array2f(io.MousePos); // eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size).cast<float>().eval();
     auto p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
       
     // Clip vertex outside viewport
@@ -41,13 +43,8 @@ namespace met {
     // If closest-projected-point information is available, and the gizmo is being dragged,
     // draw a helper line towards it
     if (e_gizmo_active) {
-      eig::Vector2f p_closest = eig::world_to_window_space(e_closest_point, e_arcball.full(), viewport_offs, viewport_size);
-
-      auto closest_colr_line = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 0.5f });
-      auto closest_colr_mark = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 0.5f });
-      
-      dl->AddCircleFilled(p_closest, 8.f, closest_colr_mark);
-      dl->AddLine(p_closest, p_window, closest_colr_line, 2.f);
+      auto closest_colr_line = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f });
+      dl->AddLine(p_window, p_mouse, closest_colr_line, 2.f);
     }
 
     // Get srgb colors for constraint

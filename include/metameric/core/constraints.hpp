@@ -134,9 +134,10 @@ namespace met {
       bool is_similar(const PowrConstraint &o) const;
     };
 
-    Colr                        colr_i = 0.0; // Expected base color, obtained from the first underlying surface
-    std::vector<PowrConstraint> cstr_j = { }; // Secondary nonlinear constraints for color reproduction
-    // std::vector<ColrConstraint> cstr_j_direct = { }; // Secondary linear constraints for color reproduction
+    Colr                        colr_i        = 0.0;   // Expected base color, obtained from the first underlying surface
+    bool                        target_direct = false; // Free variable is the last linear, instead of last nonlinear constraint
+    std::vector<ColrConstraint> cstr_j_direct = { };   // Secondary linear constraints for color reproduction
+    std::vector<PowrConstraint> cstr_j_indrct = { };   // Secondary nonlinear constraints for color reproduction
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation

@@ -90,7 +90,9 @@ namespace ImGui {
     using trf = Eigen::Affine3f;
 
     bool m_is_active = false;
-    trf  m_delta;
+    trf  m_init_trf;
+    trf  m_delta_trf;
+
   public:
     // 
     enum class Operation : met::uint {
@@ -102,7 +104,7 @@ namespace ImGui {
     
     // Begin/eval/end functions, s.t. eval() returns a delta transform applied to the current
     // transform over every frame, and the user can detect changes
-    bool begin_delta(const met::detail::Arcball &arcball, const trf &current_trf, Operation op = Operation::eTranslate);
+    bool begin_delta(const met::detail::Arcball &arcball, trf init_trf, Operation op = Operation::eTranslate);
     std::pair<bool, trf> 
          eval_delta();
     bool end_delta();

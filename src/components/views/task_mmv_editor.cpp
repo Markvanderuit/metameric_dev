@@ -234,9 +234,9 @@ namespace met {
   };
 
   class MMVEditorGuizmoTask : public detail::TaskNode {
-    bool         m_is_gizmo_used = false;
-    Colr         m_gizmo_prev_p;
     ImGui::Gizmo m_gizmo;
+    Colr         m_gizmo_curr_p;
+    Colr         m_gizmo_prev_p;
     
   public:
     bool is_active(SchedulerHandle &info) override {
@@ -250,8 +250,8 @@ namespace met {
       const auto &e_uplf  = e_scene.components.upliftings[e_cs.uplifting_i].value;
       const auto &e_vert  = e_scene.uplifting_vertex(e_cs);
       
-      return ImGui::IsItemHovered() 
-          && e_vert.has_mismatching(e_scene, e_uplf);
+      // This task runs only if mismatching is being handled, and the mouse enters the window
+      return ImGui::IsItemHovered() && e_vert.has_mismatching(e_scene, e_uplf);
     }
 
     void init(SchedulerHandle &info) override {
@@ -281,33 +281,43 @@ namespace met {
         guard_constexpr((std::is_same_v<T, IndirectSurfaceConstraint> || is_colr_constraint<T>));
         
         // Register gizmo start; cache current vertex position
-        if (auto p = e_vert.get_mismatch_position(); m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(p))))
+        if (auto p = e_vert.get_mismatch_position(); m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(p)))) {
+          m_gizmo_curr_p = p;
           m_gizmo_prev_p = p;
+        }
 
         // Register gizmo drag; apply world-space delta
         if (auto [active, delta] = m_gizmo.eval_delta(); active) {
-          // Apply delta to color value
-          auto trf_colr = (delta * e_vert.get_mismatch_position()).eval();
-
-          // Store color and expose clamped color to other tasks
-          info.global("scene").getw<Scene>().uplifting_vertex(e_cs).set_mismatch_position(trf_colr);
+          // Apply delta to tracked value
+          m_gizmo_curr_p = (delta * m_gizmo_curr_p).eval();
 
           // Expose a marker point for the snap position inside the convex hull;
           // don't snap as it feels weird while moving the point
-          info("closest_point").set<Colr>(e_hull.find_closest_interior(trf_colr));
+          auto gizmo_clip_p = info("closest_point").set<Colr>(e_hull.find_closest_interior(m_gizmo_curr_p))
+                                                   .getr<Colr>();
+
+          // Feed clipped color to scene
+          info.global("scene").getw<Scene>().uplifting_vertex(e_cs).set_mismatch_position(gizmo_clip_p);
+
+          // Tooltip shows closest clipped value
+          if (ImGui::BeginTooltip()) {
+            auto gizmo_srgb_p = lrgb_to_srgb(gizmo_clip_p);
+            ImGui::ColorEdit3("lrgb", gizmo_clip_p.data(), ImGuiColorEditFlags_Float);
+            ImGui::ColorEdit3("srgb", gizmo_srgb_p.data(), ImGuiColorEditFlags_Float);
+            ImGui::EndTooltip();
+          }
         }
 
         // Register gizmo end; apply vertex position to scene save state
         if (m_gizmo.end_delta()) {
           // Clip vertex position to inside convex hull, if enabled
-          auto cstr_colr = e_vert.get_mismatch_position();
           if (i_clip)
-            cstr_colr = e_hull.find_closest_interior(cstr_colr);
+            m_gizmo_curr_p = e_hull.find_closest_interior(m_gizmo_curr_p);
 
           // Handle save
           info.global("scene").getw<Scene>().touch({
             .name = "Move color constraint",
-            .redo = [p = cstr_colr,      e_cs](auto &scene) { scene.uplifting_vertex(e_cs).set_mismatch_position(p); },
+            .redo = [p = m_gizmo_curr_p, e_cs](auto &scene) { scene.uplifting_vertex(e_cs).set_mismatch_position(p); },
             .undo = [p = m_gizmo_prev_p, e_cs](auto &scene) { scene.uplifting_vertex(e_cs).set_mismatch_position(p); }
           });
         }
