@@ -492,7 +492,9 @@ namespace met {
       S_indrct_zero.fill(0.f);
 
       // Construct objective matrices
-      eig::MatrixXf              S_direct(wavelength_samples, 3 * info.direct_objectives.size());
+      auto S_direct = info.direct_objectives.empty()
+                    ? (eig::MatrixXf(1, 1) << 1).finished()
+                    : eig::MatrixXf(wavelength_samples, 3 * info.direct_objectives.size());
       std::vector<eig::MatrixXf> S_indrct;
       for (uint i = 0; i < info.direct_objectives.size(); ++i)
         S_direct.block<wavelength_samples, 3>(0, 3 * i) = info.direct_objectives[i].finalize(false);
@@ -516,16 +518,20 @@ namespace met {
           using vec = eig::Vector<ad::real1st, wavelength_bases>;
 
           // Helper lambda to map along unit vector
-          constexpr auto trf_by_sample = [](const eig::MatrixXf &cmfs, const eig::VectorXf &sample) {
-            return (cmfs * sample).cast<double>().eval();  };
+          constexpr auto trf_by_sample = [](const eig::MatrixXf &cmfs, const eig::VectorXf &sample) 
+                                       -> eig::Vector<double, wavelength_samples> {
+            return (cmfs * sample).cast<double>().eval();
+          };
         
-          // Map color systems along unit vector
-          auto sample_head = samples_nd[i].head(3 * info.direct_objectives.size()).eval();
+          // Map linear color systems along part of unit vector
+          auto A_direct 
+            = !info.direct_objectives.empty() 
+            ? trf_by_sample(S_direct, samples_nd[i].head(3 * info.direct_objectives.size()).eval()) 
+            : eig::Vector<double, wavelength_samples>(0);
+          
+          // Map nonlinear color systems along rest of unit vector
           auto sample_tail = samples_nd[i].tail(3 * info.indirect_objectives.size()).eval();
-          eig::Vector<double, wavelength_samples> A_direct 
-            = trf_by_sample(S_direct, sample_head);
-          std::vector<eig::Vector<double, wavelength_samples>> A_indrct 
-            = S_indrct
+          auto A_indrct = S_indrct
             | vws::transform(std::bind(trf_by_sample, _1, sample_tail))
             | vws::transform([](const auto &v) { return eig::Vector<double, wavelength_samples>(v); })
             | rng::to<std::vector>();

@@ -11,9 +11,13 @@
 namespace met {
   // Small helper struct for implementations of is_colr_constraint derivatives
   struct ColrConstraint {
-    uint cmfs_j = 0, illm_j = 0; // Index of observer and illuminant functions in scene data
-    Colr colr_j = 0.f;           // Color under this direct color system
+    // Constraint data
+    bool is_active = true; // Constraint is in effect
+    uint cmfs_j    = 0;    // Index of observer in scene data
+    uint illm_j    = 0;    // Index of illuminant in scene data
+    Colr colr_j    = 0.f;  // Color under this direct color system
 
+  public:
     bool operator==(const ColrConstraint &o) const;
     bool is_similar(const ColrConstraint &o) const;
   };
@@ -21,9 +25,10 @@ namespace met {
   // Small helper struct for constraints in IndirectSurfaceConstraint
   struct PowrConstraint {
     // Constraint data
-    uint              cmfs_j = 0;
-    std::vector<Spec> powr_j = { };
-    Colr              colr_j = 0.f;
+    bool              is_active = true; // Constraint is in effect
+    uint              cmfs_j    = 0;    // Index of observer in scene data
+    std::vector<Spec> powr_j    = { };  // Interreflection power series
+    Colr              colr_j    = 0.f;  // Color under this direct color system
 
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
@@ -134,10 +139,11 @@ namespace met {
   // accounting for nonlinear interreflections as well as linear constraints. 
   // The interreflection system is based on measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
-    Colr                        colr_i        = 0.0;   // Expected base color, obtained from the first underlying surface
-    bool                        target_direct = false; // Free variable is the last linear, instead of last nonlinear constraint
-    std::vector<ColrConstraint> cstr_j_direct = { };   // Secondary linear constraints for color reproduction
-    std::vector<PowrConstraint> cstr_j_indrct = { };   // Secondary nonlinear constraints for color reproduction
+    bool                        is_base_active = true;  // Base color linear constraint is active
+    Colr                        colr_i         = 0.0;   // Expected base color, obtained from the first underlying surface
+    bool                        target_direct  = false; // Free variable is the last linear, instead of last nonlinear constraint
+    std::vector<ColrConstraint> cstr_j_direct  = { };   // Secondary linear constraints for color reproduction
+    std::vector<PowrConstraint> cstr_j_indrct  = { };   // Secondary nonlinear constraints for color reproduction
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
@@ -148,9 +154,6 @@ namespace met {
 
     // Generate points on the constraint's metamer mismatching volume
     std::vector<MismatchSample> realize_mismatch(const Scene &scene, const Uplifting &uplifting, uint seed, uint samples) const;
-
-    // The constraint data is in a valid state for metameric mismatching
-    bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const;
 
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;

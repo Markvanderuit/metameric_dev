@@ -69,9 +69,17 @@ namespace met {
         ImGui::SameLine();
         Colr err = (cstr.colr_i - e_scene.csys(uplf.value.csys_i)(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+        
+        // Is-Active column for forcibly disabling linear part of IndirectSurfaceConstraint
+        ImGui::TableSetColumnIndex(3);
+        /* if constexpr (std::is_same_v<decltype(cstr), IndirectSurfaceConstraint&>) {
+          if (ImGui::Button(cstr.is_base_active ? "V" : "H"))
+            cstr.is_base_active = !cstr.is_base_active;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Toggle active");
+        } */
 
         // Empty row
-        ImGui::TableSetColumnIndex(3);
         ImGui::TableSetColumnIndex(4);
       };
 
@@ -84,10 +92,20 @@ namespace met {
         auto &cstr = c_vec[c_j];
         auto  csys = e_scene.csys(cstr.cmfs_j, cstr.illm_j);
 
+        // Return value set to this return value
+        PushReturnAction action = PushReturnAction::eNone;
+
         // Name column
         ImGui::TableSetColumnIndex(0);
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text(name.c_str());
+        if (c_j != c_vec.size() - 1) {
+          if (ImGui::Button("Edit"))
+            action = PushReturnAction::eEdit;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Make mismatching constraint");
+        } else {
+          ImGui::AlignTextToFramePadding();
+          ImGui::Text("Editing");
+        }
 
         // CSYS editor column
         ImGui::TableSetColumnIndex(1);
@@ -107,19 +125,15 @@ namespace met {
         Colr err = (cstr.colr_j - csys(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
 
-        // Following buttons set to this return value
-        PushReturnAction action = PushReturnAction::eNone;
-
-        // Edit button
+        // Is-Active column
         ImGui::TableSetColumnIndex(3);
         if (c_j != c_vec.size() - 1) {
-          ImGui::SameLine();
-          if (ImGui::Button("Edit"))
-            action = PushReturnAction::eEdit;
+          if (ImGui::Button(cstr.is_active ? "V" : "H"))
+            cstr.is_active = !cstr.is_active;
           if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Make mismatching constraint");
+            ImGui::SetTooltip("Toggle active");
         }
-
+          
         // Delete/Edit column
         ImGui::TableSetColumnIndex(4);
         if (ImGui::Button("X"))
@@ -140,10 +154,20 @@ namespace met {
         auto csys = IndirectColrSystem { .cmfs  = e_scene.resources.observers[cstr.cmfs_j].value(), 
                                          .powers = cstr.powr_j };
 
+        // Return value set to this return value
+        PushReturnAction action = PushReturnAction::eNone;
+
         // Name column
         ImGui::TableSetColumnIndex(0);
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text(name.c_str());
+        if (c_j != c_vec.size() - 1) {
+          if (ImGui::Button("Edit"))
+            action = PushReturnAction::eEdit;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Make mismatching constraint");
+        } else {
+          ImGui::AlignTextToFramePadding();
+          ImGui::Text("Editing");
+        }
 
         // CSYS editor column
         ImGui::TableSetColumnIndex(1);
@@ -160,19 +184,17 @@ namespace met {
         Colr err = (cstr.colr_j - csys(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
 
-        // Following buttons set to this return value
-        PushReturnAction action = PushReturnAction::eNone;
-
-        // Edit button
+        // Is-Active column
         ImGui::TableSetColumnIndex(3);
         if (c_j != c_vec.size() - 1) {
-          ImGui::SameLine();
-          if (ImGui::Button("Edit"))
-            action = PushReturnAction::eEdit;
+          if (ImGui::Button(cstr.is_active ? "V" : "H")) {
+            fmt::print("Ehhh\n");
+            cstr.is_active = !cstr.is_active;
+          }
           if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Make mismatching constraint");
+            ImGui::SetTooltip("Toggle active");
         }
-
+          
         // Delete/Edit column
         ImGui::TableSetColumnIndex(4);
         if (ImGui::Button("X"))
@@ -247,17 +269,19 @@ namespace met {
               auto actn = push_colr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
+                cstr.cstr_j.back().is_active = true;
                 break;
               } else if (actn == PushReturnAction::eEdit) {
                 std::swap(cstr.cstr_j[j], cstr.cstr_j.back());
+                cstr.cstr_j.back().is_active = true;
                 break;
               }
             }
 
             // Add button
             ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(4);
-            if (ImGui::Button("+"))
+            ImGui::TableSetColumnIndex(0);
+            if (ImGui::Button("Add"))
               cstr.cstr_j.push_back(ColrConstraint { });
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Add constraint");
@@ -283,9 +307,11 @@ namespace met {
               auto actn = push_colr_cstr_row(name, cstr.cstr_j_direct, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j_direct.erase(cstr.cstr_j_direct.begin() + j);
+                cstr.cstr_j_direct.back().is_active = true;
                 break;
               } else if (actn == PushReturnAction::eEdit) {
                 std::swap(cstr.cstr_j_direct[j], cstr.cstr_j_direct.back());
+                cstr.cstr_j_direct.back().is_active = true;
                 break;
               }
             }
@@ -296,17 +322,19 @@ namespace met {
               auto actn = push_powr_cstr_row(name, cstr.cstr_j_indrct, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j_indrct.erase(cstr.cstr_j_indrct.begin() + j);
+                cstr.cstr_j_indrct.back().is_active = true;
                 break;
               } else if (actn == PushReturnAction::eEdit) {
                 std::swap(cstr.cstr_j_indrct[j], cstr.cstr_j_indrct.back());
+                cstr.cstr_j_indrct.back().is_active = true;
                 break;
               }
             }
 
             // Add button
             ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(4);
-            if (ImGui::Button("+"))
+            ImGui::TableSetColumnIndex(0);
+            if (ImGui::Button("Add"))
               cstr.cstr_j_indrct.push_back(PowrConstraint { });
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Add constraint");
@@ -344,8 +372,8 @@ namespace met {
 
             // Spawn color button viewing the srgb-transformed patch color
             Colr lrgb = e_patches[i];
-            auto srgb = lrgb_to_srgb(lrgb);
-            if (ImGui::ColorEdit3(std::format("##patch_{}", i).c_str(), srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker))
+            auto srgb = (eig::Array4f() << lrgb_to_srgb(lrgb), 1.f).finished();
+            if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
               vert.set_mismatch_position(lrgb);
             
             if (i < e_patches.size() - 1)

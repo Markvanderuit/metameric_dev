@@ -79,9 +79,9 @@ namespace met {
       }, 
       [c](IndirectSurfaceConstraint &cstr) { 
         if (cstr.target_direct)
-          cstr.cstr_j_direct.back().colr_j = c; 
+          cstr.cstr_j_direct.back().colr_j = c;
         else
-          cstr.cstr_j_indrct.back().colr_j = c; 
+          cstr.cstr_j_indrct.back().colr_j = c;
       },
       [](const auto &cstr) {}
     };
@@ -91,13 +91,14 @@ namespace met {
     met_trace();
     return constraint | visit {
       [](const is_colr_constraint auto &cstr) { 
-        return cstr.cstr_j.back().colr_j; 
+        return (cstr.cstr_j | vws::filter(&ColrConstraint::is_active)).back().colr_j; 
       },
       [](const IndirectSurfaceConstraint &cstr) { 
-        if (cstr.target_direct)
+        if (cstr.target_direct) {
           return cstr.cstr_j_direct.back().colr_j; 
-        else
+        } else {
           return cstr.cstr_j_indrct.back().colr_j; 
+        }
       },
       [](const auto &) { return Colr(0); },
     };
@@ -113,8 +114,8 @@ namespace met {
         guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
         if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j  | vws::take(cstr.cstr_j.size() - 1),
-                           other.cstr_j | vws::take(cstr.cstr_j.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
           
           // The "free variable" should be identical outside of the specified color value
           guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
@@ -127,8 +128,8 @@ namespace met {
         guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
         if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j  | vws::take(cstr.cstr_j.size() - 1),
-                           other.cstr_j | vws::take(cstr.cstr_j.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
           
           // The "free variable" constraint should be identical outside of the specified color value
           guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
@@ -146,16 +147,16 @@ namespace met {
         if (cstr.target_direct && !cstr.cstr_j_direct.empty()) {
           // The "known" connstraints should be identical
           guard(rng::equal(cstr.cstr_j_indrct, other.cstr_j_indrct), false);
-          guard(rng::equal(cstr.cstr_j_direct  | vws::take(cstr.cstr_j_direct.size() - 1),
-                           other.cstr_j_direct | vws::take(cstr.cstr_j_direct.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j_direct  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j_direct.size() - 1),
+                           other.cstr_j_direct | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j_direct.size() - 1)), false);
 
           // The "free variable" constraint should be identical outside of the specified color value
           guard(cstr.cstr_j_direct.back().is_similar(other.cstr_j_direct.back()), false);
         } else if (!cstr.target_direct && !cstr.cstr_j_indrct.empty()) {
           // The "known" connstraints should be identical
           guard(rng::equal(cstr.cstr_j_direct, other.cstr_j_direct), false);
-          guard(rng::equal(cstr.cstr_j_indrct  | vws::take(cstr.cstr_j_indrct.size() - 1),
-                           other.cstr_j_indrct | vws::take(cstr.cstr_j_indrct.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j_indrct  | vws::filter(&PowrConstraint::is_active) | vws::take(cstr.cstr_j_indrct.size() - 1),
+                           other.cstr_j_indrct | vws::filter(&PowrConstraint::is_active) | vws::take(cstr.cstr_j_indrct.size() - 1)), false);
 
           // The "free variable" constraint should be identical outside of the specified color value
           guard(cstr.cstr_j_indrct.back().is_similar(other.cstr_j_indrct.back()), false);
@@ -199,7 +200,6 @@ namespace met {
     };
   }
 
-
   const SurfaceInfo &Uplifting::Vertex::surface() const {
     met_trace();
     return constraint | visit {
@@ -207,8 +207,8 @@ namespace met {
         return c.surface; 
       },
       [](const IndirectSurfaceConstraint &c) -> const SurfaceInfo & { 
-        return !c.cstr_j_indrct.empty() 
-          ? c.cstr_j_indrct.back().surface 
+        return !c.cstr_j_indrct .empty() 
+          ? c.cstr_j_indrct .back().surface 
           : detail::invalid_visitor_return_si; 
       },
       [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
@@ -222,28 +222,35 @@ namespace met {
         // Merge all known color system data
         auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
         auto cstr = c.cstr_j
+                  | vws::filter(&ColrConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
                   | rng::to<std::vector>();
         cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
 
         // Mismatching only occurs if there are two or more color systems, and all are unique
-        return cstr.size() > 1 && !detail::has_duplicates(cstr);
+        return cstr.size() > 1 
+            && !detail::has_duplicates(cstr);
       },
       [&](const DirectSurfaceConstraint &c) {
         // Merge all known color system data
         auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
         auto cstr = c.cstr_j
+                  | vws::filter(&ColrConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
                   | rng::to<std::vector>();
         cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
         
         // Mismatching only occurs if there are two or more color systems, and all are unique
-        return cstr.size() > 1 && !detail::has_duplicates(cstr);
+        return cstr.size() > 1
+            && !detail::has_duplicates(cstr);
       },
       [&](const IndirectSurfaceConstraint &c) {
-        return (!c.cstr_j_indrct.empty()
-            && !c.cstr_j_indrct.back().powr_j.empty())
-            || !c.cstr_j_direct.empty();
+        auto cstr = c.cstr_j_indrct
+                  | vws::filter(&PowrConstraint::is_active)
+                  | rng::to<std::vector>();
+        return !cstr.empty() 
+            && !detail::has_duplicates(cstr) 
+            && !cstr.back().powr_j.empty();
       },
       [&](const MeasurementConstraint &v) { 
         return false;
