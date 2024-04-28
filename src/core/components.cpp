@@ -143,9 +143,7 @@ namespace met {
     met_trace();
     return constraint | visit {
       [](const DirectSurfaceConstraint &)       { return true;                 },
-      [](const IndirectSurfaceConstraint &cstr) { 
-        return !cstr.cstr_j.empty();
-      },
+      [](const IndirectSurfaceConstraint &cstr) { return !cstr.cstr_j.empty(); },
       [](const auto &)                          { return false;                },
     };
   }

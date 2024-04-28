@@ -94,15 +94,10 @@ namespace met {
       Spec spec_distr = std::transform_reduce(std::execution::par_unseq,
         range_iter(paths), Spec(0), 
         [](const auto &a, const auto &b) -> Spec { return (a + b).eval(); }, 
-        [colr_div](const auto &path) -> Spec { return colr_div * accumulate_spectrum(path.wavelengths, path.L);
+        [colr_div](const auto &path) -> Spec { return colr_div * accumulate_spectrum(path.wvls, path.L);
       }).max(0.f).eval();
       Colr colr_lrgb_dstr = (cmfs.transpose() * spec_distr.matrix());
       Colr colr_srgb_dstr = lrgb_to_srgb(colr_lrgb_dstr);
-      
-      // Assume for now, only one uplifting exists
-      // Continue only if there is a constraint
-      const auto &e_uplifting = e_scene.components.upliftings[0].value;
-      guard(!e_uplifting.verts.empty());
       
       // Attempt a reconstruction of the first vertex spectrum
       {
@@ -123,27 +118,6 @@ namespace met {
         // Run a spectrum plot for the accumulated radiance
         ImGui::Separator();
         ImGui::PlotSpectrum("##rad_plot", spec_distr, -0.05f, spec_distr.maxCoeff() + 0.05f, { -1, 128.f * e_window.content_scale() });
-
-        // Run a spectrum plot for encountered spectra
-        /* if (ImPlot::BeginPlot("Reflectances", { 256.f * e_window.content_scale(), 128.f * e_window.content_scale() }, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
-          // Setup minimal format for coming line plots
-          ImPlot::SetupLegend(ImPlotLocation_North, ImPlotLegendFlags_Horizontal | ImPlotLegendFlags_Outside);
-          ImPlot::SetupAxesLimits(wavelength_min, wavelength_max, -0.05, 1.05, ImPlotCond_Always);
-          ImPlot::SetupAxisTicks(ImAxis_X1, nullptr, 0);
-          ImPlot::SetupAxisTicks(ImAxis_Y1, nullptr, 0);
-
-          // Iterate tetrahedron data and plot it
-          uint scope_i = 0;
-          for (const auto &data : tetr_data) {
-            for (const auto &tetr : data) {
-              Spec r = tetr.weights[0] * tetr.spectra[0] + tetr.weights[1] * tetr.spectra[1]
-                     + tetr.weights[2] * tetr.spectra[2] + tetr.weights[3] * tetr.spectra[3];
-              ImPlot::PlotLine(std::format("##scope_{}", scope_i++).c_str(), x_values.data(), r.data(), wavelength_samples);
-            }
-          }
-
-          ImPlot::EndPlot();
-        } */
         
         ImGui::EndTooltip();
       }

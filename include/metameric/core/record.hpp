@@ -112,7 +112,7 @@ namespace met {
 
   public:
     // Sampled path wavelengths
-    alignas(16) eig::Array4f wavelengths;
+    alignas(16) eig::Array4f wvls;
 
     // Energy over probability density
     // Note: if generated with PartialPathQuery(...), reflectances are ignored along paths.

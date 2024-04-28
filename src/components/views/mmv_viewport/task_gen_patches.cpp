@@ -9,7 +9,25 @@
 #include <execution>
 
 namespace met {
+  // Nr. of color patches to sample
   constexpr uint n_samples = 16;
+
+  namespace detail {
+    uint expand_bits_10(uint i) {
+      i = (i * 0x00010001u) & 0xFF0000FFu;
+      i = (i * 0x00000101u) & 0x0F00F00Fu;
+      i = (i * 0x00000011u) & 0xC30C30C3u;
+      i = (i * 0x00000005u) & 0x49249249u;
+      return i;
+    }
+    
+    uint morton_code(eig::Array3f v) {
+      v = (v * 1024.f).cwiseMax(0.f).cwiseMin(1023).eval();
+      return expand_bits_10(uint(v.x())) * 4u + 
+             expand_bits_10(uint(v.y())) * 2u + 
+             expand_bits_10(uint(v.z()));
+    }
+  } // namespace detail
   
   bool GenPatchesTask::is_active(SchedulerHandle &info) {
     met_trace();
@@ -94,7 +112,12 @@ namespace met {
            + p[3] * x.z();
     });
 
-    // Finally, sort patches by luminance
-    rng::sort(i_patches, {}, luminance);
+    // Finally, sort patches
+    // Hack; we sort by a morton order lol
+    auto maxc = rng::max(i_patches, {}, [](const Colr &c) { return c.maxCoeff(); });
+    auto minc = rng::min(i_patches, {}, [](const Colr &c) { return c.minCoeff(); });
+    rng::sort(i_patches, {}, [minc, mdiv = 1.f / (maxc - minc)](const Colr &c) {
+      return detail::morton_code((c - minc) * mdiv);
+    });
   }
 } // namespace met

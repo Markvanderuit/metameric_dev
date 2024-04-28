@@ -11,6 +11,7 @@
 namespace met {
   static constexpr float selector_near_distance = 12.f;
   static constexpr uint  indirect_query_spp     = 16384;
+  static constexpr uint  indirect_query_depth   = 4;
 
   RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
@@ -66,30 +67,28 @@ namespace met {
       return;
     }
     fmt::print("Found {} paths through query\n", paths.size());
-  
-    // Collect handles to all uplifting tasks
-    std::vector<TaskHandle> uplf_handles;
-    rng::transform(vws::iota(0u, static_cast<uint>(e_scene.components.upliftings.size())), 
-      std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
+
+    // Collect handle to relevant uplifting task
+    // const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
+    const auto &e_uplf_task = info.task(std::format("gen_upliftings.gen_uplifting_{}", cs.uplifting_i))
+                                  .realize<GenUpliftingDataTask>();
     
-    // Collect handle to relevant uplifting taslk
-    const auto &e_uplf_task = uplf_handles[cs.uplifting_i].realize<GenUpliftingDataTask>();
+    // Get the current reflectance distribution used during rendering operations for this constraint
+    Spec constraint_refl = e_uplf_task.query_constraint(cs.vertex_i);
 
-    // Collect camera cmfs
-    CMFS cmfs = e_scene.resources.observers[e_scene.components.observer_i.value].value();
-    cmfs = (cmfs.array())
-         / (cmfs.array().col(1) * wavelength_ssize).sum();
-    cmfs = (models::xyz_to_srgb_transform * cmfs.matrix().transpose()).transpose();
-
-    // Helper structs
+    // Helper struct
+    // A path's is restructured into values * reflectance^power
     struct SeparationRecord {
-      uint         power;  // nr. of times constriant reflectance appears along path
+      uint         power;  // nr. of times constraint reflectance appears along path
       eig::Array4f wvls;   // integration wavelengths 
-      eig::Array4f values; // remainder of incident radiance, without constraint reflectance
+      eig::Array4f values; // remainder of incident radiance, without constraint reflectance multiplied against it
     };
+
+    // Helper struct
+    // Definition for a path vertex; reflectance equals r_weight x our constraint reflectance + remainder
     struct CompactTetrRecord {
-      float        r_weight;
-      eig::Array4f remainder;
+      float        r_weight;  // Barycentric weight of reflectance at one of four vertices
+      eig::Array4f remainder; // Remainder of reflectances, premultiplied and summed
     };
 
     // Compact paths into R^P + aR', which likely means separating them instead
@@ -99,61 +98,53 @@ namespace met {
     for (int i = 0; i < paths.size(); ++i) {
       const PathRecord &path = paths[i];
 
-      // Filter vertices along path for which the uplifting data is relevant to our current constraint
-      auto verts = path.data
-                 | vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0)) // 1. drop padded memory
-                 | vws::transform([&](const auto &vt) {                          // 2. generate surface info at vertex position
-                   return e_scene.get_surface_info(vt.p, vt.record); })          
-                 | vws::filter([&](const auto &si) {                             // 3. drop vertices on other uplifting structures
-                   return si.object.uplifting_i == cs.uplifting_i; })            
-                 | vws::transform([&](const auto &si) {                          // 4. generate uplifting tetrahedron from uplifting task
-                   return e_uplf_task.query_tetrahedron(si.diffuse); })          
-                 | vws::transform([&](const auto &tetr) {                        // 5. find index of vertex that is linked to our constraint
-                   auto it = rng::find(tetr.indices, cs.vertex_i);               //    and return together with tetrahedron
-                   uint i  = std::distance(tetr.indices.begin(), it);            
-                   return std::pair { tetr, i }; })
-                 | vws::filter([&](const auto &pair) {                           // 6. drop tetrahedra that don't touch our selected constraint
-                   return pair.second < 4; })                                    
-                 | vws::transform([&](const auto &pair) {                        // 7. return compact representation; weight of r and summed remainder
-                   auto [tetr, i] = pair;
-                   CompactTetrRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
-                   for (uint j = 0; j < 4; ++j) {
-                     guard_continue(j != i);
-                     rc.remainder += tetr.weights[j] * sample_spectrum(path.wavelengths, tetr.spectra[j]);
-                   }
-                   return rc; 
-                 }) | rng::to<std::vector<CompactTetrRecord>>();                 // 8. finalize to vector
+      // Filter to find vertices along path for which the uplifting data is relevant to the constraint
+      auto verts_view = vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))                              // 1. drop padded parts of path data
+                      | vws::transform([&](const auto &vt) { return e_scene.get_surface_info(vt.p, vt.record); })  // 2. generate surface info at path vertex
+                      | vws::filter([&](const auto &si) { return si.object.uplifting_i == cs.uplifting_i; })       // 3. drop path vertices unrelated to current uplifting object
+                      | vws::transform([&](const auto &si) { return e_uplf_task.query_tetrahedron(si.diffuse); })  // 4. generate uplifting tetrahedron describing surface reflectance
+                      | vws::transform([&](const auto &tetr) {                                                     // 5. find index of tetrahedron vertex linked to our constraint
+                          uint i = std::distance(tetr.indices.begin(), rng::find(tetr.indices, cs.vertex_i));      //    and return both tetr. and index
+                          return std::pair { tetr, i }; })                                
+                      | vws::filter([&](const auto &pair) { return pair.second < 4; })                             // 6. drop tetrahedra unrelated to current uplifting vertex
+                      | vws::transform([&](const auto &pair) {                                                     // 7. return compact representation, see CompactTetrRecord
+                          auto [tetr, i] = pair;
+                          CompactTetrRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
+                          for (uint j = 0; j < 4; ++j) {
+                            guard_continue(j != i);
+                            rc.remainder += tetr.weights[j] 
+                                          * sample_spectrum(path.wvls, tetr.spectra[j]);
+                          }
+                          return rc; 
+                        });
       
-      {
-        // Get the relevant constraint's current reflectance
-        // at the path's wavelengths (notably, this data is from last frame)
-        eig::Array4f r = sample_spectrum(path.wavelengths, e_uplf_task.query_constraint(cs.vertex_i));
-        
-        // We get the "fixed" part of the path's throughput, by stripping all reflectances of
-        // the constrained vertices through division; on div-by-0, we set a component to 0
-        eig::Array4f back = path.L;
-        for (const auto &vt : verts) {
-          eig::Array4f rdiv = r * vt.r_weight + vt.remainder;
-          back = (rdiv > 0.0001f).select(back / rdiv, 0.f); // we clamp small values to zero, to prevent fireflies from mucking up a measurement
-        }
-        
-        // We them iterate all permutations of the current constraint vertices
-        // and collapse reflectances into this value
-        std::vector<SeparationRecord> permutations;
-        uint n_perms = std::pow(2u, static_cast<uint>(verts.size()));
-        for (uint i = 0; i < std::pow(2u, static_cast<uint>(verts.size())); ++i) {
-          auto bits = std::bitset<32>(i);
-          SeparationRecord sr = { .power = 0, .wvls = path.wavelengths, .values = back };
-          for (uint j = 0; j < verts.size(); ++j) {
-            if (bits[j]) {
-              sr.power++;
-              sr.values *= verts[j].r_weight;
-            } else {
-              sr.values *= verts[j].remainder;
-            }
+      // Apply filter and return selected vertices
+      auto verts = path.data | verts_view | rng::to<std::vector<CompactTetrRecord>>();
+      
+      // Get the "fixed" part of the path's throughput, by taking the constraint's current refl.
+      // and dividing it out of the assembled energy (note; this data is from last frame)
+      eig::Array4f back = path.L;
+      eig::Array4f refl = sample_spectrum(path.wvls, constraint_refl);
+      for (const auto &vt : verts) {
+        eig::Array4f rdiv = refl * vt.r_weight + vt.remainder;
+        back = (rdiv > 0.0001f).select(back / rdiv, 0.f); // we ignore small values to prevent fireflies from mucking up a measurement
+      }
+      
+      // We them iterate all permutations of the current constraint vertices
+      // and collapse reflectances into a simple power number, and multiply
+      // energy against the remainder reflectances
+      for (uint i = 0; i < std::pow(2u, static_cast<uint>(verts.size())); ++i) {
+        auto bits = std::bitset<32>(i);
+        SeparationRecord sr = { .power = 0, .wvls = path.wvls, .values = back };
+        for (uint j = 0; j < verts.size(); ++j) {
+          if (bits[j]) {
+            sr.power++;
+            sr.values *= verts[j].r_weight;
+          } else {
+            sr.values *= verts[j].remainder;
           }
-          tbb_paths.push_back(sr);
         }
+        tbb_paths.push_back(sr);
       }
     }
 
@@ -167,30 +158,20 @@ namespace met {
     rng::fill(cstr.powr_j, Spec(0));
 
     // Reduce spectral data into its respective power bracket and divide by sample count
-    // TODO parallel reduction
     for (const auto &path : paths_finalized)
       accumulate_spectrum(cstr.powr_j[path.power], path.wvls, path.values);
     for (auto &power : cstr.powr_j) {
-      power *= 0.25f * static_cast<float>(wavelength_samples);
-      power /= static_cast<float>(indirect_query_spp);
-      power = power.cwiseMax(0.f);
-      if ((power <= 5e-3).all())
+      power *= .25f * static_cast<float>(wavelength_samples) / static_cast<float>(indirect_query_spp);
+      if (power = power.cwiseMax(0.f); (power <= 1e-3).all())
         power = 0.f;
     }
 
-    for (auto &power : cstr.powr_j) {
-      fmt::print("{}\n", power);
-    }
-
-    // Obtain underlying reflectance
-    Spec r = e_uplf_task.query_constraint(cs.vertex_i);
-    
-    // Generate a default color value by passing through this reflectance
+    // Generate a default color value by passing through the current known constraint reflectance
     IndirectColrSystem csys = {
       .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
       .powers = cstr.powr_j
     };
-    cstr.colr_j = csys(r);
+    cstr.colr_j = csys(constraint_refl);
   }
 
   bool MeshViewportEditorInputTask::is_active(SchedulerHandle &info) {
@@ -268,11 +249,8 @@ namespace met {
     // Determine nearest constraint to the mouse in screen-space
     ConstraintRecord cs_nearest = ConstraintRecord::invalid();
     for (const auto &[cs, vert] : active_verts) {
-      // Extract surface information from surface constraint
-      auto si = vert.constraint | visit {
-        [](const is_surface_constraint auto &cstr) { return cstr.surface; },
-        [](const auto &cstr) { return SurfaceInfo::invalid(); }
-      };
+      // Extract surface information from surface constraint; assume these are valid at this point
+      auto si = vert.surface();
 
       // Get screen-space position; test distance and continue if we are too far away
       eig::Vector2f p_screen = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);

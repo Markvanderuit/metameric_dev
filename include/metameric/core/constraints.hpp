@@ -45,14 +45,6 @@ namespace met {
     { t.cstr_j } -> std::same_as<std::vector<ColrConstraint> &>;
   };
 
-  // Concept for a constraint on metameric behavior, which bases itself on data
-  // sampled from a surface position in the scene.
-  template <typename Ty>
-  concept is_surface_constraint = is_metameric_constraint<Ty> && requires(Ty t) {
-    // The constraint specifies surface data, sampled from the scene.
-    { t.surface } -> std::same_as<SurfaceInfo &>;
-  };
-
   // Constraint imposing reproduction of a specific spectral reflectance.
   struct MeasurementConstraint {
     Spec measure = 0.5; // Measured spectral data
@@ -84,9 +76,7 @@ namespace met {
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
-    Colr position(const Scene &scene, const Uplifting &uplifting) const { 
-      return colr_i;
-    }
+    Colr position(const Scene &scene, const Uplifting &uplifting) const { return colr_i; }
 
     // Solve for the constraint's metamer based on its current configuration
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
@@ -111,10 +101,7 @@ namespace met {
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
-    Colr position(const Scene &scene, const Uplifting &uplifting) const {
-      met_trace();
-      return colr_i;
-    }
+    Colr position(const Scene &scene, const Uplifting &uplifting) const { return colr_i; }
 
     // Solve for the constraint's metamer based on its current configuration
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
@@ -125,7 +112,7 @@ namespace met {
   public:
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
-  static_assert(is_surface_constraint<DirectSurfaceConstraint> && is_colr_constraint<DirectSurfaceConstraint>);
+  static_assert(is_colr_constraint<DirectSurfaceConstraint>);
 
 
   // Constraint imposing specific color reproduction under a known illuminant,
@@ -150,13 +137,10 @@ namespace met {
     Colr                        colr_i = 0.0; // Expected base color, obtained from the first underlying surface
     std::vector<PowrConstraint> cstr_j = { }; // Secondary nonlinear constraints for color reproduction
     // std::vector<ColrConstraint> cstr_j_direct = { }; // Secondary linear constraints for color reproduction
-
     
   public:
     // Obtain the constraint's position in the spectral uplifting tesselation
-    Colr position(const Scene &scene, const Uplifting &uplifting) const {
-      return colr_i;
-    }
+    Colr position(const Scene &scene, const Uplifting &uplifting) const { return colr_i; }
 
     // Solve for the constraint's metamer based on its current configuration
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
@@ -170,7 +154,7 @@ namespace met {
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
-  // static_assert(is_surface_constraint<IndirectSurfaceConstraint>);
+  static_assert(is_metameric_constraint<IndirectSurfaceConstraint>);
 
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);
