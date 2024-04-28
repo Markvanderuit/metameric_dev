@@ -52,7 +52,7 @@ namespace met {
     return m_path_prim.data();
   }
 
-  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, IndirectSurfaceConstraint::PowrConstraint &cstr) {
+  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, PowrConstraint &cstr) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources

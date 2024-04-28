@@ -1,5 +1,6 @@
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
+#include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/matching.hpp>
@@ -26,195 +27,331 @@ namespace met {
     auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
     const auto &e_coeffs  = uplf_handle("constraint_coeffs").getr<std::vector<Basis::vec_type>>();
-    const auto &e_patches = info.relative("viewport_gen_patches")("patches").getr<std::vector<Colr>>();
+
+    // Get a copy of the constraint's spectrum
+    Spec spec = e_spectra[e_cs.vertex_i];
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
+      // Return value for coming lambda captures
+      enum class PushReturnAction {
+        eNone,
+        eEdit,
+        eDelete
+      };
+
+      auto push_separator = [&]() {
+        ImGui::TableNextRow();
+        ImGui::Spacing();
+      };
+      
+      // Helper to handle single row for types with .colr_i
+      auto push_base_cstr_row = [&](auto &cstr) {
+        ImGui::TableNextRow();
+        auto scope = ImGui::ScopedID("Baseline");
+
+        // Name column
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Baseline");
+
+        // CSYS editor column
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        ImGui::Text(e_scene.csys_name(uplf.value.csys_i).c_str());
+
+        // lRGB/sRGB color column
+        ImGui::TableSetColumnIndex(2);
+        ImGui::ColorEdit3("##lrgb", cstr.colr_i.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+        ImGui::SameLine();
+        if (auto srgb = lrgb_to_srgb(cstr.colr_i); ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
+          cstr.colr_i = srgb_to_lrgb(srgb);
+        ImGui::SameLine();
+        Colr err = (cstr.colr_i - e_scene.csys(uplf.value.csys_i)(spec)).abs();
+        ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+
+        // Empty row
+        ImGui::TableSetColumnIndex(3);
+        ImGui::TableSetColumnIndex(4);
+      };
+
+      // Helper to handle single row for ColrConstraint type
+      auto push_colr_cstr_row = [&](std::string               name,
+                                    std::span<ColrConstraint> c_vec, 
+                                    uint                      c_j) -> PushReturnAction {
+        ImGui::TableNextRow();
+        auto scope = ImGui::ScopedID(name);
+        auto &cstr = c_vec[c_j];
+        auto  csys = e_scene.csys(cstr.cmfs_j, cstr.illm_j);
+
+        // Name column
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text(name.c_str());
+
+        // CSYS editor column
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5);
+        push_resource_selector("##cmfs", e_scene.resources.observers, cstr.cmfs_j);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        push_resource_selector("##illm", e_scene.resources.illuminants, cstr.illm_j);
+        
+        // lRGB/sRGB/error column
+        ImGui::TableSetColumnIndex(2);
+        ImGui::ColorEdit3("##lrgb", cstr.colr_j.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+        ImGui::SameLine();
+        if (auto srgb = lrgb_to_srgb(cstr.colr_j); ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
+          cstr.colr_j = srgb_to_lrgb(srgb);
+        ImGui::SameLine();
+        Colr err = (cstr.colr_j - csys(spec)).abs();
+        ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+
+        // Following buttons set to this return value
+        PushReturnAction action = PushReturnAction::eNone;
+
+        // Edit button
+        ImGui::TableSetColumnIndex(3);
+        if (c_j != c_vec.size() - 1) {
+          ImGui::SameLine();
+          if (ImGui::Button("Edit"))
+            action = PushReturnAction::eEdit;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Make mismatching constraint");
+        }
+
+        // Delete/Edit column
+        ImGui::TableSetColumnIndex(4);
+        if (ImGui::Button("X"))
+          action = PushReturnAction::eDelete;
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Delete constraint");
+          
+        return action;
+      };
+      
+      // Helper to handle single row for ColrConstraint type
+      auto push_powr_cstr_row = [&](std::string               name,
+                                    std::span<PowrConstraint> c_vec, 
+                                    uint                      c_j) -> PushReturnAction {
+        ImGui::TableNextRow();
+        auto scope = ImGui::ScopedID(name);
+        auto &cstr = c_vec[c_j];
+        auto csys = IndirectColrSystem { .cmfs  = e_scene.resources.observers[cstr.cmfs_j].value(), 
+                                         .powers = cstr.powr_j };
+
+        // Name column
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text(name.c_str());
+
+        // CSYS editor column
+        ImGui::TableSetColumnIndex(1);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        push_resource_selector("##cmfs", e_scene.resources.observers, cstr.cmfs_j);
+  
+        // lRGB/sRGB/error column
+        ImGui::TableSetColumnIndex(2);
+        ImGui::ColorEdit3("##lrgb", cstr.colr_j.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+        ImGui::SameLine();
+        if (auto srgb = lrgb_to_srgb(cstr.colr_j); ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
+          cstr.colr_j = srgb_to_lrgb(srgb);
+        ImGui::SameLine();
+        Colr err = (cstr.colr_j - csys(spec)).abs();
+        ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
+
+        // Following buttons set to this return value
+        PushReturnAction action = PushReturnAction::eNone;
+
+        // Edit button
+        ImGui::TableSetColumnIndex(3);
+        if (c_j != c_vec.size() - 1) {
+          ImGui::SameLine();
+          if (ImGui::Button("Edit"))
+            action = PushReturnAction::eEdit;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Make mismatching constraint");
+        }
+
+        // Delete/Edit column
+        ImGui::TableSetColumnIndex(4);
+        if (ImGui::Button("X"))
+          action = PushReturnAction::eDelete;
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Delete constraint");
+          
+        return action;
+      };
+
       // Get modified vertex
       auto &vert = uplf.value.verts[e_cs.vertex_i];
       
-      // Plotter for the current constraint's resulting spectrum
-      ImGui::SeparatorText("Reflectance spectrum");
-      {
-        const auto &e_sd = e_spectra[e_cs.vertex_i];
-        /* ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", e_sd); */ // Reenable for printing
-        ImGui::PlotSpectrum("##output_refl_plot", e_sd, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
-      }
+      // Plotter for the current constraint's resulting spectrum and
+      // several underlying distributions
+      vert.constraint | visit {
+        [&](const IndirectSurfaceConstraint &cstr) {
+          if (ImGui::BeginTabBar("##tab_bar")) {
+            Spec r = e_spectra[e_cs.vertex_i];
+            if (ImGui::BeginTabItem("Reflectance")) {
+              ImGui::PlotSpectrum("##output_refl_plot", spec, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
+              ImGui::EndTabItem();
+            }
+            if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
+              // Reconstruct radiance from truncated power series
+              Spec s = cstr.cstr_j_indrct.back().powr_j[0];
+              for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
+                s += r.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
+              ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 80.f * e_window.content_scale() });
+              ImGui::EndTabItem();
+            }
+            if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Power series")) {
+              float s_max = 0.f;
+              for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
+                s_max = std::max(s_max, cstr.cstr_j_indrct.back().powr_j[i].maxCoeff());
+              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 120.f * e_window.content_scale() });
+              ImGui::EndTabItem();
+            }
 
-      // Plotter for the current constraint's resulting radiance
-      // (only for IndirectSurfaceConstraint, really)
-      vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) {
-        guard(!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty());
-
-        // Reconstruct radiance from truncated power series
-        Spec r = e_spectra[e_cs.vertex_i];
-        Spec s = cstr.cstr_j_indrct.back().powr_j[0];
-        float s_max = 0.f;
-        for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i) {
-          s += r.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
-          s_max = std::max(s_max, cstr.cstr_j_indrct.back().powr_j[i].maxCoeff());
+            ImGui::EndTabBar();
+          }
+        },
+        [&](const auto &cstr) {
+          ImGui::SeparatorText("Reflectance");
+          /* ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", spec); */ // Reenable for printing
+          ImGui::SameLine();
+          if (ImGui::SmallButton("Export")) {
+            if (fs::path path; detail::save_dialog(path, "txt"))
+              io::save_spec(path, spec);
+          }
+          ImGui::PlotSpectrum("##output_refl_plot", spec, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
         }
-
-        // Plot estimated radiance
-        ImGui::SeparatorText("Radiance and powers");
-        ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 80.f * e_window.content_scale() });
-        ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 120.f * e_window.content_scale() });
-      });
+      };
       
       // Visit the underlying constraint data
       vert.constraint | visit {
         [&](is_colr_constraint auto &cstr) {
-          auto baseline_spr_name = std::format("Baseline ({})", e_scene.csys_name(uplf.value.csys_i));
-          ImGui::SeparatorText(baseline_spr_name.c_str());
-          {
-            // lRGB color picker
-            Colr &lrgb = cstr.colr_i;
-            ImGui::ColorEdit3("Base color (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
-          
-            // sRGB color picker
-            Colr srgb = lrgb_to_srgb(lrgb);
-            if (ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
-              lrgb = srgb_to_lrgb(srgb);
-
-            // Roundtrip error
-            Colr err = (lrgb - e_scene.csys(uplf.value.csys_i)(e_spectra[e_cs.vertex_i])).abs();
-            ImGui::InputFloat3("Roundtrip (lrgb)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
-          }
-
           ImGui::SeparatorText("Constraints");
-          {
-            if (!cstr.cstr_j.empty() && ImGui::BeginTable("##table", 4, ImGuiTableFlags_SizingStretchProp)) {
-              // Setup table header; columns are shown without hover or color; cleaner than table headers
-              ImGui::TableSetupScrollFreeze(0, 1);
-              ImGui::TableNextRow();
-              ImGui::TableSetColumnIndex(0); ImGui::Text("Observer");
-              ImGui::TableSetColumnIndex(1); ImGui::Text("Illuminant");
-              ImGui::TableSetColumnIndex(2); ImGui::Text("Value (lrgb/srgb/err)");
-              
-              // Each next row is dedicated to a single color constraint
-              for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
-                ImGui::TableNextRow();
-                auto scope = ImGui::ScopedID(std::format("table_row_{}", j));
-                auto &c    = cstr.cstr_j[j];
-                
-                // CMFS editor column
-                ImGui::TableSetColumnIndex(0);
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                push_resource_selector("##cmfs", e_scene.resources.observers, c.cmfs_j);
+          if (ImGui::BeginTable("##table", 5, ImGuiTableFlags_SizingStretchProp)) {
+            // Setup table header; columns are shown without hover or color; cleaner than table headers
+            ImGui::TableSetupScrollFreeze(0, 1);
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(1); ImGui::Text("Color system");
+            ImGui::TableSetColumnIndex(2); ImGui::Text("lrgb/srgb/error");
 
-                // Illuminant editor column
-                ImGui::TableSetColumnIndex(1);
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                push_resource_selector("##illm", e_scene.resources.illuminants, c.illm_j);
+            // Baseline constraint row
+            push_base_cstr_row(cstr);
 
-                // lRGB/sRGB color column
-                ImGui::TableSetColumnIndex(2);
-                ImGui::ColorEdit3("##lrgb", c.colr_j.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
-                ImGui::SameLine();
-                if (auto srgb = lrgb_to_srgb(c.colr_j); ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
-                  c.colr_j = srgb_to_lrgb(srgb);
-                ImGui::SameLine();
-                Colr err = (c.colr_j - e_scene.csys(c.cmfs_j, c.illm_j).apply(e_spectra[e_cs.vertex_i])).abs();
-                ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
-
-                // Delete button; exists early to prevent iterator issues
-                ImGui::TableSetColumnIndex(3);
-                if (ImGui::Button("Edit")) {
-                  // TODO set active MMV
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("X")) {
-                  // TODO reset active MMV to 0
-                  cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
-                  break;
-                }
-                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip("Delete constraint");
-              } // for (uint j)
-
-              ImGui::EndTable();
+            // Direct constraint rows
+            for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
+              auto name = std::format("Direct #{}", j);
+              auto actn = push_colr_cstr_row(name, cstr.cstr_j, j);
+              if (actn == PushReturnAction::eDelete) {
+                cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
+                break;
+              } else if (actn == PushReturnAction::eEdit) {
+                std::swap(cstr.cstr_j[j], cstr.cstr_j.back());
+                break;
+              }
             }
 
-            if (ImGui::Button("New constraint")) {
+            // Add button
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(4);
+            if (ImGui::Button("+"))
               cstr.cstr_j.push_back(ColrConstraint { });
-            }
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Add constraint");
+            
+            ImGui::EndTable();
           }
         },
         [&](IndirectSurfaceConstraint &cstr) {
-          if (ImGui::Button("New constraint")) {
-            cstr.cstr_j_indrct.push_back(IndirectSurfaceConstraint::PowrConstraint { });
-          }
-          
-          if (cstr.cstr_j_indrct.empty() || !cstr.cstr_j_indrct.back().surface.is_valid()) {
-            ImGui::Text("Invalid constraint");
-            return;
-          }
-          
-          auto baseline_spr_name = std::format("Base constraint ({})", e_scene.resources.observers[e_scene.components.observer_i.value].name);
-          ImGui::SeparatorText(baseline_spr_name.c_str());
-          {
-            {            
-              // lRGB color picker
-              Colr &lrgb = cstr.colr_i;
-              ImGui::ColorEdit3("Base color (lrgb)", lrgb.data(), ImGuiColorEditFlags_Float);
+          ImGui::SeparatorText("Constraints");
+          if (ImGui::BeginTable("##table", 5, ImGuiTableFlags_SizingStretchProp)) {
+            // Setup table header; columns are shown without hover or color; cleaner than table headers
+            ImGui::TableSetupScrollFreeze(0, 1);
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(1); ImGui::Text("Color system");
+            ImGui::TableSetColumnIndex(2); ImGui::Text("lrgb/srgb/error");
 
-              // sRGB color picker
-              Colr srgb = lrgb_to_srgb(lrgb);
-              if (ImGui::ColorEdit3("Base color (srgb)", srgb.data(), ImGuiColorEditFlags_Float));
-                lrgb = srgb_to_lrgb(srgb);
-                
-              // Roundtrip error
-              Colr err = (lrgb - e_scene.csys(uplf.value.csys_i)(e_spectra[e_cs.vertex_i])).abs();
-              ImGui::InputFloat3("Base color (error)", err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            // Baseline constraint row
+            push_base_cstr_row(cstr);
+
+            // Direct constraint rows
+            for (uint j = 0; j < cstr.cstr_j_direct.size(); ++j) {
+              auto name = std::format("Direct #{}", j);
+              auto actn = push_colr_cstr_row(name, cstr.cstr_j_direct, j);
+              if (actn == PushReturnAction::eDelete) {
+                cstr.cstr_j_direct.erase(cstr.cstr_j_direct.begin() + j);
+                break;
+              } else if (actn == PushReturnAction::eEdit) {
+                std::swap(cstr.cstr_j_direct[j], cstr.cstr_j_direct.back());
+                break;
+              }
             }
-            for (uint i = 0; i < cstr.cstr_j_indrct.size(); ++i) {
-              // Assemble non-linear color system
-              auto &c = cstr.cstr_j_indrct[i];
-              IndirectColrSystem csys = { .cmfs = e_scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j };
 
-              // lRGB color picker
-              Colr &lrgb = c.colr_j;
-              ImGui::ColorEdit3(std::format("Constraint {} (lrgb)", i).c_str(), lrgb.data(), ImGuiColorEditFlags_Float);
-              
-              // sRGB color picker
-              Colr srgb = lrgb_to_srgb(lrgb);
-              if (ImGui::ColorEdit3(std::format("Constraint {} (srgb)", i).c_str(), srgb.data(), ImGuiColorEditFlags_Float));
-                lrgb = srgb_to_lrgb(srgb);
-                
-              // Roundtrip error
-              Colr err = (lrgb - csys(e_spectra[e_cs.vertex_i])).abs();
-              ImGui::InputFloat3(std::format("Constraint {} (error)", i).c_str(), err.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
+            // Indirect constraint rows
+            for (uint j = 0; j < cstr.cstr_j_indrct.size(); ++j) {
+              auto name = std::format("Indirect #{}", j);
+              auto actn = push_powr_cstr_row(name, cstr.cstr_j_indrct, j);
+              if (actn == PushReturnAction::eDelete) {
+                cstr.cstr_j_indrct.erase(cstr.cstr_j_indrct.begin() + j);
+                break;
+              } else if (actn == PushReturnAction::eEdit) {
+                std::swap(cstr.cstr_j_indrct[j], cstr.cstr_j_indrct.back());
+                break;
+              }
             }
+
+            // Add button
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(4);
+            if (ImGui::Button("+"))
+              cstr.cstr_j_indrct.push_back(PowrConstraint { });
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Add constraint");
+            
+            ImGui::EndTable();
           }
-
-          /* {
-            auto max_coeff = rng::fold_left_first(
-              cstr.powers | vws::transform([](const auto &s) -> float { return s.maxCoeff(); }),
-              std::plus<float>()).value();
-
-            ImGui::PlotSpectra("##powers_plot", { }, cstr.powers, -0.05f, max_coeff + 0.05f);
-          } */
         },
         [&](MeasurementConstraint &cstr) {
-          ImGui::Text("Not implemented");
+          ImGui::Separator();
+          if (ImGui::Button("Import from file")) {
+            if (fs::path path; detail::load_dialog(path))
+              cstr.measure = io::load_spec(path);
+          }
         }
       };
 
-      // Color patch picker
-      if (!e_patches.empty()) {
-        ImGui::SeparatorText("Interior colors");
-        ImGui::BeginChild("##patches", { ImGui::GetContentRegionAvail().x * 0.95f, 32 }, 0, ImGuiWindowFlags_HorizontalScrollbar);
-        for (uint i = 0; i < e_patches.size(); ++i) {
-          // Spawn color button viewing the srgb-transformed patch color
-          auto srgb = (eig::Array4f() << lrgb_to_srgb(e_patches[i]), 1).finished();
-          if (ImGui::ColorButton(std::format("##patch_{}", i).c_str(), srgb, ImGuiColorEditFlags_Float))
-            vert.set_mismatch_position(e_patches[i]);
-          
-          // Keep all patches on the same line for now
-          if (i < e_patches.size() - 1)
-            ImGui::SameLine();
-        } // for (uint i)
-        ImGui::EndChild();
+      // Last parts before mismatch volume editor is spawned
+      if (vert.has_mismatching(e_scene, uplf.value)) {
+        // Visual separator from editing components drawn in previous tasks
+        ImGui::SeparatorText("Mismatching");
+
+        /* // Toggle button for clipping
+        auto &e_clip = info.relative("viewport_guizmo")("clip_point").getw<bool>();
+        ImGui::Checkbox("Clip to volume", &e_clip);
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Metamers can only be correctly generated inside the volume"); */
+
+        // Show optional color patches
+        const auto &e_patches = info.relative("viewport_gen_patches")("patches").getr<std::vector<Colr>>();
+        if (!e_patches.empty()) {
+          for (uint i = 0; i < e_patches.size(); ++i) {
+            // Wrap around if we are out of line space
+            if (ImGui::GetContentRegionAvail().x < 32.f)
+              ImGui::NewLine();
+
+            // Spawn color button viewing the srgb-transformed patch color
+            Colr lrgb = e_patches[i];
+            auto srgb = lrgb_to_srgb(lrgb);
+            if (ImGui::ColorEdit3(std::format("##patch_{}", i).c_str(), srgb.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker))
+              vert.set_mismatch_position(lrgb);
+            
+            if (i < e_patches.size() - 1)
+              ImGui::SameLine();
+          } // for (uint i)
+        }
       }
     });
   }

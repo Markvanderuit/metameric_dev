@@ -18,6 +18,21 @@ namespace met {
     bool is_similar(const ColrConstraint &o) const;
   };
 
+  // Small helper struct for constraints in IndirectSurfaceConstraint
+  struct PowrConstraint {
+    // Constraint data
+    uint              cmfs_j = 0;
+    std::vector<Spec> powr_j = { };
+    Colr              colr_j = 0.f;
+
+    // Surface data recorded through user interaction
+    SurfaceInfo surface = SurfaceInfo::invalid();
+
+  public:      
+    bool operator==(const PowrConstraint &o) const;
+    bool is_similar(const PowrConstraint &o) const;
+  };
+
   // Concept for a constraint on metameric behavior used throughout the application's
   // spectral uplifting pipeline. Constraints can exist on their own, or together
   // with other, secondary constraints.
@@ -119,21 +134,6 @@ namespace met {
   // accounting for nonlinear interreflections as well as linear constraints. 
   // The interreflection system is based on measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
-    // Small helper struct to store an internal constraint
-    struct PowrConstraint {
-      // Constraint data
-      uint              cmfs_j = 0;
-      std::vector<Spec> powr_j = { };
-      Colr              colr_j = 0.f;
-
-      // Surface data recorded through user interaction
-      SurfaceInfo surface = SurfaceInfo::invalid();
-
-    public:      
-      bool operator==(const PowrConstraint &o) const;
-      bool is_similar(const PowrConstraint &o) const;
-    };
-
     Colr                        colr_i        = 0.0;   // Expected base color, obtained from the first underlying surface
     bool                        target_direct = false; // Free variable is the last linear, instead of last nonlinear constraint
     std::vector<ColrConstraint> cstr_j_direct = { };   // Secondary linear constraints for color reproduction

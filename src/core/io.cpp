@@ -90,8 +90,11 @@ namespace met::io {
 
     // Parse split data into string format
     std::stringstream ss;
-    for (uint i = 0; i < wvls.size(); ++i)
-      ss << fmt::format("{:.6f} {:.6f}\n", wvls[i], values[i]);
+    for (uint i = 0; i < wvls.size(); ++i) {
+      ss << fmt::format("{:.6f} {:.6f}", wvls[i], values[i]);
+      if (i < wvls.size() - 1)
+        ss << '\n';
+    }
 
     return save_string(path, ss.str());
   }

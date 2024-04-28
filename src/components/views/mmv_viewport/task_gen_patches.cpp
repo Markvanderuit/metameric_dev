@@ -10,7 +10,7 @@
 
 namespace met {
   // Nr. of color patches to sample
-  constexpr uint n_samples = 16;
+  constexpr uint n_samples = 32;
 
   namespace detail {
     uint expand_bits_10(uint i) {

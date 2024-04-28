@@ -29,13 +29,13 @@ namespace met {
     return cmfs_j == o.cmfs_j && illm_j == o.illm_j;
   }
 
-  bool IndirectSurfaceConstraint::PowrConstraint::operator==(const IndirectSurfaceConstraint::PowrConstraint &o) const {
+  bool PowrConstraint::operator==(const PowrConstraint &o) const {
     return cmfs_j == o.cmfs_j
         && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
         && colr_j.isApprox(o.colr_j);
   }
 
-  bool IndirectSurfaceConstraint::PowrConstraint::is_similar(const IndirectSurfaceConstraint::PowrConstraint &o) const {
+  bool PowrConstraint::is_similar(const PowrConstraint &o) const {
     return cmfs_j == o.cmfs_j
         && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>);
   }
@@ -83,14 +83,14 @@ namespace met {
           { "colr_j", c.colr_j }};
   }
 
-  void from_json(const json &js, IndirectSurfaceConstraint::PowrConstraint &c) {
+  void from_json(const json &js, PowrConstraint &c) {
     met_trace();
     js.at("cmfs_j").get_to(c.cmfs_j);
     js.at("powr_j").get_to(c.powr_j);
     js.at("colr_j").get_to(c.colr_j);
   }
 
-  void to_json(json &js, const IndirectSurfaceConstraint::PowrConstraint &c) {
+  void to_json(json &js, const PowrConstraint &c) {
     met_trace();
     js = {{ "cmfs_j", c.cmfs_j },
           { "powr_j", c.powr_j },

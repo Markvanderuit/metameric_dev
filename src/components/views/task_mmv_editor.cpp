@@ -111,15 +111,6 @@ namespace met {
       
       // Get shared resources
       const auto &i_srgb_target = info("srgb_target").getr<gl::Texture2d4f>();
-      auto &e_clip              = info.relative("viewport_guizmo")("clip_point").getw<bool>();
-      
-      // Visual separator from editing components drawn in previous tasks
-      ImGui::SeparatorText("Mismatch Volume");
-
-      // Toggle button for clipping
-      ImGui::Checkbox("Clip to volume", &e_clip);
-      if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Metamers can only be correctly generated inside the volume");
       
       // Declare scoped ImGui style state to remove border padding
       auto imgui_state = { ImGui::ScopedStyleVar(ImGuiStyleVar_WindowRounding, 16.f), 
