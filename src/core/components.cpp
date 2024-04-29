@@ -258,6 +258,23 @@ namespace met {
     };
   }
 
+  std::vector<SurfaceInfo> Uplifting::Vertex::surfaces() const {
+    met_trace();
+    return constraint | visit {
+      [](const DirectSurfaceConstraint &c) { 
+        return std::vector<SurfaceInfo> { c.surface };
+      },
+      [](const IndirectSurfaceConstraint &c) { 
+        return c.cstr_j_indrct
+          | vws::filter(&PowrConstraint::is_active)
+          | vws::transform(&PowrConstraint::surface)
+          | rng::to<std::vector>();
+      },
+      [&](const auto &) { return std::vector<SurfaceInfo>(); }
+    };
+  }
+  
+
   bool Uplifting::Vertex::has_mismatching(const Scene &scene, const Uplifting &uplifting) const {
     met_trace();
     return constraint | visit { 

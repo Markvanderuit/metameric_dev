@@ -145,6 +145,7 @@ namespace met {
       bool has_surface()                                                   const; // Does the underlying constraint expose surface data?
       const SurfaceInfo &surface() const;
       void set_surface(const SurfaceInfo &sr);
+      std::vector<SurfaceInfo> surfaces() const;
     };
 
   public: // Public members

@@ -49,6 +49,9 @@ namespace met {
     const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
     const auto &e_active_constraints 
                           = info.relative("viewport_input_editor")("active_constraints").getr<std::vector<ConstraintRecord>>();
+    
+    // Useful for coming operations
+    auto dl = ImGui::GetWindowDrawList();
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -56,27 +59,54 @@ namespace met {
     eig::Array2f viewport_size = static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
                                - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin());
 
-    // Generate view over all SurfaceInfos for constraints that need to be drawn
-    auto surfaces = e_active_constraints
-                  | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
-                  | vws::transform([](const auto &v) { return v.surface(); });
+    // Generate view over surface points that are stored in all active scene constraints
+    auto all_surfaces 
+      = e_active_constraints
+      | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
+      | vws::transform([](const auto &v) { return v.surfaces(); })
+      | vws::join
+      | rng::to<std::vector>();
+
+    // Generate view over surface points that are "free variables" in all active scene constraints
+    auto active_surfaces
+      = e_active_constraints
+      | vws::transform([&](ConstraintRecord cs) { return e_scene.uplifting_vertex(cs); })
+      | vws::transform([](const auto &v) { return v.surface(); })
+      | rng::to<std::vector>();
+
+    // Draw vertex for each vertex at its surface
+    for (const auto &si : all_surfaces) {
+      // Get window-space position of surface point, and of
+      // a slightly offset point along the surface normal
+      eig::Vector2f p_window = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
+
+      // Clip vertices outside viewport
+      guard_continue((p_window.array() >= viewport_offs).all() && (p_window.array() <= viewport_offs + viewport_size).all());
+
+      // Get srgb vertex color;
+      auto vertex_color_si = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(si.diffuse), 1.f).finished());
+      
+      // Vertex color is obtained from surface diffuse color
+      auto vertex_color_border = si.is_valid() ? vertex_color_valid : vertex_color_invalid;
+      auto vertex_color_center = si.is_valid() ? vertex_color_si    : vertex_color_white;
+
+      // Draw vertex with special coloring dependent on constraint state
+      dl->AddCircleFilled(p_window, 4.f, vertex_color_border);
+      dl->AddCircleFilled(p_window, 2.f, vertex_color_center);
+    }
 
     // Draw vertex for each visible vertex at its surface
-    for (const SurfaceInfo &si : surfaces) {
+    for (const SurfaceInfo &si : active_surfaces) {
       // Get window-space position of surface point, and of
       // a slightly offset point along the surface normal
       eig::Vector2f p_window = eig::world_to_window_space(si.p, e_arcball.full(), viewport_offs, viewport_size);
       eig::Vector2f n_window = eig::world_to_window_space(si.p + si.n * 0.025f, e_arcball.full(), viewport_offs, viewport_size);
 
       // Clip vertices outside viewport
-      guard_continue((p_window.array() >= viewport_offs).all() 
-                  && (p_window.array() <= viewport_offs + viewport_size).all());
-      
-      auto dl = ImGui::GetWindowDrawList();
+      guard_continue((p_window.array() >= viewport_offs).all() && (p_window.array() <= viewport_offs + viewport_size).all());
 
       // Get srgb vertex color;
-      auto vertex_color_si 
-        = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(si.diffuse), 1.f).finished());
+      auto vertex_color_si = ImGui::ColorConvertFloat4ToU32((eig::Vector4f() << lrgb_to_srgb(si.diffuse), 1.f).finished());
 
       // Vertex color is obtained from surface diffuse color
       auto vertex_color_border = si.is_valid() ? vertex_color_valid : vertex_color_invalid;
