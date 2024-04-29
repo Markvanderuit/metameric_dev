@@ -48,12 +48,12 @@ namespace met {
       // Helper to handle single row for types with .colr_i
       auto push_base_cstr_row = [&](auto &cstr) {
         ImGui::TableNextRow();
-        auto scope = ImGui::ScopedID("Baseline");
+        auto scope = ImGui::ScopedID("Base");
 
         // Name column
         ImGui::TableSetColumnIndex(0);
         ImGui::AlignTextToFramePadding();
-        ImGui::Text("Baseline");
+        ImGui::Text("Base");
 
         // CSYS editor column
         ImGui::TableSetColumnIndex(1);
