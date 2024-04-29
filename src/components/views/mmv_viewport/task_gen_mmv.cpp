@@ -89,6 +89,5 @@ namespace met {
     i_draw = { .type           = gl::PrimitiveType::eTriangles,
                .vertex_count   = (uint) (m_chull_elems.size() / sizeof(uint)),
                .bindable_array = &i_array };
-    fmt::print("Pushed mismatch data to gpu\n");
   }
 } // namespace met

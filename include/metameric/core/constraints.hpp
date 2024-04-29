@@ -50,22 +50,30 @@ namespace met {
     { t.realize_mismatch(scene, uplifting, seed, samples) } -> std::same_as<std::vector<MismatchSample>>;
   };
 
+  // Concept for a constraint on metameric behavior used throughout the application's
+  // spectral uplifting pipeline. Constraints enforce roundtrip in an uplifting's
+  // color system to this specified value. This behavior can be turned off, so
+  // minor error is better handled. See components.hpp for Uplifting::Vertex
+  template <typename Ty>
+  concept is_roundtrip_constraint = is_metameric_constraint<Ty> && requires(Ty t) {
+    // Base roundtrip linear constraint can be (de)activated
+    { t.is_base_active } -> std::convertible_to<bool>;
+
+    // Base roundtrip targets this color value
+    { t.colr_i } -> std::convertible_to<Colr>;
+  };
+
   // Concept defining the expected components of color-system constraints
   template <typename Ty>
-  concept is_colr_constraint = is_metameric_constraint<Ty> && requires(Ty t) {
-    // The constraint specifies base color data, which must be reproduced
-    // under the uplifting's primary color system
-    { t.colr_i } -> std::same_as<Colr &>;
-
+  concept is_colr_constraint = is_roundtrip_constraint<Ty> && requires(Ty t) {
     // The constraint specifies secondary color data, under secondary
     // color systems assembled from scene data
-    { t.cstr_j } -> std::same_as<std::vector<ColrConstraint> &>;
+    { t.cstr_j } -> std::convertible_to<std::vector<ColrConstraint>>;
   };
 
   // Constraint imposing reproduction of a specific spectral reflectance.
   struct MeasurementConstraint {
     Spec measure = 0.f; // Measured spectral data
-    Colr colr_i  = 0.f; // Matching color signal
     
   public:
     // Simply return the constraint's measure
@@ -84,8 +92,9 @@ namespace met {
   // Constraint imposing specific color reproduction under a set of known
   // color systems, i.e. direct illumination.
   struct DirectColorConstraint {
-    Colr                        colr_i = 0.0; // Expected base color
-    std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
+    bool                        is_base_active = true; // Base roundtrip linear constraint is active
+    Colr                        colr_i         = 0.0;  // Expected base roundtrip color
+    std::vector<ColrConstraint> cstr_j         = { };  // Secondary constraints for color reproduction
     
   public:
     // Solve for the constraint's metamer based on its current configuration
@@ -103,8 +112,9 @@ namespace met {
   // color systems, i.e. direct illumination. The base color is sampled
   // from a scene surface.
   struct DirectSurfaceConstraint {
-    Colr                        colr_i = 0.0; // Expected base color, obtained from first surface
-    std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
+    bool                        is_base_active = true; // Base roundtrip linear constraint is active
+    Colr                        colr_i         = 0.0;  // Expected base roundtrip color, obtained from first surface
+    std::vector<ColrConstraint> cstr_j         = { };  // Secondary constraints for color reproduction
 
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
@@ -126,8 +136,8 @@ namespace met {
   // accounting for nonlinear interreflections as well as linear constraints. 
   // The interreflection system is based on measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
-    bool                        is_base_active = true;  // Base color linear constraint is active
-    Colr                        colr_i         = 0.0;   // Expected base color, obtained from the first underlying surface
+    bool                        is_base_active = true;  // Base roundtrip linear constraint is active
+    Colr                        colr_i         = 0.0;   // Expected base roundtrip color, obtained from the first underlying surface
     bool                        target_direct  = false; // Free variable is the last linear, instead of last nonlinear constraint
     std::vector<ColrConstraint> cstr_j_direct  = { };   // Secondary linear constraints for color reproduction
     std::vector<PowrConstraint> cstr_j_indrct  = { };   // Secondary nonlinear constraints for color reproduction
@@ -142,7 +152,7 @@ namespace met {
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
-  static_assert(is_metameric_constraint<IndirectSurfaceConstraint>);
+  static_assert(is_metameric_constraint<IndirectSurfaceConstraint> && is_roundtrip_constraint<IndirectSurfaceConstraint>);
 
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);

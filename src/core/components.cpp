@@ -79,6 +79,12 @@ namespace met {
   bool Uplifting::Vertex::is_position_shifting() const {
     met_trace();
     return constraint | visit {
+      [](const DirectColorConstraint &cstr) { 
+        return cstr.is_base_active;
+      },
+      [](const DirectSurfaceConstraint &cstr) { 
+        return cstr.is_base_active;
+      },
       [](const IndirectSurfaceConstraint &cstr) { 
         return cstr.is_base_active;
       },
@@ -91,9 +97,10 @@ namespace met {
   Colr Uplifting::Vertex::get_vertex_position() const {
     met_trace();
     return constraint | visit {
-      [](const auto &cstr) { 
+      [](const is_roundtrip_constraint auto &cstr) { 
         return cstr.colr_i;
-      }
+      },
+      [](const auto &) { return Colr(0); }
     };
   }
 
@@ -139,8 +146,11 @@ namespace met {
     return constraint | visit {
       [&](const DirectColorConstraint &cstr) {
         const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
+
         guard(cstr.colr_i.isApprox(other.colr_i), false);
+        guard(cstr.is_base_active == other.is_base_active, false);
         guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
+        
         if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
           guard(rng::equal(cstr.cstr_j  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
@@ -153,8 +163,11 @@ namespace met {
       },
       [&](const DirectSurfaceConstraint &cstr) {
         const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
+
+        guard(cstr.is_base_active == other.is_base_active, false);
         guard(cstr.colr_i.isApprox(other.colr_i), false);
         guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
+
         if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
           guard(rng::equal(cstr.cstr_j  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),

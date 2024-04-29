@@ -37,7 +37,8 @@ namespace met {
   }
 
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
-    return colr_i.isApprox(o.colr_i) 
+    return is_base_active == o.is_base_active
+        && colr_i.isApprox(o.colr_i) 
         && rng::equal(cstr_j, o.cstr_j);
   }
   
@@ -46,7 +47,8 @@ namespace met {
   }
   
   bool DirectSurfaceConstraint::operator==(const DirectSurfaceConstraint &o) const {
-    return surface == o.surface 
+    return is_base_active == o.is_base_active
+        && surface == o.surface 
         && colr_i.isApprox(o.colr_i) 
         && rng::equal(cstr_j, o.cstr_j);
   }
@@ -61,6 +63,7 @@ namespace met {
 
   void from_json(const json &js, DirectColorConstraint &c) {
     met_trace();
+    js.at("is_base_active").get_to(c.is_base_active);
     js.at("colr_i").get_to(c.colr_i);
     js.at("cstr_j").get_to(c.cstr_j);
   }
@@ -101,8 +104,9 @@ namespace met {
 
   void to_json(json &js, const DirectColorConstraint &c) {
     met_trace();
-    js = {{ "colr_i", c.colr_i },
-          { "cstr_j", c.cstr_j }};
+    js = {{ "is_base_active", c.is_base_active },
+          { "colr_i",         c.colr_i         },
+          { "cstr_j",         c.cstr_j         }};
   }
 
   void from_json(const json &js, MeasurementConstraint &c) {
@@ -117,6 +121,7 @@ namespace met {
 
   void from_json(const json &js, DirectSurfaceConstraint &c) {
     met_trace();
+    js.at("is_base_active").get_to(c.is_base_active);
     js.at("colr_i").get_to(c.colr_i);
     js.at("cstr_j").get_to(c.cstr_j);
     js.at("surface").get_to(c.surface);
@@ -124,9 +129,10 @@ namespace met {
 
   void to_json(json &js, const DirectSurfaceConstraint &c) {
     met_trace();
-    js = {{ "colr_i",  c.colr_i  },
-          { "cstr_j",  c.cstr_j  },
-          { "surface", c.surface }};
+    js = {{ "is_base_active", c.is_base_active },
+          { "colr_i",         c.colr_i         },
+          { "cstr_j",         c.cstr_j         },
+          { "surface",        c.surface        }};
   }
 
   void from_json(const json &js, IndirectSurfaceConstraint &c) {
@@ -196,7 +202,9 @@ namespace met {
     guard(!colr_i.isZero(), { Spec(0), Basis::vec_type(0) });
 
     /* if (has_mismatching(scene, uplifting)) {
-      // TODO; not implemented r.n. as gen_uplifting_task does not use this behavior
+      // NOTE; not implemented r.n. as gen_uplifting_task overrides this behavior with a nice, 
+      //       mismatch-volume based approximation. See MetamerConstraintBuilder
+
       auto basis = scene.resources.bases[uplifting.basis_i].value();
 
       // Gather all relevant color system spectra and corresponding color signals
@@ -240,14 +248,20 @@ namespace met {
       .n_samples = samples
     };
 
+    // Base roundtrip objective
+    if (is_base_active)
+      info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+
     // Specify direct color systems forming objective
-    info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
     rng::transform(direct_cstr, 
       std::back_inserter(info.direct_objectives),
       [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
 
+    // Base roundtrip constraint
+    if (is_base_active)
+      info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
-    info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
     rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
       std::back_inserter(info.direct_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
@@ -268,14 +282,20 @@ namespace met {
       .n_samples = samples
     };
 
+    // Base roundtrip objective
+    if (is_base_active)
+      info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+
     // Specify direct color systems forming objective
-    info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
     rng::transform(direct_cstr, 
       std::back_inserter(info.direct_objectives),
       [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
 
+    // Base roundtrip constraint
+    if (is_base_active)
+      info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
-    info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
     rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
       std::back_inserter(info.direct_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });

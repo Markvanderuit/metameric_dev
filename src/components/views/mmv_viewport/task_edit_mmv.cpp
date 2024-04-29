@@ -75,13 +75,14 @@ namespace met {
         
         // Is-Active column for forcibly disabling linear part of IndirectSurfaceConstraint
         ImGui::TableSetColumnIndex(4);
-        if constexpr (std::is_same_v<decltype(cstr), IndirectSurfaceConstraint&>) {
+        if constexpr (is_roundtrip_constraint<std::decay_t<decltype(cstr)>>) {
           ImGui::Checkbox("##is_base_active", &cstr.is_base_active);
           if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Set constraint (in)active");
+            ImGui::SetTooltip("Set base constraint (in)active");
         } else {
           ImGui::BeginDisabled();
-          ImGui::Checkbox("##is_base_active", nullptr);
+          bool null_b = true;
+          ImGui::Checkbox("##is_base_active", &null_b);
           ImGui::EndDisabled();
         }
       };
@@ -370,7 +371,6 @@ namespace met {
           if (ImGui::Button("Import from file")) {
             if (fs::path path; detail::load_dialog(path)) {
               cstr.measure = io::load_spec(path);
-              cstr.colr_i  = e_scene.csys(uplf.value.csys_i)(cstr.measure);
             }
           }
         }
