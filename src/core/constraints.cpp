@@ -9,11 +9,16 @@
 
 namespace met {
   bool ColrConstraint::operator==(const ColrConstraint &o) const {
-    return is_active == o.is_active && cmfs_j == o.cmfs_j && illm_j == o.illm_j && colr_j.isApprox(o.colr_j);
+    return is_active == o.is_active 
+        && cmfs_j == o.cmfs_j 
+        && illm_j == o.illm_j 
+        && colr_j.isApprox(o.colr_j);
   }
 
   bool ColrConstraint::is_similar(const ColrConstraint &o) const {
-    return is_active == o.is_active && cmfs_j == o.cmfs_j && illm_j == o.illm_j;
+    return is_active == o.is_active 
+        && cmfs_j == o.cmfs_j 
+        && illm_j == o.illm_j;
   }
 
   bool PowrConstraint::operator==(const PowrConstraint &o) const {
@@ -30,9 +35,8 @@ namespace met {
   }
 
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
-    return colr_i.isApprox(o.colr_i) && rng::equal(cstr_j, o.cstr_j, [](const auto &a, const auto &b) {
-      return a.cmfs_j == b.cmfs_j && a.illm_j == b.illm_j && a.colr_j.isApprox(b.colr_j);
-    });
+    return colr_i.isApprox(o.colr_i) 
+        && rng::equal(cstr_j, o.cstr_j);
   }
   
   bool MeasurementConstraint::operator==(const MeasurementConstraint &o) const {
@@ -239,12 +243,14 @@ namespace met {
 
     // Specify direct color systems forming objective
     info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
-    rng::transform(direct_cstr, std::back_inserter(info.direct_objectives),
+    rng::transform(direct_cstr, 
+      std::back_inserter(info.direct_objectives),
       [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
 
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
     info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
-    rng::transform(direct_cstr | vws::take(cstr_j.size() - 1), std::back_inserter(info.direct_constraints),
+    rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
+      std::back_inserter(info.direct_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
 
     return generate_mismatching_ocs(info);
@@ -271,7 +277,7 @@ namespace met {
 
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
     info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
-    rng::transform(direct_cstr | vws::take(cstr_j.size() - 1), 
+    rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
       std::back_inserter(info.direct_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
 

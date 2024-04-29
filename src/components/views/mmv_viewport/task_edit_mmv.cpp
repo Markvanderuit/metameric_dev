@@ -95,16 +95,17 @@ namespace met {
         // Return value set to this return value
         PushReturnAction action = PushReturnAction::eNone;
 
-        // Name column
+        // Edit column
         ImGui::TableSetColumnIndex(0);
-        if (c_j != c_vec.size() - 1) {
+        if (c_j == c_vec.size() - 1) {
+          ImGui::BeginDisabled();
+          ImGui::Button("Edit");
+          ImGui::EndDisabled();
+        } else {
           if (ImGui::Button("Edit"))
             action = PushReturnAction::eEdit;
           if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Make mismatching constraint");
-        } else {
-          ImGui::AlignTextToFramePadding();
-          ImGui::Text("Editing");
         }
 
         // CSYS editor column
@@ -124,23 +125,24 @@ namespace met {
         ImGui::SameLine();
         Colr err = (cstr.colr_j - csys(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
-
-        // Is-Active column
-        ImGui::TableSetColumnIndex(3);
-        if (c_j != c_vec.size() - 1) {
-          if (ImGui::Button(cstr.is_active ? "V" : "H"))
-            cstr.is_active = !cstr.is_active;
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Toggle active");
-        }
           
         // Delete/Edit column
-        ImGui::TableSetColumnIndex(4);
+        ImGui::TableSetColumnIndex(3);
         if (ImGui::Button("X"))
           action = PushReturnAction::eDelete;
         if (ImGui::IsItemHovered())
           ImGui::SetTooltip("Delete constraint");
           
+        // Is-Active column
+        if (c_j == c_vec.size() - 1)
+          ImGui::BeginDisabled();
+        ImGui::TableSetColumnIndex(4);
+        ImGui::Checkbox("##is_active", &cstr.is_active);
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Set constraint (in)active");
+        if (c_j == c_vec.size() - 1)
+          ImGui::EndDisabled();
+
         return action;
       };
       
@@ -157,16 +159,17 @@ namespace met {
         // Return value set to this return value
         PushReturnAction action = PushReturnAction::eNone;
 
-        // Name column
+        // Edit column
         ImGui::TableSetColumnIndex(0);
-        if (c_j != c_vec.size() - 1) {
+        if (c_j == c_vec.size() - 1) {
+          ImGui::BeginDisabled();
+          ImGui::Button("Edit");
+          ImGui::EndDisabled();
+        } else {
           if (ImGui::Button("Edit"))
             action = PushReturnAction::eEdit;
           if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Make mismatching constraint");
-        } else {
-          ImGui::AlignTextToFramePadding();
-          ImGui::Text("Editing");
         }
 
         // CSYS editor column
@@ -184,24 +187,23 @@ namespace met {
         Colr err = (cstr.colr_j - csys(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
 
-        // Is-Active column
-        ImGui::TableSetColumnIndex(3);
-        if (c_j != c_vec.size() - 1) {
-          if (ImGui::Button(cstr.is_active ? "V" : "H")) {
-            fmt::print("Ehhh\n");
-            cstr.is_active = !cstr.is_active;
-          }
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Toggle active");
-        }
-          
         // Delete/Edit column
-        ImGui::TableSetColumnIndex(4);
+        ImGui::TableSetColumnIndex(3);
         if (ImGui::Button("X"))
           action = PushReturnAction::eDelete;
         if (ImGui::IsItemHovered())
           ImGui::SetTooltip("Delete constraint");
-          
+        
+        // Is-Active column
+        if (c_j == c_vec.size() - 1)
+          ImGui::BeginDisabled();
+        ImGui::TableSetColumnIndex(4);
+        ImGui::Checkbox("##is_active", &cstr.is_active);
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Set constraint (in)active");
+        if (c_j == c_vec.size() - 1)
+          ImGui::EndDisabled();
+
         return action;
       };
 
@@ -260,6 +262,15 @@ namespace met {
             ImGui::TableSetColumnIndex(1); ImGui::Text("Color system");
             ImGui::TableSetColumnIndex(2); ImGui::Text("lrgb/srgb/error");
 
+            // Checkbox for all
+            ImGui::TableSetColumnIndex(4);
+            if (!cstr.cstr_j.empty()) {
+              // auto is_active_v = cstr.cstr_j | vws::transform(&ColrConstraint::is_active);
+              // auto is_active   = is_active_v | rng::to<std::vector<int>>();
+              // ImGui::CheckboxFlags("##is_active", is_active.data(), is_active.size());
+              // rng::copy(is_active, is_active_v.begin());
+            }
+
             // Baseline constraint row
             push_base_cstr_row(cstr);
 
@@ -284,7 +295,7 @@ namespace met {
             if (ImGui::Button("Add"))
               cstr.cstr_j.push_back(ColrConstraint { });
             if (ImGui::IsItemHovered())
-              ImGui::SetTooltip("Add constraint");
+              ImGui::SetTooltip("Add new constraint");
             
             ImGui::EndTable();
           }
@@ -297,6 +308,15 @@ namespace met {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(1); ImGui::Text("Color system");
             ImGui::TableSetColumnIndex(2); ImGui::Text("lrgb/srgb/error");
+
+            // Checkbox for all
+            ImGui::TableSetColumnIndex(4);
+            if (!cstr.cstr_j_indrct.empty()) {
+              // auto is_active_v = cstr.cstr_j | vws::transform(&ColrConstraint::is_active);
+              // auto is_active   = is_active_v | rng::to<std::vector<int>>();
+              // ImGui::CheckboxFlags("##is_active", is_active.data(), is_active.size());
+              // rng::copy(is_active, is_active_v.begin());
+            }
 
             // Baseline constraint row
             push_base_cstr_row(cstr);
@@ -337,7 +357,7 @@ namespace met {
             if (ImGui::Button("Add"))
               cstr.cstr_j_indrct.push_back(PowrConstraint { });
             if (ImGui::IsItemHovered())
-              ImGui::SetTooltip("Add constraint");
+              ImGui::SetTooltip("Add new constraint");
             
             ImGui::EndTable();
           }
