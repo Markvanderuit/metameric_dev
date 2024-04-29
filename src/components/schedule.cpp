@@ -157,7 +157,7 @@ namespace met {
       ImGui::End();
     });
 
-    scheduler.task("scene_resource_editor").init<SceneResourcesEditorTask>();
+    /* scheduler.task("scene_resource_editor").init<SceneResourcesEditorTask>();
     scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene resources")) {
@@ -166,7 +166,7 @@ namespace met {
                                                     .show_del    = false });
       }
       ImGui::End();
-    });
+    }); */
 
     // scheduler.task("gnome_rotator").init<LambdaTask>([](auto &info) {
     //   met_trace();

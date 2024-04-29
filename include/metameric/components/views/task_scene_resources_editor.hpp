@@ -101,25 +101,7 @@ namespace met {
             }
           }
 
-          /* ImGui::Separator();
-
-          // Print moment coefficients
-          {
-            ImGui::SetNextItemWidth(256.f * e_window.content_scale());
-            ImGui::InputFloat4("##coeffs_0", moment.data(),     "%.3f", ImGuiInputTextFlags_ReadOnly);
-            ImGui::SetNextItemWidth(256.f * e_window.content_scale());
-            ImGui::InputFloat4("##coeffs_1", moment.data() + 4, "%.3f", ImGuiInputTextFlags_ReadOnly);
-          } */
-
           ImGui::Separator();
-
-          /* // Print moment coefficients
-          {
-            ImGui::SetNextItemWidth(256.f * e_window.content_scale());
-            ImGui::InputFloat4("##coeffs_rtrip_0", moment_rtrip.data(),     "%.3f", ImGuiInputTextFlags_ReadOnly);
-            ImGui::SetNextItemWidth(256.f * e_window.content_scale());
-            ImGui::InputFloat4("##coeffs_rtrip_1", moment_rtrip.data() + 4, "%.3f", ImGuiInputTextFlags_ReadOnly);
-          } */
 
           // Print some minima/maxima
           {
@@ -135,16 +117,6 @@ namespace met {
         }
       }
       ImGui::End();
-
-      /* // Spawn view of weight atlas interiors
-      if (ImGui::Begin("Coefficients atlas")) {
-        const auto &e_txtr = e_scene.components.upliftings.gl.texture_coefficients;
-
-        // Spawn image over texture view
-        const auto &e_view = e_txtr.view(0);
-        ImGui::Image(ImGui::to_ptr(e_view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
-      }
-      ImGui::End(); */
 
       return; // TODO implement below
 
