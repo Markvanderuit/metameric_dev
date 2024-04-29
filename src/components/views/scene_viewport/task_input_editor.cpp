@@ -10,7 +10,7 @@
 
 namespace met {
   static constexpr float selector_near_distance = 12.f;
-  static constexpr uint  indirect_query_spp     = 16384;
+  static constexpr uint  indirect_query_spp     = 65536;
   static constexpr uint  indirect_query_depth   = 4;
 
   RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {

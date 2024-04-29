@@ -131,6 +131,14 @@ namespace met {
       // if only the "free variable" differs
       bool has_equal_mismatching(const cnstr_type &other) const;
 
+      // Test whether this vertex' position in the tesselation can jitter to avoid
+      // minor roundtrip error to the uplifting's color system, or whether this error
+      // is intentional as the base linear constraint may be disabled 
+      bool is_position_shifting() const;
+
+      // Get vertex' position in the tesselation
+      Colr get_vertex_position() const;
+
     public: // Constraint-specific boilerplate; depend on which constraint is used
       bool operator==(const Vertex &o) const = default;
       bool has_mismatching(const Scene &scene, const Uplifting &uplifting) const; // Does the underlying constraint allow for mismatching?

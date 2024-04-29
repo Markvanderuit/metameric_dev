@@ -72,8 +72,6 @@ namespace met {
         if (m_did_sample = !is_converged(); m_did_sample) {
           auto samples = vert.realize_mismatch(scene, uplifting, m_curr_samples, mmv_uplift_samples_iter);
           insert(samples);
-          fmt::print("Sampled: {}\n", samples.size());
-          fmt::print("Samples: {}\n", samples | vws::elements<0> | rng::to<std::vector>());
           m_curr_samples += mmv_uplift_samples_iter;
         }
       } else {
@@ -98,7 +96,9 @@ namespace met {
         auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
                   + bary[2] * coeffs[2] + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
         auto spec = scene.resources.bases[uplifting.basis_i].value()(coef);
-        auto colr = scene.csys(uplifting.csys_i)(spec);
+        auto colr = vert.is_position_shifting()
+                  ? scene.csys(uplifting.csys_i)(spec)
+                  : vert.get_vertex_position();
 
         // Return all three
         return { colr, spec, coef };
@@ -164,7 +164,6 @@ namespace met {
     uint                         m_uplifting_i;
     std::vector<Spec>            m_csys_boundary_spectra;
     std::vector<Basis::vec_type> m_csys_boundary_coeffs;
-    // std::vector<Moments> m_csys_boundary_coeffs;
 
     // Delaunay tesselation connecting colors/spectra on both
     // the boundary and interally in the color space, as well
@@ -180,7 +179,6 @@ namespace met {
     std::vector<Colr>            m_tesselation_points;
     std::vector<Spec>            m_tesselation_spectra;
     std::vector<Basis::vec_type> m_tesselation_coeffs;
-    // std::vector<Moments> m_tesselation_coeffs;
 
     // Buffer and accompanying mapping, store per-tetrahedron spectra
     // in an interleaved format. This data is copied to upliftings.gl

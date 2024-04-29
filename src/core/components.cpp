@@ -54,21 +54,47 @@ namespace met {
     // Visit the underlying constraint to generate output data
     return constraint | visit([&](const auto &cstr) -> MismatchSample { 
       auto [s, c] = cstr.realize(scene, uplifting);
-      return { cstr.position(scene, uplifting), s, c  }; 
+      auto p = is_position_shifting()
+             ? scene.csys(uplifting.csys_i)(s)
+             : get_vertex_position();
+      return { p, s, c }; 
     });
   }
 
   std::vector<MismatchSample> Uplifting::Vertex::realize_mismatch(const Scene     &scene, 
-                                                                                              const Uplifting &uplifting,
-                                                                                              uint seed,
-                                                                                              uint samples) const {
+                                                                  const Uplifting &uplifting,
+                                                                        uint       seed,
+                                                                        uint       samples) const {
     met_trace();
 
     // Return zero constraint for inactive vertices or those without mismatching
     guard(is_active && has_mismatching(scene, uplifting), { });
 
     // Otherwise, visit the underlying constraint to generate output data
-    return constraint | visit([&](const auto &cstr) { return cstr.realize_mismatch(scene, uplifting, seed, samples); });
+    return constraint | visit([&](const auto &cstr) { 
+      return cstr.realize_mismatch(scene, uplifting, seed, samples); 
+    });
+  }
+
+  bool Uplifting::Vertex::is_position_shifting() const {
+    met_trace();
+    return constraint | visit {
+      [](const IndirectSurfaceConstraint &cstr) { 
+        return cstr.is_base_active;
+      },
+      [](const auto &cstr) { 
+        return true;
+      }
+    };
+  }
+
+  Colr Uplifting::Vertex::get_vertex_position() const {
+    met_trace();
+    return constraint | visit {
+      [](const auto &cstr) { 
+        return cstr.colr_i;
+      }
+    };
   }
 
   void Uplifting::Vertex::set_mismatch_position(const Colr &c) {
@@ -91,12 +117,15 @@ namespace met {
     met_trace();
     return constraint | visit {
       [](const is_colr_constraint auto &cstr) { 
+        guard(!cstr.cstr_j.empty(), Colr(0));
         return (cstr.cstr_j | vws::filter(&ColrConstraint::is_active)).back().colr_j; 
       },
       [](const IndirectSurfaceConstraint &cstr) { 
         if (cstr.target_direct) {
+          guard(!cstr.cstr_j_direct.empty(), Colr(0));
           return cstr.cstr_j_direct.back().colr_j; 
         } else {
+          guard(!cstr.cstr_j_indrct.empty(), Colr(0));
           return cstr.cstr_j_indrct.back().colr_j; 
         }
       },
@@ -139,6 +168,7 @@ namespace met {
       [&](const IndirectSurfaceConstraint &cstr) {
         const auto &other = std::get<std::decay_t<decltype(cstr)>>(other_v);
         
+        guard(cstr.is_base_active == other.is_base_active, false);
         guard(cstr.colr_i.isApprox(other.colr_i), false);
         guard(cstr.target_direct == other.target_direct, false);
         guard(cstr.cstr_j_direct.size() == other.cstr_j_direct.size(), false);

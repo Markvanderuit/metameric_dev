@@ -25,13 +25,15 @@ namespace met {
     return is_active == o.is_active
         && cmfs_j == o.cmfs_j
         && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
-        && colr_j.isApprox(o.colr_j);
+        && colr_j.isApprox(o.colr_j)
+        && surface == o.surface;
   }
 
   bool PowrConstraint::is_similar(const PowrConstraint &o) const {
     return is_active == o.is_active
         && cmfs_j == o.cmfs_j
-        && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>);
+        && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
+        && surface == o.surface;
   }
 
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
@@ -77,6 +79,7 @@ namespace met {
     js.at("cmfs_j").get_to(c.cmfs_j);
     js.at("powr_j").get_to(c.powr_j);
     js.at("colr_j").get_to(c.colr_j);
+    js.at("surface").get_to(c.surface);
   }
 
   void to_json(json &js, const ColrConstraint &c) {
@@ -92,7 +95,8 @@ namespace met {
     js = {{ "is_active", c.is_active },
           { "cmfs_j",    c.cmfs_j    },
           { "powr_j",    c.powr_j    },
-          { "colr_j",    c.colr_j    }};
+          { "colr_j",    c.colr_j    },
+          { "surface",   c.surface   }};
   }
 
   void to_json(json &js, const DirectColorConstraint &c) {
@@ -143,11 +147,6 @@ namespace met {
           { "cstr_j_indrct",  c.cstr_j_indrct  }};
   }
 
-  Colr MeasurementConstraint::position(const Scene &scene, const Uplifting &uplifting) const {
-    met_trace();
-    return scene.csys(uplifting.csys_i)(measure);
-  }
-  
   SpectrumSample MeasurementConstraint::realize(const Scene &scene, const Uplifting &uplifting) const { 
     auto basis = scene.resources.bases[uplifting.basis_i].value();
     SpectrumCoeffsInfo spec_info = { .spec = measure, .basis = basis };
@@ -298,38 +297,41 @@ namespace met {
       .n_samples = samples
     };
 
-    // Specify direct/indirect color systems forming objective
+    // Base roundtrip objective
     if (is_base_active)
       info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+
+    // Specify direct/indirect color systems forming objective
     if (target_direct) {
       const auto &last = direct_cstr.back();
-      info.direct_objectives.push_back(scene.csys(last.cmfs_j, last.illm_j));
+      rng::transform(direct_cstr,
+        std::back_inserter(info.direct_objectives),
+        [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
     } else {
-      const auto &last = indrct_cstr.back();
-      info.indirect_objectives.push_back({
-        .cmfs   = scene.resources.observers[last.cmfs_j].value(),
-        .powers = last.powr_j
-      });
+      rng::transform(indrct_cstr, 
+        std::back_inserter(info.indirect_objectives),
+        [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
     }
 
-    // Specify direct/indirect color constraints; all but the last 
-    // constraint (the "free variable") are specified
+    // Base roundtrip constraint
     if (is_base_active)
       info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      
+    // Specify direct/indirect color constraints; all but the last constraint (the "free variable") are specified
     if (target_direct) {
-      rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), std::back_inserter(info.direct_constraints),
+      rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
+        std::back_inserter(info.direct_constraints),
         [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
-      rng::transform(indrct_cstr, std::back_inserter(info.indirect_constraints),
-      [&](const auto &c) { 
-          return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; 
-      });
+      rng::transform(indrct_cstr, 
+      std::back_inserter(info.indirect_constraints),
+        [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
     } else {
-      rng::transform(direct_cstr, std::back_inserter(info.direct_constraints),
+      rng::transform(direct_cstr, 
+        std::back_inserter(info.direct_constraints),
         [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
-      rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), std::back_inserter(info.indirect_constraints),
-      [&](const auto &c) { 
-          return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; 
-      });
+      rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), 
+        std::back_inserter(info.indirect_constraints),
+        [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
     } 
 
     // Output color values

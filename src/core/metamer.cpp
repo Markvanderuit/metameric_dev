@@ -428,7 +428,7 @@ namespace met {
       auto samples_nd = detail::gen_unit_dirs(info.direct_objectives.size() + 
                                               info.indirect_objectives.size(),
                                               info.n_samples, info.seed);
-      
+                                              
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init       = 0.05,
@@ -464,27 +464,22 @@ namespace met {
                | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
                | rng::to<std::vector>();
         auto b = lrgb_to_xyz(colr).cast<double>().eval();
-        for (uint j = 0; j < 3; ++j) {
-          solver.eq_constraints.push_back({ .f = ad::wrap_capture<wavelength_bases>(
-          [A = A
-             | vws::transform([j](const auto &cmfs) { return cmfs.row(j).transpose().eval(); })
-             | rng::to<std::vector>(), 
-           b = b[j], 
-           B = info.basis.func.matrix().cast<double>().eval()](const vec &x) {
-            auto r = (B * x.matrix()).eval(); // Compute full reflectance
+        solver.eq_constraints.push_back({
+          .f = ad::wrap_capture<wavelength_bases>(
+          [A = A, 
+           B = info.basis.func.matrix().cast<double>().eval(), 
+           b = b](const vec &x) {
+          // Recover spectral distribution
+          auto r = (B * x.matrix()).eval();
 
-            // A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
-            auto Ax = A[0].sum() 
-                    + A[1].dot(r);
-            for (uint i = 2; i < A.size(); ++i) {
-              r.array() *= r.array();
-              Ax        += A[i].dot(r);
-            }
-
-            // f(x) = ||Ax - b||; 
-            return Ax - b;
-          }), .tol = 1e-3 });
-        } // for (uint j)
+          // f(x) = ||Ax - b||; A(x) = a_0 + a_1*(Bx) + a_2*(Bx)^2 + a_3*(Bx)^3 + ..
+          auto Ax = (A[0].rowwise().sum() + A[1] * r).eval();
+          for (uint i = 2; i < A.size(); ++i) {
+            r.array() *= r.array();
+            Ax        += A[i] * r;
+          }
+          return (Ax.array() - b).matrix().norm();
+        }), .tol = 1e-3 });
       }
 
       // Helper fill value

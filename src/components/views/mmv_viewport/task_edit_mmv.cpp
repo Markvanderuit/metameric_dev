@@ -70,17 +70,20 @@ namespace met {
         Colr err = (cstr.colr_i - e_scene.csys(uplf.value.csys_i)(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
         
-        // Is-Active column for forcibly disabling linear part of IndirectSurfaceConstraint
+        // Empty col, not deletable
         ImGui::TableSetColumnIndex(3);
-        /* if constexpr (std::is_same_v<decltype(cstr), IndirectSurfaceConstraint&>) {
-          if (ImGui::Button(cstr.is_base_active ? "V" : "H"))
-            cstr.is_base_active = !cstr.is_base_active;
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Toggle active");
-        } */
-
-        // Empty row
+        
+        // Is-Active column for forcibly disabling linear part of IndirectSurfaceConstraint
         ImGui::TableSetColumnIndex(4);
+        if constexpr (std::is_same_v<decltype(cstr), IndirectSurfaceConstraint&>) {
+          ImGui::Checkbox("##is_base_active", &cstr.is_base_active);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Set constraint (in)active");
+        } else {
+          ImGui::BeginDisabled();
+          ImGui::Checkbox("##is_base_active", nullptr);
+          ImGui::EndDisabled();
+        }
       };
 
       // Helper to handle single row for ColrConstraint type
@@ -134,9 +137,9 @@ namespace met {
           ImGui::SetTooltip("Delete constraint");
           
         // Is-Active column
+        ImGui::TableSetColumnIndex(4);
         if (c_j == c_vec.size() - 1)
           ImGui::BeginDisabled();
-        ImGui::TableSetColumnIndex(4);
         ImGui::Checkbox("##is_active", &cstr.is_active);
         if (ImGui::IsItemHovered())
           ImGui::SetTooltip("Set constraint (in)active");
@@ -195,9 +198,9 @@ namespace met {
           ImGui::SetTooltip("Delete constraint");
         
         // Is-Active column
+        ImGui::TableSetColumnIndex(4);
         if (c_j == c_vec.size() - 1)
           ImGui::BeginDisabled();
-        ImGui::TableSetColumnIndex(4);
         ImGui::Checkbox("##is_active", &cstr.is_active);
         if (ImGui::IsItemHovered())
           ImGui::SetTooltip("Set constraint (in)active");
@@ -365,8 +368,10 @@ namespace met {
         [&](MeasurementConstraint &cstr) {
           ImGui::Separator();
           if (ImGui::Button("Import from file")) {
-            if (fs::path path; detail::load_dialog(path))
+            if (fs::path path; detail::load_dialog(path)) {
               cstr.measure = io::load_spec(path);
+              cstr.colr_i  = e_scene.csys(uplf.value.csys_i)(cstr.measure);
+            }
           }
         }
       };

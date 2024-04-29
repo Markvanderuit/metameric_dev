@@ -43,9 +43,6 @@ namespace met {
   // with other, secondary constraints.
   template <typename Ty>
   concept is_metameric_constraint = requires(Ty t, Scene scene, Uplifting uplifting, uint seed, uint samples, Colr c) {
-    // The constraint has a specific, primary color which forms a vertex position in the uplifting
-    { t.position(scene, uplifting) } -> std::same_as<Colr>;
-
     // The constraint allows for realizing a metamer (and attached color under uplifting's color system)
     { t.realize(scene, uplifting) } -> std::same_as<SpectrumSample>;
 
@@ -67,12 +64,10 @@ namespace met {
 
   // Constraint imposing reproduction of a specific spectral reflectance.
   struct MeasurementConstraint {
-    Spec measure = 0.5; // Measured spectral data
+    Spec measure = 0.f; // Measured spectral data
+    Colr colr_i  = 0.f; // Matching color signal
     
   public:
-    // Determine the constraint's position in the spectral uplifting tesselation based on the measure
-    Colr position(const Scene &scene, const Uplifting &uplifting) const;
-
     // Simply return the constraint's measure
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
 
@@ -82,8 +77,6 @@ namespace met {
     }
 
   public:
-    // Colr get_mismatching_position()              const { return 0.0; }
-    // void set_mismatching_position(const Colr &c) const { /* ..... */ }
     bool operator==(const MeasurementConstraint &o) const;
   };
   static_assert(is_metameric_constraint<MeasurementConstraint>);
@@ -95,9 +88,6 @@ namespace met {
     std::vector<ColrConstraint> cstr_j = { }; // Secondary constraints for color reproduction
     
   public:
-    // Obtain the constraint's position in the spectral uplifting tesselation
-    Colr position(const Scene &scene, const Uplifting &uplifting) const { return colr_i; }
-
     // Solve for the constraint's metamer based on its current configuration
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
 
@@ -120,9 +110,6 @@ namespace met {
     SurfaceInfo surface = SurfaceInfo::invalid();
     
   public:
-    // Obtain the constraint's position in the spectral uplifting tesselation
-    Colr position(const Scene &scene, const Uplifting &uplifting) const { return colr_i; }
-
     // Solve for the constraint's metamer based on its current configuration
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
 
@@ -146,9 +133,6 @@ namespace met {
     std::vector<PowrConstraint> cstr_j_indrct  = { };   // Secondary nonlinear constraints for color reproduction
     
   public:
-    // Obtain the constraint's position in the spectral uplifting tesselation
-    Colr position(const Scene &scene, const Uplifting &uplifting) const { return colr_i; }
-
     // Solve for the constraint's metamer based on its current configuration
     SpectrumSample realize(const Scene &scene, const Uplifting &uplifting) const;
 

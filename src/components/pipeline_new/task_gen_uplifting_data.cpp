@@ -175,6 +175,11 @@ namespace met {
 
       // Generate vertex color, attached metamer, and its originating coefficients
       auto [c, s, coef] = builder.realize(e_uplifting.verts[i], e_scene, e_uplifting);
+
+      // Override; c remains position. This way, artists can intentionally introduce roundtrip
+      // error to D65, if they disable a (generally always present) linear roundtrip constraint
+      // to the uplifting itself
+      // c = e_uplifting.verts[i].get_vertex_position(e_scene, e_uplifting);
       
       // Add to set of spectra and coefficients
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
@@ -188,32 +193,6 @@ namespace met {
         tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
       }
     }
-
-    /* // 2. Generate constraint spectra
-    // Iterate over stale constraint data, and generate corresponding spectra
-    #pragma omp parallel for
-    for (int i = 0; i < e_uplifting.verts.size(); ++i) {
-      // We only generate a spectrum if the specific vertex was changed,
-      // or the entire underlying color system has changed
-      guard_continue(e_state.verts[i] || csys_stale);
-      const auto &e_vert = e_uplifting.verts[i];
-
-      // Generate vertex color, attached metamer, and its originating coefficients
-      // this is handled in Scene object to keep it away from the pipeline
-      auto [c, s, coef] = e_vert.realize(e_scene, e_uplifting);
-      
-      // Add to set of spectra and coefficients
-      m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
-      m_tesselation_coeffs[m_csys_boundary_spectra.size() + i]  = coef;
-
-      // We only update vertices in the tesselation if the 'primary' has updated
-      // as otherwise we'd trigger re-tesselation on every constraint modification
-      Colr prev_c = m_tesselation_points[m_csys_boundary_spectra.size() + i];
-      if (!prev_c.isApprox(c)) {
-        m_tesselation_points[m_csys_boundary_spectra.size() + i] = c;
-        tssl_stale = true; // skipping atomic, as everyone's just setting to true r.n.
-      }
-    } // for (int i) */
 
     // 3. Generate color system tesselation
     if (tssl_stale) {
