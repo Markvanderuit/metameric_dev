@@ -116,6 +116,24 @@ namespace met {
     js.at("texture_size").get_to(settings.texture_size);
   }
 
+  void to_json(json &js, const ViewSettings &view) {
+    met_trace();
+    js = {{ "observer_i",    view.observer_i },
+          { "camera_trf",    view.camera_trf },
+          { "camera_aspect", view.camera_aspect },
+          { "film_size",     view.film_size  },
+          { "film_scale",    view.film_scale }};
+  }
+
+  void from_json(const json &js, ViewSettings &view) {
+    met_trace();
+    js.at("observer_i").get_to(view.observer_i);
+    js.at("camera_trf").get_to(view.camera_trf);
+    js.at("camera_aspect").get_to(view.camera_aspect);
+    js.at("film_size").get_to(view.film_size);
+    js.at("film_scale").get_to(view.film_scale);
+  }
+
   void to_json(json &js, const Object &object) {
     met_trace();
     js = {{ "is_active",   object.is_active   },
@@ -200,7 +218,8 @@ namespace met {
           { "objects",       scene.components.objects.data()      },
           { "emitters",      scene.components.emitters.data()     },
           { "upliftings",    scene.components.upliftings.data()   },
-          { "colr_systems",  scene.components.colr_systems.data() }};
+          { "colr_systems",  scene.components.colr_systems.data() },
+          { "views",         scene.components.views.data()        }};
   }
 
   void from_json(const json &js, Scene &scene) {
@@ -211,6 +230,7 @@ namespace met {
     js.at("emitters").get_to(scene.components.emitters.data());
     js.at("upliftings").get_to(scene.components.upliftings.data());
     js.at("colr_systems").get_to(scene.components.colr_systems.data());
+    js.at("views").get_to(scene.components.views.data());
   }
   
   void Scene::create() {
@@ -240,6 +260,9 @@ namespace met {
       col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
     }
     resources.bases.push("Default basis", basis, false);
+
+    // Default view, used by viewport
+    components.views.push("Default view", ViewSettings());
 
     // Default color system
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };

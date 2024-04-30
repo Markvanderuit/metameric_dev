@@ -7,8 +7,7 @@
                                        scene_txtr_bsis_data,                     \
                                        scene_txtr_bary_data,                     \
                                        scene_txtr_spec_data,                     \
-                                       scene_txtr_coef_data,                     \
-                                       scene_txtr_warp_data)                     \
+                                       scene_txtr_coef_data)                     \
   BarycentricInfo scene_reflectance_barycentric_info(uint object_i) {            \
     return scene_buff_bary_info[object_i];                                       \
   }                                                                              \
@@ -39,10 +38,6 @@
                                                                                  \
   uvec4 scene_coefficients_data_fetch(ivec3 p) {                                 \
     return texelFetch(scene_txtr_coef_data, p, 0);                               \
-  }                                                                              \
-                                                                                 \
-  float scene_phase_warp_data_texture(float p) {                                 \
-    return texture(scene_txtr_warp_data, p).x;                                   \
   }                                                                              \
                                                                                  \
   float scene_basis_func(float wvl, uint j) {                                    \

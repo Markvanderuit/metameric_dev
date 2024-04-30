@@ -14,10 +14,11 @@ namespace met {
     auto & scene_data_by_type(Scene &scene) {
       using VTy = typename Ty::value_type;
       if constexpr (is_component<Ty>) {
-        if      constexpr (std::is_same_v<VTy, ColorSystem>) return scene.components.colr_systems;
-        else if constexpr (std::is_same_v<VTy, Emitter>)     return scene.components.emitters;
-        else if constexpr (std::is_same_v<VTy, Object>)      return scene.components.objects;
-        else if constexpr (std::is_same_v<VTy, Uplifting>)   return scene.components.upliftings;
+        if      constexpr (std::is_same_v<VTy, ColorSystem>)  return scene.components.colr_systems;
+        else if constexpr (std::is_same_v<VTy, Emitter>)      return scene.components.emitters;
+        else if constexpr (std::is_same_v<VTy, Object>)       return scene.components.objects;
+        else if constexpr (std::is_same_v<VTy, Uplifting>)    return scene.components.upliftings;
+        else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
         else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
       } else {
         if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
@@ -38,6 +39,7 @@ namespace met {
         else if constexpr (std::is_same_v<VTy, Emitter>)     return scene.components.emitters;
         else if constexpr (std::is_same_v<VTy, Object>)      return scene.components.objects;
         else if constexpr (std::is_same_v<VTy, Uplifting>)   return scene.components.upliftings;
+        else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
         else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
       } else {
         if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
@@ -54,6 +56,7 @@ namespace met {
       bool inside_tree        = true;     // Push imgui components inside a TreeNode section,  or inline directly
       bool show_add           = true;     // Allow adding of components to lists
       bool show_del           = true;     // Allow deletion of components
+      bool show_dupl          = true;     // Allow duplication of components
       bool edit_name          = true;     // Allow editing of component name
       bool edit_data          = true;     // Allow editing of component data
     };
@@ -75,6 +78,7 @@ namespace met {
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Emitter> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Uplifting> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ColorSystem> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ViewSettings> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Mesh> &);
 
     // Helper method; encapsulate a scene component whose data can be edited by a visitor closure, 
@@ -201,9 +205,29 @@ namespace met {
         encapsulate_scene_data<Ty>(info, data_i, [](auto &info, uint i, auto &data) {
           if (ImGui::SmallButton(data.value.is_active ? "V" : "H"))
             data.value.is_active = !data.value.is_active;
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Toggle component (in)active");
         });
       } // if (inside_tree && edit_data)
     } // if (has_active_value)
+
+    // Duplicate button, on same line as tree node if available
+    if (edit_info.inside_tree && edit_info.show_dupl) {
+      ImGui::SameLine(ImGui::GetContentRegionMax().x - 60.f);
+      if (ImGui::SmallButton("D")) {
+        if (section_open && edit_info.inside_tree) ImGui::TreePop();
+        info.global("scene").getw<Scene>().touch({
+          .name = "Duplicate component",
+          .redo = [data] (auto &scene)                             { 
+            detail::scene_data_by_type<Ty>(scene).push_back(data); },
+          .undo = [](auto &scene)                                  { 
+            detail::scene_data_by_type<Ty>(scene).pop_back();      }
+        });
+        return; // Exit early as iterators are invalidated
+      }
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Duplicate component");
+    } // if (inside_tree && show_dupl)
 
     // Delete button, on same line as tree node if available
     if (edit_info.inside_tree && edit_info.show_del) {
@@ -217,8 +241,10 @@ namespace met {
           .undo = [data_i, data](auto &scene)                           { 
             detail::scene_data_by_type<Ty>(scene).insert(data_i, data); }
         });
-        return;
+        return; // Exit early as iterators are invalidated
       }
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Delete component");
     } // if (inside_tree && show_del)
 
     // If the section is closed, we can now return early

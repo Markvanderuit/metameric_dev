@@ -70,7 +70,6 @@ namespace met {
     program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture());
     program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
-    program.bind("b_warp_1f",             scene.components.upliftings.gl.texture_warp);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);

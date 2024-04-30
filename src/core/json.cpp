@@ -1,5 +1,6 @@
 #include <metameric/core/io.hpp>
 #include <metameric/core/json.hpp>
+#include <metameric/core/ranges.hpp>
 #include <nlohmann/json.hpp>
 
 namespace met {
@@ -39,12 +40,20 @@ namespace met {
 } // namespace met
 
 namespace Eigen {
+  void from_json(const met::json& js, Array2u &v) {
+    std::ranges::copy(js, v.begin());
+  }
+
   void from_json(const met::json& js, Array3u &v) {
     std::ranges::copy(js, v.begin());
   }
   
   void from_json(const met::json& js, Array4u &v) {
     std::ranges::copy(js, v.begin());
+  }
+
+  void to_json(met::json &js, const Array2u &v) {
+    js = std::vector<Array2u::value_type>(v.begin(), v.end());
   }
 
   void to_json(met::json &js, const Array3u &v) {

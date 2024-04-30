@@ -82,6 +82,7 @@ namespace met::detail {
         update();
       return m_center + m_zoom * m_eye; 
     }
+
     eig::Array3f eye_dir() const { 
       met_trace();
       if (m_is_mutated)
@@ -107,6 +108,16 @@ namespace met::detail {
 
     void set_aspect(float aspect) {
       m_aspect = aspect;
+      m_is_mutated = true;
+    }
+
+    void set_zoom(float zoom) {
+      m_zoom = zoom;
+      m_is_mutated = true;
+    }
+
+    void set_eye(eig::Array3f eye) {
+      m_eye = eye;
       m_is_mutated = true;
     }
 

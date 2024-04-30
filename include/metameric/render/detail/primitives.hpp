@@ -63,7 +63,7 @@ namespace met::detail {
     struct SamplerState {
       alignas(4) uint spp_per_iter;
       alignas(4) uint spp_curr;
-      alignas(4) uint pixel_per_iter;
+      alignas(4) uint pixel_checkerboard;
       alignas(4) uint pixel_curr;
     };
     
@@ -83,7 +83,9 @@ namespace met::detail {
     uint m_spp_max;
     uint m_spp_curr;
     uint m_spp_per_iter;
-    bool m_checkerboard;
+    
+    uint m_pixel_curr;
+    bool m_pixel_checkerboard;
 
     // Protected constructor to initialize sampler state buffers and maps
     IntegrationRenderPrimitive();

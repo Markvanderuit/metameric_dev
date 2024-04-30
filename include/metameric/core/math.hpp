@@ -27,8 +27,8 @@ namespace met {
       aff.computeRotationScaling(&rot, &scl);
 
       // Obtain euler rotation and scaling from separated matrices
-      trf.rotation.x() = std::acos((rot * eig::Vector3f::UnitX()).dot(eig::Vector3f::UnitX()));
-      trf.rotation.y() = std::acos((rot * eig::Vector3f::UnitY()).dot(eig::Vector3f::UnitY()));
+      trf.rotation.x() = std::acos((rot * eig::Vector3f::UnitY()).dot(eig::Vector3f::UnitY()));
+      trf.rotation.y() = std::acos((rot * eig::Vector3f::UnitX()).dot(eig::Vector3f::UnitX()));
       trf.rotation.z() = std::acos((rot * eig::Vector3f::UnitZ()).dot(eig::Vector3f::UnitZ()));
       trf.scaling      = scl * eig::Vector3f(1.f);
             
@@ -38,8 +38,8 @@ namespace met {
     eig::Affine3f affine() const {
       eig::Affine3f aff = eig::Affine3f::Identity();
       aff *= eig::Translation3f(position);
-      aff *= eig::AngleAxisf(rotation.x(), eig::Vector3f::UnitX());
-      aff *= eig::AngleAxisf(rotation.y(), eig::Vector3f::UnitY());
+      aff *= eig::AngleAxisf(rotation.x(), eig::Vector3f::UnitY());
+      aff *= eig::AngleAxisf(rotation.y(), eig::Vector3f::UnitX());
       aff *= eig::AngleAxisf(rotation.z(), eig::Vector3f::UnitZ());
       aff *= eig::Scaling(scaling.x(), scaling.y(), scaling.z());
       return aff;

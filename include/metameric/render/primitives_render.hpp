@@ -37,7 +37,7 @@ namespace met {
     uint max_depth = PathRecord::path_max_depth;
 
     // Render pixels each other frame, alternating between checkerboards
-    bool checkerboard = false;
+    bool pixel_checkerboard = false;
 
     // Program cache; enforced given the shader's long compile time
     ResourceHandle cache_handle;

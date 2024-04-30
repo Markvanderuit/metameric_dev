@@ -22,12 +22,15 @@ namespace met {
       met_trace_full();
 
       // Reset current sample count
-      m_spp_curr = 0;
+      m_spp_curr   = 0;
+      m_pixel_curr = 0;
       
       // Push sample count to next available buffer and add sync object for flush operation
       m_sampler_state_i = (m_sampler_state_i + 1) % m_sampler_state_buffs.size();
-      m_sampler_state_mapps[m_sampler_state_i]->spp_per_iter = m_spp_per_iter;
-      m_sampler_state_mapps[m_sampler_state_i]->spp_curr     = m_spp_curr;
+      m_sampler_state_mapps[m_sampler_state_i]->spp_per_iter       = m_spp_per_iter;
+      m_sampler_state_mapps[m_sampler_state_i]->spp_curr           = m_spp_curr;
+      m_sampler_state_mapps[m_sampler_state_i]->pixel_curr         = m_pixel_curr;
+      m_sampler_state_mapps[m_sampler_state_i]->pixel_checkerboard = m_pixel_checkerboard;
       m_sampler_state_buffs[m_sampler_state_i].flush();
       m_sampler_state_syncs[m_sampler_state_i] = gl::sync::Fence(gl::sync::time_s(1));
     }
@@ -35,13 +38,22 @@ namespace met {
     void IntegrationRenderPrimitive::advance_sampler_state() {
       met_trace_full();
 
-      // Advance current sample count by previous nr. of taken samples
-      m_spp_curr += m_spp_per_iter;
+      if (m_pixel_checkerboard) {
+        // Advance current sample count every two iterations
+        m_pixel_curr = (m_pixel_curr + 1) % 2;
+        if (m_pixel_curr == 0)
+          m_spp_curr += m_spp_per_iter;
+      } else {
+        // Advance current sample count by previous nr. of taken samples
+        m_spp_curr += m_spp_per_iter;
+      }
 
       // Push sample count to next available buffer and add sync object for flush operation
       m_sampler_state_i = (m_sampler_state_i + 1) % m_sampler_state_buffs.size();
-      m_sampler_state_mapps[m_sampler_state_i]->spp_per_iter = m_spp_per_iter;
-      m_sampler_state_mapps[m_sampler_state_i]->spp_curr     = m_spp_curr;
+      m_sampler_state_mapps[m_sampler_state_i]->spp_per_iter       = m_spp_per_iter;
+      m_sampler_state_mapps[m_sampler_state_i]->spp_curr           = m_spp_curr;
+      m_sampler_state_mapps[m_sampler_state_i]->pixel_curr         = m_pixel_curr;
+      m_sampler_state_mapps[m_sampler_state_i]->pixel_checkerboard = m_pixel_checkerboard;
       m_sampler_state_buffs[m_sampler_state_i].flush();
       m_sampler_state_syncs[m_sampler_state_i] = gl::sync::Fence(gl::sync::time_s(1));
     }
@@ -156,8 +168,8 @@ namespace met {
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.json",
-      .spec_const = {{ 0u, 16u                               },
-                     { 1u, 16u                               },
+      .spec_const = {{ 0u, 16u                                },
+                     { 1u, 16u                                },
                      { 2u, static_cast<uint>(info.view_type) }}
     });
   }
@@ -228,10 +240,11 @@ namespace met {
     });
 
     // Assign sampler configuration
-    m_spp_curr     = 0;
-    m_spp_max      = info.spp_max;
-    m_spp_per_iter = info.spp_per_iter;
-    m_checkerboard = info.checkerboard;
+    m_spp_curr           = 0;
+    m_spp_max            = info.spp_max;
+    m_spp_per_iter       = info.spp_per_iter;
+    m_pixel_curr         = 0;
+    m_pixel_checkerboard = info.pixel_checkerboard;
   }
 
   void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
@@ -241,9 +254,17 @@ namespace met {
     // Rebuild target texture if necessary
     if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
       m_film = {{ .size = sensor.film_size.max(1).eval() }};
-      auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
-      m_dispatch.groups_x = dispatch_ndiv.x();
-      m_dispatch.groups_y = dispatch_ndiv.y();
+
+      // Set dispatch size
+      if (m_pixel_checkerboard) {
+        auto dispatch_ndiv  = ceil_div((m_film.size() / eig::Array2u(2, 1)).eval(), 16u);
+        m_dispatch.groups_x = dispatch_ndiv.x();
+        m_dispatch.groups_y = dispatch_ndiv.y();
+      } else {
+        auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
+        m_dispatch.groups_x = dispatch_ndiv.x();
+        m_dispatch.groups_y = dispatch_ndiv.y();
+      }
     }
 
     // Set film to black
@@ -277,7 +298,6 @@ namespace met {
     program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture());
     program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
-    program.bind("b_warp_1f",             scene.components.upliftings.gl.texture_warp);
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     if (!scene.resources.images.empty()) {

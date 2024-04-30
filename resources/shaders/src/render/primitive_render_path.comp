@@ -31,7 +31,7 @@ layout(binding = 0) uniform b_buff_sensor {
 layout(binding = 1) uniform b_buff_sampler_state {
   uint spp_per_iter;
   uint spp_curr;
-  uint pixel_per_iter;
+  uint pixel_checkerboard;
   uint pixel_curr;
 } buff_sampler_state;
 layout(binding = 2) uniform b_buff_objects {
@@ -76,7 +76,6 @@ layout(binding = 4)          uniform sampler1DArray   b_illm_1f; // Illuminant f
 layout(binding = 5)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
 layout(binding = 6)          uniform sampler1DArray   b_bsis_1f; // Basis function data, 1 component
 layout(binding = 7)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
-layout(binding = 8)          uniform sampler1D        b_warp_1f; // Warp data for spectral MESE
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
 // Shared memory declarations
@@ -91,7 +90,7 @@ shared MeshInfo        s_mesh_info[max_supported_meshes];
 // Wavelength/emitter sampling distributions draw from uniform buffers
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
-declare_scene_traversal_stack(8); 
+declare_scene_traversal_stack(6); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)
 declare_scene_cmfs_data(b_cmfs_3f);
@@ -99,7 +98,7 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
-declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_bary_4f, b_spec_4f, b_coef_4f, b_warp_1f);
+declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_bary_4f, b_spec_4f, b_coef_4f);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/path.glsl>
@@ -115,31 +114,37 @@ void load_shared() {
 }
 
 // Initial sample state is seeded from pixel index, and rotated by multiplication
-SamplerState get_sampler_state(uint i) {
-  uint state = 1 + gl_GlobalInvocationID.x 
-                 + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+SamplerState get_sampler_state(uvec2 xy, uint i) {
+  uint state = 1 + xy.x + xy.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x;
   return state * (1 + i);
 }
 
 void main() {
   load_shared();
 
-  // Clamp invocations to requested size
-  guard(all(lessThan(ivec2(gl_GlobalInvocationID.xy), buff_sensor.film_size)));
+  // Select the correct pixel to render for e.g. checkerboarding
+  uvec2 xy = gl_GlobalInvocationID.xy;
+  if (bool(buff_sampler_state.pixel_checkerboard))
+    xy = xy 
+       * uvec2(2, 1) 
+       + uvec2((xy.y % 2) + buff_sampler_state.pixel_curr, 0);
 
+  // Clamp invocations to requested size
+  guard(all(lessThan(xy, buff_sensor.film_size)));
+  
   // Load sensor data
   Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
 
   // Running average measure is current value in film
-  vec3 measure = imageLoad(b_film, ivec2(gl_GlobalInvocationID.xy)).xyz;
+  vec3 measure = imageLoad(b_film, ivec2(xy)).xyz;
 
   // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
             i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
           ++i) {
     // Initialize sampler and generate sensor sample
-    SamplerState state         = get_sampler_state(i);
-    SensorSample sensor_sample = sample_sensor(sensor, ivec2(gl_GlobalInvocationID.xy), i, next_3d(state));
+    SamplerState state         = get_sampler_state(xy, i);
+    SensorSample sensor_sample = sample_sensor(sensor, ivec2(xy), i, next_3d(state));
 
     // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity
     vec4 L = Li(sensor_sample, state);
@@ -149,5 +154,5 @@ void main() {
   } // for (uint spp_iter)
   
   // Store running average measure to film
-  imageStore(b_film, ivec2(gl_GlobalInvocationID.xy), vec4(measure, 1));
+  imageStore(b_film, ivec2(xy), vec4(measure, 1));
 }

@@ -58,13 +58,13 @@ namespace met::detail {
       // Handle mouse scroll
       if (io.MouseWheel != 0.f) {
         arcb_handle.getw<detail::Arcball>()
-              .set_zoom_delta(-io.MouseWheel);
+                   .set_zoom_delta(-io.MouseWheel);
       }
 
       // Handle right mouse controll
       if (io.MouseDown[1]) {
         arcb_handle.getw<detail::Arcball>()
-              .set_ball_delta(eig::Array2f(io.MouseDelta) / view_size.array());
+                   .set_ball_delta(eig::Array2f(io.MouseDelta) / view_size.array());
       }
 
       // Handle middle mouse controll

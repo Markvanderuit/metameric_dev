@@ -33,6 +33,19 @@ namespace met {
     }
   };
 
+  /* Camera and render settings data layout; a simple description
+     of how to render the current scene, either to screen or film. */
+  struct ViewSettings {
+    uint         observer_i = 0;      // Referral to underlying CMFS
+    Transform    camera_trf;          // Transform applied to scene camera
+    float        camera_aspect = 1.f; // Aspect ratio applied to scene camera (1 = x/y)
+    eig::Array2u film_size    = 256;  // Pixel count of film target
+    float        film_scale = 1.f;    // Optional scaling using inside renderer
+
+  public: // Boilerplate
+    bool operator==(const ViewSettings &o) const;
+  };
+
   /* Color system representation; a simple referral to CMFS and illuminant data */
   struct ColorSystem {
     uint observer_i   = 0;

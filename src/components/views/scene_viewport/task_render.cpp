@@ -22,9 +22,10 @@ namespace met {
     // info("gbuffer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
     // info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
     // info("renderer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
-    info("renderer").init<PathRenderPrimitive>({ .spp_per_iter = 1u,
-                                                 .max_depth    = 4u,
-                                                 .cache_handle = info.global("cache") });
+    info("renderer").init<PathRenderPrimitive>({ .spp_per_iter       = 1u,
+                                                 .max_depth          = 4u,
+                                                 .pixel_checkerboard = true,
+                                                 .cache_handle       = info.global("cache") });
   }
     
   void MeshViewportRenderTask::eval(SchedulerHandle &info) {
@@ -34,7 +35,7 @@ namespace met {
     auto target_handle  = info.relative("viewport_image")("lrgb_target");
     auto camera_handle  = info.relative("viewport_input_camera")("arcball");
     auto render_handle  = info("renderer");
-    auto gbuffer_handle = info("gbuffer");
+    // auto gbuffer_handle = info("gbuffer");
     auto sensor_handle  = info("sensor");
     const auto &e_scene = info.global("scene").getr<Scene>();
     // const auto &i_pathr = render_handle.getr<GBufferViewPrimitive>();
@@ -56,7 +57,8 @@ namespace met {
       // auto &i_pathr        = render_handle.getw<GBufferPrimitive>();
       /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
       
-      i_sensor.film_size = e_target.size() / 2;
+      float scale = 0.75;
+      i_sensor.film_size = (e_target.size().cast<float>() * scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();
       i_sensor.flush();

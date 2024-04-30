@@ -139,6 +139,7 @@ namespace met {
       e_scene.components.emitters.update(e_scene);
       e_scene.components.objects.update(e_scene);
       e_scene.components.upliftings.update(e_scene);
+      e_scene.components.views.update(e_scene);
     });
 
     // Pipeline tasks generate uplifting data per object
@@ -149,10 +150,11 @@ namespace met {
     scheduler.task("scene_components_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene components")) {
-        push_editor<detail::Component<Object>>(info,      { .editor_name = "Objects" });
-        push_editor<detail::Component<Emitter>>(info,     { .editor_name = "Emitters" });
-        push_editor<detail::Component<Uplifting>>(info,   { .editor_name = "Uplifting models" });
-        push_editor<detail::Component<ColorSystem>>(info, { .editor_name = "Color systems", .edit_name = false });
+        push_editor<detail::Component<Object>>(info,       { .editor_name = "Objects" });
+        push_editor<detail::Component<Emitter>>(info,      { .editor_name = "Emitters" });
+        push_editor<detail::Component<Uplifting>>(info,    { .editor_name = "Uplifting models" });
+        push_editor<detail::Component<ColorSystem>>(info,  { .editor_name = "Color systems", .edit_name = false });
+        push_editor<detail::Component<ViewSettings>>(info, { .editor_name = "Views" });
       }
       ImGui::End();
     });

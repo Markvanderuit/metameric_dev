@@ -249,6 +249,9 @@ namespace met {
                                       { m_data.insert(m_data.begin() + i, v); }
       constexpr void resize(size_t i) { m_data.resize(i);      }
       constexpr void erase(size_t i)  { m_data.erase(m_data.begin() + i); }
+      constexpr void push_back(const cmpnt_type& v) 
+                                      { m_data.push_back(v);   }
+      constexpr void pop_back()       { m_data.pop_back();     }
       constexpr void clear()          { m_data.clear();        }
       constexpr auto empty()    const { return m_data.empty(); }
       constexpr auto size()     const { return m_data.size();  }
@@ -373,6 +376,9 @@ namespace met {
                                       { m_data.insert(m_data.begin() + i, v); }
       constexpr void resize(size_t i) { m_data.resize(i);      }
       constexpr void erase(size_t i)  { m_data.erase(m_data.begin() + i); }
+      constexpr void push_back(const resrc_type& v) 
+                                      { m_data.push_back(v);   }
+      constexpr void pop_back()       { m_data.pop_back();     }
       constexpr void clear()          { m_data.clear();        }
       constexpr auto empty()    const { return m_data.empty(); }
       constexpr auto size()     const { return m_data.size();  }

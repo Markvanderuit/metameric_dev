@@ -7,6 +7,7 @@
 #define EIGEN_MATRIX_PLUGIN     "eigen_matrix.ext"
 
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 // Introduce 'eig' namespace shorthand in the metameric namespace
 namespace met {

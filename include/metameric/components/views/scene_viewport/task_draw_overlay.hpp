@@ -17,6 +17,7 @@ namespace met {
 
     void eval_draw_constraints(SchedulerHandle &info);
     void eval_draw_path_queries(SchedulerHandle &info);
+    void eval_draw_view_rect(SchedulerHandle &info);
 
   public:
     bool is_active(SchedulerHandle &info) override;

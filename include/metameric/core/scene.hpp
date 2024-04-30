@@ -29,15 +29,16 @@ namespace met {
   struct Scene {
     // Scene components, directly visible or influential in the scene (stored as json on disk)
     struct SceneComponents {
-      detail::Components<ColorSystem> colr_systems;
-      detail::Components<Emitter>     emitters;
-      detail::Components<Object>      objects;
-      detail::Components<Uplifting>   upliftings;
-      detail::Component<Settings>     settings;   // Miscellaneous settings; e.g. texture size
-      detail::Component<uint>         observer_i; // Primary observer index; simple enough for now
+      detail::Components<ColorSystem>  colr_systems;
+      detail::Components<Emitter>      emitters;
+      detail::Components<Object>       objects;
+      detail::Components<Uplifting>    upliftings;
+      detail::Components<ViewSettings> views;
+      detail::Component<Settings>      settings;   // Miscellaneous settings; e.g. texture size
+      detail::Component<uint>          observer_i; // Primary observer index; simple enough for now
     
       // Check if any components were changed/added/removed
-      constexpr bool is_mutated() const { return colr_systems || emitters || objects || upliftings || settings || observer_i; }
+      constexpr bool is_mutated() const { return colr_systems || emitters || objects || upliftings || settings || views || observer_i; }
       constexpr operator bool() const { return is_mutated(); };
     } components;
 
