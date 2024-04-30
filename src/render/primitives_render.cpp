@@ -231,6 +231,7 @@ namespace met {
     m_spp_curr     = 0;
     m_spp_max      = info.spp_max;
     m_spp_per_iter = info.spp_per_iter;
+    m_checkerboard = info.checkerboard;
   }
 
   void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {

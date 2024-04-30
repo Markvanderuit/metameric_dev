@@ -31,6 +31,8 @@ layout(binding = 0) uniform b_buff_sensor {
 layout(binding = 1) uniform b_buff_sampler_state {
   uint spp_per_iter;
   uint spp_curr;
+  uint pixel_per_iter;
+  uint pixel_curr;
 } buff_sampler_state;
 layout(binding = 2) uniform b_buff_objects {
   uint n;
@@ -137,7 +139,7 @@ void main() {
           ++i) {
     // Initialize sampler and generate sensor sample
     SamplerState state         = get_sampler_state(i);
-    SensorSample sensor_sample = sample_sensor(sensor, ivec2(gl_GlobalInvocationID.xy), next_3d(state));
+    SensorSample sensor_sample = sample_sensor(sensor, ivec2(gl_GlobalInvocationID.xy), i, next_3d(state));
 
     // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity
     vec4 L = Li(sensor_sample, state);
