@@ -104,6 +104,7 @@ namespace met {
   public:
     using InfoType = PathRenderPrimitiveInfo;
     
+    PathRenderPrimitive() = default;
     PathRenderPrimitive(InfoType info);
 
     void reset(const Sensor &sensor, const Scene &scene) override;

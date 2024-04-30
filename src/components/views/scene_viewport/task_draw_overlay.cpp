@@ -130,7 +130,7 @@ namespace met {
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_view_i  = info.parent()("view_settings_i").getr<uint>();
     const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-    const auto &e_view = e_scene.components.views[e_view_i].value;
+    const auto &e_view    = e_scene.components.views[e_view_i].value;
     
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 

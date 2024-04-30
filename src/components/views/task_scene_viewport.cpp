@@ -3,6 +3,7 @@
 #include <metameric/components/views/scene_viewport/task_input_query.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/views/scene_viewport/task_render.hpp>
+#include <metameric/components/views/scene_viewport/task_export.hpp>
 #include <metameric/components/views/scene_viewport/task_draw_overlay.hpp>
 #include <metameric/components/views/scene_viewport/task_draw_combine.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
@@ -71,6 +72,9 @@ namespace met {
     });
 
     info.child_task("viewport_end").init<detail::_ViewportEndTask>(viewport_info);
+    
+    // TODO move to the right place
+    info.child_task("viewport_export").init<MeshViewportExportTask>();
   }
 
   void SceneViewportTask::eval(SchedulerHandle &info) {
