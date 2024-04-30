@@ -52,32 +52,26 @@ namespace met {
       }
       if (m_path.empty() || m_in_prog)
         ImGui::EndDisabled();
-      ImGui::SameLine();
-      if (!m_in_prog)
-        ImGui::BeginDisabled();
-      if (ImGui::Button("Stop render")) {
-        m_in_prog  = false;
-        m_spp_curr = 0;
-        
-        // Restart viewport render task
-        info.relative("viewport_render")("active").set(true);
-      }
-      if (!m_in_prog)
-        ImGui::EndDisabled();
       if (m_in_prog) {
         auto prg = static_cast<float>(m_spp_curr) / static_cast<float>(m_spp_trgt);
         auto str = std::format("{} / {} ({})", m_spp_curr, m_spp_trgt, prg);
         ImGui::ProgressBar(prg, { 0, 0 }, str.c_str());
         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-        ImGui::Text("Progress");
+        if (ImGui::Button("Cancel")) {
+          m_in_prog  = false;
+          m_spp_curr = 0;
+          
+          // Restart viewport render task
+          info.relative("viewport_render")("active").set(true);
+        }
       }
 
-      if (!m_in_prog && m_spp_curr > 0 && m_render.film().is_init()) {
+      /* if (!m_in_prog && m_spp_curr > 0 && m_render.film().is_init()) {
         // Place texture view using draw target
         ImGui::Image(ImGui::to_ptr(m_render.film().object()), 
           m_render.film().size().cast<float>().eval(), 
           eig::Vector2f(0, 1), eig::Vector2f(1, 0));
-      }
+      } */
     }
     ImGui::End();
 

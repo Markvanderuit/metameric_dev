@@ -434,7 +434,7 @@ namespace met {
         .x_init       = 0.05,
         .upper        = 1.0,
         .lower        =-1.0,
-        .max_iters    = 128,
+        .max_iters    = 256,
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
 
