@@ -20,7 +20,8 @@ namespace met {
     const auto &e_scene = info.global("scene").getr<Scene>();
     const auto &e_view  = e_scene.components.views[m_view].value;
 
-    if (ImGui::Begin("Render to file")) {
+    bool is_open = true;
+    if (ImGui::Begin("Export view", &is_open)) {
       // Path header
       auto path_str = m_path.string();
       if (ImGui::Button("...")) {
@@ -70,6 +71,10 @@ namespace met {
     }
     ImGui::End();
 
+    // Window closed, kill this task
+    if (!is_open)
+      info.task().dstr();
+
     // Handle render state
     if (m_in_prog) {
       // Begin render
@@ -89,6 +94,7 @@ namespace met {
           auto cen = (e_view.camera_trf.position + dir).eval();
 
           m_arcball.set_zoom(1);
+          m_arcball.set_fov_y(e_view.camera_fov_y * std::numbers::pi_v<float> / 180.f);
           m_arcball.set_eye(eye);
           m_arcball.set_center(cen);
           m_arcball.set_aspect(static_cast<float>(e_view.film_size.x()) / static_cast<float>(e_view.film_size.y()));

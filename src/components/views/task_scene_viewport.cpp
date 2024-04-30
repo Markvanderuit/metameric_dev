@@ -54,6 +54,8 @@ namespace met {
                    e_state] = e_scene.components.views[e_view_i];
 
       if (e_state || is_first_eval()) { // View data changed in scene, overwrites arcball for now
+        fmt::print("State updated\n");
+        
         auto &e_arcball = camera_handle.getw<detail::Arcball>();
 
         eig::Affine3f trf_rot = eig::Affine3f::Identity();
@@ -65,6 +67,7 @@ namespace met {
         auto eye = -dir; 
         auto cen = (e_view.camera_trf.position + dir).eval();
 
+        e_arcball.set_fov_y(e_view.camera_fov_y * std::numbers::pi_v<float> / 180.f);
         e_arcball.set_zoom(1);
         e_arcball.set_eye(eye);
         e_arcball.set_center(cen);

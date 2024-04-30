@@ -118,18 +118,18 @@ namespace met {
 
   void to_json(json &js, const ViewSettings &view) {
     met_trace();
-    js = {{ "observer_i",    view.observer_i },
-          { "camera_trf",    view.camera_trf },
-          { "camera_aspect", view.camera_aspect },
-          { "film_size",     view.film_size  },
-          { "film_scale",    view.film_scale }};
+    js = {{ "observer_i",    view.observer_i   },
+          { "camera_trf",    view.camera_trf   },
+          { "camera_fov_y",  view.camera_fov_y },
+          { "film_size",     view.film_size    },
+          { "film_scale",    view.film_scale   }};
   }
 
   void from_json(const json &js, ViewSettings &view) {
     met_trace();
     js.at("observer_i").get_to(view.observer_i);
     js.at("camera_trf").get_to(view.camera_trf);
-    js.at("camera_aspect").get_to(view.camera_aspect);
+    js.at("camera_fov_y").get_to(view.camera_fov_y);
     js.at("film_size").get_to(view.film_size);
     js.at("film_scale").get_to(view.film_scale);
   }
