@@ -98,6 +98,8 @@ namespace met {
     std::span<Ty> data() {
       return cnt_span<Ty>(m_data);
     }
+
+    void save_exr(fs::path path) const;
     
   private: // Serialization
     void to_stream(const PixelFormat &ty, std::ostream &str) const {

@@ -381,4 +381,71 @@ namespace met {
   uint Image::channels() const {
     return detail::size_from_format(m_pixel_frmt);
   }
+  
+  void Image::save_exr(fs::path path) const {
+    met_trace();
+    debug::check_expr(channels() == 4, "non-rgba export not implemented");
+    debug::check_expr(pixel_type() == PixelType::eFloat, "non-float export not implemented");
+    
+    // Placeholder path string for c-style APIs
+    std::string spath = io::path_with_ext(path, "exr").string();
+    const char *cpath = spath.c_str();
+
+    // Initialize components
+    EXRHeader  exr_header;
+    EXRImage   exr_image;
+    InitEXRHeader(&exr_header);
+    InitEXRImage(&exr_image);
+
+    uint type_size = detail::size_from_type(pixel_type());
+    uint pixl_chan = detail::size_from_format(pixel_frmt());
+
+    // Split into a/b/g/r/ data lines and flip the image
+    std::array<std::vector<float>, 4> rgba;
+    std::array<unsigned char *, 4>    rgba_p;
+    rgba.fill(std::vector<float>(m_size.prod()));
+    for (uint c = 0; c < 4; ++c) {
+      #pragma omp parallel for
+      for (int j = 0; j < m_size.y(); ++j) {
+        for (int i = 0; i < m_size.x(); ++i) {
+          size_t src_indx = ((m_size.y() - 1 - j) * m_size.x()) + i; // flip y-coord
+          size_t dst_indx = j * m_size.x() + i; 
+          size_t src_offs = type_size * (src_indx * 4 + c);
+          std::memcpy(&rgba[c][dst_indx], &m_data[src_offs], type_size);
+        } // for (uint i)
+      } // for (uint j)
+
+      // Flip channel pointer so we output as abgr
+      rgba_p[c] = (unsigned char *) rgba[3 - c].data();
+    } // for (uint c)
+
+    // Specify layout
+    exr_image.num_channels = 4;
+    exr_image.width        = m_size.x();
+    exr_image.height       = m_size.y();
+    exr_image.images       = rgba_p.data();
+
+    std::array<EXRChannelInfo, 4> header_channels;
+    std::array<int, 4> header_pixel_types = {
+      TINYEXR_PIXELTYPE_FLOAT, TINYEXR_PIXELTYPE_FLOAT, TINYEXR_PIXELTYPE_FLOAT, TINYEXR_PIXELTYPE_FLOAT
+    };
+    std::array<int, 4> requested_pixel_types = {
+      TINYEXR_PIXELTYPE_HALF, TINYEXR_PIXELTYPE_HALF, TINYEXR_PIXELTYPE_HALF, TINYEXR_PIXELTYPE_HALF
+    };
+
+    std::strcpy(header_channels[0].name, "A\0");
+    std::strcpy(header_channels[1].name, "B\0");
+    std::strcpy(header_channels[2].name, "G\0");
+    std::strcpy(header_channels[3].name, "R\0");
+    exr_header.num_channels          = 4;
+    exr_header.channels              = header_channels.data();
+    exr_header.pixel_types           = header_pixel_types.data();
+    exr_header.requested_pixel_types = requested_pixel_types.data();
+    
+    // Attempt save
+    const char *error = nullptr;
+    if (int ret = SaveEXRImageToFile(&exr_image, &exr_header, cpath, &error); ret)
+      debug::check_expr(false,
+        std::format("Could not save to EXR, image path \"{}\", return code \"{}\"", path.string(), ret));
+  }
 } // namespace met

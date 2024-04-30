@@ -141,13 +141,10 @@ namespace met {
     // Transform a view quad into world space
     auto aspect   = static_cast<float>(e_view.film_size.x()) / static_cast<float>(e_view.film_size.y());
     auto view_trf = e_view.camera_trf.affine().matrix();
-    // auto proj_trf = eig::perspective_rh_no(e_arcball.fov_y(),
-    //                                        static_cast<float>(e_view.film_size.y()) / static_cast<float>(e_view.film_size.x()),
-    //                                        0.0, e_arcball.far_z());
-    std::vector quad = { eig::Array4f(-.5, -.5 / aspect, 1, 1),
-                         eig::Array4f(-.5,  .5 / aspect, 1, 1),
-                         eig::Array4f( .5,  .5 / aspect, 1, 1),
-                         eig::Array4f( .5, -.5 / aspect, 1, 1) };
+    std::vector quad = { eig::Array4f(-.5 * aspect, -.5, 1, 1),
+                         eig::Array4f(-.5 * aspect,  .5, 1, 1),
+                         eig::Array4f( .5 * aspect,  .5, 1, 1),
+                         eig::Array4f( .5 * aspect, -.5, 1, 1) };
     std::vector<eig::Vector2f> p_window(4);
     rng::transform(quad, p_window.begin(), [&](const auto &v) {
       auto p = ((view_trf) * v.matrix()).head<3>().eval();

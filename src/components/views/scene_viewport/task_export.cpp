@@ -1,4 +1,5 @@
 #include <metameric/core/io.hpp>
+#include <metameric/core/image.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/scene_viewport/task_export.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -6,7 +7,7 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 
 namespace met {
-  constexpr static uint spp_per_iter = 64u;
+  constexpr static uint spp_per_iter = 16u;
 
   void MeshViewportExportTask::init(SchedulerHandle &info) {
     met_trace();    
@@ -17,23 +18,23 @@ namespace met {
 
     // Get shared resources
     const auto &e_scene = info.global("scene").getr<Scene>();
+    const auto &e_view  = e_scene.components.views[m_view].value;
 
-    if (ImGui::Begin("Render export")) {
+    if (ImGui::Begin("Render to file")) {
       // Path header
       auto path_str = m_path.string();
-      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.8);
-      if (ImGui::InputText("File path", &path_str)) {
-        m_path = path_str;
-      }
-      ImGui::SameLine();
-      if (ImGui::SmallButton("...")) {
+      if (ImGui::Button("...")) {
         if (fs::path path; detail::save_dialog(path, "exr"))
           m_path = path;
+      }
+      ImGui::SameLine();
+      if (ImGui::InputText("Path", &path_str)) {
+        m_path = path_str;
       }
 
       ImGui::SeparatorText("Render settings");
       
-      ImGui::InputScalar("Samples per pixel", ImGuiDataType_U32, &m_spp_trgt);
+      ImGui::InputScalar("SPP", ImGuiDataType_U32, &m_spp_trgt);
       push_resource_selector("View", e_scene.components.views, m_view);
       
       ImGui::SeparatorText("Render progress");
@@ -74,7 +75,6 @@ namespace met {
       // Begin render
       if (m_spp_curr == 0) {
         // Get shared resources
-        const auto &e_view = e_scene.components.views[m_view].value;
         m_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
 
         // Specify camera
@@ -113,6 +113,19 @@ namespace met {
       // End render
       if (m_spp_curr >= m_spp_trgt) {
         m_in_prog = false;
+
+        // Create cpu-side image matching gpu-side film format
+        Image image = {{
+          .pixel_frmt = Image::PixelFormat::eRGBA,
+          .pixel_type = Image::PixelType::eFloat,
+          .size       = e_view.film_size
+        }};
+
+        // Copy over to cpu-side
+        m_render.film().get(cast_span<float>(image.data()));
+
+        // Save to exr; no gamma correction
+        image.save_exr(m_path);
       }
     }
   }
