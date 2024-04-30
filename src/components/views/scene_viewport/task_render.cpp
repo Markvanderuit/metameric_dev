@@ -17,7 +17,8 @@ namespace met {
   }
 
   void MeshViewportRenderTask::init(SchedulerHandle &info) {
-    met_trace_full();    
+    met_trace_full(); 
+    info("active").set<bool>(true);   
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
     // info("gbuffer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
     // info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
@@ -44,7 +45,12 @@ namespace met {
     // Test if renderer necessitates a reset; scene changes, camera changes, target changes
     bool reset_target = target_handle.is_mutated();
     bool reset_camera = camera_handle.is_mutated();
-    bool reset        = is_first_eval() || reset_target || reset_camera || e_scene.components;    
+    bool reset = is_first_eval() 
+      || info("active").is_mutated()
+      || reset_target || reset_camera || e_scene.components;
+
+    // Test if renderer is allowed to render
+    guard(info("active").getr<bool>());
     
     // Push sensor changes, reset render component...
     if (reset) {

@@ -324,11 +324,11 @@ namespace met {
     // Specify direct/indirect color systems forming objective
     if (target_direct) {
       const auto &last = direct_cstr.back();
-      rng::transform(direct_cstr,
+      rng::transform(direct_cstr | vws::reverse | vws::take(1),
         std::back_inserter(info.direct_objectives),
         [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
     } else {
-      rng::transform(indrct_cstr, 
+      rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
         std::back_inserter(info.indirect_objectives),
         [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
     }

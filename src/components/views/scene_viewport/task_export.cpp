@@ -38,7 +38,7 @@ namespace met {
       ImGui::InputScalar("SPP", ImGuiDataType_U32, &m_spp_trgt);
       push_resource_selector("View", e_scene.components.views, m_view);
       
-      ImGui::SeparatorText("Render progress");
+      ImGui::Separator();
 
       // Start/stop buttons
       if (m_path.empty() || m_in_prog)
@@ -46,6 +46,9 @@ namespace met {
       if (ImGui::Button("Start render")) {
         m_in_prog  = true;
         m_spp_curr = 0;
+
+        // Kill viewport render task
+        info.relative("viewport_render")("active").set(false);
       }
       if (m_path.empty() || m_in_prog)
         ImGui::EndDisabled();
@@ -55,11 +58,18 @@ namespace met {
       if (ImGui::Button("Stop render")) {
         m_in_prog  = false;
         m_spp_curr = 0;
+        
+        // Restart viewport render task
+        info.relative("viewport_render")("active").set(true);
       }
       if (!m_in_prog)
         ImGui::EndDisabled();
       if (m_in_prog) {
-        ImGui::ProgressBar(static_cast<float>(m_spp_curr) / static_cast<float>(m_spp_trgt));
+        auto prg = static_cast<float>(m_spp_curr) / static_cast<float>(m_spp_trgt);
+        auto str = std::format("{} / {} ({})", m_spp_curr, m_spp_trgt, prg);
+        ImGui::ProgressBar(prg, { 0, 0 }, str.c_str());
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::Text("Progress");
       }
 
       if (!m_in_prog && m_spp_curr > 0 && m_render.film().is_init()) {
@@ -132,6 +142,12 @@ namespace met {
 
         // Save to exr; no gamma correction
         image.save_exr(m_path);
+
+        // Clear path because I am an idiot sometimes
+        m_path.clear();
+
+        // Restart viewport render task
+        info.relative("viewport_render")("active").set(true);
       }
     }
   }
