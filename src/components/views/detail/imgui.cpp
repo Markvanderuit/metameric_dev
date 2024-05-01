@@ -107,7 +107,7 @@ namespace ImGui {
   void PlotSpectra(const char* label, std::span<const std::string> legend, std::span<const met::Spec> reflectances, float min_bounds, float max_bounds, const ImVec2 &size) {
     using namespace met;
 
-    if (ImPlot::BeginPlot(label, size, ImPlotFlags_NoInputs | ImPlotFlags_NoFrame)) {
+    if (ImPlot::BeginPlot(label, size, ImPlotFlags_Crosshairs | ImPlotFlags_NoFrame)) {
       // Get wavelength values for x-axis in plot
       Spec x_values;
       rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());

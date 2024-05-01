@@ -40,19 +40,20 @@ namespace met {
       
       ImGui::Separator();
 
-      // Start/stop buttons
-      if (m_path.empty() || m_in_prog)
-        ImGui::BeginDisabled();
-      if (ImGui::Button("Start render")) {
-        m_in_prog  = true;
-        m_spp_curr = 0;
+      // Start/stop/progress bar
+      if (!m_in_prog) {
+        if (m_path.empty() || m_in_prog)
+          ImGui::BeginDisabled();
+        if (ImGui::Button("Start render")) {
+          m_in_prog  = true;
+          m_spp_curr = 0;
 
-        // Kill viewport render task
-        info.relative("viewport_render")("active").set(false);
-      }
-      if (m_path.empty() || m_in_prog)
-        ImGui::EndDisabled();
-      if (m_in_prog) {
+          // Kill viewport render task
+          info.relative("viewport_render")("active").set(false);
+        }
+        if (m_path.empty() || m_in_prog)
+          ImGui::EndDisabled();
+      } else {
         auto prg = static_cast<float>(m_spp_curr) / static_cast<float>(m_spp_trgt);
         auto str = std::format("{} / {} ({})", m_spp_curr, m_spp_trgt, prg);
         ImGui::ProgressBar(prg, { 0, 0 }, str.c_str());

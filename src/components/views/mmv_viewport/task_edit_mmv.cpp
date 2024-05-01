@@ -30,17 +30,16 @@ namespace met {
     const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
     const auto &e_coeffs  = uplf_handle("constraint_coeffs").getr<std::vector<Basis::vec_type>>();
 
-    // Get a copy of the constraint's spectrum
-    Spec spec = e_spectra[e_cs.vertex_i];
-    
     // Generate packed-unpacked roundtrip spectrum to compare to full precision distribution
-    Spec unpacked_spec;
+    Spec spec = e_spectra[e_cs.vertex_i], unpacked_spec;
+    Basis::vec_type coeffs = e_coeffs[e_cs.vertex_i], unpacked_coeffs;
     if constexpr (wavelength_bases == 12) {
-      auto coeffs = detail::unpack_snorm_12(detail::pack_snorm_12(e_coeffs[e_cs.vertex_i]));
-      unpacked_spec = e_basis(coeffs);
+      unpacked_coeffs = detail::unpack_snorm_12(detail::pack_snorm_12(e_coeffs[e_cs.vertex_i]));
+      unpacked_spec   = e_basis(coeffs);
     } else if constexpr (wavelength_bases == 16) {
-      auto coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
-      unpacked_spec = e_basis(coeffs);
+      spec = e_spectra[e_cs.vertex_i];
+      unpacked_coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
+      unpacked_spec   = e_basis(coeffs);
     }
           
     
@@ -234,9 +233,22 @@ namespace met {
           if (ImGui::BeginTabBar("##tab_bar")) {
             if (ImGui::BeginTabItem("Reflectance")) {
               std::vector<Spec>        data = { spec, unpacked_spec };
-              std::vector<std::string> lgnd = { "Exact", "Packed" };
+              std::vector<std::string> lgnd = { "Exact", "Packed"   };
               ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Coefficients")) {
+              std::vector<Basis::vec_type> coef = { coeffs, unpacked_coeffs };
+              std::vector<std::string> lgnd     = { "Exact", "Packed"       };
+              if (ImPlot::BeginPlot("##output_coef_plot", { -1.f, 256.f * e_window.content_scale() }, ImPlotFlags_Crosshairs | ImPlotFlags_NoFrame)) {
+                Basis::vec_type x_values;
+                rng::copy(vws::iota(0u, wavelength_bases), x_values.begin());
+                ImPlot::SetupAxes("Index", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
+                ImPlot::SetupAxesLimits(-1.f, wavelength_bases, -1.f, 1.f, ImPlotCond_Always);
+                for (const auto &[text, vals] : met::vws::zip(lgnd, coef))
+                  ImPlot::PlotLine(text.c_str(), x_values.data(), vals.data(), wavelength_bases);
+              }
+              ImPlot::EndPlot();
             }
             if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
               // Reconstruct radiance from truncated power series
