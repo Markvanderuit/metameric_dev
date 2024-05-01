@@ -35,7 +35,7 @@ namespace met {
     // Get shared resources 
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_target  = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
-    const auto &e_render  = info.relative("viewport_render")("renderer").getr<detail::BaseRenderPrimitive>();
+    const auto &e_render  = info.relative("viewport_render")("renderer").getr<PathRenderPrimitive>();
     const auto &e_overlay = info.relative("viewport_draw_overlay")("target").getr<gl::Texture2d4f>();
 
     // Specify dispatch size
@@ -43,7 +43,8 @@ namespace met {
     auto dispatch_ndiv = ceil_div(dispatch_n, 16u);
 
     // Push miscellaneous uniforms
-    m_unif_buffer_map->viewport_size = dispatch_n;
+    m_unif_buffer_map->viewport_size       = dispatch_n;
+    m_unif_buffer_map->sample_checkerboard = static_cast<uint>(e_render.is_pixel_checkerboard() && e_render.iter() <= 1);
     m_unif_buffer.flush();
 
     // Bind required resources to their corresponding targets

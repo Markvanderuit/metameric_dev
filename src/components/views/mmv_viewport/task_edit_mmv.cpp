@@ -37,11 +37,9 @@ namespace met {
     Spec unpacked_spec;
     if constexpr (wavelength_bases == 12) {
       auto coeffs = detail::unpack_snorm_12(detail::pack_snorm_12(e_coeffs[e_cs.vertex_i]));
-      fmt::print("input: {}\noutput: {}\n", e_coeffs[e_cs.vertex_i], coeffs);
       unpacked_spec = e_basis(coeffs);
     } else if constexpr (wavelength_bases == 16) {
       auto coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
-      fmt::print("input: {}\noutput: {}\n", e_coeffs[e_cs.vertex_i], coeffs);
       unpacked_spec = e_basis(coeffs);
     }
           

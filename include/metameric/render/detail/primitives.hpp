@@ -80,19 +80,23 @@ namespace met::detail {
     void advance_sampler_state();
     const gl::Buffer &get_sampler_state();
 
+    uint m_iter;
     uint m_spp_max;
     uint m_spp_curr;
     uint m_spp_per_iter;
-    
     uint m_pixel_curr;
     bool m_pixel_checkerboard;
 
     // Protected constructor to initialize sampler state buffers and maps
     IntegrationRenderPrimitive();
 
-  public:
+  public: // Getters
     bool has_next_sample_state() const {
       return m_spp_max == 0 || m_spp_curr < m_spp_max;
     }
+    bool is_pixel_checkerboard() const { return m_pixel_checkerboard; }
+    uint iter()                  const { return m_iter;               }
+    uint spp_curr()              const { return m_spp_curr;           }
+    uint spp_max()               const { return m_spp_max;            }
   };
 } // namespace met::detail

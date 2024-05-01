@@ -9,6 +9,7 @@ layout(std430) buffer;
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
   uvec2 viewport_size;
+  uint  sample_checkerboard;
 } buff_unif;
 
 // Texture unit, ergo sampler declarations
@@ -24,11 +25,18 @@ void main() {
   const vec2 xy = (vec2(i) + 0.5) / vec2(buff_unif.viewport_size);
   guard(all(lessThan(i, buff_unif.viewport_size)));
 
-  // Sample direct/indirect render outputs and combine
-  vec4 value   = texture(b_render_4f, xy);
+  // Sample render output
+  vec4 value;
+  if (bool(buff_unif.sample_checkerboard)) {
+    value = 2 * texture(b_render_4f, xy);
+  } else {
+    value = texture(b_render_4f, xy);
+  }
+
+  // Sample overlay render and mix with result
   vec4 overlay = texture(b_overlay_4f, xy);
   value = mix(value, vec4(overlay.xyz, 1), overlay.a);
   
-  // Store combined result
+  // Store mixed result
   imageStore(b_target_4f, ivec2(i), value + overlay);
 }

@@ -8,6 +8,7 @@ namespace met {
   class MeshViewportDrawCombineTask : public detail::TaskNode {
     struct UnifLayout {
       eig::Vector2u viewport_size;
+      uint          sample_checkerboard;
     };
 
     gl::Buffer   m_unif_buffer;

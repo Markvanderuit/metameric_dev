@@ -21,6 +21,9 @@ namespace met {
     void IntegrationRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
       met_trace_full();
 
+      // Reset iter counter
+      m_iter = 0;
+
       // Reset current sample count
       m_spp_curr   = 0;
       m_pixel_curr = 0;
@@ -37,6 +40,8 @@ namespace met {
 
     void IntegrationRenderPrimitive::advance_sampler_state() {
       met_trace_full();
+
+      m_iter++;
 
       if (m_pixel_checkerboard) {
         // Advance current sample count every two iterations
@@ -240,6 +245,7 @@ namespace met {
     });
 
     // Assign sampler configuration
+    m_iter               = 0;
     m_spp_curr           = 0;
     m_spp_max            = info.spp_max;
     m_spp_per_iter       = info.spp_per_iter;
