@@ -100,6 +100,10 @@ void main() {
                  * buff_uplift_coef.data[result_indx][j][i]; // TODO get the coefficients of the correct constraints here
   } // for (uint i)
 
-  // Store result, outputting packed moment coefficients
+  // Store result, outputting packed moment coefficients to 128 bytes
+#if MET_WAVELENGTH_BASES == 12
   out_coeffs = pack_snorm_12(coeffs);
+#elif MET_WAVELENGTH_BASES == 16
+  out_coeffs = pack_snorm_16(coeffs);
+#endif
 }

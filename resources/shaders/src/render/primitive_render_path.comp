@@ -127,7 +127,7 @@ void main() {
   if (bool(buff_sampler_state.pixel_checkerboard))
     xy = xy 
        * uvec2(2, 1) 
-       + uvec2((xy.y % 2) + buff_sampler_state.pixel_curr, 0);
+       + uvec2((xy.y + buff_sampler_state.pixel_curr) % 2, 0);
 
   // Clamp invocations to requested size
   guard(all(lessThan(xy, buff_sensor.film_size)));

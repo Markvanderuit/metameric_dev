@@ -24,12 +24,27 @@ namespace met {
     const auto &e_window  = info.global("window").getr<gl::Window>();
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
+    const auto &e_uplift  = e_scene.components.upliftings[e_cs.uplifting_i].value;
+    const auto &e_basis   = e_scene.resources.bases[e_uplift.basis_i].value();
     auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
     const auto &e_coeffs  = uplf_handle("constraint_coeffs").getr<std::vector<Basis::vec_type>>();
 
     // Get a copy of the constraint's spectrum
     Spec spec = e_spectra[e_cs.vertex_i];
+    
+    // Generate packed-unpacked roundtrip spectrum to compare to full precision distribution
+    Spec unpacked_spec;
+    if constexpr (wavelength_bases == 12) {
+      auto coeffs = detail::unpack_snorm_12(detail::pack_snorm_12(e_coeffs[e_cs.vertex_i]));
+      fmt::print("input: {}\noutput: {}\n", e_coeffs[e_cs.vertex_i], coeffs);
+      unpacked_spec = e_basis(coeffs);
+    } else if constexpr (wavelength_bases == 16) {
+      auto coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
+      fmt::print("input: {}\noutput: {}\n", e_coeffs[e_cs.vertex_i], coeffs);
+      unpacked_spec = e_basis(coeffs);
+    }
+          
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
@@ -157,7 +172,7 @@ namespace met {
         ImGui::TableNextRow();
         auto scope = ImGui::ScopedID(name);
         auto &cstr = c_vec[c_j];
-        auto csys = IndirectColrSystem { .cmfs  = e_scene.resources.observers[cstr.cmfs_j].value(), 
+        auto csys = IndirectColrSystem { .cmfs   = e_scene.resources.observers[cstr.cmfs_j].value(), 
                                          .powers = cstr.powr_j };
 
         // Return value set to this return value
@@ -219,24 +234,25 @@ namespace met {
       vert.constraint | visit {
         [&](const IndirectSurfaceConstraint &cstr) {
           if (ImGui::BeginTabBar("##tab_bar")) {
-            Spec r = e_spectra[e_cs.vertex_i];
             if (ImGui::BeginTabItem("Reflectance")) {
-              ImGui::PlotSpectrum("##output_refl_plot", spec, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
+              std::vector<Spec>        data = { spec, unpacked_spec };
+              std::vector<std::string> lgnd = { "Exact", "Packed" };
+              ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
             if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
               // Reconstruct radiance from truncated power series
               Spec s = cstr.cstr_j_indrct.back().powr_j[0];
               for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
-                s += r.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
-              ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 80.f * e_window.content_scale() });
+                s += spec.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
+              ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
             if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Power series")) {
               float s_max = 0.f;
               for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
                 s_max = std::max(s_max, cstr.cstr_j_indrct.back().powr_j[i].maxCoeff());
-              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 120.f * e_window.content_scale() });
+              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
 
@@ -246,12 +262,15 @@ namespace met {
         [&](const auto &cstr) {
           ImGui::SeparatorText("Reflectance");
           /* ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", spec); */ // Reenable for printing
-          ImGui::SameLine();
+          /* ImGui::SameLine();
           if (ImGui::SmallButton("Export")) {
             if (fs::path path; detail::save_dialog(path, "txt"))
               io::save_spec(path, spec);
-          }
-          ImGui::PlotSpectrum("##output_refl_plot", spec, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
+          } */
+          // ImGui::PlotSpectrum("##output_refl_plot", spec, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
+          std::vector<Spec>        data = { spec, unpacked_spec };
+          std::vector<std::string> lgnd = { "Exact", "Packed" };
+          ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
         }
       };
       
@@ -265,15 +284,6 @@ namespace met {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(1); ImGui::Text("Color system");
             ImGui::TableSetColumnIndex(2); ImGui::Text("lrgb/srgb/error");
-
-            // Checkbox for all
-            ImGui::TableSetColumnIndex(4);
-            if (!cstr.cstr_j.empty()) {
-              // auto is_active_v = cstr.cstr_j | vws::transform(&ColrConstraint::is_active);
-              // auto is_active   = is_active_v | rng::to<std::vector<int>>();
-              // ImGui::CheckboxFlags("##is_active", is_active.data(), is_active.size());
-              // rng::copy(is_active, is_active_v.begin());
-            }
 
             // Baseline constraint row
             push_base_cstr_row(cstr);

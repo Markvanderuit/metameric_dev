@@ -353,7 +353,6 @@ namespace met {
     clear_mods();
 
     // TODO remove this override that forces a reload of basis functions from disk
-      
     // Load spectral basis
     // Normalize if they not already normalized
     auto basis = io::load_basis("resources/misc/basis_262144.txt");

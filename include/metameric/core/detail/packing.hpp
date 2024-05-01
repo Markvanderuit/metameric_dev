@@ -212,6 +212,29 @@ namespace met::detail {
     return u.out;
   }
 
+  // Pack a quad of floats to [0, 1] chars in a single object
+  // follows glm::packSnorm4x8
+  inline
+  uint pack_snorm_4x8(const eig::Array4f &v) {
+    union { schar in[4]; uint out; } u;
+    auto result = (v.max(-1.f).min(1.f) * 127.f).round().cast<schar>().eval();
+		u.in[0] = result[0];
+		u.in[1] = result[1];
+		u.in[2] = result[2];
+		u.in[3] = result[3];
+    return u.out;
+  }
+
+  // Inverse of pack_unorm_4x8
+  // follows glm::unpackUnorm4x8
+  inline
+  eig::Array4f unpack_snorm_4x8(uint i) {
+    union { uint in; schar out[4]; } u;
+		u.in = i;
+		return (eig::Array4f(u.out[0], u.out[1], u.out[2], u.out[3]) * 0.0078740157480315f)
+      .cwiseMax(-1.f).cwiseMin(1.f).eval();
+  }
+
   // Pack a quad of floats to [0, 1] chars in a single object, taking
   // the nearest lower value
   inline
@@ -377,6 +400,22 @@ namespace met::detail {
       unpack_11(u.out.b6), unpack_11(u.out.b7),  unpack_10(u.out.b8),  
       unpack_11(u.out.b9), unpack_11(u.out.b10), unpack_10(u.out.b11),  
     };
+  }
+
+  inline
+  eig::Array4u pack_snorm_16(const eig::Vector<float, 16> &v) {
+    return (eig::Array4u() << pack_snorm_4x8(v(eig::seq(0,  3 ))),
+                              pack_snorm_4x8(v(eig::seq(4,  7 ))),
+                              pack_snorm_4x8(v(eig::seq(8,  11))),
+                              pack_snorm_4x8(v(eig::seq(12, 15)))).finished();
+  }
+  
+  inline
+  eig::Vector<float, 16> unpack_snorm_16(const eig::Array4u &p) {
+    return (eig::Vector<float, 16>() << unpack_snorm_4x8(p[0]),
+                                        unpack_snorm_4x8(p[1]),
+                                        unpack_snorm_4x8(p[2]),
+                                        unpack_snorm_4x8(p[3])).finished();
   }
 
   /*

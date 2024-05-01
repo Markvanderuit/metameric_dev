@@ -77,7 +77,14 @@ namespace met {
           ImGui::Separator();
 
           // Recover and plot spectrum
-          auto coeffs = detail::unpack_snorm_12(coef_data);
+          Basis::vec_type coeffs;
+          if constexpr (wavelength_bases == 12) {
+            coeffs = detail::unpack_snorm_12(coef_data);
+          } else if constexpr (wavelength_bases == 16) {
+            coeffs = detail::unpack_snorm_16(coef_data);
+          } else {
+            // ...
+          }
           auto interp_spectrum =(tetr.spectra[0] * bary[0]
                                + tetr.spectra[1] * bary[1]
                                + tetr.spectra[2] * bary[2]

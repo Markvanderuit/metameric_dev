@@ -20,9 +20,6 @@ namespace met {
     met_trace_full(); 
     info("active").set<bool>(true);   
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
-    // info("gbuffer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
-    // info("renderer").init<GBufferViewPrimitive>({ .cache_handle = info.global("cache") });
-    // info("renderer").init<GBufferPrimitive>({ .cache_handle = info.global("cache") });
     info("renderer").init<PathRenderPrimitive>({ .spp_per_iter       = 1u,
                                                  .max_depth          = 4u,
                                                  .pixel_checkerboard = true,
@@ -63,12 +60,11 @@ namespace met {
       // auto &i_pathr        = render_handle.getw<GBufferPrimitive>();
       /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
       
-      float scale = 0.75;
+      float scale = 0.5; // quarter res
       i_sensor.film_size = (e_target.size().cast<float>() * scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();
       i_sensor.flush();
-
       i_pathr.reset(i_sensor, e_scene);
 
       // Build new gbuffer for hacky denoising

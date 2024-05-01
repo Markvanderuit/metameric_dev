@@ -30,9 +30,9 @@ struct BVHNodePack {
   uint child_aabb1[4]; // per child: lo.z | hi.z
 };
 
-float[wavelength_bases] unpack_snorm_12(in uvec4 p) {
-  float[wavelength_bases] m;
-  for (int i = 0; i < min(12, wavelength_bases); ++i) {
+float[12] unpack_snorm_12(in uvec4 p) {
+  float[12] m;
+  for (int i = 0; i < 12; ++i) {
     uint j = bitfieldExtract(p[i / 3],                // 0,  0,  0,  1,  1,  1,  ...
                              (i % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
                              (i % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
@@ -42,9 +42,9 @@ float[wavelength_bases] unpack_snorm_12(in uvec4 p) {
   return m;
 }
 
-uvec4 pack_snorm_12(in float[wavelength_bases] v) {
+uvec4 pack_snorm_12(in float[12] v) {
   uvec4 p;
-  for (int i = 0; i < min(12, wavelength_bases); ++i) {
+  for (int i = 0; i < 12; ++i) {
     float scale = i % 3 == 2 ? 1024.f : 2048.f;
     uint j = uint(round((v[i] + 1.f) * .5f * scale));
     p[i / 3] = bitfieldInsert(p[i / 3],                // 0,  0,  0,  1,  1,  1,  ...
@@ -52,6 +52,40 @@ uvec4 pack_snorm_12(in float[wavelength_bases] v) {
                               (i % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
                               (i % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
   }
+  return p;
+}
+float[16] unpack_snorm_16(in uvec4 p) {
+  float[16] m;
+  vec4 f4;
+  f4 = unpackSnorm4x8(p[0]);
+  m[0] = f4[0];
+  m[1] = f4[1];
+  m[2] = f4[2];
+  m[3] = f4[3];
+  f4 = unpackSnorm4x8(p[1]);
+  m[4] = f4[0];
+  m[5] = f4[1];
+  m[6] = f4[2];
+  m[7] = f4[3];
+  f4 = unpackSnorm4x8(p[2]);
+  m[8]  = f4[0];
+  m[9] = f4[1];
+  m[10] = f4[2];
+  m[11] = f4[3];
+  f4 = unpackSnorm4x8(p[3]);
+  m[12] = f4[0];
+  m[13] = f4[1];
+  m[14] = f4[2];
+  m[15] = f4[3];
+  return m;
+}
+
+uvec4 pack_snorm_16(in float[16] v) {
+  uvec4 p;
+  p[0] = packSnorm4x8(vec4(v[0],  v[1],  v[2],  v[3]));
+  p[1] = packSnorm4x8(vec4(v[4],  v[5],  v[6],  v[7]));
+  p[2] = packSnorm4x8(vec4(v[8],  v[9],  v[10], v[11]));
+  p[3] = packSnorm4x8(vec4(v[12], v[13], v[14], v[15]));
   return p;
 }
 

@@ -113,7 +113,7 @@ namespace ImGui {
       rng::copy(vws::iota(0u, wavelength_samples) | vws::transform(wavelength_at_index), x_values.begin());
       
       // Setup minimal format for coming line plots
-      ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoGridLines /* ImPlotAxisFlags_NoDecorations */);
+      ImPlot::SetupAxes("Wavelength", "Value", ImPlotAxisFlags_NoGridLines, ImPlotAxisFlags_NoDecorations);
 
       // More restrained 400-700nm to ignore funky edges
       ImPlot::SetupAxesLimits(400.f, 700.f, min_bounds, max_bounds, ImPlotCond_Always);

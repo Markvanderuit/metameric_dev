@@ -4,6 +4,17 @@
   // If element indices differ. Do costly interpolation manually :(
   const ivec2 reflectance_tx_offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
   
+  // Helper to load and unpack absis coefficients dependent on nr. of bases 
+#if MET_WAVELENGTH_BASES == 12
+  float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
+    return unpack_snorm_12(scene_coefficients_data_fetch(px));
+  }
+#elif MET_WAVELENGTH_BASES == 16
+  float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
+    return unpack_snorm_16(scene_coefficients_data_fetch(px));
+  }
+#endif
+
   vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
     ObjectInfo      object_info       = scene_object_info(object_i);
@@ -23,7 +34,7 @@
 
     // Mix four texels appropriately, sampling each of four wavelengths independently
     for (uint i = 0; i < 4; ++i) { // four texel corners
-      float[wavelength_bases] c = unpack_snorm_12(scene_coefficients_data_fetch(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0)));
+      float[wavelength_bases] c = scene_sample_reflectance_coeffs(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0));
       float w = hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i])));
       for (uint j = 0; j < 4; ++j) {                // four wavelengths
         for (uint k = 0; k < wavelength_bases; ++k) // n bases

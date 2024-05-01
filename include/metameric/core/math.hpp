@@ -3,9 +3,10 @@
 #include <metameric/core/detail/eigen.hpp>
 
 namespace met {
-  // Shorthand unsigned types
+  // Shorthand types
   using byte   = std::byte;
   using uint   = unsigned int;
+  using schar  = signed   char;
   using uchar  = unsigned char;
   using ushort = unsigned short;
 
