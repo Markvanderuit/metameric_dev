@@ -98,7 +98,7 @@ namespace met {
 
       // Target distribution
       push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
-      ImGui::DragFloat("Power", &value.illuminant_scale, 0.1f, 0.0f, 100.f);
+      ImGui::DragFloat("Power", &value.illuminant_scale, 0.005f, 0.0f, 100.f);
     };
 
     // Default implementation of editing visitor for Uplifting components
