@@ -91,7 +91,6 @@ void main() {
 
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   out_barycs = vec4(result_bary.xyz, float(result_indx));
-  out_barycs = vec4(p, 1);
 
   // Gather basis coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[wavelength_bases] coeffs;
