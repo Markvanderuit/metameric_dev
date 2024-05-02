@@ -218,9 +218,9 @@ namespace met {
     
     auto intr_offs = eig::Array2f(4.f);
     auto view_offs = (viewport_offs + intr_offs).eval();
-    auto view_size = eig::Array2f(104, 18);
+    auto view_size = eig::Array2f(96, 32);
     
-    auto text = std::format("{} x {}, {} spp", 
+    auto text = std::format("res: {} x {}\nspp: {}", 
       e_render.film().size().x(), 
       e_render.film().size().y(), 
       e_render.spp_curr() + 1);

@@ -74,8 +74,8 @@ namespace met::detail {
 
     // Obtain writeable, flushable mapping of nr. of meshes and individual mesh data
     auto *map = object_info.map_as<ObjectUniformBufferLayout>(buffer_access_flags).data();
-    m_buffer_map_size = &map->n;
-    m_buffer_map_data = map->data;
+    m_info_map_size = &map->n;
+    m_info_map_data = map->data;
   }
   
   void GLPacking<met::Object>::update(std::span<const detail::Component<met::Object>> objects, const Scene &scene) {
@@ -86,7 +86,7 @@ namespace met::detail {
     // fmt::print("Type updated: {}\n", typeid(decltype(objects)::value_type).name());
 
     // Set appropriate object count, then flush change to buffer
-    *m_buffer_map_size = static_cast<uint>(objects.size());
+    *m_info_map_size = static_cast<uint>(objects.size());
     object_info.flush(sizeof(uint));
 
     // Write updated objects to mapping
@@ -101,7 +101,7 @@ namespace met::detail {
       auto object_trf = object.transform.affine();
       auto mesh_trf   = scene.resources.meshes.gl.transforms[object.mesh_i];
 
-      m_buffer_map_data[i] = {
+      m_info_map_data[i] = {
         // Fill transform data
         .trf          = object_trf.matrix(),
         .trf_inv      = object_trf.matrix().inverse().eval(),
@@ -240,11 +240,16 @@ namespace met::detail {
     // Preallocate up to a number of meshes
     emitter_info = {{ .size  = sizeof(EmitterUniformBufferLayout),
                       .flags = buffer_create_flags }};
-
+    
     // Obtain writeable, flushable mapping of nr. of components and individual data
     auto *map = emitter_info.map_as<EmitterUniformBufferLayout>(buffer_access_flags).data();
-    m_buffer_map_size = &map->n;
-    m_buffer_map_data = map->data;
+    m_info_map_size = &map->n;
+    m_info_map_data = map->data;
+
+    // Same for envmpa data
+    emitter_envm_info = {{ .size  = sizeof(EmitterInfoLayout),
+                           .flags = buffer_create_flags }};
+    m_envm_map_data = emitter_envm_info.map_as<EmitterEnvmapInfoLayout>(buffer_access_flags).data();
   }
 
   void GLPacking<met::Emitter>::update(std::span<const detail::Component<met::Emitter>> emitters, const Scene &scene) {
@@ -254,7 +259,7 @@ namespace met::detail {
     guard(scene.components.emitters);
 
     // Set appropriate component count, then flush change to buffer
-    *m_buffer_map_size = static_cast<uint>(emitters.size());
+    *m_info_map_size = static_cast<uint>(emitters.size());
     emitter_info.flush(sizeof(uint));
 
     // Write updated components to mapping
@@ -276,7 +281,7 @@ namespace met::detail {
         srfc_area_inv = 1.f / emitter.transform.scaling.head<2>().prod();
       }
       
-      m_buffer_map_data[i] = {
+      m_info_map_data[i] = {
         .trf              = trf.matrix(),
         .trf_inv          = trf.matrix().inverse().eval(),
         
@@ -312,9 +317,20 @@ namespace met::detail {
       emitter_distr[i] = 1.f / static_cast<float>(active_emitters.size());
       // emitter_distr[i] = s.sum() * emitter.illuminant_scale;
     }
-
     auto distr = Distribution(cnt_span<float>(emitter_distr));   
     emitter_distr_buffer = distr.to_buffer_std140();
+
+    // Store information on first constant emitter, if one is present and active
+    m_envm_map_data->envm_is_present = false;
+    for (uint i = 0; i < emitters.size(); ++i) {
+      const auto &[emitter, state] = emitters[i];
+      if (emitter.is_active && emitter.type == Emitter::Type::eConstant) {
+        m_envm_map_data->envm_is_present = true;
+        m_envm_map_data->envm_i          = i;
+        break;
+      }
+    }
+    emitter_envm_info.flush();
   }
 
   GLPacking<met::Mesh>::GLPacking() {
@@ -359,7 +375,7 @@ namespace met::detail {
       // We simplify a copy of the mesh, reparameterize it so texture UVs are
       // unique and non-overlapping, unitize it to a [0, 1] cube, and finally
       // build a bvh acceleration structure over this mess
-      m_meshes[i]   = value; // simplified_mesh<met::Mesh>(value, 16384, 1e-3);
+      m_meshes[i]   = simplified_mesh<met::Mesh>(value, 12288, 1e-3);
       txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
       transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
       m_bvhs[i]     = create_bvh({ .mesh            = m_meshes[i], 

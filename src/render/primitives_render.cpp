@@ -297,6 +297,7 @@ namespace met {
     program.bind("b_buff_sampler_state",  get_sampler_state());
     program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
     program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
     program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
     program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);

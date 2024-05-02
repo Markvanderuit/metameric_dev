@@ -271,7 +271,7 @@ namespace met {
     // Default uplifting
     components.objects.emplace("Default object", { 
       .transform   = { .position = { 0.f, 0.f, 0.f },
-                       .rotation = { -90.f * std::numbers::pi_v<float> / 180.f, 0.f, 0.f },
+                       .rotation = { 0.f, -90.f * std::numbers::pi_v<float> / 180.f, 0.f },
                        .scaling  = 1.f },
       .mesh_i      = 0, 
       .uplifting_i = 0,
@@ -283,7 +283,7 @@ namespace met {
     components.emitters.push("Default emitter", {
       .type             = Emitter::Type::eRect,
       .transform        = { .position = { 0.f, 1.f, 0.f },
-                            .rotation = { 90.f * std::numbers::pi_v<float> / 180.f, 0.f, 0.f },
+                            .rotation = { 0.f, 90.f * std::numbers::pi_v<float> / 180.f, 0.f },
                             .scaling  = .5f },
       .illuminant_i     = 0,
       .illuminant_scale = 1e-1

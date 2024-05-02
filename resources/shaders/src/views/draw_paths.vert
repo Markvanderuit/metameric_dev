@@ -46,7 +46,7 @@ declare_scene_cmfs_data(b_cmfs_3f);
 void main() {
   uint path_i = (gl_VertexID / 2) / path_max_depth;
   uint depth  = buff_paths.data[path_i].path_depth;
-  uint vert_i = min(((gl_VertexID % (path_max_depth * 2)) + 1) / 2, depth - 1);
+  uint vert_i = min(((gl_VertexID % (path_max_depth * 2)) + 1) / 2, max(1, depth) - 1);
 
   // Generate output color
   out_value_c = sensor_apply(buff_paths.data[path_i].wvls, 

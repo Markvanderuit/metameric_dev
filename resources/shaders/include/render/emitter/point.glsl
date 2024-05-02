@@ -11,7 +11,7 @@ PositionSample sample_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec
   ps.t = length(ps.d);
   ps.d /= ps.t;
   
-  ps.pdf = 1.f;
+  ps.pdf      = 1.f;
   ps.is_delta = true;
 
   return ps;

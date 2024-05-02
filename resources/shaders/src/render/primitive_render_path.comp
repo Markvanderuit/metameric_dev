@@ -62,6 +62,10 @@ layout(binding = 8) uniform b_buff_emitters_distr {
   float func[max_supported_emitters];
   float cdf[max_supported_emitters + 1];
 } buff_emitters_distr;
+layout(binding = 9) uniform b_buff_envmap_info {
+  bool envm_is_present;
+  uint envm_i;
+} buff_envmap_info;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
@@ -97,7 +101,7 @@ declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_emitter_data(s_emtr_info, buff_emitters.n);
+declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_bary_4f, b_spec_4f, b_coef_4f);
 
 // All includes from and in here rely on buffers/samplers to be declared

@@ -36,8 +36,8 @@ namespace met::detail {
     constexpr static size_t v = sizeof(ObjectInfoLayout);
 
     // Mapped buffer accessors
-    uint*                       m_buffer_map_size;
-    std::span<ObjectInfoLayout> m_buffer_map_data;
+    uint*                       m_info_map_size;
+    std::span<ObjectInfoLayout> m_info_map_data;
 
   public:
     // This buffer stores one instance of ObjectInfoLayout per object component
@@ -47,11 +47,16 @@ namespace met::detail {
     GLPacking();
     void update(std::span<const detail::Component<met::Object>>, const Scene &);
 
-    std::span<const ObjectInfoLayout> objects() const { return m_buffer_map_data; }
+    std::span<const ObjectInfoLayout> objects() const { return m_info_map_data; }
   };
   
   template <>
   class GLPacking<met::Emitter> {
+    struct alignas(16) EmitterEnvmapInfoLayout {
+      alignas(4) bool envm_is_present;
+      alignas(4) uint envm_i;
+    };
+
     struct alignas(16) EmitterInfoLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
@@ -69,12 +74,16 @@ namespace met::detail {
     };
 
     // Mapped buffer accessors
-    uint*                        m_buffer_map_size;
-    std::span<EmitterInfoLayout> m_buffer_map_data;
+    uint*                        m_info_map_size;
+    std::span<EmitterInfoLayout> m_info_map_data;
+    EmitterEnvmapInfoLayout     *m_envm_map_data;
 
   public:
     // This buffer stores one instance of EmitterInfoLayout per emitter component
     gl::Buffer emitter_info;
+
+    // Information on a background constant emitter to sample, if rays escape
+    gl::Buffer emitter_envm_info;
 
     // Sampling distribution based on each emitter's individual power output
     gl::Buffer emitter_distr_buffer;

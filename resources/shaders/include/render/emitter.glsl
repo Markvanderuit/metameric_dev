@@ -34,7 +34,7 @@ vec4 eval_emitter(in EmitterInfo em, in PositionSample ps, in vec4 wvls) {
   } else if (em.type == EmitterTypePoint) {
     return eval_emitter_point(em, ps, wvls);
   } else if (em.type == EmitterTypeConstant) {
-    return eval_emitter_constant(em, ps, wvls);
+    return eval_emitter_constant(em, wvls);
   }
 }
 
@@ -42,6 +42,20 @@ vec4 eval_emitter(in PositionSample ps, in vec4 wvls) {
   if (!record_is_emitter(ps.data))
     return vec4(0);
   return eval_emitter(scene_emitter_info(record_get_emitter(ps.data)), ps, wvls);
+}
+
+vec4 eval_env_emitter(in vec4 wvls) {
+  if (!scene_has_envm_emitter())
+    return vec4(0);
+  EmitterInfo em = scene_emitter_info(scene_envm_emitter_idx());
+  return eval_emitter_constant(em, wvls);
+}
+
+float pdf_env_emitter(vec3 d_local) {
+  if (!scene_has_envm_emitter())
+    return 0.f;
+  EmitterInfo em = scene_emitter_info(scene_envm_emitter_idx());
+  return pdf_emitter_constant(em, d_local);
 }
 
 float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
@@ -52,7 +66,8 @@ float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
   } else if (em.type == EmitterTypePoint) {
     return pdf_emitter_point(em, ps);
   } else {
-    return pdf_emitter_constant(em, ps);
+    return 0.f;
+    // return pdf_emitter_constant(em, ps);
   }
 }
 
