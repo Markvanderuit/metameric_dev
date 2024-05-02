@@ -151,6 +151,9 @@ void main() {
 
     // Integrate over color system and add to measure in running average
     measure += (sensor_apply(sensor_sample, L) - measure) / float(1 + i);
+
+    // Instead output debug value
+    // measure += (Li_debug(sensor_sample, state).xyz - measure) / float(i + 1);
   } // for (uint spp_iter)
   
   // Store running average measure to film

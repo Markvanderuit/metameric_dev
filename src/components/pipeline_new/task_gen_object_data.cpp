@@ -42,9 +42,9 @@ namespace met {
      {{ .type       = gl::ShaderType::eVertex,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.vert.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.vert.json" },
-      { .type       = gl::ShaderType::eGeometry,
+      /* { .type       = gl::ShaderType::eGeometry,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.geom.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.geom.json" },
+        .cross_path = "resources/shaders/pipeline_new/gen_texture.geom.json" }, */
       { .type       = gl::ShaderType::eFragment,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.frag.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.frag.json",
@@ -53,9 +53,9 @@ namespace met {
      {{ .type       = gl::ShaderType::eVertex,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.vert.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.vert.json" },
-      { .type       = gl::ShaderType::eGeometry,
+      /* { .type       = gl::ShaderType::eGeometry,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.geom.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.geom.json" },
+        .cross_path = "resources/shaders/pipeline_new/gen_texture.geom.json" }, */
       { .type       = gl::ShaderType::eFragment,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.frag.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.frag.json",
@@ -69,6 +69,7 @@ namespace met {
     m_unif_buffer = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
     m_unif_map    = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
     m_unif_map->object_i = m_object_i;
+    m_unif_map->px_scale = 1.f;
     m_unif_buffer.flush();
   }
 
@@ -108,6 +109,10 @@ namespace met {
     const auto &e_tesselation_coef = info(uplifting_task_name, "tesselation_coef").getr<gl::Buffer>();
 
     { // First dispatch; determine barycentric weights and index per pixel
+      // Push data to uniform buffer
+      m_unif_map->px_scale = static_cast<float>(e_patch.size.prod()) 
+                           / static_cast<float>(e_barycentrics.texture().size().head<2>().prod());
+      m_unif_buffer.flush();
       
       // Get ref. to relevant program for texture or color handling,
       // then bind relevant resources to corresponding targets
@@ -132,6 +137,7 @@ namespace met {
       gl::state::set(gl::DrawCapability::eDither,     false);
       gl::state::set_scissor(e_patch.size, e_patch.offs);
       gl::state::set_viewport(e_barycentrics.texture().size().head<2>());
+      gl::state::set_line_width(2.f);
 
       // Prepare framebuffer, clear relevant patch (not necessary actually)
       m_fbo.bind();
@@ -161,6 +167,16 @@ namespace met {
                            { gl::DrawCapability::eCullOp,    false },
                            { gl::DrawCapability::eBlendOp,   false }},
         .draw_op        = gl::DrawOp::eFill,
+        .bindable_array = &e_scene.resources.meshes.gl.array
+      });
+      gl::dispatch_draw({
+        .type           = gl::PrimitiveType::eTriangles,
+        .vertex_count   = command.vertex_count,
+        .vertex_first   = command.vertex_first,
+        .capabilities   = {{ gl::DrawCapability::eDepthTest, false },
+                           { gl::DrawCapability::eCullOp,    false },
+                           { gl::DrawCapability::eBlendOp,   false }},
+        .draw_op        = gl::DrawOp::eLine,
         .bindable_array = &e_scene.resources.meshes.gl.array
       });
     }

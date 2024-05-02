@@ -293,6 +293,17 @@ namespace met {
       ImGui::LabelText("Vertices", "%d", value.verts.size());
       ImGui::LabelText("Elements", "%d", value.elems.size());
     };
+
+    // Default implementation of editing visitor for Mesh resources
+    template <>
+    void edit_visitor_default(SchedulerHandle &info, uint i, const Resource<Image> &resource) {
+      // Get external resources and shorthands
+      const auto &scene = info.global("scene").getr<Scene>();
+      const auto &value = resource.value();
+
+      ImGui::LabelText("Width",  "%d", value.size().x());
+      ImGui::LabelText("Height", "%d", value.size().y());
+    };
   } // namespace detail
 
   /* Explicit template instantiations */
@@ -306,4 +317,6 @@ namespace met {
   void push_editor<detail::Component<ColorSystem>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Component<ColorSystem>>);
   template
   void push_editor<detail::Resource<Mesh>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Resource<Mesh>>);
+  template
+  void push_editor<detail::Resource<Image>>(SchedulerHandle &, detail::ImGuiEditInfo, detail::ImGuiEditVisitor<detail::Resource<Image>>);
 } // namespace met

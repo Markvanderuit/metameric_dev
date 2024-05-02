@@ -359,10 +359,12 @@ namespace met::detail {
       // We simplify a copy of the mesh, reparameterize it so texture UVs are
       // unique and non-overlapping, unitize it to a [0, 1] cube, and finally
       // build a bvh acceleration structure over this mess
-      m_meshes[i]   = simplified_mesh<met::Mesh>(value, 16384, 1e-3);
+      m_meshes[i]   = value; // simplified_mesh<met::Mesh>(value, 16384, 1e-3);
       txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
       transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_bvhs[i]     = create_bvh({ .mesh = m_meshes[i], .n_node_children = 8, .n_leaf_children = 3 });
+      m_bvhs[i]     = create_bvh({ .mesh            = m_meshes[i], 
+                                   .n_node_children = 8, 
+                                   .n_leaf_children = 3 });
             
       // Set appropriate mesh transform in buffer
       m_buffer_layout_map_data[i].trf = transforms[i];

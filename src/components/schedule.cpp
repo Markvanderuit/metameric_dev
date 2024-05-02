@@ -1,6 +1,6 @@
 #include <metameric/core/math.hpp>
 #include <metameric/core/scene.hpp>
-#include <metameric/core/scheduler.hpp>
+#include <metameric/core/scheduler.hpp> 
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
@@ -159,16 +159,21 @@ namespace met {
       ImGui::End();
     });
 
-    /* scheduler.task("scene_resource_editor").init<SceneResourcesEditorTask>();
+    scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
     scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene resources")) {
         push_editor<detail::Resource<Mesh>>(info, { .editor_name = "Meshes",
                                                     .show_add    = false,
-                                                    .show_del    = false });
+                                                    .show_del    = false,
+                                                    .show_dupl   = false });
+        push_editor<detail::Resource<Image>>(info, { .editor_name = "Textures",
+                                                     .show_add    = false,
+                                                     .show_del    = false,
+                                                     .show_dupl   = false });
       }
       ImGui::End();
-    }); */
+    });
 
     // scheduler.task("gnome_rotator").init<LambdaTask>([](auto &info) {
     //   met_trace();

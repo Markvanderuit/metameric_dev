@@ -79,7 +79,8 @@ namespace met {
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Uplifting> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ColorSystem> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ViewSettings> &);
-    template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Mesh> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Mesh>  &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Image> &);
 
     // Helper method; encapsulate a scene component whose data can be edited by a visitor closure, 
     // s.t. this surrounding method handles scene save state updating

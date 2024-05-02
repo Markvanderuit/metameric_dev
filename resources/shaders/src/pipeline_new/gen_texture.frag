@@ -23,7 +23,7 @@ layout(location = 1) out uvec4 out_coeffs; // Per fragment MESE representations 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
   AtlasLayout data[];
-} buff_weights;
+} buff_atlas;
 layout(binding = 1) restrict readonly buffer b_buff_textures {
   TextureInfo[] data;
 } buff_textures;
@@ -33,7 +33,8 @@ layout(binding = 2) restrict readonly buffer b_buff_uplift_coef {
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
-  uint object_i;
+  uint  object_i;
+  float px_scale;
 } unif;
 layout(binding = 1) uniform b_buff_uplift_data {
   uint offs;
@@ -90,6 +91,7 @@ void main() {
 
   // Store result, packing 3/4th of the weights together with the tetrahedron's index
   out_barycs = vec4(result_bary.xyz, float(result_indx));
+  out_barycs = vec4(p, 1);
 
   // Gather basis coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[wavelength_bases] coeffs;

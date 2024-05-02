@@ -51,20 +51,8 @@ namespace met {
     using InfoType = CreateInfo;
 
     Image()  = default;
-    ~Image() = default;
     Image(LoadInfo info);
     Image(CreateInfo info);
-
-    inline
-    void swap(auto &o) {
-      met_trace();
-      using std::swap;
-      swap(m_pixel_frmt, o.m_pixel_frmt);
-      swap(m_pixel_type, o.m_pixel_type);
-      swap(m_color_frmt, o.m_color_frmt);
-      swap(m_size, o.m_size);
-      swap(m_data, o.m_data);
-    }
 
     inline
     bool operator==(const auto &o) const {
@@ -73,8 +61,6 @@ namespace met {
           && m_size.isApprox(o.m_size)
           && std::equal(std::execution::par_unseq, range_iter(m_data), range_iter(o.m_data));
     }
-
-    met_declare_noncopyable(Image);
 
   public: // Pixel queries and format conversions
     void         set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);

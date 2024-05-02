@@ -11,7 +11,8 @@
 namespace met {
   class GenObjectDataTask : public detail::TaskNode {
     struct UnifLayout {
-      alignas(4) uint         object_i;
+      alignas(4) uint  object_i;
+      alignas(4) float px_scale;
     };
 
     uint             m_object_i;
@@ -26,7 +27,6 @@ namespace met {
     std::string m_cache_key_txtr; // Program for texture handling
     std::string m_cache_key_colr; // Program for single-color handling
     std::string m_cache_key_bake; // Program for moment coefficient baking
-
 
   public:
     GenObjectDataTask(uint object_i);

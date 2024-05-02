@@ -13,9 +13,10 @@ layout(std430) buffer;
 layout(std140) uniform;
 
 // Vertex stage declarations
-layout(location = 0) in uvec4 in_vert_pack; // Packed (reparameterized) vertex data
-layout(location = 1) in uint  in_txuv_pack; // Packed (original) texture UVs
-layout(location = 0) out vec2 out_txuv;     // Per-vertex original texture UVs
+layout(location = 0) in uvec4  in_vert_pack; // Packed (reparameterized) vertex data
+layout(location = 1) in uint   in_txuv_pack; // Packed (original) texture UVs
+layout(location = 0) out vec2  out_txuv;     // Per-vertex original texture UVs
+// layout(location = 1) out vec2  out_txpx;     // Per-vertex pixel location
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
@@ -24,14 +25,16 @@ layout(binding = 0) restrict readonly buffer b_buff_atlas {
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_unif {
-  uint object_i;
+  uint  object_i;
+  float px_scale;
 } unif;
 
 void main() {
-  // UV coordinates are directly unpacked and forwarded
+  // UV coordinates are directly unpacked and forwarded for texture sampling
   out_txuv = unpackUnorm2x16(in_txuv_pack);
 
   // Vertex position becomes reparatemerized texture coordinates in relevant atlas patch
   AtlasLayout atlas = buff_atlas.data[unif.object_i];
   gl_Position = vec4(atlas.uv0 + atlas.uv1 * unpackUnorm2x16(in_vert_pack.w), 0, 1) * 2.f - 1.f;
+  // out_txpx    = vec2(atlas.offs) + vec2(atlas.size) * unpackUnorm2x16(in_vert_pack.w);
 }

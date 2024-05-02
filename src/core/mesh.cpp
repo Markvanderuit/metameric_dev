@@ -406,7 +406,11 @@ namespace met {
 
     // Finally, generate atlas
     xatlas::Generate(atlas, {}, {
-      .padding = 2 // pixel padding, outside of bilinear padding
+      .bilinear   = true,
+      .blockAlign = true
+      // .padding    = 4,   // pixel padding, outside of bilinear padding
+      // .texelsPerUnit = 1024.f,
+      // .resolution = 1024 // Estimated texture size
     });
     const auto &parm = atlas->meshes[0];
 

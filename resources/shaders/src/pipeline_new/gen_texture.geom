@@ -1,14 +1,25 @@
 #include <preamble.glsl>
 #include <math.glsl>
 
-// Passthrough vertex-fragment declarations
-layout(location = 0)  in  vec2 in_txuv[];
-layout(location = 0)  out vec2 out_txuv;
+// General layout rule declarations
+layout(std430) buffer;
+layout(std140) uniform;
 
 // Geometry stage declaration
 layout(triangles)        in;
 layout(triangle_strip)   out;
 layout(max_vertices = 3) out;
+
+// Passthrough vertex-fragment declarations
+layout(location = 0) in  vec2 in_txuv[];
+// layout(location = 1) in  vec2 in_txpx[];
+layout(location = 0) out vec2 out_txuv;
+
+// Uniform buffer declarations
+layout(binding = 0) uniform b_buff_unif {
+  uint  object_i;
+  float px_scale;
+} unif;
 
 vec2 primitive_vert_expander(in vec2 a, in vec2 b, in vec2 c) {
   float n_ab = distance(a, b);
@@ -18,7 +29,8 @@ vec2 primitive_vert_expander(in vec2 a, in vec2 b, in vec2 c) {
   return -d;
 }
 
-const float expansion_dist = .005f;
+const float expansion_mult = 0.f; // -0.001f; //0.00025f;
+// const float expansion_mult = 0.005f;
 
 void main() {
   for (uint i = 0; i < 3; ++i) {
@@ -28,16 +40,26 @@ void main() {
     vec2 d_gl = primitive_vert_expander(gl_in[i].gl_Position.xy,
                                         gl_in[li].gl_Position.xy,
                                         gl_in[ri].gl_Position.xy);
-    vec2 d_tx = primitive_vert_expander(in_txuv[i], in_txuv[li], in_txuv[ri]);
+    vec2 d_tx = primitive_vert_expander(in_txuv[i], 
+                                        in_txuv[li], 
+                                        in_txuv[ri]);
 
     // Get ratio of relative expansion sizes
     float n_gl = length(d_gl);
     float n_tx = length(d_tx);
+    float ratio = n_tx / n_gl;
+    d_gl /= n_gl;
+    d_tx /= n_tx;
 
     // Normalize directions, then scale by same amount, being careful
     // to scale in render-side and uv-side as relatively the same
-    d_gl = (d_gl / n_gl) * expansion_dist;
-    d_tx = (d_tx / n_tx) * (n_tx / n_gl) * expansion_dist;
+    d_gl *= expansion_mult;
+    d_tx *= ratio * expansion_mult;
+    // d_gl = (d_gl / n_gl)   // normalized vector
+    //      * expansion_mult; // expanded by length
+    // d_tx = (d_tx / n_tx)   // normalized vector
+    //      * (n_tx / n_gl)   // scaled by ratio
+    //      * expansion_mult; // expanded by length
     
     // Output expanded triangles
     gl_Position = vec4(gl_in[i].gl_Position.xy + d_gl, 0, 1);

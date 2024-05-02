@@ -40,10 +40,11 @@ vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state)
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
 
-  // Sample BRDF at position
-  BRDFInfo brdf = get_brdf(si, wvls);
+  return vec4(si.tx, 0, 1);
 
-  return brdf.r;
+  // Sample BRDF at position
+  // BRDFInfo brdf = get_brdf(si, wvls);
+  // return brdf.r;
 }
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {

@@ -19,7 +19,7 @@ namespace met {
       const auto &e_scene  = info.global("scene").getr<Scene>();
       const auto &e_window = info.global("window").getr<gl::Window>();
 
-      /* // Spawn view of texture atlas interiors
+      // Spawn view of texture atlas interiors
       if (ImGui::Begin("Texture atlas")) {
         const auto &e_atlas = e_scene.resources.images.gl.texture_atlas_3f;
         // Spawn views
@@ -31,7 +31,7 @@ namespace met {
           }
         }
       }
-      ImGui::End(); */
+      ImGui::End();
 
       // Spawn view of weight atlas interiors
       if (ImGui::Begin("Barycentrics atlas")) {
@@ -40,7 +40,7 @@ namespace met {
         
         // Spawn image over texture view
         const auto &e_view = e_txtr.view(0);
-        ImGui::Image(ImGui::to_ptr(e_view.object()), { 1024, 1024 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+        ImGui::Image(ImGui::to_ptr(e_view.object()), { 4096, 4096 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
 
         // Compute sample position in texture dependent on mouse position in image
         eig::Array2f mouse_pos =(static_cast<eig::Array2f>(ImGui::GetMousePos()) 
