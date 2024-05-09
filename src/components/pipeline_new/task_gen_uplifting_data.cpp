@@ -18,7 +18,7 @@
 
 namespace met {
   // Nr. of points on the color system boundary; lower means more space available for constraints
-  constexpr uint n_system_boundary_samples = 64;
+  constexpr uint n_system_boundary_samples = 100;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -64,8 +64,8 @@ namespace met {
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info("mismatch_hulls").set<std::vector<ConvexHull>>({});
-    /* info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
-    info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
+    info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
+    /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
       if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
         const auto &e_scene = info.global("scene").getr<Scene>();
         const auto &[e_uplifting, e_state] 

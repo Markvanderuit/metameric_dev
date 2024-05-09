@@ -1,0 +1,131 @@
+#include <catch2/catch_test_macros.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/core/constraints.hpp>
+#include <metameric/core/matching.hpp>
+#include <metameric/core/math.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/ranges.hpp>
+#include <metameric/core/distribution.hpp>
+#include <metameric/core/metamer.hpp>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/core/json.hpp>
+#include <metameric/core/utility.hpp>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <algorithm>
+#include <execution>
+#include <numbers>
+#include <unordered_set>
+
+using namespace met;
+
+namespace test {
+  // Given a random vector in RN bounded to [-1, 1], return a vector
+  // distributed over a gaussian distribution
+  template <uint N>
+  inline auto inv_gaussian_cdf(const eig::Array<float, N, 1> &x) {
+    auto y = (-(x * x) + 1.f).max(.0001f).log().eval();
+    auto z = (0.5f * y + (2.f / std::numbers::pi_v<float>)).eval();
+    return (((z * z - y).sqrt() - z).sqrt() * x.sign()).eval();
+  }
+  
+  // Given a random vector in RN bounded to [-1, 1], return a uniformly
+  // distributed point on the unit sphere
+  template <uint N>
+  inline auto inv_unit_sphere_cdf(const eig::Array<float, N, 1> &x) {
+    return inv_gaussian_cdf<N>(x).matrix().normalized().array().eval();
+  }
+  
+  // Generate a set of random, uniformly distributed unit vectors in RN
+  template <uint N>
+  inline auto gen_unit_dirs(uint n_samples, uint seed = 4) {
+    met_trace();
+
+    std::vector<eig::Array<float, N, 1>> unit_dirs(n_samples);
+
+    if (n_samples <= 16) {
+      UniformSampler sampler(-1.f, 1.f, seed);
+      for (int i = 0; i < unit_dirs.size(); ++i)
+        unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.next_nd<N>());
+    } else {
+      UniformSampler sampler(-1.f, 1.f, seed);
+      #pragma omp parallel
+      { // Draw samples for this thread's range with separate sampler per thread
+        UniformSampler sampler(-1.f, 1.f, seed + static_cast<uint>(omp_get_thread_num()));
+        #pragma omp for
+        for (int i = 0; i < unit_dirs.size(); ++i)
+          unit_dirs[i] = inv_unit_sphere_cdf<N>(sampler.next_nd<N>());
+      }
+    }
+
+    return unit_dirs;
+  }
+
+  // Mapping from static to dynamic, so we can vary the nr. of objectives for which samples are generated
+  auto gen_unit_dirs(uint n_objectives, uint n_samples, uint seed = 4) {
+    constexpr auto eig_static_to_dynamic = [](const auto &v) { return (eig::ArrayXf(v.size()) << v).finished(); };
+    std::vector<eig::ArrayXf> X(n_samples);
+    switch (n_objectives) {
+      case 1: rng::transform(gen_unit_dirs<3>(n_samples, seed),  X.begin(), eig_static_to_dynamic); break;
+      case 2: rng::transform(gen_unit_dirs<6>(n_samples, seed),  X.begin(), eig_static_to_dynamic); break;
+      case 3: rng::transform(gen_unit_dirs<9>(n_samples, seed),  X.begin(), eig_static_to_dynamic); break;
+      case 4: rng::transform(gen_unit_dirs<12>(n_samples, seed), X.begin(), eig_static_to_dynamic); break;
+      case 5: rng::transform(gen_unit_dirs<15>(n_samples, seed), X.begin(), eig_static_to_dynamic); break;
+      default: debug::check_expr(false, "Not implemented!");
+    }
+    return X;
+  }
+} // namespace test
+
+std::vector<Spec> generate_ocs(const DirectColorSystemOCSInfo &info) {
+  // Sample unit vectors in 3d
+  auto samples = test::gen_unit_dirs<3>(info.n_samples, info.seed);
+
+  // Output for parallel solve
+  std::vector<Spec> out(samples.size());
+
+  // Parallel solve for boundary spectra
+  auto A = info.direct_objective.finalize();
+  #pragma omp parallel for
+  for (int i = 0; i < samples.size(); ++i) {
+    // Obtain actual spectrum by projecting sample onto optimal
+    Spec s = (A * samples[i].matrix()).eval();
+    for (auto &f : s)
+      f = f >= 0.f ? 1.f : 0.f;
+    
+    out[i] = s;
+  }
+
+  return out;
+}
+
+TEST_CASE("ocs_generation") {
+
+  // Load spectral basis
+  // Normalize if they not already normalized
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  for (auto col : basis.func.colwise()) {
+    auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+    col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
+  }
+
+  // Define color system
+  ColrSystem csys = {
+    .cmfs       = models::cmfs_cie_xyz,
+    .illuminant = models::emitter_cie_e
+  };
+
+  // Find boundary spectra
+  auto ocs = generate_ocs({
+    .direct_objective = csys,
+    .basis            = basis,
+    .n_samples        = 256
+  });
+  // auto ocs = generate_color_system_ocs({
+  //   .direct_objective = csys,
+  //   .basis            = basis,
+  //   .n_samples        = 256
+  // });
+
+  for (const auto &[i, sd] : enumerate_view(ocs))
+    fmt::print("{},\n", sd);
+}

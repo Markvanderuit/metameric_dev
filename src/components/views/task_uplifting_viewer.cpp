@@ -1,6 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_uplifting_viewer.hpp>
 #include <metameric/components/views/uplifting_viewport/task_draw_color_system.hpp>
+#include <metameric/components/views/uplifting_viewport/task_draw_srgb_cube.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <small_gl/buffer.hpp>
@@ -201,6 +202,7 @@ namespace met {
     info.child_task("viewport_begin").init<UpliftingViewerBeginTask>(m_uplifting_i);
     info.child_task("viewport_camera_input").init<detail::ArcballInputTask>(info.child("viewport_begin")("lrgb_target"));
     info.child_task("viewport_draw").init<DrawColorSystemTask>(m_uplifting_i);
+    info.child_task("viewport_cube").init<DrawSRGBCubeTask>(m_uplifting_i);
     info.child_task("viewport_end").init<UpliftingViewerEndTask>();
   }
 
