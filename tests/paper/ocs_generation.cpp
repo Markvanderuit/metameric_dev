@@ -10,11 +10,23 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/utility.hpp>
+#include <metameric/components/schedule.hpp>
+#include <metameric/components/misc/task_frame_begin.hpp>
+#include <metameric/components/misc/task_frame_end.hpp>
+#include <metameric/components/views/task_window.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/task_viewport.hpp>
+#include <metameric/components/views/detail/task_arcball_input.hpp>
+#include <small_gl/window.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/array.hpp>
+#include <small_gl/dispatch.hpp>
+#include <small_gl/utility.hpp>
 #include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <execution>
-#include <numbers>
-#include <unordered_set>
+#include <sstream>
 
 using namespace met;
 
@@ -91,7 +103,6 @@ std::vector<Spec> generate_ocs(const DirectColorSystemOCSInfo &info) {
     Spec s = (A * samples[i].matrix()).eval();
     for (auto &f : s)
       f = f >= 0.f ? 1.f : 0.f;
-    
     out[i] = s;
   }
 
@@ -99,7 +110,6 @@ std::vector<Spec> generate_ocs(const DirectColorSystemOCSInfo &info) {
 }
 
 TEST_CASE("ocs_generation") {
-
   // Load spectral basis
   // Normalize if they not already normalized
   auto basis = io::load_basis("resources/misc/basis_262144.txt");
@@ -115,17 +125,72 @@ TEST_CASE("ocs_generation") {
   };
 
   // Find boundary spectra
-  auto ocs = generate_ocs({
+  auto ocs_srgb = generate_ocs({
     .direct_objective = csys,
     .basis            = basis,
-    .n_samples        = 256
-  });
+    .n_samples        = 16384
+  }) | vws::transform([&](const Spec &s) { return csys(s); })
+    //  | vws::filter([](const auto &v) { return !v.isZero(); })
+     | vws::transform(lrgb_to_srgb)
+     | rng::to<std::vector>();
+  // auto ocs_xyY = ocs_rgb
+  //    | vws::transform(lrgb_to_xyz)
+  //    | vws::transform(xyz_to_xyY)
+  //    | rng::to<std::vector>();
   // auto ocs = generate_color_system_ocs({
   //   .direct_objective = csys,
   //   .basis            = basis,
   //   .n_samples        = 256
   // });
 
-  for (const auto &[i, sd] : enumerate_view(ocs))
-    fmt::print("{},\n", sd);
+
+  // Print to string
+  std::stringstream ss;
+  for (const auto &v : ocs_srgb)
+    ss << fmt::format("{}, ", v);
+  ss << '\n';
+
+  // Save to file
+  // fs::path out_path = std::format("C:/Data/Dump/ocs_srgb_{}.txt", wavelength_bases);
+  fs::path out_path = std::format("C:/Data/Dump/ocs_srgb_full.txt", wavelength_bases);
+  io::save_string(out_path, ss.str());
+
+
+  /* // Setup OpenGL components
+  auto al = std::vector<eig::AlArray3f>(range_iter(ocs));
+  gl::Buffer verts = {{ .data = cnt_span<const std::byte>(al)}};
+
+
+  // Setup program loop
+  {
+    // Scheduler is responsible for handling application tasks, resources, and runtime loop
+    LinearScheduler scheduler;
+
+    // Initialize window (OpenGL context), as a resource owned by the scheduler
+    auto &window = scheduler.global("window").init<gl::Window>({ 
+      .size  = { 1024, 1024 }, 
+      .title = "Test window, pls ignore", 
+      .flags = gl::WindowFlags::eVisible   | gl::WindowFlags::eFocused 
+             | gl::WindowFlags::eDecorated | gl::WindowFlags::eResizable 
+             | gl::WindowFlags::eMSAA met_debug_insert(| gl::WindowFlags::eDebug)
+    }).getw<gl::Window>();
+
+    // Initialize OpenGL debug messages, if requested
+    if constexpr (met_enable_debug) {
+      gl::debug::enable_messages(gl::DebugMessageSeverity::eLow, gl::DebugMessageTypeFlags::eAll);
+      gl::debug::insert_message("OpenGL debug messages are active!", gl::DebugMessageSeverity::eLow);
+    }
+
+    // Initialize program cache, as a resource owned by the scheduler
+    scheduler.global("cache").set<gl::ProgramCache>({ });
+
+    // Initialize schedule
+    scheduler.task("frame_begin").init<FrameBeginTask>();
+    scheduler.task("window").init<WindowTask>();
+    scheduler.task("frame_end").init<FrameEndTask>();
+    
+    // Create and start runtime loop
+    while (!window.should_close())
+      scheduler.run();
+  } */
 }

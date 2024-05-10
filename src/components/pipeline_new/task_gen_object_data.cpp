@@ -15,15 +15,15 @@ namespace met {
     met_trace();
 
     // Get external resources
-    const auto &e_scene        = info.global("scene").getr<Scene>();
-    const auto &e_object       = e_scene.components.objects[m_object_i];
-    const auto &e_uplifting    = e_scene.components.upliftings[e_object.value.uplifting_i];
-    const auto &e_settings     = e_scene.components.settings;
-    const auto &e_barycentrics = e_scene.components.upliftings.gl.texture_barycentrics;
+    const auto &e_scene     = info.global("scene").getr<Scene>();
+    const auto &e_object    = e_scene.components.objects[m_object_i];
+    const auto &e_uplifting = e_scene.components.upliftings[e_object.value.uplifting_i];
+    const auto &e_settings  = e_scene.components.settings;
+    const auto &e_coeffs    = e_scene.components.upliftings.gl.texture_coefficients;
 
     // Force on first run, then make dependent on uplifting/object/texture settings. Yikes
     return is_first_eval()                 || // First run demands render
-           e_barycentrics.is_invalitated() || // Texture atlas re-allocate demands rerender
+           e_coeffs.is_invalitated() || // Texture atlas re-allocate demands rerender
            e_object.state.diffuse          || // Note; we ignore object transforms
            e_object.state.mesh_i           ||  
            e_object.state.uplifting_i      || 
@@ -83,19 +83,13 @@ namespace met {
     const auto &e_uplifting = e_scene.components.upliftings[e_object.uplifting_i];
 
     // Find relevant patch in texture atlas
-    const auto &e_barycentrics = e_scene.components.upliftings.gl.texture_barycentrics;
     const auto &e_coefficients = e_scene.components.upliftings.gl.texture_coefficients;
-    const auto &e_patch        = e_barycentrics.patch(m_object_i);
+    const auto &e_patch        = e_coefficients.patch(m_object_i);
 
     // Rebuild framebuffer if necessary
-    if (is_first_eval() || e_barycentrics.is_invalitated() || m_atlas_layer_i != e_patch.layer_i) {
+    if (is_first_eval() || e_coefficients.is_invalitated() || m_atlas_layer_i != e_patch.layer_i) {
       m_atlas_layer_i = e_patch.layer_i;
       m_fbo = {{ .type       = gl::FramebufferType::eColor,
-                 .index      = 0,
-                 .attachment = &e_barycentrics.texture(),
-                 .layer      = m_atlas_layer_i },
-               { .type       = gl::FramebufferType::eColor,
-                 .index      = 1,
                  .attachment = &e_coefficients.texture(),
                  .layer      = m_atlas_layer_i }};
     } 
@@ -111,7 +105,7 @@ namespace met {
     { // First dispatch; determine barycentric weights and index per pixel
       // Push data to uniform buffer
       m_unif_map->px_scale = static_cast<float>(e_patch.size.prod()) 
-                           / static_cast<float>(e_barycentrics.texture().size().head<2>().prod());
+                           / static_cast<float>(e_coefficients.texture().size().head<2>().prod());
       m_unif_buffer.flush();
       
       // Get ref. to relevant program for texture or color handling,
@@ -124,7 +118,7 @@ namespace met {
       program.bind("b_buff_uplift_pack", e_tesselation_pack);
       program.bind("b_buff_uplift_coef", e_tesselation_coef);
       program.bind("b_buff_objects",     e_scene.components.objects.gl.object_info);
-      program.bind("b_buff_atlas",       e_barycentrics.buffer());
+      program.bind("b_buff_atlas",       e_coefficients.buffer());
       if (std::holds_alternative<uint>(e_object.diffuse) && !e_scene.resources.images.empty()) {
         program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());
         program.bind("b_buff_textures",  e_scene.resources.images.gl.texture_info);
@@ -136,13 +130,12 @@ namespace met {
       gl::state::set(gl::DrawCapability::eScissorTest, true);
       gl::state::set(gl::DrawCapability::eDither,     false);
       gl::state::set_scissor(e_patch.size, e_patch.offs);
-      gl::state::set_viewport(e_barycentrics.texture().size().head<2>());
+      gl::state::set_viewport(e_coefficients.texture().size().head<2>());
       gl::state::set_line_width(2.f);
 
       // Prepare framebuffer, clear relevant patch (not necessary actually)
       m_fbo.bind();
-      m_fbo.clear(gl::FramebufferType::eColor, 0.f, 0);
-      m_fbo.clear(gl::FramebufferType::eColor, 0.f, 1);
+      m_fbo.clear(gl::FramebufferType::eColor, 0.f);
 
       // Find relevant draw command to map UVs;
       // if no UVs are present, we fall back on a rectangle's UVs to simply fill the patch

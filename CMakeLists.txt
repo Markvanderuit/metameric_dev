@@ -22,12 +22,12 @@ set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supp
 set(MET_MOMENT_COEFFICIENTS  8) # Nr. of coeffs used for moment-based spectral representation
 
 # Define some constants as available on both shader and program side
-set(MET_SUPPORTED_MESHES       16) # Maximum supported scene meshes
-set(MET_SUPPORTED_OBJECTS      16) # Maximum supported scene objects
-set(MET_SUPPORTED_EMITTERS     16) # Maximum supported scene emitters
-set(MET_SUPPORTED_UPLIFTINGS    8) # Maximum supported individual uplifting textures
-set(MET_SUPPORTED_CONSTRAINTS 256) # Maximum supported boundary spectra + constraint spectra
-set(MET_SUPPORTED_TEXTURES    256) # Maximum supported scene textures
+set(MET_SUPPORTED_MESHES        16) # Maximum supported scene meshes
+set(MET_SUPPORTED_OBJECTS       16) # Maximum supported scene objects
+set(MET_SUPPORTED_EMITTERS      16) # Maximum supported scene emitters
+set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported individual uplifting textures
+set(MET_SUPPORTED_CONSTRAINTS 1024) # Maximum supported boundary spectra + constraint spectra
+set(MET_SUPPORTED_TEXTURES     256) # Maximum supported scene textures
 
 # Print configuration info
 message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")

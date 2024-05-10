@@ -18,7 +18,7 @@
 
 namespace met {
   // Nr. of points on the color system boundary; lower means more space available for constraints
-  constexpr uint n_system_boundary_samples = 100;
+  constexpr uint n_system_boundary_samples = 128;
   constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -54,8 +54,8 @@ namespace met {
 
     // Initialize buffer to hold packed spectral data; this buffer is copied over to a texture
     // in <scene.components.upliftings.gl.*> for fast access during rendering
-    m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_constraints, .flags = buffer_create_flags  }};
-    m_buffer_spec_pack_map = m_buffer_spec_pack.map_as<SpecPackLayout>(buffer_access_flags);
+    // m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_constraints, .flags = buffer_create_flags  }};
+    // m_buffer_spec_pack_map = m_buffer_spec_pack.map_as<SpecPackLayout>(buffer_access_flags);
 
     // Specify spectrum cache, for plotting of generated constraint spectra
     info("constraint_spectra").set<std::vector<Spec>>({});
@@ -239,7 +239,7 @@ namespace met {
         SpecPackLayout pack;
         for (uint i = 0; i < 4; ++i)
           pack.col(i) = m_tesselation_spectra[el[i]];
-        m_buffer_spec_pack_map[i] = pack.transpose().reshaped(wavelength_samples, 4);
+        // m_buffer_spec_pack_map[i] = pack.transpose().reshaped(wavelength_samples, 4);
 
         // Moment coefficients are stored directly
         SpecCoefLayout coeffs;
@@ -249,12 +249,12 @@ namespace met {
       }
 
       // Flush changes to GL-side 
-      m_buffer_spec_pack.flush();
+      // m_buffer_spec_pack.flush();
       info("tesselation_coef").getw<gl::Buffer>().flush();
       
-      // Do pixel-buffer copy of packed spectra to sampleable texture
-      e_scene.components.upliftings.gl.texture_spectra.set(m_buffer_spec_pack, 0, { wavelength_samples, m_tesselation_data_map->elem_size },
-                                                                                  { 0,                  m_tesselation_data_map->elem_offs });
+      // // Do pixel-buffer copy of packed spectra to sampleable texture
+      // e_scene.components.upliftings.gl.texture_spectra.set(m_buffer_spec_pack, 0, { wavelength_samples, m_tesselation_data_map->elem_size },
+      //                                                                             { 0,                  m_tesselation_data_map->elem_offs });
     }
     
     // 5. If a viewer task exists, we should supply mesh data for rendering
@@ -265,6 +265,13 @@ namespace met {
       if (tssl_stale && viewer_handle.is_init()) {
         // Convert delaunay to triangle mesh
         auto mesh = convert_mesh<AlMesh>(m_tesselation);
+
+        // // Convert to xyY, then refit a convex hull for rendering
+        // std::vector<eig::AlArray3f> xyY = m_tesselation.verts;
+        // rng::transform(xyY, xyY.begin(), lrgb_to_xyz);
+        // rng::transform(xyY, xyY.begin(), xyz_to_xyY);
+        // auto mesh = generate_convex_hull<AlMesh, eig::AlArray3f>(xyY);
+        // rng::for_each(mesh.verts, [](Colr &c) { c.z() = 0.f; });
 
         // Push mesh data and generate vertex array; we do a full, expensive, inefficient copy. 
         // The viewer is only for debugging anyways

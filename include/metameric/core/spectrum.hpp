@@ -125,7 +125,7 @@ namespace met {
   } // namespace models
 
   /* 
-    lRGB/sRGB conversion functions
+    Color space conversion functions
   */
 
   // Convert a value in sRGB to linear sRGB
@@ -147,6 +147,16 @@ namespace met {
   inline Colr lrgb_to_xyz(Colr c) { return models::srgb_to_xyz_transform * c.matrix(); }
   inline Colr xyz_to_srgb(Colr c) { return lrgb_to_srgb(xyz_to_lrgb(c)); }
   inline Colr srgb_to_xyz(Colr c) { return lrgb_to_xyz(srgb_to_lrgb(c)); }
+
+  // xyY/xy conversion shorthands
+  inline eig::Array2f xyz_to_xy(Colr c) {
+    auto sum = c.sum();
+    return (eig::Array2f() << c.head<2>() / (sum > 0.f ? sum : 1.f)).finished();
+  }
+  inline Colr xyz_to_xyY(Colr c) {
+    auto sum = c.sum();
+    return (eig::Array3f() << c.head<2>() / (sum > 0.f ? sum : 1.f), c.y()).finished();
+  }
 
   /* 
     Spectrum helper functions

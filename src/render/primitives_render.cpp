@@ -298,13 +298,11 @@ namespace met {
     program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
     program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_buff_barycentrics",   scene.components.upliftings.gl.texture_barycentrics.buffer());
+    program.bind("b_buff_coeffs",         scene.components.upliftings.gl.texture_coefficients.buffer());
     program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
-    program.bind("b_bary_4f",             scene.components.upliftings.gl.texture_barycentrics.texture());
-    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture());
-    program.bind("b_spec_4f",             scene.components.upliftings.gl.texture_spectra);
+    program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture()); 
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     if (!scene.resources.images.empty()) {

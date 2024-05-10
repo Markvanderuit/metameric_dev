@@ -13,12 +13,17 @@
   float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
     return unpack_snorm_16(scene_coefficients_data_fetch(px));
   }
+#else // fallback fails
+  float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
+    float[wavelength_bases] v;
+    return v;
+  }
 #endif
 
   vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
     ObjectInfo      object_info       = scene_object_info(object_i);
-    BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(object_i);
+    BarycentricInfo barycentrics_info = scene_reflectance_atlas_info(object_i);
 
     // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
     // also handle single-color objects by sampling the center of their patch
@@ -45,7 +50,7 @@
     return clamp(r, 0, 1);
   }
 
-  // Helper to perform spectrum interpolation given all relevant information;
+  /* // Helper to perform spectrum interpolation given all relevant information;
   // - what tetrahedron of spectra to access
   // - what barycentrics to use
   vec4 detail_mix_reflectances(in vec4 wvls, in vec4 bary, in uint index) {
@@ -53,12 +58,12 @@
     for (uint i = 0; i < 4; ++i)
       r[i] = dot(bary, scene_spectral_data_texture(vec2(wvls[i], index)));
     return r;
-  }
+  } */
 
-  vec4 scene_sample_reflectance_barycentrics(in uint object_i, in vec2 tx, in vec4 wvls) {
+  /* vec4 scene_sample_reflectance_barycentrics(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
     ObjectInfo      object_info       = scene_object_info(object_i);
-    BarycentricInfo barycentrics_info = scene_reflectance_barycentric_info(object_i);
+    BarycentricInfo barycentrics_info = scene_reflectance_atlas_info(object_i);
 
     // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
     // also handle single-color objects by sampling the center of their patch
@@ -96,12 +101,12 @@
     }
 
     return clamp(r, 0, 1);
-  }
+  } */
   
   // Forward to whatever sampler we're experimenting with today
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
-    // return scene_sample_reflectance_barycentrics(object_i, tx, wvls);
     return scene_sample_reflectance_bases(object_i, tx, wvls);
+    /* return scene_sample_reflectance_barycentrics(object_i, tx, wvls); */
   }
 #else  // SCENE_DATA_REFLECTANCE
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) { return vec4(1); }

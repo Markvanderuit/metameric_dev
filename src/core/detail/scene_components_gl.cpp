@@ -129,23 +129,23 @@ namespace met::detail {
   GLPacking<met::Uplifting>::GLPacking() {
     met_trace_full();
     
-    const uint requested_layers = max_supported_constraints * max_supported_upliftings;
+    // const uint requested_layers = max_supported_constraints * max_supported_upliftings;
 
-    // Ensure nr. of allocated layers remains below what the device supports
-    const uint supported_layers = 
-      std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
-    debug::check_expr(supported_layers >= requested_layers,
-      fmt::format("This OpenGL device supports texture arrays up to {} layers,\
-                   \nbut {} layers were requested for GLPacking<Uplifting>!",
-                   supported_layers, requested_layers));    
+    // // Ensure nr. of allocated layers remains below what the device supports
+    // const uint supported_layers = 
+    //   std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
+    // debug::check_expr(supported_layers >= requested_layers,
+    //   fmt::format("This OpenGL device supports texture arrays up to {} layers,\
+    //                \nbut {} layers were requested for GLPacking<Uplifting>!",
+    //                supported_layers, requested_layers));    
 
     // Initialize array texture to hold packed spectrum data, for fast sampled
     // access during rendering
-    texture_spectra = {{ .size  = { wavelength_samples, requested_layers } }};
+    // texture_spectra = {{ .size  = { wavelength_samples, requested_layers } }};
 
     // Initialize texture atlas to hold per-object barycentric weights, for
     // fast access during rendering; this is resized when necessary in update()
-    texture_barycentrics = {{ .levels  = 1, .padding = 0 }};
+    // texture_barycentrics = {{ .levels  = 1, .padding = 0 }};
     texture_coefficients = {{ .levels  = 1, .padding = 0 }};
 
     // Initialize warped phase data for spectral MESE method
@@ -164,7 +164,6 @@ namespace met::detail {
     const auto &e_settings = scene.components.settings.value;
     
     // Barycentric texture has not been touched yet
-    scene.components.upliftings.gl.texture_barycentrics.set_invalitated(false);
     scene.components.upliftings.gl.texture_coefficients.set_invalitated(false);
 
     // Only rebuild if there are upliftings and objects
@@ -172,8 +171,8 @@ namespace met::detail {
     guard(scene.components.upliftings                  || 
           scene.components.objects                     ||
           scene.components.settings.state.texture_size ||
-          !texture_barycentrics.texture().is_init()    ||
-          !texture_barycentrics.buffer().is_init()     );
+          !texture_coefficients.texture().is_init()    ||
+          !texture_coefficients.buffer().is_init()     );
     
     // Gather necessary texture sizes for each object
     std::vector<eig::Array2u> inputs(e_objects.size());
@@ -200,23 +199,22 @@ namespace met::detail {
       input = (input.cast<float>() * scaled_4f).max(2.f).cast<uint>().eval();
 
     // Test if the necessitated inputs match exactly to the atlas' reserved patches
-    bool is_exact_fit = rng::equal(inputs, texture_barycentrics.patches(),
+    bool is_exact_fit = rng::equal(inputs, texture_coefficients.patches(),
       eig::safe_approx_compare<eig::Array2u>, {}, &detail::TextureAtlasBase::PatchLayout::size);
 
     // Regenerate atlas if inputs don't match the atlas' current layout
     // Note; barycentric weights will need a full rebuild, which is detected
     //       by the nr. of objects changing or the texture setting changing. A bit spaghetti.
-    texture_barycentrics.resize(inputs);
     texture_coefficients.resize(inputs);
-    if (texture_barycentrics.is_invalitated()) {
+    if (texture_coefficients.is_invalitated()) {
       // The barycentric texture was re-allocated, which means underlying memory was all invalidated.
       // So in a case of really bad spaghetti-code, we force object-dependent parts of the pipeline 
       // to rerun here. But uhh, code smell much?
       auto &e_scene = const_cast<Scene &>(scene);
       e_scene.components.objects.set_mutated(true);
 
-      fmt::print("Rebuilt texture atlases\n");
-      for (const auto &patch : texture_barycentrics.patches()) {
+      fmt::print("Rebuilt texture atlas\n");
+      for (const auto &patch : texture_coefficients.patches()) {
         fmt::print("\toffs = {}, size = {}, uv0 = {}, uv1 = {}\n", patch.offs, patch.size, patch.uv0, patch.uv1);
       }
     }

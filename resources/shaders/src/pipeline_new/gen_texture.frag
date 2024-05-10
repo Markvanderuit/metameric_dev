@@ -17,8 +17,7 @@ layout(constant_id = 0) const bool sample_albedo = true;
 
 // Fragment stage declarations
 layout(location = 0) in  vec2  in_txuv;    // Per-fragment original texture UVs, adjusted to atlas
-layout(location = 0) out vec4  out_barycs; // Per fragment barycentric coordinates and spectrum index
-layout(location = 1) out uvec4 out_coeffs; // Per fragment MESE representations of texel spectra
+layout(location = 0) out uvec4 out_coeffs; // Per fragment MESE representations of texel spectra
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
@@ -88,9 +87,6 @@ void main() {
     result_bary = bary;
     result_indx = j; // + buff_uplift_data.offs;
   } // for (uint j)
-
-  // Store result, packing 3/4th of the weights together with the tetrahedron's index
-  out_barycs = vec4(result_bary.xyz, float(result_indx));
 
   // Gather basis coefficients representing tetrahedron's spectra, mix them, and store packed result
   float[wavelength_bases] coeffs;

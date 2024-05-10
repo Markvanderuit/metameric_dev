@@ -35,11 +35,10 @@ namespace met {
 
       // Spawn view of weight atlas interiors
       if (ImGui::Begin("Barycentrics atlas")) {
-        const auto &e_txtr = e_scene.components.upliftings.gl.texture_barycentrics;
         const auto &e_coef = e_scene.components.upliftings.gl.texture_coefficients;
         
         // Spawn image over texture view
-        const auto &e_view = e_txtr.view(0);
+        const auto &e_view = e_coef.view(0);
         ImGui::Image(ImGui::to_ptr(e_view.object()), { 4096, 4096 }, { 0, 0 }, { 1, 1 }, ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
 
         // Compute sample position in texture dependent on mouse position in image
@@ -57,18 +56,18 @@ namespace met {
           e_coef.texture().get(cnt_span<uint>(coef_data), 0u, 
                                eig::Array3u { 1, 1, 1 }, 
                                eig::Array3u { tooltip_pos.x(), tooltip_pos.y(), 0 });
-          eig::Array4f bary_data;
-          e_txtr.texture().get(cnt_span<float>(bary_data), 0u, 
-                               eig::Array3u { 1, 1, 1 }, 
-                               eig::Array3u { tooltip_pos.x(), tooltip_pos.y(), 0 });
+          // eig::Array4f bary_data;
+          // e_txtr.texture().get(cnt_span<float>(bary_data), 0u, 
+          //                      eig::Array3u { 1, 1, 1 }, 
+          //                      eig::Array3u { tooltip_pos.x(), tooltip_pos.y(), 0 });
           
-          // Unpack barycentric data
-          uint        index = static_cast<uint>(bary_data.w());
-          eig::Array4f bary = { bary_data.x(), bary_data.y(), bary_data.z(), 1.f - bary_data.head<3>().sum() };
+          // // Unpack barycentric data
+          // uint        index = static_cast<uint>(bary_data.w());
+          // eig::Array4f bary = { bary_data.x(), bary_data.y(), bary_data.z(), 1.f - bary_data.head<3>().sum() };
 
           // Obtain tetrahedron data
-          const auto &e_uplf_task = info.task("gen_upliftings.gen_uplifting_0").realize<GenUpliftingDataTask>();
-          auto tetr = e_uplf_task.query_tetrahedron(index);
+          // const auto &e_uplf_task = info.task("gen_upliftings.gen_uplifting_0").realize<GenUpliftingDataTask>();
+          // auto tetr = e_uplf_task.query_tetrahedron(index);
 
           // Intro info
           ImGui::SetNextItemWidth(256.f * e_window.content_scale());
@@ -85,36 +84,25 @@ namespace met {
           } else {
             // ...
           }
-          auto interp_spectrum =(tetr.spectra[0] * bary[0]
-                               + tetr.spectra[1] * bary[1]
-                               + tetr.spectra[2] * bary[2]
-                               + tetr.spectra[3] * bary[3]).eval();
           if constexpr (wavelength_bases == decltype(coeffs)::RowsAtCompileTime) {
             auto coeffs_spectrum = e_scene.resources.bases[0].value()(coeffs);
 
-            // Plot the mixed spectra
+            /* // Plot the mixed spectra
             {
               std::vector<std::string> legend = { "a", "b", "c", "d" };
               ImGui::PlotSpectra("Tetrahedron", legend, tetr.spectra, -0.05, 1.05, { 0.f, 128.f });
-            }
+            } */
 
             ImGui::Separator();
 
             // Plot the reconstructed spectra
-            {
-              std::vector<std::string> legend = { "Baseline", "Basis" };
-              std::vector<Spec>        spectra = { interp_spectrum, coeffs_spectrum };
-              ImGui::PlotSpectra("Reconstruction", legend, spectra, -0.05, 1.05, { 0.f, 128.f });
-            }
+            ImGui::PlotSpectrum("Reconstruction", coeffs_spectrum, -0.05, 1.05, { 0.f, 128.f });
           }
 
           ImGui::Separator();
 
           // Print some minima/maxima
           {
-            ImGui::LabelText("Min coeff", "%.3f", interp_spectrum.minCoeff());
-            ImGui::LabelText("Max coeff", "%.3f", interp_spectrum.maxCoeff());
-            ImGui::InputFloat4("Barycentrics", bary.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat4("Coeffs (r1)", coeffs.data(),     "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat4("Coeffs (r2)", coeffs.data() + 4, "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat4("Coeffs (r3)", coeffs.data() + 8, "%.3f", ImGuiInputTextFlags_ReadOnly);

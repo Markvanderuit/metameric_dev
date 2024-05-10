@@ -49,9 +49,9 @@ layout(binding = 5) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[max_supported_emitters];
 } buff_emitters;
-layout(binding = 6) restrict readonly buffer b_buff_barycentrics {
+layout(binding = 6) restrict readonly buffer b_buff_coeffs {
   BarycentricInfo data[max_supported_objects];
-} buff_barycentrics;
+} buff_coeffs;
 layout(binding = 7) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
@@ -83,12 +83,10 @@ layout(binding = 2) restrict coherent buffer b_buff_output {
 // Texture/image units, ergo samplers and output images
 layout(binding = 0) uniform sampler2DArray  b_txtr_1f; // Alpha texture atlas
 layout(binding = 1) uniform sampler2DArray  b_txtr_3f; // RGB texture atlas
-layout(binding = 2) uniform sampler2DArray  b_bary_4f; // Uplifting weight atlas
-layout(binding = 3) uniform sampler1DArray  b_spec_4f; // Uplifting spectral atlas
-layout(binding = 4) uniform sampler1DArray  b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 5) uniform sampler1DArray  b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 6) uniform sampler1DArray  b_bsis_1f; // Basis function data, 1 component
-layout(binding = 7) uniform usampler2DArray b_coef_4f; // Warp data for spectral MESE
+layout(binding = 2) uniform sampler1DArray  b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 3) uniform sampler1DArray  b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 4) uniform sampler1DArray  b_bsis_1f; // Basis function data, 1 component
+layout(binding = 5) uniform usampler2DArray b_coef_4f; // Warp data for spectral MESE
 
 // Shared memory declarations
 shared ObjectInfo      s_objc_info[max_supported_objects];
@@ -107,7 +105,7 @@ declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
-declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_bary_4f, b_spec_4f, b_coef_4f);
+declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_coef_4f);
 declare_scene_traversal_stack(6); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, max_supported_emitters)
@@ -121,7 +119,7 @@ declare_path_data(buff_output.head, buff_output.data);
 void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
   for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_bary_info[i] = buff_barycentrics.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_bary_info[i] = buff_coeffs.data[i];
   for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
   for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
   memoryBarrierShared();

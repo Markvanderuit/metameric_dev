@@ -339,12 +339,13 @@ namespace met::io {
       // Separate current line by spaces
       auto split = line 
                  | vws::split(' ') 
+                 | vws::take(1 + wavelength_bases)
                  | vws::transform([](auto &&r) { return std::string(range_iter(r)); })
                  | rng::to<std::vector>();
       auto data = std::span(split); // span representation for slicing
 
       // Skip empty or commented lines
-      guard_continue(!data.empty() && data[0][0] != '#');
+      guard_continue(!data.empty() && data[0][0] != '#' && !data[0].empty());
 
       if (mode == read_mode::eMean) {
         debug::check_expr(data.size() >= 2,

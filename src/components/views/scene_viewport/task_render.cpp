@@ -21,7 +21,7 @@ namespace met {
     info("active").set<bool>(true);   
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
     info("renderer").init<PathRenderPrimitive>({ .spp_per_iter       = 1u,
-                                                 .max_depth          = 4u,
+                                                 .max_depth          = 5u,
                                                  .pixel_checkerboard = true,
                                                  .cache_handle       = info.global("cache") });
   }

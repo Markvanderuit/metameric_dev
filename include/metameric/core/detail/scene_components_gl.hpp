@@ -94,27 +94,26 @@ namespace met::detail {
 
   // GL-side uplifting data
   // Handles gl-side uplifted texture data, though on a per-object basis. Most
-  // contents of .texture_barycentrics and .texture_spectra are filled in by the
-  // uplifting pipeline, which is part of the program pipeline 
+  // data is filled in by the uplifting pipeline, which is part of the program pipeline 
   template <>
   class GLPacking<met::Uplifting> {
     using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
     using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
-    using spectra_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
+    // using spectra_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
 
   public:
     // Atlas texture; each per-object patch stored in this atlas holds barycentric
     // weights and an index, referring to one set of four spectra in `texture_spectra`
-    atlas_type_f texture_barycentrics;
+    // atlas_type_f texture_barycentrics;
     
     // Atlas texture; each per-object patch stored in this atlas holds moment coefficients
     // for spectral MESE method
     atlas_type_u texture_coefficients;
 
-    // Array texture; each layer holds one set of four spectra, packed together s.t.
+    /* // Array texture; each layer holds one set of four spectra, packed together s.t.
     // one texture sample equates four reflectances at a single wavelength
-    spectra_type texture_spectra;
+    spectra_type texture_spectra; */
 
     // Basis functions; each layer holds a basis function
     basis_type texture_basis;
