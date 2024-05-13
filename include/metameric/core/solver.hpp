@@ -111,6 +111,28 @@ namespace nlopt {
         return diff.squaredNorm();
     };
   };
+
+  // Describes f(x) = ||(Ax - b)||^2 with corresponding gradient
+  template <met::uint N>
+  auto func_squared_norm_c(const auto &Af, const auto &bf, unsigned &iter) -> Wrapper<N>::Constraint::Capture {
+    using namespace met;
+    using vec = Wrapper<N>::vec;
+    return 
+      [A = Af.cast<double>().eval(), b = bf.cast<double>().eval(), &iter]
+      (eig::Map<const vec> x, eig::Map<vec> g) {
+        iter++;
+
+        // shorthand for Ax - b
+        auto diff = ((A * x).array() - b).matrix().eval();
+
+        // g(x) = 2A(Ax - b)
+        if (g.data())
+          g = 2.0 * A.transpose() * diff;
+
+        // f(x) = ||(Ax - b)||^2
+        return diff.squaredNorm();
+    };
+  };
   
   // Describes f(x) = ||(Ax - b)||^2 with corresponding gradient
   template <met::uint N>

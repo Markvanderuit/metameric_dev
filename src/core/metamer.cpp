@@ -668,16 +668,33 @@ namespace met {
     met_trace();
     
     opt::Wrapper<wavelength_bases> solver = {
-      .x_init       = 0.05,
+      .x_init       = 0.0,
       .upper        = 1.0,
       .lower        =-1.0,
-      .max_iters    = 128,   // Failsafe
+      .max_iters    = 512,   // Failsafe
       .rel_xpar_tol = 1e-5, // Threshold for objective error
     };
 
-    // Objective function minimizes l2 norm over spectral distribution differences
-    solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, info.spec);
+    using vec = eig::Vector<ad::real1st, wavelength_bases>;
 
+    // Objective function minimizes l2 norm over spectral distribution differences
+    // solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, info.spec);
+    solver.objective = opt::func_squared_norm<wavelength_bases>(info.basis.func, info.spec);
+    // uint iter = 0;
+    // solver.objective = opt::func_squared_norm_c<wavelength_bases>(info.basis.func, info.spec, iter);
+    // solver.objective = ad::wrap_capture<wavelength_bases>(
+    //   [s = info.spec.cast<double>().eval(),
+    //    B = info.basis.func.matrix().cast<double>().eval(),
+    //    &iter
+    //   ](const vec &x) {
+    //     iter++;
+
+    //     // Recover spectral distribution
+    //     auto diff  = ((B * x).array() - s).matrix().eval();
+    //     return diff.cwiseAbs().sum();
+    //   }
+    // );
+    
     // Add boundary inequality constraints, upholding spectral 0 <= x <= 1
     {
       auto A = (eig::Matrix<float, 2 * wavelength_samples, wavelength_bases>()
@@ -689,7 +706,10 @@ namespace met {
                                           .tol = 1e-3 });
     }
     
-    return solve(solver).x.cast<float>().cwiseMax(-1.f).cwiseMin(1.f).eval();
+    auto ret = solve(solver);
+    // fmt::print("objective: {}\n", ret.objective);
+    // fmt::print("iter:      {}\n", iter);
+    return ret.x.cast<float>().cwiseMax(-1.f).cwiseMin(1.f).eval();
   }
   
   std::vector<std::tuple<Colr, Spec, Basis::vec_type>> generate_mismatching_ocs(const DirectMismatchingOCSInfo &info) {

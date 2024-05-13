@@ -108,6 +108,20 @@
     return scene_sample_reflectance_bases(object_i, tx, wvls);
     /* return scene_sample_reflectance_barycentrics(object_i, tx, wvls); */
   }
+
+#elif defined(SCENE_DATA_RGB) 
+  vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls /* ignored */) {
+    // Load relevant info objects
+    ObjectInfo  object_info = scene_object_info(object_i);
+    if (object_info.is_albedo_sampled) {
+      TextureInfo atlas_info  = scene_rgb_atlas_info(object_i);
+      vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
+      vec3 tx_uv = vec3(atlas_info.uv0 + atlas_info.uv1 * tx_si, atlas_info.layer);
+      return vec4(scene_rgb_data_texture(tx_uv).xyz, 1); // Discard alpha for now
+    } else {
+      return vec4(object_info.albedo_v, 1);
+    }
+  }
 #else  // SCENE_DATA_REFLECTANCE
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) { return vec4(1); }
 #endif // SCENE_DATA_REFLECTANCE

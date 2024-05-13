@@ -80,8 +80,9 @@ namespace met {
   // Argument struct and method for generating a closest representation in the basis
   // for a given spectral distribution.
   struct SpectrumCoeffsInfo {
-    const Spec  &spec;  // Input spectrum to fit
-    const Basis &basis; // Spectral basis functions
+    const Spec      &spec;  // Input spectrum to fit
+    const Basis     &basis; // Spectral basis functions
+    Basis::vec_type weights = 1;
   };
   Basis::vec_type generate_spectrum_coeffs(const SpectrumCoeffsInfo &info);
 

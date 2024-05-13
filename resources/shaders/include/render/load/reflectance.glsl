@@ -2,7 +2,7 @@
 #define LOAD_REFLECTANCE_GLSL_GUARD
 
 #define SCENE_DATA_REFLECTANCE
-                      
+
 #define declare_scene_reflectance_data(scene_buff_atls_info,    \
                                        scene_txtr_bsis_data,    \
                                        scene_txtr_coef_data)    \

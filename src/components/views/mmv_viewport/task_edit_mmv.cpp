@@ -269,11 +269,12 @@ namespace met {
             }
 
             ImGui::EndTabBar();
+            ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", spec); // Reenable for printing
           }
         },
         [&](const auto &cstr) {
           ImGui::SeparatorText("Reflectance");
-          /* ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", spec); */ // Reenable for printing
+          ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", spec); // Reenable for printing
           /* ImGui::SameLine();
           if (ImGui::SmallButton("Export")) {
             if (fs::path path; detail::save_dialog(path, "txt"))

@@ -327,4 +327,117 @@ namespace met {
 
     return m_film;
   }
+
+  RGBPathRenderPrimitive::RGBPathRenderPrimitive(RGBPathRenderPrimitiveInfo info)
+  : detail::IntegrationRenderPrimitive(),
+    m_cache_handle(info.cache_handle) {
+    met_trace_full();
+
+    // Initialize program object, if it doesn't yet exist
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
+      .type       = gl::ShaderType::eCompute,
+      .spirv_path = "resources/shaders/render/primitive_render_path_rgb.comp.spv",
+      .cross_path = "resources/shaders/render/primitive_render_path_rgb.comp.json",
+      .spec_const = {{ 0u, 16u            },
+                     { 1u, 16u            },
+                     { 2u, info.max_depth }}
+    });
+
+    // Assign sampler configuration
+    m_iter               = 0;
+    m_spp_curr           = 0;
+    m_spp_max            = info.spp_max;
+    m_spp_per_iter       = info.spp_per_iter;
+    m_pixel_curr         = 0;
+    m_pixel_checkerboard = info.pixel_checkerboard;
+
+    // RGB value override space
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
+    m_illm_colr_texture    = {{ .size = { 1, n_layers } }};
+    m_illm_colr_buffer     = {{ .size = m_illm_colr_texture.size().prod() * sizeof(eig::Array4f), .flags = buffer_create_flags }};
+    m_illm_colr_buffer_map = m_illm_colr_buffer.map_as<eig::Array4f>(buffer_access_flags);
+  }
+
+  void RGBPathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+    IntegrationRenderPrimitive::reset(sensor, scene);
+
+    // Rebuild target texture if necessary
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size)) {
+      m_film = {{ .size = sensor.film_size.max(1).eval() }};
+
+      // Set dispatch size
+      if (m_pixel_checkerboard) {
+        auto dispatch_ndiv  = ceil_div((m_film.size() / eig::Array2u(2, 1)).eval(), 16u);
+        m_dispatch.groups_x = dispatch_ndiv.x();
+        m_dispatch.groups_y = dispatch_ndiv.y();
+      } else {
+        auto dispatch_ndiv  = ceil_div(m_film.size(), 16u);
+        m_dispatch.groups_x = dispatch_ndiv.x();
+        m_dispatch.groups_y = dispatch_ndiv.y();
+      }
+    }
+
+    // Set film to black
+    m_film.clear();
+     
+    // Push illuminant values if changed
+    if (const auto &illm = scene.resources.illuminants; true /* illm.is_mutated() */) {
+      for (uint i = 0; i < illm.size(); ++i) {
+        const auto &[value, state] = illm[i];
+        // guard_continue(state);
+        ColrSystem csys = { .cmfs = models::cmfs_cie_xyz, .illuminant = value };
+        m_illm_colr_buffer_map[i] = (eig::Array4f() << csys(Spec(1), true), 1).finished();
+      }
+      m_illm_colr_buffer.flush();
+      m_illm_colr_texture.set(m_illm_colr_buffer);
+    }
+  }
+
+  const gl::Texture2d4f &RGBPathRenderPrimitive::render(const Sensor &sensor, const Scene &scene) {
+    met_trace_full();
+    
+    // If the film object is stale, run a reset()
+    if (!m_film.is_init() || !m_film.size().isApprox(sensor.film_size))
+      reset(sensor, scene);
+
+    // Return early if sample count has reached specified maximum
+    guard(has_next_sample_state(), m_film);
+
+    // Draw relevant program from cache
+    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+
+    // Bind required resources to their corresponding targets
+    program.bind();
+    program.bind("b_film",                m_film);
+    program.bind("b_buff_sensor",         sensor.buffer());
+    program.bind("b_buff_sampler_state",  get_sampler_state());
+    program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
+    program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
+    program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
+    program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
+    program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_illm_3f",             m_illm_colr_texture);
+    if (!scene.resources.images.empty()) {
+      program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
+      program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
+      program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+    }
+    if (!scene.resources.meshes.empty()) {
+      program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
+      program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
+      program.bind("b_buff_bvhs_prim", scene.resources.meshes.gl.bvh_prims);
+    }
+
+    // Dispatch compute shader
+    gl::sync::memory_barrier( gl::BarrierFlags::eImageAccess   | gl::BarrierFlags::eTextureFetch  |
+                              gl::BarrierFlags::eUniformBuffer | gl::BarrierFlags::eStorageBuffer | 
+                              gl::BarrierFlags::eBufferUpdate                                     );
+    gl::dispatch_compute(m_dispatch);
+
+    // Advance sampler state for next render() call
+    advance_sampler_state();
+
+    return m_film;
+  }
 } // namespace met

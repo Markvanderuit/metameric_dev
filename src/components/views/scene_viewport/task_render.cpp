@@ -9,6 +9,9 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
+  // using RenderPrimitive = PathRenderPrimitive;
+  using RenderPrimitive = RGBPathRenderPrimitive; // fallback for direct roundtrip testing
+
   bool MeshViewportRenderTask::is_active(SchedulerHandle &info) {
     met_trace();
     const auto &e_scene = info.global("scene").getr<Scene>();
@@ -20,10 +23,10 @@ namespace met {
     met_trace_full(); 
     info("active").set<bool>(true);   
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
-    info("renderer").init<PathRenderPrimitive>({ .spp_per_iter       = 1u,
-                                                 .max_depth          = 4u,
-                                                 .pixel_checkerboard = true,
-                                                 .cache_handle       = info.global("cache") });
+    info("renderer").init<RenderPrimitive>({ .spp_per_iter       = 1u,
+                                             .max_depth          = 4u,
+                                             .pixel_checkerboard = true,
+                                             .cache_handle       = info.global("cache") });
   }
     
   void MeshViewportRenderTask::eval(SchedulerHandle &info) {
@@ -36,7 +39,7 @@ namespace met {
     auto sensor_handle     = info("sensor");
     const auto &e_scene    = info.global("scene").getr<Scene>();
     const auto &e_view_i   = info.parent()("view_settings_i").getr<uint>();
-    const auto &i_pathr    = render_handle.getr<PathRenderPrimitive>();
+    const auto &i_pathr    = render_handle.getr<RenderPrimitive>();
     const auto &e_view     = e_scene.components.views[e_view_i].value;
     const auto &e_settings = e_scene.components.settings.value;
 
@@ -55,26 +58,18 @@ namespace met {
       const auto &e_target = target_handle.getr<gl::Texture2d4f>();
       const auto &e_camera = camera_handle.getr<detail::Arcball>();
       auto &i_sensor       = sensor_handle.getw<Sensor>();
-      auto &i_pathr        = render_handle.getw<PathRenderPrimitive>();
-      // auto &i_gbuffer      = gbuffer_handle.getw<PathRenderPrimitive>();
-
-      // auto &i_pathr        = render_handle.getw<GBufferPrimitive>();
-      /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
+      auto &i_pathr        = render_handle.getw<RenderPrimitive>();
       
       i_sensor.film_size = (e_target.size().cast<float>() * e_settings.view_scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();
       i_sensor.flush();
       i_pathr.reset(i_sensor, e_scene);
-
-      // Build new gbuffer for hacky denoising
-      // i_gbuffer.render(i_sensor, e_scene);
-      // i_pathr.render(i_gbuffer, i_sensor, e_scene);
     }
 
     // ... then call renderer
     if (i_pathr.has_next_sample_state()) {
-      auto &i_pathr = render_handle.getw<PathRenderPrimitive>();
+      auto &i_pathr = render_handle.getw<RenderPrimitive>();
       i_pathr.render(sensor_handle.getr<Sensor>(), e_scene);
     }
   }

@@ -35,7 +35,7 @@ namespace met {
     // Get shared resources 
     const auto &e_scene   = info.global("scene").getr<Scene>();
     const auto &e_target  = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
-    const auto &e_render  = info.relative("viewport_render")("renderer").getr<PathRenderPrimitive>();
+    const auto &e_render  = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
     const auto &e_overlay = info.relative("viewport_draw_overlay")("target").getr<gl::Texture2d4f>();
 
     // Specify dispatch size
