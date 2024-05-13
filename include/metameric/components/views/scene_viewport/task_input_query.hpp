@@ -30,7 +30,6 @@ namespace met {
     void init(SchedulerHandle &info) override {
       met_trace();
       info("path_query").init<PathQueryPrimitive>({
-        .max_depth    = 4,
         .cache_handle = info.global("cache")
       });
     } 

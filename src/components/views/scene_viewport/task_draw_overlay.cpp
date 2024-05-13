@@ -206,6 +206,7 @@ namespace met {
     met_trace();
 
     // Get handles, shared resources, modified resources
+    const auto &e_scene  = info.global("scene").getr<Scene>();
     const auto &e_render = info.relative("viewport_render")("renderer").getr<detail::IntegrationRenderPrimitive>();
     
     // Compute viewport offset and size, minus ImGui's tab bars etc
@@ -218,9 +219,10 @@ namespace met {
     
     auto intr_offs = eig::Array2f(4.f);
     auto view_offs = (viewport_offs + intr_offs).eval();
-    auto view_size = eig::Array2f(96, 32);
+    auto view_size = eig::Array2f(128, 42);
     
-    auto text = std::format("res: {} x {}\nspp: {}", 
+    auto text = std::format("scene: {}\nres: {} x {}\nspp: {}", 
+      e_scene.save_path.filename().string(),
       e_render.film().size().x(), 
       e_render.film().size().y(), 
       e_render.spp_curr() + 1);

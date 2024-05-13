@@ -276,7 +276,6 @@ namespace met {
       auto &value = component.value;
 
       push_resource_selector("CMFS", scene.resources.observers, value.observer_i);
-      ImGui::DragFloat("Render Scale", &value.film_scale, .05f, .05f, 1.f);
       ImGui::DragFloat("Field of view (y)", &value.camera_fov_y, 1.f, .05f, 90.f);
       ImGui::InputScalarN("Film size", ImGuiDataType_U32, value.film_size.data(), 2);
       ImGui::DragFloat3("Position", value.camera_trf.position.data(), 0.01f, -100.f, 100.f);

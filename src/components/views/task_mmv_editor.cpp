@@ -257,6 +257,7 @@ namespace met {
 
       // Get handles, shared resources, etc
       const auto &e_arcball = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
+      const auto &e_trnf    = info.relative("viewport_gen_mmv")("chull_trnf").getr<eig::Matrix4f>();
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &e_cs      = info.parent()("selection").getr<ConstraintRecord>();
       const auto &e_vert    = e_scene.uplifting_vertex(e_cs);
@@ -271,8 +272,14 @@ namespace met {
         using T = std::decay_t<decltype(cstr)>;
         guard_constexpr((std::is_same_v<T, IndirectSurfaceConstraint> || is_colr_constraint<T>));
         
+        // Get [0, 1] matrix and inverse, as the displayed mesh is scaled
+        auto proj     = [m = e_trnf.inverse().eval()](eig::Array3f p) -> Colr { return (m * (eig::Vector4f() << p, 1).finished()).head<3>(); };
+        auto proj_inv = [m = e_trnf](eig::Array3f p)                  -> Colr { return (m * (eig::Vector4f() << p, 1).finished()).head<3>(); };
+
         // Register gizmo start; cache current vertex position
-        if (auto p = e_vert.get_mismatch_position(); m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(p)))) {
+        if (auto p  = e_vert.get_mismatch_position(), 
+                 p_ = proj(p); 
+                 m_gizmo.begin_delta(e_arcball, eig::Affine3f(eig::Translation3f(p_)))) {
           m_gizmo_curr_p = p;
           m_gizmo_prev_p = p;
         }
@@ -280,7 +287,7 @@ namespace met {
         // Register gizmo drag; apply world-space delta
         if (auto [active, delta] = m_gizmo.eval_delta(); active) {
           // Apply delta to tracked value
-          m_gizmo_curr_p = (delta * m_gizmo_curr_p).eval();
+          m_gizmo_curr_p = proj_inv((delta * proj(m_gizmo_curr_p)));
 
           // Expose a marker point for the snap position inside the convex hull;
           // don't snap as it feels weird while moving the point
@@ -288,7 +295,9 @@ namespace met {
                                                    .getr<Colr>();
 
           // Feed clipped color to scene
-          info.global("scene").getw<Scene>().uplifting_vertex(e_cs).set_mismatch_position(gizmo_clip_p);
+          info.global("scene").getw<Scene>()
+              .uplifting_vertex(e_cs)
+              .set_mismatch_position(gizmo_clip_p);
 
           // Tooltip shows closest clipped value
           if (ImGui::BeginTooltip()) {
@@ -332,7 +341,9 @@ namespace met {
     info.child_task("viewport_edit_mmv").init<EditMMVTask>();
     info.child_task("viewport_image").init<MMVEditorImageTask>();
     info.child_task("viewport_camera").init<detail::ArcballInputTask>(info.child("viewport_image")("lrgb_target"), 
-      detail::ArcballInputTask::InfoType { .dist = 1.f, .e_center = .5f, .zoom_delta_mult = 0.025f });
+      detail::ArcballInputTask::InfoType { .dist            = 1.f, 
+                                           .e_center        = .5f, 
+                                           .zoom_delta_mult = 0.025f });
     info.child_task("viewport_gen_mmv").init<GenMMVTask>();
     info.child_task("viewport_gen_patches").init<GenPatchesTask>();
     info.child_task("viewport_draw_mmv").init<DrawMMVTask>();

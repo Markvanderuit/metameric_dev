@@ -20,8 +20,8 @@ namespace met {
 
   bool ViewSettings::operator==(const ViewSettings &o) const {
     guard(film_size.isApprox(o.film_size), false);
-    return std::tie(observer_i, camera_trf, camera_fov_y, film_scale)
-        == std::tie(o.observer_i, o.camera_trf, o.camera_fov_y, o.film_scale);
+    return std::tie(observer_i, camera_trf, camera_fov_y)
+        == std::tie(o.observer_i, o.camera_trf, o.camera_fov_y);
   }
  
   bool Object::operator==(const Object &o) const {
@@ -74,7 +74,7 @@ namespace met {
     met_trace();
 
     // Return zero constraint for inactive vertices or those without mismatching
-    guard(is_active && has_mismatching(scene, uplifting), { });
+    guard(has_mismatching(scene, uplifting), { });
 
     // Otherwise, visit the underlying constraint to generate output data
     return constraint | visit([&](const auto &cstr) { 

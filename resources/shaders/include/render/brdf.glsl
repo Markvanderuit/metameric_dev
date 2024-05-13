@@ -5,6 +5,7 @@
 #include <render/surface.glsl>
 #include <render/brdf/null.glsl>
 #include <render/brdf/diffuse.glsl>
+#include <render/brdf/pbr.glsl>
 
 BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls) {
   BRDFInfo brdf;
@@ -18,6 +19,8 @@ BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls) {
     brdf.type = BRDFTypeDiffuse;
     brdf.r    = vec4(1);
     // init_brdf_null(brdf, si, wvls);
+  } else if (brdf.type == BRDFTypePBR) {
+    init_brdf_pbr(brdf, si, wvls);
   } /* else if (...) {
     // ...
   } */
@@ -30,6 +33,8 @@ BRDFSample sample_brdf(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo si) {
     return sample_brdf_diffuse(brdf, sample_2d, si);
   } else if (brdf.type == BRDFTypeNull) {
     return sample_brdf_null(brdf, sample_2d, si);
+  } else if (brdf.type == BRDFTypePBR) {
+    return sample_brdf_pbr(brdf, sample_2d, si);
   } /* else if (...) {
     // ...
   } */
@@ -40,6 +45,8 @@ vec4 eval_brdf(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
     return eval_brdf_diffuse(brdf, si, wo);
   } else if (brdf.type == BRDFTypeNull) {
     return eval_brdf_null(brdf, si, wo);
+  } else if (brdf.type == BRDFTypePBR) {
+    return eval_brdf_pbr(brdf, si, wo);
   } /* else if (...) {
     // ...
   } */
@@ -50,6 +57,8 @@ float pdf_brdf(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
     return pdf_brdf_diffuse(brdf, si, wo);
   } else if (brdf.type == BRDFTypeNull) {
     return pdf_brdf_null(brdf, si, wo);
+  } else if (brdf.type == BRDFTypePBR) {
+    return pdf_brdf_pbr(brdf, si, wo);
   } /* else if (...) {
     // ...
   } */

@@ -108,7 +108,7 @@ namespace met {
 
   // A queried path object
   struct PathRecord {
-    constexpr static uint path_max_depth = 5;
+    constexpr static uint path_max_depth = 4;
 
   public:
     // Sampled path wavelengths

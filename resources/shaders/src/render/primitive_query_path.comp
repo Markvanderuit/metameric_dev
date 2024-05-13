@@ -149,7 +149,8 @@ void main() {
 
   // Sample incident radiance along ray for given wavelengths, weighted by probability
   // Discard return value
-  /* vec4 L = */ Li(sensor_sample, state);
+  float alpha;
+  /* vec4 L = */ Li(sensor_sample, state, alpha);
 
   /* // Integrate over color system and add to measure
   vec3 measure = sensor_apply(sensor_sample, L); */

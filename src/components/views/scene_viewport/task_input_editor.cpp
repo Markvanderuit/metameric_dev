@@ -11,7 +11,6 @@
 namespace met {
   static constexpr float selector_near_distance = 12.f;
   static constexpr uint  indirect_query_spp     = 65536;
-  static constexpr uint  indirect_query_depth   = 4;
 
   RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
@@ -126,8 +125,9 @@ namespace met {
       eig::Array4f back = path.L;
       eig::Array4f refl = sample_spectrum(path.wvls, constraint_refl);
       for (const auto &vt : verts) {
-        eig::Array4f rdiv = refl * vt.r_weight + vt.remainder;
-        back = (rdiv > 0.0001f).select(back / rdiv, 0.f); // we ignore small values to prevent fireflies from mucking up a measurement
+        eig::Array4f rdiv = refl * vt.r_weight + vt.remainder; // r_i = a_i*r + w_i
+        // back = (rdiv > 0.0001f).select(back / rdiv, 0.f); // we ignore small values to prevent fireflies from mucking up a measurement
+        back = (rdiv > 0.0001f).select(back / rdiv, back); // we ignore small values to prevent fireflies from mucking up a measurement
       }
       
       // We them iterate all permutations of the current constraint vertices
@@ -139,9 +139,9 @@ namespace met {
         for (uint j = 0; j < verts.size(); ++j) {
           if (bits[j]) {
             sr.power++;
-            sr.values *= verts[j].r_weight;
+            sr.values *= verts[j].r_weight;  // a_i
           } else {
-            sr.values *= verts[j].remainder;
+            sr.values *= verts[j].remainder; // w_i
           }
         }
         tbb_paths.push_back(sr);

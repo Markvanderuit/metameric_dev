@@ -21,7 +21,7 @@ namespace met {
     info("active").set<bool>(true);   
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
     info("renderer").init<PathRenderPrimitive>({ .spp_per_iter       = 1u,
-                                                 .max_depth          = 5u,
+                                                 .max_depth          = 4u,
                                                  .pixel_checkerboard = true,
                                                  .cache_handle       = info.global("cache") });
   }
@@ -30,14 +30,15 @@ namespace met {
     met_trace_full();
 
     // Get handles, shared resources, modified resources, shorthands
-    auto target_handle  = info.relative("viewport_image")("lrgb_target");
-    auto camera_handle  = info.relative("viewport_input_camera")("arcball");
-    auto render_handle  = info("renderer");
-    // auto gbuffer_handle = info("gbuffer");
-    auto sensor_handle  = info("sensor");
-    const auto &e_scene = info.global("scene").getr<Scene>();
-    // const auto &i_pathr = render_handle.getr<GBufferViewPrimitive>();
-    const auto &i_pathr = render_handle.getr<PathRenderPrimitive>();
+    auto target_handle     = info.relative("viewport_image")("lrgb_target");
+    auto camera_handle     = info.relative("viewport_input_camera")("arcball");
+    auto render_handle     = info("renderer");
+    auto sensor_handle     = info("sensor");
+    const auto &e_scene    = info.global("scene").getr<Scene>();
+    const auto &e_view_i   = info.parent()("view_settings_i").getr<uint>();
+    const auto &i_pathr    = render_handle.getr<PathRenderPrimitive>();
+    const auto &e_view     = e_scene.components.views[e_view_i].value;
+    const auto &e_settings = e_scene.components.settings.value;
 
     // Test if renderer necessitates a reset; scene changes, camera changes, target changes
     bool reset_target = target_handle.is_mutated();
@@ -60,8 +61,7 @@ namespace met {
       // auto &i_pathr        = render_handle.getw<GBufferPrimitive>();
       /* auto &i_pathr        = render_handle.getw<PathRenderPrimitive>(); */
       
-      float scale = 0.5; // quarter res
-      i_sensor.film_size = (e_target.size().cast<float>() * scale).cast<uint>().eval();
+      i_sensor.film_size = (e_target.size().cast<float>() * e_settings.view_scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();
       i_sensor.flush();

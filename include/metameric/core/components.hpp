@@ -19,7 +19,15 @@ namespace met {
     // Texture render size; input res, 2048x2048, 1024x1024, or 512x512
     enum class TextureSize { eFull, eHigh, eMed, eLow } texture_size;
 
-    friend auto operator<=>(const Settings &, const Settings &) = default;
+    // View component linked to scene viewport
+    uint view_i = 0;
+
+    // Render scaling used for scene viewport
+    float view_scale   = .5f;  
+
+
+  public: // Boilerplate  
+    auto operator<=>(const Settings &) const = default;
 
   public: // Helper methods to apply stored settings
     inline
@@ -40,7 +48,6 @@ namespace met {
     Transform    camera_trf;          // Transform applied to scene camera
     float        camera_fov_y = 45.f; // Vertical field of view
     eig::Array2u film_size    = 256;  // Pixel count of film target
-    float        film_scale   = 1.f;  // Optional scaling using inside renderer
 
   public: // Boilerplate
     bool operator==(const ViewSettings &o) const;

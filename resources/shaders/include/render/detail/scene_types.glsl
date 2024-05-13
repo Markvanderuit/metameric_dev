@@ -103,10 +103,13 @@ struct EmitterInfo {
 
 #define BRDFTypeNull    0
 #define BRDFTypeDiffuse 1
+#define BRDFTypePBR     2
 
 struct BRDFInfo {
-  uint type; // Type of BRDF: null, diffuse for now
-  vec4 r;    // Surface albedo for four wavelengths
+  uint type;       // Type of BRDF: null, diffuse for now
+  vec4 r;          // Surface albedo for four wavelengths
+  float roughness; // Supplemental values for pbr shader
+  float metallic;  // Supplemental values for pbr shader
 };
 
 #include <render/detail/packing.glsl>

@@ -3,6 +3,7 @@
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/mesh.hpp>
+#include <metameric/core/image.hpp>
 #include <metameric/core/matching.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
@@ -29,6 +30,8 @@ namespace met {
     auto uplf_handle      = info.task(std::format("gen_upliftings.gen_uplifting_{}", e_cs.uplifting_i)).mask(info);
     const auto &e_spectra = uplf_handle("constraint_spectra").getr<std::vector<Spec>>();
     const auto &e_coeffs  = uplf_handle("constraint_coeffs").getr<std::vector<Basis::vec_type>>();
+    const auto &e_hulls   = uplf_handle("mismatch_hulls").getr<std::vector<ConvexHull>>();
+    const auto &e_hull    = e_hulls[e_cs.vertex_i];
 
     // Generate packed-unpacked roundtrip spectrum to compare to full precision distribution
     Spec spec = e_spectra[e_cs.vertex_i], unpacked_spec;
@@ -40,8 +43,7 @@ namespace met {
       spec = e_spectra[e_cs.vertex_i];
       unpacked_coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
       unpacked_spec   = e_basis(coeffs);
-    }
-          
+    }  
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {
@@ -253,16 +255,16 @@ namespace met {
             if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
               // Reconstruct radiance from truncated power series
               Spec s = cstr.cstr_j_indrct.back().powr_j[0];
-              for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
+              for (uint i = 0; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
                 s += spec.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
               ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
             if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Power series")) {
               float s_max = 0.f;
-              for (uint i = 1; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
+              for (uint i = 0; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
                 s_max = std::max(s_max, cstr.cstr_j_indrct.back().powr_j[i].maxCoeff());
-              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 110.f * e_window.content_scale() });
+              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 128.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
 
@@ -400,6 +402,33 @@ namespace met {
       if (vert.has_mismatching(e_scene, uplf.value)) {
         // Visual separator from editing components drawn in previous tasks
         ImGui::SeparatorText("Mismatching");
+
+        
+        if (ImGui::SmallButton("Save image")) {
+          if (fs::path path; detail::save_dialog(path, "exr")) {
+            // Get shared texture resource
+            const auto &e_txtr = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
+            debug::check_expr(e_txtr.is_init());
+
+            // Create cpu-side rgba image matching gpu-side film format
+            Image image = {{
+              .pixel_frmt = Image::PixelFormat::eRGBA,
+              .pixel_type = Image::PixelType::eFloat,
+              .size       = e_txtr.size()
+            }};
+
+            // Copy over to cpu-side
+            e_txtr.get(cast_span<float>(image.data()));
+
+            // Save to exr; no gamma correction
+            image.save_exr(path);
+          }
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Print hull")) {
+          fmt::print("verts\n{}\n\n", e_hull.hull.verts);
+          fmt::print("elems\n{}\n\n", e_hull.hull.elems);
+        }
 
         /* // Toggle button for clipping
         auto &e_clip = info.relative("viewport_guizmo")("clip_point").getw<bool>();

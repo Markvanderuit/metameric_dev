@@ -64,7 +64,7 @@ namespace met {
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info("mismatch_hulls").set<std::vector<ConvexHull>>({});
-    info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
+    /* info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i); */
     /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
       if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
         const auto &e_scene = info.global("scene").getr<Scene>();
@@ -263,8 +263,9 @@ namespace met {
       auto viewer_handle = info.task(viewer_name);
       
       if (tssl_stale && viewer_handle.is_init()) {
-        // Convert delaunay to triangle mesh
+        // Convert delaunay to triangle mesh, then unitize to [0, 1]
         auto mesh = convert_mesh<AlMesh>(m_tesselation);
+        auto inv  = unitize_mesh<AlMesh>(mesh);
 
         // // Convert to xyY, then refit a convex hull for rendering
         // std::vector<eig::AlArray3f> xyY = m_tesselation.verts;
@@ -356,15 +357,11 @@ namespace met {
               .dot(bary - bary.cwiseMax(0.f).cwiseMin(1.f));
 
       // Continue if error does not improve
+      // or store best result
       guard_continue(err < result_err);
-
-      // Store best result
       result_err  = err;
       result_bary = bary;
       result_i    = i;
-
-      // Exit if zero error is reached
-      guard_break(result_err > 0.f);
     }
 
     // Assign weights to return value

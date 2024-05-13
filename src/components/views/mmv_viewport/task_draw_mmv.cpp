@@ -19,7 +19,12 @@ namespace met {
     const auto &e_arcball       = info.relative("viewport_camera")("arcball").getr<detail::Arcball>();
     const auto &e_gizmo_active  = info.relative("viewport_guizmo")("is_active").getr<bool>();
     const auto &e_closest_point = info.relative("viewport_guizmo")("closest_point").getr<Colr>();
+    const auto &e_trnf          = info.relative("viewport_gen_mmv")("chull_trnf").getr<eig::Matrix4f>();
     const auto &io              = ImGui::GetIO();
+
+    // Get [0, 1] matrix and inverse, as the displayed mesh is scaled
+    auto proj     = [m = e_trnf.inverse().eval()](eig::Array3f p) -> Colr { return (m * (eig::Vector4f() << p, 1).finished()).head<3>(); };
+    auto proj_inv = [m = e_trnf](eig::Array3f p)                  -> Colr { return (m * (eig::Vector4f() << p, 1).finished()).head<3>(); };
 
     // Compute viewport offset and size, minus ImGui's tab bars etc
     eig::Array2f viewport_offs = static_cast<eig::Array2f>(ImGui::GetWindowPos()) 
@@ -33,8 +38,8 @@ namespace met {
     // Visit underlying color constraint to extract edit position, then
     // determine window-space position of surface point
     auto p        = e_vert.get_mismatch_position();
-    auto p_mouse  = eig::Array2f(io.MousePos); // eig::window_to_pixel(io.MousePos, viewport_offs, viewport_size).cast<float>().eval();
-    auto p_window = eig::world_to_window_space(p, e_arcball.full(), viewport_offs, viewport_size);
+    auto p_mouse  = eig::Array2f(io.MousePos);
+    auto p_window = eig::world_to_window_space(proj(p), e_arcball.full(), viewport_offs, viewport_size);
       
     // Clip vertex outside viewport
     guard((p_window.array() >= viewport_offs).all() 

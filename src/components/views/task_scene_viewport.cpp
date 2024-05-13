@@ -16,11 +16,15 @@ namespace met {
   void SceneViewportTask::init(SchedulerHandle &info) {
     met_trace();
 
+    // Get shared resources
+    const auto &e_scene    = info.global("scene").getr<Scene>();
+
     // Make is_active available
     info("is_active").set(true);
 
     // Refer to view settings for the viewport
     info("view_settings_i").set<uint>(0);
+    info("view_settings_i").getw<uint>() = e_scene.components.settings.value.view_i;
 
     // Specify viewport settings
     detail::ViewportTaskInfo viewport_info = {
@@ -53,9 +57,7 @@ namespace met {
       const auto &[e_view, 
                    e_state] = e_scene.components.views[e_view_i];
 
-      if (e_state || is_first_eval()) { // View data changed in scene, overwrites arcball for now
-        fmt::print("State updated\n");
-        
+      if (e_state || is_first_eval()) { // View data changed in scene, overwrites arcball for now        
         auto &e_arcball = camera_handle.getw<detail::Arcball>();
 
         eig::Affine3f trf_rot = eig::Affine3f::Identity();
@@ -82,6 +84,11 @@ namespace met {
 
   void SceneViewportTask::eval(SchedulerHandle &info) {
     met_trace();
-    // ...
+    
+    // Update attached view based on view settings
+    const auto &e_scene    = info.global("scene").getr<Scene>();
+    const auto &[val, sta] = e_scene.components.settings;
+    if (sta.view_i)
+      info("view_settings_i").getw<uint>() = val.view_i;
   }
 }

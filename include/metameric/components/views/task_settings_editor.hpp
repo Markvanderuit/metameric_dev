@@ -4,6 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/component_edit.hpp>
 
 namespace met {
   struct SettingsEditorTask : public detail::TaskNode {
@@ -35,6 +36,12 @@ namespace met {
           ImGui::EndCombo();
         }
         settings.texture_size = static_cast<Settings::TextureSize>(texture_i);
+
+        // Selector for active view in scene viewport
+        detail::push_resource_selector("Viewport", e_scene.components.views, settings.view_i);
+
+        ImGui::DragFloat("Render scale", &settings.view_scale, .05f, .05f, 1.f);
+
 
         // Test if settings are changed, and apply
         if (settings != e_settings) {

@@ -7,7 +7,7 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 
 namespace met {
-  constexpr static uint spp_per_iter = 16u;
+  constexpr static uint spp_per_iter = 4u;
 
   void MeshViewportExportTask::init(SchedulerHandle &info) {
     met_trace();    
@@ -56,6 +56,7 @@ namespace met {
       } else {
         auto prg = static_cast<float>(m_spp_curr) / static_cast<float>(m_spp_trgt);
         auto str = std::format("{} / {} ({})", m_spp_curr, m_spp_trgt, prg);
+        fmt::print("render progress: {}\n", str);
         ImGui::ProgressBar(prg, { 0, 0 }, str.c_str());
         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
         if (ImGui::Button("Cancel")) {
@@ -125,7 +126,7 @@ namespace met {
       if (m_spp_curr >= m_spp_trgt) {
         m_in_prog = false;
 
-        // Create cpu-side image matching gpu-side film format
+        // Create cpu-side rgba image matching gpu-side film format
         Image image = {{
           .pixel_frmt = Image::PixelFormat::eRGBA,
           .pixel_type = Image::PixelType::eFloat,

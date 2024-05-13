@@ -54,13 +54,13 @@ vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state)
   // return brdf.r;
 }
 
-vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
+vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout float alpha) {
   // Initialize path store if requested
   path_initialize(pt);
   
   // Path throughput information; we track 4 wavelengths simultaneously
-  vec4  S               = vec4(0.f);
-  vec4  beta            = vec4(1.f / wvl_pdfs);
+  vec4  S    = vec4(0.f);
+  vec4  beta = vec4(1.f / wvl_pdfs);
 
   // Last brdf sample, default-initialized
   BRDFSample bs; 
@@ -87,6 +87,9 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
         // Add to output radiance
         S += s;
       }
+      
+      // Output 0 alpha on initial ray miss
+      alpha = depth > 0 ? 1.f : 0.f;
       
       break;
     }
@@ -187,8 +190,8 @@ vec4 Li_debug(in SensorSample sensor_sample, in SamplerState state) {
   return Li_debug(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state);
 }
 
-vec4 Li(in SensorSample sensor_sample, in SamplerState state) {
-  return Li(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state);
+vec4 Li(in SensorSample sensor_sample, in SamplerState state, inout float alpha) {
+  return Li(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state, alpha);
 }
 
 #endif // RENDER_PATH_GLSL_GUARD

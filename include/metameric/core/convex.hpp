@@ -54,15 +54,11 @@ namespace met {
         // Check if this simplex is a better candidate
         float err = (bry - bry.cwiseMax(0.f).cwiseMin(1.f)).matrix().squaredNorm();
         guard_continue(err < result_err);
-
         result_err = err;
         result_i   = i;
         result_bry = bry;
-
-        // Check if this simplex is the enclosing simplex, meaning we can stop iterating
-        guard_break(result_err > 0.f);
       }
-
+      
       return { result_bry, deln.elems[result_i] };
     }
 
