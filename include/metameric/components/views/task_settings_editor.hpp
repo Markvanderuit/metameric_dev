@@ -14,17 +14,29 @@ namespace met {
       // Track killing of own task
       bool is_settings_open = true;
       
-      if (ImGui::Begin("Settings", &is_settings_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking)) {
+      if (ImGui::Begin("Settings", &is_settings_open)) {
         // Get external resources
         const auto &e_scene               = info.global("scene").getr<Scene>();
         const auto &[e_settings, e_state] = e_scene.components.settings;
 
-        // Texture name helper
-        std::array<std::string, 4> texture_names = { "Full", "High", "Medium", "Low" };
-        uint texture_i = static_cast<uint>(e_settings.texture_size);
-
         // Copy of settings to detect modification
         auto settings = e_settings;
+        
+        // Renderer type
+        if (ImGui::BeginCombo("Renderer", std::format("{}", settings.renderer_type).c_str())) {
+          for (uint i = 0; i < 6; ++i) {
+            auto type = static_cast<Settings::RendererType>(i);
+            auto name = std::format("{}", type);
+            if (ImGui::Selectable(name.c_str(), settings.renderer_type == type)) {
+              settings.renderer_type = type;
+            }
+          } // for (uint i)
+          ImGui::EndCombo();
+        }
+
+        // Texture name helper
+        std::array<std::string, 4> texture_names = { "Full", "High", "Medium", "Low" };
+        uint texture_i = static_cast<uint>(settings.texture_size);
 
         // Combobox to selext texture size setting
         if (ImGui::BeginCombo("Texture size", texture_names[texture_i].c_str())) {

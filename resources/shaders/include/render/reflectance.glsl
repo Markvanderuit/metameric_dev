@@ -22,16 +22,14 @@
 
   vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
-    ObjectInfo      object_info       = scene_object_info(object_i);
-    BarycentricInfo barycentrics_info = scene_reflectance_atlas_info(object_i);
+    ObjectInfo      object_info = scene_object_info(object_i);
+    BarycentricInfo atlas_info  = scene_reflectance_atlas_info(object_i);
 
     // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
     // also handle single-color objects by sampling the center of their patch
-    vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
-    vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
-
-    // Scale up to full texture size
-    vec3 tx_3d = tx_uv * vec3(scene_barycentric_data_size(), 1) - vec3(0.5, 0.5, 0);
+    vec3 tx_3d = vec3(atlas_info.uv0 + atlas_info.uv1 * (object_info.is_albedo_sampled ? tx : vec2(0.5f)),
+                      atlas_info.layer) 
+               * vec3(scene_barycentric_data_size(), 1) - vec3(0.5, 0.5, 0);
     vec2 alpha = mod(tx_3d.xy, 1.f);
 
     // Return value; reflectance for four wavelengths
@@ -47,6 +45,7 @@
       }
     }
 
+    // Should not be necessary, but just in case
     return clamp(r, 0, 1);
   }
 
@@ -114,9 +113,9 @@
     // Load relevant info objects
     ObjectInfo  object_info = scene_object_info(object_i);
     if (object_info.is_albedo_sampled) {
-      TextureInfo atlas_info  = scene_rgb_atlas_info(object_i);
-      vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
-      vec3 tx_uv = vec3(atlas_info.uv0 + atlas_info.uv1 * tx_si, atlas_info.layer);
+      TextureInfo txtr  = scene_rgb_atlas_info(object_info.albedo_i);
+      // tx.xy = vec2(1) - vec2(tx.y, tx.x);
+      vec3 tx_uv = vec3(txtr.uv0 + txtr.uv1 * tx, txtr.layer);
       return vec4(scene_rgb_data_texture(tx_uv).xyz, 1); // Discard alpha for now
     } else {
       return vec4(object_info.albedo_v, 1);

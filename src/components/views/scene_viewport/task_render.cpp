@@ -9,8 +9,11 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  // using RenderPrimitive = PathRenderPrimitive;
-  using RenderPrimitive = RGBPathRenderPrimitive; // fallback for direct roundtrip testing
+  constexpr static uint spp_per_iter = 1u;
+  constexpr static uint path_depth  = PathRecord::path_max_depth;
+
+  using RenderPrimitive = PathRenderPrimitive;
+  // using RenderPrimitive = RGBPathRenderPrimitive; // fallback for direct roundtrip testing
 
   bool MeshViewportRenderTask::is_active(SchedulerHandle &info) {
     met_trace();
@@ -21,12 +24,12 @@ namespace met {
 
   void MeshViewportRenderTask::init(SchedulerHandle &info) {
     met_trace_full(); 
+
+    // Get handles, shared resources, modified resources, shorthands
+    const auto &e_scene = info.global("scene").getr<Scene>();
+
     info("active").set<bool>(true);   
     info("sensor").set<Sensor>({ /* ... */ }).getw<Sensor>().flush();
-    info("renderer").init<RenderPrimitive>({ .spp_per_iter       = 1u,
-                                             .max_depth          = 4u,
-                                             .pixel_checkerboard = true,
-                                             .cache_handle       = info.global("cache") });
   }
     
   void MeshViewportRenderTask::eval(SchedulerHandle &info) {
@@ -39,9 +42,52 @@ namespace met {
     auto sensor_handle     = info("sensor");
     const auto &e_scene    = info.global("scene").getr<Scene>();
     const auto &e_view_i   = info.parent()("view_settings_i").getr<uint>();
-    const auto &i_pathr    = render_handle.getr<RenderPrimitive>();
     const auto &e_view     = e_scene.components.views[e_view_i].value;
     const auto &e_settings = e_scene.components.settings.value;
+
+    // (Re-)initialize renderer
+    if (is_first_eval() || e_scene.components.settings.state.renderer_type) {
+      switch (e_settings.renderer_type) {
+        case Settings::RendererType::ePath:
+          render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+                                                    .max_depth          = path_depth,
+                                                    .pixel_checkerboard = true,
+                                                    .cache_handle       = info.global("cache") });
+          break;
+        case Settings::RendererType::eDirect:
+          render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+                                                    .max_depth          = 2u,
+                                                    .pixel_checkerboard = true,
+                                                    .cache_handle       = info.global("cache") });
+          break;
+        case Settings::RendererType::eDebug:
+          render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+                                                    .max_depth          = 2u,
+                                                    .pixel_checkerboard = true,
+                                                    .enable_debug       = true,
+                                                    .cache_handle       = info.global("cache") });
+          break;
+        case Settings::RendererType::ePathRGB:
+          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+                                                       .max_depth          = path_depth,
+                                                       .pixel_checkerboard = true,
+                                                       .cache_handle       = info.global("cache") });
+          break;
+        case Settings::RendererType::eDirectRGB:
+          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+                                                       .max_depth          = 2u,
+                                                       .pixel_checkerboard = true,
+                                                       .cache_handle       = info.global("cache") });
+          break;
+        case Settings::RendererType::eDebugRGB:
+          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+                                                       .max_depth          = 2u,
+                                                       .pixel_checkerboard = true,
+                                                       .enable_debug       = true,
+                                                       .cache_handle       = info.global("cache") });
+          break;
+      }
+    }
 
     // Test if renderer necessitates a reset; scene changes, camera changes, target changes
     bool reset_target = target_handle.is_mutated();
@@ -55,22 +101,47 @@ namespace met {
     
     // Push sensor changes, reset render component...
     if (reset) {
+      // Get shared resources
       const auto &e_target = target_handle.getr<gl::Texture2d4f>();
       const auto &e_camera = camera_handle.getr<detail::Arcball>();
+
+      // Push new sensor data
       auto &i_sensor       = sensor_handle.getw<Sensor>();
-      auto &i_pathr        = render_handle.getw<RenderPrimitive>();
-      
       i_sensor.film_size = (e_target.size().cast<float>() * e_settings.view_scale).cast<uint>().eval();
       i_sensor.proj_trf  = e_camera.proj().matrix();
       i_sensor.view_trf  = e_camera.view().matrix();
       i_sensor.flush();
-      i_pathr.reset(i_sensor, e_scene);
+
+      // Forward to underlying type dependent on setting
+      switch (e_settings.renderer_type) {
+        case Settings::RendererType::ePath:
+        case Settings::RendererType::eDirect:
+        case Settings::RendererType::eDebug:
+          render_handle.getw<PathRenderPrimitive>().reset(i_sensor, e_scene);
+          break;
+        case Settings::RendererType::ePathRGB:
+        case Settings::RendererType::eDirectRGB:
+        case Settings::RendererType::eDebugRGB:
+          render_handle.getw<RGBPathRenderPrimitive>().reset(i_sensor, e_scene);
+          break;
+      }
     }
 
-    // ... then call renderer
-    if (i_pathr.has_next_sample_state()) {
-      auto &i_pathr = render_handle.getw<RenderPrimitive>();
-      i_pathr.render(sensor_handle.getr<Sensor>(), e_scene);
+    // ... then forward to renderer to update frame if sampler is not exhausted
+    if (render_handle.getr<detail::IntegrationRenderPrimitive>().has_next_sample_state()) {
+      // Forward to underlying type dependent on setting
+      switch (e_settings.renderer_type) {
+        case Settings::RendererType::ePath:
+        case Settings::RendererType::eDirect:
+        case Settings::RendererType::eDebug:
+          render_handle.getw<PathRenderPrimitive>().render(sensor_handle.getr<Sensor>(), e_scene);
+          break;
+        case Settings::RendererType::ePathRGB:
+        case Settings::RendererType::eDirectRGB:
+        case Settings::RendererType::eDebugRGB:
+          render_handle.getw<RGBPathRenderPrimitive>().render(sensor_handle.getr<Sensor>(), e_scene);
+          break;
+      }
     }
   }
 } // namespace met

@@ -239,9 +239,10 @@ namespace met {
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_path.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_path.comp.json",
-      .spec_const = {{ 0u, 16u            },
-                     { 1u, 16u            },
-                     { 2u, info.max_depth }}
+      .spec_const = {{ 0u, 16u                     },
+                     { 1u, 16u                     },
+                     { 2u, info.max_depth          },
+                     { 4u, uint(info.enable_debug) }}
     });
 
     // Assign sampler configuration
@@ -251,6 +252,9 @@ namespace met {
     m_spp_per_iter       = info.spp_per_iter;
     m_pixel_curr         = 0;
     m_pixel_checkerboard = info.pixel_checkerboard;
+
+    // Linear texture sampler
+    m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
   }
 
   void PathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
@@ -302,14 +306,21 @@ namespace met {
     program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
+    program.bind("b_bsis_1f",             m_sampler);
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture()); 
+    program.bind("b_coef_4f",             m_sampler);
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
+    program.bind("b_cmfs_3f",             m_sampler);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
-    if (!scene.resources.images.empty()) {
+    program.bind("b_illm_1f",             m_sampler);
+
+    /* if (!scene.resources.images.empty()) {
       program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
-    }
+      if (scene.resources.images.gl.texture_atlas_1f.texture().is_init())
+        program.bind("b_txtr_1f", scene.resources.images.gl.texture_atlas_1f.texture());
+      if (scene.resources.images.gl.texture_atlas_3f.texture().is_init())
+        program.bind("b_txtr_3f", scene.resources.images.gl.texture_atlas_3f.texture());
+    } */
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
@@ -338,9 +349,10 @@ namespace met {
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_path_rgb.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_path_rgb.comp.json",
-      .spec_const = {{ 0u, 16u            },
-                     { 1u, 16u            },
-                     { 2u, info.max_depth }}
+      .spec_const = {{ 0u, 16u                     },
+                     { 1u, 16u                     },
+                     { 2u, info.max_depth          },
+                     { 4u, uint(info.enable_debug) }}
     });
 
     // Assign sampler configuration
@@ -356,6 +368,9 @@ namespace met {
     m_illm_colr_texture    = {{ .size = { 1, n_layers } }};
     m_illm_colr_buffer     = {{ .size = m_illm_colr_texture.size().prod() * sizeof(eig::Array4f), .flags = buffer_create_flags }};
     m_illm_colr_buffer_map = m_illm_colr_buffer.map_as<eig::Array4f>(buffer_access_flags);
+
+    // Linear texture sampler
+    m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
   }
 
   void RGBPathRenderPrimitive::reset(const Sensor &sensor, const Scene &scene) {
@@ -418,10 +433,18 @@ namespace met {
     program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_illm_3f",             m_illm_colr_texture);
+    program.bind("b_illm_3f",             m_sampler);
+    
     if (!scene.resources.images.empty()) {
       program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
+      if (scene.resources.images.gl.texture_atlas_1f.texture().is_init()) {
+        program.bind("b_txtr_1f", m_sampler);
+        program.bind("b_txtr_1f", scene.resources.images.gl.texture_atlas_1f.texture());
+      }
+      if (scene.resources.images.gl.texture_atlas_3f.texture().is_init()) {
+        program.bind("b_txtr_3f", m_sampler);
+        program.bind("b_txtr_3f", scene.resources.images.gl.texture_atlas_3f.texture());
+      }
     }
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);

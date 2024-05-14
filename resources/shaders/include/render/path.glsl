@@ -47,11 +47,12 @@ vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state)
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
 
-  return vec4(si.tx, 0, 1);
+  // Hope this is the right one; should be normalized d65
+  vec4 d65_n = scene_illuminant(1, wvls);
 
-  // Sample BRDF at position
-  // BRDFInfo brdf = get_brdf(si, wvls);
-  // return brdf.r;
+  // Sample BRDF albedo at position, integrate, and return color
+  BRDFInfo brdf = get_brdf(si, wvls);
+  return d65_n * brdf.r / wvl_pdfs;
 }
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout float alpha) {
@@ -186,12 +187,12 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
   return S;
 }
 
-vec4 Li_debug(in SensorSample sensor_sample, in SamplerState state) {
-  return Li_debug(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state);
-}
-
 vec4 Li(in SensorSample sensor_sample, in SamplerState state, inout float alpha) {
   return Li(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state, alpha);
+}
+
+vec4 Li_debug(in SensorSample sensor_sample, in SamplerState state) {
+  return Li_debug(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state);
 }
 
 #endif // RENDER_PATH_GLSL_GUARD

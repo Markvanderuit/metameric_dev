@@ -108,13 +108,15 @@ namespace met {
 
   void to_json(json &js, const Settings &settings) {
     met_trace();
-    js = {{ "texture_size", settings.texture_size },
-          { "view_i",       settings.view_i       },
-          { "view_scale", settings.view_scale     }};
+    js = {{ "renderer_type", settings.renderer_type },
+          { "texture_size",  settings.texture_size  },
+          { "view_i",        settings.view_i        },
+          { "view_scale",    settings.view_scale    }};
   }
 
   void from_json(const json &js, Settings &settings) {
     met_trace();
+    js.at("renderer_type").get_to(settings.renderer_type);
     js.at("texture_size").get_to(settings.texture_size);
     js.at("view_i").get_to(settings.view_i);
     js.at("view_scale").get_to(settings.view_scale);
@@ -241,19 +243,28 @@ namespace met {
     // Clear out scene first
     *this = { };
 
+    // Normalized D65 integrating to 1 luminance; probably more useful during rendering
+    // than regular D65
+    Spec d65n;
+    {
+      ColrSystem csys = { .cmfs = models::cmfs_cie_xyz, .illuminant = Spec(1) };
+      d65n = models::emitter_cie_d65 / luminance(csys(models::emitter_cie_d65));
+    }
+  
     // Pre-supply some data for an initial scene
     components.settings   = { .name  = "Settings", 
                               .value = { .texture_size = Settings::TextureSize::eHigh }};
     components.observer_i = { .name  = "Default observer", 
                               .value = 0 };
-    resources.illuminants.push("D65",      models::emitter_cie_d65,     false);
-    resources.illuminants.push("E",        models::emitter_cie_e,       false);
-    resources.illuminants.push("FL2",      models::emitter_cie_fl2,     false);
-    resources.illuminants.push("FL11",     models::emitter_cie_fl11,    false);
-    resources.illuminants.push("LED-RGB1", models::emitter_cie_ledrgb1, false);
-    resources.illuminants.push("LED-B1",   models::emitter_cie_ledb1,   false);
-    resources.observers.push("CIE XYZ",    models::cmfs_cie_xyz,        false);
-    resources.meshes.push("Rectangle",     models::unit_rect,           false);
+    resources.illuminants.push("D65",              models::emitter_cie_d65,     false);
+    resources.illuminants.push("D65 (normalized)", d65n,                        false);
+    resources.illuminants.push("E",                models::emitter_cie_e,       false);
+    resources.illuminants.push("FL2",              models::emitter_cie_fl2,     false);
+    resources.illuminants.push("FL11",             models::emitter_cie_fl11,    false);
+    resources.illuminants.push("LED-RGB1",         models::emitter_cie_ledrgb1, false);
+    resources.illuminants.push("LED-B1",           models::emitter_cie_ledb1,   false);
+    resources.observers.push("CIE XYZ",            models::cmfs_cie_xyz,        false);
+    resources.meshes.push("Rectangle",             models::unit_rect,           false);
 
     // Load default basis from file and normalize if not already normalized
     auto basis = io::load_basis("resources/misc/basis_262144.txt");
@@ -287,8 +298,8 @@ namespace met {
       .transform        = { .position = { 0.f, 1.f, 0.f },
                             .rotation = { 0.f, 90.f * std::numbers::pi_v<float> / 180.f, 0.f },
                             .scaling  = .5f },
-      .illuminant_i     = 0,
-      .illuminant_scale = 1e-1
+      .illuminant_i     = 1, // normalized d65
+      .illuminant_scale = 1
     });
     
     // Set state to fresh create

@@ -19,8 +19,9 @@ layout(std140) uniform;
 layout(std430) buffer;
 
 // Specialization constant declarations
-layout(constant_id = 2) const uint max_depth = 4; // Maximum path depth
+layout(constant_id = 2) const uint max_depth = 4;     // Maximum path depth
 layout(constant_id = 3) const bool use_alpha = false; // On initial ray miss, return 0 alpha?
+layout(constant_id = 4) const bool use_debug = false; // Override and enable debug queries
 
 // Uniform buffer declarations
 layout(binding = 0) uniform b_buff_sensor {
@@ -43,27 +44,24 @@ layout(binding = 3) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
-layout(binding = 4) uniform b_buff_textures {
-  TextureInfo data[max_supported_textures];
-} buff_textures;
-layout(binding = 5) uniform b_buff_emitters {
+layout(binding = 4) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[max_supported_objects];
 } buff_emitters;
-layout(binding = 6) restrict readonly buffer b_buff_coeffs {
+layout(binding = 5) restrict readonly buffer b_buff_coeffs {
   BarycentricInfo data[max_supported_objects];
 } buff_coeffs;
-layout(binding = 7) uniform b_buff_wvls_distr {
+layout(binding = 6) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
-layout(binding = 8) uniform b_buff_emitters_distr {
+layout(binding = 7) uniform b_buff_emitters_distr {
   float func_sum;
   float func[max_supported_emitters];
   float cdf[max_supported_emitters + 1];
 } buff_emitters_distr;
-layout(binding = 9) uniform b_buff_envmap_info {
+layout(binding = 8) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
@@ -138,6 +136,8 @@ void main() {
 
   // Running average rgba measure is current value in film
   vec4 measure = imageLoad(b_film, ivec2(xy));
+  if (!use_alpha)
+    measure.w = 1.f;
 
   // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
@@ -147,20 +147,24 @@ void main() {
     SamplerState state         = get_sampler_state(xy, i);
     SensorSample sensor_sample = sample_sensor(sensor, ivec2(xy), i, next_3d(state));
 
-    // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity;
-    // optionally capture alpha
-    float alpha;
-    vec4 L = Li(sensor_sample, state, alpha);
+    if (!use_debug) {      
+      // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity;
+      // optionally capture alpha
+      float alpha;
+      vec4 L = Li(sensor_sample, state, alpha);
 
-    // If alpha is ignored, we output black
-    if (!use_alpha)
-      alpha = 1.f;
+      // If alpha is ignored, we output black
+      if (!use_alpha)
+        alpha = 1.f;
+      
+      // Integrate over color system and add to measure in running average
+      measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(1 + i);
+    } else {
+      // Instead output debug value
+      vec4 L = Li_debug(sensor_sample, state);
+      measure += (vec4(sensor_apply(sensor_sample, L), 1) - measure) / float(1 + i);
+    }
 
-    // Integrate over color system and add to measure in running average
-    measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(1 + i);
-
-    // Instead output debug value
-    // measure += (Li_debug(sensor_sample, state).xyz - measure) / float(i + 1);
   } // for (uint spp_iter)
   
   // Store running average measure to film

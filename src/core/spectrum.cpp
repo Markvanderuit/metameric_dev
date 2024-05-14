@@ -76,7 +76,7 @@ namespace met {
     CMFS csys = (cmfs.array().colwise() * illuminant)
               / (cmfs.array().col(1)    * illuminant).sum();
     if (as_rgb)
-      csys = (models::xyz_to_srgb_transform * csys.matrix().transpose()).transpose().eval();
+      csys = (models::xyz_to_srgb_transform * csys.transpose()).transpose().eval();
     return csys;
   }
   

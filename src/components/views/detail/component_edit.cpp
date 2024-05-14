@@ -14,7 +14,12 @@ namespace met {
       // First, spawn a editor for the variant's specific type; color editor, or texture selector
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.75);
       if (std::holds_alternative<Colr>(variant)) {
-        ImGui::ColorEdit3(std::format("##_{}_value", title).c_str(), std::get<Colr>(variant).data());
+        auto lrgb = std::get<Colr>(variant);
+        ImGui::ColorEdit3(std::format("##_{}_lrgb", title).c_str(), lrgb.data()/* , ImGuiColorEditFlags_Float */);
+        ImGui::SameLine();
+        if (auto srgb = lrgb_to_srgb(lrgb); ImGui::ColorEdit3(std::format("##_{}_srgb", title).c_str(), srgb.data(), ImGuiColorEditFlags_NoInputs /* | ImGuiColorEditFlags_Float */))
+          lrgb = srgb_to_lrgb(srgb);
+        variant = lrgb;
       } else if (std::holds_alternative<uint>(variant)) {
         push_resource_selector(std::format("##_{}_txtr", title), resources, std::get<uint>(variant));
       }

@@ -40,15 +40,17 @@ namespace met::detail {
     using Base = Settings;
     using ComponentStateBase<Base>::m_mutated;
 
-    ComponentState<decltype(Base::texture_size)> texture_size;
-    ComponentState<decltype(Base::view_i)>       view_i;
-    ComponentState<decltype(Base::view_scale)>   view_scale;
+    ComponentState<decltype(Base::renderer_type)> renderer_type;
+    ComponentState<decltype(Base::texture_size)>  texture_size;
+    ComponentState<decltype(Base::view_i)>        view_i;
+    ComponentState<decltype(Base::view_scale)>    view_scale;
 
   public:
     virtual 
     bool update(const Base &o) override {
-      return m_mutated = texture_size.update(o.texture_size) || 
-                         view_i.update(o.view_i) ||
+      return m_mutated = renderer_type.update(o.renderer_type) || 
+                         texture_size.update(o.texture_size)   || 
+                         view_i.update(o.view_i)               ||
                          view_scale.update(o.view_scale);
     }
   };

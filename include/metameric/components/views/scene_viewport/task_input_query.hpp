@@ -97,6 +97,7 @@ namespace met {
       }).max(0.f).eval();
       Colr colr_lrgb_dstr = (cmfs.transpose() * spec_distr.matrix());
       Colr colr_srgb_dstr = lrgb_to_srgb(colr_lrgb_dstr);
+      auto colr_luminance = luminance(colr_lrgb_dstr);
       
       // Attempt a reconstruction of the first vertex spectrum
       {
@@ -105,18 +106,19 @@ namespace met {
         // Plot intergrated color
         ImGui::ColorEdit3("lrgb", colr_lrgb_dstr.data(), ImGuiColorEditFlags_Float);
         ImGui::ColorEdit3("srgb", colr_srgb_dstr.data(), ImGuiColorEditFlags_Float);
+        ImGui::Value("Luminance", colr_luminance);
+        
+        // ImGui::Separator();
 
-        ImGui::Separator();
-
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
-        ImGui::Value("Minimum", spec_distr.minCoeff());
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
-        ImGui::Value("Maximum", spec_distr.maxCoeff());
+        // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
+        // ImGui::Value("Minimum", spec_distr.minCoeff());
+        // ImGui::SameLine();
+        // ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45);
+        // ImGui::Value("Maximum", spec_distr.maxCoeff());
 
         // Run a spectrum plot for the accumulated radiance
         ImGui::Separator();
-        ImGui::PlotSpectrum("##rad_plot", spec_distr, -0.05f, spec_distr.maxCoeff() + 0.05f, { -1, 128.f * e_window.content_scale() });
+        ImGui::PlotSpectrum("##rad_plot", spec_distr, -0.05f, spec_distr.maxCoeff() + 0.05f, { -1, 96.f * e_window.content_scale() });
         
         ImGui::EndTooltip();
       }

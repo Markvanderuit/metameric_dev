@@ -64,7 +64,7 @@ namespace met {
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info("mismatch_hulls").set<std::vector<ConvexHull>>({});
-    /* info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i); */
+    info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
     /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
       if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
         const auto &e_scene = info.global("scene").getr<Scene>();
@@ -122,7 +122,7 @@ namespace met {
     bool tssl_stale = is_first_eval() || e_state.verts.is_resized() || csys_stale;
 
     // Color system spectra within which the 'uplifted' texture is defined
-    auto csys = e_scene.csys(e_csys);
+    auto csys = e_scene.csys(e_csys.value);
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {
@@ -263,16 +263,8 @@ namespace met {
       auto viewer_handle = info.task(viewer_name);
       
       if (tssl_stale && viewer_handle.is_init()) {
-        // Convert delaunay to triangle mesh, then unitize to [0, 1]
+        // Convert delaunay to triangle mesh
         auto mesh = convert_mesh<AlMesh>(m_tesselation);
-        auto inv  = unitize_mesh<AlMesh>(mesh);
-
-        // // Convert to xyY, then refit a convex hull for rendering
-        // std::vector<eig::AlArray3f> xyY = m_tesselation.verts;
-        // rng::transform(xyY, xyY.begin(), lrgb_to_xyz);
-        // rng::transform(xyY, xyY.begin(), xyz_to_xyY);
-        // auto mesh = generate_convex_hull<AlMesh, eig::AlArray3f>(xyY);
-        // rng::for_each(mesh.verts, [](Colr &c) { c.z() = 0.f; });
 
         // Push mesh data and generate vertex array; we do a full, expensive, inefficient copy. 
         // The viewer is only for debugging anyways

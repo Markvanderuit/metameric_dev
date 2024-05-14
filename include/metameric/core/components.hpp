@@ -16,15 +16,26 @@ namespace met {
   struct Settings {
     using state_type = detail::SettingsState;
 
-    // Texture render size; input res, 2048x2048, 1024x1024, or 512x512
-    enum class TextureSize { eFull, eHigh, eMed, eLow } texture_size;
+    // Selected viewport renderer; the rgb renderers are hacked in just for debugging
+    enum class RendererType { 
+      ePath,        // Spectral render, up to fixed path length
+      ePathRGB,     // RGB fallback, up to fixed path length
+      eDirect,      // Spectral render, direct light only
+      eDirectRGB,   // RGB fallback, direct light only
+      eDebug,      // Spectral render, queries a value (eg albedo) and returns
+      eDebugRGB    // RGB fallback, queries a value (eg albedo) and returns
+    } renderer_type = RendererType::ePath;
+
+    // Clamped texture sizes in atlas; input res, 2048x2048, 1024x1024, or 512x512
+    enum class TextureSize { 
+      eFull, eHigh, eMed, eLow 
+    } texture_size = TextureSize::eHigh;
 
     // View component linked to scene viewport
     uint view_i = 0;
 
     // Render scaling used for scene viewport
     float view_scale   = .5f;  
-
 
   public: // Boilerplate  
     auto operator<=>(const Settings &) const = default;
@@ -201,6 +212,23 @@ namespace std {
   struct std::formatter<met::Uplifting::Vertex::cnstr_type> : std::formatter<string_view> {
     auto format(const met::Uplifting::Vertex::cnstr_type& constraint, std::format_context& ctx) const {
       auto s = constraint | met::visit { [&](const auto &arg) { return std::format("{}", arg); } };
+      return std::formatter<std::string_view>::format(s, ctx);
+    }
+  };
+
+  // Format Settings::RendererType, wich is an enum class
+  template <>
+  struct std::formatter<met::Settings::RendererType> : std::formatter<string_view> {
+    auto format(const met::Settings::RendererType& ty, std::format_context& ctx) const {
+      std::string s;
+      switch (ty) {
+        case met::Settings::RendererType::ePath      : s = "path";         break;
+        case met::Settings::RendererType::ePathRGB   : s = "path (rgb)";   break;
+        case met::Settings::RendererType::eDirect    : s = "direct";       break;
+        case met::Settings::RendererType::eDirectRGB : s = "direct (rgb)"; break;
+        case met::Settings::RendererType::eDebug     : s = "debug";        break;
+        case met::Settings::RendererType::eDebugRGB  : s = "debug (rgb)";  break;
+      };
       return std::formatter<std::string_view>::format(s, ctx);
     }
   };

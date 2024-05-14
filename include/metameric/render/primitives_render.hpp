@@ -4,6 +4,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/render/detail/primitives.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/sampler.hpp>
 
 namespace met {
   // Helper struct for creation of GBufferPrimitive
@@ -40,6 +41,9 @@ namespace met {
     // Render pixels each other frame, alternating between checkerboards
     bool pixel_checkerboard = false;
 
+    // Query a value (e.g. albedo), integrate it, and return
+    bool enable_debug = false;
+
     // Program cache; enforced given the shader's long compile time
     ResourceHandle cache_handle;
   };
@@ -58,6 +62,9 @@ namespace met {
 
     // Render pixels each other frame, alternating between checkerboards
     bool pixel_checkerboard = false;
+    
+    // Query a value (e.g. albedo) and return
+    bool enable_debug = false;
 
     // Program cache; enforced given the shader's long compile time
     ResourceHandle cache_handle;
@@ -120,6 +127,8 @@ namespace met {
 
     // Internal GL objects
     gl::ComputeInfo m_dispatch;
+    gl::Sampler     m_sampler; // linear sampler
+
 
   public:
     using InfoType = PathRenderPrimitiveInfo;
@@ -142,6 +151,7 @@ namespace met {
 
     // Internal GL objects
     gl::ComputeInfo m_dispatch;
+    gl::Sampler     m_sampler; // linear sampler
 
   private: // Helpers for gl-side RGB value overrides for illuminants
     gl::Buffer              m_illm_colr_buffer;

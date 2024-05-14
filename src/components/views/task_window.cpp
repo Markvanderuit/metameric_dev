@@ -3,6 +3,7 @@
 #include <metameric/components/schedule.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/views/task_window.hpp>
+#include <metameric/components/views/task_export.hpp>
 #include <metameric/components/views/task_settings_editor.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
@@ -322,6 +323,12 @@ namespace met {
         if (ImGui::MenuItem("Settings", nullptr, nullptr)) {
           if (auto handle = info.child_task("settings_editor"); !handle.is_init()) {
             handle.init<SettingsEditorTask>();
+          }
+        }
+
+        if (ImGui::MenuItem("Render to file...", nullptr, nullptr)) {
+          if (auto handle = info.child_task("export_view"); !handle.is_init()) {
+            handle.init<ExportTask>();
           }
         }
 

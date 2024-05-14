@@ -3,6 +3,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/render/detail/primitives.hpp>
+#include <small_gl/sampler.hpp>
 
 namespace met {
   // Helper object for creation of PathQueryPrimitive and PartialPathQueryPrimitive
@@ -31,6 +32,9 @@ namespace met {
     uint                   *m_output_head_map;
     std::span<PathRecord>   m_output_data_map;
     mutable gl::sync::Fence m_output_sync;
+
+    // Internal GL objects
+    gl::Sampler m_sampler; // linear sampler
     
   public:
     using InfoType = PathQueryPrimitiveInfo;

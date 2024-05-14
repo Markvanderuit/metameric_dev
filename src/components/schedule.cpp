@@ -159,7 +159,7 @@ namespace met {
       ImGui::End();
     });
 
-    // scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
+    scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
     scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene resources")) {
@@ -169,7 +169,7 @@ namespace met {
                                                     .show_dupl   = false });
         push_editor<detail::Resource<Image>>(info, { .editor_name = "Textures",
                                                      .show_add    = false,
-                                                     .show_del    = false,
+                                                     .show_del    = true,
                                                      .show_dupl   = false });
       }
       ImGui::End();
@@ -185,7 +185,7 @@ namespace met {
     //   } catch (const std::exception &e) { /* Ignore; gnome not loaded yet */ }
     // });
 
-    scheduler.task("mesh_viewport").init<SceneViewportTask>();
+    scheduler.task("viewport").init<SceneViewportTask>();
 
     // Insert temporary unimportant tasks
     submit_schedule_debug(scheduler);

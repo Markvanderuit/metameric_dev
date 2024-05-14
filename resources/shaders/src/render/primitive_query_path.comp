@@ -42,27 +42,24 @@ layout(binding = 3) uniform b_buff_meshes {
   uint n;
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
-layout(binding = 4) uniform b_buff_textures {
-  TextureInfo data[max_supported_textures];
-} buff_textures;
-layout(binding = 5) uniform b_buff_emitters {
+layout(binding = 4) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[max_supported_emitters];
 } buff_emitters;
-layout(binding = 6) restrict readonly buffer b_buff_coeffs {
+layout(binding = 5) restrict readonly buffer b_buff_coeffs {
   BarycentricInfo data[max_supported_objects];
 } buff_coeffs;
-layout(binding = 7) uniform b_buff_wvls_distr {
+layout(binding = 6) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
-layout(binding = 8) uniform b_buff_emitters_distr {
+layout(binding = 7) uniform b_buff_emitters_distr {
   float func_sum;
   float func[max_supported_emitters];
   float cdf[max_supported_emitters + 1];
 } buff_emitters_distr;
-layout(binding = 9) uniform b_buff_envmap_info {
+layout(binding = 8) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
@@ -81,12 +78,10 @@ layout(binding = 2) restrict coherent buffer b_buff_output {
 } buff_output;
 
 // Texture/image units, ergo samplers and output images
-layout(binding = 0) uniform sampler2DArray  b_txtr_1f; // Alpha texture atlas
-layout(binding = 1) uniform sampler2DArray  b_txtr_3f; // RGB texture atlas
-layout(binding = 2) uniform sampler1DArray  b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 3) uniform sampler1DArray  b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 4) uniform sampler1DArray  b_bsis_1f; // Basis function data, 1 component
-layout(binding = 5) uniform usampler2DArray b_coef_4f; // Warp data for spectral MESE
+layout(binding = 0) uniform sampler1DArray  b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 1) uniform sampler1DArray  b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 2) uniform sampler1DArray  b_bsis_1f; // Basis function data, 1 component
+layout(binding = 3) uniform usampler2DArray b_coef_4f; // Warp data for spectral MESE
 
 // Shared memory declarations
 shared ObjectInfo      s_objc_info[max_supported_objects];

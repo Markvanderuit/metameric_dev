@@ -7,6 +7,7 @@
 #include <small_gl/dispatch.hpp>
 #include <small_gl/framebuffer.hpp>
 #include <small_gl/program.hpp>
+#include <small_gl/sampler.hpp>
 
 namespace met {
   class GenObjectDataTask : public detail::TaskNode {
@@ -22,6 +23,7 @@ namespace met {
     gl::Buffer       m_unif_buffer;
     UnifLayout      *m_unif_map;
     gl::Framebuffer  m_fbo;
+    gl::Sampler      m_sampler;
 
     // Keys for program caches
     std::string m_cache_key_txtr; // Program for texture handling
