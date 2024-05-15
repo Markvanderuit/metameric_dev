@@ -341,11 +341,12 @@ namespace met::detail {
   // Pack 12 signed norm-bounded values into 11 and 10 bits, respectively
   inline
   eig::Array4u pack_snorm_12(const eig::Vector<float, 12> &v) {
-    constexpr auto pack = [](float f, float scale) -> uint { 
-      return static_cast<uint>(std::round((std::clamp(f, -1.f, 1.f) + 1.f) * 0.5f * scale));
+    constexpr auto pack = [](float f, uint bits) -> uint { 
+      float f_ = std::clamp((f + 1.f) * .5f, 0.f, 1.f); // to [0, 1]
+      return static_cast<uint>(std::round(f_ * static_cast<float>((1 << bits) - 1)));
     };
-    constexpr auto pack_11 = std::bind(pack, std::placeholders::_1, 2048.f);
-    constexpr auto pack_10 = std::bind(pack, std::placeholders::_1, 1024.f);
+    constexpr auto pack_11 = std::bind(pack, std::placeholders::_1, 11);
+    constexpr auto pack_10 = std::bind(pack, std::placeholders::_1, 10);
 
     union pack_t { 
       struct {
@@ -371,11 +372,11 @@ namespace met::detail {
   inline
   eig::Vector<float, 12> unpack_snorm_12(const eig::Array4u &p) {
     constexpr auto unpack_11 = [](uint i) -> float { 
-      float f = static_cast<float>(i) / 2048.f;
+      float f = static_cast<float>(i) / static_cast<float>((1 << 11) - 1);
       return f * 2.f - 1.f;
     };
     constexpr auto unpack_10 = [](uint i) -> float {
-      float f = static_cast<float>(i) / 1024.f;
+      float f = static_cast<float>(i) / static_cast<float>((1 << 10) - 1);
       return f * 2.f - 1.f;
     };
     

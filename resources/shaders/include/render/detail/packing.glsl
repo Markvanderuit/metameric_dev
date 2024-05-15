@@ -30,23 +30,56 @@ struct BVHNodePack {
   uint child_aabb1[4]; // per child: lo.z | hi.z
 };
 
+float[8] unpack_snorm_8(in uvec4 p) {
+  float[8] m;
+  vec2 f2;
+  f2 = unpackSnorm2x16(p[0]);
+  m[0] = f2.x;
+  m[1] = f2.x;
+  f2 = unpackSnorm2x16(p[1]);
+  m[2] = f2.x;
+  m[3] = f2.x;
+  f2 = unpackSnorm2x16(p[2]);
+  m[4] = f2.x;
+  m[5] = f2.x;
+  f2 = unpackSnorm2x16(p[3]);
+  m[6] = f2.x;
+  m[7] = f2.x;
+  return m;
+}
+
 float[12] unpack_snorm_12(in uvec4 p) {
   float[12] m;
   for (int i = 0; i < 12; ++i) {
     uint j = bitfieldExtract(p[i / 3],                // 0,  0,  0,  1,  1,  1,  ...
                              (i % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
                              (i % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
-    float scale = i % 3 == 2 ? 0.0009765625f : 0.0004882813f;
-    m[i] = float(j) * scale * 2.f - 1.f;
+
+    float scale = i % 3 == 2 
+                ? float((1 << 10) - 1) 
+                : float((1 << 11) - 1);
+                
+    m[i] = (float(j) / scale) * 2.f - 1.f;
   }
   return m;
+}
+
+uvec4 pack_snorm_8(in float[8] v) {
+  uvec4 p;
+  p[0] = packSnorm2x16(vec2(v[0], v[1]));
+  p[1] = packSnorm2x16(vec2(v[2], v[3]));
+  p[2] = packSnorm2x16(vec2(v[4], v[5]));
+  p[3] = packSnorm2x16(vec2(v[6], v[7]));
+  return p;
 }
 
 uvec4 pack_snorm_12(in float[12] v) {
   uvec4 p;
   for (int i = 0; i < 12; ++i) {
-    float scale = i % 3 == 2 ? 1024.f : 2048.f;
-    uint j = uint(round((v[i] + 1.f) * .5f * scale));
+    float scale = i % 3 == 2 
+                ? float((1 << 10) - 1) 
+                : float((1 << 11) - 1);
+    uint j = uint(round(clamp((v[i] + 1.f) * .5f, 0.f, 1.f) * scale));
     p[i / 3] = bitfieldInsert(p[i / 3],                // 0,  0,  0,  1,  1,  1,  ...
                               j,
                               (i % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
@@ -54,6 +87,7 @@ uvec4 pack_snorm_12(in float[12] v) {
   }
   return p;
 }
+
 float[16] unpack_snorm_16(in uvec4 p) {
   float[16] m;
   vec4 f4;
@@ -98,6 +132,34 @@ float[8] unpack_half_8x16(in uvec4 p) {
 uvec4 pack_half_8x16(in float[8] m) {
   return uvec4(packHalf2x16(vec2(m[0], m[1])), packHalf2x16(vec2(m[2], m[3])),
                packHalf2x16(vec2(m[4], m[5])), packHalf2x16(vec2(m[6], m[7])));
+}
+
+float[wavelength_bases] unpack_bases(in uvec4 p) {
+  float[wavelength_bases] v;
+#if   MET_WAVELENGTH_BASES == 16
+  v = unpack_snorm_16(p);
+#elif MET_WAVELENGTH_BASES == 12
+  v = unpack_snorm_12(p);
+#elif MET_WAVELENGTH_BASES == 8
+  v = unpack_snorm_8(p);
+#else
+  // ...
+#endif;
+  return v;
+}
+
+uvec4 pack_bases(in float[wavelength_bases] v) {
+  uvec4 p;
+#if   MET_WAVELENGTH_BASES == 16
+  p = pack_snorm_16(v);
+#elif MET_WAVELENGTH_BASES == 12
+  p = pack_snorm_12(v);
+#elif MET_WAVELENGTH_BASES == 8
+  p = pack_snorm_8(v);
+#else
+  // ...
+#endif;
+  return p;
 }
 
 #endif // RENDER_DETAIL_PACKING_GLSL_GUARD
