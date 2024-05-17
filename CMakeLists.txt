@@ -21,7 +21,7 @@ set(MET_WAVELENGTH_BASES    16) # Maximum nr. of bases used in generative functi
 
 # TODO remove
 set(MET_GENERALIZED_WEIGHTS 16) # Maximum nr. of generalized convex weights supported TODO remove
-set(MET_MOMENT_COEFFICIENTS 16) # Nr. of coeffs used for moment-based spectral representation
+set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral representation
 
 # Define some constants as available on both shader and program side
 set(MET_SUPPORTED_MESHES        48) # Maximum supported scene meshes

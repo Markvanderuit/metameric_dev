@@ -43,7 +43,7 @@ namespace met {
       spec = e_spectra[e_cs.vertex_i];
       unpacked_coeffs = detail::unpack_snorm_16(detail::pack_snorm_16(e_coeffs[e_cs.vertex_i]));
       unpacked_spec   = e_basis(coeffs);
-    }  
+    }
     
     // Encapsulate editable data, so changes are saved in an undoable manner
     detail::encapsulate_scene_data<ComponentType>(info, e_cs.uplifting_i, [&](auto &info, uint i, ComponentType &uplf) {

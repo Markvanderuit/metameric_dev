@@ -338,12 +338,32 @@ namespace met::detail {
     return v;
   }
 
+  inline
+  eig::Array4u pack_snorm_8(const eig::Vector<float, 8> &v) {
+    eig::Array4u p;
+    p[0] = pack_snorm_2x16(v(eig::seqN(0, 2)));
+    p[1] = pack_snorm_2x16(v(eig::seqN(2, 2)));
+    p[2] = pack_snorm_2x16(v(eig::seqN(4, 2)));
+    p[3] = pack_snorm_2x16(v(eig::seqN(6, 2)));
+    return p;
+  }
+
+  inline
+  eig::Vector<float, 8> unpack_snorm_8(const eig::Array4u &p) {
+    eig::Vector<float, 8> v;
+    v(eig::seqN(0, 2)) = detail::unpack_snorm_2x16(p[0]);
+    v(eig::seqN(2, 2)) = detail::unpack_snorm_2x16(p[1]);
+    v(eig::seqN(4, 2)) = detail::unpack_snorm_2x16(p[2]);
+    v(eig::seqN(6, 2)) = detail::unpack_snorm_2x16(p[3]);
+    return v;
+  }
+
   // Pack 12 signed norm-bounded values into 11 and 10 bits, respectively
   inline
   eig::Array4u pack_snorm_12(const eig::Vector<float, 12> &v) {
     constexpr auto pack = [](float f, uint bits) -> uint { 
       float f_ = std::clamp((f + 1.f) * .5f, 0.f, 1.f); // to [0, 1]
-      return static_cast<uint>(std::round(f_ * static_cast<float>((1 << bits) - 1)));
+      return static_cast<uint>(std::clamp(std::round(f_ * static_cast<float>((1 << bits) - 1)), 0.f, static_cast<float>(1 << bits)));
     };
     constexpr auto pack_11 = std::bind(pack, std::placeholders::_1, 11);
     constexpr auto pack_10 = std::bind(pack, std::placeholders::_1, 10);
@@ -376,7 +396,7 @@ namespace met::detail {
       return f * 2.f - 1.f;
     };
     constexpr auto unpack_10 = [](uint i) -> float {
-      float f = static_cast<float>(i) / static_cast<float>((1 << 10) - 1);
+    float f = static_cast<float>(i) / static_cast<float>((1 << 10) - 1);
       return f * 2.f - 1.f;
     };
     

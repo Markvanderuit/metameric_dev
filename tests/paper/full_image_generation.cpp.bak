@@ -1,0 +1,406 @@
+#include <catch2/catch_test_macros.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/core/constraints.hpp>
+#include <metameric/core/matching.hpp>
+#include <metameric/core/math.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/ranges.hpp>
+#include <metameric/core/distribution.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/metamer.hpp>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/json.hpp>
+#include <metameric/core/io.hpp>
+#include <metameric/core/utility.hpp>
+#include <metameric/core/image.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/components/schedule.hpp>
+#include <metameric/components/misc/task_frame_begin.hpp>
+#include <metameric/components/misc/task_frame_end.hpp>
+#include <metameric/components/views/task_window.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/task_viewport.hpp>
+#include <metameric/components/views/detail/task_arcball_input.hpp>
+#include <small_gl/window.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/array.hpp>
+#include <small_gl/dispatch.hpp>
+#include <small_gl/utility.hpp>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <algorithm>
+#include <execution>
+#include <sstream>
+
+using namespace met;
+
+constexpr uint n_boundary_samples = 128;
+std::string    scene_name         = "colorchecker";
+constexpr bool pack_roundtrip     = false;
+constexpr bool generate_bsis      = false; // Individually uplift pixels and downsample again
+constexpr bool generate_bsis_tssl = false; // Use tessellation to uplift pixels, then downsample
+constexpr bool generate_mese      = false; // Individually uplift pixels, represent using bounded MESE and downsample again
+constexpr bool generate_mese_tssl = false; // Use tessellation to uplift pixels, represent using bounded MESE, then downsample
+
+fs::path base_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Figures/full color roundtrip";
+
+// Assumes value is in [0, 1]
+auto pack_4xu32(auto v) {
+  if constexpr (decltype(v)::RowsAtCompileTime == 12)
+    return detail::pack_snorm_12(v);
+  else if constexpr (decltype(v)::RowsAtCompileTime == 16)
+    return detail::pack_snorm_16(v);
+  else if constexpr (decltype(v)::RowsAtCompileTime == 8)
+    return detail::pack_snorm_8(v);
+  else
+    debug::check_expr(false, "Not implemented");
+}
+
+// Assumes value is in [0, 1]
+template <uint N>
+auto unpack_4xu32(auto v) {
+  if constexpr (N == 12)
+    return detail::unpack_snorm_12(v);
+  else if constexpr (N == 16)
+    return detail::unpack_snorm_16(v);
+  else if constexpr (N == 8)
+    return detail::unpack_snorm_8(v);
+  else
+    debug::check_expr(false, "Not implemented");
+}
+
+TEST_CASE("bsis") {
+  guard(generate_bsis);
+
+  // Load spectral basis, normalize if not already normalized
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  for (auto col : basis.func.colwise()) {
+    auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+    
+    col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
+  }
+
+  fs::path inpt_path = base_path / "inputs" / std::format("{}.exr", scene_name);
+  fs::path oupt_path = pack_roundtrip 
+                     ? (base_path / "results_bsis" / std::format("{}_{}_packed.exr", scene_name, wavelength_bases))
+                     : (base_path / "results_bsis" / std::format("{}_{}.exr", scene_name, wavelength_bases));
+
+  fmt::print("[\n {}\n ->\n {}\n]\n", inpt_path.string(), oupt_path.string());
+  
+  // Load input
+  Image img = {{ .path = inpt_path }};
+
+  // Uplift, then downsample again for roundtrip
+  {
+    ColrSystem csys = {
+      .cmfs       = models::cmfs_cie_xyz,
+      .illuminant = models::emitter_cie_d65
+    };
+
+    Image copy = img;
+    #pragma omp parallel for
+    for (int j = 0; j < copy.size().y(); ++j) {
+      for (int i = 0; i < copy.size().x(); ++i) {
+        auto colr = img.get_pixel({ i, j }).head<3>().eval();
+
+        // Uplift to coefficients
+        auto coef = generate_spectrum_coeffs(DirectSpectrumInfo {
+          .direct_constraints = {{ csys, colr }}, .basis = basis,
+        });
+
+        // Roundtrip pack-upack coeffs
+        if (pack_roundtrip)
+          coef = unpack_4xu32<wavelength_bases>(pack_4xu32(coef));
+
+        // Uplift to spectrum
+        auto spec = basis(coef);
+
+        // Downsample to color, store output
+        if (!colr.isZero())
+          colr = csys(spec);
+        copy.set_pixel({ i, copy.size().y() - 1 - j }, (eig::Array4f() << colr, 1).finished());
+      }
+    }
+    img = copy;
+  }
+
+  // Save output
+  img.save_exr(oupt_path);
+}
+
+TEST_CASE("bsis_tssl") {
+  guard(generate_bsis_tssl);
+
+  // Load spectral basis
+  // Normalize if they not already normalized
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  for (auto col : basis.func.colwise()) {
+    auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+    col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
+  }
+
+  fs::path inpt_path = base_path / "inputs" / std::format("{}.exr", scene_name);
+  fs::path oupt_path = pack_roundtrip 
+                     ? (base_path / "results_bsis_tssl" / std::format("{}_{}_packed.exr", scene_name, wavelength_bases))
+                     : (base_path / "results_bsis_tssl" / std::format("{}_{}.exr", scene_name, wavelength_bases));
+
+  fmt::print("[\n {}\n ->\n {}\n]\n", inpt_path.string(), oupt_path.string());
+
+  // Load input
+  Image img = {{ .path = inpt_path }};
+
+  // Uplift, then downsample again for roundtrip
+  {
+    auto rgba  = img.data<eig::Array4f>();
+
+    // Input color system
+    ColrSystem csys = {
+      .cmfs       = models::cmfs_cie_xyz,
+      .illuminant = models::emitter_cie_d65
+    };
+    
+    // Generate color system tessellation; boundary spectra only
+    auto ocs_coeffs = generate_color_system_ocs_coeffs({ .direct_objective = csys,
+                                                         .basis            = basis,
+                                                         .seed             = 4,
+                                                         .n_samples        = n_boundary_samples });
+
+    // Generate corresponding spectra and colors
+    std::vector<Spec> ocs_spectra(ocs_coeffs.size());
+    std::vector<Colr> ocs_colors(ocs_coeffs.size());
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_coeffs), 
+                    ocs_spectra.begin(), 
+                    [&](const auto &coef) { return basis(coef); });
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_spectra), 
+                    ocs_colors.begin(), 
+                    [&](const auto &spec) { return csys(spec); });
+
+    // Generate tessellation
+    ConvexHull chull = ConvexHull::build(ocs_colors);
+
+    // Uplift image multithreaded
+    Image copy = img;
+    #pragma omp parallel for
+    for (int j = 0; j < copy.size().y(); ++j) {
+      for (int i = 0; i < copy.size().x(); ++i) {
+        auto colr = img.get_pixel({ i, j }).head<3>().eval();
+
+        // Find enclosing simplex in tessellation
+        auto [bary, elem] = chull.find_enclosing_elem(colr);
+        auto coeffs       = elem | index_into_view(ocs_coeffs) | rng::to<std::vector>();
+        
+        // Linear combination reconstructs coefficients and spectrum for this metamer
+        auto coef =(bary[0] * coeffs[0] + bary[1] * coeffs[1]
+                  + bary[2] * coeffs[2] + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
+
+        // Roundtrip pack-upack coeffs
+        if (pack_roundtrip)
+          coef = unpack_4xu32<wavelength_bases>(pack_4xu32(coef));
+
+        // Uplift to spectrum
+        auto spec = basis(coef);
+
+        // Downsample to color, store output
+        if (!colr.isZero())
+          colr = csys(spec);
+        copy.set_pixel({ i, copy.size().y() - 1 - j }, (eig::Array4f() << colr, 1).finished());
+      }
+    }
+    img = copy;
+  }
+
+  // Save output
+  img.save_exr(oupt_path);
+}
+
+TEST_CASE("mese") {
+  guard(generate_mese);
+
+  // Load spectral basis
+  // Normalize if they not already normalized
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  for (auto col : basis.func.colwise()) {
+    auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff(); 
+    col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
+  }
+
+  fs::path inpt_path = base_path / "inputs" / std::format("{}.exr", scene_name);
+  fs::path oupt_path = pack_roundtrip 
+                     ? (base_path / "results_mese" / std::format("{}_{}_packed.exr", scene_name, wavelength_bases))
+                     : (base_path / "results_mese" / std::format("{}_{}.exr", scene_name, wavelength_bases));
+
+  fmt::print("[\n {}\n ->\n {}\n]\n", inpt_path.string(), oupt_path.string());
+
+  // Load input
+  Image img = {{ .path = inpt_path }};
+
+  // Uplift, then downsample again for roundtrip
+  {
+    ColrSystem csys = {
+      .cmfs       = models::cmfs_cie_xyz,
+      .illuminant = models::emitter_cie_d65
+    };
+
+    Image copy = img;
+    #pragma omp parallel for
+    for (int j = 0; j < copy.size().y(); ++j) {
+      for (int i = 0; i < copy.size().x(); ++i) {
+        auto colr = img.get_pixel({ i, j }).head<3>().eval();
+
+        // Fit closest smooth spectrum
+        auto [spec, _] = generate_spectrum(DirectSpectrumInfo {
+          .direct_constraints = {{ csys, colr }}, .basis = basis,
+        });
+
+        // Fit bounded MESE coefficients
+        auto coef = spectrum_to_moments(spec);
+
+        // Roundtrip pack-upack coeffs
+        if (pack_roundtrip)
+          coef = unpack_4xu32<moment_coeffs>(pack_4xu32(coef));
+
+        // Uplift to spectrum
+        spec = moments_to_spectrum(coef);
+
+        // Downsample to color, store output
+        colr = csys(spec);
+        /* if ((colr > 0.001f).any())
+          colr = csys(spec); */
+        copy.set_pixel({ i, copy.size().y() - 1 - j }, (eig::Array4f() << colr, 1).finished());
+      }
+    }
+    img = copy;
+  }
+
+  // Save output
+  img.save_exr(oupt_path);
+}
+
+TEST_CASE("mese_tssl") {
+  guard(generate_mese_tssl);
+
+  // Load spectral basis
+  // Normalize if they not already normalized
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  for (auto col : basis.func.colwise()) {
+    auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+    col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
+  }
+
+  fs::path inpt_path = base_path / "inputs" / std::format("{}.exr", scene_name);
+  fs::path oupt_path = pack_roundtrip 
+                     ? (base_path / "results_mese_tssl" / std::format("{}_{}_packed.exr", scene_name, wavelength_bases))
+                     : (base_path / "results_mese_tssl" / std::format("{}_{}.exr", scene_name, wavelength_bases));
+  
+  fmt::print("[\n {}\n ->\n {}\n]\n", inpt_path.string(), oupt_path.string());
+
+  // Load input
+  Image img = {{ .path = inpt_path }};
+
+  // Uplift, then downsample again for roundtrip
+  {
+    // Input color system
+    ColrSystem csys = {
+      .cmfs       = models::cmfs_cie_xyz,
+      .illuminant = models::emitter_cie_d65
+    };
+    
+    // Generate color system tessellation; boundary spectra only
+    auto ocs_coeffs = generate_color_system_ocs_coeffs({ .direct_objective = csys,
+                                                          .basis            = basis,
+                                                          .seed             = 4,
+                                                          .n_samples        = n_boundary_samples });
+
+    // Generate corresponding spectra, coefficients and colors
+    std::vector<Spec>    ocs_spectra(ocs_coeffs.size());
+    std::vector<Moments> ocs_moments(ocs_coeffs.size());
+    std::vector<Colr>    ocs_colors(ocs_coeffs.size());
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_coeffs), 
+                    ocs_spectra.begin(), 
+                    [&](const auto &coef) { return basis(coef); });
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_spectra), 
+                    ocs_moments.begin(), 
+                    spectrum_to_moments);
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_moments), 
+                    ocs_colors.begin(), 
+                    [&](const auto &coef) { return csys(moments_to_spectrum(coef)); });
+    
+    // Bounded MESE struggles heavily with OCS boundary spectra for some reason. To avoid unecessary error,
+    // we reproduce the boundary, shrunk slightly inwards where results are slightly better.
+    /* std::vector<Colr>    ocs_colors_shrunk(ocs_coeffs.size());
+    std::vector<Spec>    ocs_spectra_shrunk(ocs_coeffs.size());
+    std::vector<Moments> ocs_moments_shrunk(ocs_coeffs.size());
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_colors_shrunk), 
+                    ocs_colors_shrunk.begin(), 
+                    [&](const auto &c) { 
+                      auto dir = (Colr(0.5) - c).matrix().normalized().eval();
+                      return (c + .1f * dir.array()).eval();
+                    });
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_colors_shrunk), 
+                    ocs_spectra_shrunk.begin(), 
+                    [&](const auto &c) { 
+                      auto [spec, _] = generate_spectrum(DirectSpectrumInfo {
+                        .direct_constraints = {{ csys, c }}, .basis = basis,
+                      });
+                      return spec;
+                    });
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_spectra_shrunk), 
+                    ocs_moments_shrunk.begin(), 
+                    spectrum_to_moments);
+    std::transform(std::execution::par_unseq, 
+                    range_iter(ocs_moments), 
+                    ocs_colors_shrunk.begin(), 
+                    [&](const auto &coef) { return csys(moments_to_spectrum(coef)); }); */
+    
+    // ocs_colors.append_range(ocs_colors_shrunk);
+    // ocs_spectra.append_range(ocs_spectra_shrunk);
+    // ocs_moments.append_range(ocs_moments_shrunk);
+
+    // Generate tessellation
+    ConvexHull chull = ConvexHull::build(ocs_colors);
+
+    // Uplift image multithreaded
+    Image copy = img;
+    #pragma omp parallel for
+    for (int j = 0; j < copy.size().y(); ++j) {
+      for (int i = 0; i < copy.size().x(); ++i) {
+        auto colr = img.get_pixel({ i, j }).head<3>().eval();
+
+        // Find enclosing simplex in tessellation
+        auto [bary, elem] = chull.find_enclosing_elem(colr);
+        auto moments      = elem | index_into_view(ocs_moments) | rng::to<std::vector>();
+        // auto spectra      = elem | index_into_view(ocs_spectra) | rng::to<std::vector>();
+
+        // Linear combination reconstructs coefficients and spectrum for this metamer
+        auto mmnt =(bary[0] * moments[0] + bary[1] * moments[1]
+                  + bary[2] * moments[2] + bary[3] * moments[3]).eval();
+
+        // Roundtrip pack-upack coeffs
+        if (pack_roundtrip)
+          mmnt = unpack_4xu32<moment_coeffs>(pack_4xu32(mmnt)).eval();
+        
+        // Uplift to spectrum
+        auto spec = moments_to_spectrum(mmnt).cwiseMax(0.f).cwiseMin(1.f).eval();
+
+        // Downsample to color, store output
+        // Clip small values; mese seems to flip around sometimes for near-blacks.
+        if (auto colr_ = csys(spec); (colr - colr_).abs().sum() <= 0.025)
+          colr = csys(spec);
+        copy.set_pixel({ i, copy.size().y() - 1 - j }, (eig::Array4f() << colr, 1).finished());
+      }
+    }
+    img = copy;
+  }
+
+  // Save output
+  img.save_exr(oupt_path);
+}
