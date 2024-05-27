@@ -2,6 +2,7 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
 #include <metameric/core/metamer.hpp>
+#include <metameric/core/moments.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
 #include <metameric/core/matching.hpp>
@@ -234,9 +235,10 @@ namespace met {
         [&](const IndirectSurfaceConstraint &cstr) {
           if (ImGui::BeginTabBar("##tab_bar")) {
             if (ImGui::BeginTabItem("Reflectance")) {
-              std::vector<Spec>        data = { spec, unpacked_spec };
-              std::vector<std::string> lgnd = { "Exact", "Packed"   };
-              ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
+              // std::vector<Spec>        data = { spec, unpacked_spec };
+              // std::vector<std::string> lgnd = { "Exact", "Packed" };
+              // ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
+              ImGui::PlotSpectrum("##output_refl_plot", spec, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Coefficients")) {
@@ -267,9 +269,7 @@ namespace met {
               ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 128.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
-
             ImGui::EndTabBar();
-            ImGui::SameLine();  if (ImGui::SmallButton("Print")) fmt::print("{}\n", spec); // Reenable for printing
           }
         },
         [&](const auto &cstr) {
@@ -281,9 +281,10 @@ namespace met {
               io::save_spec(path, spec);
           } */
           // ImGui::PlotSpectrum("##output_refl_plot", spec, -0.05f, 1.05f, { -1.f, 80.f * e_window.content_scale() });
-          std::vector<Spec>        data = { spec, unpacked_spec };
-          std::vector<std::string> lgnd = { "Exact", "Packed" };
-          ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
+          // std::vector<Spec>        data = { spec, unpacked_spec };
+          // std::vector<std::string> lgnd = { "Exact", "Packed" };
+          // ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
+          ImGui::PlotSpectrum("##output_refl_plot", spec, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
         }
       };
       
@@ -403,9 +404,8 @@ namespace met {
       if (vert.has_mismatching(e_scene, uplf.value)) {
         // Visual separator from editing components drawn in previous tasks
         ImGui::SeparatorText("Mismatching");
-
         
-        if (ImGui::SmallButton("Save image")) {
+        /* if (ImGui::SmallButton("Save image")) {
           if (fs::path path; detail::save_dialog(path, "exr")) {
             // Get shared texture resource
             const auto &e_txtr = info.relative("viewport_image")("lrgb_target").getr<gl::Texture2d4f>();
@@ -426,10 +426,25 @@ namespace met {
           }
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("Print hull")) {
+        if (ImGui::SmallButton("Print hull data")) {
           fmt::print("verts\n{}\n\n", e_hull.hull.verts);
           fmt::print("elems\n{}\n\n", e_hull.hull.elems);
         }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Print reflectance")) {
+          fmt::print("{}\n", spec);
+        }
+        
+        vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
+          if (ImGui::SmallButton("Print power series")) {
+            for (uint i = 0; i < cstr.cstr_j_indrct.size(); ++i) {
+              fmt::print("cstr {}\n", i);
+              for (uint j = 0; j < cstr.cstr_j_indrct[i].powr_j.size(); ++j) {
+                fmt::print("  {} : {}\n", j, cstr.cstr_j_indrct[i].powr_j[j]);
+              }
+            }
+          }
+        }); */
 
         /* // Toggle button for clipping
         auto &e_clip = info.relative("viewport_guizmo")("clip_point").getw<bool>();

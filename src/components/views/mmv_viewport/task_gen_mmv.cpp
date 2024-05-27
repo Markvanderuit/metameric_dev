@@ -14,7 +14,7 @@
 #include <execution>
 
 namespace met {
-  constexpr bool export_unitized_mesh = true; // Scale mesh to a [0,1]-bounding box for better input later on
+  constexpr bool export_unitized_mesh = true; // Scale mesh to a [0,1]-bounding box for easier editing; masks the true size of mismatch volumes, which can be very small
 
   void GenMMVTask::init(SchedulerHandle &info) {
     met_trace();

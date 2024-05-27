@@ -84,11 +84,11 @@ namespace met {
         m_coef_samples.clear();
       }
 
+      // Return zero constraint for inactive vertices
+      guard(vert.is_active, { Colr(0), Spec(0), Basis::vec_type(0) });
+      
       // If a mismatch volume exists
       if (chull.has_delaunay()) {
-      // Return zero constraint for inactive vertices
-        guard(vert.is_active, { Colr(0), Spec(0), Basis::vec_type(0) });
-
         // We use the convex hull to quickly find a metamer, instead of doing costly
         // nonlinear solver runs. Find the best enclosing simplex, and then mix the
         // attached coefficients to generate a spectrum at said position

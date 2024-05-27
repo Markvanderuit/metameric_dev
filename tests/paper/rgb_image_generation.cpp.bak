@@ -37,9 +37,9 @@ using namespace met;
 
 constexpr uint n_boundary_samples = 128;
 std::string    scene_name         = "colorchecker";
-constexpr bool pack_roundtrip     = false;
+constexpr bool pack_roundtrip     = true;
 constexpr bool generate_bsis      = false; // Individually uplift pixels and downsample again
-constexpr bool generate_bsis_tssl = false; // Use tessellation to uplift pixels, then downsample
+constexpr bool generate_bsis_tssl = true;  // Use tessellation to uplift pixels, then downsample
 constexpr bool generate_mese      = false; // Individually uplift pixels, represent using bounded MESE and downsample again
 constexpr bool generate_mese_tssl = false; // Use tessellation to uplift pixels, represent using bounded MESE, then downsample
 
@@ -53,8 +53,10 @@ auto pack_4xu32(auto v) {
     return detail::pack_snorm_16(v);
   else if constexpr (decltype(v)::RowsAtCompileTime == 8)
     return detail::pack_snorm_8(v);
-  else
+  else {
     debug::check_expr(false, "Not implemented");
+    return eig::Array4u(0);
+  }
 }
 
 // Assumes value is in [0, 1]
@@ -66,8 +68,10 @@ auto unpack_4xu32(auto v) {
     return detail::unpack_snorm_16(v);
   else if constexpr (N == 8)
     return detail::unpack_snorm_8(v);
-  else
+  else {
     debug::check_expr(false, "Not implemented");
+    return eig::Array<float, N, 1>(0);
+  }
 }
 
 TEST_CASE("bsis") {

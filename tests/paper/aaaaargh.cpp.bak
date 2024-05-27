@@ -1,0 +1,71 @@
+#include <catch2/catch_test_macros.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/core/constraints.hpp>
+#include <metameric/core/matching.hpp>
+#include <metameric/core/math.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/ranges.hpp>
+#include <metameric/core/distribution.hpp>
+#include <metameric/core/metamer.hpp>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/core/json.hpp>
+#include <metameric/core/utility.hpp>
+#include <metameric/components/schedule.hpp>
+#include <metameric/components/misc/task_frame_begin.hpp>
+#include <metameric/components/misc/task_frame_end.hpp>
+#include <metameric/components/views/task_window.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/task_viewport.hpp>
+#include <metameric/components/views/detail/task_arcball_input.hpp>
+#include <small_gl/window.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/array.hpp>
+#include <small_gl/dispatch.hpp>
+#include <small_gl/utility.hpp>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <algorithm>
+#include <execution>
+#include <sstream>
+
+using namespace met;
+
+namespace test {
+
+} // namespace test
+
+// Hardcoded eigenvalues
+static eig::Array<float, 32, 1> EVs = {
+  // First 12
+  4.80323533e+01f, 
+  7.51669501e+00f,
+  4.21518090e+00f, 
+  2.06736524e+00f,
+  1.12826738e+00f, 
+  3.10498058e-01f,
+  2.64876889e-01f, 
+  1.43566338e-01f,
+  6.96868703e-02f, 
+  5.60114977e-02f,
+  3.38647589e-02f, 
+  2.67549622e-02f,
+
+  2.32778257e-02f, 2.04676939e-02f, 1.59482759e-02f, 1.11668831e-02f,
+  1.06935859e-02f, 8.98293044e-03f, 7.15868075e-03f, 5.56392880e-03f,
+  3.88411047e-03f, 3.47654084e-03f, 3.39976034e-03f, 2.63938959e-03f,
+  2.33516443e-03f, 1.97400732e-03f, 1.75606828e-03f, 1.56239373e-03f,
+  1.40881035e-03f, 1.26965006e-03f, 1.08290781e-03f, 9.45006468e-04f, 
+}; 
+
+TEST_CASE("aaaarggh") {
+  // Load spectral basis
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  basis.func.colwise().normalize();
+
+  auto eigenvector = basis.func.col(0).eval();
+  eigenvector.normalize();
+  fmt::print("{}\n", eigenvector.norm());
+
+  auto projection = (basis.func.transpose() * (eigenvector.array() * 20.f).matrix()).eval();
+  fmt::print("{}\n", projection.norm());
+}

@@ -127,7 +127,7 @@ namespace met {
     void eval(SchedulerHandle &info) override {
       met_trace();
       
-      if (ImGui::Begin("Blahhh")) {
+      if (ImGui::Begin("Measure tool")) {
         uint min_v = 0, max_v = 4096;
         ImGui::SliderScalar("Slider", ImGuiDataType_U32, &m_query_spp, &min_v, &max_v);
       }

@@ -507,6 +507,31 @@ namespace met::io {
       }
     }
 
+
+    // TODO; REMOVE HARDCODED FOR PAPER TEST
+    eig::Vector<float, 32> ev = {
+      4.80323533e+01f, 7.51669501e+00f, 4.21518090e+00f, 2.06736524e+00f,
+      1.12826738e+00f, 3.10498058e-01f, 2.64876889e-01f, 1.43566338e-01f,
+      6.96868703e-02f, 5.60114977e-02f, 3.38647589e-02f, 2.67549622e-02f,
+      2.32778257e-02f, 2.04676939e-02f, 1.59482759e-02f, 1.11668831e-02f,
+      1.06935859e-02f, 8.98293044e-03f, 7.15868075e-03f, 5.56392880e-03f,
+      3.88411047e-03f, 3.47654084e-03f, 3.39976034e-03f, 2.63938959e-03f,
+      2.33516443e-03f, 1.97400732e-03f, 1.75606828e-03f, 1.56239373e-03f,
+      1.40881035e-03f, 1.26965006e-03f, 1.08290781e-03f, 9.45006468e-04f, 
+    }; 
+    
+    uint i = 0;
+    for (auto col : s.func.colwise()) {
+      // Ensure EVe is normal (should be the case), then scale by EVa;
+      col.normalize();
+      col *= ev[i]; 
+      
+      // finally, scale to [-1, 1] boundary
+      col /= std::max(std::abs(col.minCoeff()), std::abs(col.maxCoeff()));
+
+      i++;
+    }
+
     return s;
   }
   

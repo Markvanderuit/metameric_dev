@@ -71,6 +71,9 @@ namespace met {
     m_unif_map->object_i = m_object_i;
     m_unif_map->px_scale = 1.f;
     m_unif_buffer.flush();
+
+    // Linear texture sampler
+    m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};
   }
 
   void GenObjectDataTask::eval(SchedulerHandle &info) {
@@ -121,6 +124,7 @@ namespace met {
       program.bind("b_buff_atlas",       e_coefficients.buffer());
       if (std::holds_alternative<uint>(e_object.diffuse) && !e_scene.resources.images.empty()) {
         program.bind("b_txtr_3f",        e_scene.resources.images.gl.texture_atlas_3f.texture());
+        program.bind("b_txtr_3f",        m_sampler);  
         program.bind("b_buff_textures",  e_scene.resources.images.gl.texture_info);
       }
 
@@ -162,6 +166,7 @@ namespace met {
         .draw_op        = gl::DrawOp::eFill,
         .bindable_array = &e_scene.resources.meshes.gl.array
       });
+
       gl::dispatch_draw({
         .type           = gl::PrimitiveType::eTriangles,
         .vertex_count   = command.vertex_count,

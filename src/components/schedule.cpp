@@ -160,7 +160,7 @@ namespace met {
     });
 
     scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
-    scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
+    /* scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene resources")) {
         push_editor<detail::Resource<Mesh>>(info, { .editor_name = "Meshes",
@@ -173,7 +173,7 @@ namespace met {
                                                      .show_dupl   = false });
       }
       ImGui::End();
-    });
+    }); */
 
     // scheduler.task("gnome_rotator").init<LambdaTask>([](auto &info) {
     //   met_trace();
@@ -188,7 +188,7 @@ namespace met {
     scheduler.task("viewport").init<SceneViewportTask>();
 
     // Insert temporary unimportant tasks
-    submit_schedule_debug(scheduler);
+    // submit_schedule_debug(scheduler);
 
     scheduler.task("frame_end").init<FrameEndTask>(false);
   }

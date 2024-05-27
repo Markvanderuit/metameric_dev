@@ -4,21 +4,37 @@
   // If element indices differ. Do costly interpolation manually :(
   const ivec2 reflectance_tx_offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
   
-  // Helper to load and unpack absis coefficients dependent on nr. of bases 
-#if MET_WAVELENGTH_BASES == 12
+  // Helper to load and unpack basis coefficients
   float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
-    return unpack_snorm_12(scene_coefficients_data_fetch(px));
+    return unpack_bases(scene_coefficients_data_fetch(px));
   }
-#elif MET_WAVELENGTH_BASES == 16
-  float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
-    return unpack_snorm_16(scene_coefficients_data_fetch(px));
+  float[wavelength_bases] scene_sample_reflectance_coeffs(in vec3 px) {
+    return unpack_bases(scene_coefficients_data_texture(px));
   }
-#else // fallback fails
-  float[wavelength_bases] scene_sample_reflectance_coeffs(in ivec3 px) {
-    float[wavelength_bases] v;
-    return v;
+
+  vec4 scene_sample_reflectance_bases_s(in uint object_i, in vec2 tx, in vec4 wvls) {
+    // Load relevant info objects
+    ObjectInfo      object_info = scene_object_info(object_i);
+    BarycentricInfo atlas_info  = scene_reflectance_atlas_info(object_i);
+
+    // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
+    // also handle single-color objects by sampling the center of their patch
+    vec3 tx_3d = vec3(atlas_info.uv0 + atlas_info.uv1 * (object_info.is_albedo_sampled ? tx : vec2(0.5f)),
+                      atlas_info.layer);
+
+    // Return value; reflectance for four wavelengths
+    vec4 r = vec4(0); 
+
+    // Mix four texels appropriately, sampling each of four wavelengths independently
+    float[wavelength_bases] c = scene_sample_reflectance_coeffs(tx_3d);
+
+    for (uint j = 0; j < 4; ++j)                  // four wavelengths
+      for (uint k = 0; k < wavelength_bases; ++k) // n bases
+        r[j] += c[k] * scene_basis_func(wvls[j], k);
+
+    // Should not be necessary, but just in case
+    return clamp(r, 0, 1);
   }
-#endif
 
   vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
@@ -104,6 +120,7 @@
   
   // Forward to whatever sampler we're experimenting with today
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
+    // return scene_sample_reflectance_bases_s(object_i, tx, wvls);
     return scene_sample_reflectance_bases(object_i, tx, wvls);
     /* return scene_sample_reflectance_barycentrics(object_i, tx, wvls); */
   }

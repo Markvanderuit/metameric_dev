@@ -14,7 +14,7 @@ namespace met {
 
     // Window settings
     eig::Array2u app_size  = { 1680, 1024 };
-    std::string  app_title = "Metameric Editor";
+    std::string  app_title = "Metameric Toolkit";
   };
 
   // Application create function

@@ -1,0 +1,284 @@
+#include <catch2/catch_test_macros.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/core/constraints.hpp>
+#include <metameric/core/matching.hpp>
+#include <metameric/core/math.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/ranges.hpp>
+#include <metameric/core/distribution.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/metamer.hpp>
+#include <metameric/core/spectrum.hpp>
+#include <metameric/core/moments.hpp>
+#include <metameric/core/distribution.hpp>
+#include <metameric/core/json.hpp>
+#include <metameric/core/io.hpp>
+#include <metameric/core/utility.hpp>
+#include <metameric/core/image.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/components/schedule.hpp>
+#include <metameric/components/misc/task_frame_begin.hpp>
+#include <metameric/components/misc/task_frame_end.hpp>
+#include <metameric/components/views/task_window.hpp>
+#include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/task_viewport.hpp>
+#include <metameric/components/views/detail/task_arcball_input.hpp>
+#include <small_gl/window.hpp>
+#include <small_gl/program.hpp>
+#include <small_gl/buffer.hpp>
+#include <small_gl/array.hpp>
+#include <small_gl/dispatch.hpp>
+#include <small_gl/utility.hpp>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <algorithm>
+#include <execution>
+#include <sstream>
+#include <vector>
+#include <zstr.hpp>
+
+using namespace met;
+
+constexpr static uint n_boundary_samples = 128;
+
+static fs::path input_base_path  = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Spectral uplifting/Figures/multiple_reflectance_recovery";
+static fs::path output_base_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Figures/spectral color roundtrip/results";
+static std::string scene_name = "leaf";
+
+// Scenes to run
+static auto scenes = { "textile" };
+
+// Type of output to generate; default is color-mapped
+constexpr static bool generate_mse = false; // If true, outputs mse of spectral distribution instead
+
+// Which outputs to generate
+constexpr static bool generate_ground = true; // Fit spectral texture using the tessellation with interior samples, then roundtrip to color system
+constexpr static bool generate_tssl   = true; // Fit spectral texture using the tessellation with interior samples, then roundtrip to color system
+constexpr static bool generate_mese   = true; // Fit spectral texture using the bounded MESE, then roundtrip to color system
+constexpr static bool generate_csys   = true; // Map spectral texture into color system
+
+// Output configuration
+eig::Array2u pixel = { 279, 295 };
+std::vector<uint> n_interior_samples = { 0, 1, 4, 16, 64, 256 };
+
+// Hack illuminant getter
+Spec get_illuminant_by_name(const std::string &str) {
+  if (str == "D65")           return models::emitter_cie_d65;
+  else if (str == "E")        return models::emitter_cie_e;
+  else if (str == "FL2")      return models::emitter_cie_fl2;
+  else if (str == "FL11")     return models::emitter_cie_fl11;
+  else if (str == "LED-B1")   return models::emitter_cie_ledb1;
+  else if (str == "LED-RGB1") return models::emitter_cie_ledrgb1;
+  return Spec(0);
+}
+
+// Quick hack-together 2d spectral distribution that easily converst to met::Image
+struct SpectralImage {
+public: // Constructors
+  SpectralImage() = default;
+
+  SpectralImage(const eig::Array2u &size, Spec fill = 0.f)
+  : m_size(size), m_data(size.prod(), fill) { }
+
+public: // Accessors
+  auto        size() const { return m_size; }
+  auto       &data()       { return m_data; }
+  const auto &data() const { return m_data; }
+
+  void set(const eig::Array2u &xy, Spec v) {
+    uint i = xy.y() * m_size.x() + xy.x();
+    m_data[i] = v;
+  }
+
+  const Spec &get(const eig::Array2u &xy) const {
+    uint i = xy.y() * m_size.x() + xy.x();
+    return m_data[i];
+  }
+
+  Spec &get(const eig::Array2u &xy) {
+    uint i = xy.y() * m_size.x() + xy.x();
+    return m_data[i];
+  }
+
+public: // Colorimetry
+  Image apply(const ColrSystem &csys) {
+    Image image = {{ .pixel_frmt = Image::PixelFormat::eRGBA,
+                     .pixel_type = Image::PixelType::eFloat,
+                     .size       = m_size }};
+    std::transform(std::execution::par_unseq, range_iter(data()), image.data<eig::Array4f>().begin(),
+      [&csys](const Spec &s) { return (eig::Array4f() << csys(s), 1).finished(); });
+    return image;
+  }
+
+private:
+  eig::Array2u      m_size;
+  std::vector<Spec> m_data;
+};
+
+SpectralImage load_raw_spectral_texture(fs::path path) {
+  path.make_preferred();
+
+  // File contents
+  float wvl_min, wvl_max;
+  eig::Array3u dims;
+  std::vector<float> block;
+  {
+    // Open file stream to binary spectral texture
+    zstr::ifstream ifs(path.string(), std::ios::in | std::ios::binary);
+    
+    // Read small header data
+    ifs.read((char *) &wvl_min,    sizeof(float));
+    ifs.read((char *) &wvl_max,    sizeof(float));
+    ifs.read((char *) dims.data(), sizeof(decltype(dims)));
+    
+    // Read large block data
+    block.resize(dims.prod());
+    ifs.read((char *) block.data(), block.size() * sizeof(float));
+    ifs.close();
+  }
+  
+  // Distance between wavelength samples
+  float sample_dist = (wvl_max - wvl_min) / static_cast<float>(dims.x());
+
+  // Wavelength sample locations
+  std::vector<float> sample_wvls;
+  sample_wvls.reserve(dims.x());
+  sample_wvls.push_back(wvl_min);
+  for (uint j = 1; j < dims.x(); ++j)
+    sample_wvls.push_back(sample_wvls.back() + sample_dist);
+
+  // Assemble spectral image, accumulating samples into metameric's distribution
+  SpectralImage image(dims.tail<2>());
+  #pragma omp parallel for
+  for (int i = 0; i < dims.tail<2>().prod(); ++i) {
+    image.data()[i] = io::spectrum_from_data(
+      sample_wvls,
+      std::span<float>(block.data() + i * dims.x(), dims.x())
+    );
+  }
+  
+  return image;
+}
+
+TEST_CASE("ground") {
+  guard(generate_ground);
+
+  for (const auto &scene_name : scenes) {
+    fs::path inpt_path = input_base_path / "textures_raw" / std::format("{}.sraw", scene_name);
+    
+    // Load hyperspectral data into metameric's format
+    auto inpt_image = load_raw_spectral_texture(inpt_path);
+
+    // Do a roundtrip
+    fmt::print("\"ground\" : np.array({}),\n", inpt_image.get(pixel));
+  }
+}
+
+
+TEST_CASE("tssl") {
+  guard(generate_tssl);
+
+  // Load spectral basis
+  // Normalize if they not already normalized
+  auto basis = io::load_basis("resources/misc/basis_262144.txt");
+  for (auto col : basis.func.colwise()) {
+    auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
+    col /= std::max(std::abs(max_coeff), std::abs(min_coeff));
+  }
+
+  // Define the color system in which the uplifting tessellation is defined
+  ColrSystem csys = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
+
+  for (const auto &scene_name : scenes) {
+    fs::path inpt_path = input_base_path / "textures_raw" / std::format("{}.sraw", scene_name);
+    
+    // Load hyperspectral data into metameric's format
+    auto inpt_image = load_raw_spectral_texture(inpt_path);
+
+    // Color version of hyperspectral in uplifting's color system
+    auto colr_image  = inpt_image.apply(csys);
+
+    for (const auto &i_interior_samples : n_interior_samples) {
+      // Generate random samples on the input size of the hyperspectral image
+      UniformSampler sampler(0.f, static_cast<float>(inpt_image.data().size() - 1), 4u);
+      std::vector<float> interior_samples(i_interior_samples);
+      for (uint i = 0; i < i_interior_samples; ++i)
+        interior_samples[i] = sampler.next_1d();
+
+      // Sample coeffs for the tessellation's boundary from the object color solid
+      auto coeffs = generate_color_system_ocs_coeffs({ .direct_objective = csys,
+                                                      .basis            = basis,
+                                                      .seed             = 4,
+                                                      .n_samples        = n_boundary_samples });
+      
+      // Sample coeffs for the tessellation's interior from the hyperspectral
+      {
+        std::vector<Basis::vec_type> interior_coeffs(i_interior_samples);
+        // #pragma omp parallel for
+        for (int i = 0; i < i_interior_samples; ++i) {
+          uint j = static_cast<uint>(std::round(interior_samples[i]));
+          interior_coeffs[i] = generate_spectrum_coeffs(SpectrumCoeffsInfo {
+            .spec = inpt_image.data().at(j), .basis = basis
+          });
+        }
+        coeffs.append_range(interior_coeffs);
+      }
+
+      // Map coefficients to color positions in the R3 space of the tessellation
+      std::vector<Colr> positions(coeffs.size());
+      std::transform(std::execution::par_unseq, 
+                      range_iter(coeffs), 
+                      positions.begin(), 
+                      [&](const auto &coef) { return csys(basis(coef)); });
+
+      // Generate tessellation; we now essentially have all data
+      // necessary for uplifting
+      ConvexHull chull = ConvexHull::build(positions);
+
+      // Now we can start rendering images under different illuminants
+      {
+        auto colr = colr_image.get_pixel(pixel).head<3>().eval();
+
+        // Find enclosing simplex in tessellation
+        auto [bary, elem] = chull.find_enclosing_elem(colr.head<3>().eval());
+        auto simplex      = elem | index_into_view(coeffs) | rng::to<std::vector>();
+        
+        // Linear combination reconstructs coefficients representing some metamer in this pixel
+        auto coef =(bary[0] * simplex[0] + bary[1] * simplex[1]
+                  + bary[2] * simplex[2] + bary[3] * simplex[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
+
+        auto spec = basis(coef);
+
+        fmt::print("\"tssl, n={}\" : np.array({}),\n", i_interior_samples, spec);
+      }
+    }
+  }
+}
+
+TEST_CASE("mese") {
+  guard(generate_mese);
+
+  for (const auto &scene_name : scenes) {
+    fs::path inpt_path = input_base_path / "textures_raw" / std::format("{}.sraw", scene_name);
+    
+    // Load hyperspectral data into metameric's format
+    auto inpt_image = load_raw_spectral_texture(inpt_path);
+
+    // Do a roundtrip
+    auto moments = spectrum_to_moments(inpt_image.get(pixel));
+    auto spec    = moments_to_spectrum_lagrange(moments);
+    fmt::print("\"mese\" : np.array({}),\n", spec);
+  }
+}
+
+TEST_CASE("csys") {
+  guard(generate_csys);
+
+  for (const auto &scene_name : scenes) {
+    fs::path inpt_path = input_base_path / "textures_raw" / std::format("{}.sraw", scene_name);
+
+    // Load hyperspectral data into metameric's format
+    auto inpt_image = load_raw_spectral_texture(inpt_path);
+    ColrSystem oupt_csys  = { .cmfs = models::cmfs_cie_xyz, .illuminant = models::emitter_cie_d65 };
+    fmt::print("\n\ncolr : {}\n", oupt_csys(inpt_image.get(pixel)));
+  }
+}

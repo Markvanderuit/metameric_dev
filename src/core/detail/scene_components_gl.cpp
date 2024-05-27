@@ -547,8 +547,10 @@ namespace met::detail {
       input = (input.cast<float>() * scaled_1f).max(1.f).cast<uint>().eval();
 
     // Rebuild texture atlases with mips
-    texture_atlas_3f = {{ .sizes = inputs_3f, .levels = 1 + clamped_3f.log2().maxCoeff() }};
-    texture_atlas_1f = {{ .sizes = inputs_1f, .levels = 1 + clamped_1f.log2().maxCoeff() }};
+    // texture_atlas_3f = {{ .sizes = inputs_3f, .levels = 1 + clamped_3f.log2().maxCoeff() }};
+    // texture_atlas_1f = {{ .sizes = inputs_1f, .levels = 1 + clamped_1f.log2().maxCoeff() }};
+    texture_atlas_3f = {{ .sizes = inputs_3f, .levels = 1 }};
+    texture_atlas_1f = {{ .sizes = inputs_1f, .levels = 1 }};
 
     std::vector<TextureInfoLayout> info(images.size());
     for (uint i = 0; i < images.size(); ++i) {
@@ -631,19 +633,15 @@ namespace met::detail {
     met_trace_full();
 
     guard(scene.resources.observers);
-    // fmt::print("Type updated: {}\n", typeid( decltype(cmfs)::value_type).name());
     
-    // Whitepoint for normalization
-    // Spec illuminant = models::emitter_cie_d65;
-
     for (uint i = 0; i < cmfs.size(); ++i) {
       const auto &[value, state] = cmfs[i];
       guard_continue(state);
 
-      // Premultiply with RGB and normalize s.t. a unit spectrum has 1 luminance
+      // Premultiply with RGB and normalize
       ColrSystem csys = { .cmfs = value, .illuminant = Spec(1)  };
-      CMFS to_rgb = csys.finalize();
-      cmfs_buffer_map[i] = to_rgb.transpose().reshaped(wavelength_samples, 3);
+      CMFS       cmfs = csys.finalize();
+      cmfs_buffer_map[i] = cmfs.transpose().reshaped(wavelength_samples, 3);
     }
 
     cmfs_buffer.flush();

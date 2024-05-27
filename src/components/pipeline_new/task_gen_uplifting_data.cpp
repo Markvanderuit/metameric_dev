@@ -64,7 +64,7 @@ namespace met {
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info("mismatch_hulls").set<std::vector<ConvexHull>>({});
-    info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i);
+    /* info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i); */
     /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
       if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
         const auto &e_scene = info.global("scene").getr<Scene>();
@@ -169,7 +169,7 @@ namespace met {
       // If a state change occurred, restart spectrum builder
       if (csys_stale || !builder.matches_vertex(e_uplifting.verts[i]))
         builder.assign_vertex(e_uplifting.verts[i]);
-        
+      
       // If the vertex was not edited, or the metamer builder has converged, we can exit early
       guard_continue(e_state.verts[i] || !builder.is_converged());
 
@@ -345,12 +345,12 @@ namespace met {
       eig::Vector4f bary = (eig::Array4f() << xyz, 1.f - xyz.sum()).finished();
 
       // Compute squared error of potentially unbounded barycentric weights
-      float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f))
-              .dot(bary - bary.cwiseMax(0.f).cwiseMin(1.f));
+      float err = (bary - bary.cwiseMax(0.f).cwiseMin(1.f)).matrix().squaredNorm();
 
       // Continue if error does not improve
       // or store best result
-      guard_continue(err < result_err);
+      if (err > result_err)
+        continue;
       result_err  = err;
       result_bary = bary;
       result_i    = i;

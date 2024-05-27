@@ -59,11 +59,9 @@ void main() {
   // unbound sampler object floating around
   vec3 p;
   if (sample_albedo) { 
-    TextureInfo txtr = buff_textures.data[object.albedo_i];
-    vec3 txuv = vec3(txtr.uv0 + txtr.uv1 * in_txuv, txtr.layer);
-
     // Color value is supplied by scene texture
-    p = texture(b_txtr_3f, txuv).xyz;
+    TextureInfo txtr = buff_textures.data[object.albedo_i];
+    p = texture(b_txtr_3f, vec3(txtr.uv0 + txtr.uv1 * in_txuv, txtr.layer)).xyz;
   } else {
     // Color value is specified directly
     p = object.albedo_v;
@@ -78,11 +76,12 @@ void main() {
     vec3 xyz  = buff_uplift_pack.data[j].inv * (p - buff_uplift_pack.data[j].sub);
     vec4 bary = vec4(xyz, 1.f - hsum(xyz));
 
-    // Compute squared error of potentially unbounded barycentric weights
+    // Compute error of potentially unbounded barycentric weights
     float err = sdot(bary - clamp(bary, 0, 1));
 
     // Store better result if error is improved
-    guard_continue(err < result_err);
+    if (err > result_err)
+      continue;
     result_err  = err;
     result_bary = bary;
     result_indx = j; // + buff_uplift_data.offs;
@@ -94,13 +93,9 @@ void main() {
     coeffs[i] = 0.f;
     for (uint j = 0; j < 4; ++j)
       coeffs[i] += result_bary[j] 
-                 * buff_uplift_coef.data[result_indx][j][i]; // TODO get the coefficients of the correct constraints here
+                 * buff_uplift_coef.data[result_indx][j][i];
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients to 128 bytes
-#if MET_WAVELENGTH_BASES == 12
-  out_coeffs = pack_snorm_12(coeffs);
-#elif MET_WAVELENGTH_BASES == 16
-  out_coeffs = pack_snorm_16(coeffs);
-#endif
+  out_coeffs = pack_bases(coeffs);
 }
