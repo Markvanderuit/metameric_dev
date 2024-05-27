@@ -21,29 +21,6 @@ constexpr static bool use_basis_indirect_spectrum = true;
 constexpr static bool use_basis_indirect_mismatch = true;
 
 namespace met {
-  static eig::Array<float, 32, 1> ev = {
-    // First 12
-    4.80323533e+01f, 
-    7.51669501e+00f,
-    4.21518090e+00f, 
-    2.06736524e+00f,
-    1.12826738e+00f, 
-    3.10498058e-01f,
-    2.64876889e-01f, 
-    1.43566338e-01f,
-    6.96868703e-02f, 
-    5.60114977e-02f,
-    3.38647589e-02f, 
-    2.67549622e-02f,
-
-    2.32778257e-02f, 2.04676939e-02f, 1.59482759e-02f, 1.11668831e-02f,
-    1.06935859e-02f, 8.98293044e-03f, 7.15868075e-03f, 5.56392880e-03f,
-    3.88411047e-03f, 3.47654084e-03f, 3.39976034e-03f, 2.63938959e-03f,
-    2.33516443e-03f, 1.97400732e-03f, 1.75606828e-03f, 1.56239373e-03f,
-    1.40881035e-03f, 1.26965006e-03f, 1.08290781e-03f, 9.45006468e-04f, 
-  }; 
-  static Basis::vec_type ev_scale = (eig::Array<float, wavelength_bases, 1>::Ones() /*  / ev.head<wavelength_bases>() */).eval();
-
   namespace detail {
     // Given a random vector in RN bounded to [-1, 1], return a vector
     // distributed over a gaussian distribution
@@ -142,10 +119,7 @@ namespace met {
       }
 
       // Run solver and return recovered coefficients
-      auto coeffs = solve(solver).x.cast<float>().eval();
-      auto old_coeffs = coeffs;
-      coeffs = coeffs.cwiseProduct(ev_scale).eval();
-      return coeffs; // coeffs.cwiseProduct(ev_scale).eval();
+      return solve(solver).x.cast<float>().eval();
     } else {
       // Solver settings
       opt::Wrapper<wavelength_samples> solver = {
@@ -265,8 +239,7 @@ namespace met {
         } // for (uint j)
       }
 
-      auto coeffs = solve(solver).x.cast<float>().eval();
-      return coeffs.cwiseProduct(ev_scale).eval();
+      return solve(solver).x.cast<float>().eval();
     } else {
       // Solver settings
       opt::Wrapper<wavelength_samples> solver = {
@@ -390,9 +363,7 @@ namespace met {
           // Run solver and store recovered spectral distribution if it is legit
           auto r = solve(local_solver);
           guard_continue(!r.x.array().isNaN().any());
-          auto coeffs = r.x.cast<float>().eval();
-          coeffs = coeffs.cwiseProduct(ev_scale).eval();
-          tbb_output.push_back(coeffs);
+          tbb_output.push_back(r.x.cast<float>().eval());
         } // for (int i)
       }
     } else {
@@ -578,7 +549,6 @@ namespace met {
           // Run solver and store recovered spectral distribution if it is safe
           auto coeffs = solve(local_solver).x.cast<float>().eval();
           guard_continue(!coeffs.array().isNaN().any());
-          coeffs = coeffs.cwiseProduct(ev_scale).eval();
           tbb_output.push_back(coeffs);
         } // for (int i)
       }
@@ -655,10 +625,6 @@ namespace met {
     // Output for parallel solve
     tbb::concurrent_vector<Basis::vec_type> tbb_output;
     tbb_output.reserve(samples.size());
-
-    // // Populate with extremas 
-    // tbb_output.push_back(Basis::vec_type(-1));
-    // tbb_output.push_back(Basis::vec_type(1));
 
     // Parallel solve for boundary spectra
     auto A = info.direct_objective.finalize();
@@ -737,7 +703,6 @@ namespace met {
     }
     
     auto coeffs = solve(solver).x.cast<float>().eval();
-    coeffs = coeffs.cwiseProduct(ev_scale).eval();
     return coeffs.cwiseMax(-1.f).cwiseMin(1.f).eval();
   }
   
