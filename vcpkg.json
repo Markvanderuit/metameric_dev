@@ -6,15 +6,6 @@
     "cxxopts",
     "catch2",
     "eigen3",
-    {
-      "name" : "glslang",
-      "features": [ "tools" ]
-    },
-    "spirv-cross",
-    {
-      "name" : "spirv-tools",
-      "features" : [ "tools" ]
-    },
     "fmt",
     {
       "name": "glad",

@@ -84,10 +84,17 @@ find_package(ZLIB      REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Include third party shader-related tools provided through vcpkg
-find_program(glslangValidator NAMES glslangValidator PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
-find_program(spirv-opt        NAMES spirv-opt        PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
-find_program(spirv-cross      NAMES spirv-cross      PATHS ${CMAKE_PROGRAM_PATH} REQUIRED)
+# Find included third party shader-related tools
+if (WIN32)
+  set(spv_tools_path ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv/windows)
+elseif(UNIX)
+  set(spv_tools_path ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv/linux)
+else()
+  message(FATAL_ERROR "SPIR-V tools do not support this platform" )
+endif()
+find_program(glslangValidator NAMES glslangValidator PATHS ${spv_tools_path} NO_DEFAULT_PATH REQUIRED)
+find_program(spirv-opt        NAMES spirv-opt        PATHS ${spv_tools_path} NO_DEFAULT_PATH REQUIRED)
+find_program(spirv-cross      NAMES spirv-cross      PATHS ${spv_tools_path} NO_DEFAULT_PATH REQUIRED)
 
 # Include small_gl library; forward exceptions/tracy options
 option(gl_enable_exceptions  "" ${met_enable_exceptions})
@@ -161,7 +168,8 @@ foreach(glsl_src ${glsl_srcs})
   set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
   
   # Add preprocessor stage to handle #include as well as > c98 preprocessing
-  # we reuse the local c++ compiler, because wow do I need me some varargs
+  # we reuse the local c++ compiler to avoid google_include extensions and
+  # allow for varargs
   # TODO; adapt dependent on compiler
   add_custom_command(
     OUTPUT  ${spirv_parse_fp}
@@ -179,7 +187,7 @@ foreach(glsl_src ${glsl_srcs})
     DEPENDS ${glsl_src} ${glsl_includes}
     VERBATIM
   )
-
+  
   # Generate spir-v binary using glslangValidator, store in .temp file
   add_custom_command(
     OUTPUT  ${spirv_temp_fp}
