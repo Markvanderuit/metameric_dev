@@ -6,6 +6,7 @@
     "cxxopts",
     "catch2",
     "eigen3",
+    "embree", 
     "fmt",
     {
       "name": "glad",
@@ -47,6 +48,7 @@
         "baseline": "2023-02-22",
         "path": "third_party/vcpkg-registry",
         "packages": [
+          "embree",
           "meshoptimizer",
           "nlopt"
         ]

@@ -1,0 +1,17 @@
+{
+  "name": "embree",
+  "version": "2023-02-22",
+  "description": "High Performance Ray Tracing Kernels",
+  "license": "Apache-2.0",
+  "supports": "!arm | osx",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}
