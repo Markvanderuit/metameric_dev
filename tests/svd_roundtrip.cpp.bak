@@ -8,7 +8,6 @@
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/tree.hpp>
 #include <metameric/core/detail/packing.hpp>
 #include <nlohmann/json.hpp>
 #include <small_gl/window.hpp>

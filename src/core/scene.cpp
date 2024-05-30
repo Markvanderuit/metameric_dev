@@ -5,7 +5,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/matching.hpp>
 #include <metameric/core/serialization.hpp>
-#include <metameric/core/tree.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/packing.hpp>
 #include <assimp/Importer.hpp>
