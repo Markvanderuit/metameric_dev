@@ -92,3 +92,23 @@ function(compile_glsl_to_spirv_list glsl_srcs_fp spirv_dependencies)
   endforeach()
   set(spirv_dependencies "${spirv_dependencies}" PARENT_SCOPE)
 endfunction()
+
+function(add_shader_target target_name)
+  # Recursively find all shader files
+  file(GLOB_RECURSE glsl_srcs
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.frag
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.geom
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.vert
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.comp
+  )
+  file(GLOB_RECURSE glsl_includes 
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include/*
+  )
+
+  # Generate list of command functions
+  set(spirv_dependencies ${glsl_includes})
+  compile_glsl_to_spirv_list("${glsl_srcs}" "${spirv_dependencies}")
+
+  # Specify custom target built on all command functions
+  add_custom_target(${target_name} DEPENDS ${spirv_dependencies})
+endfunction()

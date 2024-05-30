@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 # Specify VCPKG toolchain path, CMAKE module path
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake CACHE STRING "Vcpkg toolchain file")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/resources" CACHE STRING "CMake module path")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/resources/cmake" CACHE STRING "CMake module path")
 
 project(Metameric LANGUAGES CXX)
 
@@ -38,11 +38,10 @@ message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
 message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 
 # Specify output directories as /bin and /lib
+# Punch MSVC's multi-configuration output directories until they follow suit
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-
-# Punch MSVC's multi-configuration output directories until they follow suit
 if(MSVC)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
@@ -58,7 +57,11 @@ if(MSVC)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
 
-# Gather all settings into one list
+# Ensure these are available for third parties
+find_package(OpenMP REQUIRED)
+find_package(Threads REQUIRED)
+
+# Gather all preprocessor values into one list
 set(preprocessor_defines
   -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
   -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
@@ -72,14 +75,12 @@ set(preprocessor_defines
   -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
   -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
 )
-
-# Specify module path and add custom modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/resources/cmake")
-include(spirv)
-
-# Ensure these are available for third parties
-find_package(OpenMP REQUIRED)
-find_package(Threads REQUIRED)
+if(met_enable_exceptions)
+  list(APPEND preprocessor_defines -DMET_ENABLE_EXCEPTIONS)
+endif()
+if(met_enable_tracy)
+  list(APPEND preprocessor_defines -DMET_ENABLE_TRACY)
+endif()
 
 # Include third party libraries provided through vcpkg
 find_package(assimp    CONFIG REQUIRED)
@@ -104,63 +105,43 @@ find_package(embree    CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Find included third party shader-related tools
-if (WIN32)
-  set(spv_tools_path ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv/windows)
-elseif(UNIX)
-  set(spv_tools_path ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv/linux)
-else()
-  message(FATAL_ERROR "SPIR-V tools do not support this platform" )
-endif()
-find_program(glslangValidator NAMES glslangValidator PATHS ${spv_tools_path} NO_DEFAULT_PATH REQUIRED)
-find_program(spirv-opt        NAMES spirv-opt        PATHS ${spv_tools_path} NO_DEFAULT_PATH REQUIRED)
-find_program(spirv-cross      NAMES spirv-cross      PATHS ${spv_tools_path} NO_DEFAULT_PATH REQUIRED)
-
-# Include small_gl library; forward exceptions/tracy options
+# Include xAtlas/Autodiff/small_gl
 option(gl_enable_exceptions  "" ${met_enable_exceptions})
 option(gl_enable_tracy       "" ${met_enable_tracy})
-add_subdirectory(third_party/small_gl)
-
-# Include xAtlas/Autodiff
 add_subdirectory(third_party/xatlas)
 add_subdirectory(third_party/autodiff)
+add_subdirectory(third_party/small_gl)
 
-# Recursively find all shader files
-file(GLOB_RECURSE glsl_srcs
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.frag
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.geom
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.vert
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.comp
+# Specify cmake modules/finds
+include(CTest)
+include(Catch)
+include(spirv)
+include(resource)
+
+# Gather list of third party libraries
+set(core_dependencies
+  autodiff::autodiff
+  assimp::assimp
+  Eigen3::Eigen
+  embree
+  fmt::fmt-header-only
+  nlohmann_json::nlohmann_json
+  NLopt::nlopt
+  meshoptimizer::meshoptimizer
+  Qhull::qhullcpp Qhull::qhull_r
+  unofficial::tinyexr::tinyexr
+  small_gl
+  TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy
+  Tracy::TracyClient
+  xatlas
+  ZLIB::ZLIB
 )
-file(GLOB_RECURSE glsl_includes 
-  ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include/*
+set(component_dependencies
+  imgui::imgui imguizmo::imguizmo implot::implot unofficial::nativefiledialog::nfd
 )
-
-# Add single target to perform all shader preprocessing/validation
-set(spirv_dependencies ${glsl_includes})
-compile_glsl_to_spirv_list("${glsl_srcs}" "${spirv_dependencies}")
-add_custom_target(shaders DEPENDS ${spirv_dependencies})
-
-# Add commands to copy resources/misc files
-file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/misc/*)
-foreach(misc_file ${misc_files})
-  # Obtain path, stripped of lead, and filename
-  cmake_path(RELATIVE_PATH misc_file
-    BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE relative_path)
-  message(STATUS "Found misc resource : ${relative_path}")
-
-  set(misc_out "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${relative_path}")
-  add_custom_command(
-    OUTPUT ${misc_out}
-    COMMAND ${CMAKE_COMMAND} -E copy ${misc_file} ${misc_out}
-    DEPENDS ${misc_file}
-  )
-  list(APPEND misc_copy_list ${misc_out})
-endforeach()
-
-# Add single target to perfrom all resource/misc file copies
-add_custom_target(misc_copy DEPENDS ${misc_copy_list})
+if(OpenMP_CXX_FOUND)
+  list(APPEND core_dependencies OpenMP::OpenMP_CXX)
+endif()
 
 # Simple function to add a library with consistent settings
 function(add_library_r target dir)
@@ -173,91 +154,36 @@ function(add_library_r target dir)
   add_library(${target} ${srcs})
   target_include_directories(${target} PUBLIC include)
   target_compile_features(${target} PUBLIC cxx_std_23)
-
-  if(OpenMP_CXX_FOUND)
-    target_link_libraries(${target} PUBLIC OpenMP::OpenMP_CXX)
-  endif()
-  if(met_enable_exceptions)
-    target_compile_definitions(${target} PUBLIC MET_ENABLE_EXCEPTIONS)
-  endif()
-  if(met_enable_tracy)
-    target_compile_definitions(${target} PUBLIC MET_ENABLE_TRACY)
-  endif()
-endfunction()
-
-# Simple function to add an executable with consistent settings
-function(add_executable_r target src)
-  add_executable(${target} ${src})
-  target_compile_features(${target} PUBLIC cxx_std_23)
-  if(OpenMP_CXX_FOUND)
-    target_link_libraries(${target} PUBLIC OpenMP::OpenMP_CXX)
-  endif()
-  if(met_enable_exceptions)
-    target_compile_definitions(${target} PUBLIC MET_ENABLE_EXCEPTIONS)
-  endif()
-  if(met_enable_tracy)
-    target_compile_definitions(${target} PUBLIC MET_ENABLE_TRACY)
-  endif()
 endfunction()
 
 # Set up core library
 add_library_r(core core)
-target_link_libraries(core PUBLIC
-  autodiff::autodiff
-  assimp::assimp
-  Eigen3::Eigen
-  embree
-  fmt::fmt-header-only
-  nlohmann_json::nlohmann_json
-  NLopt::nlopt
-  meshoptimizer::meshoptimizer
-  Qhull::qhullcpp
-  Qhull::qhull_r
-  unofficial::tinyexr::tinyexr
-  small_gl
-  TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy
-  Tracy::TracyClient
-  xatlas
-  ZLIB::ZLIB
-)
+target_link_libraries(core PUBLIC ${core_dependencies})
 target_include_directories(core PUBLIC ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 target_compile_definitions(core PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
 # Set up render library
 add_library_r(render render)
-target_link_libraries(render PUBLIC
-  core
-  imgui::imgui
-)
+target_link_libraries(render PUBLIC core)
 
 # Set up components library
 add_library_r(components components)
-target_link_libraries(components PUBLIC
-  render
-  imgui::imgui
-  imguizmo::imguizmo
-  implot::implot
-  unofficial::nativefiledialog::nfd
-)
+target_link_libraries(components PUBLIC render ${component_dependencies})
 
-# Link dependencies for copying/compiling resources
-add_dependencies(core       misc_copy)
+# Specify shader/resource targets, link these as dependencies for preprocessing
+add_shader_target(shaders)
+add_resource_target(misc)
+add_dependencies(core       misc)
 add_dependencies(render     shaders)
 add_dependencies(components shaders)
 
-# Setup executables
-add_executable_r(metameric_editor src/app/metameric_editor.cpp)
+# Setup editor executable
+add_executable(metameric_editor src/app/metameric_editor.cpp)
+target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
-add_executable_r(moment_testing src/app/moment_testing.cpp)
-target_link_libraries(moment_testing PRIVATE core render components)
-add_executable_r(noise_testing src/app/noise_testing.cpp)
-target_link_libraries(noise_testing PRIVATE core render components)
 
 # Optionally setup Catch2 tests
 if (met_enable_tests)
-  include(CTest)
-  include(Catch)
-
   # Find all test files
   file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
 

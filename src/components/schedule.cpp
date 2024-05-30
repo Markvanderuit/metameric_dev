@@ -179,8 +179,7 @@ namespace met {
     //   met_trace();
     //   try {
     //     auto &e_scene = info.global("scene").getw<Scene>();
-    //     auto &e_gnome = e_scene.components.objects("Gnome").value;
-
+    //     auto &e_gnome = e_scene.components.objects[4].value;
     //     e_gnome.transform.rotation.y() += 0.1f;
     //   } catch (const std::exception &e) { /* Ignore; gnome not loaded yet */ }
     // });

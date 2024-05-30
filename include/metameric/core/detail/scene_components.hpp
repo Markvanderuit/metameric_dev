@@ -215,30 +215,10 @@ namespace met {
       constexpr void emplace(std::string_view name, value_type &&value) {
         m_data.emplace_back(cmpnt_type { .name = std::string(name), .value = std::move(value) });
       }
-      
-      // TODO remove
-      /* constexpr void erase(std::string_view name) {
-        auto it = rng::find(m_data, name, &cmpnt_type::name);
-        debug::check_expr(it != m_data.end(), "Erased scene component does not exist");
-        m_data.erase(it);
-      } */
 
       // operator[...] exposes throwing at()
       constexpr const cmpnt_type &operator[](uint i) const { return m_data.at(i); }
       constexpr       cmpnt_type &operator[](uint i)       { return m_data.at(i); }
-
-      // operator("...") enables named lookup
-      // TODO remove
-      /* constexpr const cmpnt_type &operator()(std::string_view name) const {
-        auto it = rng::find(m_data, name, &cmpnt_type::name);
-        debug::check_expr(it != m_data.end(), "Queried scene component does not exist");
-        return *it;
-      }
-      constexpr cmpnt_type &operator()(std::string_view name) {
-        auto it = rng::find(m_data, name, &cmpnt_type::name);
-        debug::check_expr(it != m_data.end(), "Queried scene component does not exist");
-        return *it;
-      } */
 
       // Bookkeeping; expose the underlying std::vector, instead of a direct pointer
       constexpr const auto & data() const { return m_data; }
@@ -336,36 +316,10 @@ namespace met {
         met_trace();
         m_data.emplace_back(resrc_type(std::string(name), std::move(value), deletable));
       }
-      
-      // TODO remove
-      /* constexpr void erase(std::string_view name) {
-        met_trace();
-        auto it = rng::find(m_data, name, &resrc_type::name);
-        debug::check_expr(it != m_data.end(), "Erased scene resource does not exist");
-        m_data.erase(it);
-      } */
 
       // operator[...] exposes throwing at()
       constexpr const resrc_type &operator[](uint i) const { return m_data.at(i); }
       constexpr       resrc_type &operator[](uint i)       { return m_data.at(i); }
-
-      // operator("...") enables named lookup
-      // TODO remove
-      /* constexpr const resrc_type &operator()(std::string_view name) const {
-        met_trace();
-        auto it = rng::find(m_data, name, &resrc_type::name);
-        debug::check_expr(it != m_data.end(), "Queried scene resource does not exist");
-        return *it;
-      } */
-
-      // operator("...") enables named lookup
-      // TODO remove
-      /* constexpr resrc_type &operator()(std::string_view name) {
-        met_trace();
-        auto it = rng::find(m_data, name, &resrc_type::name);
-        debug::check_expr(it != m_data.end(), "Queried scene resource does not exist");
-        return *it;
-      } */
 
       // Bookkeeping; expose the underlying std::vector, instead of a direct pointer
       constexpr const auto & data() const { return m_data; }
