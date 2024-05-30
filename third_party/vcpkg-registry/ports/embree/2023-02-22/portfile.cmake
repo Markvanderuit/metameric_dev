@@ -16,7 +16,6 @@ if(VCPKG_TARGET_IS_EMSCRIPTEN)
     # cf. [Using SIMD with WebAssembly](https://emscripten.org/docs/porting/simd.html#using-simd-with-webassembly)
     vcpkg_list(APPEND EXTRA_OPTIONS
         -DEMBREE_MAX_ISA:STRING=NONE
-
         -DEMBREE_ISA_AVX:BOOL=OFF
         -DEMBREE_ISA_AVX2:BOOL=OFF
         -DEMBREE_ISA_AVX512:BOOL=OFF
@@ -53,9 +52,7 @@ vcpkg_cmake_configure(
       ${EXTRA_OPTIONS}
       -DBUILD_TESTING=OFF
       -DEMBREE_TESTING_INSTALL_TESTS=OFF
-      -DEMBREE_TESTING_INSTALL_TESTS=OFF
       -DEMBREE_ZIP_MODE=OFF
-      -DEMBREE_STAT_COUNTERS=OFF
       -DEMBREE_GEOMETRY_QUAD=OFF
       -DEMBREE_GEOMETRY_GRID=OFF
       -DEMBREE_GEOMETRY_POINT=OFF
@@ -72,14 +69,15 @@ vcpkg_cmake_configure(
       -DEMBREE_STATIC_LIB=${EMBREE_STATIC_LIB}
       -DEMBREE_TASKING_SYSTEM:STRING=${EMBREE_TASKING_SYSTEM}
       -DEMBREE_INSTALL_DEPENDENCIES=OFF
-    MAYBE_UNUSED_VARIABLES
+      MAYBE_UNUSED_VARIABLES
       EMBREE_STATIC_RUNTIME
 )
 
 
 vcpkg_cmake_install()
 vcpkg_copy_pdbs()
-vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/embree-${VERSION} PACKAGE_NAME embree)
+
+vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/embree-4.3.1 PACKAGE_NAME embree)
 set(config_file "${CURRENT_PACKAGES_DIR}/share/embree/embree-config.cmake")
 # Fix details in config.
 file(READ "${config_file}" contents)
@@ -87,7 +85,7 @@ string(REPLACE "SET(EMBREE_BUILD_TYPE Release)" "" contents "${contents}")
 string(REPLACE "/../../../" "/../../" contents "${contents}")
 string(REPLACE "FIND_PACKAGE" "include(CMakeFindDependencyMacro)\n  find_dependency" contents "${contents}")
 string(REPLACE "REQUIRED" "COMPONENTS" contents "${contents}")
-string(REPLACE "/lib/cmake/embree-${VERSION}" "/share/embree" contents "${contents}")
+string(REPLACE "/lib/cmake/embree-4.3.1" "/share/embree" contents "${contents}")
 
 if(NOT VCPKG_BUILD_TYPE)
     string(REPLACE "/lib/embree4.lib" "$<$<CONFIG:DEBUG>:/debug>/lib/embree4.lib" contents "${contents}")
@@ -103,7 +101,5 @@ endif()
 if(APPLE)
     file(REMOVE "${CURRENT_PACKAGES_DIR}/uninstall.command" "${CURRENT_PACKAGES_DIR}/debug/uninstall.command")
 endif()
-file(RENAME "${CURRENT_PACKAGES_DIR}/share/doc" "${CURRENT_PACKAGES_DIR}/share/${PORT}/")
 
-file(COPY "${CMAKE_CURRENT_LIST_DIR}/usage" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE.txt")

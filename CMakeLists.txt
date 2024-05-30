@@ -79,6 +79,7 @@ find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(ZLIB      REQUIRED)
+find_package(embree    CONFIG REQUIRED)
 
 # Include third party header-only libraries provided through vcpkg
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
@@ -104,25 +105,25 @@ add_subdirectory(third_party/small_gl)
 # Include xAtlas
 add_subdirectory(third_party/xatlas)
 
-# Include Intel Embree, compiled from scratch
-set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
-set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
-set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
-set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
-set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
-set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
-set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
-set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
-set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-# TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
-add_subdirectory(third_party/embree)
+# # Include Intel Embree, compiled from scratch
+# set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
+# set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
+# set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
+# set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
+# set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
+# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
+# set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
+# set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
+# set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
+# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
+# # TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
+# add_subdirectory(third_party/embree)
 
 # Include Autodiff library, compiled from scratch
 add_subdirectory(third_party/autodiff)
