@@ -58,6 +58,25 @@ if(MSVC)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 endif(MSVC)
 
+# Gather all settings into one list
+set(preprocessor_defines
+  -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
+  -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
+  -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
+  -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
+  -DMET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
+  -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
+  -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
+  -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
+  -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
+  -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
+  -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
+)
+
+# Specify module path and add custom modules
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/resources/cmake")
+include(spirv)
+
 # Ensure these are available for third parties
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
@@ -102,46 +121,9 @@ option(gl_enable_exceptions  "" ${met_enable_exceptions})
 option(gl_enable_tracy       "" ${met_enable_tracy})
 add_subdirectory(third_party/small_gl)
 
-# Include xAtlas
+# Include xAtlas/Autodiff
 add_subdirectory(third_party/xatlas)
-
-# # Include Intel Embree, compiled from scratch
-# set(BUILD_TESTING                OFF CACHE BOOL " " FORCE) # grumble
-# set(EMBREE_TESTING_INSTALL_TESTS OFF CACHE BOOL " " FORCE) # grumble
-# set(EMBREE_TUTORIAL              OFF CACHE BOOL " " FORCE)
-# set(EMBREE_STATIC_LIB            OFF CACHE BOOL " " FORCE)
-# set(EMBREE_ZIP_MODE              OFF CACHE BOOL " " FORCE)
-# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_QUAD         OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_GRID         OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_POINT        OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_SUBDIVISION  OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_CURVE        OFF CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_INSTANCE     ON  CACHE BOOL " " FORCE)
-# set(EMBREE_GEOMETRY_USER         ON  CACHE BOOL " " FORCE)
-# set(EMBREE_IGNORE_INVALID_RAYS   ON  CACHE BOOL " " FORCE)
-# set(EMBREE_RAY_MASK              OFF CACHE BOOL " " FORCE)
-# set(EMBREE_STAT_COUNTERS         OFF CACHE BOOL " " FORCE)
-# # TODO: disable more unused parts of Embree to speed up compile; see cmakelists for components
-# add_subdirectory(third_party/embree)
-
-# Include Autodiff library, compiled from scratch
 add_subdirectory(third_party/autodiff)
-
-# Add together arguments to pass to shader compilation
-set(glsl_defines
-  -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
-  -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
-  -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
-  -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
-  -DMET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
-  -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
-  -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
-  -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
-  -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
-  -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
-  -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
-)
 
 # Recursively find all shader files
 file(GLOB_RECURSE glsl_srcs
@@ -154,79 +136,10 @@ file(GLOB_RECURSE glsl_includes
   ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include/*
 )
 
-# Process shaders
-foreach(glsl_src ${glsl_srcs})
-  # Obtain path, stripped of lead, and filename
-  cmake_path(RELATIVE_PATH glsl_src
-             BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src
-             OUTPUT_VARIABLE relative_path)
-
-  message(STATUS "Found shader : ${relative_path}")
-  
-  set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}")
-  set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.temp")
-  set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.spv")
-  set(spirv_refl_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${relative_path}.json")
-  
-  # Add preprocessor stage to handle #include as well as > c98 preprocessing
-  # we reuse the local c++ compiler to avoid google_include extensions and
-  # allow for varargs
-  # TODO; adapt dependent on compiler
-  add_custom_command(
-    OUTPUT  ${spirv_parse_fp}
-    COMMAND ${CMAKE_CXX_COMPILER}
-            -Tp                                                        # treat this as a c++ source file
-            ${glsl_src}                                                # source file
-            -EP                                                        # override line directive
-            -P                                                         # preprocess to file
-            -C                                                         # preserve comments
-            -I "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include" # include directory
-            -Zc:preprocessor                                           # make nice recent c++ macro expansions available
-            -std:c++20                                                 # make nice recent c++ macro expansions available
-            -Fi${spirv_parse_fp}                                       # preprocess file output name
-            ${glsl_defines}                                            # embedded defines
-    DEPENDS ${glsl_src} ${glsl_includes}
-    VERBATIM
-  )
-  
-  # Generate spir-v binary using glslangValidator, store in .temp file
-  add_custom_command(
-    OUTPUT  ${spirv_temp_fp}
-    COMMAND ${glslangValidator} ${spirv_parse_fp} 
-            -o ${spirv_temp_fp} 
-            --client opengl100 
-            --target-env spirv1.5 
-            --glsl-version 460
-    DEPENDS ${spirv_parse_fp}
-    VERBATIM
-  )
-
-  # Generate optimized spir-v binary using spirv-opt from spirv-tools
-  add_custom_command(
-    OUTPUT  ${spirv_bin_fp}
-    COMMAND ${spirv-opt} ${spirv_temp_fp} 
-            -o ${spirv_bin_fp} 
-            -O 
-            -Os
-    DEPENDS ${spirv_temp_fp}
-    VERBATIM 
-  )
-
-  # Generate spir-v reflection information in .json files using spirv-cross
-  add_custom_command(
-    OUTPUT  ${spirv_refl_fp}
-    COMMAND ${spirv-cross} ${spirv_temp_fp} 
-            --output ${spirv_refl_fp} --reflect
-    DEPENDS ${spirv_temp_fp}
-    VERBATIM
-  )
-
-  # Set up list of dependency commands for outputs
-  list(APPEND shader_dependencies ${spirv_bin_fp} ${spirv_refl_fp})
-endforeach()
-
 # Add single target to perform all shader preprocessing/validation
-add_custom_target(shaders DEPENDS ${shader_dependencies})
+set(spirv_dependencies ${glsl_includes})
+compile_glsl_to_spirv_list("${glsl_srcs}" "${spirv_dependencies}")
+add_custom_target(shaders DEPENDS ${spirv_dependencies})
 
 # Add commands to copy resources/misc files
 file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/misc/*)
@@ -290,42 +203,25 @@ endfunction()
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC
-  assimp::assimp
   autodiff::autodiff
-  small_gl
+  assimp::assimp
   Eigen3::Eigen
-  fmt::fmt-header-only
   embree
-  Tracy::TracyClient
+  fmt::fmt-header-only
   nlohmann_json::nlohmann_json
   NLopt::nlopt
-  unofficial::tinyexr::tinyexr
   meshoptimizer::meshoptimizer
   Qhull::qhullcpp
   Qhull::qhull_r
+  unofficial::tinyexr::tinyexr
+  small_gl
   TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy
+  Tracy::TracyClient
   xatlas
   ZLIB::ZLIB
 )
-target_include_directories(core PUBLIC
-  ${STB_INCLUDE_DIRS}
-  ${ZSTR_INCLUDE_DIRS}
-)
-target_compile_definitions(core PUBLIC
-  MET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN}
-  MET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX}
-  MET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES}
-  MET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES}
-  MET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
-  MET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
-  MET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
-  MET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
-  MET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
-  MET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
-  MET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
-)
-target_compile_definitions(core PUBLIC _USE_MATH_DEFINES) # exposec cmath defines in msvc
-add_dependencies(core misc_copy)
+target_include_directories(core PUBLIC ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
+target_compile_definitions(core PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
 # Set up render library
 add_library_r(render render)
@@ -333,18 +229,20 @@ target_link_libraries(render PUBLIC
   core
   imgui::imgui
 )
-add_dependencies(render shaders)
 
 # Set up components library
 add_library_r(components components)
 target_link_libraries(components PUBLIC
-  core
   render
   imgui::imgui
   imguizmo::imguizmo
   implot::implot
   unofficial::nativefiledialog::nfd
 )
+
+# Link dependencies for copying/compiling resources
+add_dependencies(core       misc_copy)
+add_dependencies(render     shaders)
 add_dependencies(components shaders)
 
 # Setup executables
@@ -357,14 +255,15 @@ target_link_libraries(noise_testing PRIVATE core render components)
 
 # Optionally setup Catch2 tests
 if (met_enable_tests)
-  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
-
-  add_executable(metameric_tests ${srcs})
-  # target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core components small_gl)
-  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core)
-  target_compile_features(metameric_tests PUBLIC cxx_std_23)
-  
   include(CTest)
   include(Catch)
+
+  # Find all test files
+  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
+
+  # Setup test executable
+  add_executable(metameric_tests ${srcs})
+  target_link_libraries(metameric_tests PRIVATE Catch2::Catch2WithMain core)
+  target_compile_features(metameric_tests PUBLIC cxx_std_23)
   catch_discover_tests(metameric_tests WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
