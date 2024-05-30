@@ -4,6 +4,3 @@
 [submodule "third_party/small_gl"]
 	path = third_party/small_gl
 	url = https://github.com/Markvanderuit/small_gl.git
-[submodule "third_party/small_gl_parser"]
-	path = third_party/small_gl_parser
-	url = https://github.com/Markvanderuit/small_gl_parser.git
