@@ -1,6 +1,5 @@
 #include <preamble.glsl>
 #include <render/load/defaults.glsl>
-#include <render/sensor.glsl>
 
 // Layout declarations
 layout(std140) uniform;
@@ -13,9 +12,6 @@ layout(binding = 0) uniform b_buff_sensor {
   mat4  view_trf;
   uvec2 film_size; 
 } buff_sensor;
-layout(binding = 1) uniform b_buff_settings {
-  float alpha;
-} buff_settings;
 
 // Vertex stage declarations
 layout(location = 0) in vec3  value_in;
