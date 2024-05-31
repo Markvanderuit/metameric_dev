@@ -19,9 +19,7 @@
 namespace met {
   // Nr. of points on the color system boundary; lower means more space available for constraints
   constexpr uint n_system_boundary_samples = 128;
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
+  
   GenUpliftingDataTask:: GenUpliftingDataTask(uint uplifting_i)
   : m_uplifting_i(uplifting_i) { }
 
@@ -42,6 +40,9 @@ namespace met {
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
     met_trace_full();
+      
+    constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+    constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
     // Initialize buffers to hold packed delaunay tesselation data; these buffers are used by
     // the gen_object_data task to generate barycentric weights for the objects' textures

@@ -4,9 +4,6 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
   bool DrawColorSystemTask::is_active(SchedulerHandle &info) {
     met_trace();
     return info.relative("viewport_begin")("is_active").getr<bool>();
@@ -14,6 +11,9 @@ namespace met {
 
   void DrawColorSystemTask::init(SchedulerHandle &info) {
     met_trace_full();
+      
+    constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+    constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
     // Generate program object
     m_program = {{ .type = gl::ShaderType::eVertex,   

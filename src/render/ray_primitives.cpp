@@ -2,8 +2,6 @@
 
 namespace met {
   constexpr uint isct_wg_size = 256;
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
   DispatchDividePrimitive::DispatchDividePrimitive(uint div) {
     m_program = {{ .type       = gl::ShaderType::eCompute,

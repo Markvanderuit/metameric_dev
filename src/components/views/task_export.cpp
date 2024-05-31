@@ -7,8 +7,7 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 
 namespace met {
-  constexpr static uint path_depth  = PathRecord::path_max_depth;
-  constexpr static uint spp_per_iter = 4u;
+  constexpr static uint export_spp_per_iter = 4u;
 
   void ExportTask::init(SchedulerHandle &info) {
     met_trace();    
@@ -123,38 +122,36 @@ namespace met {
         // Initialize renderer
         switch (m_render_type) {
           case Settings::RendererType::ePath:
-            render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                      .max_depth          = path_depth,
+            render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
                                                       .pixel_checkerboard = false,
                                                       .cache_handle       = info.global("cache") });
             break;
           case Settings::RendererType::eDirect:
-            render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+            render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
                                                       .max_depth          = 2u,
                                                       .pixel_checkerboard = false,
                                                       .cache_handle       = info.global("cache") });
             break;
           case Settings::RendererType::eDebug:
-            render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+            render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
                                                       .max_depth          = 2u,
                                                       .pixel_checkerboard = false,
                                                       .enable_debug       = true,
                                                       .cache_handle       = info.global("cache") });
             break;
           case Settings::RendererType::ePathRGB:
-            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                         .max_depth          = path_depth,
+            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
                                                          .pixel_checkerboard = false,
                                                          .cache_handle       = info.global("cache") });
             break;
           case Settings::RendererType::eDirectRGB:
-            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
                                                          .max_depth          = 2u,
                                                          .pixel_checkerboard = false,
                                                          .cache_handle       = info.global("cache") });
             break;
           case Settings::RendererType::eDebugRGB:
-            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
+            render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = export_spp_per_iter,
                                                          .max_depth          = 2u,
                                                          .pixel_checkerboard = false,
                                                          .enable_debug       = true,
@@ -188,7 +185,7 @@ namespace met {
           render_handle.getw<RGBPathRenderPrimitive>().render(m_sensor, e_scene);
           break;
       }
-      m_spp_curr += spp_per_iter;
+      m_spp_curr += export_spp_per_iter;
 
       // End render
       if (m_spp_curr >= m_spp_trgt) {

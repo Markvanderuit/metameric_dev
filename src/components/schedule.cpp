@@ -159,7 +159,7 @@ namespace met {
       ImGui::End();
     });
 
-    scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
+    // scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
     /* scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene resources")) {

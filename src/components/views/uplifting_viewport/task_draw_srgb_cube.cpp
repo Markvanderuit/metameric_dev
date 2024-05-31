@@ -4,9 +4,6 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
   bool DrawSRGBCubeTask::is_active(SchedulerHandle &info) {
     met_trace();
     return info.relative("viewport_begin")("is_active").getr<bool>();

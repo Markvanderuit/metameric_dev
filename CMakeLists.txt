@@ -154,6 +154,7 @@ function(add_library_r target dir)
   add_library(${target} ${srcs})
   target_include_directories(${target} PUBLIC include)
   target_compile_features(${target} PUBLIC cxx_std_23)
+  # set_target_properties(${target} PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE BATCH UNITY_BUILD_BATCH_SIZE 16)
 endfunction()
 
 # Set up core library

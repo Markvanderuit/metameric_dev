@@ -9,11 +9,7 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  constexpr static uint spp_per_iter = 1u;
-  constexpr static uint path_depth  = PathRecord::path_max_depth;
-
-  using RenderPrimitive = PathRenderPrimitive;
-  // using RenderPrimitive = RGBPathRenderPrimitive; // fallback for direct roundtrip testing
+  constexpr static uint render_spp_per_iter = 1u;
 
   bool MeshViewportRenderTask::is_active(SchedulerHandle &info) {
     met_trace();
@@ -49,42 +45,42 @@ namespace met {
     if (is_first_eval() || e_scene.components.settings.state.renderer_type) {
       switch (e_settings.renderer_type) {
         case Settings::RendererType::ePath:
-          render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                    .max_depth          = path_depth,
-                                                    .pixel_checkerboard = true,
-                                                    .cache_handle       = info.global("cache") });
+          render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
+                                                    .max_depth           = PathRecord::path_max_depth,
+                                                    .pixel_checkerboard  = true,
+                                                    .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirect:
-          render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                    .max_depth          = 2u,
-                                                    .pixel_checkerboard = true,
-                                                    .cache_handle       = info.global("cache") });
+          render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
+                                                    .max_depth           = 2u,
+                                                    .pixel_checkerboard  = true,
+                                                    .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDebug:
-          render_handle.init<PathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                    .max_depth          = 2u,
-                                                    .pixel_checkerboard = true,
-                                                    .enable_debug       = true,
-                                                    .cache_handle       = info.global("cache") });
+          render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
+                                                    .max_depth           = 2u,
+                                                    .pixel_checkerboard  = true,
+                                                    .enable_debug        = true,
+                                                    .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::ePathRGB:
-          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                       .max_depth          = path_depth,
-                                                       .pixel_checkerboard = true,
-                                                       .cache_handle       = info.global("cache") });
+          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
+                                                       .max_depth           = PathRecord::path_max_depth,
+                                                       .pixel_checkerboard  = true,
+                                                       .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirectRGB:
-          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                       .max_depth          = 2u,
-                                                       .pixel_checkerboard = true,
-                                                       .cache_handle       = info.global("cache") });
+          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
+                                                       .max_depth           = 2u,
+                                                       .pixel_checkerboard  = true,
+                                                       .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDebugRGB:
-          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter       = spp_per_iter,
-                                                       .max_depth          = 2u,
-                                                       .pixel_checkerboard = true,
-                                                       .enable_debug       = true,
-                                                       .cache_handle       = info.global("cache") });
+          render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
+                                                       .max_depth           = 2u,
+                                                       .pixel_checkerboard  = true,
+                                                       .enable_debug        = true,
+                                                       .cache_handle        = info.global("cache") });
           break;
       }
     }

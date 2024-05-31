@@ -14,10 +14,6 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  // Constants
-  constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-  
   class UpliftingViewerBeginTask : public detail::TaskNode {
     using Depthbuffer = gl::Renderbuffer<gl::DepthComponent, 1>;
 
@@ -127,7 +123,10 @@ namespace met {
 
     void init(SchedulerHandle &info) override {
       met_trace_full();
-
+      
+      constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
+      constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+      
       // Set up draw components for gamma correction
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, 
                      .mag_filter = gl::SamplerMagFilter::eNearest }};
