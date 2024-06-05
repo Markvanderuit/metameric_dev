@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 
-function(add_resource_target target_name)
+function(add_resource_target target_name target_dir)
   # Generate list of relevant files
-  file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/misc/*)
+  file(GLOB_RECURSE misc_files ${CMAKE_CURRENT_SOURCE_DIR}/resources/${target_dir}/*)
   
   # Generate list of command functions to copy files
   foreach(misc_file ${misc_files})

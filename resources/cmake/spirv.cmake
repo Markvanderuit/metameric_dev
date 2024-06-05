@@ -18,8 +18,6 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
              BASE_DIRECTORY ${PROJECT_SOURCE_DIR}/resources/shaders/src
              OUTPUT_VARIABLE glsl_rel_fp)
 
-  message(STATUS "Found shader : ${glsl_rel_fp}")
-
   set(spirv_parse_fp "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}")
   set(spirv_temp_fp  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.temp")
   set(spirv_bin_fp   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${glsl_rel_fp}.spv")

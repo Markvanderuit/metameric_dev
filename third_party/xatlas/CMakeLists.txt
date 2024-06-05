@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.22)
 
 # Project is not versioned, so use date of last upstream commit.
 project(xatlas LANGUAGES CXX VERSION "0.0.0")

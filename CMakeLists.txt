@@ -4,23 +4,21 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake CACHE STRING "Vcpkg toolchain file")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/resources/cmake" CACHE STRING "CMake module path")
 
+# Specify project name, languages
 project(Metameric LANGUAGES CXX)
 
 # Build options
-option(met_enable_exceptions "Enable exceptions on release" ON)
-option(met_enable_tracy      "Enable Tracy support"         ON)
-option(met_enable_tests      "Build tests"                  ON)
+option(MET_ENABLE_EXCEPTIONS "Enable exceptions on release" ON)
+option(MET_ENABLE_TRACY      "Enable Tracy support"         ON)
+option(MET_ENABLE_TESTS      "Build tests"                  ON)
 
-# Define Metameric's spectral layout
+# Spectral layout; inserted in code/shaders as preprocessor defines
 set(MET_WAVELENGTH_MIN     380) # Minimum wavelength of spectral range
 set(MET_WAVELENGTH_MAX     780) # Maximum wavelength of spectral range
 set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral representations
 set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
 
-# TODO remove
-set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral representation
-
-# Define some constants as available on both shader and program side
+# Some object limits for renderer; inserted in code/shaders as preprocessor defines
 set(MET_SUPPORTED_MESHES        48) # Maximum supported scene meshes
 set(MET_SUPPORTED_OBJECTS       48) # Maximum supported scene objects
 set(MET_SUPPORTED_EMITTERS      16) # Maximum supported scene emitters
@@ -28,10 +26,13 @@ set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported individual uplifting tex
 set(MET_SUPPORTED_CONSTRAINTS 1024) # Maximum supported boundary spectra + constraint spectra
 set(MET_SUPPORTED_TEXTURES     256) # Maximum supported scene textures
 
+# TODO remove; inserted in code/shaders as preprocessor defines
+set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral representation
+
 # Print configuration info
-message(STATUS "Metameric : Enabling exceptions = ${met_enable_exceptions}")
-message(STATUS "Metameric : Enabling Tracy      = ${met_enable_tracy}")
-message(STATUS "Metameric : Building tests      = ${met_enable_tests}")
+message(STATUS "Metameric : Enabling exceptions = ${MET_ENABLE_EXCEPTIONS}")
+message(STATUS "Metameric : Enabling Tracy      = ${MET_ENABLE_TRACY}")
+message(STATUS "Metameric : Building tests      = ${MET_ENABLE_TESTS}")
 message(STATUS "Metameric : Wavelength min.     = ${MET_WAVELENGTH_MIN}")
 message(STATUS "Metameric : Wavelength max.     = ${MET_WAVELENGTH_MAX}")
 message(STATUS "Metameric : Wavelength samples  = ${MET_WAVELENGTH_SAMPLES}")
@@ -61,27 +62,6 @@ endif(MSVC)
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 
-# Gather all preprocessor values into one list
-set(preprocessor_defines
-  -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
-  -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
-  -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
-  -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
-  -DMET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
-  -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
-  -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
-  -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
-  -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
-  -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
-  -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
-)
-if(met_enable_exceptions)
-  list(APPEND preprocessor_defines -DMET_ENABLE_EXCEPTIONS)
-endif()
-if(met_enable_tracy)
-  list(APPEND preprocessor_defines -DMET_ENABLE_TRACY)
-endif()
-
 # Include third party libraries provided through vcpkg
 find_package(assimp    CONFIG REQUIRED)
 find_package(Catch2    CONFIG REQUIRED)
@@ -105,9 +85,9 @@ find_package(embree    CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Include xAtlas/Autodiff/small_gl
-option(gl_enable_exceptions  "" ${met_enable_exceptions})
-option(gl_enable_tracy       "" ${met_enable_tracy})
+# Include xAtlas/Autodiff/small_gl manually
+option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
+option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
 add_subdirectory(third_party/xatlas)
 add_subdirectory(third_party/autodiff)
 add_subdirectory(third_party/small_gl)
@@ -118,7 +98,29 @@ include(Catch)
 include(spirv)
 include(resource)
 
+# Gather all preprocessor values into one list
+set(preprocessor_defines
+  -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
+  -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
+  -DMET_WAVELENGTH_SAMPLES=${MET_WAVELENGTH_SAMPLES} 
+  -DMET_WAVELENGTH_BASES=${MET_WAVELENGTH_BASES} 
+  -DMET_MOMENT_COEFFICIENTS=${MET_MOMENT_COEFFICIENTS}
+  -DMET_SUPPORTED_MESHES=${MET_SUPPORTED_MESHES}
+  -DMET_SUPPORTED_OBJECTS=${MET_SUPPORTED_OBJECTS}
+  -DMET_SUPPORTED_EMITTERS=${MET_SUPPORTED_EMITTERS}
+  -DMET_SUPPORTED_UPLIFTINGS=${MET_SUPPORTED_UPLIFTINGS}
+  -DMET_SUPPORTED_CONSTRAINTS=${MET_SUPPORTED_CONSTRAINTS}
+  -DMET_SUPPORTED_TEXTURES=${MET_SUPPORTED_TEXTURES}
+)
+if(MET_ENABLE_EXCEPTIONS)
+  list(APPEND preprocessor_defines -DMET_ENABLE_EXCEPTIONS)
+endif()
+if(MET_ENABLE_TRACY)
+  list(APPEND preprocessor_defines -DMET_ENABLE_TRACY)
+endif()
+
 # Gather list of third party libraries
+set(incl_dependencies include ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
   assimp::assimp
@@ -136,32 +138,25 @@ set(core_dependencies
   xatlas
   ZLIB::ZLIB
 )
-set(component_dependencies
-  imgui::imgui imguizmo::imguizmo implot::implot unofficial::nativefiledialog::nfd
-)
+set(component_dependencies imgui::imgui imguizmo::imguizmo implot::implot unofficial::nativefiledialog::nfd)
 if(OpenMP_CXX_FOUND)
   list(APPEND core_dependencies OpenMP::OpenMP_CXX)
 endif()
 
 # Simple function to add a library with consistent settings
 function(add_library_r target dir)
-  file(GLOB_RECURSE srcs 
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/metameric/${dir}/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/metameric/${dir}/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cpp
-  )
+  file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cpp)
 
   add_library(${target} ${srcs})
-  target_include_directories(${target} PUBLIC include)
+
+  target_include_directories(${target} PUBLIC ${incl_dependencies})
   target_compile_features(${target} PUBLIC cxx_std_23)
-  # set_target_properties(${target} PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE BATCH UNITY_BUILD_BATCH_SIZE 16)
+  target_compile_definitions(core PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 endfunction()
 
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC ${core_dependencies})
-target_include_directories(core PUBLIC ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
-target_compile_definitions(core PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
 # Set up render library
 add_library_r(render render)
@@ -173,8 +168,8 @@ target_link_libraries(components PUBLIC render ${component_dependencies})
 
 # Specify shader/resource targets, link these as dependencies for preprocessing
 add_shader_target(shaders)
-add_resource_target(misc)
-add_dependencies(core       misc)
+add_resource_target(resources misc)
+add_dependencies(core       resources)
 add_dependencies(render     shaders)
 add_dependencies(components shaders)
 
@@ -184,7 +179,7 @@ target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
 
 # Optionally setup Catch2 tests
-if (met_enable_tests)
+if (MET_ENABLE_TESTS)
   # Find all test files
   file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
 
