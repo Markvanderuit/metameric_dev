@@ -80,6 +80,7 @@ namespace met {
 
     // Import a wavefront .obj file, adding its components into the loaded scene
     void import_wavefront_obj(const fs::path &path);
+    void overwrite_wavefront_obj(const fs::path &path);
 
     // Import an existing scene, adding its components into the loaded scene
     void import_scene(const fs::path &path);

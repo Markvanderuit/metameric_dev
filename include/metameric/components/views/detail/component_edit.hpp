@@ -55,10 +55,10 @@ namespace met {
       std::string editor_name = "Editor"; // Surrounding editor section name
       bool inside_tree        = true;     // Push imgui components inside a TreeNode section,  or inline directly
       bool show_add           = true;     // Allow adding of components to lists
-      bool show_del           = true;     // Allow deletion of components
-      bool show_dupl          = true;     // Allow duplication of components
-      bool edit_name          = true;     // Allow editing of component name
-      bool edit_data          = true;     // Allow editing of component data
+      bool show_del           = true;     // Allow deletion of component/resource
+      bool show_dupl          = true;     // Allow duplication of component/resource
+      bool edit_name          = true;     // Allow editing of component/resource name
+      bool edit_data          = true;     // Allow editing of component/resource data
     };
 
     // Visitor closure that allows editing of a component/resource inside push_*_editor(),
@@ -229,6 +229,8 @@ namespace met {
       if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Duplicate component");
     } // if (inside_tree && show_dupl)
+
+
 
     // Delete button, on same line as tree node if available
     if (edit_info.inside_tree && edit_info.show_del) {

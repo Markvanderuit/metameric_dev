@@ -3,6 +3,7 @@
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>
+#include <metameric/components/views/detail/file_dialog.hpp>
 #include <concepts>
 
 namespace met {
@@ -309,6 +310,13 @@ namespace met {
       
       ImGui::LabelText("Vertices", "%d", value.verts.size());
       ImGui::LabelText("Elements", "%d", value.elems.size());
+
+      /* ImGui::Separator();
+
+      if (fs::path path; ImGui::Button("Reload from file...") && detail::load_dialog(path, "obj")) {
+        auto &value = detail::scene_data_by_type<Resource<Mesh>>(scene)[i];
+
+      } */
     };
 
     // Default implementation of editing visitor for Mesh resources
@@ -320,6 +328,13 @@ namespace met {
 
       ImGui::LabelText("Width",  "%d", value.size().x());
       ImGui::LabelText("Height", "%d", value.size().y());
+
+      /* ImGui::Separator();
+
+      if (fs::path path; ImGui::Button("Reload from file...") && detail::load_dialog(path, "exr,png,jpg,jpeg,bmp")) {
+        auto &value = detail::scene_data_by_type<Resource<Image>>(scene)[i];
+        
+      } */
     };
   } // namespace detail
 
