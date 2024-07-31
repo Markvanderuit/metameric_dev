@@ -363,6 +363,7 @@ namespace met {
           // Run solver and store recovered spectral distribution if it is legit
           auto r = solve(local_solver);
           guard_continue(!r.x.array().isNaN().any());
+          guard_continue(!r.x.array().isZero());
           tbb_output.push_back(r.x.cast<float>().eval());
         } // for (int i)
       }
@@ -408,6 +409,7 @@ namespace met {
           // Run solver and obtain recovered spectral distribution if it is legit
           auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
           guard_continue(!r.isNaN().any());
+          guard_continue(!r.array().isZero());
           tbb_output.push_back(generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis }));
         } // for (int i)
       }
@@ -549,6 +551,7 @@ namespace met {
           // Run solver and store recovered spectral distribution if it is safe
           auto coeffs = solve(local_solver).x.cast<float>().eval();
           guard_continue(!coeffs.array().isNaN().any());
+          guard_continue(!coeffs.array().isZero());
           tbb_output.push_back(coeffs);
         } // for (int i)
       }
@@ -643,6 +646,7 @@ namespace met {
       
       // Store valid spectrum
       guard_continue(!c.array().isNaN().any());
+      guard_continue(!c.array().isZero());
       tbb_output.push_back(c);
     }
     
