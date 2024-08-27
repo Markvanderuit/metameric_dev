@@ -42,9 +42,6 @@ namespace met {
      {{ .type       = gl::ShaderType::eVertex,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.vert.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.vert.json" },
-      /* { .type       = gl::ShaderType::eGeometry,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.geom.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.geom.json" }, */
       { .type       = gl::ShaderType::eFragment,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.frag.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.frag.json",
@@ -53,17 +50,10 @@ namespace met {
      {{ .type       = gl::ShaderType::eVertex,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.vert.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.vert.json" },
-      /* { .type       = gl::ShaderType::eGeometry,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.geom.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.geom.json" }, */
       { .type       = gl::ShaderType::eFragment,
         .spirv_path = "resources/shaders/pipeline_new/gen_texture.frag.spv",
         .cross_path = "resources/shaders/pipeline_new/gen_texture.frag.json",
         .spec_const = {{ 0, false }} }});
-    std::tie(m_cache_key_bake, std::ignore) = e_cache.set(
-     {{ .type       = gl::ShaderType::eCompute,
-        .spirv_path = "resources/shaders/pipeline_new/gen_moments.comp.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_moments.comp.json" }});
                                 
     // Initialize uniform buffer and writeable, flushable mapping
     m_unif_buffer = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
