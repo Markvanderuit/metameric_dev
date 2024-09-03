@@ -102,9 +102,9 @@ namespace met {
         }
       };
 
-      // Helper to handle single row for ColrConstraint type
+      // Helper to handle single row for LinearConstraint type
       auto push_colr_cstr_row = [&](std::string               name,
-                                    std::span<ColrConstraint> c_vec, 
+                                    std::span<LinearConstraint> c_vec, 
                                     uint                      c_j) -> PushReturnAction {
         ImGui::TableNextRow();
         auto scope = ImGui::ScopedID(name);
@@ -165,9 +165,9 @@ namespace met {
         return action;
       };
       
-      // Helper to handle single row for ColrConstraint type
+      // Helper to handle single row for LinearConstraint type
       auto push_powr_cstr_row = [&](std::string               name,
-                                    std::span<PowrConstraint> c_vec, 
+                                    std::span<NLinearConstraint> c_vec, 
                                     uint                      c_j) -> PushReturnAction {
         ImGui::TableNextRow();
         auto scope = ImGui::ScopedID(name);
@@ -254,19 +254,19 @@ namespace met {
               }
               ImPlot::EndPlot();
             }
-            if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
+            if (!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
               // Reconstruct radiance from truncated power series
-              Spec s = cstr.cstr_j_indrct.back().powr_j[0];
-              for (uint i = 0; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
-                s += spec.pow(static_cast<float>(i)) * cstr.cstr_j_indrct.back().powr_j[i];
+              Spec s = cstr.cstr_j.back().powr_j[0];
+              for (uint i = 0; i < cstr.cstr_j.back().powr_j.size(); ++i)
+                s += spec.pow(static_cast<float>(i)) * cstr.cstr_j.back().powr_j[i];
               ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
-            if (!cstr.cstr_j_indrct.empty() && !cstr.cstr_j_indrct.back().powr_j.empty() && ImGui::BeginTabItem("Power series")) {
+            if (!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty() && ImGui::BeginTabItem("Power series")) {
               float s_max = 0.f;
-              for (uint i = 0; i < cstr.cstr_j_indrct.back().powr_j.size(); ++i)
-                s_max = std::max(s_max, cstr.cstr_j_indrct.back().powr_j[i].maxCoeff());
-              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j_indrct.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 128.f * e_window.content_scale() });
+              for (uint i = 0; i < cstr.cstr_j.back().powr_j.size(); ++i)
+                s_max = std::max(s_max, cstr.cstr_j.back().powr_j[i].maxCoeff());
+              ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 128.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -290,7 +290,7 @@ namespace met {
       
       // Visit the underlying constraint data
       vert.constraint | visit {
-        [&](is_colr_constraint auto &cstr) {
+        [&](is_linear_constraint auto &cstr) {
           ImGui::SeparatorText("Constraints");
           if (ImGui::BeginTable("##table", 5, ImGuiTableFlags_SizingStretchProp)) {
             // Setup table header; columns are shown without hover or color; cleaner than table headers
@@ -321,7 +321,7 @@ namespace met {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             if (ImGui::Button("Add"))
-              cstr.cstr_j.push_back(ColrConstraint { });
+              cstr.cstr_j.push_back(LinearConstraint { });
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Add new constraint");
             
@@ -339,8 +339,8 @@ namespace met {
 
             // Checkbox for all
             ImGui::TableSetColumnIndex(4);
-            if (!cstr.cstr_j_indrct.empty()) {
-              // auto is_active_v = cstr.cstr_j | vws::transform(&ColrConstraint::is_active);
+            if (!cstr.cstr_j.empty()) {
+              // auto is_active_v = cstr.cstr_j | vws::transform(&LinearConstraint::is_active);
               // auto is_active   = is_active_v | rng::to<std::vector<int>>();
               // ImGui::CheckboxFlags("##is_active", is_active.data(), is_active.size());
               // rng::copy(is_active, is_active_v.begin());
@@ -349,32 +349,17 @@ namespace met {
             // Baseline constraint row
             push_base_cstr_row(cstr);
 
-            // Direct constraint rows
-            for (uint j = 0; j < cstr.cstr_j_direct.size(); ++j) {
-              auto name = std::format("Direct #{}", j);
-              auto actn = push_colr_cstr_row(name, cstr.cstr_j_direct, j);
-              if (actn == PushReturnAction::eDelete) {
-                cstr.cstr_j_direct.erase(cstr.cstr_j_direct.begin() + j);
-                cstr.cstr_j_direct.back().is_active = true;
-                break;
-              } else if (actn == PushReturnAction::eEdit) {
-                std::swap(cstr.cstr_j_direct[j], cstr.cstr_j_direct.back());
-                cstr.cstr_j_direct.back().is_active = true;
-                break;
-              }
-            }
-
             // Indirect constraint rows
-            for (uint j = 0; j < cstr.cstr_j_indrct.size(); ++j) {
+            for (uint j = 0; j < cstr.cstr_j.size(); ++j) {
               auto name = std::format("Indirect #{}", j);
-              auto actn = push_powr_cstr_row(name, cstr.cstr_j_indrct, j);
+              auto actn = push_powr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
-                cstr.cstr_j_indrct.erase(cstr.cstr_j_indrct.begin() + j);
-                cstr.cstr_j_indrct.back().is_active = true;
+                cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
+                cstr.cstr_j.back().is_active = true;
                 break;
               } else if (actn == PushReturnAction::eEdit) {
-                std::swap(cstr.cstr_j_indrct[j], cstr.cstr_j_indrct.back());
-                cstr.cstr_j_indrct.back().is_active = true;
+                std::swap(cstr.cstr_j[j], cstr.cstr_j.back());
+                cstr.cstr_j.back().is_active = true;
                 break;
               }
             }
@@ -383,7 +368,7 @@ namespace met {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             if (ImGui::Button("Add"))
-              cstr.cstr_j_indrct.push_back(PowrConstraint { });
+              cstr.cstr_j.push_back(NLinearConstraint { });
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Add new constraint");
             
@@ -437,10 +422,10 @@ namespace met {
         
         vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
           if (ImGui::SmallButton("Print power series")) {
-            for (uint i = 0; i < cstr.cstr_j_indrct.size(); ++i) {
+            for (uint i = 0; i < cstr.cstr_j.size(); ++i) {
               fmt::print("cstr {}\n", i);
-              for (uint j = 0; j < cstr.cstr_j_indrct[i].powr_j.size(); ++j) {
-                fmt::print("  {} : {}\n", j, cstr.cstr_j_indrct[i].powr_j[j]);
+              for (uint j = 0; j < cstr.cstr_j[i].powr_j.size(); ++j) {
+                fmt::print("  {} : {}\n", j, cstr.cstr_j[i].powr_j[j]);
               }
             }
           }

@@ -23,7 +23,7 @@ namespace met {
 
     // Force on first run, then make dependent on uplifting/object/texture settings. Yikes
     return is_first_eval()                 || // First run demands render
-           e_coeffs.is_invalitated() || // Texture atlas re-allocate demands rerender
+           e_coeffs.is_invalitated()       || // Texture atlas re-allocate demands rerender
            e_object.state.diffuse          || // Note; we ignore object transforms
            e_object.state.mesh_i           ||  
            e_object.state.uplifting_i      || 

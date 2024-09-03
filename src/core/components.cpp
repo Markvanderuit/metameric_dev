@@ -113,14 +113,11 @@ namespace met {
   void Uplifting::Vertex::set_mismatch_position(const Colr &c) {
     met_trace();
     constraint | visit { 
-      [c](is_colr_constraint auto &cstr) { 
+      [c](is_linear_constraint auto &cstr) { 
         cstr.cstr_j.back().colr_j = c; 
       }, 
       [c](IndirectSurfaceConstraint &cstr) { 
-        if (cstr.target_direct)
-          cstr.cstr_j_direct.back().colr_j = c;
-        else
-          cstr.cstr_j_indrct.back().colr_j = c;
+        cstr.cstr_j.back().colr_j = c;
       },
       [](const auto &cstr) {}
     };
@@ -129,18 +126,13 @@ namespace met {
   Colr Uplifting::Vertex::get_mismatch_position() const {
     met_trace();
     return constraint | visit {
-      [](const is_colr_constraint auto &cstr) { 
+      [](const is_linear_constraint auto &cstr) { 
         guard(!cstr.cstr_j.empty(), Colr(0));
-        return (cstr.cstr_j | vws::filter(&ColrConstraint::is_active)).back().colr_j; 
+        return (cstr.cstr_j | vws::filter(&LinearConstraint::is_active)).back().colr_j; 
       },
       [](const IndirectSurfaceConstraint &cstr) { 
-        if (cstr.target_direct) {
-          guard(!cstr.cstr_j_direct.empty(), Colr(0));
-          return cstr.cstr_j_direct.back().colr_j; 
-        } else {
-          guard(!cstr.cstr_j_indrct.empty(), Colr(0));
-          return cstr.cstr_j_indrct.back().colr_j; 
-        }
+        guard(!cstr.cstr_j.empty(), Colr(0));
+        return cstr.cstr_j.back().colr_j; 
       },
       [](const auto &) { return Colr(0); },
     };
@@ -159,8 +151,8 @@ namespace met {
         
         if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
-                           other.cstr_j | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j  | vws::filter(&LinearConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::filter(&LinearConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
           
           // The "free variable" should be identical outside of the specified color value
           guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
@@ -176,8 +168,8 @@ namespace met {
 
         if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
-                           other.cstr_j | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j  | vws::filter(&LinearConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::filter(&LinearConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
           
           // The "free variable" constraint should be identical outside of the specified color value
           guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
@@ -189,26 +181,15 @@ namespace met {
         
         guard(cstr.is_base_active == other.is_base_active, false);
         guard(cstr.colr_i.isApprox(other.colr_i), false);
-        guard(cstr.target_direct == other.target_direct, false);
-        guard(cstr.cstr_j_direct.size() == other.cstr_j_direct.size(), false);
-        guard(cstr.cstr_j_indrct.size() == other.cstr_j_indrct.size(), false);
+        guard(cstr.cstr_j.size() == other.cstr_j.size(), false);
         
-        if (cstr.target_direct && !cstr.cstr_j_direct.empty()) {
+        if (!cstr.cstr_j.empty()) {
           // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j_indrct, other.cstr_j_indrct), false);
-          guard(rng::equal(cstr.cstr_j_direct  | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j_direct.size() - 1),
-                           other.cstr_j_direct | vws::filter(&ColrConstraint::is_active) | vws::take(cstr.cstr_j_direct.size() - 1)), false);
+          guard(rng::equal(cstr.cstr_j  | vws::filter(&NLinearConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1),
+                           other.cstr_j | vws::filter(&NLinearConstraint::is_active) | vws::take(cstr.cstr_j.size() - 1)), false);
 
           // The "free variable" constraint should be identical outside of the specified color value
-          guard(cstr.cstr_j_direct.back().is_similar(other.cstr_j_direct.back()), false);
-        } else if (!cstr.target_direct && !cstr.cstr_j_indrct.empty()) {
-          // The "known" connstraints should be identical
-          guard(rng::equal(cstr.cstr_j_direct, other.cstr_j_direct), false);
-          guard(rng::equal(cstr.cstr_j_indrct  | vws::filter(&PowrConstraint::is_active) | vws::take(cstr.cstr_j_indrct.size() - 1),
-                           other.cstr_j_indrct | vws::filter(&PowrConstraint::is_active) | vws::take(cstr.cstr_j_indrct.size() - 1)), false);
-
-          // The "free variable" constraint should be identical outside of the specified color value
-          guard(cstr.cstr_j_indrct.back().is_similar(other.cstr_j_indrct.back()), false);
+          guard(cstr.cstr_j.back().is_similar(other.cstr_j.back()), false);
         }
         return true; // only the free variable differs
       },
@@ -223,7 +204,7 @@ namespace met {
         return true;
       },
       [](const IndirectSurfaceConstraint &cstr) { 
-        return !cstr.target_direct && !cstr.cstr_j_indrct.empty(); 
+        return !cstr.cstr_j.empty(); 
       },
       [](const auto &) { 
         return false;
@@ -239,10 +220,9 @@ namespace met {
         cstr.colr_i  = si.diffuse;
       },
       [si](IndirectSurfaceConstraint &cstr) { 
-        guard(!cstr.target_direct);
-        guard(!cstr.cstr_j_indrct.empty());
-        cstr.cstr_j_indrct.back().surface = si;
-        if (cstr.cstr_j_indrct.size() == 1)
+        guard(!cstr.cstr_j.empty());
+        cstr.cstr_j.back().surface = si;
+        if (cstr.cstr_j.size() == 1)
           cstr.colr_i = si.diffuse;
       },
       [&](auto &) { /* ... */ }
@@ -256,8 +236,8 @@ namespace met {
         return c.surface; 
       },
       [](const IndirectSurfaceConstraint &c) -> const SurfaceInfo & { 
-        return !c.cstr_j_indrct .empty() 
-          ? c.cstr_j_indrct .back().surface 
+        return !c.cstr_j.empty() 
+          ? c.cstr_j.back().surface 
           : detail::invalid_visitor_return_si; 
       },
       [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
@@ -271,9 +251,9 @@ namespace met {
         return std::vector<SurfaceInfo> { c.surface };
       },
       [](const IndirectSurfaceConstraint &c) { 
-        return c.cstr_j_indrct
-          | vws::filter(&PowrConstraint::is_active)
-          | vws::transform(&PowrConstraint::surface)
+        return c.cstr_j
+          | vws::filter(&NLinearConstraint::is_active)
+          | vws::transform(&NLinearConstraint::surface)
           | rng::to<std::vector>();
       },
       [&](const auto &) { return std::vector<SurfaceInfo>(); }
@@ -288,7 +268,7 @@ namespace met {
         // Merge all known color system data
         auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
         auto cstr = c.cstr_j
-                  | vws::filter(&ColrConstraint::is_active)
+                  | vws::filter(&LinearConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
                   | rng::to<std::vector>();
         cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
@@ -301,7 +281,7 @@ namespace met {
         // Merge all known color system data
         auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
         auto cstr = c.cstr_j
-                  | vws::filter(&ColrConstraint::is_active)
+                  | vws::filter(&LinearConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
                   | rng::to<std::vector>();
         cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
@@ -311,8 +291,8 @@ namespace met {
             && !detail::has_duplicates(cstr);
       },
       [&](const IndirectSurfaceConstraint &c) {
-        auto cstr = c.cstr_j_indrct
-                  | vws::filter(&PowrConstraint::is_active)
+        auto cstr = c.cstr_j
+                  | vws::filter(&NLinearConstraint::is_active)
                   | rng::to<std::vector>();
         return !cstr.empty() 
             && !detail::has_duplicates(cstr) 

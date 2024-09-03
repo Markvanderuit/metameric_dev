@@ -15,16 +15,16 @@ namespace met {
   constexpr static uint mmv_uplift_samples_max  = 256u;
   constexpr static uint mmv_uplift_samples_iter = 16u;
 
-  // Helper struct to recover spectra by "rolling" mismatch volume generation. The resulting
-  // convex structure is then sampled for interior spectra. This is much faster than solving
-  // for metamers inside the convex structure directly.
+  // Helper struct to recover spectra by "rolling window" mismatch volume generation. The resulting
+  // convex structure is then used to construct interior spectra through linear interpolation. 
+  // This is much faster than solving for metamers directly, if the user is going to edit constraints.
   struct MetamerConstraintBuilder {
     ConvexHull chull; // Convex hull data is exposed for UI components to use
   
   private:
     using cnstr_type  = typename Uplifting::Vertex::cnstr_type;
 
-    bool                        m_did_sample    = false;                   // Cache; did we gene this iteration?
+    bool                        m_did_sample    = false;                   // Cache; did we generate samples this iteration?
     std::deque<Colr>            m_colr_samples  = { };                     // For tracking incoming and exiting samples' positions
     std::deque<Basis::vec_type> m_coef_samples  = { };                     // For tracking incoming and exiting samples' coefficeints
     uint                        m_curr_samples  = 0;                       // How many samples are of the current vertex constraint

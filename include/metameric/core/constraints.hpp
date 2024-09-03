@@ -9,8 +9,8 @@
 #include <utility>
 
 namespace met {
-  // Small helper struct for implementations of is_colr_constraint derivatives
-  struct ColrConstraint {
+  // Small helper struct; specifying linear illumination or observer constraints
+  struct LinearConstraint {
     // Constraint data
     bool is_active = true; // Constraint is in effect
     uint cmfs_j    = 0;    // Index of observer in scene data
@@ -18,12 +18,12 @@ namespace met {
     Colr colr_j    = 0.f;  // Color under this direct color system
 
   public:
-    bool operator==(const ColrConstraint &o) const;
-    bool is_similar(const ColrConstraint &o) const;
+    bool operator==(const LinearConstraint &o) const;
+    bool is_similar(const LinearConstraint &o) const;
   };
 
-  // Small helper struct for constraints in IndirectSurfaceConstraint
-  struct PowrConstraint {
+  // Small helper struct; specifying nonlinear illumination constraints with truncated power series
+  struct NLinearConstraint {
     // Constraint data
     bool              is_active = true; // Constraint is in effect
     uint              cmfs_j    = 0;    // Index of observer in scene data
@@ -34,8 +34,8 @@ namespace met {
     SurfaceInfo surface = SurfaceInfo::invalid();
 
   public:      
-    bool operator==(const PowrConstraint &o) const;
-    bool is_similar(const PowrConstraint &o) const;
+    bool operator==(const NLinearConstraint &o) const;
+    bool is_similar(const NLinearConstraint &o) const;
   };
 
   // Concept for a constraint on metameric behavior used throughout the application's
@@ -63,12 +63,12 @@ namespace met {
     { t.colr_i } -> std::convertible_to<Colr>;
   };
 
-  // Concept defining the expected components of color-system constraints
+  // Concept defining the expected components of linear color-system constraints
   template <typename Ty>
-  concept is_colr_constraint = is_roundtrip_constraint<Ty> && requires(Ty t) {
+  concept is_linear_constraint = is_roundtrip_constraint<Ty> && requires(Ty t) {
     // The constraint specifies secondary color data, under secondary
     // color systems assembled from scene data
-    { t.cstr_j } -> std::convertible_to<std::vector<ColrConstraint>>;
+    { t.cstr_j } -> std::convertible_to<std::vector<LinearConstraint>>;
   };
 
   // Constraint imposing reproduction of a specific spectral reflectance.
@@ -92,9 +92,9 @@ namespace met {
   // Constraint imposing specific color reproduction under a set of known
   // color systems, i.e. direct illumination.
   struct DirectColorConstraint {
-    bool                        is_base_active = true; // Base roundtrip linear constraint is active
-    Colr                        colr_i         = 0.0;  // Expected base roundtrip color
-    std::vector<ColrConstraint> cstr_j         = { };  // Secondary constraints for color reproduction
+    bool                          is_base_active = true; // Base roundtrip linear constraint is active
+    Colr                          colr_i         = 0.0;  // Expected base roundtrip color
+    std::vector<LinearConstraint> cstr_j         = { };  // Secondary constraints for color reproduction
     
   public:
     // Solve for the constraint's metamer based on its current configuration
@@ -106,15 +106,15 @@ namespace met {
   public:
     bool operator==(const DirectColorConstraint &o) const;
   };
-  static_assert(is_colr_constraint<DirectColorConstraint>);
+  static_assert(is_linear_constraint<DirectColorConstraint>);
 
   // Constraint imposing specific color reproduction under a set of known
   // color systems, i.e. direct illumination. The base color is sampled
   // from a scene surface.
   struct DirectSurfaceConstraint {
-    bool                        is_base_active = true; // Base roundtrip linear constraint is active
-    Colr                        colr_i         = 0.0;  // Expected base roundtrip color, obtained from first surface
-    std::vector<ColrConstraint> cstr_j         = { };  // Secondary constraints for color reproduction
+    bool                          is_base_active = true; // Base roundtrip linear constraint is active
+    Colr                          colr_i         = 0.0;  // Expected base roundtrip color, obtained from first surface
+    std::vector<LinearConstraint> cstr_j         = { };  // Secondary constraints for color reproduction
 
     // Surface data recorded through user interaction
     SurfaceInfo surface = SurfaceInfo::invalid();
@@ -129,18 +129,16 @@ namespace met {
   public:
     bool operator==(const DirectSurfaceConstraint &o) const;
   };
-  static_assert(is_colr_constraint<DirectSurfaceConstraint>);
+  static_assert(is_linear_constraint<DirectSurfaceConstraint>);
 
 
   // Constraint imposing specific color reproduction under a known illuminant,
   // accounting for nonlinear interreflections as well as linear constraints. 
   // The interreflection system is based on measured light transport data from a scene surface.
   struct IndirectSurfaceConstraint {
-    bool                        is_base_active = true;  // Base roundtrip linear constraint is active
-    Colr                        colr_i         = 0.0;   // Expected base roundtrip color, obtained from the first underlying surface
-    bool                        target_direct  = false; // Free variable is the last linear, instead of last nonlinear constraint
-    std::vector<ColrConstraint> cstr_j_direct  = { };   // Secondary linear constraints for color reproduction
-    std::vector<PowrConstraint> cstr_j_indrct  = { };   // Secondary nonlinear constraints for color reproduction
+    bool                           is_base_active = true;  // Base roundtrip linear constraint is active
+    Colr                           colr_i         = 0.0;   // Expected base roundtrip color, obtained from the first underlying surface
+    std::vector<NLinearConstraint> cstr_j         = { };   // Secondary nonlinear constraints for color reproduction
     
   public:
     // Solve for the constraint's metamer based on its current configuration
@@ -152,13 +150,14 @@ namespace met {
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
-  static_assert(is_metameric_constraint<IndirectSurfaceConstraint> && is_roundtrip_constraint<IndirectSurfaceConstraint>);
+  static_assert(is_metameric_constraint<IndirectSurfaceConstraint> 
+             && is_roundtrip_constraint<IndirectSurfaceConstraint>);
 
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);
   void to_json(json &js, const DirectColorConstraint &c);
-  void from_json(const json &js, ColrConstraint &c);
-  void to_json(json &js, const ColrConstraint &c);
+  void from_json(const json &js, LinearConstraint &c);
+  void to_json(json &js, const LinearConstraint &c);
   void from_json(const json &js, MeasurementConstraint &c);
   void to_json(json &js, const MeasurementConstraint &c);
   void from_json(const json &js, DirectSurfaceConstraint &c);

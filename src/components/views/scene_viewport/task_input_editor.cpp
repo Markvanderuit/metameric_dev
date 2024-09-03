@@ -51,7 +51,7 @@ namespace met {
     return m_path_prim.data();
   }
 
-  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, PowrConstraint &cstr) {
+  void MeshViewportEditorInputTask::build_indirect_constraint(SchedulerHandle &info, const ConstraintRecord &cs, NLinearConstraint &cstr) {
     met_trace_full();
 
     // Get handles, shared resources, modified resources
@@ -292,8 +292,8 @@ namespace met {
       // to prevent overhead from constraint generation
       auto &e_vert = info.global("scene").getw<Scene>().uplifting_vertex(i_cs);
       e_vert.constraint | visit_single([&](IndirectSurfaceConstraint &cstr) { 
-        cstr.cstr_j_indrct.back().powr_j.clear();
-        cstr.cstr_j_indrct.back().colr_j = 0.f;
+        cstr.cstr_j.back().powr_j.clear();
+        cstr.cstr_j.back().colr_j = 0.f;
       });
     }
 
@@ -337,7 +337,7 @@ namespace met {
       auto gizmo_curr_v = e_vert; // copy of vertex
       gizmo_curr_v.set_surface(gizmo_cast_p);
       gizmo_curr_v.constraint | visit_single([&](IndirectSurfaceConstraint &c) { 
-          build_indirect_constraint(info, i_cs, c.cstr_j_indrct.back());
+          build_indirect_constraint(info, i_cs, c.cstr_j.back());
       });
 
       // Save result

@@ -13,9 +13,6 @@
 #include <execution>
 #include <numbers>
 
-// TODO remove
-#include <metameric/components/views/task_uplifting_viewer.hpp>
-
 namespace met {
   // Nr. of points on the color system boundary; lower means more space available for constraints
   constexpr uint n_system_boundary_samples = 128;
@@ -53,11 +50,6 @@ namespace met {
     m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<MeshPackLayout>(buffer_access_flags);
     m_tesselation_coef_map = info("tesselation_coef").getw<gl::Buffer>().map_as<SpecCoefLayout>(buffer_access_flags);
 
-    // Initialize buffer to hold packed spectral data; this buffer is copied over to a texture
-    // in <scene.components.upliftings.gl.*> for fast access during rendering
-    // m_buffer_spec_pack     = {{ .size = sizeof(SpecPackLayout) * max_supported_constraints, .flags = buffer_create_flags  }};
-    // m_buffer_spec_pack_map = m_buffer_spec_pack.map_as<SpecPackLayout>(buffer_access_flags);
-
     // Specify spectrum cache, for plotting of generated constraint spectra
     info("constraint_spectra").set<std::vector<Spec>>({});
     info("constraint_coeffs").set<std::vector<Basis::vec_type>>({});
@@ -65,39 +57,6 @@ namespace met {
     // Specify draw dispatch, as handle for a potential viewer to render the tesselation
     info("tesselation_draw").set<gl::DrawInfo>({});
     info("mismatch_hulls").set<std::vector<ConvexHull>>({});
-    /* info.task(std::format("uplifting_viewport_{}", m_uplifting_i)).init<UpliftingViewerTask>(m_uplifting_i); */
-    /* info.task(std::format("uplifting_debugger_{}", m_uplifting_i)).init<LambdaTask>([&](auto &info) {
-      if (ImGui::Begin(std::format("Uplifting data ({})", m_uplifting_i).c_str())) {
-        const auto &e_scene = info.global("scene").getr<Scene>();
-        const auto &[e_uplifting, e_state] 
-          = info.global("scene").getw<Scene>().components.upliftings[m_uplifting_i];
-        const auto &e_basis = e_scene.resources.bases[e_uplifting.basis_i].value();
-
-        static bool im_show_all_bases = true;
-        static bool im_show_all_bound = true;
-        static uint im_basis_i = 0;
-        static uint im_bound_i = 0;
-        
-        ImGui::Checkbox("Show all bases", &im_show_all_bases);
-        if (im_show_all_bases) {
-          ImGui::PlotSpectra("##basis", { },  e_basis.func.colwise() | rng::to<std::vector<Spec>>(), -1.f, 1.f);
-        } else {
-          constexpr uint im_basis_min = 0, im_basis_max = wavelength_bases - 1;
-          ImGui::SliderScalar("Basis index", ImGuiDataType_U32, &im_basis_i, &im_basis_min, &im_basis_max);
-          ImGui::PlotSpectrum("##basis", Spec(e_basis.func.col(im_basis_i)), -1.f, 1.f);
-        }
-        ImGui::Separator();
-        ImGui::Checkbox("Show all boundaries", &im_show_all_bound);
-        if (im_show_all_bound) {
-          ImGui::PlotSpectra("##bounds", { }, m_csys_boundary_spectra, 0., 1.f);
-        } else {
-          uint im_bound_min = 0, im_bound_max = m_csys_boundary_spectra.size() - 1;
-          ImGui::SliderScalar("Boundary index", ImGuiDataType_U32, &im_bound_i, &im_bound_min, &im_bound_max);
-          ImGui::PlotSpectrum("##bounds", m_csys_boundary_spectra[im_bound_i]);
-        }
-      }
-      ImGui::End();
-    }); */
   }
 
   void GenUpliftingDataTask::eval(SchedulerHandle &info) {
@@ -176,11 +135,6 @@ namespace met {
 
       // Generate vertex color, attached metamer, and its originating coefficients
       auto [c, s, coef] = builder.realize(e_uplifting.verts[i], e_scene, e_uplifting);
-
-      // Override; c remains position. This way, artists can intentionally introduce roundtrip
-      // error to D65, if they disable a (generally always present) linear roundtrip constraint
-      // to the uplifting itself
-      // c = e_uplifting.verts[i].get_vertex_position(e_scene, e_uplifting);
       
       // Add to set of spectra and coefficients
       m_tesselation_spectra[m_csys_boundary_spectra.size() + i] = s;
@@ -240,7 +194,6 @@ namespace met {
         SpecPackLayout pack;
         for (uint i = 0; i < 4; ++i)
           pack.col(i) = m_tesselation_spectra[el[i]];
-        // m_buffer_spec_pack_map[i] = pack.transpose().reshaped(wavelength_samples, 4);
 
         // Moment coefficients are stored directly
         SpecCoefLayout coeffs;
@@ -250,12 +203,7 @@ namespace met {
       }
 
       // Flush changes to GL-side 
-      // m_buffer_spec_pack.flush();
       info("tesselation_coef").getw<gl::Buffer>().flush();
-      
-      // // Do pixel-buffer copy of packed spectra to sampleable texture
-      // e_scene.components.upliftings.gl.texture_spectra.set(m_buffer_spec_pack, 0, { wavelength_samples, m_tesselation_data_map->elem_size },
-      //                                                                             { 0,                  m_tesselation_data_map->elem_offs });
     }
     
     // 5. If a viewer task exists, we should supply mesh data for rendering

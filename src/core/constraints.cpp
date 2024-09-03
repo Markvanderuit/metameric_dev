@@ -8,20 +8,20 @@
 #include <algorithm>
 
 namespace met {
-  bool ColrConstraint::operator==(const ColrConstraint &o) const {
+  bool LinearConstraint::operator==(const LinearConstraint &o) const {
     return is_active == o.is_active 
         && cmfs_j == o.cmfs_j 
         && illm_j == o.illm_j 
         && colr_j.isApprox(o.colr_j);
   }
 
-  bool ColrConstraint::is_similar(const ColrConstraint &o) const {
+  bool LinearConstraint::is_similar(const LinearConstraint &o) const {
     return is_active == o.is_active 
         && cmfs_j == o.cmfs_j 
         && illm_j == o.illm_j;
   }
 
-  bool PowrConstraint::operator==(const PowrConstraint &o) const {
+  bool NLinearConstraint::operator==(const NLinearConstraint &o) const {
     return is_active == o.is_active
         && cmfs_j == o.cmfs_j
         && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
@@ -29,7 +29,7 @@ namespace met {
         && surface == o.surface;
   }
 
-  bool PowrConstraint::is_similar(const PowrConstraint &o) const {
+  bool NLinearConstraint::is_similar(const NLinearConstraint &o) const {
     return is_active == o.is_active
         && cmfs_j == o.cmfs_j
         && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
@@ -56,9 +56,7 @@ namespace met {
   bool IndirectSurfaceConstraint::operator==(const IndirectSurfaceConstraint &o) const {
     return is_base_active == o.is_base_active
         && colr_i.isApprox(o.colr_i) 
-        && target_direct == o.target_direct
-        && rng::equal(cstr_j_direct, o.cstr_j_direct)
-        && rng::equal(cstr_j_indrct, o.cstr_j_indrct);
+        && rng::equal(cstr_j, o.cstr_j);
   }
 
   void from_json(const json &js, DirectColorConstraint &c) {
@@ -68,7 +66,7 @@ namespace met {
     js.at("cstr_j").get_to(c.cstr_j);
   }
 
-  void from_json(const json &js, ColrConstraint &c) {
+  void from_json(const json &js, LinearConstraint &c) {
     met_trace();
     js.at("is_active").get_to(c.is_active);
     js.at("cmfs_j").get_to(c.cmfs_j);
@@ -76,7 +74,7 @@ namespace met {
     js.at("colr_j").get_to(c.colr_j);
   }
 
-  void from_json(const json &js, PowrConstraint &c) {
+  void from_json(const json &js, NLinearConstraint &c) {
     met_trace();
     js.at("is_active").get_to(c.is_active);
     js.at("cmfs_j").get_to(c.cmfs_j);
@@ -85,7 +83,7 @@ namespace met {
     js.at("surface").get_to(c.surface);
   }
 
-  void to_json(json &js, const ColrConstraint &c) {
+  void to_json(json &js, const LinearConstraint &c) {
     met_trace();
     js = {{ "is_active", c.is_active },
           { "cmfs_j",    c.cmfs_j    },
@@ -93,7 +91,7 @@ namespace met {
           { "colr_j",    c.colr_j    }};
   }
 
-  void to_json(json &js, const PowrConstraint &c) {
+  void to_json(json &js, const NLinearConstraint &c) {
     met_trace();
     js = {{ "is_active", c.is_active },
           { "cmfs_j",    c.cmfs_j    },
@@ -139,18 +137,14 @@ namespace met {
     met_trace();
     js.at("is_base_active").get_to(c.is_base_active);
     js.at("colr_i").get_to(c.colr_i);
-    js.at("target_direct").get_to(c.target_direct);
-    js.at("cstr_j_direct").get_to(c.cstr_j_direct);
-    js.at("cstr_j_indrct").get_to(c.cstr_j_indrct);
+    js.at("cstr_j").get_to(c.cstr_j);
   }
 
   void to_json(json &js, const IndirectSurfaceConstraint &c) {
     met_trace();
     js = {{ "is_base_active", c.is_base_active },
           { "colr_i",         c.colr_i         },
-          { "target_direct",  c.target_direct  },
-          { "cstr_j_direct",  c.cstr_j_direct  },
-          { "cstr_j_indrct",  c.cstr_j_indrct  }};
+          { "cstr_j",         c.cstr_j  }};
   }
 
   SpectrumSample MeasurementConstraint::realize(const Scene &scene, const Uplifting &uplifting) const { 
@@ -239,7 +233,7 @@ namespace met {
     met_trace();
     
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j | vws::filter(&ColrConstraint::is_active) | rng::to<std::vector>();
+    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | rng::to<std::vector>();
 
     // Assemble info object for generating boundary spectra
     DirectMismatchingOCSInfo info = {
@@ -273,7 +267,7 @@ namespace met {
     met_trace();
     
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j | vws::filter(&ColrConstraint::is_active) | rng::to<std::vector>();
+    auto direct_cstr = cstr_j | vws::filter(&LinearConstraint::is_active) | rng::to<std::vector>();
 
     // Assemble info object for generating boundary spectra
     DirectMismatchingOCSInfo info = {
@@ -307,8 +301,7 @@ namespace met {
     met_trace();
 
     // Filter out inactive constraints
-    auto direct_cstr = cstr_j_direct | vws::filter(&ColrConstraint::is_active) | rng::to<std::vector>();
-    auto indrct_cstr = cstr_j_indrct | vws::filter(&PowrConstraint::is_active) | rng::to<std::vector>();
+    auto indrct_cstr = cstr_j | vws::filter(&NLinearConstraint::is_active) | rng::to<std::vector>();
 
     // Assemble info object for generating boundary spectra
     IndirectMismatchingOCSInfo info = {
@@ -321,38 +314,19 @@ namespace met {
     if (is_base_active)
       info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
 
-    // Specify direct/indirect color systems forming objective
-    if (target_direct) {
-      const auto &last = direct_cstr.back();
-      rng::transform(direct_cstr | vws::reverse | vws::take(1),
-        std::back_inserter(info.direct_objectives),
-        [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
-    } else {
-      rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
-        std::back_inserter(info.indirect_objectives),
-        [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
-    }
+    // Specify indirect color systems forming objective
+    rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
+      std::back_inserter(info.indirect_objectives),
+      [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
 
     // Base roundtrip constraint
     if (is_base_active)
       info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
       
     // Specify direct/indirect color constraints; all but the last constraint (the "free variable") are specified
-    if (target_direct) {
-      rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
-        std::back_inserter(info.direct_constraints),
-        [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
-      rng::transform(indrct_cstr, 
+    rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), 
       std::back_inserter(info.indirect_constraints),
-        [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
-    } else {
-      rng::transform(direct_cstr, 
-        std::back_inserter(info.direct_constraints),
-        [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
-      rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), 
-        std::back_inserter(info.indirect_constraints),
-        [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
-    } 
+      [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
 
     // Output color values
     return generate_mismatching_ocs(info);

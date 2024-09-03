@@ -169,7 +169,7 @@ namespace met {
           // Properties view column
           ImGui::TableSetColumnIndex(2);
           vert.constraint | visit {
-            [](is_colr_constraint auto &cstr) {
+            [](is_linear_constraint auto &cstr) {
               // Show primary color value
               auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.colr_i), 1).finished();
               ImGui::ColorButton("##base_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
@@ -187,7 +187,7 @@ namespace met {
               ImGui::ColorButton("##base_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
             
               // Show secondary color constraints
-              for (auto &cstr_j : cstr.cstr_j_indrct | vws::take(3ul)) {
+              for (auto &cstr_j : cstr.cstr_j | vws::take(3ul)) {
                 auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr_j.colr_j), 1).finished();
                 ImGui::SameLine();
                 ImGui::ColorButton("##cstr_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
