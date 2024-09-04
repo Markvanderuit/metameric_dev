@@ -269,7 +269,7 @@ namespace met {
       e_vert.constraint | visit([&](const auto &cstr) {
         // Only continue for supported types
         using T = std::decay_t<decltype(cstr)>;
-        guard_constexpr((std::is_same_v<T, IndirectSurfaceConstraint> || is_linear_constraint<T>));
+        guard_constexpr((is_nlinear_constraint<T> || is_linear_constraint<T>));
         
         // Get [0, 1] matrix and inverse, as the displayed mesh is scaled
         auto proj     = [m = e_trnf.inverse().eval()](eig::Array3f p) -> Colr { return (m * (eig::Vector4f() << p, 1).finished()).head<3>(); };

@@ -181,7 +181,7 @@ namespace met {
                 ImGui::ColorButton("##cstr_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);
               }
             },
-            [](IndirectSurfaceConstraint &cstr) {
+            [](is_nlinear_constraint auto &cstr) {
               // Show primary color value
               auto srgb = (eig::Array4f() << lrgb_to_srgb(cstr.colr_i), 1).finished();
               ImGui::ColorButton("##base_colr", srgb, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_Float);

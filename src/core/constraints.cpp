@@ -25,15 +25,13 @@ namespace met {
     return is_active == o.is_active
         && cmfs_j == o.cmfs_j
         && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
-        && colr_j.isApprox(o.colr_j)
-        && surface == o.surface;
+        && colr_j.isApprox(o.colr_j);
   }
 
   bool NLinearConstraint::is_similar(const NLinearConstraint &o) const {
     return is_active == o.is_active
         && cmfs_j == o.cmfs_j
-        && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>)
-        && surface == o.surface;
+        && rng::equal(powr_j, o.powr_j, eig::safe_approx_compare<Spec>);
   }
 
   bool DirectColorConstraint::operator==(const DirectColorConstraint &o) const {
@@ -56,7 +54,8 @@ namespace met {
   bool IndirectSurfaceConstraint::operator==(const IndirectSurfaceConstraint &o) const {
     return is_base_active == o.is_base_active
         && colr_i.isApprox(o.colr_i) 
-        && rng::equal(cstr_j, o.cstr_j);
+        && rng::equal(cstr_j,   o.cstr_j)
+        && rng::equal(surfaces, o.surfaces);
   }
 
   void from_json(const json &js, DirectColorConstraint &c) {
@@ -80,7 +79,6 @@ namespace met {
     js.at("cmfs_j").get_to(c.cmfs_j);
     js.at("powr_j").get_to(c.powr_j);
     js.at("colr_j").get_to(c.colr_j);
-    js.at("surface").get_to(c.surface);
   }
 
   void to_json(json &js, const LinearConstraint &c) {
@@ -96,8 +94,7 @@ namespace met {
     js = {{ "is_active", c.is_active },
           { "cmfs_j",    c.cmfs_j    },
           { "powr_j",    c.powr_j    },
-          { "colr_j",    c.colr_j    },
-          { "surface",   c.surface   }};
+          { "colr_j",    c.colr_j    }};
   }
 
   void to_json(json &js, const DirectColorConstraint &c) {
@@ -133,18 +130,39 @@ namespace met {
           { "surface",        c.surface        }};
   }
 
+
+  struct OldNLinearConstraint {
+    SurfaceInfo surface;
+  };
+
+  void from_json(const json &js, OldNLinearConstraint &c) {
+    met_trace();
+    js.at("surface").get_to(c.surface);
+  }
+
   void from_json(const json &js, IndirectSurfaceConstraint &c) {
     met_trace();
     js.at("is_base_active").get_to(c.is_base_active);
     js.at("colr_i").get_to(c.colr_i);
-    js.at("cstr_j").get_to(c.cstr_j);
+
+    // Hotfix for now to update scenes
+    if (js.contains("cstr_j_indrct")) {
+      std::vector<OldNLinearConstraint> old;
+      js.at("cstr_j_indrct").get_to(c.cstr_j);
+      js.at("cstr_j_indrct").get_to(old);
+      rng::transform(old, std::back_inserter(c.surfaces), &OldNLinearConstraint::surface);
+    } else {
+      js.at("cstr_j").get_to(c.cstr_j);
+      js.at("surfaces").get_to(c.surfaces);
+    }
   }
 
   void to_json(json &js, const IndirectSurfaceConstraint &c) {
     met_trace();
     js = {{ "is_base_active", c.is_base_active },
           { "colr_i",         c.colr_i         },
-          { "cstr_j",         c.cstr_j  }};
+          { "cstr_j",         c.cstr_j         },
+          { "surfaces",       c.surfaces       }};
   }
 
   SpectrumSample MeasurementConstraint::realize(const Scene &scene, const Uplifting &uplifting) const { 

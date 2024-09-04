@@ -103,9 +103,9 @@ namespace met {
       };
 
       // Helper to handle single row for LinearConstraint type
-      auto push_colr_cstr_row = [&](std::string               name,
+      auto push_colr_cstr_row = [&](std::string                 name,
                                     std::span<LinearConstraint> c_vec, 
-                                    uint                      c_j) -> PushReturnAction {
+                                    uint                        c_j) -> PushReturnAction {
         ImGui::TableNextRow();
         auto scope = ImGui::ScopedID(name);
         auto &cstr = c_vec[c_j];
@@ -165,10 +165,10 @@ namespace met {
         return action;
       };
       
-      // Helper to handle single row for LinearConstraint type
-      auto push_powr_cstr_row = [&](std::string               name,
+      // Helper to handle single row for NLinearConstraint type
+      auto push_powr_cstr_row = [&](std::string                  name,
                                     std::span<NLinearConstraint> c_vec, 
-                                    uint                      c_j) -> PushReturnAction {
+                                    uint                         c_j) -> PushReturnAction {
         ImGui::TableNextRow();
         auto scope = ImGui::ScopedID(name);
         auto &cstr = c_vec[c_j];
@@ -235,12 +235,10 @@ namespace met {
         [&](const IndirectSurfaceConstraint &cstr) {
           if (ImGui::BeginTabBar("##tab_bar")) {
             if (ImGui::BeginTabItem("Reflectance")) {
-              // std::vector<Spec>        data = { spec, unpacked_spec };
-              // std::vector<std::string> lgnd = { "Exact", "Packed" };
-              // ImGui::PlotSpectra("##output_refl_plot", lgnd, data, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::PlotSpectrum("##output_refl_plot", spec, -.05f, 1.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
+
             if (ImGui::BeginTabItem("Coefficients")) {
               std::vector<Basis::vec_type> coef = { coeffs, unpacked_coeffs };
               std::vector<std::string> lgnd     = { "Exact", "Packed"       };
@@ -253,7 +251,9 @@ namespace met {
                   ImPlot::PlotLine(text.c_str(), x_values.data(), vals.data(), wavelength_bases);
               }
               ImPlot::EndPlot();
+              ImGui::EndTabItem();
             }
+
             if (!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty() && ImGui::BeginTabItem("Radiance")) {
               // Reconstruct radiance from truncated power series
               Spec s = cstr.cstr_j.back().powr_j[0];
@@ -262,6 +262,7 @@ namespace met {
               ImGui::PlotSpectrum("##output_radi_plot", s, -0.05f, s.maxCoeff() + 0.05f, { -1.f, 110.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
+
             if (!cstr.cstr_j.empty() && !cstr.cstr_j.back().powr_j.empty() && ImGui::BeginTabItem("Power series")) {
               float s_max = 0.f;
               for (uint i = 0; i < cstr.cstr_j.back().powr_j.size(); ++i)
@@ -269,6 +270,7 @@ namespace met {
               ImGui::PlotSpectra("##output_powr_plot", {}, cstr.cstr_j.back().powr_j, -0.05f, s_max + 0.05f, { -1.f, 128.f * e_window.content_scale() });
               ImGui::EndTabItem();
             }
+
             ImGui::EndTabBar();
           }
         },
@@ -308,7 +310,8 @@ namespace met {
               auto actn = push_colr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
-                cstr.cstr_j.back().is_active = true;
+                if (!cstr.cstr_j.empty())
+                  cstr.cstr_j.back().is_active = true;
                 break;
               } else if (actn == PushReturnAction::eEdit) {
                 std::swap(cstr.cstr_j[j], cstr.cstr_j.back());
@@ -337,15 +340,6 @@ namespace met {
             ImGui::TableSetColumnIndex(1); ImGui::Text("Color system");
             ImGui::TableSetColumnIndex(2); ImGui::Text("lrgb/srgb/error");
 
-            // Checkbox for all
-            ImGui::TableSetColumnIndex(4);
-            if (!cstr.cstr_j.empty()) {
-              // auto is_active_v = cstr.cstr_j | vws::transform(&LinearConstraint::is_active);
-              // auto is_active   = is_active_v | rng::to<std::vector<int>>();
-              // ImGui::CheckboxFlags("##is_active", is_active.data(), is_active.size());
-              // rng::copy(is_active, is_active_v.begin());
-            }
-
             // Baseline constraint row
             push_base_cstr_row(cstr);
 
@@ -355,10 +349,13 @@ namespace met {
               auto actn = push_powr_cstr_row(name, cstr.cstr_j, j);
               if (actn == PushReturnAction::eDelete) {
                 cstr.cstr_j.erase(cstr.cstr_j.begin() + j);
-                cstr.cstr_j.back().is_active = true;
+                cstr.surfaces.erase(cstr.surfaces.begin() + j);
+                if (!cstr.cstr_j.empty())
+                  cstr.cstr_j.back().is_active = true;
                 break;
               } else if (actn == PushReturnAction::eEdit) {
-                std::swap(cstr.cstr_j[j], cstr.cstr_j.back());
+                std::swap(cstr.cstr_j[j],   cstr.cstr_j.back());
+                std::swap(cstr.surfaces[j], cstr.surfaces.back());
                 cstr.cstr_j.back().is_active = true;
                 break;
               }
@@ -367,8 +364,10 @@ namespace met {
             // Add button
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            if (ImGui::Button("Add"))
+            if (ImGui::Button("Add")) {
               cstr.cstr_j.push_back(NLinearConstraint { });
+              cstr.surfaces.push_back(SurfaceInfo::invalid());
+            }
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Add new constraint");
             

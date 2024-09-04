@@ -2,6 +2,7 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/matching.hpp>
 #include <metameric/core/scene.hpp>
+#include <tuple>
 
 namespace met {
   namespace detail {
@@ -85,18 +86,10 @@ namespace met {
   bool Uplifting::Vertex::is_position_shifting() const {
     met_trace();
     return constraint | visit {
-      [](const DirectColorConstraint &cstr) { 
+      [](const is_roundtrip_constraint auto &cstr) { 
         return cstr.is_base_active;
       },
-      [](const DirectSurfaceConstraint &cstr) { 
-        return cstr.is_base_active;
-      },
-      [](const IndirectSurfaceConstraint &cstr) { 
-        return cstr.is_base_active;
-      },
-      [](const auto &cstr) { 
-        return true;
-      }
+      [](const auto &) { return true; }
     };
   }
 
@@ -116,7 +109,7 @@ namespace met {
       [c](is_linear_constraint auto &cstr) { 
         cstr.cstr_j.back().colr_j = c; 
       }, 
-      [c](IndirectSurfaceConstraint &cstr) { 
+      [c](is_nlinear_constraint auto &cstr) { 
         cstr.cstr_j.back().colr_j = c;
       },
       [](const auto &cstr) {}
@@ -130,7 +123,7 @@ namespace met {
         guard(!cstr.cstr_j.empty(), Colr(0));
         return (cstr.cstr_j | vws::filter(&LinearConstraint::is_active)).back().colr_j; 
       },
-      [](const IndirectSurfaceConstraint &cstr) { 
+      [](const is_nlinear_constraint auto &cstr) { 
         guard(!cstr.cstr_j.empty(), Colr(0));
         return cstr.cstr_j.back().colr_j; 
       },
@@ -221,7 +214,7 @@ namespace met {
       },
       [si](IndirectSurfaceConstraint &cstr) { 
         guard(!cstr.cstr_j.empty());
-        cstr.cstr_j.back().surface = si;
+        cstr.surfaces.back() = si;
         if (cstr.cstr_j.size() == 1)
           cstr.colr_i = si.diffuse;
       },
@@ -236,8 +229,8 @@ namespace met {
         return c.surface; 
       },
       [](const IndirectSurfaceConstraint &c) -> const SurfaceInfo & { 
-        return !c.cstr_j.empty() 
-          ? c.cstr_j.back().surface 
+        return !c.surfaces.empty() 
+          ? c.surfaces.back() 
           : detail::invalid_visitor_return_si; 
       },
       [&](const auto &) -> const SurfaceInfo & { return detail::invalid_visitor_return_si; }
@@ -251,9 +244,9 @@ namespace met {
         return std::vector<SurfaceInfo> { c.surface };
       },
       [](const IndirectSurfaceConstraint &c) { 
-        return c.cstr_j
-          | vws::filter(&NLinearConstraint::is_active)
-          | vws::transform(&NLinearConstraint::surface)
+        return vws::zip(c.cstr_j, c.surfaces)
+          | vws::filter([](const auto &p) { return std::get<0>(p).is_active; })
+          | vws::values
           | rng::to<std::vector>();
       },
       [&](const auto &) { return std::vector<SurfaceInfo>(); }

@@ -11,11 +11,10 @@
 namespace met {
   // Small helper struct; specifying linear illumination or observer constraints
   struct LinearConstraint {
-    // Constraint data
-    bool is_active = true; // Constraint is in effect
+    bool is_active = true; // Constraint is active
     uint cmfs_j    = 0;    // Index of observer in scene data
     uint illm_j    = 0;    // Index of illuminant in scene data
-    Colr colr_j    = 0.f;  // Color under this direct color system
+    Colr colr_j    = 0.f;  // Color specified as constraint
 
   public:
     bool operator==(const LinearConstraint &o) const;
@@ -24,14 +23,10 @@ namespace met {
 
   // Small helper struct; specifying nonlinear illumination constraints with truncated power series
   struct NLinearConstraint {
-    // Constraint data
     bool              is_active = true; // Constraint is in effect
     uint              cmfs_j    = 0;    // Index of observer in scene data
     std::vector<Spec> powr_j    = { };  // Interreflection power series
-    Colr              colr_j    = 0.f;  // Color under this direct color system
-
-    // Surface data recorded through user interaction
-    SurfaceInfo surface = SurfaceInfo::invalid();
+    Colr              colr_j    = 0.f;  // Color specified as constraint
 
   public:      
     bool operator==(const NLinearConstraint &o) const;
@@ -69,6 +64,14 @@ namespace met {
     // The constraint specifies secondary color data, under secondary
     // color systems assembled from scene data
     { t.cstr_j } -> std::convertible_to<std::vector<LinearConstraint>>;
+  };
+
+  // Concept defining the expected components of nonlinear color-system constraints
+  template <typename Ty>
+  concept is_nlinear_constraint = is_roundtrip_constraint<Ty> && requires(Ty t) {
+    // The constraint specifies secondary color data, under secondary
+    // color systems assembled from scene data
+    { t.cstr_j } -> std::convertible_to<std::vector<NLinearConstraint>>;
   };
 
   // Constraint imposing reproduction of a specific spectral reflectance.
@@ -139,6 +142,9 @@ namespace met {
     bool                           is_base_active = true;  // Base roundtrip linear constraint is active
     Colr                           colr_i         = 0.0;   // Expected base roundtrip color, obtained from the first underlying surface
     std::vector<NLinearConstraint> cstr_j         = { };   // Secondary nonlinear constraints for color reproduction
+
+    // Surface data recorded through user interaction for each secondary nonlinear constraint; the first specifies base constraint
+    std::vector<SurfaceInfo> surfaces = { };   
     
   public:
     // Solve for the constraint's metamer based on its current configuration
@@ -150,8 +156,7 @@ namespace met {
   public:
     bool operator==(const IndirectSurfaceConstraint &o) const;
   };
-  static_assert(is_metameric_constraint<IndirectSurfaceConstraint> 
-             && is_roundtrip_constraint<IndirectSurfaceConstraint>);
+  static_assert(is_nlinear_constraint<IndirectSurfaceConstraint>);
 
   // JSON (de)serialization of constraint variants
   void from_json(const json &js, DirectColorConstraint &c);
