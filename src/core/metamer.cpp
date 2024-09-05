@@ -434,8 +434,8 @@ namespace met {
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
         .x_init       = 0.05,
-        // .upper        = 1.0,
-        // .lower        =-1.0,
+        .upper        = 1.0,
+        .lower        =-1.0,
         .max_iters    = 256,
         .rel_xpar_tol = 1e-3, // Threshold for objective error
       };
@@ -492,9 +492,9 @@ namespace met {
       auto S_direct = info.direct_objectives.empty()
                     ? (eig::MatrixXf(1, 1) << 1).finished()
                     : eig::MatrixXf(wavelength_samples, 3 * info.direct_objectives.size());
-      std::vector<eig::MatrixXf> S_indrct;
       for (uint i = 0; i < info.direct_objectives.size(); ++i)
         S_direct.block<wavelength_samples, 3>(0, 3 * i) = info.direct_objectives[i].finalize(false);
+      std::vector<eig::MatrixXf> S_indrct;
       for (uint i = 0; i < info.indirect_objectives.size(); ++i) {
         auto powers = info.indirect_objectives[i].finalize(false);
         if (S_indrct.size() < powers.size())
@@ -521,10 +521,10 @@ namespace met {
           };
         
           // Map linear color systems along part of unit vector
-          auto A_direct 
+          /* auto A_direct 
             = !info.direct_objectives.empty() 
             ? trf_by_sample(S_direct, samples_nd[i].head(3 * info.direct_objectives.size()).eval()) 
-            : eig::Vector<double, wavelength_samples>(0);
+            : eig::Vector<double, wavelength_samples>(0); */
           
           // Map nonlinear color systems along rest of unit vector
           auto sample_tail = samples_nd[i].tail(3 * info.indirect_objectives.size()).eval();
@@ -535,11 +535,11 @@ namespace met {
 
           // Specify objective
           local_solver.objective = ad::wrap_capture<wavelength_bases>(
-            [A_direct, A_indrct, B = info.basis.func.cast<double>().eval()]
+            [/* A_direct,  */A_indrct, B = info.basis.func.cast<double>().eval()]
             (const vec &x) {
               auto r = (B * x.matrix()).eval();            // Compute full reflectance
-              auto diff = A_direct.dot(r)                  // Linear objective
-                        + A_indrct[0].sum()                // Nonlinear objective, 0th component
+              auto diff = /* A_direct.dot(r) */                  // Linear objective
+                        /* + */ A_indrct[0].sum()                // Nonlinear objective, 0th component
                         + A_indrct[1].dot(r);              // Nonlinear objective, 1st component
               for (uint i = 2; i < A_indrct.size(); ++i) { // Nonlinear objective, nth objectives
                 r.array() *= r.array();

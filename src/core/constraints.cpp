@@ -329,13 +329,17 @@ namespace met {
     };
 
     // Base roundtrip objective
-    if (is_base_active)
-      info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+    // if (is_base_active)
+    //   info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
 
     // Specify indirect color systems forming objective
-    rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
-      std::back_inserter(info.indirect_objectives),
-      [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
+    info.indirect_objectives.push_back({
+      .cmfs   = scene.resources.observers[indrct_cstr.back().cmfs_j].value(),
+      .powers = indrct_cstr.back().powr_j
+    });
+    // rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
+    //   std::back_inserter(info.indirect_objectives),
+    //   [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
 
     // Base roundtrip constraint
     if (is_base_active)
