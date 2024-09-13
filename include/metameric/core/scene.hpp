@@ -125,16 +125,6 @@ namespace met {
       return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
     }
 
-  public:
-    // Helper object; SurfaceInfo with references to relevant underlying objects
-    struct SurfaceInfo : public met::SurfaceInfo {
-      const Object    &object;
-      const Uplifting &uplifting;
-    };
-
-    // From a RayRecord, recover underlying surface information
-    SurfaceInfo get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const;
-
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);

@@ -5,7 +5,6 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
-#include <metameric/core/matching.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>

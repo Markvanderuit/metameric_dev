@@ -58,9 +58,14 @@ namespace met {
       constexpr
       operator bool() const { return state.is_mutated(); };
       
+      constexpr const value_type* operator->() const { return &value; }
+      constexpr       value_type* operator->()       { return &value; }
+      constexpr const value_type& operator*()  const { return value;  }
+      constexpr       value_type& operator*()        { return value;  }
+
       constexpr friend 
       auto operator<=>(const Component &, const Component &) = default;
-      
+
     public: // Serialization
       void to_stream(std::ostream &str) const {
         met_trace();
@@ -114,11 +119,16 @@ namespace met {
     public: // State handling
       constexpr void set_mutated(bool b) { m_mutated = b;    }
       constexpr bool is_mutated()  const { return m_mutated; }
-      constexpr operator bool()    const { return m_mutated; };
+      constexpr operator bool()    const { return m_mutated; }
 
     public: // Boilerplate
       constexpr const value_type &value() const { return m_value; }
       constexpr       value_type &value()       { set_mutated(true); return m_value; }
+      
+      constexpr const value_type *operator->() const { return &m_value;                    }
+      constexpr       value_type *operator->()       { set_mutated(true); return &m_value; }
+      constexpr const value_type &operator*()  const { return m_value;                     }
+      constexpr       value_type &operator*()        { set_mutated(true); return m_value;  }
 
       constexpr friend 
       auto operator<=>(const Resource &, const Resource &) = default;

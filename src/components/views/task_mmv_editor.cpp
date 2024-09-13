@@ -1,5 +1,4 @@
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/matching.hpp>
 #include <metameric/core/convex.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/components/views/task_mmv_editor.hpp>

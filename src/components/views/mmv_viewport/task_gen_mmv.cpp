@@ -1,6 +1,5 @@
 #include <metameric/core/distribution.hpp>
 #include <metameric/core/mesh.hpp>
-#include <metameric/core/matching.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/record.hpp>
 #include <metameric/core/mesh.hpp>

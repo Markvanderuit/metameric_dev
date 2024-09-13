@@ -1,7 +1,6 @@
-#include <metameric/core/matching.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
-#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
 #include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <bitset>
@@ -11,6 +10,73 @@
 namespace met {
   static constexpr float selector_near_distance = 12.f;
   static constexpr uint  indirect_query_spp     = 65536;
+
+  namespace detail {
+    // From a trio of vertex positions forming a triangle, and a center position,
+    // compute barycentric coordinate representation
+    eig::Vector3f get_barycentric_coords(eig::Vector3f p, eig::Vector3f a, eig::Vector3f b, eig::Vector3f c) {
+      met_trace();
+
+      eig::Vector3f ab = b - a, ac = c - a;
+
+      float a_tri = std::abs(.5f * ac.cross(ab).norm());
+      float a_ab  = std::abs(.5f * (p - a).cross(ab).norm());
+      float a_ac  = std::abs(.5f * ac.cross(p - a).norm());
+      float a_bc  = std::abs(.5f * (c - p).cross(b - p).norm());
+
+      return (eig::Vector3f(a_bc, a_ac, a_ab) / a_tri).eval();
+    }
+
+    // Helper object; SurfaceInfo with references to relevant underlying objects
+    struct SurfaceInfo : public met::SurfaceInfo {
+      const Object    &object;
+      const Uplifting &uplifting;
+    };
+
+    // From a RayRecord, recover underlying surface information in the scene
+    SurfaceInfo get_surface_info(const Scene &scene, const eig::Array3f &p, const SurfaceRecord &rc) {
+      // Get relevant resources; mostly gl-side resources
+      const auto &object    = *scene.components.objects[rc.object_i()];
+      const auto &uplifting = *scene.components.upliftings[object.uplifting_i];
+      const auto &object_gl = scene.components.objects.gl.objects()[rc.object_i()];
+
+      // Assemble SurfaceInfo object
+      SurfaceInfo si = { .object = object, .uplifting = uplifting  };
+      si.record = rc;
+
+      // Unpack relevant primitive data, and restore old, non-reparameterized UV coordinates
+      // so we can sample image data cpu-side
+      auto prim = scene.resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
+      auto txuv = scene.resources.meshes.gl.bvh_txuvs_cpu[rc.primitive_i()];
+      prim.v0.tx = detail::unpack_unorm_2x16(txuv[0]);
+      prim.v1.tx = detail::unpack_unorm_2x16(txuv[1]);
+      prim.v2.tx = detail::unpack_unorm_2x16(txuv[2]);
+
+      // Generate barycentric coordinates
+      eig::Vector3f pinv = (object_gl.trf_mesh_inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
+      eig::Vector3f bary = get_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
+
+      // Recover surface geometric data
+      si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
+      si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
+      si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
+      si.p  = (object_gl.trf_mesh * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
+      si.n  = (object_gl.trf_mesh * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
+      si.n.normalize();
+
+      // Recover surface diffuse data based on underlying object material
+      si.diffuse = object.diffuse | visit {
+        [&](uint i) -> Colr { 
+          return scene.resources.images[i]->sample(si.tx, Image::ColorFormat::eLRGB).head<3>(); 
+        },
+        [&](Colr c) -> Colr { 
+          return c; 
+        }
+      };
+
+      return si;
+    }
+  } // namespace detail
 
   RayRecord MeshViewportEditorInputTask::eval_ray_query(SchedulerHandle &info, const Ray &ray) {
     met_trace_full();
@@ -98,15 +164,15 @@ namespace met {
       const PathRecord &path = paths[i];
 
       // Filter to find vertices along path for which the uplifting data is relevant to the constraint
-      auto verts_view = vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))                              // 1. drop padded parts of path data
-                      | vws::transform([&](const auto &vt) { return e_scene.get_surface_info(vt.p, vt.record); })  // 2. generate surface info at path vertex
-                      | vws::filter([&](const auto &si) { return si.object.uplifting_i == cs.uplifting_i; })       // 3. drop path vertices unrelated to current uplifting object
-                      | vws::transform([&](const auto &si) { return e_uplf_task.query_tetrahedron(si.diffuse); })  // 4. generate uplifting tetrahedron describing surface reflectance
-                      | vws::transform([&](const auto &tetr) {                                                     // 5. find index of tetrahedron vertex linked to our constraint
-                          uint i = std::distance(tetr.indices.begin(), rng::find(tetr.indices, cs.vertex_i));      //    and return both tetr. and index
-                          return std::pair { tetr, i }; })                                
-                      | vws::filter([&](const auto &pair) { return pair.second < 4; })                             // 6. drop tetrahedra unrelated to current uplifting vertex
-                      | vws::transform([&](const auto &pair) {                                                     // 7. return compact representation, see CompactTetrRecord
+      auto verts_view = vws::take(std::max(static_cast<int>(path.path_depth) - 1, 0))                                       // 1. drop padded parts of path data
+                      | vws::transform([&](const auto &vt) { return detail::get_surface_info(e_scene, vt.p, vt.record); })  // 2. generate surface info at path vertex
+                      | vws::filter([&](const auto &si) { return si.object.uplifting_i == cs.uplifting_i; })                // 3. drop path vertices unrelated to current uplifting object
+                      | vws::transform([&](const auto &si) { return e_uplf_task.query_tetrahedron(si.diffuse); })           // 4. generate uplifting tetrahedron describing surface reflectance
+                      | vws::transform([&](const auto &tetr) {                                                              // 5. find index of tetrahedron vertex linked to our constraint
+                          uint i = std::distance(tetr.indices.begin(), rng::find(tetr.indices, cs.vertex_i));               //    and return both tetr. and index
+                          return std::pair { tetr, i }; })                                        
+                      | vws::filter([&](const auto &pair) { return pair.second < 4; })                                      // 6. drop tetrahedra unrelated to current uplifting vertex
+                      | vws::transform([&](const auto &pair) {                                                              // 7. return compact representation, see CompactTetrRecord
                           auto [tetr, i] = pair;
                           CompactTetrRecord rc = { .r_weight = tetr.weights[i], .remainder = 0.f };
                           for (uint j = 0; j < 4; ++j) {
@@ -218,9 +284,8 @@ namespace met {
     // Determine active constraint vertices for the viewport
     auto &i_active_constraints = info("active_constraints").getw<std::vector<ConstraintRecord>>();
     i_active_constraints.clear();
-    for (const auto &[i, comp] : enumerate_view(e_scene.components.upliftings)) {
-      const auto &uplifting = comp.value; 
-      for (const auto &[j, vert] : enumerate_view(uplifting.verts)) {
+    for (const auto &[i, uplifting] : enumerate_view(e_scene.components.upliftings)) {
+      for (const auto &[j, vert] : enumerate_view(uplifting->verts)) {
         // Only constraints currently being edited are shown
         auto str = std::format("scene_components_editor.mmv_editor_{}_{}", i, j);
         guard_continue(info.task(str).is_init());
@@ -310,7 +375,7 @@ namespace met {
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
       auto gizmo_cast_p 
          = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
+         ? detail::get_surface_info(e_scene, m_ray_result.get_position(), m_ray_result.record)
          : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Store surface data and extracted color in  constraint
@@ -328,7 +393,7 @@ namespace met {
       m_ray_result = eval_ray_query(info, e_arcball.generate_ray(p_screen));
       auto gizmo_cast_p 
          = (m_ray_result.record.is_valid() && m_ray_result.record.is_object())
-         ? e_scene.get_surface_info(m_ray_result.get_position(), m_ray_result.record)
+         ? detail::get_surface_info(e_scene, m_ray_result.get_position(), m_ray_result.record)
          : SurfaceInfo { .p = m_gizmo_curr_p.p };
 
       // Right at the end, we build the indirect surface constraint HERE

@@ -178,11 +178,11 @@ namespace met {
     // Gather all relevant color system spectra and corresponding color signals
     auto basis = scene.resources.bases[uplifting.basis_i].value();
     DirectSpectrumInfo spec_info = {
-      .direct_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
+      .linear_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
       .basis              = basis
     };
     for (const auto &c : cstr_j)
-      spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
+      spec_info.linear_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
     return generate_spectrum(spec_info);
@@ -197,11 +197,11 @@ namespace met {
     // Gather all relevant color system spectra and corresponding color signals
     auto basis = scene.resources.bases[uplifting.basis_i].value();
     DirectSpectrumInfo spec_info = {
-      .direct_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
+      .linear_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
       .basis              = basis
     };
     for (const auto &c : cstr_j)
-      spec_info.direct_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
+      spec_info.linear_constraints.push_back({ scene.csys(c.cmfs_j, c.illm_j), c.colr_j });
 
     // Generate a metamer satisfying the system+signal constraint set and return as pair
     return generate_spectrum(spec_info);
@@ -225,8 +225,8 @@ namespace met {
         .powers = powers
       };
       IndirectSpectrumInfo spec_info = {
-        .direct_constraints   = {{ scene.csys(uplifting.csys_i), surface.diffuse }},
-        .indirect_constraints = {{ csys, colr }},
+        .linear_constraints   = {{ scene.csys(uplifting.csys_i), surface.diffuse }},
+        .nlinear_constraints = {{ csys, colr }},
         .basis                = basis
       };
 
@@ -238,7 +238,7 @@ namespace met {
       
       auto basis = scene.resources.bases[uplifting.basis_i].value();
       DirectSpectrumInfo spec_info = {
-        .direct_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
+        .linear_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
         .basis              = basis
       };
 
@@ -262,20 +262,20 @@ namespace met {
 
     // Base roundtrip objective
     if (is_base_active)
-      info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+      info.linear_objectives.push_back(scene.csys(uplifting.csys_i));
 
     // Specify direct color systems forming objective
     rng::transform(direct_cstr, 
-      std::back_inserter(info.direct_objectives),
+      std::back_inserter(info.linear_objectives),
       [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
 
     // Base roundtrip constraint
     if (is_base_active)
-      info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      info.linear_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
 
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
-      std::back_inserter(info.direct_constraints),
+      std::back_inserter(info.linear_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
 
     return generate_mismatching_ocs(info);
@@ -296,20 +296,20 @@ namespace met {
 
     // Base roundtrip objective
     if (is_base_active)
-      info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+      info.linear_objectives.push_back(scene.csys(uplifting.csys_i));
 
     // Specify direct color systems forming objective
     rng::transform(direct_cstr, 
-      std::back_inserter(info.direct_objectives),
+      std::back_inserter(info.linear_objectives),
       [&](const auto &c) { return scene.csys(c.cmfs_j, c.illm_j); });
 
     // Base roundtrip constraint
     if (is_base_active)
-      info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      info.linear_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
 
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
-      std::back_inserter(info.direct_constraints),
+      std::back_inserter(info.linear_constraints),
       [&](const auto &c) { return std::pair { scene.csys(c.cmfs_j, c.illm_j), c.colr_j }; });
 
     return generate_mismatching_ocs(info);
@@ -330,24 +330,24 @@ namespace met {
 
     // Base roundtrip objective
     // if (is_base_active)
-    //   info.direct_objectives.push_back(scene.csys(uplifting.csys_i));
+    //   info.linear_objectives.push_back(scene.csys(uplifting.csys_i));
 
     // Specify indirect color systems forming objective
-    info.indirect_objectives.push_back({
+    info.nlinear_objectives.push_back({
       .cmfs   = scene.resources.observers[indrct_cstr.back().cmfs_j].value(),
       .powers = indrct_cstr.back().powr_j
     });
     // rng::transform(indrct_cstr | vws::reverse | vws::take(1), 
-    //   std::back_inserter(info.indirect_objectives),
+    //   std::back_inserter(info.nlinear_objectives),
     //   [&](const auto &c) { return IndirectColrSystem { .cmfs = scene.resources.observers[c.cmfs_j].value(), .powers = c.powr_j }; });
 
     // Base roundtrip constraint
     if (is_base_active)
-      info.direct_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      info.linear_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
       
     // Specify direct/indirect color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), 
-      std::back_inserter(info.indirect_constraints),
+      std::back_inserter(info.nlinear_constraints),
       [&](const auto &c) { return std::pair { IndirectColrSystem { scene.resources.observers[c.cmfs_j].value(), c.powr_j }, c.colr_j }; });
 
     // Output color values

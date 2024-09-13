@@ -3,7 +3,6 @@
 #include <metameric/core/json.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/matching.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/core/detail/packing.hpp>
@@ -51,22 +50,6 @@ namespace met {
       met_trace();
       js.at("name").get_to(component.name);
       js.at("value").get_to(component.value);
-    }
-
-    eig::Vector3f gen_barycentric_coords(eig::Vector3f p, 
-                                         eig::Vector3f a, 
-                                         eig::Vector3f b, 
-                                         eig::Vector3f c) {
-      met_trace();
-
-      eig::Vector3f ab = b - a, ac = c - a;
-
-      float a_tri = std::abs(.5f * ac.cross(ab).norm());
-      float a_ab  = std::abs(.5f * (p - a).cross(ab).norm());
-      float a_ac  = std::abs(.5f * ac.cross(p - a).norm());
-      float a_bc  = std::abs(.5f * (c - p).cross(b - p).norm());
-
-      return (eig::Vector3f(a_bc, a_ac, a_ab) / a_tri).eval();
     }
   } // namespace detail
 
@@ -930,50 +913,6 @@ namespace met {
     return std::format("{}, {}", 
                        resources.observers[c.observer_i].name, 
                        resources.illuminants[c.illuminant_i].name);
-  }
-
-  Scene::SurfaceInfo Scene::get_surface_info(const eig::Array3f &p, const SurfaceRecord &rc) const {
-    met_trace();
-
-    // Get relevant resources; mostly gl-side resources
-    const auto &object    = components.objects[rc.object_i()].value;
-    const auto &object_gl = components.objects.gl.objects()[rc.object_i()];
-    const auto &uplifting = components.upliftings[object.uplifting_i].value;
-
-    // Unpack relevant primitive data, and restore old, non-reparameterized UV coordinates
-    // so we can sample image data cpu-side
-    auto prim = resources.meshes.gl.bvh_prims_cpu[rc.primitive_i()].unpack();
-    auto txuv = resources.meshes.gl.bvh_txuvs_cpu[rc.primitive_i()];
-    prim.v0.tx = detail::unpack_unorm_2x16(txuv[0]);
-    prim.v1.tx = detail::unpack_unorm_2x16(txuv[1]);
-    prim.v2.tx = detail::unpack_unorm_2x16(txuv[2]);
-
-    // Return object; fill in often accessed indices
-    SurfaceInfo si = {
-      .object    = object,
-      .uplifting = uplifting
-    };
-    si.record = rc;
-
-    // Generate barycentric coordinates
-    eig::Vector3f pinv = (object_gl.trf_mesh_inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
-    auto bary = detail::gen_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
-
-    // Recover surface geometric data
-    si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
-    si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
-    si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
-    si.p  = (object_gl.trf_mesh * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
-    si.n  = (object_gl.trf_mesh * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
-    si.n.normalize();
-
-    // Recover surface diffuse data based on underlying object material
-    si.diffuse = object.diffuse | visit {
-      [&](uint i) -> Colr { return resources.images[i].value().sample(si.tx, Image::ColorFormat::eLRGB).head<3>(); },
-      [&](Colr c) -> Colr { return c; }
-    };
-    
-    return si;
   }
 
   void Scene::to_stream(std::ostream &str) const {

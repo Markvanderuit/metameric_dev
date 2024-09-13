@@ -16,8 +16,8 @@
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/detail/task_viewport.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
-#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
-#include <metameric/components/pipeline_new/task_gen_object_data.hpp>
+#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline/task_gen_object_data.hpp>
 
 namespace met {
   void submit_schedule_debug(detail::SchedulerBase &scheduler) {

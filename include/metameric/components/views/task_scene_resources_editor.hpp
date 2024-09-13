@@ -5,7 +5,7 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
-#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
 #include <small_gl/window.hpp>
 #include <format>
 

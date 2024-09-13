@@ -1,6 +1,5 @@
 #include <metameric/core/components.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/matching.hpp>
 #include <metameric/core/scene.hpp>
 #include <tuple>
 

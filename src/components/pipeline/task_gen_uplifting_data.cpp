@@ -4,7 +4,7 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/misc/task_lambda.hpp>
 #include <small_gl/buffer.hpp>
@@ -31,8 +31,7 @@ namespace met {
     // if some uplifting is still in progress
     return is_first_eval() 
         || e_uplifting
-        || rng::any_of(m_mismatch_builders, 
-                       [](const auto &builder) { return !builder.is_converged(); });
+        || rng::any_of(m_mismatch_builders, [](const auto &builder) { return !builder.is_converged(); });
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -167,9 +166,6 @@ namespace met {
         pack.sub.head<3>() = vts[3];
         return pack;
       });
-
-      // Print size of new tesselation
-      fmt::print("Uplifting tesselation: {} verts, {} elems\n", m_tesselation.verts.size(), m_tesselation.elems.size());
 
       // Update packing layout data
       m_tesselation_data_map->elem_offs = max_supported_constraints * m_uplifting_i;

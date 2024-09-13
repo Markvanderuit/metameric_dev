@@ -85,7 +85,7 @@ namespace met {
   constexpr inline T ceil_div(T n, T_ div) {
     return (n + static_cast<T>(div) - T(1)) / static_cast<T>(div);
   }
-
+  
   // Debug namespace; mostly check_expr(...) from here on
   namespace debug {
     // Evaluate a boolean expression, throwing a detailed exception pointing
@@ -108,4 +108,83 @@ namespace met {
   #define check_expr(expr, msg, sl)
   #endif
   } // namespace debug
+
+  // Visit a variant using syntactic sugar,
+  // e.g. 'std::visit(visitor, variant)' formed from 'variant | visit { visitors... };'
+  // Src: https://en.cppreference.com/w/cpp/utility/variant/visit
+  // Src: https://github.com/AVasK/vx
+  /*
+    variant | visit {
+      [](uint i)  { ... },
+      [](float f) { ... },
+      [](auto v)  { ... },
+    }
+  */
+  template <typename... Ts> struct visit : Ts... { using Ts::operator()...; };
+  template <typename... Ts> visit(Ts...) -> visit<Ts...>;
+  template <typename... Ts, typename... Fs>
+  constexpr decltype(auto) operator| (std::variant<Ts...> const& v, visit<Fs...> const& f) {
+    return std::visit(f, v);
+  }
+  template <typename... Ts, typename... Fs>
+  constexpr decltype(auto) operator| (std::variant<Ts...> & v, visit<Fs...> const& f) {
+    return std::visit(f, v);
+  }
+  
+  // Syntactic sugar for a variant | match { visitors } pattern over
+  // all the known types of an std::optional, matching only if the
+  // underlying type is present
+  template <typename T, typename... Fs>
+  requires (std::is_invocable_v<visit<Fs...>, T> && std::is_invocable_v<visit<Fs...>>)
+  constexpr decltype(auto) operator| (std::optional<T> const& o, visit<Fs...> const& visit) {
+    if (o.has_value()) 
+      return visit(o.value());
+    else 
+      return visit();
+  }
+
+  // Visit a variant, s.t. the arguments passed to the capture
+  // form default-initialized objects of the variant's underlying type,
+  // and a boolean indicating whether the type is matched. Useful
+  // for type selectors in UI components
+  /* 
+    variant | visit_types([](auto default_of_type, bool is_match) {
+      ...
+    });
+   */
+  template <typename T> struct visit_types : T { using T::operator(); };
+  template <typename T> visit_types(T) -> visit_types<T>;
+  template <typename... Ts, typename F>
+  constexpr decltype(auto) operator| (std::variant<Ts...> const& v, visit_types<F> const& f) {
+    using VTy = std::variant<Ts...>;
+    auto indexes = detail::indexing_tuple<std::variant_size_v<VTy>>;
+    return detail::tuple_visit(indexes, [&v, f](auto I) {
+      using ATy = std::variant_alternative_t<I, VTy>;
+      return f(ATy(), std::holds_alternative<ATy>(v));
+    });
+  }
+  template <typename... Ts, typename F>
+  constexpr decltype(auto) operator| (std::variant<Ts...> & v, visit_types<F> const& f) {
+    using VTy = std::variant<Ts...>;
+    auto indexes = detail::indexing_tuple<std::variant_size_v<VTy>>;
+    return detail::tuple_visit(indexes, [&v, f](auto I) {
+      using ATy = std::variant_alternative_t<I, VTy>;
+      return f(ATy(), std::holds_alternative<ATy>(v));
+    });
+  }
+
+  // Syntactic sugar for 'std::visit(visitor, variant) <- variant | visit_single(visitor);'
+  /*
+    variant | visit_single([](uint i)  { ... });
+  */
+  template <typename T> struct visit_single : T { using T::operator(); };
+  template <typename T> visit_single(T) -> visit_single<T>;
+  template <typename... Ts, typename F>
+  constexpr void operator| (std::variant<Ts...> const& v, visit_single<F> const& f) {
+    v | visit { f, [](const auto &) {} };
+  }
+  template <typename... Ts, typename F>
+  constexpr void operator| (std::variant<Ts...> & v, visit_single<F> const& f) {
+    v | visit { f, [](auto &) {} };
+  }
 } // namespace met

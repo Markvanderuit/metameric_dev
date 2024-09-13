@@ -3,7 +3,6 @@
 #include <metameric/core/detail/scene_components.hpp>
 #include <metameric/core/constraints.hpp>
 #include <metameric/core/math.hpp>
-#include <metameric/core/matching.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <vector>
 

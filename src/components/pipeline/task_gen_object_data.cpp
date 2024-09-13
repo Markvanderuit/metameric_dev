@@ -1,5 +1,5 @@
 #include <metameric/core/scene.hpp>
-#include <metameric/components/pipeline_new/task_gen_object_data.hpp>
+#include <metameric/components/pipeline/task_gen_object_data.hpp>
 #include <small_gl/texture.hpp>
 #include <format>
 
@@ -40,19 +40,19 @@ namespace met {
     auto &e_cache = info.global("cache").getw<gl::ProgramCache>();
     std::tie(m_cache_key_txtr, std::ignore) = e_cache.set(
      {{ .type       = gl::ShaderType::eVertex,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.vert.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.vert.json" },
+        .spirv_path = "resources/shaders/pipeline/gen_texture.vert.spv",
+        .cross_path = "resources/shaders/pipeline/gen_texture.vert.json" },
       { .type       = gl::ShaderType::eFragment,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.frag.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.frag.json",
+        .spirv_path = "resources/shaders/pipeline/gen_texture.frag.spv",
+        .cross_path = "resources/shaders/pipeline/gen_texture.frag.json",
         .spec_const = {{ 0, true }} }});
     std::tie(m_cache_key_colr, std::ignore) = e_cache.set(
      {{ .type       = gl::ShaderType::eVertex,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.vert.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.vert.json" },
+        .spirv_path = "resources/shaders/pipeline/gen_texture.vert.spv",
+        .cross_path = "resources/shaders/pipeline/gen_texture.vert.json" },
       { .type       = gl::ShaderType::eFragment,
-        .spirv_path = "resources/shaders/pipeline_new/gen_texture.frag.spv",
-        .cross_path = "resources/shaders/pipeline_new/gen_texture.frag.json",
+        .spirv_path = "resources/shaders/pipeline/gen_texture.frag.spv",
+        .cross_path = "resources/shaders/pipeline/gen_texture.frag.json",
         .spec_const = {{ 0, false }} }});
                                 
     // Initialize uniform buffer and writeable, flushable mapping

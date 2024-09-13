@@ -83,7 +83,7 @@ namespace met {
     met_trace();
     
     // Take a grayscale spectrum as mean to build around
-    Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
+    Spec mean = Spec(luminance(info.linear_constraints[0].second)).cwiseMin(1.f);
     
     if constexpr (use_basis_direct_spectrum) {
       // Solver settings
@@ -99,7 +99,7 @@ namespace met {
       solver.objective = opt::func_norm<wavelength_bases>(info.basis.func, mean);
 
       // Add color system equality constraints, upholding spectral metamerism
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
 
@@ -135,7 +135,7 @@ namespace met {
       solver.objective = opt::func_norm<wavelength_samples>(obj, mean);
 
       // Add color system equality constraints, upholding spectral metamerism
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
@@ -156,9 +156,9 @@ namespace met {
     
     /* // Generate surrounding boundary spectra
     IndirectMismatchingOCSInfo ocs_info = {
-      .direct_objective   = info.direct_constraints[0].first,
-      .indirect_objective = info.indirect_constraints[0].first,
-      .direct_constraints = info.direct_constraints,
+      .direct_objective   = info.linear_constraints[0].first,
+      .indirect_objective = info.nlinear_constraints[0].first,
+      .linear_constraints = info.linear_constraints,
       .basis              = info.basis,
       .n_samples          = 8
     };
@@ -166,7 +166,7 @@ namespace met {
     auto verts  = ocs_info.indirect_objective(ocs_info.basis(coeffs));
 
     auto chull          = ConvexHull::build(std::span(verts), ConvexHull::BuildOptions::eDelaunay);
-    auto [bary, bary_i] = chull.find_enclosing_elem(info.indirect_constraints[0].second);
+    auto [bary, bary_i] = chull.find_enclosing_elem(info.nlinear_constraints[0].second);
     
     return (bary[0] * coeffs[0] + bary[1] * coeffs[1] +
             bary[2] * coeffs[2] + bary[3] * coeffs[3]).eval(); */
@@ -176,7 +176,7 @@ namespace met {
     met_trace();
     
     // Take a grayscale spectrum as mean to build around
-    Spec mean = Spec(luminance(info.direct_constraints[0].second)).cwiseMin(1.f);
+    Spec mean = Spec(luminance(info.linear_constraints[0].second)).cwiseMin(1.f);
 
     if constexpr (use_basis_indirect_spectrum) {
       // Solver settings
@@ -203,7 +203,7 @@ namespace met {
       }
 
       // Add direct color system equality constraints, upholding surface metamerism
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
@@ -212,7 +212,7 @@ namespace met {
 
       // Add interreflection equality constraint, upholding requested output color;
       // specify three equalities for three partial derivatives
-      for (const auto [csys, colr] : info.indirect_constraints) {
+      for (const auto [csys, colr] : info.nlinear_constraints) {
         auto A_ = csys.finalize(false);
         auto b_ = lrgb_to_xyz(colr);
         /* for (uint j = 0; j < 3; ++j)  */
@@ -255,7 +255,7 @@ namespace met {
       solver.objective = opt::func_norm<wavelength_samples>(obj, mean);
 
       // Add color system equality constraints, upholding spectral metamerism
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
@@ -264,7 +264,7 @@ namespace met {
       
       // Add interreflection equality constraint, upholding requested output color;
       // specify three equalities for three partial derivatives
-      for (const auto [csys, colr] : info.indirect_constraints) {
+      for (const auto [csys, colr] : info.nlinear_constraints) {
         using vec = eig::Vector<ad::real1st, wavelength_samples>;
         auto A_ = csys.finalize(false);
         auto b_ = lrgb_to_xyz(colr);
@@ -301,7 +301,7 @@ namespace met {
 
     if constexpr (use_basis_direct_mismatch) {
       // Sample unit vectors in nd
-      auto samples_nd = detail::gen_unit_dirs(info.direct_objectives.size(), info.n_samples, info.seed);
+      auto samples_nd = detail::gen_unit_dirs(info.linear_objectives.size(), info.n_samples, info.seed);
 
       // Solver settings
       opt::Wrapper<wavelength_bases> solver = {
@@ -324,7 +324,7 @@ namespace met {
       }
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
@@ -332,9 +332,9 @@ namespace met {
       }
 
       // Dynamic case
-      eig::MatrixXf S(wavelength_samples, 3 * info.direct_objectives.size());
-      for (uint i = 0; i < info.direct_objectives.size(); ++i)
-        S.block<wavelength_samples, 3>(0, 3 * i) = info.direct_objectives[i].finalize(false);
+      eig::MatrixXf S(wavelength_samples, 3 * info.linear_objectives.size());
+      for (uint i = 0; i < info.linear_objectives.size(); ++i)
+        S.block<wavelength_samples, 3>(0, 3 * i) = info.linear_objectives[i].finalize(false);
       eig::JacobiSVD<decltype(S)> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
@@ -342,8 +342,8 @@ namespace met {
       /* // Static case
       // This only works for the current configuration
       auto S = (eig::Matrix<float, wavelength_samples, 6>()
-        << info.direct_objectives[0].finalize(false), 
-           info.direct_objectives[1].finalize(false)).finished();
+        << info.linear_objectives[0].finalize(false), 
+           info.linear_objectives[1].finalize(false)).finished();
       eig::JacobiSVD<decltype(S)> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval(); */
@@ -379,7 +379,7 @@ namespace met {
       };
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
@@ -388,8 +388,8 @@ namespace met {
 
       // This only works for the current configuration
       auto S = (eig::Matrix<float, wavelength_samples, 6>()
-        << info.direct_objectives[0].finalize(false), 
-           info.direct_objectives[1].finalize(false)).finished();
+        << info.linear_objectives[0].finalize(false), 
+           info.linear_objectives[1].finalize(false)).finished();
       eig::JacobiSVD<decltype(S)> svd;
       svd.compute(S, eig::ComputeFullV);
       auto U = (S * svd.matrixV() * svd.singularValues().asDiagonal().inverse()).eval();
@@ -427,8 +427,8 @@ namespace met {
     
     if constexpr (use_basis_indirect_mismatch) {
       // Sample unit vectors in nd; total nr. of objectives is counted
-      auto samples_nd = detail::gen_unit_dirs(info.direct_objectives.size() + 
-                                              info.indirect_objectives.size(),
+      auto samples_nd = detail::gen_unit_dirs(info.linear_objectives.size() + 
+                                              info.nlinear_objectives.size(),
                                               info.n_samples, info.seed);
                                               
       // Solver settings
@@ -452,7 +452,7 @@ namespace met {
       }
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = (csys.finalize(false).transpose() * info.basis.func).eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_bases>(A, b), 
@@ -460,7 +460,7 @@ namespace met {
       }
 
       // Add indirect color system equality constraints, upholding uplifting roundtrip
-      for (const auto [csys, colr] : info.indirect_constraints) {
+      for (const auto [csys, colr] : info.nlinear_constraints) {
         using vec = eig::Vector<ad::real1st, wavelength_bases>;
         auto A = csys.finalize(false)
                | vws::transform([](const CMFS &cmfs) { return cmfs.transpose().cast<double>().eval(); })
@@ -485,18 +485,18 @@ namespace met {
       }
 
       // Helper fill value
-      eig::MatrixXf S_indrct_zero(wavelength_samples, 3 * info.indirect_objectives.size());
+      eig::MatrixXf S_indrct_zero(wavelength_samples, 3 * info.nlinear_objectives.size());
       S_indrct_zero.fill(0.f);
 
       // Construct objective matrices
-      auto S_direct = info.direct_objectives.empty()
+      auto S_direct = info.linear_objectives.empty()
                     ? (eig::MatrixXf(1, 1) << 1).finished()
-                    : eig::MatrixXf(wavelength_samples, 3 * info.direct_objectives.size());
-      for (uint i = 0; i < info.direct_objectives.size(); ++i)
-        S_direct.block<wavelength_samples, 3>(0, 3 * i) = info.direct_objectives[i].finalize(false);
+                    : eig::MatrixXf(wavelength_samples, 3 * info.linear_objectives.size());
+      for (uint i = 0; i < info.linear_objectives.size(); ++i)
+        S_direct.block<wavelength_samples, 3>(0, 3 * i) = info.linear_objectives[i].finalize(false);
       std::vector<eig::MatrixXf> S_indrct;
-      for (uint i = 0; i < info.indirect_objectives.size(); ++i) {
-        auto powers = info.indirect_objectives[i].finalize(false);
+      for (uint i = 0; i < info.nlinear_objectives.size(); ++i) {
+        auto powers = info.nlinear_objectives[i].finalize(false);
         if (S_indrct.size() < powers.size())
           S_indrct.resize(powers.size(), S_indrct_zero);
         for (uint j = 0; j < powers.size(); ++j)
@@ -522,12 +522,12 @@ namespace met {
         
           // Map linear color systems along part of unit vector
           /* auto A_direct 
-            = !info.direct_objectives.empty() 
-            ? trf_by_sample(S_direct, samples_nd[i].head(3 * info.direct_objectives.size()).eval()) 
+            = !info.linear_objectives.empty() 
+            ? trf_by_sample(S_direct, samples_nd[i].head(3 * info.linear_objectives.size()).eval()) 
             : eig::Vector<double, wavelength_samples>(0); */
           
           // Map nonlinear color systems along rest of unit vector
-          auto sample_tail = samples_nd[i].tail(3 * info.indirect_objectives.size()).eval();
+          auto sample_tail = samples_nd[i].tail(3 * info.nlinear_objectives.size()).eval();
           auto A_indrct = S_indrct
             | vws::transform(std::bind(trf_by_sample, _1, sample_tail))
             | vws::transform([](const auto &v) { return eig::Vector<double, wavelength_samples>(v); })
@@ -568,7 +568,7 @@ namespace met {
       };
 
       // Add direct color system equality constraints, upholding uplifting roundtrip
-      for (const auto [csys, colr] : info.direct_constraints) {
+      for (const auto [csys, colr] : info.linear_constraints) {
         auto A = csys.finalize(false).transpose().eval();
         auto b = lrgb_to_xyz(colr);
         solver.eq_constraints.push_back({ .f   = opt::func_norm<wavelength_samples>(A, b), 
@@ -640,7 +640,7 @@ namespace met {
 
       // Run solve to find nearest valid spectrum within the basis function set
       auto c = generate_spectrum_coeffs(DirectSpectrumInfo {
-        .direct_constraints = {{ info.direct_objective, info.direct_objective(s) }},
+        .linear_constraints = {{ info.direct_objective, info.direct_objective(s) }},
         .basis = info.basis
       });
       
@@ -718,7 +718,7 @@ namespace met {
                    range_iter(c), v.begin(),
                    [&info](const auto &c) { 
                     auto s = info.basis(c);
-                    return std::tuple { info.direct_objectives.back()(s), s, c }; }); // the differentiating color system generates output
+                    return std::tuple { info.linear_objectives.back()(s), s, c }; }); // the differentiating color system generates output
     return v;
   }
   
@@ -730,7 +730,7 @@ namespace met {
                    range_iter(c), v.begin(),
                    [&info](const auto &c) { 
                     auto s = info.basis(c);
-                    return std::tuple { info.indirect_objectives.back()(s), s, c }; }); // the differentiating color system generates output
+                    return std::tuple { info.nlinear_objectives.back()(s), s, c }; }); // the differentiating color system generates output
     return v;
   }
 } // namespace met

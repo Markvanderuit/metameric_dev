@@ -7,7 +7,7 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
-#include <metameric/components/pipeline_new/task_gen_uplifting_data.hpp>
+#include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
 #include <metameric/render/primitives_query.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
