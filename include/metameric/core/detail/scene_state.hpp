@@ -16,7 +16,7 @@ namespace std {
 } // namespace std
 
 namespace met::detail {
-  // Virtual base class for component state tracking in the Scene class;
+  // Virtual base class for component state tracking in the Scene class
   template <typename Ty>
   class ComponentStateBase {
   protected:
@@ -31,7 +31,7 @@ namespace met::detail {
     constexpr operator bool()   const { return m_mutated; };
 
     // Given a fresh copy of the object, update known component state
-    virtual bool update(const Ty &o)    = 0;
+    virtual bool update(const Ty &o) = 0;
   };
 
   // FWD; default component state tracker if no overload is available;

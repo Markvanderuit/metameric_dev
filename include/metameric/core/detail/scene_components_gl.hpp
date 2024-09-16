@@ -33,8 +33,6 @@ namespace met::detail {
       alignas(16) Colr          albedo_v;
     };
 
-    constexpr static size_t v = sizeof(ObjectInfoLayout);
-
     // Mapped buffer accessors
     uint*                       m_info_map_size;
     std::span<ObjectInfoLayout> m_info_map_data;
@@ -100,25 +98,16 @@ namespace met::detail {
     using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
     using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
-    // using spectra_type = gl::Texture1d<float, 4, gl::TextureType::eImageArray>;
 
   public:
-    // Atlas texture; each per-object patch stored in this atlas holds barycentric
-    // weights and an index, referring to one set of four spectra in `texture_spectra`
-    // atlas_type_f texture_barycentrics;
-    
-    // Atlas texture; each per-object patch stored in this atlas holds moment coefficients
-    // for spectral MESE method
+    // Atlas texture; each per-object patch stored in this atlas holds either
+    // linear (ours) or moment (bounded MESE) coefficients
     atlas_type_u texture_coefficients;
-
-    /* // Array texture; each layer holds one set of four spectra, packed together s.t.
-    // one texture sample equates four reflectances at a single wavelength
-    spectra_type texture_spectra; */
 
     // Basis functions; each layer holds a basis function
     basis_type texture_basis;
 
-    // Warped phase data for spectral MESE method
+    // Warped phase data for bounded MESE method
     gl::Texture1d1f texture_warp;
 
   public:

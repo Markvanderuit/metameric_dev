@@ -10,24 +10,20 @@
 
 namespace met {
   namespace detail {
-    // Concept for class to have own, overriding ComponentStateBase<Ty> implementation
-    // linked as state_type
     template <typename Ty>
-    concept has_state_ty = requires { 
-      std::is_class_v<Ty>; 
-      typename Ty::state_type;
+    struct ComponentStateType { 
+      using type = ComponentState<Ty>;
     };
 
-    // Default, empty struct if a GL-side type is not specified for a component or resource
-    struct SceneGLDefault { };
+    template <typename Ty> requires requires { typename Ty::state_type; }
+    struct ComponentStateType<Ty> { 
+      using type = typename Ty::state_type;
+    };
 
-    // Define component_state_t<Ty> to deduce required state object
-    template <typename Ty> struct ComponentStateSelector;
-    template <typename Ty> requires (!has_state_ty<Ty>)
-    struct ComponentStateSelector<Ty> { using type = ComponentState<Ty>; };
-    template <typename Ty> requires (has_state_ty<Ty>)
-    struct ComponentStateSelector<Ty> { using type = typename Ty::state_type; };
-    template <typename Ty> using component_state_t = ComponentStateSelector<Ty>::type;
+    // template <typename Ty>
+    // struct ComponentGLType {
+    //   using type = 
+    // };
 
     // Base template for gl-side packing of components/resources
     // If not explicitly specialized, no gl-side packing occurs 
@@ -47,7 +43,7 @@ namespace met {
     template <typename Ty>
     struct Component {
       using value_type = Ty;
-      using state_type = component_state_t<value_type>;
+      using state_type = ComponentStateType<value_type>::type;;
 
     public:
       std::string name  = "";  // Loaded name of component
