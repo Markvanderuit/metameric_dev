@@ -12,7 +12,7 @@ namespace met::detail {
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
   // Helper method to pack BVH node data tightly
-  GLPacking<met::Mesh>::NodePack pack(const BVH::Node &node) {
+  SceneGLType<met::Mesh>::NodePack pack(const BVH::Node &node) {
     // Obtain a merger of the child bounding boxes
     constexpr auto merge = [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
       return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
@@ -20,7 +20,7 @@ namespace met::detail {
     auto aabb = rng::fold_left_first(node.child_aabb.begin(), 
                                      node.child_aabb.begin() + node.size(), merge).value();
 
-    GLPacking<met::Mesh>::NodePack p;
+    SceneGLType<met::Mesh>::NodePack p;
 
     // 3xu32 packs AABB lo, ex
     auto b_lo_in = aabb.minb;
@@ -59,7 +59,7 @@ namespace met::detail {
     }
   }
 
-  GLPacking<met::Object>::GLPacking() {
+  SceneGLType<met::Object>::SceneGLType() {
     met_trace_full();
 
     // Uniform layout which includes nr. of active components
@@ -77,13 +77,12 @@ namespace met::detail {
     m_info_map_size = &map->n;
     m_info_map_data = map->data;
   }
-  
-  void GLPacking<met::Object>::update(std::span<const detail::Component<met::Object>> objects, const Scene &scene) {
+
+  void SceneGLType<met::Object>::update(const Scene &scene) {
     met_trace_full();
 
-    guard(!objects.empty());
-    guard(scene.components.objects);
-    // fmt::print("Type updated: {}\n", typeid(decltype(objects)::value_type).name());
+    const auto &objects = scene.components.objects;
+    guard(!objects.empty() && objects);
 
     // Set appropriate object count, then flush change to buffer
     *m_info_map_size = static_cast<uint>(objects.size());
@@ -124,28 +123,12 @@ namespace met::detail {
       object_info.flush(sizeof(ObjectInfoLayout), 
                         sizeof(ObjectInfoLayout) * i + sizeof(uint) * 4);
     } // for (uint i)
+
   }
-
-  GLPacking<met::Uplifting>::GLPacking() {
+  SceneGLType<met::Uplifting>::SceneGLType() {
     met_trace_full();
-    
-    // const uint requested_layers = max_supported_constraints * max_supported_upliftings;
 
-    // // Ensure nr. of allocated layers remains below what the device supports
-    // const uint supported_layers = 
-    //   std::min(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 2048);
-    // debug::check_expr(supported_layers >= requested_layers,
-    //   fmt::format("This OpenGL device supports texture arrays up to {} layers,\
-    //                \nbut {} layers were requested for GLPacking<Uplifting>!",
-    //                supported_layers, requested_layers));    
-
-    // Initialize array texture to hold packed spectrum data, for fast sampled
-    // access during rendering
-    // texture_spectra = {{ .size  = { wavelength_samples, requested_layers } }};
-
-    // Initialize texture atlas to hold per-object barycentric weights, for
-    // fast access during rendering; this is resized when necessary in update()
-    // texture_barycentrics = {{ .levels  = 1, .padding = 0 }};
+    // Initialize texture atlas to hold per-object coefficients
     texture_coefficients = {{ .levels  = 1, .padding = 0 }};
 
     // Initialize warped phase data for spectral MESE method
@@ -157,22 +140,23 @@ namespace met::detail {
     texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
   }
 
-  void GLPacking<met::Uplifting>::update(std::span<const detail::Component<met::Uplifting>> upliftings, const Scene &scene) {
+  void SceneGLType<met::Uplifting>::update(const Scene &scene) {
     // Get relevant resources
-    const auto &e_objects  = scene.components.objects;
-    const auto &e_images   = scene.resources.images;
-    const auto &e_settings = scene.components.settings.value;
+    const auto &e_objects    = scene.components.objects;
+    const auto &e_upliftings = scene.components.upliftings;
+    const auto &e_images     = scene.resources.images;
+    const auto &e_settings   = scene.components.settings;
     
     // Barycentric texture has not been touched yet
-    scene.components.upliftings.gl.texture_coefficients.set_invalitated(false);
-
+    e_upliftings.gl.texture_coefficients.set_invalitated(false);
+    
     // Only rebuild if there are upliftings and objects
-    guard(!upliftings.empty() && !e_objects.empty());
-    guard(scene.components.upliftings                  || 
-          scene.components.objects                     ||
-          scene.components.settings.state.texture_size ||
-          !texture_coefficients.texture().is_init()    ||
-          !texture_coefficients.buffer().is_init()     );
+    guard(!e_upliftings.empty() && !e_upliftings.empty());
+    guard(e_upliftings                                              || 
+          e_objects                                                 ||
+          e_settings.state.texture_size                             ||
+          !e_upliftings.gl.texture_coefficients.texture().is_init() ||
+          !e_upliftings.gl.texture_coefficients.buffer().is_init()  );
     
     // Gather necessary texture sizes for each object
     std::vector<eig::Array2u> inputs(e_objects.size());
@@ -193,7 +177,7 @@ namespace met::detail {
     // specified texture settings
     eig::Array2u maximal_4f = rng::fold_left(inputs, eig::Array2u(0), 
       [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u clamped_4f = e_settings.apply_texture_size(maximal_4f);
+    eig::Array2u clamped_4f = e_settings->apply_texture_size(maximal_4f);
     eig::Array2f scaled_4f  = clamped_4f.cast<float>() / maximal_4f.cast<float>();
     for (auto &input : inputs)
       input = (input.cast<float>() * scaled_4f).max(2.f).cast<uint>().eval();
@@ -226,7 +210,7 @@ namespace met::detail {
     }
   }
 
-  GLPacking<met::Emitter>::GLPacking() {
+  SceneGLType<met::Emitter>::SceneGLType() {
     met_trace_full();
 
     // Uniform layout which includes nr. of active components
@@ -250,11 +234,11 @@ namespace met::detail {
     m_envm_map_data = emitter_envm_info.map_as<EmitterEnvmapInfoLayout>(buffer_access_flags).data();
   }
 
-  void GLPacking<met::Emitter>::update(std::span<const detail::Component<met::Emitter>> emitters, const Scene &scene) {
+  void SceneGLType<met::Emitter>::update(const Scene &scene) {
     met_trace_full();
 
-    guard(!emitters.empty());
-    guard(scene.components.emitters);
+    const auto &emitters = scene.components.emitters;
+    guard(!emitters.empty() && emitters);
 
     // Set appropriate component count, then flush change to buffer
     *m_info_map_size = static_cast<uint>(emitters.size());
@@ -331,7 +315,7 @@ namespace met::detail {
     emitter_envm_info.flush();
   }
 
-  GLPacking<met::Mesh>::GLPacking() {
+  SceneGLType<met::Mesh>::SceneGLType() {
     met_trace_full();
 
     // Mesh uniform layout which includes nr. of active meshes
@@ -349,12 +333,12 @@ namespace met::detail {
     m_buffer_layout_map_data = map->data;
   }
 
-  void GLPacking<met::Mesh>::update(std::span<const detail::Resource<met::Mesh>> meshes, const Scene &scene) {
+  void SceneGLType<met::Mesh>::update(const Scene &scene) {
     met_trace_full();
 
-    guard(!meshes.empty());
-    guard(scene.resources.meshes);
-    // fmt::print("Type updated: {}\n", typeid(decltype(meshes)::value_type).name());
+    const auto &meshes = scene.resources.meshes;
+
+    guard(!meshes.empty() && meshes);
 
     // Resize cache vectors, which keep cleaned, simplified mesh data around 
     m_meshes.resize(meshes.size());
@@ -503,12 +487,13 @@ namespace met::detail {
     mesh_info.flush();
   }
 
-  void GLPacking<met::Image>::update(std::span<const detail::Resource<met::Image>> images, const Scene &scene) {
+  void SceneGLType<met::Image>::update(const Scene &scene) {
     met_trace_full();
     
+    const auto &images = scene.resources.images;
+
     guard(!images.empty());
     guard(scene.resources.images || scene.components.settings.state.texture_size);
-    // fmt::print("Type updated: {}\n", typeid(decltype(images)::value_type).name());
 
     // Get texture settings, which are relevant
     const auto &e_settings = scene.components.settings.value;
@@ -597,7 +582,7 @@ namespace met::detail {
     texture_info = {{ .data = cnt_span<const std::byte>(info) }};
   }
 
-  GLPacking<met::Spec>::GLPacking() {
+  SceneGLType<met::Spec>::SceneGLType() {
     met_trace_full();
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
     spec_texture    = {{ .size = { wavelength_samples, n_layers } }};
@@ -605,14 +590,15 @@ namespace met::detail {
     spec_buffer_map = spec_buffer.map_as<Spec>(buffer_access_flags);
   }
 
-  void GLPacking<met::Spec>::update(std::span<const detail::Resource<met::Spec>> illm, const Scene &scene) {
+  void SceneGLType<met::Spec>::update(const Scene &scene) {
     met_trace_full();
 
-    guard(scene.resources.illuminants);
+    const auto &illuminants = scene.resources.illuminants;
+    guard(illuminants);
     // fmt::print("Type updated: {}\n", typeid(decltype(illm)::value_type).name());
     
-    for (uint i = 0; i < illm.size(); ++i) {
-      const auto &[value, state] = illm[i];
+    for (uint i = 0; i < illuminants.size(); ++i) {
+      const auto &[value, state] = illuminants[i];
       guard_continue(state);
       spec_buffer_map[i] = value;  
     }
@@ -621,7 +607,7 @@ namespace met::detail {
     spec_texture.set(spec_buffer);
   }
 
-  GLPacking<met::CMFS>::GLPacking() {
+  SceneGLType<met::CMFS>::SceneGLType() {
     met_trace_full();
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
     cmfs_texture    = {{ .size = { wavelength_samples, n_layers } }};
@@ -629,13 +615,14 @@ namespace met::detail {
     cmfs_buffer_map = cmfs_buffer.map_as<CMFS>(buffer_access_flags);
   }
 
-  void GLPacking<met::CMFS>::update(std::span<const detail::Resource<met::CMFS>> cmfs, const Scene &scene) {
+  void SceneGLType<met::CMFS>::update(const Scene &scene) {
     met_trace_full();
 
-    guard(scene.resources.observers);
+    const auto &observers = scene.resources.observers;
+    guard(observers);
     
-    for (uint i = 0; i < cmfs.size(); ++i) {
-      const auto &[value, state] = cmfs[i];
+    for (uint i = 0; i < observers.size(); ++i) {
+      const auto &[value, state] = observers[i];
       guard_continue(state);
 
       // Premultiply with RGB and normalize
@@ -648,18 +635,19 @@ namespace met::detail {
     cmfs_texture.set(cmfs_buffer);
   }
 
-  GLPacking<met::ColorSystem>::GLPacking() {
+  SceneGLType<met::ColorSystem>::SceneGLType() {
     met_trace_full();
     // ...
   }
 
-  void GLPacking<met::ColorSystem>::update(std::span<const detail::Component<met::ColorSystem>>, const Scene &scene) {
+  void SceneGLType<met::ColorSystem>::update(const Scene &scene) {
     met_trace_full();
 
-    guard(scene.components.colr_systems ||
-          scene.components.emitters     ||
-          scene.resources.observers     || 
-          scene.resources.illuminants   );
+    const auto &colr_systems = scene.components.colr_systems;
+    guard(colr_systems                 ||
+          scene.components.emitters    ||
+          scene.resources.observers    || 
+          scene.resources.illuminants  );
     
     // Get indices of active emitter data
     auto active_emitters = scene.components.emitters

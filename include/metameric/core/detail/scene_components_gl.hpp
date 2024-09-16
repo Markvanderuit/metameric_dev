@@ -16,7 +16,7 @@ namespace met::detail {
   // GL-side object data
   // Handles shader-side information about objects in the scene
   template <>
-  class GLPacking<met::Object> {
+  class SceneGLType<met::Object> {
     struct alignas(16) ObjectInfoLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
@@ -40,16 +40,21 @@ namespace met::detail {
   public:
     // This buffer stores one instance of ObjectInfoLayout per object component
     gl::Buffer object_info;
-    
+
   public:
-    GLPacking();
-    void update(std::span<const detail::Component<met::Object>>, const Scene &);
+    // Class constructor
+    SceneGLType();
+
+    // Update packing data for this scene; objects whose state is indicated as changed
+    // are repacked for GL-side
+    void update(const Scene &);
 
     std::span<const ObjectInfoLayout> objects() const { return m_info_map_data; }
+
   };
-  
+
   template <>
-  class GLPacking<met::Emitter> {
+  class SceneGLType<met::Emitter> {
     struct alignas(16) EmitterEnvmapInfoLayout {
       alignas(4) bool envm_is_present;
       alignas(4) uint envm_i;
@@ -86,15 +91,15 @@ namespace met::detail {
     // Sampling distribution based on each emitter's individual power output
     gl::Buffer emitter_distr_buffer;
 
-    GLPacking();
-    void update(std::span<const detail::Component<met::Emitter>>, const Scene &);
+    SceneGLType();
+    void update(const Scene &);
   };
 
   // GL-side uplifting data
   // Handles gl-side uplifted texture data, though on a per-object basis. Most
   // data is filled in by the uplifting pipeline, which is part of the program pipeline 
   template <>
-  class GLPacking<met::Uplifting> {
+  class SceneGLType<met::Uplifting> {
     using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
     using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
@@ -111,25 +116,25 @@ namespace met::detail {
     gl::Texture1d1f texture_warp;
 
   public:
-    GLPacking();
-    void update(std::span<const detail::Component<met::Uplifting>>, const Scene &);
+    SceneGLType();
+    void update(const Scene &);
   };
   
   template <>
-  struct GLPacking<met::ColorSystem> {
+  struct SceneGLType<met::ColorSystem> {
     Spec       wavelength_distr;
     gl::Buffer wavelength_distr_buffer;
 
   public:
-    GLPacking();
-    void update(std::span<const detail::Component<met::ColorSystem>>, const Scene &);
+    SceneGLType();
+    void update(const Scene &);
   };
 
   // GL-side mesh data
   // Handles packed mesh buffers, bvh buffers, and info to unpack
   // said buffers shader-side
   template <>
-  struct GLPacking<met::Mesh> {
+  struct SceneGLType<met::Mesh> {
     // Packed BVH struct data
     // No unpacked representation available
     struct NodePack {
@@ -194,8 +199,8 @@ namespace met::detail {
     // Cache of mesh transforms, pre-applied to object transforms
     std::vector<eig::Matrix4f> transforms;
   public:
-    GLPacking();
-    void update(std::span<const detail::Resource<met::Mesh>>, const Scene &);
+    SceneGLType();
+    void update(const Scene &);
 
   public:
     std::span<const met::Mesh> meshes() const { return m_meshes; }
@@ -206,7 +211,7 @@ namespace met::detail {
   // Handles texture atlases for 1-component and 3-component textures in the scene,
   // as well as information on how to access the corresponding texture atlas regions.
   template <>
-  class GLPacking<met::Image> {
+  class SceneGLType<met::Image> {
     struct TextureInfoLayout {
       alignas(4) bool         is_3f;
       alignas(4) uint         layer;
@@ -226,13 +231,13 @@ namespace met::detail {
     TextureAtlas<float, 1> texture_atlas_1f;
   
   public:
-    void update(std::span<const detail::Resource<met::Image>>, const Scene &);
+    void update(const Scene &);
   };
   
   // GL-side spectrum data
   // Handles shader-side per-wavelength access of illuminant spectral data.
   template <>
-  class GLPacking<met::Spec> {
+  class SceneGLType<met::Spec> {
     using texture_type = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
     
     // Pixel buffer copy helpers
@@ -245,14 +250,14 @@ namespace met::detail {
     texture_type spec_texture;
 
   public:
-    GLPacking();
-    void update(std::span<const detail::Resource<met::Spec>>, const Scene &);
+    SceneGLType();
+    void update(const Scene &);
   };
   
   // GL-side color-matching-function data
   // Handles shader-side per-wavelength access of observer spectral data.
   template <>
-  class GLPacking<met::CMFS> {
+  class SceneGLType<met::CMFS> {
     using texture_type = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
 
     // Pixel buffer copy helpers
@@ -265,7 +270,7 @@ namespace met::detail {
     texture_type cmfs_texture;
 
   public:
-    GLPacking();
-    void update(std::span<const detail::Resource<met::CMFS>>, const Scene &);
+    SceneGLType();
+    void update(const Scene &);
   };
 } // namespace met::detail

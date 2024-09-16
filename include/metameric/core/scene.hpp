@@ -129,4 +129,54 @@ namespace met {
     void to_stream(std::ostream &str) const;
     void fr_stream(std::istream &str);
   };
+
+  // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>
+  template <typename Ty>
+  concept is_component = requires(Ty ty) { { detail::Component { ty } } -> std::same_as<Ty>; };  
+  template <typename Ty>
+  concept is_resource = requires(Ty ty) { { detail::Resource { ty } } -> std::same_as<Ty>; };  
+  template <typename Ty>
+  concept is_scene_data = is_component<Ty> || is_resource<Ty>;
+
+  // Forward to appropriate scene components or resources based on type
+  template <typename Ty> requires (is_scene_data<Ty>) 
+  constexpr
+  auto & scene_data_by_type(Scene &scene) {
+    using VTy = typename Ty::value_type;
+    if constexpr (is_component<Ty>) {
+      if      constexpr (std::is_same_v<VTy, ColorSystem>)  return scene.components.colr_systems;
+      else if constexpr (std::is_same_v<VTy, Emitter>)      return scene.components.emitters;
+      else if constexpr (std::is_same_v<VTy, Object>)       return scene.components.objects;
+      else if constexpr (std::is_same_v<VTy, Uplifting>)    return scene.components.upliftings;
+      else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
+      else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
+    } else {
+      if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
+      else if constexpr (std::is_same_v<VTy, Image>) return scene.resources.images;
+      else if constexpr (std::is_same_v<VTy, CMFS>)  return scene.resources.observers;
+      else if constexpr (std::is_same_v<VTy, Spec>)  return scene.resources.illuminants;
+      else debug::check_expr(false, "resources_by_type<Ty> exhausted its implemented options"); 
+    };
+  }
+
+  // Forward to appropriate scene components or resources based on type
+  template <typename Ty> requires (is_scene_data<Ty>) 
+  constexpr
+  const auto & scene_data_by_type(const Scene &scene) {
+    using VTy = typename Ty::value_type;
+    if constexpr (is_component<Ty>) {
+      if      constexpr (std::is_same_v<VTy, ColorSystem>)  return scene.components.colr_systems;
+      else if constexpr (std::is_same_v<VTy, Emitter>)      return scene.components.emitters;
+      else if constexpr (std::is_same_v<VTy, Object>)       return scene.components.objects;
+      else if constexpr (std::is_same_v<VTy, Uplifting>)    return scene.components.upliftings;
+      else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
+      else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
+    } else {
+      if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
+      else if constexpr (std::is_same_v<VTy, Image>) return scene.resources.images;
+      else if constexpr (std::is_same_v<VTy, CMFS>)  return scene.resources.observers;
+      else if constexpr (std::is_same_v<VTy, Spec>)  return scene.resources.illuminants;
+      else debug::check_expr(false, "resources_by_type<Ty> exhausted its implemented options"); 
+    };
+  }
 } // namespace met

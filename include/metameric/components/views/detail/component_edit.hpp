@@ -8,48 +8,6 @@
 
 namespace met {
   namespace detail {
-    // Forward to appropriate scene components or resources based on type
-    template <typename Ty> requires (is_scene_data<Ty>) 
-    constexpr
-    auto & scene_data_by_type(Scene &scene) {
-      using VTy = typename Ty::value_type;
-      if constexpr (is_component<Ty>) {
-        if      constexpr (std::is_same_v<VTy, ColorSystem>)  return scene.components.colr_systems;
-        else if constexpr (std::is_same_v<VTy, Emitter>)      return scene.components.emitters;
-        else if constexpr (std::is_same_v<VTy, Object>)       return scene.components.objects;
-        else if constexpr (std::is_same_v<VTy, Uplifting>)    return scene.components.upliftings;
-        else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
-        else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
-      } else {
-        if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
-        else if constexpr (std::is_same_v<VTy, Image>) return scene.resources.images;
-        else if constexpr (std::is_same_v<VTy, CMFS>)  return scene.resources.observers;
-        else if constexpr (std::is_same_v<VTy, Spec>)  return scene.resources.illuminants;
-        else debug::check_expr(false, "resources_by_type<Ty> exhausted its implemented options"); 
-      };
-    }
-
-    // Forward to appropriate scene components or resources based on type
-    template <typename Ty> requires (is_scene_data<Ty>) 
-    constexpr
-    const auto & scene_data_by_type(const Scene &scene) {
-      using VTy = typename Ty::value_type;
-      if constexpr (is_component<Ty>) {
-        if      constexpr (std::is_same_v<VTy, ColorSystem>) return scene.components.colr_systems;
-        else if constexpr (std::is_same_v<VTy, Emitter>)     return scene.components.emitters;
-        else if constexpr (std::is_same_v<VTy, Object>)      return scene.components.objects;
-        else if constexpr (std::is_same_v<VTy, Uplifting>)   return scene.components.upliftings;
-        else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
-        else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
-      } else {
-        if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
-        else if constexpr (std::is_same_v<VTy, Image>) return scene.resources.images;
-        else if constexpr (std::is_same_v<VTy, CMFS>)  return scene.resources.observers;
-        else if constexpr (std::is_same_v<VTy, Spec>)  return scene.resources.illuminants;
-        else debug::check_expr(false, "resources_by_type<Ty> exhausted its implemented options"); 
-      };
-    }
-
     // Info object for customizing behavior of push_*_editor() and related methods
     struct ImGuiEditInfo {
       std::string editor_name = "Editor"; // Surrounding editor section name
@@ -194,7 +152,7 @@ namespace met {
 
     // Get external resources and shorthands
     const auto &scene = info.global("scene").getr<Scene>();
-    const auto &data  = detail::scene_data_by_type<Ty>(scene)[data_i];
+    const auto &data  = scene_data_by_type<Ty>(scene)[data_i];
 
     // If requested, spawn a TreeNode.
     bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(data.name.c_str());
@@ -220,17 +178,15 @@ namespace met {
         info.global("scene").getw<Scene>().touch({
           .name = "Duplicate component",
           .redo = [data] (auto &scene)                             { 
-            detail::scene_data_by_type<Ty>(scene).push_back(data); },
+            scene_data_by_type<Ty>(scene).push_back(data); },
           .undo = [](auto &scene)                                  { 
-            detail::scene_data_by_type<Ty>(scene).pop_back();      }
+            scene_data_by_type<Ty>(scene).pop_back();      }
         });
         return; // Exit early as iterators are invalidated
       }
       if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Duplicate component");
     } // if (inside_tree && show_dupl)
-
-
 
     // Delete button, on same line as tree node if available
     if (edit_info.inside_tree && edit_info.show_del) {
@@ -240,9 +196,9 @@ namespace met {
         info.global("scene").getw<Scene>().touch({
           .name = "Delete component",
           .redo = [data_i] (auto &scene)                                { 
-            detail::scene_data_by_type<Ty>(scene).erase(data_i);        },
+            scene_data_by_type<Ty>(scene).erase(data_i);        },
           .undo = [data_i, data](auto &scene)                           { 
-            detail::scene_data_by_type<Ty>(scene).insert(data_i, data); }
+            scene_data_by_type<Ty>(scene).insert(data_i, data); }
         });
         return; // Exit early as iterators are invalidated
       }
@@ -284,7 +240,7 @@ namespace met {
     
     // Get external resources and shorthands
     const auto &scene  = info.global("scene").getr<Scene>();
-    const auto &data  = detail::scene_data_by_type<Ty>(scene);
+    const auto &data  = scene_data_by_type<Ty>(scene);
     
     // If requested, spawn a TreeNode
     bool section_open = !edit_info.inside_tree || ImGui::CollapsingHeader(edit_info.editor_name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
@@ -317,9 +273,9 @@ namespace met {
         info.global("scene").getw<Scene>().touch({
           .name = "Add component",
           .redo = [](auto &scene) {
-            detail::scene_data_by_type<Ty>(scene).push("New component", { }); },
+            scene_data_by_type<Ty>(scene).push("New component", { }); },
           .undo = [](auto &scene) {
-            detail::scene_data_by_type<Ty>(scene).erase(detail::scene_data_by_type<Ty>(scene).size() - 1); }
+            scene_data_by_type<Ty>(scene).erase(scene_data_by_type<Ty>(scene).size() - 1); }
         });
       }
     }

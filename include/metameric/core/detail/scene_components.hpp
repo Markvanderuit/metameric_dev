@@ -10,40 +10,17 @@
 
 namespace met {
   namespace detail {
-    template <typename Ty>
-    struct ComponentStateType { 
-      using type = ComponentState<Ty>;
-    };
+    // FWD
+    template <typename Ty> struct SceneStateType;
+    template <typename Ty> struct SceneGLType;
 
-    template <typename Ty> requires requires { typename Ty::state_type; }
-    struct ComponentStateType<Ty> { 
-      using type = typename Ty::state_type;
-    };
-
-    // template <typename Ty>
-    // struct ComponentGLType {
-    //   using type = 
-    // };
-
-    // Base template for gl-side packing of components/resources
-    // If not explicitly specialized, no gl-side packing occurs 
-    template <typename Ty>
-    struct GLPacking { /* ... */ };
-
-    // Concept to determine if GLPacking supplies specializable update() function,
-    // in which case gpu-side data is pushed each frame on component update
-    template <typename Ty, typename Tc>
-    concept is_gl_packing_implemented = requires(Ty ty, std::span<const Tc> tc, const Scene &scene) {
-      ty.update(tc, scene);
-    };
-    
     /* Scene component.
       Wrapper around objects/emitters/etc present in the scene, to handle component name, active flag,
       and specializable state tracking to detect internal changes for e.g. the Uplifting object. */
     template <typename Ty>
     struct Component {
       using value_type = Ty;
-      using state_type = ComponentStateType<value_type>::type;;
+      using state_type = SceneStateType<value_type>::type;;
 
     public:
       std::string name  = "";  // Loaded name of component
@@ -166,13 +143,16 @@ namespace met {
     struct Components {
       using value_type = Ty;
       using cmpnt_type = Component<value_type>;
-      using gl_type    = GLPacking<value_type>;
+      using gl_type    = SceneGLType<value_type>;
 
     private:
       mutable bool            m_mutated = true;
       mutable bool            m_resized = false;
       mutable size_t          m_size    = 0;
       std::vector<cmpnt_type> m_data;
+
+    public: // GL-side packing; always accessible to the underlying pipeline
+      mutable gl_type gl;
 
     public: // State handling
       // Test each internal component for an update and, if component state is changed,
@@ -197,9 +177,7 @@ namespace met {
         }
 
         // If a gl packing type is specialized for the component type, update gl packing data
-        if constexpr (is_gl_packing_implemented<gl_type, cmpnt_type>) {
-          gl.update(m_data, scene);          
-        }
+        gl.update(scene);          
 
         return m_mutated;
       }
@@ -246,9 +224,6 @@ namespace met {
       constexpr auto begin()          { return m_data.begin(); }
       constexpr auto end()            { return m_data.end();   }
 
-    public: // GL-side packing; always accessible to the underlying pipeline
-      mutable gl_type gl;
-
     public: // Serialization
       void to_stream(std::ostream &str) const {
         met_trace();
@@ -269,10 +244,13 @@ namespace met {
     struct Resources {
       using value_type = Ty;
       using resrc_type = Resource<value_type>;
-      using gl_type    = GLPacking<value_type>;
+      using gl_type    = SceneGLType<value_type>;
 
     private:
       std::vector<resrc_type> m_data;
+      
+    public: // GL-side packing; always accessible to the underlying pipeline
+      mutable gl_type gl;
 
     public: // State handling
       // Reset each internal resource's state and, if state was changed, updated
@@ -284,9 +262,7 @@ namespace met {
         bool mutated = is_mutated();
 
         // If a gl packing type is specialized for the component type, update gl packing data
-        if constexpr (is_gl_packing_implemented<gl_type, resrc_type>) {
-          gl.update(m_data, scene);          
-        }
+        gl.update(scene);          
 
         // Reset state for next iteration
         set_mutated(false);
@@ -346,9 +322,6 @@ namespace met {
       constexpr auto end()      const { return m_data.end();   }
       constexpr auto begin()          { return m_data.begin(); }
       constexpr auto end()            { return m_data.end();   }
-      
-    public: // GL-side packing; always accessible to the underlying pipeline
-      mutable gl_type gl;
 
     public: // Serialization
       void to_stream(std::ostream &str) const {
@@ -364,13 +337,23 @@ namespace met {
     };
   } // namespace detail
 
-  // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>
-  template <typename Ty>
-  concept is_component = requires(Ty ty) { { detail::Component { ty } } -> std::same_as<Ty>; };  
-  template <typename Ty>
-  concept is_resource = requires(Ty ty) { { detail::Resource { ty } } -> std::same_as<Ty>; };  
-  template <typename Ty>
-  concept is_scene_data = is_component<Ty> || is_resource<Ty>;
+  namespace detail {
+    // Default GLPack in case this is not implemented for a class
+    template <typename Ty>
+    struct SceneGLType {
+      void update(const Scene &) { /* ... */ }
+    };
+
+    template <typename Ty>
+    struct SceneStateType { 
+      using type = ComponentState<Ty>;
+    };
+
+    template <typename Ty> requires requires { typename Ty::state_type; }
+    struct SceneStateType<Ty> { 
+      using type = typename Ty::state_type;
+    };
+  } // namespace detail
 } // namespace met
 
 /* Here follows structured binding support for Scene::Component/Scene::Resource types.

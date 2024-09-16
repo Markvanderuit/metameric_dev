@@ -146,8 +146,8 @@ namespace met::detail {
     constexpr       auto &operator[](uint i)       { return m_cache.at(i); }
     
     // Bookkeeping; expose the underlying std::vector, instead of a direct pointer
-    constexpr const auto & data() const { return m_cache; }
-    constexpr       auto & data()       { return m_cache; }
+    constexpr const auto &data() const { return m_cache; }
+    constexpr       auto &data()       { return m_cache; }
 
     // Boilerplate
     constexpr auto size()  const { return m_cache.size();  }
