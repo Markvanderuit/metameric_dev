@@ -24,7 +24,7 @@ layout(binding = 0) restrict readonly buffer b_buff_atlas {
   AtlasLayout data[];
 } buff_atlas;
 layout(binding = 1) restrict readonly buffer b_buff_uplift_coef { 
-  float[max_supported_constraints][4][wavelength_bases] data;
+  float[met_max_constraints][4][wavelength_bases] data;
 } buff_uplift_coef;
 
 // Uniform buffer declarations
@@ -37,15 +37,15 @@ layout(binding = 1) uniform b_buff_uplift_data {
   uint size;
 } buff_uplift_data;
 layout(binding = 2) uniform b_buff_uplift_pack { 
-  Elem data[max_supported_constraints]; 
+  Elem data[met_max_constraints]; 
 } buff_uplift_pack;
 layout(binding = 3) uniform b_buff_objects {
   uint n;
-  ObjectInfo data[max_supported_objects];
+  ObjectInfo data[met_max_objects];
 } buff_objects;
 layout(binding = 4) uniform b_buff_textures {
   uint n;
-  TextureInfo data[max_supported_textures];
+  TextureInfo data[met_max_textures];
 } buff_textures;
 
 // Image/sampler declarations

@@ -3,8 +3,6 @@
 #include <metameric/core/components.hpp>
 
 namespace met::detail {
-  
-
   /* Overload of ComponentState for Object */
   struct ObjectState : public detail::ComponentStateBase<Object> {
     using Base = Object;

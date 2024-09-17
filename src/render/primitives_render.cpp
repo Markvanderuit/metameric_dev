@@ -364,7 +364,7 @@ namespace met {
     m_pixel_checkerboard = info.pixel_checkerboard;
 
     // RGB value override space
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), detail::met_max_constraints);
     m_illm_colr_texture    = {{ .size = { 1, n_layers } }};
     m_illm_colr_buffer     = {{ .size = m_illm_colr_texture.size().prod() * sizeof(eig::Array4f), .flags = buffer_create_flags }};
     m_illm_colr_buffer_map = m_illm_colr_buffer.map_as<eig::Array4f>(buffer_access_flags);

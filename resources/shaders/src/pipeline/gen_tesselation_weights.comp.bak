@@ -42,7 +42,7 @@ layout(binding = 2) uniform b_buff_objects {
   ObjectInfo data[32];
 } buff_objects;
 layout(binding = 3) uniform b_buff_uplift_pack { 
-  Elem data[max_supported_constraints]; 
+  Elem data[met_max_constraints]; 
 } buff_uplift_pack;
 
 // Image/sampler declarations

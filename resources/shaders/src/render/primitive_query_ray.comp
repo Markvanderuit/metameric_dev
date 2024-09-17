@@ -22,15 +22,15 @@ layout(binding = 0) uniform b_buff_sensor {
 } buff_sensor;
 layout(binding = 1) uniform b_buff_objects {
   uint n;
-  ObjectInfo data[max_supported_objects];
+  ObjectInfo data[met_max_objects];
 } buff_objects;
 layout(binding = 2) uniform b_buff_meshes {
   uint n;
-  MeshInfo data[max_supported_meshes];
+  MeshInfo data[met_max_meshes];
 } buff_meshes;
 layout(binding = 3) uniform b_buff_emitters {
   uint n;
-  EmitterInfo data[max_supported_emitters];
+  EmitterInfo data[met_max_emitters];
 } buff_emitters;
 layout(binding = 4) uniform b_buff_envmap_info {
   bool envm_is_present;
@@ -49,16 +49,16 @@ layout(binding = 2) restrict coherent buffer b_buff_output {
 } buff_output;
 
 // Shared memory declarations
-shared ObjectInfo  s_objc_info[max_supported_objects];
-shared EmitterInfo s_emtr_info[max_supported_emitters];
-shared MeshInfo    s_mesh_info[max_supported_meshes];
+shared ObjectInfo  s_objc_info[met_max_objects];
+shared EmitterInfo s_emtr_info[met_max_emitters];
+shared MeshInfo    s_mesh_info[met_max_meshes];
 
 declare_scene_traversal_stack(8); 
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_distr_sampler_default(wavelength, buff_wvls_distr, wavelength_samples)
-declare_distr_sampler_default(emitters, buff_emitters_distr, max_supported_emitters)
+declare_distr_sampler_default(emitters, buff_emitters_distr, met_max_emitters)
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/scene.glsl>

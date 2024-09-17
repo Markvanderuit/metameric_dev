@@ -4,85 +4,92 @@
 #include <metameric/core/image.hpp>
 #include <metameric/core/spectrum.hpp>
 #include <metameric/core/components.hpp>
-#include <metameric/core/detail/scene_components_state.hpp>
-#include <metameric/core/detail/packing.hpp>
-#include <metameric/core/detail/texture_atlas.hpp>
 #include <metameric/core/detail/bvh.hpp>
+#include <metameric/core/detail/packing.hpp>
+#include <metameric/core/detail/scene_components_state.hpp>
+#include <metameric/core/detail/texture_atlas.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 
 namespace met::detail {
+  // Define maximum supported components for some types
+  // These aren't up to device limits, but mostly exist so some 
+  // sizes can be hardcoded shader-side in uniform buffers and
+  // can be crammed into shared memory where possible
+  constexpr static uint met_max_meshes      = MET_SUPPORTED_MESHES;
+  constexpr static uint met_max_objects     = MET_SUPPORTED_OBJECTS;
+  constexpr static uint met_max_emitters    = MET_SUPPORTED_EMITTERS;
+  constexpr static uint met_max_upliftings  = MET_SUPPORTED_UPLIFTINGS;
+  constexpr static uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
+  constexpr static uint met_max_textures    = MET_SUPPORTED_TEXTURES;
+
   // GL-side object data
   // Handles shader-side information about objects in the scene
   template <>
   class SceneGLType<met::Object> {
-    struct alignas(16) ObjectInfoLayout {
+    // Per-object block layout for std140 uniform buffer
+    struct BlockLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
       alignas(16) eig::Matrix4f trf_mesh;
       alignas(16) eig::Matrix4f trf_mesh_inv;
-
       alignas(4)  bool          is_active;
-
       alignas(4)  uint          mesh_i;
       alignas(4)  uint          uplifting_i;
-
       alignas(4)  bool          is_albedo_sampled;
       alignas(4)  uint          albedo_i;
       alignas(16) Colr          albedo_v;
     };
-
-    // Mapped buffer accessors
-    uint*                       m_info_map_size;
-    std::span<ObjectInfoLayout> m_info_map_data;
+    
+    // All-object block layout for std140 uniform buffer, mapped for write
+    struct BufferLayout {
+      alignas(4)  uint                                     size;
+      alignas(16) std::array<BlockLayout, met_max_objects> data;
+    } *m_object_info_map;
 
   public:
-    // This buffer stores one instance of ObjectInfoLayout per object component
+    // This buffer stores one instance of BlockLayout per object component
     gl::Buffer object_info;
 
   public:
     // Class constructor
     SceneGLType();
 
-    // Update packing data for this scene; objects whose state is indicated as changed
-    // are repacked for GL-side
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
-
-    std::span<const ObjectInfoLayout> objects() const { return m_info_map_data; }
-
   };
 
   template <>
   class SceneGLType<met::Emitter> {
-    struct alignas(16) EmitterEnvmapInfoLayout {
-      alignas(4) bool envm_is_present;
-      alignas(4) uint envm_i;
-    };
-
-    struct alignas(16) EmitterInfoLayout {
+    // Per-object block layout for std140 uniform buffer
+    struct EmBlockLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
-
       alignas(4)  uint          type;
       alignas(4)  bool          is_active;
       alignas(4)  uint          illuminant_i;
       alignas(4)  float         illuminant_scale;
-      
       alignas(4)  eig::Array3f  center; // center for sphere/point, corner for rect
       alignas(4)  float         srfc_area_inv;
-
       alignas(4)  eig::Array3f  rect_n;
       alignas(4)  float         sphere_r;
     };
+    
+    // All-object block layout for std140 uniform buffer, mapped for write
+    struct EmBufferLayout {
+      alignas(4)  uint                                        size;
+      alignas(16) std::array<EmBlockLayout, met_max_emitters> data;
+    } *m_em_info_map;
 
-    // Mapped buffer accessors
-    uint*                        m_info_map_size;
-    std::span<EmitterInfoLayout> m_info_map_data;
-    EmitterEnvmapInfoLayout     *m_envm_map_data;
+    // Single block layout for std140 uniform buffer, mapped for write
+    struct EnvBufferLayout {
+      alignas(4) bool envm_is_present;
+      alignas(4) uint envm_i;
+    } *m_envm_info_data;
 
   public:
-    // This buffer stores one instance of EmitterInfoLayout per emitter component
+    // This buffer stores one instance of EmBlockLayout per emitter component
     gl::Buffer emitter_info;
 
     // Information on a background constant emitter to sample, if rays escape
@@ -91,7 +98,11 @@ namespace met::detail {
     // Sampling distribution based on each emitter's individual power output
     gl::Buffer emitter_distr_buffer;
 
+  public:
+    // Class constructor
     SceneGLType();
+
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
 
@@ -100,7 +111,6 @@ namespace met::detail {
   // data is filled in by the uplifting pipeline, which is part of the program pipeline 
   template <>
   class SceneGLType<met::Uplifting> {
-    using atlas_type_f = TextureAtlas<float, 4>;
     using atlas_type_u = TextureAtlas<uint, 4>;
     using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
 
@@ -116,53 +126,43 @@ namespace met::detail {
     gl::Texture1d1f texture_warp;
 
   public:
+    // Class constructor
     SceneGLType();
-    void update(const Scene &);
-  };
-  
-  template <>
-  struct SceneGLType<met::ColorSystem> {
-    Spec       wavelength_distr;
-    gl::Buffer wavelength_distr_buffer;
 
-  public:
-    SceneGLType();
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
 
   // GL-side mesh data
-  // Handles packed mesh buffers, bvh buffers, and info to unpack
-  // said buffers shader-side
+  // Handles packed mesh buffers, bvh buffers, and info to unpack said buffers shader-side
   template <>
   class SceneGLType<met::Mesh> {
-    // Mesh layout data
-    struct MeshInfoLayout {
+    // Per-mesh block layout for std140 uniform buffer
+    struct MeshBlockLayout {
       alignas(16) eig::Matrix4f trf; // Model packing transform
-
       alignas(4)  uint verts_offs;
       alignas(4)  uint verts_size;
-
       alignas(4)  uint elems_offs;
       alignas(4)  uint elems_size;
-
       alignas(4)  uint nodes_offs;
       alignas(4)  uint nodes_size;
     };
-    static_assert(sizeof(MeshInfoLayout) == 96);
+    static_assert(sizeof(MeshBlockLayout) == 96);
+    
+    // All-mesh block layout for std140 uniform buffer, mapped for write
+    struct MeshBufferLayout {
+      alignas(4)  uint                                       size;
+      alignas(16) std::array<MeshBlockLayout, met_max_meshes> data;
+    } *m_mesh_info_map;
 
   private:
     // Caches of simplified meshes and generated acceleration data
     std::vector<met::Mesh> m_meshes;
     std::vector<met::BVH>  m_bvhs;
 
-    // Mapped buffer accessors
-    uint*                     m_buffer_layout_map_size;
-    std::span<MeshInfoLayout> m_buffer_layout_map_data;
-
   public:
     // This buffer contains offsets/sizes, ergo layout info necessary to
-    // sample relevant parts of the other buffers, storing one instance
-    // of MeshInfoLayout per mesh resource
+    // sample relevant parts of the other buffers
     gl::Buffer mesh_info;
 
     // Packed mesh data, used in gen_object_data and miscellaneous operations
@@ -176,8 +176,8 @@ namespace met::detail {
 
     // CPU-side packed bvh data and original texture coordinates
     // Useful for ray interaction recovery that mirrors the gpu-side precision issues
-    std::vector<PrimitivePack>  bvh_prims_cpu;
-    std::vector<eig::Array3u>   bvh_txuvs_cpu; // unparameterized texture coordinates per bvh prim
+    std::vector<PrimitivePack> bvh_prims_cpu;
+    std::vector<eig::Array3u>  bvh_txuvs_cpu; // unparameterized texture coordinates per bvh prim
 
     // Draw array referencing packed, indexed mesh data
     // and a set of draw commands for assembling multidraw operations over this array;
@@ -189,8 +189,10 @@ namespace met::detail {
     std::vector<eig::Matrix4f> transforms;
     
   public:
+    // Class constructor
     SceneGLType();
 
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
   
@@ -199,21 +201,24 @@ namespace met::detail {
   // as well as information on how to access the corresponding texture atlas regions.
   template <>
   class SceneGLType<met::Image> {
-    struct alignas(16) TextureInfoLayout {
+    // Per-texture block layout for std140 uniform buffer
+    struct BlockLayout {
       alignas(4)  bool         is_3f;
       alignas(4)  uint         layer;
       alignas(8)  eig::Array2u offs, size;
       alignas(8)  eig::Array2f uv0, uv1;
     };
 
-    // Mapped nr. of textures and texture data
-    uint*                        m_info_map_size;
-    std::span<TextureInfoLayout> m_info_map_data;
+    // All-texture block layout for std140 uniform buffer, mapped for write
+    struct BufferLayout {
+      alignas(4)  uint                                      size;
+      alignas(16) std::array<BlockLayout, met_max_textures> data;
+    } *m_texture_info_map;
 
   public:
     // This buffer contains offsets/sizes, ergo layout info necessary to
     // sample relevant parts of the texture atlases, storing one instance
-    // of TextureInfoLayout per image resource
+    // of BlockLayout per image resource
     gl::Buffer texture_info;
     
     // Texture atlases store packed image data in f32 format; one atlas for 3-component
@@ -222,8 +227,25 @@ namespace met::detail {
     TextureAtlas<float, 1> texture_atlas_1f;
   
   public:
+    // Class constructor
     SceneGLType();
     
+    // Update GL-side data for objects indicated as changed
+    void update(const Scene &);
+  };
+  
+  // GL-side colorsystem data
+  // Handles shader-side information about color system sampling
+  template <>
+  struct SceneGLType<met::ColorSystem> {
+    Spec       wavelength_distr;
+    gl::Buffer wavelength_distr_buffer;
+
+  public:
+    // Class constructor
+    SceneGLType();
+
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
   
@@ -243,7 +265,10 @@ namespace met::detail {
     texture_type spec_texture;
 
   public:
+    // Class constructor
     SceneGLType();
+
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
   
@@ -263,7 +288,10 @@ namespace met::detail {
     texture_type cmfs_texture;
 
   public:
+    // Class constructor
     SceneGLType();
+
+    // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
 } // namespace met::detail

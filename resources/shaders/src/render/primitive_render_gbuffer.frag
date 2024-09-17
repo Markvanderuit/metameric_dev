@@ -23,7 +23,7 @@ layout(binding = 0) uniform b_buff_sensor {
 } buff_sensor;
 layout(binding = 1) uniform b_buff_objects {
   uint n;
-  ObjectInfo data[max_supported_objects];
+  ObjectInfo data[met_max_objects];
 } buff_objects;
 
 void main() {

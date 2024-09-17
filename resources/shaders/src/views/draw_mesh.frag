@@ -24,11 +24,11 @@ layout(binding = 0) uniform b_unif_camera {
 } unif_camera;
 layout(binding = 1) uniform b_buff_textures {
   uint n;
-  TextureInfo data[max_supported_textures];
+  TextureInfo data[met_max_textures];
 } buff_textures;
 layout(binding = 2) uniform b_buff_objects {
   uint n;
-  ObjectInfo[max_supported_objects] data;
+  ObjectInfo[met_max_objects] data;
 } buff_objects;
 
 // Sampler declarations

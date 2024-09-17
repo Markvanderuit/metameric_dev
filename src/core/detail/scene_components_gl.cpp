@@ -1,13 +1,14 @@
 #include <metameric/core/detail/scene_components_gl.hpp>
 #include <metameric/core/distribution.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/scene.hpp>
 #include <ranges>
 #include <numbers>
 
 namespace met::detail {
+  // Buffer access flags for writeable, flusheable mapped buffer
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
@@ -24,16 +25,16 @@ namespace met::detail {
 
   // Helper method to pack BVH node data tightly
   NodePack pack(const BVH::Node &node) {
-    // Obtain a merger of the child bounding boxes
-    constexpr auto merge = [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
-      return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
-    };
+    met_trace();
 
-    auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), merge); //.value();
-    // auto aabb = rng::fold_left_first(node.child_aabb.begin(), 
-    //                                  node.child_aabb.begin() + node.size(), merge).value();
-
+    // Output node pack
     NodePack p;
+
+    // Generate a AABB over child AABBs
+    auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), 
+    [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
+      return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
+    });
 
     // 3xu32 packs AABB lo, ex
     auto b_lo_in = aabb.minb;
@@ -63,32 +64,12 @@ namespace met::detail {
     return p;
   }
 
-  eig::Array2u clamp_texture_size_by_setting(Settings::TextureSize setting, eig::Array2u size) {
-    switch (setting) {
-      case Settings::TextureSize::eHigh: return size.cwiseMin(2048u);
-      case Settings::TextureSize::eMed:  return size.cwiseMin(1024u);
-      case Settings::TextureSize::eLow:  return size.cwiseMin(512u);
-      default:                           return size;
-    }
-  }
-
   SceneGLType<met::Object>::SceneGLType() {
     met_trace_full();
 
-    // Uniform layout which includes nr. of active components
-    struct ObjectUniformBufferLayout {
-      alignas(4) uint n;
-      ObjectInfoLayout data[max_supported_objects];
-    };
-
-    // Preallocate up to a number of meshes
-    object_info = {{ .size  = sizeof(ObjectUniformBufferLayout),
-                     .flags = buffer_create_flags }};
-
-    // Obtain writeable, flushable mapping of nr. of meshes and individual mesh data
-    auto *map = object_info.map_as<ObjectUniformBufferLayout>(buffer_access_flags).data();
-    m_info_map_size = &map->n;
-    m_info_map_data = map->data;
+    // Preallocate up to a number of objects and obtain writeable/flushable mapping
+    object_info       = {{ .size  = sizeof(BufferLayout), .flags = buffer_create_flags }};
+    m_object_info_map = object_info.map_as<BufferLayout>(buffer_access_flags).data();
   }
 
   void SceneGLType<met::Object>::update(const Scene &scene) {
@@ -98,7 +79,7 @@ namespace met::detail {
     guard(!objects.empty() && objects);
 
     // Set appropriate object count, then flush change to buffer
-    *m_info_map_size = static_cast<uint>(objects.size());
+    m_object_info_map->size = static_cast<uint>(objects.size());
     object_info.flush(sizeof(uint));
 
     // Write updated objects to mapping
@@ -110,22 +91,18 @@ namespace met::detail {
       bool is_albedo_sampled = object.diffuse.index() != 0;
 
       // Get mesh transform, incorporate into gl-side object transform
-      auto object_trf = object.transform.affine();
-      auto mesh_trf   = scene.resources.meshes.gl.transforms[object.mesh_i];
+      auto object_trf = object.transform.affine().matrix().eval();
+      auto mesh_trf   = (object_trf * scene.resources.meshes.gl.transforms[object.mesh_i]).eval();
 
-      m_info_map_data[i] = {
-        // Fill transform data
-        .trf          = object_trf.matrix(),
-        .trf_inv      = object_trf.matrix().inverse().eval(),
-        .trf_mesh     = (object_trf.matrix() * mesh_trf).eval(),
-        .trf_mesh_inv = (object_trf.matrix() * mesh_trf).inverse().eval(),
-
-        // Fill shape data
-        .is_active   = object.is_active,
-        .mesh_i      = object.mesh_i,
-        .uplifting_i = object.uplifting_i,
-
-        // Fill materials data
+      // Fill in object struct data
+      m_object_info_map->data[i] = {
+        .trf               = object_trf,
+        .trf_inv           = object_trf.inverse().eval(),
+        .trf_mesh          = mesh_trf,
+        .trf_mesh_inv      = mesh_trf.inverse().eval(),
+        .is_active         = object.is_active,
+        .mesh_i            = object.mesh_i,
+        .uplifting_i       = object.uplifting_i,
         .is_albedo_sampled = is_albedo_sampled,
         .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
         .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse)
@@ -133,27 +110,28 @@ namespace met::detail {
 
       // Flush change to buffer; most changes to objects are local,
       // so we flush specific regions instead of the whole
-      object_info.flush(sizeof(ObjectInfoLayout), 
-                        sizeof(ObjectInfoLayout) * i + sizeof(uint) * 4);
+      object_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
     } // for (uint i)
-
   }
+
   SceneGLType<met::Uplifting>::SceneGLType() {
     met_trace_full();
 
     // Initialize texture atlas to hold per-object coefficients
     texture_coefficients = {{ .levels  = 1, .padding = 0 }};
 
-    // Initialize warped phase data for spectral MESE method
-    auto warp_data = generate_warped_phase();
-    texture_warp = {{ .size = { static_cast<uint>(warp_data.size()) },
-                      .data = cnt_span<const float>(warp_data)      }};
-
     // Initialize basis function data
     texture_basis = {{ .size = { wavelength_samples, wavelength_bases } }};
+
+    // Initialize warped phase data for spectral MESE method
+    auto warp_data = generate_warped_phase();
+    texture_warp = {{ .size = static_cast<uint>(warp_data.size()), 
+                      .data = cnt_span<const float>(warp_data) }};
   }
 
   void SceneGLType<met::Uplifting>::update(const Scene &scene) {
+    met_trace_full();
+
     // Get relevant resources
     const auto &e_objects    = scene.components.objects;
     const auto &e_upliftings = scene.components.upliftings;
@@ -229,22 +207,16 @@ namespace met::detail {
     // Uniform layout which includes nr. of active components
     struct EmitterUniformBufferLayout {
       alignas(4)   uint n;
-      EmitterInfoLayout data[max_supported_emitters];
+      EmBlockLayout data[met_max_emitters];
     };
     
-    // Preallocate up to a number of objects
-    emitter_info = {{ .size  = sizeof(EmitterUniformBufferLayout),
-                      .flags = buffer_create_flags }};
-    
-    // Obtain writeable, flushable mapping of nr. of components and individual data
-    auto *map = emitter_info.map_as<EmitterUniformBufferLayout>(buffer_access_flags).data();
-    m_info_map_size = &map->n;
-    m_info_map_data = map->data;
+    // Preallocate up to a number of objects and obtain writeable/flushable mapping
+    emitter_info = {{ .size = sizeof(EmBufferLayout), .flags = buffer_create_flags }};
+    m_em_info_map = emitter_info.map_as<EmBufferLayout>(buffer_access_flags).data();
 
-    // Same for envmap data
-    emitter_envm_info = {{ .size  = sizeof(EmitterInfoLayout),
-                           .flags = buffer_create_flags }};
-    m_envm_map_data = emitter_envm_info.map_as<EmitterEnvmapInfoLayout>(buffer_access_flags).data();
+    // Allocate buffer for envmap data and obtain writeable, flushable mapping
+    emitter_envm_info = {{ .size = sizeof(EnvBufferLayout), .flags = buffer_create_flags }};
+    m_envm_info_data = emitter_envm_info.map_as<EnvBufferLayout>(buffer_access_flags).data();
   }
 
   void SceneGLType<met::Emitter>::update(const Scene &scene) {
@@ -254,7 +226,7 @@ namespace met::detail {
     guard(!emitters.empty() && emitters);
 
     // Set appropriate component count, then flush change to buffer
-    *m_info_map_size = static_cast<uint>(emitters.size());
+    m_em_info_map->size = static_cast<uint>(emitters.size());
     emitter_info.flush(sizeof(uint));
 
     // Write updated components to mapping
@@ -276,7 +248,7 @@ namespace met::detail {
         srfc_area_inv = 1.f / emitter.transform.scaling.head<2>().prod();
       }
       
-      m_info_map_data[i] = {
+      m_em_info_map->data[i] = {
         .trf              = trf.matrix(),
         .trf_inv          = trf.matrix().inverse().eval(),
         
@@ -293,12 +265,11 @@ namespace met::detail {
 
       // Flush change to buffer; most changes to objects are local,
       // so we flush specific regions instead of the whole
-      emitter_info.flush(sizeof(EmitterInfoLayout), 
-                         sizeof(EmitterInfoLayout) * i + sizeof(uint) * 4);
+      emitter_info.flush(sizeof(EmBlockLayout), sizeof(EmBlockLayout) * i + sizeof(uint));
     } // for (uint i)
 
     // Build sampling distribution over emitter's powers
-    std::vector<float> emitter_distr(max_supported_emitters, 0.f);
+    std::vector<float> emitter_distr(met_max_emitters, 0.f);
     auto active_emitters = scene.components.emitters
                          | vws::transform([](const auto &comp) { return comp.value; })
                          | vws::filter(&Emitter::is_active)
@@ -310,18 +281,17 @@ namespace met::detail {
       guard_continue(emitter.is_active);
       Spec s  = scene.resources.illuminants[emitter.illuminant_i].value();
       emitter_distr[i] = 1.f / static_cast<float>(active_emitters.size());
-      // emitter_distr[i] = s.sum() * emitter.illuminant_scale;
     }
     auto distr = Distribution(cnt_span<float>(emitter_distr));   
     emitter_distr_buffer = distr.to_buffer_std140();
 
     // Store information on first constant emitter, if one is present and active
-    m_envm_map_data->envm_is_present = false;
+    m_envm_info_data->envm_is_present = false;
     for (uint i = 0; i < emitters.size(); ++i) {
       const auto &[emitter, state] = emitters[i];
       if (emitter.is_active && emitter.type == Emitter::Type::eConstant) {
-        m_envm_map_data->envm_is_present = true;
-        m_envm_map_data->envm_i          = i;
+        m_envm_info_data->envm_is_present = true;
+        m_envm_info_data->envm_i          = i;
         break;
       }
     }
@@ -331,26 +301,15 @@ namespace met::detail {
   SceneGLType<met::Mesh>::SceneGLType() {
     met_trace_full();
 
-    // Mesh uniform layout which includes nr. of active meshes
-    struct MeshUniformBufferLayout {
-      alignas(4) uint n;
-      MeshInfoLayout data[max_supported_meshes];
-    };
-
-    // Preallocate up to a number of meshes
-    mesh_info = {{ .size  = sizeof(MeshUniformBufferLayout), .flags = buffer_create_flags }};
-
-    // Obtain writeable, flushable mapping of nr. of meshes and individual mesh data
-    auto *map = mesh_info.map_as<MeshUniformBufferLayout>(buffer_access_flags).data();
-    m_buffer_layout_map_size = &map->n;
-    m_buffer_layout_map_data = map->data;
+    // Preallocate up to a number of meshes and obtain writeable/flushable mapping
+    mesh_info       = {{ .size = sizeof(MeshBufferLayout), .flags = buffer_create_flags }};
+    m_mesh_info_map = mesh_info.map_as<MeshBufferLayout>(buffer_access_flags).data();
   }
 
   void SceneGLType<met::Mesh>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &meshes = scene.resources.meshes;
-
     guard(!meshes.empty() && meshes);
 
     // Resize cache vectors, which keep cleaned, simplified mesh data around 
@@ -360,6 +319,9 @@ namespace met::detail {
 
     // Keep around old, unparameterized texture coordinates for now
     std::vector<std::vector<eig::Array2f>> txuvs(meshes.size());
+
+    // Set appropriate mesh count in buffer
+    m_mesh_info_map->size = static_cast<uint>(meshes.size());
 
     // Generate cleaned, simplified mesh data
     #pragma omp parallel for
@@ -378,11 +340,8 @@ namespace met::detail {
                                    .n_leaf_children = 3 });
             
       // Set appropriate mesh transform in buffer
-      m_buffer_layout_map_data[i].trf = transforms[i];
+      m_mesh_info_map->data[i].trf = transforms[i];
     }
-    
-    // Set appropriate mesh count in buffer
-    *m_buffer_layout_map_size = static_cast<uint>(meshes.size());
 
     // Pack mesh/BVH data tightly and fill in corresponding mesh layout info
     {
@@ -404,7 +363,7 @@ namespace met::detail {
       
       // Fill in remainder of mesh layout info
       for (int i = 0; i < meshes.size(); ++i) {
-        auto &layout = m_buffer_layout_map_data[i];
+        auto &layout = m_mesh_info_map->data[i];
         layout.verts_offs = verts_offs[i];
         layout.nodes_offs = nodes_offs[i];
         layout.elems_offs = elems_offs[i];
@@ -492,8 +451,8 @@ namespace met::detail {
     }};
     draw_commands.resize(meshes.size());
     for (uint i = 0; i < meshes.size(); ++i) {
-      draw_commands[i] = { .vertex_count = m_buffer_layout_map_data[i].elems_size * 3,
-                           .vertex_first = m_buffer_layout_map_data[i].elems_offs * 3 };
+      draw_commands[i] = { .vertex_count = m_mesh_info_map->data[i].elems_size * 3,
+                           .vertex_first = m_mesh_info_map->data[i].elems_offs * 3 };
     }
 
     // Flush changes to layout data
@@ -506,17 +465,12 @@ namespace met::detail {
     // Uniform layout which includes nr. of active components
     struct TextureUniformBufferLayout {
       alignas(4)   uint n;
-      TextureInfoLayout data[max_supported_textures];
+      BlockLayout data[met_max_textures];
     };
 
-    // Preallocate up to a number of objects
-    texture_info = {{ .size  = sizeof(TextureUniformBufferLayout),
-                      .flags = buffer_create_flags }};
-
-    // Obtain writeable, flushable mapping of nr. of components and individual data
-    auto *map = texture_info.map_as<TextureUniformBufferLayout>(buffer_access_flags).data();
-    m_info_map_size = &map->n;
-    m_info_map_data = map->data;
+    // Preallocate up to a number of blocks
+    texture_info = {{ .size = sizeof(BufferLayout), .flags = buffer_create_flags }};
+    m_texture_info_map = texture_info.map_as<BufferLayout>(buffer_access_flags).data();
   }
 
   void SceneGLType<met::Image>::update(const Scene &scene) {
@@ -558,7 +512,7 @@ namespace met::detail {
     texture_atlas_1f = {{ .sizes = inputs_1f, .levels = 1 }};
 
     // Set appropriate component count, then flush change to buffer
-    *m_info_map_size = static_cast<uint>(images.size());
+    m_texture_info_map->size = static_cast<uint>(images.size());
     texture_info.flush(sizeof(uint));
 
     for (uint i = 0; i < images.size(); ++i) {
@@ -574,14 +528,13 @@ namespace met::detail {
                    uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
 
       // Fill in info object in mapped buffer
-      m_info_map_data[i] = { .is_3f = is_3f,      .layer = resrv.layer_i,
-                             .offs  = resrv.offs, .size  = resrv.size,
-                             .uv0   = uv0,        .uv1   = uv1 };
+      m_texture_info_map->data[i] = { .is_3f = is_3f,      .layer = resrv.layer_i,
+                                      .offs  = resrv.offs, .size  = resrv.size,
+                                      .uv0   = uv0,        .uv1   = uv1 };
 
       // Flush change to buffer; most changes to objects are local,
       // so we flush specific regions instead of the whole
-      texture_info.flush(sizeof(TextureInfoLayout), 
-                         sizeof(TextureInfoLayout) * i + sizeof(uint) * 4);
+      texture_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
 
       // Get a resampled float representation of image data
       auto imgf = img.convert({ .resize_to  = resrv.size,
@@ -609,7 +562,7 @@ namespace met::detail {
 
   SceneGLType<met::Spec>::SceneGLType() {
     met_trace_full();
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     spec_texture    = {{ .size = { wavelength_samples, n_layers } }};
     spec_buffer     = {{ .size = spec_texture.size().prod() * sizeof(float), .flags = buffer_create_flags }};
     spec_buffer_map = spec_buffer.map_as<Spec>(buffer_access_flags);
@@ -620,7 +573,6 @@ namespace met::detail {
 
     const auto &illuminants = scene.resources.illuminants;
     guard(illuminants);
-    // fmt::print("Type updated: {}\n", typeid(decltype(illm)::value_type).name());
     
     for (uint i = 0; i < illuminants.size(); ++i) {
       const auto &[value, state] = illuminants[i];
@@ -634,7 +586,7 @@ namespace met::detail {
 
   SceneGLType<met::CMFS>::SceneGLType() {
     met_trace_full();
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), max_supported_constraints);
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     cmfs_texture    = {{ .size = { wavelength_samples, n_layers } }};
     cmfs_buffer     = {{ .size = cmfs_texture.size().prod() * sizeof(eig::Array3f), .flags = buffer_create_flags }};
     cmfs_buffer_map = cmfs_buffer.map_as<CMFS>(buffer_access_flags);
@@ -698,15 +650,11 @@ namespace met::detail {
 
     // Multiply by sensor response distribution's Y-curve
     // which we'll generate first
-    {
-      CMFS cmfs = scene.resources.observers[scene.components.observer_i].value();
-      d *= cmfs.array().rowwise().sum();
-    }
+    CMFS cmfs = scene.resources.observers[scene.components.observer_i].value();
+    d *= cmfs.array().rowwise().sum();
 
     // Add defensive sampling for very small wavelength values
-    {
-      d += (Spec(1) - d) * 0.01f;
-    }
+    d += (Spec(1) - d) * 0.01f;
 
     wavelength_distr        = d;
     wavelength_distr_buffer = Distribution(cnt_span<float>(wavelength_distr)).to_buffer_std140();

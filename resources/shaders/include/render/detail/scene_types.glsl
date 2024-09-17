@@ -4,12 +4,12 @@
 #include <spectrum.glsl>
 
 // Define metameric's scene layout
-const uint max_supported_meshes      = MET_SUPPORTED_MESHES;
-const uint max_supported_objects     = MET_SUPPORTED_OBJECTS;
-const uint max_supported_emitters    = MET_SUPPORTED_EMITTERS;
-const uint max_supported_upliftings  = MET_SUPPORTED_UPLIFTINGS;
-const uint max_supported_constraints = MET_SUPPORTED_CONSTRAINTS;
-const uint max_supported_textures    = MET_SUPPORTED_TEXTURES;
+const uint met_max_meshes      = MET_SUPPORTED_MESHES;
+const uint met_max_objects     = MET_SUPPORTED_OBJECTS;
+const uint met_max_emitters    = MET_SUPPORTED_EMITTERS;
+const uint met_max_upliftings  = MET_SUPPORTED_UPLIFTINGS;
+const uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
+const uint met_max_textures    = MET_SUPPORTED_TEXTURES;
 
 // Info object to gather Scene::Object data
 struct ObjectInfo {

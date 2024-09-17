@@ -21,14 +21,14 @@ layout(binding = 1) uniform b_buff_sampler {
 } buff_sampler;
 layout(binding = 2) uniform b_buff_objects {
   uint n;
-  ObjectInfo data[max_supported_objects];
+  ObjectInfo data[met_max_objects];
 } buff_objects;
 layout(binding = 3) uniform b_buff_bvhs_info {
   uint n;
-  MeshInfo data[max_supported_meshes];
+  MeshInfo data[met_max_meshes];
 } buff_bvhs_info;
 layout(binding = 4) uniform b_buff_textures {
-  TextureInfo[max_supported_textures] data;
+  TextureInfo[met_max_textures] data;
 } buff_textures;
 
 // Storage buffer declarations
@@ -65,8 +65,8 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_target_4f;
 
 // Shared memory declarations
 // TODO remove
-shared ObjectInfo s_objc_info[max_supported_objects];
-shared MeshInfo   s_bvhs_info[max_supported_meshes];
+shared ObjectInfo s_objc_info[met_max_objects];
+shared MeshInfo   s_bvhs_info[met_max_meshes];
 shared uint       s_stack[gl_WorkGroupSize.x * gl_WorkGroupSize.y][16];
 
 // // Define names of scene buffers to replace preproc in intersect.glsl

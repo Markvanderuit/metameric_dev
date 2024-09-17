@@ -38,7 +38,10 @@ namespace met {
       // Get relevant resources; mostly gl-side resources
       const auto &object    = *scene.components.objects[rc.object_i()];
       const auto &uplifting = *scene.components.upliftings[object.uplifting_i];
-      const auto &object_gl = scene.components.objects.gl.objects()[rc.object_i()];
+
+      // Get object*mesh transform and ivnerse
+      auto object_trf = object.transform.affine().matrix().eval();
+      auto mesh_trf   = (object_trf * scene.resources.meshes.gl.transforms[object.mesh_i]).eval();
 
       // Assemble SurfaceInfo object
       SurfaceInfo si = { .object = object, .uplifting = uplifting  };
@@ -53,15 +56,15 @@ namespace met {
       prim.v2.tx = detail::unpack_unorm_2x16(txuv[2]);
 
       // Generate barycentric coordinates
-      eig::Vector3f pinv = (object_gl.trf_mesh_inv * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
+      eig::Vector3f pinv = (mesh_trf.inverse() * eig::Vector4f(p.x(), p.y(), p.z(), 1.f)).head<3>();
       eig::Vector3f bary = get_barycentric_coords(pinv, prim.v0.p, prim.v1.p, prim.v2.p);
 
       // Recover surface geometric data
       si.p  = bary.x() * prim.v0.p  + bary.y() * prim.v1.p  + bary.z() * prim.v2.p;
       si.n  = bary.x() * prim.v0.n  + bary.y() * prim.v1.n  + bary.z() * prim.v2.n;
       si.tx = bary.x() * prim.v0.tx + bary.y() * prim.v1.tx + bary.z() * prim.v2.tx;
-      si.p  = (object_gl.trf_mesh * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
-      si.n  = (object_gl.trf_mesh * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
+      si.p  = (mesh_trf * eig::Vector4f(si.p.x(), si.p.y(), si.p.z(), 1.f)).head<3>();
+      si.n  = (mesh_trf * eig::Vector4f(si.n.x(), si.n.y(), si.n.z(), 0.f)).head<3>();
       si.n.normalize();
 
       // Recover surface diffuse data based on underlying object material

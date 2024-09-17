@@ -42,9 +42,9 @@ namespace met {
 
     // Initialize buffers to hold packed delaunay tesselation data; these buffers are used by
     // the gen_object_data task to generate barycentric weights for the objects' textures
-    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                             .flags = buffer_create_flags });
-    info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * max_supported_constraints, .flags = buffer_create_flags });
-    info("tesselation_coef").init<gl::Buffer>({ .size = sizeof(SpecCoefLayout) * max_supported_constraints, .flags = buffer_create_flags });
+    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                              .flags = buffer_create_flags });
+    info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * detail::met_max_constraints, .flags = buffer_create_flags });
+    info("tesselation_coef").init<gl::Buffer>({ .size = sizeof(SpecCoefLayout) * detail::met_max_constraints, .flags = buffer_create_flags });
     m_tesselation_data_map = info("tesselation_data").getw<gl::Buffer>().map_as<MeshDataLayout>(buffer_access_flags).data();
     m_tesselation_pack_map = info("tesselation_pack").getw<gl::Buffer>().map_as<MeshPackLayout>(buffer_access_flags);
     m_tesselation_coef_map = info("tesselation_coef").getw<gl::Buffer>().map_as<SpecCoefLayout>(buffer_access_flags);
@@ -168,7 +168,7 @@ namespace met {
       });
 
       // Update packing layout data
-      m_tesselation_data_map->elem_offs = max_supported_constraints * m_uplifting_i;
+      m_tesselation_data_map->elem_offs = detail::met_max_constraints * m_uplifting_i;
       m_tesselation_data_map->elem_size = m_tesselation.elems.size();
 
       // Get writeable buffers and flush changes
