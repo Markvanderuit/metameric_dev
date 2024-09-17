@@ -11,16 +11,29 @@ namespace met::detail {
   constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
   constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
 
+  // Packed BVH node data
+  struct NodePack {
+    uint aabb_pack_0;                 // lo.x, lo.y
+    uint aabb_pack_1;                 // hi.x, hi.y
+    uint aabb_pack_2;                 // lo.z, hi.z
+    uint data_pack;                   // leaf | size | offs
+    std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
+    std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
+  };
+  static_assert(sizeof(NodePack) == 64);
+
   // Helper method to pack BVH node data tightly
-  SceneGLType<met::Mesh>::NodePack pack(const BVH::Node &node) {
+  NodePack pack(const BVH::Node &node) {
     // Obtain a merger of the child bounding boxes
     constexpr auto merge = [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
       return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
     };
-    auto aabb = rng::fold_left_first(node.child_aabb.begin(), 
-                                     node.child_aabb.begin() + node.size(), merge).value();
 
-    SceneGLType<met::Mesh>::NodePack p;
+    auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), merge); //.value();
+    // auto aabb = rng::fold_left_first(node.child_aabb.begin(), 
+    //                                  node.child_aabb.begin() + node.size(), merge).value();
+
+    NodePack p;
 
     // 3xu32 packs AABB lo, ex
     auto b_lo_in = aabb.minb;
@@ -216,10 +229,10 @@ namespace met::detail {
     // Uniform layout which includes nr. of active components
     struct EmitterUniformBufferLayout {
       alignas(4)   uint n;
-      EmitterInfoLayout data[max_supported_objects];
+      EmitterInfoLayout data[max_supported_emitters];
     };
     
-    // Preallocate up to a number of meshes
+    // Preallocate up to a number of objects
     emitter_info = {{ .size  = sizeof(EmitterUniformBufferLayout),
                       .flags = buffer_create_flags }};
     
@@ -228,7 +241,7 @@ namespace met::detail {
     m_info_map_size = &map->n;
     m_info_map_data = map->data;
 
-    // Same for envmpa data
+    // Same for envmap data
     emitter_envm_info = {{ .size  = sizeof(EmitterInfoLayout),
                            .flags = buffer_create_flags }};
     m_envm_map_data = emitter_envm_info.map_as<EmitterEnvmapInfoLayout>(buffer_access_flags).data();
@@ -487,16 +500,31 @@ namespace met::detail {
     mesh_info.flush();
   }
 
+  SceneGLType<met::Image>::SceneGLType() {
+    met_trace_full();
+
+    // Uniform layout which includes nr. of active components
+    struct TextureUniformBufferLayout {
+      alignas(4)   uint n;
+      TextureInfoLayout data[max_supported_textures];
+    };
+
+    // Preallocate up to a number of objects
+    texture_info = {{ .size  = sizeof(TextureUniformBufferLayout),
+                      .flags = buffer_create_flags }};
+
+    // Obtain writeable, flushable mapping of nr. of components and individual data
+    auto *map = texture_info.map_as<TextureUniformBufferLayout>(buffer_access_flags).data();
+    m_info_map_size = &map->n;
+    m_info_map_data = map->data;
+  }
+
   void SceneGLType<met::Image>::update(const Scene &scene) {
     met_trace_full();
     
     const auto &images = scene.resources.images;
-
-    guard(!images.empty());
-    guard(scene.resources.images || scene.components.settings.state.texture_size);
-
-    // Get texture settings, which are relevant
     const auto &e_settings = scene.components.settings.value;
+    guard(!images.empty() && (scene.resources.images || scene.components.settings.state.texture_size));
 
     // Keep track of which atlas' position a texture needs to be stuffed in
     std::vector<uint> indices(images.size(), std::numeric_limits<uint>::max());
@@ -507,55 +535,53 @@ namespace met::detail {
       const auto &[img, state] = images[i];
       bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
 
-      indices[i] = is_3f 
-                 ? inputs_3f.size() 
-                 : inputs_1f.size();
+      indices[i] = is_3f ? inputs_3f.size() : inputs_1f.size();
       
       if (is_3f) inputs_3f.push_back(img.size());
       else       inputs_1f.push_back(img.size());
     } // for (uint i)
 
     // Determine maximum texture sizes, and texture scaling necessary to uphold size settings
-    eig::Array2u maximal_3f = rng::fold_left(inputs_3f, eig::Array2u(0), 
-      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u maximal_1f = rng::fold_left(inputs_1f, eig::Array2u(0), 
-      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
-    eig::Array2u clamped_3f = e_settings.apply_texture_size(maximal_3f);
-    eig::Array2u clamped_1f = e_settings.apply_texture_size(maximal_1f);
-    eig::Array2f scaled_3f  = clamped_3f.cast<float>() / maximal_3f.cast<float>();
-    eig::Array2f scaled_1f  = clamped_1f.cast<float>() / maximal_1f.cast<float>();
+    eig::Array2u max_3f = rng::fold_left(inputs_3f, eig::Array2u(0), eig::cwiseMax<eig::Array2u>);
+    eig::Array2u max_1f = rng::fold_left(inputs_1f, eig::Array2u(0), eig::cwiseMax<eig::Array2u>);
+    eig::Array2f mul_3f = e_settings.apply_texture_size(max_3f).cast<float>() / max_3f.cast<float>();
+    eig::Array2f mul_1f = e_settings.apply_texture_size(max_1f).cast<float>() / max_1f.cast<float>();
 
-    // Scale input sizes by appropriate texture scaling
-    for (auto &input : inputs_3f)
-      input = (input.cast<float>() * scaled_3f).max(1.f).cast<uint>().eval();
-    for (auto &input : inputs_1f)
-      input = (input.cast<float>() * scaled_1f).max(1.f).cast<uint>().eval();
+    // Scale input sizes by appropriate scaling
+    rng::transform(inputs_3f, inputs_3f.begin(), 
+      [mul_3f](const auto &v) { return (v.cast<float>() * mul_3f).max(1.f).cast<uint>().eval(); });
+    rng::transform(inputs_1f, inputs_1f.begin(), 
+      [mul_1f](const auto &v) { return (v.cast<float>() * mul_1f).max(1.f).cast<uint>().eval(); });
 
     // Rebuild texture atlases with mips
-    // texture_atlas_3f = {{ .sizes = inputs_3f, .levels = 1 + clamped_3f.log2().maxCoeff() }};
-    // texture_atlas_1f = {{ .sizes = inputs_1f, .levels = 1 + clamped_1f.log2().maxCoeff() }};
     texture_atlas_3f = {{ .sizes = inputs_3f, .levels = 1 }};
     texture_atlas_1f = {{ .sizes = inputs_1f, .levels = 1 }};
 
-    std::vector<TextureInfoLayout> info(images.size());
+    // Set appropriate component count, then flush change to buffer
+    *m_info_map_size = static_cast<uint>(images.size());
+    texture_info.flush(sizeof(uint));
+
     for (uint i = 0; i < images.size(); ++i) {
       const auto &[img, state] = images[i];
 
       // Load patch from appropriate atlas (3f or 1f)
       bool is_3f = img.pixel_frmt() == Image::PixelFormat::eRGB;
-      auto size  = is_3f ? texture_atlas_3f.capacity() 
-                         : texture_atlas_1f.capacity();
-      auto resrv = is_3f ? texture_atlas_3f.patch(indices[i])
-                         : texture_atlas_1f.patch(indices[i]);
+      auto size  = is_3f ? texture_atlas_3f.capacity() : texture_atlas_1f.capacity();
+      auto resrv = is_3f ? texture_atlas_3f.patch(indices[i]) : texture_atlas_1f.patch(indices[i]);
 
       // Determine UV coordinates of the texture inside the full atlas
       eig::Array2f uv0 = resrv.offs.cast<float>() / size.head<2>().cast<float>(),
                    uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
 
-      // Fill in info object
-      info[i] = { .is_3f = is_3f,      .layer = resrv.layer_i,
-                  .offs  = resrv.offs, .size  = resrv.size,
-                  .uv0   = uv0,        .uv1   = uv1 };
+      // Fill in info object in mapped buffer
+      m_info_map_data[i] = { .is_3f = is_3f,      .layer = resrv.layer_i,
+                             .offs  = resrv.offs, .size  = resrv.size,
+                             .uv0   = uv0,        .uv1   = uv1 };
+
+      // Flush change to buffer; most changes to objects are local,
+      // so we flush specific regions instead of the whole
+      texture_info.flush(sizeof(TextureInfoLayout), 
+                         sizeof(TextureInfoLayout) * i + sizeof(uint) * 4);
 
       // Get a resampled float representation of image data
       auto imgf = img.convert({ .resize_to  = resrv.size,
@@ -574,12 +600,11 @@ namespace met::detail {
       }
     } // for (uint i)
 
-    // Fill in mip data using OpenGL's base functions
-    if (texture_atlas_3f.texture().is_init()) texture_atlas_3f.texture().generate_mipmaps();
-    if (texture_atlas_1f.texture().is_init()) texture_atlas_1f.texture().generate_mipmaps();
-
-    // Push layout data
-    texture_info = {{ .data = cnt_span<const std::byte>(info) }};
+    // Fill in mip data
+    if (texture_atlas_3f.texture().is_init()) 
+      texture_atlas_3f.texture().generate_mipmaps();
+    if (texture_atlas_1f.texture().is_init()) 
+      texture_atlas_1f.texture().generate_mipmaps();
   }
 
   SceneGLType<met::Spec>::SceneGLType() {

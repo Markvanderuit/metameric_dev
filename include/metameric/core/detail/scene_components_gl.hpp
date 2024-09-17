@@ -134,19 +134,8 @@ namespace met::detail {
   // Handles packed mesh buffers, bvh buffers, and info to unpack
   // said buffers shader-side
   template <>
-  struct SceneGLType<met::Mesh> {
-    // Packed BVH struct data
-    // No unpacked representation available
-    struct NodePack {
-      uint aabb_pack_0;                 // lo.x, lo.y
-      uint aabb_pack_1;                 // hi.x, hi.y
-      uint aabb_pack_2;                 // lo.z, hi.z
-      uint data_pack;                   // leaf | size | offs
-      std::array<uint, 8> child_pack_0; // per child: lo.x | lo.y | hi.x | hi.y
-      std::array<uint, 4> child_pack_1; // per child: lo.z | hi.z
-    };
-    static_assert(sizeof(NodePack) == 64);
-
+  class SceneGLType<met::Mesh> {
+    // Mesh layout data
     struct MeshInfoLayout {
       alignas(16) eig::Matrix4f trf; // Model packing transform
 
@@ -178,8 +167,8 @@ namespace met::detail {
 
     // Packed mesh data, used in gen_object_data and miscellaneous operations
     gl::Buffer mesh_verts; // Mesh vertices; packed position, normal, and reparameterized texture uvs
-    gl::Buffer mesh_elems; // Mesh elements/indexes
-    gl::Buffer mesh_txuvs; // Original texture coordinates, kept around for spectral texture baking
+    gl::Buffer mesh_elems; // Mesh elements
+    gl::Buffer mesh_txuvs; // Original (unreparameterized) texture coordinates, kept for baking
 
     // Packed BVH data, used during render/query operations
     gl::Buffer bvh_nodes;
@@ -198,13 +187,11 @@ namespace met::detail {
     
     // Cache of mesh transforms, pre-applied to object transforms
     std::vector<eig::Matrix4f> transforms;
+    
   public:
     SceneGLType();
-    void update(const Scene &);
 
-  public:
-    std::span<const met::Mesh> meshes() const { return m_meshes; }
-    std::span<const met::BVH>  bvhs() const { return m_bvhs; }
+    void update(const Scene &);
   };
   
   // GL-side texture data
@@ -212,12 +199,16 @@ namespace met::detail {
   // as well as information on how to access the corresponding texture atlas regions.
   template <>
   class SceneGLType<met::Image> {
-    struct TextureInfoLayout {
-      alignas(4) bool         is_3f;
-      alignas(4) uint         layer;
-      alignas(8) eig::Array2u offs, size;
-      alignas(8) eig::Array2f uv0, uv1;
+    struct alignas(16) TextureInfoLayout {
+      alignas(4)  bool         is_3f;
+      alignas(4)  uint         layer;
+      alignas(8)  eig::Array2u offs, size;
+      alignas(8)  eig::Array2f uv0, uv1;
     };
+
+    // Mapped nr. of textures and texture data
+    uint*                        m_info_map_size;
+    std::span<TextureInfoLayout> m_info_map_data;
 
   public:
     // This buffer contains offsets/sizes, ergo layout info necessary to
@@ -231,6 +222,8 @@ namespace met::detail {
     TextureAtlas<float, 1> texture_atlas_1f;
   
   public:
+    SceneGLType();
+    
     void update(const Scene &);
   };
   

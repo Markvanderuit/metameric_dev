@@ -23,10 +23,7 @@ layout(location = 0) out uvec4 out_coeffs; // Per fragment MESE representations 
 layout(binding = 0) restrict readonly buffer b_buff_atlas {
   AtlasLayout data[];
 } buff_atlas;
-layout(binding = 1) restrict readonly buffer b_buff_textures {
-  TextureInfo[] data;
-} buff_textures;
-layout(binding = 2) restrict readonly buffer b_buff_uplift_coef { 
+layout(binding = 1) restrict readonly buffer b_buff_uplift_coef { 
   float[max_supported_constraints][4][wavelength_bases] data;
 } buff_uplift_coef;
 
@@ -46,6 +43,10 @@ layout(binding = 3) uniform b_buff_objects {
   uint n;
   ObjectInfo data[max_supported_objects];
 } buff_objects;
+layout(binding = 4) uniform b_buff_textures {
+  uint n;
+  TextureInfo data[max_supported_textures];
+} buff_textures;
 
 // Image/sampler declarations
 layout(binding = 0) uniform sampler2DArray b_txtr_3f;

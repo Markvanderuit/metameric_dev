@@ -30,7 +30,7 @@ layout(binding = 2) uniform b_buff_meshes {
 } buff_meshes;
 layout(binding = 3) uniform b_buff_emitters {
   uint n;
-  EmitterInfo data[max_supported_objects];
+  EmitterInfo data[max_supported_emitters];
 } buff_emitters;
 layout(binding = 4) uniform b_buff_envmap_info {
   bool envm_is_present;
@@ -50,7 +50,7 @@ layout(binding = 2) restrict coherent buffer b_buff_output {
 
 // Shared memory declarations
 shared ObjectInfo  s_objc_info[max_supported_objects];
-shared EmitterInfo s_emtr_info[max_supported_objects];
+shared EmitterInfo s_emtr_info[max_supported_emitters];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
 
 declare_scene_traversal_stack(8); 

@@ -46,7 +46,7 @@ layout(binding = 3) uniform b_buff_meshes {
 } buff_meshes;
 layout(binding = 4) uniform b_buff_emitters {
   uint n;
-  EmitterInfo data[max_supported_objects];
+  EmitterInfo data[max_supported_emitters];
 } buff_emitters;
 layout(binding = 5) restrict readonly buffer b_buff_coeffs {
   BarycentricInfo data[max_supported_objects];
@@ -79,7 +79,7 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film,
 
 // Shared memory declarations
 shared ObjectInfo      s_objc_info[max_supported_objects];
-shared EmitterInfo     s_emtr_info[max_supported_objects];
+shared EmitterInfo     s_emtr_info[max_supported_emitters];
 shared BarycentricInfo s_bary_info[max_supported_objects];
 shared MeshInfo        s_mesh_info[max_supported_meshes];
 

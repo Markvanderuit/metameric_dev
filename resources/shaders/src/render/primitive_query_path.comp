@@ -22,8 +22,6 @@ layout(std430) buffer;
 layout(constant_id = 1) const uint max_depth = 4; // Maximum path depth
 
 // Uniform buffer declarations
-
-// Uniform buffer declarations
 layout(binding = 0) uniform b_buff_query {
   uint spp;
 } buff_query;
@@ -85,7 +83,7 @@ layout(binding = 3) uniform usampler2DArray b_coef_4f; // Warp data for spectral
 
 // Shared memory declarations
 shared ObjectInfo      s_objc_info[max_supported_objects];
-shared EmitterInfo     s_emtr_info[max_supported_objects];
+shared EmitterInfo     s_emtr_info[max_supported_emitters];
 shared BarycentricInfo s_bary_info[max_supported_objects];
 shared MeshInfo        s_mesh_info[max_supported_meshes];
 

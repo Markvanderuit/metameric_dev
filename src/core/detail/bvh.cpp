@@ -175,8 +175,8 @@ namespace met {
 
         // Store leaf offset and count
         // and set flag bit to indicate that node is indeed a leaf
-        node.offs_data  = static_cast<uint>(bvh.prims.size()) | BVH::Node::leaf_flag_bit;
-        node.size_data  = static_cast<uint>(prims.size());
+        node.offs_data = static_cast<uint>(bvh.prims.size()) | 0x80000000u;
+        node.size_data = static_cast<uint>(prims.size());
         
         // Store processed primitives in BVH
         rng::copy(prims, std::back_inserter(bvh.prims));
@@ -198,7 +198,6 @@ namespace met {
     using FTy = BVH(*)(BVHCreateInternalInfo);
     constexpr FTy f[] = { create_bvh_internal<Ks>... };
     return f[0](info);
-    // return f[std::min(info.n_node_children, 8u) >> 2](info);
   }
 
   BVH create_bvh(BVHCreateMeshInfo info) {

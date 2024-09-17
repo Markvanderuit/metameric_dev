@@ -43,11 +43,12 @@ layout(binding = 3) uniform b_buff_meshes {
   MeshInfo data[max_supported_meshes];
 } buff_meshes;
 layout(binding = 4) uniform b_buff_textures {
+  uint n;
   TextureInfo data[max_supported_textures];
 } buff_textures;
 layout(binding = 5) uniform b_buff_emitters {
   uint n;
-  EmitterInfo data[max_supported_objects];
+  EmitterInfo data[max_supported_emitters];
 } buff_emitters;
 layout(binding = 6) uniform b_buff_wvls_distr {
   float func_sum;
@@ -75,7 +76,7 @@ layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film,
 
 // Shared memory declarations
 shared ObjectInfo  s_objc_info[max_supported_objects];
-shared EmitterInfo s_emtr_info[max_supported_objects];
+shared EmitterInfo s_emtr_info[max_supported_emitters];
 shared MeshInfo    s_mesh_info[max_supported_meshes];
 
 // Traversal stack lives in shared memory

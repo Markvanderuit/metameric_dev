@@ -22,12 +22,14 @@ layout(location = 0) out vec4 out_value_colr;
 layout(binding = 0) uniform b_unif_camera {
   mat4 trf;
 } unif_camera;
-layout(binding = 0) restrict readonly buffer b_buff_objects {
-  ObjectInfo[] data;
-} buff_objects;
-layout(binding = 1) restrict readonly buffer b_buff_textures {
-  TextureInfo[] data;
+layout(binding = 1) uniform b_buff_textures {
+  uint n;
+  TextureInfo data[max_supported_textures];
 } buff_textures;
+layout(binding = 2) uniform b_buff_objects {
+  uint n;
+  ObjectInfo[max_supported_objects] data;
+} buff_objects;
 
 // Sampler declarations
 layout(binding = 1) uniform sampler2DArray b_txtr_1f;

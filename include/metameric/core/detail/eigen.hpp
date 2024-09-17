@@ -144,6 +144,12 @@ namespace Eigen {
     }).eval();
   }
 
+  // Usable cwiseMax/cwiseMin functions for algorithms/ranges ops/projs
+  template <typename T> requires(is_approx_comparable<T>)
+  T cwiseMax(const T &a, const T &b) { return a.cwiseMax(b).eval(); }
+  template <typename T> requires(is_approx_comparable<T>)
+  T cwiseMin(const T &a, const T &b) { return a.cwiseMin(b).eval(); }
+
   /* Define useful integer types */
 
   using Array1us = Array<unsigned short, 1, 1>;
