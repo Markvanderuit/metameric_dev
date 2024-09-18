@@ -17,11 +17,6 @@ layout(binding = 0) uniform b_buff_sensor {
   mat4  view_trf;
   uvec2 film_size; 
 } buff_sensor;
-layout(binding = 1) uniform b_buff_wvls_distr {
-  float func_sum;
-  float func[wavelength_samples];
-  float cdf[wavelength_samples + 1];
-} buff_wvls_distr;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_paths { 
@@ -53,6 +48,5 @@ void main() {
                              buff_paths.data[path_i].L);
 
   // Generate output vertex position
-  gl_Position = buff_sensor.full_trf 
-              * vec4(buff_paths.data[path_i].data[vert_i].p, 1);
+  gl_Position = buff_sensor.full_trf * vec4(buff_paths.data[path_i].data[vert_i].p, 1);
 }

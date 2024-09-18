@@ -60,6 +60,7 @@ namespace met::detail {
   class IntegrationRenderPrimitive : public BaseRenderPrimitive {
     constexpr static uint sampler_state_size = 6;
     
+    // Struct storing sampler state; modified across frames to count which sample is next
     struct SamplerState {
       alignas(4) uint spp_per_iter;
       alignas(4) uint spp_curr;
@@ -73,12 +74,17 @@ namespace met::detail {
     std::array<gl::sync::Fence, sampler_state_size> m_sampler_state_syncs;
     uint                                            m_sampler_state_i;
 
+    // Buffer storing CDF for wavelength sampling at path start
+    Spec m_wavelength_distr;
+    gl::Buffer m_wavelength_distr_buffer;
+
   protected:
     virtual const gl::Texture2d4f &render(const Sensor &sensor, const Scene &scene) override; // default-implemented
     virtual void reset(const Sensor &sensor, const Scene &scene) override;
 
     void advance_sampler_state();
     const gl::Buffer &get_sampler_state();
+    const gl::Buffer &get_wavelength_distr() { return m_wavelength_distr_buffer; }
 
     uint m_iter;
     uint m_spp_max;

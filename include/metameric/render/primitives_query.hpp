@@ -23,7 +23,7 @@ namespace met {
   
   // Primitive to query light transport along a single ray and get information
   // on each path
-  struct PathQueryPrimitive : public detail::BaseQueryPrimitive {
+  class PathQueryPrimitive : public detail::BaseQueryPrimitive {
     ResourceHandle m_cache_handle;
     std::string    m_cache_key; 
     uint           m_max_depth;
@@ -36,6 +36,10 @@ namespace met {
     // Internal GL objects
     gl::Sampler m_sampler; // linear sampler
     
+    // Buffer storing CDF for wavelength sampling at path start
+    Spec m_wavelength_distr;
+    gl::Buffer m_wavelength_distr_buffer;
+
   public:
     using InfoType = PathQueryPrimitiveInfo;
 

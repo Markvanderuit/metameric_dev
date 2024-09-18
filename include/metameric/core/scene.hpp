@@ -107,7 +107,7 @@ namespace met {
     
   public:
     // Extract a specific uplifting vertex, given indices;
-    // supplied here given the common cumbersomeness of deep access
+    // added here given the common cumbersomeness of deep access
     const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const {
       return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
     }

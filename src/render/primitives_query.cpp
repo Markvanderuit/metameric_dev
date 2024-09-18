@@ -1,3 +1,4 @@
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_query.hpp>
 
@@ -46,6 +47,42 @@ namespace met {
       m_output_data_map = cast_span<PathRecord>(map.subspan(4 * sizeof(uint)));
     }
 
+    // (Re)generate sampling distribution for wavelengths
+    bool rebuild_wavelength_distr 
+      = !m_wavelength_distr_buffer.is_init() 
+      || scene.components.observer_i
+      || scene.resources.observers
+      || scene.resources.illuminants; 
+    if (rebuild_wavelength_distr) {
+      // Get scene observer, and list of (scaled) active emitter SPDs in the scene
+      CMFS observer = *scene.resources.observers[*scene.components.observer_i];
+      auto emitters = scene.components.emitters
+                    | vws::filter([](const auto &comp) { return comp.value.is_active; });
+      auto illums = emitters
+                  | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i; })
+                  | vws::transform([&](uint i) { return *scene.resources.illuminants[i];   })
+                  | rng::to<std::vector>();
+      auto scales = emitters
+                  | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
+                  | rng::to<std::vector>();
+  
+      // Generate average over scaled distributions
+      m_wavelength_distr = 1.f;
+      if (!illums.empty()) {
+        m_wavelength_distr = 0.f;
+        for (uint i = 0; i < illums.size(); ++i)
+          m_wavelength_distr += illums[i] * scales[i];
+      }
+      m_wavelength_distr /= m_wavelength_distr.maxCoeff();
+
+      // Scale by observer, then add defensive sampling for very small values
+      m_wavelength_distr *= observer.array().rowwise().sum();
+      m_wavelength_distr += (Spec(1) - m_wavelength_distr) * 0.01f;
+      
+      // Push sampling distribution to buffer
+      m_wavelength_distr_buffer = Distribution(cnt_span<float>(m_wavelength_distr)).to_buffer_std140();
+    }
+
     // Clear output data, specifically the buffer's head
     eig::Array4f clear_value = 0.f;
     m_output.clear(obj_span<const std::byte>(clear_value), 1u, sizeof(decltype(clear_value)));
@@ -65,7 +102,7 @@ namespace met {
     program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
     program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_coeffs",         scene.components.upliftings.gl.texture_coefficients.buffer()); 
-    program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
+    program.bind("b_buff_wvls_distr",     m_wavelength_distr_buffer);
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture());
@@ -76,11 +113,6 @@ namespace met {
     program.bind("b_cmfs_3f",             m_sampler);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     program.bind("b_illm_1f",             m_sampler);
-    /* if (!scene.resources.images.empty()) {
-      program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      program.bind("b_txtr_1f",       scene.resources.images.gl.texture_atlas_1f.texture());
-      program.bind("b_txtr_3f",       scene.resources.images.gl.texture_atlas_3f.texture());
-    } */
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);

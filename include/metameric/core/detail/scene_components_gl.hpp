@@ -236,21 +236,6 @@ namespace met::detail {
   };
   
   // Template specialization of SceneGLHandler.
-  // Handles shader-side information about color system sampling
-  template <>
-  struct SceneGLHandler<met::ColorSystem> : public SceneGLHandlerBase {
-    Spec       wavelength_distr;
-    gl::Buffer wavelength_distr_buffer;
-
-  public:
-    // Class constructor
-    SceneGLHandler();
-
-    // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
-  };
-  
-  // Template specialization of SceneGLHandler.
   // Handles shader-side per-wavelength access of illuminant spectral data.
   template <>
   class SceneGLHandler<met::Spec> : public SceneGLHandlerBase {

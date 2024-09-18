@@ -282,10 +282,9 @@ namespace met {
     m_fbo.bind();
     m_vao.bind();
     m_program.bind();
-    m_program.bind("b_buff_sensor",     e_sensor.buffer());
-    m_program.bind("b_buff_paths",      e_query.output());
-    m_program.bind("b_buff_wvls_distr", e_scene.components.colr_systems.gl.wavelength_distr_buffer);
-    m_program.bind("b_cmfs_3f",         e_scene.resources.observers.gl.cmfs_texture);
+    m_program.bind("b_buff_sensor", e_sensor.buffer());
+    m_program.bind("b_buff_paths",  e_query.output());
+    m_program.bind("b_cmfs_3f",     e_scene.resources.observers.gl.cmfs_texture);
 
     uint n_dispatch = 2 
                     * PathRecord::path_max_depth

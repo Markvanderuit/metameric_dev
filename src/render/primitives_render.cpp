@@ -1,3 +1,4 @@
+#include <metameric/core/distribution.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
@@ -36,6 +37,37 @@ namespace met {
       m_sampler_state_mapps[m_sampler_state_i]->pixel_checkerboard = m_pixel_checkerboard;
       m_sampler_state_buffs[m_sampler_state_i].flush();
       m_sampler_state_syncs[m_sampler_state_i] = gl::sync::Fence(gl::sync::time_s(1));
+
+      // Generate sampling distribution for wavelengths
+      {
+        // Get scene observer, and list of (scaled) active emitter SPDs in the scene
+        CMFS observer = *scene.resources.observers[*scene.components.observer_i];
+        auto emitters = scene.components.emitters
+                      | vws::filter([](const auto &comp) { return comp.value.is_active; });
+        auto illums = emitters
+                    | vws::transform([ ](const auto &comp) { return comp.value.illuminant_i; })
+                    | vws::transform([&](uint i) { return *scene.resources.illuminants[i];   })
+                    | rng::to<std::vector>();
+        auto scales = emitters
+                    | vws::transform([](const auto &comp) { return comp.value.illuminant_scale; })
+                    | rng::to<std::vector>();
+    
+        // Generate average over scaled distributions
+        m_wavelength_distr = 1.f;
+        if (!illums.empty()) {
+          m_wavelength_distr = 0.f;
+          for (uint i = 0; i < illums.size(); ++i)
+            m_wavelength_distr += illums[i] * scales[i];
+        }
+        m_wavelength_distr /= m_wavelength_distr.maxCoeff();
+
+        // Scale by observer, then add defensive sampling for very small values
+        m_wavelength_distr *= observer.array().rowwise().sum();
+        m_wavelength_distr += (Spec(1) - m_wavelength_distr) * 0.01f;
+      }
+      
+      // Push sampling distribution to buffer
+      m_wavelength_distr_buffer = Distribution(cnt_span<float>(m_wavelength_distr)).to_buffer_std140();
     }
 
     void IntegrationRenderPrimitive::advance_sampler_state() {
@@ -303,7 +335,7 @@ namespace met {
     program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
     program.bind("b_buff_coeffs",         scene.components.upliftings.gl.texture_coefficients.buffer());
-    program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
+    program.bind("b_buff_wvls_distr",     get_wavelength_distr());
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
     program.bind("b_bsis_1f",             m_sampler);
@@ -313,14 +345,7 @@ namespace met {
     program.bind("b_cmfs_3f",             m_sampler);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     program.bind("b_illm_1f",             m_sampler);
-
-    /* if (!scene.resources.images.empty()) {
-      program.bind("b_buff_textures", scene.resources.images.gl.texture_info);
-      if (scene.resources.images.gl.texture_atlas_1f.texture().is_init())
-        program.bind("b_txtr_1f", scene.resources.images.gl.texture_atlas_1f.texture());
-      if (scene.resources.images.gl.texture_atlas_3f.texture().is_init())
-        program.bind("b_txtr_3f", scene.resources.images.gl.texture_atlas_3f.texture());
-    } */
+    
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
@@ -430,7 +455,7 @@ namespace met {
     program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
     program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
-    program.bind("b_buff_wvls_distr",     scene.components.colr_systems.gl.wavelength_distr_buffer);
+    program.bind("b_buff_wvls_distr",     get_wavelength_distr());
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
     program.bind("b_illm_3f",             m_illm_colr_texture);
     program.bind("b_illm_3f",             m_sampler);
