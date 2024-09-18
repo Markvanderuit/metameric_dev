@@ -156,7 +156,6 @@ namespace met {
             // for this combobox
             auto combo_str = to_capital(std::format("{}", vert.constraint));
             if (ImGui::BeginCombo("##constraint_type", combo_str.c_str())) {
-
               vert.constraint | visit_types([&](auto default_v, bool holds_alternative) {
                 auto selectable_str = to_capital(std::format("{}", default_v));
                 if (ImGui::Selectable(selectable_str.c_str(), holds_alternative) && !holds_alternative)

@@ -64,7 +64,7 @@ namespace met::detail {
     return p;
   }
 
-  SceneGLType<met::Object>::SceneGLType() {
+  SceneGLHandler<met::Object>::SceneGLHandler() {
     met_trace_full();
 
     // Preallocate up to a number of objects and obtain writeable/flushable mapping
@@ -72,7 +72,7 @@ namespace met::detail {
     m_object_info_map = object_info.map_as<BufferLayout>(buffer_access_flags).data();
   }
 
-  void SceneGLType<met::Object>::update(const Scene &scene) {
+  void SceneGLHandler<met::Object>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &objects = scene.components.objects;
@@ -114,7 +114,7 @@ namespace met::detail {
     } // for (uint i)
   }
 
-  SceneGLType<met::Uplifting>::SceneGLType() {
+  SceneGLHandler<met::Uplifting>::SceneGLHandler() {
     met_trace_full();
 
     // Initialize texture atlas to hold per-object coefficients
@@ -129,7 +129,7 @@ namespace met::detail {
                       .data = cnt_span<const float>(warp_data) }};
   }
 
-  void SceneGLType<met::Uplifting>::update(const Scene &scene) {
+  void SceneGLHandler<met::Uplifting>::update(const Scene &scene) {
     met_trace_full();
 
     // Get relevant resources
@@ -201,7 +201,7 @@ namespace met::detail {
     }
   }
 
-  SceneGLType<met::Emitter>::SceneGLType() {
+  SceneGLHandler<met::Emitter>::SceneGLHandler() {
     met_trace_full();
 
     // Uniform layout which includes nr. of active components
@@ -219,7 +219,7 @@ namespace met::detail {
     m_envm_info_data = emitter_envm_info.map_as<EnvBufferLayout>(buffer_access_flags).data();
   }
 
-  void SceneGLType<met::Emitter>::update(const Scene &scene) {
+  void SceneGLHandler<met::Emitter>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &emitters = scene.components.emitters;
@@ -298,7 +298,7 @@ namespace met::detail {
     emitter_envm_info.flush();
   }
 
-  SceneGLType<met::Mesh>::SceneGLType() {
+  SceneGLHandler<met::Mesh>::SceneGLHandler() {
     met_trace_full();
 
     // Preallocate up to a number of meshes and obtain writeable/flushable mapping
@@ -306,7 +306,7 @@ namespace met::detail {
     m_mesh_info_map = mesh_info.map_as<MeshBufferLayout>(buffer_access_flags).data();
   }
 
-  void SceneGLType<met::Mesh>::update(const Scene &scene) {
+  void SceneGLHandler<met::Mesh>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &meshes = scene.resources.meshes;
@@ -459,7 +459,7 @@ namespace met::detail {
     mesh_info.flush();
   }
 
-  SceneGLType<met::Image>::SceneGLType() {
+  SceneGLHandler<met::Image>::SceneGLHandler() {
     met_trace_full();
 
     // Uniform layout which includes nr. of active components
@@ -473,7 +473,7 @@ namespace met::detail {
     m_texture_info_map = texture_info.map_as<BufferLayout>(buffer_access_flags).data();
   }
 
-  void SceneGLType<met::Image>::update(const Scene &scene) {
+  void SceneGLHandler<met::Image>::update(const Scene &scene) {
     met_trace_full();
     
     const auto &images = scene.resources.images;
@@ -560,7 +560,7 @@ namespace met::detail {
       texture_atlas_1f.texture().generate_mipmaps();
   }
 
-  SceneGLType<met::Spec>::SceneGLType() {
+  SceneGLHandler<met::Spec>::SceneGLHandler() {
     met_trace_full();
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     spec_texture    = {{ .size = { wavelength_samples, n_layers } }};
@@ -568,7 +568,7 @@ namespace met::detail {
     spec_buffer_map = spec_buffer.map_as<Spec>(buffer_access_flags);
   }
 
-  void SceneGLType<met::Spec>::update(const Scene &scene) {
+  void SceneGLHandler<met::Spec>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &illuminants = scene.resources.illuminants;
@@ -584,7 +584,7 @@ namespace met::detail {
     spec_texture.set(spec_buffer);
   }
 
-  SceneGLType<met::CMFS>::SceneGLType() {
+  SceneGLHandler<met::CMFS>::SceneGLHandler() {
     met_trace_full();
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     cmfs_texture    = {{ .size = { wavelength_samples, n_layers } }};
@@ -592,7 +592,7 @@ namespace met::detail {
     cmfs_buffer_map = cmfs_buffer.map_as<CMFS>(buffer_access_flags);
   }
 
-  void SceneGLType<met::CMFS>::update(const Scene &scene) {
+  void SceneGLHandler<met::CMFS>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &observers = scene.resources.observers;
@@ -612,12 +612,12 @@ namespace met::detail {
     cmfs_texture.set(cmfs_buffer);
   }
 
-  SceneGLType<met::ColorSystem>::SceneGLType() {
+  SceneGLHandler<met::ColorSystem>::SceneGLHandler() {
     met_trace_full();
     // ...
   }
 
-  void SceneGLType<met::ColorSystem>::update(const Scene &scene) {
+  void SceneGLHandler<met::ColorSystem>::update(const Scene &scene) {
     met_trace_full();
 
     const auto &colr_systems = scene.components.colr_systems;

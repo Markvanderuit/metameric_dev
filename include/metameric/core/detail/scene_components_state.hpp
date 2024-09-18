@@ -3,94 +3,84 @@
 #include <metameric/core/components.hpp>
 
 namespace met::detail {
-  /* Overload of ComponentState for Object */
-  struct ObjectState : public detail::ComponentStateBase<Object> {
-    using Base = Object;
-    using ComponentStateBase<Base>::m_mutated;
-    
-    detail::ComponentState<decltype(Base::is_active)>    is_active;
-    detail::ComponentState<decltype(Base::transform)>    transform;
-    detail::ComponentState<decltype(Base::mesh_i)>       mesh_i;
-    detail::ComponentState<decltype(Base::uplifting_i)>  uplifting_i;
-    detail::ComponentState<decltype(Base::diffuse)>      diffuse;
-    /* detail::ComponentState<decltype(Base::normals)>      normals;
-    detail::ComponentState<decltype(Base::roughness)>    roughness;
-    detail::ComponentState<decltype(Base::metallic)>     metallic;
-    detail::ComponentState<decltype(Base::opacity)>      opacity; */
+  // Template specialization of SceneStateHandler that exposes specific state
+  // for the members of met::Object.
+  template <>
+  struct SceneStateHandler<Object> : public SceneStateHandlerBase<Object> {    
+    SceneStateHandler<decltype(Object::is_active)>   is_active;
+    SceneStateHandler<decltype(Object::transform)>   transform;
+    SceneStateHandler<decltype(Object::mesh_i)>      mesh_i;
+    SceneStateHandler<decltype(Object::uplifting_i)> uplifting_i;
+    SceneStateHandler<decltype(Object::diffuse)>     diffuse;
 
   public:
-    virtual
-    bool update(const Base &o) override {
-      return m_mutated = (
-        is_active.update(o.is_active)     |
-        transform.update(o.transform)     |
-        mesh_i.update(o.mesh_i)           |
-        uplifting_i.update(o.uplifting_i) |
-        diffuse.update(o.diffuse)         /* |
-        roughness.update(o.roughness)     |
-        metallic.update(o.metallic)       |
-        opacity.update(o.opacity)         |
-        normals.update(o.normals) */
+    bool update(const Object &o) override {
+      met_trace();
+      return m_mutated = 
+      ( is_active.update(o.is_active)
+      | transform.update(o.transform)
+      | mesh_i.update(o.mesh_i)
+      | uplifting_i.update(o.uplifting_i)
+      | diffuse.update(o.diffuse)
       );
-    }
-  };
-
-  /* Overload of ComponentState for Settings */
-  struct SettingsState : public ComponentStateBase<Settings> {
-    using Base = Settings;
-    using ComponentStateBase<Base>::m_mutated;
-
-    ComponentState<decltype(Base::renderer_type)> renderer_type;
-    ComponentState<decltype(Base::texture_size)>  texture_size;
-    ComponentState<decltype(Base::view_i)>        view_i;
-    ComponentState<decltype(Base::view_scale)>    view_scale;
-
-  public:
-    virtual 
-    bool update(const Base &o) override {
-      return m_mutated = renderer_type.update(o.renderer_type) || 
-                         texture_size.update(o.texture_size)   || 
-                         view_i.update(o.view_i)               ||
-                         view_scale.update(o.view_scale);
     }
   };
   
-  /* Overload of ComponentState for Uplifting */
-  struct UpliftingState : public ComponentStateBase<Uplifting> {
-    using Base = Uplifting;
-    using ComponentStateBase<Base>::m_mutated;
+  // Template specialization of SceneStateHandler that exposes specific state
+  // for the members of met::Settings.
+  template <>
+  struct SceneStateHandler<Settings> : public SceneStateHandlerBase<Settings> {
+    SceneStateHandler<decltype(Settings::renderer_type)> renderer_type;
+    SceneStateHandler<decltype(Settings::texture_size)>  texture_size;
+    SceneStateHandler<decltype(Settings::view_i)>        view_i;
+    SceneStateHandler<decltype(Settings::view_scale)>    view_scale;
 
-    ComponentState<decltype(Base::csys_i)>             csys_i;
-    ComponentState<decltype(Base::basis_i)>            basis_i;
-    ComponentStates<decltype(Base::verts)::value_type> verts;
-    
   public:
-    virtual 
-    bool update(const Base &o) override {
-      return m_mutated = (
-        csys_i.update(o.csys_i)   |
-        basis_i.update(o.basis_i) | 
-        verts.update(o.verts)
+    bool update(const Settings &o) override {
+      met_trace();
+      return m_mutated = 
+      ( renderer_type.update(o.renderer_type)
+      | texture_size.update(o.texture_size)
+      | view_i.update(o.view_i)
+      | view_scale.update(o.view_scale)
       );
     }
   };
+  
+  // Template specialization of SceneStateHandler that exposes specific state
+  // for the members of met::Uplifting::Vertex.
+  template <>
+  struct SceneStateHandler<Uplifting::Vertex> : public SceneStateHandlerBase<Uplifting::Vertex> {
+    SceneStateHandler<decltype(Uplifting::Vertex::name)>       name;
+    SceneStateHandler<decltype(Uplifting::Vertex::is_active)>  is_active;
+    SceneStateHandler<decltype(Uplifting::Vertex::constraint)> constraint;
 
-  /* Overload of ComponentState for Uplifting::Vertex */
-  struct VertexState : public ComponentStateBase<Uplifting::Vertex> {
-    using Base = Uplifting::Vertex;
-    using ComponentStateBase<Base>::m_mutated;
-
-    ComponentState<decltype(Base::name)>       name;
-    ComponentState<decltype(Base::is_active)>  is_active;
-    ComponentState<decltype(Base::constraint)> constraint;
-    
   public:
-    virtual 
-    bool update(const Base &o) override {
-      return m_mutated = (
-        name.update(o.name)   |
-        is_active.update(o.is_active) | 
-        constraint.update(o.constraint)
+    bool update(const Uplifting::Vertex &o) override {
+      met_trace();
+      return m_mutated = 
+      ( name.update(o.name)
+      | is_active.update(o.is_active)
+      | constraint.update(o.constraint)
+      );
+    }
+  };
+  
+  // Template specialization of SceneStateHandler that exposes specific state
+  // for the members of met::Uplifting.
+  template <>
+  struct SceneStateHandler<Uplifting> : public SceneStateHandlerBase<Uplifting> {
+    SceneStateHandler<decltype(Uplifting::csys_i)>                 csys_i;
+    SceneStateHandler<decltype(Uplifting::basis_i)>                basis_i;
+    SceneStateVectorHandler<decltype(Uplifting::verts)::value_type> verts;
+
+  public:
+    bool update(const Uplifting &o) override {
+      met_trace();
+      return m_mutated = 
+      ( csys_i.update(o.csys_i)
+      | basis_i.update(o.basis_i) 
+      | verts.update(o.verts)
       );
     }
   };

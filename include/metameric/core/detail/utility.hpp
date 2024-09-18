@@ -14,6 +14,17 @@
 #include <variant>
 #include <vector>
 
+// Risky; add is_variant_v detector
+namespace std {
+  template<typename T> struct is_variant : std::false_type {};
+
+  template<typename ...Args>
+  struct is_variant<std::variant<Args...>> : std::true_type {};
+  
+  template <typename T>
+  inline constexpr bool is_variant_v = is_variant<T>::value;
+} // namespace std
+
 namespace met::detail {
   /**
    * Message class which stores a keyed list of strings, which

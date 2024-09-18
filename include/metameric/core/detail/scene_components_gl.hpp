@@ -6,7 +6,6 @@
 #include <metameric/core/components.hpp>
 #include <metameric/core/detail/bvh.hpp>
 #include <metameric/core/detail/packing.hpp>
-#include <metameric/core/detail/scene_components_state.hpp>
 #include <metameric/core/detail/texture_atlas.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
@@ -16,7 +15,7 @@ namespace met::detail {
   // Define maximum supported components for some types
   // These aren't up to device limits, but mostly exist so some 
   // sizes can be hardcoded shader-side in uniform buffers and
-  // can be crammed into shared memory where possible
+  // can be crammed into shared memory in some places
   constexpr static uint met_max_meshes      = MET_SUPPORTED_MESHES;
   constexpr static uint met_max_objects     = MET_SUPPORTED_OBJECTS;
   constexpr static uint met_max_emitters    = MET_SUPPORTED_EMITTERS;
@@ -24,12 +23,12 @@ namespace met::detail {
   constexpr static uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
   constexpr static uint met_max_textures    = MET_SUPPORTED_TEXTURES;
 
-  // GL-side object data
+  // Template specialization of SceneGLHandler.
   // Handles shader-side information about objects in the scene
   template <>
-  class SceneGLType<met::Object> {
+  class SceneGLHandler<met::Object> : public SceneGLHandlerBase {
     // Per-object block layout for std140 uniform buffer
-    struct BlockLayout {
+    struct alignas(16) BlockLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
       alignas(16) eig::Matrix4f trf_mesh;
@@ -44,8 +43,8 @@ namespace met::detail {
     
     // All-object block layout for std140 uniform buffer, mapped for write
     struct BufferLayout {
-      alignas(4)  uint                                     size;
-      alignas(16) std::array<BlockLayout, met_max_objects> data;
+      alignas(4) uint size;
+      std::array<BlockLayout, met_max_objects> data;
     } *m_object_info_map;
 
   public:
@@ -54,16 +53,18 @@ namespace met::detail {
 
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
 
+  // Template specialization of SceneGLHandler.
+  // Handles GL data about emitters in the scene.
   template <>
-  class SceneGLType<met::Emitter> {
+  class SceneGLHandler<met::Emitter> : public SceneGLHandlerBase {
     // Per-object block layout for std140 uniform buffer
-    struct EmBlockLayout {
+    struct alignas(16) EmBlockLayout {
       alignas(16) eig::Matrix4f trf;
       alignas(16) eig::Matrix4f trf_inv;
       alignas(4)  uint          type;
@@ -78,8 +79,8 @@ namespace met::detail {
     
     // All-object block layout for std140 uniform buffer, mapped for write
     struct EmBufferLayout {
-      alignas(4)  uint                                        size;
-      alignas(16) std::array<EmBlockLayout, met_max_emitters> data;
+      alignas(4) uint size;
+      std::array<EmBlockLayout, met_max_emitters> data;
     } *m_em_info_map;
 
     // Single block layout for std140 uniform buffer, mapped for write
@@ -100,17 +101,17 @@ namespace met::detail {
 
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
 
-  // GL-side uplifting data
+  // Template specialization of SceneGLHandler.
   // Handles gl-side uplifted texture data, though on a per-object basis. Most
   // data is filled in by the uplifting pipeline, which is part of the program pipeline 
   template <>
-  class SceneGLType<met::Uplifting> {
+  class SceneGLHandler<met::Uplifting> : public SceneGLHandlerBase {
     using atlas_type_u = TextureAtlas<uint, 4>;
     using basis_type   = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
 
@@ -127,18 +128,18 @@ namespace met::detail {
 
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
 
-  // GL-side mesh data
+  // Template specialization of SceneGLHandler.
   // Handles packed mesh buffers, bvh buffers, and info to unpack said buffers shader-side
   template <>
-  class SceneGLType<met::Mesh> {
+  class SceneGLHandler<met::Mesh> : public SceneGLHandlerBase {
     // Per-mesh block layout for std140 uniform buffer
-    struct MeshBlockLayout {
+    struct alignas(16) MeshBlockLayout {
       alignas(16) eig::Matrix4f trf; // Model packing transform
       alignas(4)  uint verts_offs;
       alignas(4)  uint verts_size;
@@ -151,8 +152,8 @@ namespace met::detail {
     
     // All-mesh block layout for std140 uniform buffer, mapped for write
     struct MeshBufferLayout {
-      alignas(4)  uint                                       size;
-      alignas(16) std::array<MeshBlockLayout, met_max_meshes> data;
+      alignas(4) uint size;
+      std::array<MeshBlockLayout, met_max_meshes> data;
     } *m_mesh_info_map;
 
   private:
@@ -190,29 +191,29 @@ namespace met::detail {
     
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
   
-  // GL-side texture data
+  // Template specialization of SceneGLHandler.
   // Handles texture atlases for 1-component and 3-component textures in the scene,
   // as well as information on how to access the corresponding texture atlas regions.
   template <>
-  class SceneGLType<met::Image> {
+  class SceneGLHandler<met::Image> : public SceneGLHandlerBase {
     // Per-texture block layout for std140 uniform buffer
-    struct BlockLayout {
-      alignas(4)  bool         is_3f;
-      alignas(4)  uint         layer;
-      alignas(8)  eig::Array2u offs, size;
-      alignas(8)  eig::Array2f uv0, uv1;
+    struct alignas(16) BlockLayout {
+      alignas(4) bool         is_3f;
+      alignas(4) uint         layer;
+      alignas(8) eig::Array2u offs, size;
+      alignas(8) eig::Array2f uv0, uv1;
     };
 
     // All-texture block layout for std140 uniform buffer, mapped for write
     struct BufferLayout {
-      alignas(4)  uint                                      size;
-      alignas(16) std::array<BlockLayout, met_max_textures> data;
+      alignas(4) uint size;
+      std::array<BlockLayout, met_max_textures> data;
     } *m_texture_info_map;
 
   public:
@@ -228,31 +229,31 @@ namespace met::detail {
   
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
     
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
   
-  // GL-side colorsystem data
+  // Template specialization of SceneGLHandler.
   // Handles shader-side information about color system sampling
   template <>
-  struct SceneGLType<met::ColorSystem> {
+  struct SceneGLHandler<met::ColorSystem> : public SceneGLHandlerBase {
     Spec       wavelength_distr;
     gl::Buffer wavelength_distr_buffer;
 
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
     void update(const Scene &);
   };
   
-  // GL-side spectrum data
+  // Template specialization of SceneGLHandler.
   // Handles shader-side per-wavelength access of illuminant spectral data.
   template <>
-  class SceneGLType<met::Spec> {
+  class SceneGLHandler<met::Spec> : public SceneGLHandlerBase {
     using texture_type = gl::Texture1d<float, 1, gl::TextureType::eImageArray>;
     
     // Pixel buffer copy helpers
@@ -266,16 +267,16 @@ namespace met::detail {
 
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
   
-  // GL-side color-matching-function data
+  // Template specialization of SceneGLHandler.
   // Handles shader-side per-wavelength access of observer spectral data.
   template <>
-  class SceneGLType<met::CMFS> {
+  class SceneGLHandler<met::CMFS> : public SceneGLHandlerBase {
     using texture_type = gl::Texture1d<float, 3, gl::TextureType::eImageArray>;
 
     // Pixel buffer copy helpers
@@ -289,9 +290,9 @@ namespace met::detail {
 
   public:
     // Class constructor
-    SceneGLType();
+    SceneGLHandler();
 
     // Update GL-side data for objects indicated as changed
-    void update(const Scene &);
+    void update(const Scene &) override;
   };
 } // namespace met::detail
