@@ -46,10 +46,8 @@ namespace ImGui {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigWindowsMoveFromTitleBarOnly = true;
 
-    // Handle font loading/dpi scaling
-    auto content_scale = window.content_scale();
-    io.Fonts->AddFontFromFileTTF(appl_imgui_font_path.c_str(), 12 * content_scale , 0, 0);
-    ImGui::GetStyle().ScaleAllSizes(content_scale);
+    // Handle dpi scaling
+    ImGui::GetStyle().ScaleAllSizes(window.content_scale());
 
     // Initialize ImGui platform specific bindings
     ImGui_ImplOpenGL3_Init();

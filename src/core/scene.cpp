@@ -237,18 +237,6 @@ namespace met {
     resources.observers.push("CIE XYZ",            models::cmfs_cie_xyz,        false);
     resources.meshes.push("Rectangle",             models::unit_rect,           false);
 
-    // Load default basis from file and normalize if not already normalized
-    /* Spec eigen_values = {
-      4.80323533e+01f,   7.51669501e+00f,   4.21518090e+00f,   2.06736524e+00f,
-      1.12826738e+00f,   3.10498058e-01f,   2.64876889e-01f,   1.43566338e-01f,
-      6.96868703e-02f,   5.60114977e-02f,   3.38647589e-02f,   2.67549622e-02f,
-      2.32778257e-02f,   2.04676939e-02f,   1.59482759e-02f,   1.11668831e-02f,
-      1.06935859e-02f,   8.98293044e-03f,   7.15868075e-03f,   5.56392880e-03f,
-      3.88411047e-03f,   3.47654084e-03f,   3.39976034e-03f,   2.63938959e-03f,
-      2.33516443e-03f,   1.97400732e-03f,   1.75606828e-03f,   1.56239373e-03f,
-      1.40881035e-03f,   1.26965006e-03f,   1.08290781e-03f,   9.45006468e-04f, 
-    }; */
-
     auto basis = io::load_basis("resources/misc/basis_262144.txt");
     for (auto col : basis.func.colwise()) {
       auto min_coeff = col.minCoeff(), max_coeff = col.maxCoeff();
