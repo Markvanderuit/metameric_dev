@@ -55,15 +55,6 @@ namespace met {
     bool operator==(const View &o) const;
   };
 
-  /* Color system representation; a simple referral to CMFS and illuminant data */
-  struct ColorSystem {
-    uint observer_i   = 0;
-    uint illuminant_i = 0;
-
-    friend
-    auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
-  };
-
   /* Object representation; 
      A shape represented by a surface mesh, material data, 
      and an accompanying uplifting to handle spectral data. */
@@ -115,7 +106,6 @@ namespace met {
      given its centrality to the codebase. */
   struct Uplifting {
     struct Vertex {
-    public: // Public members
       using cnstr_type = std::variant<MeasurementConstraint,   DirectColorConstraint,
                                       DirectSurfaceConstraint, IndirectSurfaceConstraint>;
                                       
@@ -160,9 +150,10 @@ namespace met {
     };
 
   public: // Public members
-    uint                csys_i  = 0; // Index of primary color system
-    uint                basis_i = 0; // Index of used underlying basis
-    std::vector<Vertex> verts;      // Vertex constraints on mesh
+    uint                observer_i   = 0; // Index of primary color system observer data
+    uint                illuminant_i = 0; // Index of primary color system illuminant data
+    uint                basis_i      = 0; // Index of underlying basis function data
+    std::vector<Vertex> verts;            // All vertex constraints on mesh
 
   public: // Boilerplate
     bool operator==(const Uplifting &o) const;

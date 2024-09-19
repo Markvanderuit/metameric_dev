@@ -119,8 +119,9 @@ namespace met {
       auto &value = component.value;
       
       // Uplifting value modifications
-      push_resource_selector("Basis functions", scene.resources.bases, value.basis_i);
-      push_resource_selector("Base color system", scene.components.colr_systems, value.csys_i);
+      push_resource_selector("Base CMFS",       scene.resources.observers,   value.observer_i);
+      push_resource_selector("Base illuminant", scene.resources.illuminants, value.illuminant_i);
+      push_resource_selector("Basis functions", scene.resources.bases,       value.basis_i);
 
       // Visual separator for vertex constraints
       // which are layed out in a table
@@ -270,20 +271,6 @@ namespace met {
           ImGui::EndPopup();
         } // if (BeginPopup())
       }
-    };
-
-    // Default implementation of editing visitor for ColorSystem components
-    template <>
-    void edit_visitor_default(SchedulerHandle &info, uint i, Component<ColorSystem> &component) {
-      // Get external resources and shorthands
-      const auto &scene = info.global("scene").getr<Scene>();
-      auto &value = component.value;
-      
-      push_resource_selector("CMFS", scene.resources.observers, value.observer_i);
-      push_resource_selector("Illuminant", scene.resources.illuminants, value.illuminant_i);
-
-      // Force update name to adhere to [CMFS][Illuminant] naming clarity
-      component.name = scene.csys_name(value);
     };
 
     // Default implementation of editing visitor for Emitter components

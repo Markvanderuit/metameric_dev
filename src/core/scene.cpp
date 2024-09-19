@@ -74,16 +74,36 @@ namespace met {
     }
   }
 
+  // Legacy ColorSystem; needs to be removed after scene load
+  struct ColorSystem {
+    uint observer_i   = 0;
+    uint illuminant_i = 0;
+
+    friend
+    auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
+  };
+
   void to_json(json &js, const Uplifting &uplifting) {
     met_trace();
-    js = {{ "csys_i",  uplifting.csys_i  },
-          { "basis_i", uplifting.basis_i },
-          { "verts",   uplifting.verts   }};
+    js = {{ "observer_i",   uplifting.observer_i   },
+          { "illuminant_i", uplifting.illuminant_i },
+          { "basis_i",      uplifting.basis_i      },
+          { "verts",        uplifting.verts        }};
   }
 
   void from_json(const json &js, Uplifting &uplifting) {
     met_trace();
-    js.at("csys_i").get_to(uplifting.csys_i);
+    
+    if (js.contains("csys_i")) {
+      // Legacy code; todo remove
+      ColorSystem c;
+      js.at("csys_i").get_to(c);
+      uplifting.observer_i = c.observer_i;
+      uplifting.illuminant_i = c.illuminant_i;
+    } else {
+      js.at("observer_i").get_to(uplifting.observer_i);
+      js.at("illuminant_i").get_to(uplifting.illuminant_i);
+    }
     js.at("basis_i").get_to(uplifting.basis_i);
     js.at("verts").get_to(uplifting.verts);
   }
@@ -867,20 +887,9 @@ namespace met {
     mod_i = -1;
   }
 
-  met::ColrSystem Scene::csys(uint i) const {
-    met_trace();
-    return csys(components.colr_systems[i].value);
-  }
-
   met::ColrSystem Scene::csys(uint cmfs_i, uint illm_i) const {
     met_trace();
-    return csys({ .observer_i = cmfs_i, .illuminant_i = illm_i });
-  }
-
-  met::ColrSystem Scene::csys(ColorSystem c) const {
-    met_trace();
-    return { .cmfs       = resources.observers[c.observer_i].value(),
-             .illuminant = resources.illuminants[c.illuminant_i].value() };
+    return ColrSystem { .cmfs = *resources.observers[cmfs_i], .illuminant = *resources.illuminants[illm_i] };
   }
 
   met::Spec Scene::emitter_spd(uint i) const {
@@ -910,19 +919,9 @@ namespace met {
 
   std::string Scene::csys_name(uint cmfs_i, uint illm_i) const {
     met_trace();
-    return csys_name({ .observer_i = cmfs_i, .illuminant_i = illm_i });
-  }
-
-  std::string Scene::csys_name(uint i) const {
-    met_trace();
-    return csys_name(components.colr_systems[i].value);
-  }
-
-  std::string Scene::csys_name(ColorSystem c) const {
-    met_trace();
     return std::format("{}, {}", 
-                       resources.observers[c.observer_i].name, 
-                       resources.illuminants[c.illuminant_i].name);
+                       resources.observers[cmfs_i].name, 
+                       resources.illuminants[illm_i].name);
   }
 
   const Uplifting::Vertex &Scene::uplifting_vertex(ConstraintRecord cs) const {

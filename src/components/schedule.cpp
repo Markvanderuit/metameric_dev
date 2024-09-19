@@ -123,8 +123,15 @@ namespace met {
       }
       for (auto [i, comp] : enumerate_view(e_scene.components.upliftings)) {
         auto &upl = comp.value;
-        if (upl.csys_i >= e_scene.components.colr_systems.size())
-          upl.csys_i = 0u;
+        if (upl.observer_i >= e_scene.resources.observers.size())
+          upl.observer_i = 0u;
+        if (upl.illuminant_i >= e_scene.resources.illuminants.size())
+          upl.illuminant_i = 0u;
+      }
+      {
+        auto &settings = e_scene.components.settings.value;
+        if (settings.view_i >= e_scene.components.views.size())
+          settings.view_i = 0u;
       }
 
       // Force update of stale gl-side components and state tracking
@@ -134,7 +141,6 @@ namespace met {
       e_scene.resources.observers.update(e_scene);
       e_scene.resources.bases.update(e_scene);
       e_scene.components.settings.state.update(e_scene.components.settings.value);
-      e_scene.components.colr_systems.update(e_scene);
       e_scene.components.emitters.update(e_scene);
       e_scene.components.objects.update(e_scene);
       e_scene.components.upliftings.update(e_scene);
@@ -152,7 +158,6 @@ namespace met {
         push_editor<detail::Component<Object>>(info,       { .editor_name = "Objects" });
         push_editor<detail::Component<Emitter>>(info,      { .editor_name = "Emitters" });
         push_editor<detail::Component<Uplifting>>(info,    { .editor_name = "Uplifting models" });
-        push_editor<detail::Component<ColorSystem>>(info,  { .editor_name = "Color systems", .edit_name = false });
         push_editor<detail::Component<View>>(info, { .editor_name = "Views" });
       }
       ImGui::End();

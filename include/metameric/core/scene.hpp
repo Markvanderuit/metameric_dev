@@ -14,12 +14,11 @@ namespace met {
   struct Scene {
     // Scene components, directly visible or influential in the scene (stored in json on disk)
     struct {
-      detail::ComponentVector<ColorSystem>  colr_systems; // Color systems (observer+illuminant) used in uplifting structures
-      detail::ComponentVector<Emitter>      emitters;     // Scene emitters
-      detail::ComponentVector<Object>       objects;      // Scene objects
-      detail::ComponentVector<Uplifting>    upliftings;   // Uplifting structures used by objects to uplift albedo
-      detail::ComponentVector<View>         views;        // Scene cameras for rendering output
-      detail::Component<Settings>           settings;     // Miscellaneous settings; e.g. texture size
+      detail::ComponentVector<Emitter>   emitters;     // Scene emitters
+      detail::ComponentVector<Object>    objects;      // Scene objects
+      detail::ComponentVector<Uplifting> upliftings;   // Uplifting structures used by objects to uplift albedo
+      detail::ComponentVector<View>      views;        // Scene cameras for rendering output
+      detail::Component<Settings>        settings;     // Miscellaneous settings; e.g. texture size
     } components;
 
     // Scene resources, primarily referred to by components in the scene (stored in binary zlib on disk)
@@ -71,15 +70,9 @@ namespace met {
     void clear_mods();          // Clear entire modification state       
 
   public: // Scene data helper functions
-    // Realize a pretty-printed name of a certain color system
-    std::string csys_name(uint i)                   const;
-    std::string csys_name(uint cmfs_i, uint illm_i) const;
-    std::string csys_name(ColorSystem c)            const;
-
-    // Realize the spectral data of a certain color system
-    ColrSystem csys(uint i)                   const;
+    // Realize the spectral data of a certain color system (or a pretty-printed name)
     ColrSystem csys(uint cmfs_i, uint illm_i) const;
-    ColrSystem csys(ColorSystem c)            const;
+    std::string csys_name(uint cmfs_i, uint illm_i) const;
 
     // Realize the spectral data of a certain emitter
     Spec emitter_spd(uint i)    const;
