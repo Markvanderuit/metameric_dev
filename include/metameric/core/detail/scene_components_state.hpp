@@ -105,6 +105,4 @@ namespace met::detail {
       );
     }
   };
-
-
 } // namespace met::detail

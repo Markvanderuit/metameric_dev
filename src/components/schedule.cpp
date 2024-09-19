@@ -8,9 +8,7 @@
 #include <metameric/components/misc/task_lambda.hpp>
 #include <metameric/components/misc/task_frame_begin.hpp>
 #include <metameric/components/misc/task_frame_end.hpp>
-#include <metameric/components/views/task_viewport.hpp>
 #include <metameric/components/views/task_window.hpp>
-#include <metameric/components/views/task_scene_resources_editor.hpp>
 #include <metameric/components/views/task_scene_viewport.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
@@ -20,62 +18,6 @@
 #include <metameric/components/pipeline/task_gen_object_data.hpp>
 
 namespace met {
-  void submit_schedule_debug(detail::SchedulerBase &scheduler) {
-    scheduler.task("schedule_view").init<LambdaTask>([&](SchedulerHandle &info) {
-      // Check if the scheduler handle implements a MapBasedSchedule
-      auto *info_data = dynamic_cast<MapBasedSchedule *>(&info);
-      guard(info_data);
-
-      // Temporary window to show runtime schedule
-      if (ImGui::Begin("Scheduler info")) {
-        // Query MapBasedSchedule information
-        const auto &rsrc_map = info_data->resources();
-        const auto &task_map = info_data->tasks();
-        const auto  schedule = info_data->schedule();
-
-        for (const auto &task_key : schedule) {
-          // Split string to get task name without prepend
-          auto count = std::count(range_iter(task_key), '.');
-          auto split = std::views::split(task_key, '.')
-                     | std::views::transform([](const auto &r) { return std::string(range_iter(r)); });
-          auto name = (split | std::views::drop(count)).front();
-          
-          // Indent dependent on how much of a subtask something is
-          for (uint i = 0; i < count; ++i) ImGui::Indent(16.f);
-
-          if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf)) {
-            if (ImGui::IsItemHovered() && rsrc_map.contains(task_key)) {
-              ImGui::BeginTooltip();
-              for (const auto &[key, _] : rsrc_map.at(task_key)) {
-                ImGui::Text(key.c_str());
-              }
-              ImGui::EndTooltip();
-            }
-            ImGui::TreePop();
-          }
-
-          // Unindent dependent on how much of a subtask something is
-          for (uint i = 0; i < count; ++i) ImGui::Unindent(16.f);
-        }
-      }
-      ImGui::End();
-    });
-
-    /* // Temporary window to plot pca components
-    scheduler.task("plot_models").init<LambdaTask>([](auto &info) {
-      if (ImGui::Begin("PCA plots")) {
-        eig::Array2f plot_size = (static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMax())
-                               - static_cast<eig::Array2f>(ImGui::GetWindowContentRegionMin())) 
-                               * eig::Array2f(.67f, 0.3f);
-        
-        // Do some stuff with the PCA bases
-        const auto &basis = info.global("scene").getr<Scene>().resources.bases[0].value().func;
-        ImGui::PlotSpectra("##basis_plot", { }, basis.colwise() | rng::to<std::vector<Spec>>(), -1.f, 1.f);
-      }
-      ImGui::End();
-    }); */
-  }
-
   void submit_metameric_editor_schedule_unloaded(detail::SchedulerBase &scheduler) {
     met_trace();
 
@@ -97,11 +39,12 @@ namespace met {
     
     scheduler.clear();
     
+    // Initial window/gl tasks
     scheduler.task("frame_begin").init<FrameBeginTask>();
     scheduler.task("window").init<WindowTask>();
 
-    // Simple task triggers scene update and filters some edge cases
-    // for scene data editing; is run at start of frame
+    // Boilerplate task which triggers scene state updates, filters some edge cases, and
+    // generally keeps everything running nicely.
     scheduler.task("scene_handler").init<LambdaTask>([](SchedulerHandle &info) {
       met_trace();
 
@@ -134,7 +77,7 @@ namespace met {
           settings.view_i = 0u;
       }
 
-      // Force update of stale gl-side components and state tracking
+      // Force update check of stale gl-side components and state tracking
       e_scene.resources.meshes.update(e_scene);
       e_scene.resources.images.update(e_scene);
       e_scene.resources.illuminants.update(e_scene);
@@ -147,11 +90,11 @@ namespace met {
       e_scene.components.views.update(e_scene);
     });
 
-    // Pipeline tasks generate uplifting data per object
+    // Pipeline tasks generate uplifting data and then bake a spectral texture per object
     scheduler.task("gen_upliftings").init<GenUpliftingsTask>();
     scheduler.task("gen_objects").init<GenObjectsTask>();
 
-    // View tasks handle UI components
+    // Editor task for scene components (objects, emitters, etc)
     scheduler.task("scene_components_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene components")) {
@@ -163,7 +106,7 @@ namespace met {
       ImGui::End();
     });
 
-    // scheduler.task("scene_debugger").init<SceneResourcesEditorTask>();
+    // Editor task for scene resources (meshes, textures, etc)
     scheduler.task("scene_resource_editor").init<LambdaTask>([](auto &info) {
       met_trace();
       if (ImGui::Begin("Scene resources")) {
@@ -179,11 +122,10 @@ namespace met {
       ImGui::End();
     });
 
+    // Viewport task which takes camera input, renders scene, and shows scene
     scheduler.task("viewport").init<SceneViewportTask>();
 
-    // Insert temporary unimportant tasks
-    // submit_schedule_debug(scheduler);
-
+    // Final window/gl task
     scheduler.task("frame_end").init<FrameEndTask>(false);
   }
   

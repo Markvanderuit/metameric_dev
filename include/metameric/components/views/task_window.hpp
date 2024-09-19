@@ -5,10 +5,8 @@
 namespace met {
   class WindowTask : public detail::TaskNode {
     bool m_open_close_modal; 
-    bool m_open_exit_modal; 
-    bool m_open_create_modal; 
+    bool m_open_exit_modal;
 
-    /* void handle_new_safe(SchedulerHandle &info); */
     void handle_close_safe(SchedulerHandle &info);
     void handle_exit_safe(SchedulerHandle &info);
     

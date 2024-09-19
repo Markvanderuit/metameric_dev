@@ -7,9 +7,10 @@
 #include <small_gl/window.hpp>
 
 namespace met {
-  struct FrameEndTask : public detail::TaskNode {
+  class FrameEndTask : public detail::TaskNode {
     bool m_bind_default_fbo;
 
+  public:
     FrameEndTask(bool bind_default_fbo = true)
     : m_bind_default_fbo(bind_default_fbo) { }
 

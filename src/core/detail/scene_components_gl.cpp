@@ -462,12 +462,6 @@ namespace met::detail {
   SceneGLHandler<met::Image>::SceneGLHandler() {
     met_trace_full();
 
-    // Uniform layout which includes nr. of active components
-    struct TextureUniformBufferLayout {
-      alignas(4)   uint n;
-      BlockLayout data[met_max_textures];
-    };
-
     // Preallocate up to a number of blocks
     texture_info = {{ .size = sizeof(BufferLayout), .flags = buffer_create_flags }};
     m_texture_info_map = texture_info.map_as<BufferLayout>(buffer_access_flags).data();
