@@ -41,7 +41,7 @@ namespace met {
       // Generate sampling distribution for wavelengths
       {
         // Get scene observer, and list of (scaled) active emitter SPDs in the scene
-        CMFS observer = *scene.resources.observers[*scene.components.observer_i];
+        CMFS observer = scene.primary_observer();
         auto emitters = scene.components.emitters
                       | vws::filter([](const auto &comp) { return comp.value.is_active; });
         auto illums = emitters

@@ -200,7 +200,6 @@ namespace met {
   void to_json(json &js, const Scene &scene) {
     met_trace();
     js = {{ "settings",      scene.components.settings            },
-          { "observer_i",    scene.components.observer_i          },
           { "objects",       scene.components.objects.data()      },
           { "emitters",      scene.components.emitters.data()     },
           { "upliftings",    scene.components.upliftings.data()   },
@@ -211,7 +210,6 @@ namespace met {
   void from_json(const json &js, Scene &scene) {
     met_trace();
     js.at("settings").get_to(scene.components.settings);
-    js.at("observer_i").get_to(scene.components.observer_i);
     js.at("objects").get_to(scene.components.objects.data());
     js.at("emitters").get_to(scene.components.emitters.data());
     js.at("upliftings").get_to(scene.components.upliftings.data());
@@ -234,10 +232,7 @@ namespace met {
     }
   
     // Pre-supply some data for an initial scene
-    components.settings   = { .name  = "Settings", 
-                              .value = { .texture_size = Settings::TextureSize::eHigh }};
-    components.observer_i = { .name  = "Default observer", 
-                              .value = 0 };
+    components.settings   = { .name  = "Settings", .value = {  }};
     resources.illuminants.push("D65",              models::emitter_cie_d65,     false);
     resources.illuminants.push("D65 (normalized)", d65n,                        false);
     resources.illuminants.push("E",                models::emitter_cie_e,       false);
@@ -898,6 +893,21 @@ namespace met {
     return (resources.illuminants[e.illuminant_i].value() * e.illuminant_scale).eval();
   }
 
+  CMFS Scene::primary_observer() const {
+    met_trace();
+    return view_observer(components.settings->view_i);
+  }
+  
+  met::CMFS Scene::view_observer(uint i) const {
+    met_trace();
+    return view_observer(components.views[i].value);
+  }
+
+  met::CMFS Scene::view_observer(ViewSettings i) const {
+    met_trace();
+    return resources.observers[i.observer_i].value();
+  }
+
   std::string Scene::csys_name(uint cmfs_i, uint illm_i) const {
     met_trace();
     return csys_name({ .observer_i = cmfs_i, .illuminant_i = illm_i });
@@ -915,6 +925,14 @@ namespace met {
                        resources.illuminants[c.illuminant_i].name);
   }
 
+  const Uplifting::Vertex &Scene::uplifting_vertex(ConstraintRecord cs) const {
+    return components.upliftings[cs.uplifting_i]->verts[cs.vertex_i];
+  }
+
+  Uplifting::Vertex &Scene::uplifting_vertex(ConstraintRecord cs) {
+    return components.upliftings[cs.uplifting_i]->verts[cs.vertex_i];
+  }
+  
   void Scene::to_stream(std::ostream &str) const {
     met_trace();
     io::to_stream(resources.meshes,      str);

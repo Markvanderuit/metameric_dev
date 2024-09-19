@@ -1,20 +1,19 @@
 #include <metameric/core/io.hpp>
-#include <metameric/core/math.hpp>
+#include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
 #include <zstr.hpp>
 #include <algorithm>
+#include <deque>
 #include <execution>
 #include <functional>
 #include <fstream>
 #include <unordered_map>
 #include <unordered_set>
-#include <deque>
 
 namespace met::io {
   using namespace std::placeholders;

@@ -88,9 +88,13 @@ namespace met {
     // Test if renderer necessitates a reset; scene changes, camera changes, target changes
     bool reset_target = target_handle.is_mutated();
     bool reset_camera = camera_handle.is_mutated();
-    bool reset = is_first_eval() 
-      || info("active").is_mutated()
-      || reset_target || reset_camera || e_scene.components;
+    bool reset_scene  = e_scene.components.colr_systems || e_scene.components.emitters || e_scene.components.objects
+      || e_scene.components.upliftings || e_scene.components.views || e_scene.components.settings;
+    bool reset = is_first_eval()     // Always run on first call of eval()
+      || info("active").is_mutated() // Run if active flag is flipped
+      || reset_target 
+      || reset_camera 
+      || reset_scene;
 
     // Test if renderer is allowed to render
     guard(info("active").getr<bool>());

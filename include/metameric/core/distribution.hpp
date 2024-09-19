@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
 #include <small_gl/fwd.hpp>
 #include <algorithm>
@@ -51,7 +51,7 @@ namespace met {
   static_assert(std::uniform_random_bit_generator<PCGEngine>);
 
   // Simple sampler class that encapsulates a random number engine
-  template <typename E = PCGEngine> requires (std::uniform_random_bit_generator<E>)
+  template <typename E> requires (std::uniform_random_bit_generator<E>)
   class UniformSampler {
     E                                     m_engine;
     std::uniform_real_distribution<float> m_distr;

@@ -134,7 +134,6 @@ namespace met {
       e_scene.resources.observers.update(e_scene);
       e_scene.resources.bases.update(e_scene);
       e_scene.components.settings.state.update(e_scene.components.settings.value);
-      e_scene.components.observer_i.state.update(e_scene.components.observer_i.value);
       e_scene.components.colr_systems.update(e_scene);
       e_scene.components.emitters.update(e_scene);
       e_scene.components.objects.update(e_scene);

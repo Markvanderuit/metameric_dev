@@ -2,9 +2,8 @@
 
 #include <metameric/core/math.hpp>
 #include <metameric/core/utility.hpp>
-#include <iostream>
-#include <concepts>
-#include <vector>
+#include <istream>
+#include <ostream>
 
 namespace met::io {
   // Simple serializable contract to avoid use of interfaces on currently

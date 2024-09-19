@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
@@ -150,7 +150,4 @@ namespace met {
       return ch;
     }
   };
-
-  using ConvexHull   = ConvexHullBase<eig::Array3f>;
-  using AlConvexHull = ConvexHullBase<eig::AlArray3f>;
 } // namespace met

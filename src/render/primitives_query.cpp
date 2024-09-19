@@ -50,12 +50,13 @@ namespace met {
     // (Re)generate sampling distribution for wavelengths
     bool rebuild_wavelength_distr 
       = !m_wavelength_distr_buffer.is_init() 
-      || scene.components.observer_i
+      || scene.components.settings.state.view_i
+      || scene.components.views[scene.components.settings->view_i].state.observer_i
       || scene.resources.observers
       || scene.resources.illuminants; 
     if (rebuild_wavelength_distr) {
       // Get scene observer, and list of (scaled) active emitter SPDs in the scene
-      CMFS observer = *scene.resources.observers[*scene.components.observer_i];
+      CMFS observer = scene.primary_observer();
       auto emitters = scene.components.emitters
                     | vws::filter([](const auto &comp) { return comp.value.is_active; });
       auto illums = emitters

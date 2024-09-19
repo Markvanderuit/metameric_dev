@@ -1,20 +1,13 @@
 #pragma once
 
-#include <metameric/core/detail/scene_components.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/constraints.hpp>
-#include <metameric/core/math.hpp>
-#include <metameric/core/spectrum.hpp>
+#include <metameric/core/detail/scene_components.hpp>
 #include <vector>
 
 namespace met {
-  // Concept; some components have active flags to enable/disable them in the scene
-  template <typename Ty>
-  concept has_active_value = requires (Ty ty) { { ty.is_active } -> std::same_as<bool&>; };
-
   /* Scene settings data layout. */
   struct Settings {
-    using state_type = detail::SettingsState;
-
     // Selected viewport renderer; the rgb renderers are hacked in just for debugging
     enum class RendererType { 
       ePath,        // Spectral render, up to fixed path length
@@ -76,8 +69,6 @@ namespace met {
      A shape represented by a surface mesh, material data, 
      and an accompanying uplifting to handle spectral data. */
   struct Object {
-    using state_type = detail::ObjectState;
-
     // Scene properties
     bool      is_active = true;
     Transform transform;
@@ -88,15 +79,10 @@ namespace met {
 
     // Material data, packed with object; either a specified value, or a texture index
     std::variant<Colr,  uint> diffuse;
-    /* std::variant<Colr,  uint> normals;
-    std::variant<float, uint> roughness;
-    std::variant<float, uint> metallic;
-    std::variant<float, uint> opacity; */
-    
+
   public: // Boilerplate
     bool operator==(const Object &o) const;
   };
-  static_assert(has_active_value<Object>);
 
   /* Emitter representation; just a simple point light for now */
   struct Emitter {
@@ -123,18 +109,14 @@ namespace met {
   public: // Boilerplater
     bool operator==(const Emitter &o) const;
   };
-  static_assert(has_active_value<Emitter>);
 
   /* Spectral uplifting data layout;
      Mostly a tesselation of a color space, with constraints on the tesselation's
      vertices describing spectral behavior. Kept separate from Scene object,
      given its centrality to the codebase. */
   struct Uplifting {
-    using state_type = detail::UpliftingState;
-  
     struct Vertex {
     public: // Public members
-      using state_type = detail::VertexState;
       using cnstr_type = std::variant<MeasurementConstraint,   DirectColorConstraint,
                                       DirectSurfaceConstraint, IndirectSurfaceConstraint>;
                                       
@@ -186,7 +168,6 @@ namespace met {
   public: // Boilerplate
     bool operator==(const Uplifting &o) const;
   };
-  static_assert(has_active_value<Uplifting::Vertex>);
 } // namespace met
 
 // Custom std::format overloads for some types

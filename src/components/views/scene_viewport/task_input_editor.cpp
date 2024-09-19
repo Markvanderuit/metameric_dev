@@ -236,10 +236,7 @@ namespace met {
     }
 
     // Generate a default color value by passing through the current known constraint reflectance
-    IndirectColrSystem csys = {
-      .cmfs   = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-      .powers = cstr.powr_j
-    };
+    IndirectColrSystem csys = { .cmfs = e_scene.primary_observer(), .powers = cstr.powr_j };
     cstr.colr_j = csys(constraint_refl);
   }
 

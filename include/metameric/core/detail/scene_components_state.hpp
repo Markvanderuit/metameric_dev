@@ -84,4 +84,25 @@ namespace met::detail {
       );
     }
   };
+
+  template <>
+  struct SceneStateHandler<ViewSettings> : public SceneStateHandlerBase<ViewSettings> {
+    SceneStateHandler<decltype(ViewSettings::observer_i)>   observer_i;
+    SceneStateHandler<decltype(ViewSettings::camera_trf)>   camera_trf;
+    SceneStateHandler<decltype(ViewSettings::camera_fov_y)> camera_fov_y;
+    SceneStateHandler<decltype(ViewSettings::film_size)>    film_size;
+
+  public:
+    bool update(const ViewSettings &o) override {
+      met_trace();
+      return m_mutated = 
+      ( observer_i.update(o.observer_i)
+      | camera_trf.update(o.camera_trf) 
+      | camera_fov_y.update(o.camera_fov_y)
+      | film_size.update(o.film_size)
+      );
+    }
+  };
+
+
 } // namespace met::detail

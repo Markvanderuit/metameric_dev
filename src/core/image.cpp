@@ -1,5 +1,7 @@
 #include <metameric/core/image.hpp>
 #include <metameric/core/ranges.hpp>
+#include <algorithm>
+#include <execution>
 #include <cstdint>
 #include <limits>
 #include <format>
@@ -262,6 +264,14 @@ namespace met {
     // If data is provided, run a copy
     if (!info.data.empty())
       std::copy(std::execution::par_unseq, range_iter(info.data), m_data.begin());
+  }
+
+  bool Image::operator==(const Image &o) const {
+    met_trace();
+    return std::tie(m_pixel_frmt, m_pixel_type, m_color_frmt) 
+        == std::tie(o.m_pixel_frmt, o.m_pixel_type, o.m_color_frmt)
+        && m_size.isApprox(o.m_size)
+        && std::equal(std::execution::par_unseq, range_iter(m_data), range_iter(o.m_data));
   }
 
   void Image::set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt) {

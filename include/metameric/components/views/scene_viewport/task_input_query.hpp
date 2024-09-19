@@ -77,11 +77,8 @@ namespace met {
         std::back_inserter(uplf_handles), [&](uint i) { return info.task(std::format("gen_upliftings.gen_uplifting_{}", i)); });
 
       // Integration color matching functions, s.t. a unit spectrum integrates to 1 luminance
-      CMFS cmfs = ColrSystem {
-        .cmfs       = e_scene.resources.observers[e_scene.components.observer_i.value].value(),
-        .illuminant = Spec(1)
-      }.finalize();
-
+      CMFS cmfs = ColrSystem { .cmfs = e_scene.primary_observer(), .illuminant = Spec(1) }.finalize();
+      
       // Divider by nr. of requested path samples; not total paths. Most extra paths
       // come from NEE, and further division is taken into account by probability weighintg
       float colr_div = 1.f / (4.f * static_cast<float>(m_query_spp));

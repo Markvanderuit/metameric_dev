@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/json.hpp>
 #include <array>
 
@@ -132,8 +132,7 @@ namespace met {
   struct TetrahedronRecord {
     eig::Array4f        weights; // Barycentric weights combining tetrahedron
     std::array<Spec, 4> spectra; // Associated spectra at the vertices
-    std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated 
-                                 // from a constraint; -1 otherwise
+    std::array<int,  4> indices; // Index of constraint, if vertex spectrum originated from a constraint; -1 otherwise
   };
   
   // Helper object for handling selection of a specific 

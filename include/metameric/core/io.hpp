@@ -1,7 +1,6 @@
 #pragma once
 
-#include <metameric/core/mesh.hpp>
-#include <metameric/core/spectrum.hpp>
+#include <metameric/core/fwd.hpp>
 #include <filesystem>
 #include <string>
 

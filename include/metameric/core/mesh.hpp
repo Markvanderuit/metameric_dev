@@ -1,11 +1,8 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
-#include <span>
-#include <vector>
-#include <utility>
 
 namespace met {
   // Simple indexed mesh representation with optional normal/texcoord data

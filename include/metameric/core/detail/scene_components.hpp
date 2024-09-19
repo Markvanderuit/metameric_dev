@@ -2,7 +2,6 @@
 
 #include <metameric/core/serialization.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/scene_fwd.hpp>
 #include <metameric/core/detail/scene_components_utility.hpp>
 #include <concepts>
 #include <functional>
@@ -132,7 +131,7 @@ namespace met::detail {
      Encapsulates std::vector<Component<Ty>> to handle named component lookups and
      and state tracking. */
   template <typename Ty>
-  struct Components {
+  struct ComponentVector {
     using value_type = Ty;
     using cmpnt_type = Component<value_type>;
     using gl_type    = SceneGLHandler<value_type>;
@@ -231,7 +230,7 @@ namespace met::detail {
      Encapsulates std::vector<Resource<Ty>> to handle named resource lookups and some minor
      syntactic sugar for easy resource initialization. */
   template <typename Ty>
-  struct Resources {
+  struct ResourceVector {
     using value_type = Ty;
     using resrc_type = Resource<value_type>;
     using gl_type    = SceneGLHandler<value_type>;

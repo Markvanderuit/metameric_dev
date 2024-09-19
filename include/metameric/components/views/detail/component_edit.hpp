@@ -7,7 +7,11 @@
 #include <metameric/components/views/detail/imgui.hpp>
 
 namespace met {
-  namespace detail {
+  namespace detail {  
+    // Concept; some components have active flags to enable/disable them in the scene
+    template <typename Ty>
+    concept has_active_value = requires (Ty ty) { { ty.is_active } -> std::same_as<bool&>; };
+    
     // Info object for customizing behavior of push_*_editor() and related methods
     struct ImGuiEditInfo {
       std::string editor_name = "Editor"; // Surrounding editor section name
@@ -158,7 +162,7 @@ namespace met {
     bool section_open = !edit_info.inside_tree || ImGui::TreeNodeEx(data.name.c_str());
 
     // Is_active button, on same line as tree node if available
-    if constexpr (has_active_value<typename Ty::value_type>) {
+    if constexpr (detail::has_active_value<typename Ty::value_type>) {
       if (edit_info.inside_tree && edit_info.edit_data) {
         ImGui::SameLine(ImGui::GetContentRegionMax().x - 38.f);
         encapsulate_scene_data<Ty>(info, data_i, [](auto &info, uint i, auto &data) {
@@ -168,7 +172,7 @@ namespace met {
             ImGui::SetTooltip("Toggle component (in)active");
         });
       } // if (inside_tree && edit_data)
-    } // if (has_active_value)
+    } // if (detail::has_active_value)
 
     // Duplicate button, on same line as tree node if available
     if (edit_info.inside_tree && edit_info.show_dupl) {

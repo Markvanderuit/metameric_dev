@@ -1,14 +1,8 @@
 #pragma once
 
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/io.hpp>
-#include <metameric/core/math.hpp>
 #include <metameric/core/serialization.hpp>
-#include <metameric/core/spectrum.hpp>
-#include <algorithm>
-#include <execution>
-#include <memory>
-#include <optional>
-#include <vector>
 
 namespace met {
   /* Image.
@@ -54,13 +48,7 @@ namespace met {
     Image(LoadInfo info);
     Image(CreateInfo info);
 
-    inline
-    bool operator==(const auto &o) const {
-      return std::tie(m_pixel_frmt, m_pixel_type, m_color_frmt) 
-          == std::tie(o.m_pixel_frmt, o.m_pixel_type, o.m_color_frmt)
-          && m_size.isApprox(o.m_size)
-          && std::equal(std::execution::par_unseq, range_iter(m_data), range_iter(o.m_data));
-    }
+    bool operator==(const Image &o) const;
 
   public: // Pixel queries and format conversions
     void         set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);

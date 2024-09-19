@@ -9,56 +9,41 @@
 #include <metameric/core/components.hpp>
 #include <metameric/core/detail/scene_components_gl.hpp>
 #include <metameric/core/detail/scene_components_state.hpp>
-#include <variant>
 
 namespace met {
   /* Scene data layout.
      Simple indexed scene; no graph, just a library of objects and 
-     their dependencies; responsible for most program data, as well
-     as tracking of dependency modifications */
+     their dependencies. Contains most program data, pushes data to GPU for rendering/viewing
+     and handles state tracking for the program pipeline. 
+  */
   struct Scene {
-    // Scene components, directly visible or influential in the scene (stored as json on disk)
-    struct SceneComponents {
-      detail::Components<ColorSystem>  colr_systems;
-      detail::Components<Emitter>      emitters;
-      detail::Components<Object>       objects;
-      detail::Components<Uplifting>    upliftings;
-      detail::Components<ViewSettings> views;
-      detail::Component<Settings>      settings;   // Miscellaneous settings; e.g. texture size
-      detail::Component<uint>          observer_i; // Primary observer index; simple enough for now
-    
-      // Check if any components were changed/added/removed
-      constexpr bool is_mutated() const { return colr_systems || emitters || objects || upliftings || settings || views || observer_i; }
-      constexpr operator bool() const { return is_mutated(); };
+    // Scene components, directly visible or influential in the scene (stored in json on disk)
+    struct {
+      detail::ComponentVector<ColorSystem>  colr_systems; // Color systems (observer+illuminant) used in uplifting structures
+      detail::ComponentVector<Emitter>      emitters;     // Scene emitters
+      detail::ComponentVector<Object>       objects;      // Scene objects
+      detail::ComponentVector<Uplifting>    upliftings;   // Uplifting structures used by objects to uplift albedo
+      detail::ComponentVector<ViewSettings> views;        // Scene cameras for rendering output
+      detail::Component<Settings>           settings;     // Miscellaneous settings; e.g. texture size
     } components;
 
-    // Scene resources, primarily referred to by components in the scene (stored in zlib on disk)
-    struct SceneResources {
-      detail::Resources<Mesh>  meshes;
-      detail::Resources<Image> images;
-      detail::Resources<Spec>  illuminants;
-      detail::Resources<CMFS>  observers;
-      detail::Resources<Basis> bases;
-
-      // Check if any resources were changed/added/removed
-      constexpr bool is_mutated() const { return meshes || images || illuminants || observers || bases; }
-      constexpr operator bool() const { return is_mutated(); };
+    // Scene resources, primarily referred to by components in the scene (stored in binary zlib on disk)
+    struct {
+      detail::ResourceVector<Mesh>  meshes;      // Loaded mesh data
+      detail::ResourceVector<Image> images;      // Loaded texture data
+      detail::ResourceVector<Spec>  illuminants; // Loaded spectral power distributions
+      detail::ResourceVector<CMFS>  observers;   // Loaded observer distributions
+      detail::ResourceVector<Basis> bases;       // Loaded basis function data
     } resources;
 
-    // Check if any components/resources were changed/added/removed
-    constexpr bool is_mutated() const { return resources || components; }
-    constexpr operator bool() const { return is_mutated(); };
-    
   public: // Save state and IO handling
-    enum class SaveState {
-      eUnloaded, // Scene is not currently loaded by application
-      eNew,      // Scene has no previous save, is newly created
-      eSaved,    // Scene has previous save, and has not been modified
-      eUnsaved,  // Scene has previous save, and has been modified
-    };
+    // Scene is either not loaded, has no previous save, or is saved/modified
+    enum class SaveState { 
+      eUnloaded, eNew, eSaved, eUnsaved 
+    } save_state = SaveState::eUnloaded; 
 
-    SaveState save_state = SaveState::eUnloaded; 
-    fs::path  save_path  = "";
+    // Current scene path, only set if SaveState is ::eSaved or ::eUnsaved
+    fs::path save_path  = "";
 
     void create();                   // Create new, empty scene
     void load(const fs::path &path); // Load scene data from path 
@@ -105,15 +90,15 @@ namespace met {
     Spec emitter_spd(uint i)    const;
     Spec emitter_spd(Emitter e) const;
     
-  public:
+    // Realize the observer data of a certain view
+    CMFS primary_observer() const;
+    CMFS view_observer(uint i) const;
+    CMFS view_observer(ViewSettings i) const;
+
     // Extract a specific uplifting vertex, given indices;
     // added here given the common cumbersomeness of deep access
-    const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const {
-      return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
-    }
-    Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) {
-      return components.upliftings[cs.uplifting_i].value.verts[cs.vertex_i];
-    }
+    const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const;
+    Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs);
 
   public: // Serialization
     void to_stream(std::ostream &str) const;
@@ -132,41 +117,33 @@ namespace met {
   template <typename Ty> requires (is_scene_data<Ty>) 
   constexpr
   auto & scene_data_by_type(Scene &scene) {
-    using VTy = typename Ty::value_type;
-    if constexpr (is_component<Ty>) {
-      if      constexpr (std::is_same_v<VTy, ColorSystem>)  return scene.components.colr_systems;
-      else if constexpr (std::is_same_v<VTy, Emitter>)      return scene.components.emitters;
-      else if constexpr (std::is_same_v<VTy, Object>)       return scene.components.objects;
-      else if constexpr (std::is_same_v<VTy, Uplifting>)    return scene.components.upliftings;
-      else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
-      else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
-    } else {
-      if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
-      else if constexpr (std::is_same_v<VTy, Image>) return scene.resources.images;
-      else if constexpr (std::is_same_v<VTy, CMFS>)  return scene.resources.observers;
-      else if constexpr (std::is_same_v<VTy, Spec>)  return scene.resources.illuminants;
-      else debug::check_expr(false, "resources_by_type<Ty> exhausted its implemented options"); 
-    };
+    using value_type = typename Ty::value_type;
+    if      constexpr (std::is_same_v<value_type, ColorSystem>)  return scene.components.colr_systems;
+    else if constexpr (std::is_same_v<value_type, Emitter>)      return scene.components.emitters;
+    else if constexpr (std::is_same_v<value_type, Object>)       return scene.components.objects;
+    else if constexpr (std::is_same_v<value_type, Uplifting>)    return scene.components.upliftings;
+    else if constexpr (std::is_same_v<value_type, ViewSettings>) return scene.components.views;
+    else if constexpr (std::is_same_v<value_type, Mesh>)         return scene.resources.meshes;
+    else if constexpr (std::is_same_v<value_type, Image>)        return scene.resources.images;
+    else if constexpr (std::is_same_v<value_type, CMFS>)         return scene.resources.observers;
+    else if constexpr (std::is_same_v<value_type, Spec>)         return scene.resources.illuminants;
+    else debug::check_expr(false, "scene_data_by_type<Ty> exhausted implemented options");
   }
 
   // Forward to appropriate scene components or resources based on type
   template <typename Ty> requires (is_scene_data<Ty>) 
   constexpr
   const auto & scene_data_by_type(const Scene &scene) {
-    using VTy = typename Ty::value_type;
-    if constexpr (is_component<Ty>) {
-      if      constexpr (std::is_same_v<VTy, ColorSystem>)  return scene.components.colr_systems;
-      else if constexpr (std::is_same_v<VTy, Emitter>)      return scene.components.emitters;
-      else if constexpr (std::is_same_v<VTy, Object>)       return scene.components.objects;
-      else if constexpr (std::is_same_v<VTy, Uplifting>)    return scene.components.upliftings;
-      else if constexpr (std::is_same_v<VTy, ViewSettings>) return scene.components.views;
-      else debug::check_expr(false, "components_by_type<Ty> exhausted its implemented options"); 
-    } else {
-      if      constexpr (std::is_same_v<VTy, Mesh>)  return scene.resources.meshes;
-      else if constexpr (std::is_same_v<VTy, Image>) return scene.resources.images;
-      else if constexpr (std::is_same_v<VTy, CMFS>)  return scene.resources.observers;
-      else if constexpr (std::is_same_v<VTy, Spec>)  return scene.resources.illuminants;
-      else debug::check_expr(false, "resources_by_type<Ty> exhausted its implemented options"); 
-    };
+    using value_type = typename Ty::value_type;
+    if      constexpr (std::is_same_v<value_type, ColorSystem>)  return scene.components.colr_systems;
+    else if constexpr (std::is_same_v<value_type, Emitter>)      return scene.components.emitters;
+    else if constexpr (std::is_same_v<value_type, Object>)       return scene.components.objects;
+    else if constexpr (std::is_same_v<value_type, Uplifting>)    return scene.components.upliftings;
+    else if constexpr (std::is_same_v<value_type, ViewSettings>) return scene.components.views;
+    else if constexpr (std::is_same_v<value_type, Mesh>)         return scene.resources.meshes;
+    else if constexpr (std::is_same_v<value_type, Image>)        return scene.resources.images;
+    else if constexpr (std::is_same_v<value_type, CMFS>)         return scene.resources.observers;
+    else if constexpr (std::is_same_v<value_type, Spec>)         return scene.resources.illuminants;
+    debug::check_expr(false, "scene_data_by_type<Ty> exhausted implemented options");
   }
 } // namespace met
