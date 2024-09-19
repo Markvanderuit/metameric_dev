@@ -1,7 +1,6 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/components/views/scene_viewport/task_input_editor.hpp>
 #include <metameric/components/pipeline/task_gen_uplifting_data.hpp>
-#include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <bitset>
 #include <execution>
@@ -160,8 +159,8 @@ namespace met {
     };
 
     // Compact paths into R^P + aR', which likely means separating them instead
-    tbb::concurrent_vector<SeparationRecord> tbb_paths;
-    tbb_paths.reserve(paths.size());
+    std::vector<SeparationRecord> paths_finalized;
+    paths_finalized.reserve(paths.size());
     #pragma omp parallel for
     for (int i = 0; i < paths.size(); ++i) {
       const PathRecord &path = paths[i];
@@ -213,12 +212,16 @@ namespace met {
             sr.values *= verts[j].remainder; // w_i
           }
         }
-        tbb_paths.push_back(sr);
+
+        #pragma omp critical
+        {
+          paths_finalized.push_back(sr);
+        }
       }
     }
 
     // Copy tbb over to single vector block
-    std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
+    // std::vector<SeparationRecord> paths_finalized(range_iter(tbb_paths));
     fmt::print("Separated into {} path permutations\n", paths_finalized.size());
 
     // Make space in constraint available, up to maximum power

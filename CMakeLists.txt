@@ -82,7 +82,6 @@ find_package(meshoptimizer CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(NLopt     CONFIG REQUIRED)
 find_package(Qhull     CONFIG REQUIRED)
-find_package(TBB       CONFIG REQUIRED)
 find_package(tinyexr   CONFIG REQUIRED)
 find_package(Tracy     CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
@@ -134,7 +133,6 @@ set(core_dependencies
   Qhull::qhullcpp Qhull::qhull_r
   unofficial::tinyexr::tinyexr
   small_gl
-  TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy
   Tracy::TracyClient
   xatlas
   ZLIB::ZLIB

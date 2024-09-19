@@ -5,7 +5,6 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
-#include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <execution>
 #include <numbers>
@@ -296,8 +295,8 @@ namespace met {
   std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const DirectMismatchingOCSInfo &info) {
     met_trace();
     // Output data structure 
-    tbb::concurrent_vector<Basis::vec_type> tbb_output;
-    tbb_output.reserve(info.n_samples);
+    std::vector<Basis::vec_type> output;
+    output.reserve(info.n_samples);
 
     if constexpr (use_basis_direct_mismatch) {
       // Sample unit vectors in nd
@@ -364,7 +363,12 @@ namespace met {
           auto r = solve(local_solver);
           guard_continue(!r.x.array().isNaN().any());
           guard_continue(!r.x.array().isZero());
-          tbb_output.push_back(r.x.cast<float>().eval());
+
+          // Thread safe push
+          #pragma omp critical
+          {
+            output.push_back(r.x.cast<float>().eval());
+          }
         } // for (int i)
       }
     } else {
@@ -410,20 +414,25 @@ namespace met {
           auto r = solve(local_solver).x.cast<float>().array().cwiseMax(0.f).cwiseMin(1.f).eval();
           guard_continue(!r.isNaN().any());
           guard_continue(!r.array().isZero());
-          tbb_output.push_back(generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis }));
+          
+          // Thread safe push
+          #pragma omp critical
+          {
+            output.push_back(generate_spectrum_coeffs(SpectrumCoeffsInfo { r, info.basis }));
+          }
         } // for (int i)
       }
     }
 
-    return std::vector<Basis::vec_type>(range_iter(tbb_output));
+    return output;
   }
 
   std::vector<Basis::vec_type> generate_mismatching_ocs_coeffs(const IndirectMismatchingOCSInfo &info) {
     met_trace();
 
     // Output data structure 
-    tbb::concurrent_vector<Basis::vec_type> tbb_output;
-    tbb_output.reserve(info.n_samples);
+    std::vector<Basis::vec_type> output;
+    output.reserve(info.n_samples);
     
     if constexpr (use_basis_indirect_mismatch) {
       // Sample unit vectors in nd; total nr. of objectives is counted
@@ -552,7 +561,11 @@ namespace met {
           auto coeffs = solve(local_solver).x.cast<float>().eval();
           guard_continue(!coeffs.array().isNaN().any());
           guard_continue(!coeffs.array().isZero());
-          tbb_output.push_back(coeffs);
+
+          #pragma omp critical
+          {
+            output.push_back(coeffs);
+          }
         } // for (int i)
       }
     } else {
@@ -616,7 +629,7 @@ namespace met {
       } */
     }
     
-    return std::vector<Basis::vec_type>(range_iter(tbb_output));
+    return output;
   }
 
   std::vector<Basis::vec_type> generate_color_system_ocs_coeffs(const DirectColorSystemOCSInfo &info) {
@@ -626,8 +639,8 @@ namespace met {
     auto samples = detail::gen_unit_dirs<3>(info.n_samples, info.seed);
 
     // Output for parallel solve
-    tbb::concurrent_vector<Basis::vec_type> tbb_output;
-    tbb_output.reserve(samples.size());
+    std::vector<Basis::vec_type> output;
+    output.reserve(samples.size());
 
     // Parallel solve for boundary spectra
     auto A = info.direct_objective.finalize();
@@ -647,10 +660,14 @@ namespace met {
       // Store valid spectrum
       guard_continue(!c.array().isNaN().any());
       guard_continue(!c.array().isZero());
-      tbb_output.push_back(c);
+
+      #pragma omp critical
+      {
+        output.push_back(c);
+      }
     }
     
-    return std::vector<Basis::vec_type>(range_iter(tbb_output));
+    return output;
   }
 
   std::vector<Spec> generate_color_system_ocs(const DirectColorSystemOCSInfo &info) {
