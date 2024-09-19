@@ -18,7 +18,7 @@ namespace met {
     }
   } // namespace detail
 
-  bool ViewSettings::operator==(const ViewSettings &o) const {
+  bool View::operator==(const View &o) const {
     guard(film_size.isApprox(o.film_size), false);
     return std::tie(observer_i, camera_trf, camera_fov_y)
         == std::tie(o.observer_i, o.camera_trf, o.camera_fov_y);

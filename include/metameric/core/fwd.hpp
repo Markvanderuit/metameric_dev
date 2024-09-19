@@ -12,7 +12,7 @@ namespace met {
   struct Emitter;
   struct Object;
   struct Settings;
-  struct ViewSettings;
+  struct View;
   struct Uplifting;
 
   // Scene resources

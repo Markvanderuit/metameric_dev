@@ -18,7 +18,7 @@ namespace met {
       detail::ComponentVector<Emitter>      emitters;     // Scene emitters
       detail::ComponentVector<Object>       objects;      // Scene objects
       detail::ComponentVector<Uplifting>    upliftings;   // Uplifting structures used by objects to uplift albedo
-      detail::ComponentVector<ViewSettings> views;        // Scene cameras for rendering output
+      detail::ComponentVector<View>         views;        // Scene cameras for rendering output
       detail::Component<Settings>           settings;     // Miscellaneous settings; e.g. texture size
     } components;
 
@@ -88,7 +88,7 @@ namespace met {
     // Realize the observer data of a certain view
     CMFS primary_observer() const;
     CMFS view_observer(uint i) const;
-    CMFS view_observer(ViewSettings i) const;
+    CMFS view_observer(View i) const;
 
     // Extract a specific uplifting vertex, given indices;
     // added here given the common cumbersomeness of deep access
@@ -117,7 +117,7 @@ namespace met {
     else if constexpr (std::is_same_v<value_type, Emitter>)      return scene.components.emitters;
     else if constexpr (std::is_same_v<value_type, Object>)       return scene.components.objects;
     else if constexpr (std::is_same_v<value_type, Uplifting>)    return scene.components.upliftings;
-    else if constexpr (std::is_same_v<value_type, ViewSettings>) return scene.components.views;
+    else if constexpr (std::is_same_v<value_type, View>) return scene.components.views;
     else if constexpr (std::is_same_v<value_type, Mesh>)         return scene.resources.meshes;
     else if constexpr (std::is_same_v<value_type, Image>)        return scene.resources.images;
     else if constexpr (std::is_same_v<value_type, CMFS>)         return scene.resources.observers;
@@ -134,7 +134,7 @@ namespace met {
     else if constexpr (std::is_same_v<value_type, Emitter>)      return scene.components.emitters;
     else if constexpr (std::is_same_v<value_type, Object>)       return scene.components.objects;
     else if constexpr (std::is_same_v<value_type, Uplifting>)    return scene.components.upliftings;
-    else if constexpr (std::is_same_v<value_type, ViewSettings>) return scene.components.views;
+    else if constexpr (std::is_same_v<value_type, View>) return scene.components.views;
     else if constexpr (std::is_same_v<value_type, Mesh>)         return scene.resources.meshes;
     else if constexpr (std::is_same_v<value_type, Image>)        return scene.resources.images;
     else if constexpr (std::is_same_v<value_type, CMFS>)         return scene.resources.observers;

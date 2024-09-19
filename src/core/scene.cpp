@@ -104,7 +104,7 @@ namespace met {
     js.at("view_scale").get_to(settings.view_scale);
   }
 
-  void to_json(json &js, const ViewSettings &view) {
+  void to_json(json &js, const View &view) {
     met_trace();
     js = {{ "observer_i",    view.observer_i   },
           { "camera_trf",    view.camera_trf   },
@@ -112,7 +112,7 @@ namespace met {
           { "film_size",     view.film_size    }};
   }
 
-  void from_json(const json &js, ViewSettings &view) {
+  void from_json(const json &js, View &view) {
     met_trace();
     js.at("observer_i").get_to(view.observer_i);
     js.at("camera_trf").get_to(view.camera_trf);
@@ -263,7 +263,7 @@ namespace met {
     resources.bases.push("Default basis", basis, false);
 
     // Default view, used by viewport
-    components.views.push("Default view", ViewSettings());
+    components.views.push("Default view", View());
 
     // Default color system
     ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };
@@ -903,7 +903,7 @@ namespace met {
     return view_observer(components.views[i].value);
   }
 
-  met::CMFS Scene::view_observer(ViewSettings i) const {
+  met::CMFS Scene::view_observer(View i) const {
     met_trace();
     return resources.observers[i.observer_i].value();
   }

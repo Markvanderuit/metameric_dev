@@ -153,7 +153,7 @@ namespace met {
         push_editor<detail::Component<Emitter>>(info,      { .editor_name = "Emitters" });
         push_editor<detail::Component<Uplifting>>(info,    { .editor_name = "Uplifting models" });
         push_editor<detail::Component<ColorSystem>>(info,  { .editor_name = "Color systems", .edit_name = false });
-        push_editor<detail::Component<ViewSettings>>(info, { .editor_name = "Views" });
+        push_editor<detail::Component<View>>(info, { .editor_name = "Views" });
       }
       ImGui::End();
     });
@@ -173,15 +173,6 @@ namespace met {
       }
       ImGui::End();
     });
-
-    // scheduler.task("gnome_rotator").init<LambdaTask>([](auto &info) {
-    //   met_trace();
-    //   try {
-    //     auto &e_scene = info.global("scene").getw<Scene>();
-    //     auto &e_gnome = e_scene.components.objects[4].value;
-    //     e_gnome.transform.rotation.y() += 0.1f;
-    //   } catch (const std::exception &e) { /* Ignore; gnome not loaded yet */ }
-    // });
 
     scheduler.task("viewport").init<SceneViewportTask>();
 

@@ -40,7 +40,7 @@ namespace met {
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Emitter> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<Uplifting> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ColorSystem> &);
-    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<ViewSettings> &);
+    template <> void edit_visitor_default(SchedulerHandle &, uint i, Component<View> &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Mesh>  &);
     template <> void edit_visitor_default(SchedulerHandle &, uint i, const Resource<Image> &);
 

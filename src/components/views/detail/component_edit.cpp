@@ -288,7 +288,7 @@ namespace met {
 
     // Default implementation of editing visitor for Emitter components
     template <>
-    void edit_visitor_default(SchedulerHandle &info, uint i, Component<ViewSettings> &component) {
+    void edit_visitor_default(SchedulerHandle &info, uint i, Component<View> &component) {
       // Get external resources and shorthands
       const auto &scene = info.global("scene").getr<Scene>();
       auto &value = component.value;
