@@ -188,3 +188,19 @@ if (MET_ENABLE_TESTS)
   target_compile_features(metameric_tests PUBLIC cxx_std_23)
   catch_discover_tests(metameric_tests WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
+
+# Finally, handle dependency copy if necessary
+add_custom_command(
+  TARGET metameric_editor POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:metameric_editor> $<TARGET_FILE_DIR:metameric_editor> COMMAND_EXPAND_LISTS
+)
+
+# Copy tbb12 so embree doesn't break things
+if (WIN32)
+  add_custom_command(
+    TARGET metameric_editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${TBB12_LIBRARY}
+    $<TARGET_FILE_DIR:metameric_editor>/tbb12.dll
+  )
+endif()
