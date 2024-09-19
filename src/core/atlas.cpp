@@ -1,5 +1,5 @@
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/detail/texture_atlas.hpp>
+#include <metameric/core/atlas.hpp>
 #include <algorithm>
 #include <deque>
 
@@ -53,9 +53,9 @@ namespace met {
   }
 
   template <typename T, uint D>
-  void TextureAtlas<T, D>::resize(vec2 size, uint count) {
+  void TextureAtlas<T, D>::resize(eig::Array2u size, uint count) {
     met_trace_full();
-    std::vector<vec2> v(count, size);
+    std::vector<eig::Array2u> v(count, size);
     resize(v);
   }
 
@@ -70,7 +70,7 @@ namespace met {
   }
 
   template <typename T, uint D>
-  void TextureAtlas<T, D>::reserve(vec3 new_capacity) {
+  void TextureAtlas<T, D>::reserve(eig::Array3u new_capacity) {
     met_trace_full();
     
     // Only grow if necessary. texture.shrink_to_fit() handles, well, shrinking
@@ -83,7 +83,7 @@ namespace met {
   }
 
   template <typename T, uint D>
-  TextureAtlas<T, D>::vec3 TextureAtlas<T, D>::capacity() const { 
+  eig::Array3u TextureAtlas<T, D>::capacity() const { 
     return m_texture.is_init() ? m_texture.size() : 0;
   }
 
@@ -99,7 +99,7 @@ namespace met {
   }
   
   template <typename T, uint D>
-  void TextureAtlas<T, D>::resize(std::span<vec2> sizes) {
+  void TextureAtlas<T, D>::resize(std::span<eig::Array2u> sizes) {
     met_trace_full();
 
     m_is_invalitated = false;
@@ -115,15 +115,15 @@ namespace met {
     }
 
     // Determine maximum horizontal/vertical patch size plus potential padding
-    vec2 max_size = { rng::max(sizes, {}, [](auto v) { return v.x(); }).x() + 2 * m_padding,
-                      rng::max(sizes, {}, [](auto v) { return v.y(); }).y() + 2 * m_padding };
+    eig::Array2u max_size = { rng::max(sizes, {}, [](auto v) { return v.x(); }).x() + 2 * m_padding,
+                              rng::max(sizes, {}, [](auto v) { return v.y(); }).y() + 2 * m_padding };
     
     // Establish necessary capacity based on existing texture's size, or size of the maximum
     // h/v patch size if capacity is already insufficient
-    vec3 new_capacity = (vec3() << capacity().head<2>().max(max_size), 1).finished();
+    auto new_capacity = (eig::Array3u() << capacity().head<2>().max(max_size), 1).finished();
 
     // Generate work data; copy all input sizes, assign them an index, and sort them by area
-    struct Work { uint i; vec2 size; };
+    struct Work { uint i; eig::Array2u size; };
     std::vector<Work> work_data(sizes.size());
     for (uint i = 0; i < sizes.size(); ++i)
       work_data[i] = { .i = i, .size = sizes[i] };
@@ -150,7 +150,7 @@ namespace met {
 
     // Helper capture to grow the texture's estimated necessary capacity
     // following the specified growth method
-    auto perform_grow = [&](vec2 size) {
+    auto perform_grow = [&](eig::Array2u size) {
       switch (m_method) {
         case BuildMethod::eLayered:
           new_capacity.z()++;
@@ -202,7 +202,7 @@ namespace met {
 
     // Tightly pack capacity for the current required space
     auto view = new_patches | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
-    auto maxm = rng::fold_left(view, vec2(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
+    auto maxm = rng::fold_left(view, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
     auto maxl = 1 + rng::max(new_patches, {}, &PatchLayout::layer_i).layer_i;
     new_capacity = { maxm.x(), maxm.y(), maxl };
 
@@ -252,9 +252,9 @@ namespace met {
 
     // Tightly pack capacity for the current required space
     auto view = m_patches | vws::transform([&](const auto &s) { return s.offs + s.size + m_padding; });
-    auto maxm = rng::fold_left(view, vec2(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
+    auto maxm = rng::fold_left(view, eig::Array2u(0), [](auto a, auto b) { return a.cwiseMax(b).eval();  });
     auto maxl = 1 + rng::max(m_patches, {}, &PatchLayout::layer_i).layer_i;
-    vec3 new_capacity = { maxm.x(), maxm.y(), maxl };
+    eig::Array3u new_capacity = { maxm.x(), maxm.y(), maxl };
     
     dstr_views();
 

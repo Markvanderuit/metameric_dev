@@ -1,5 +1,5 @@
+#include <metameric/core/bvh.hpp>
 #include <metameric/core/ranges.hpp>
-#include <metameric/core/detail/bvh.hpp>
 #include <embree4/rtcore.h>
 #include <algorithm>
 #include <execution>
@@ -200,7 +200,7 @@ namespace met {
     return f[0](info);
   }
 
-  BVH create_bvh(BVHCreateMeshInfo info) {
+  BVH::BVH(CreateMeshInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
@@ -227,12 +227,12 @@ namespace met {
     } // for (int i)
 
     // return create_bvh_internal_varargs<2, 4, 8>({
-    return create_bvh_internal_varargs<8>({
+    *this = create_bvh_internal_varargs<8>({
       .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
     });
   }
   
-  BVH create_bvh(BVHCreateAABBInfo info) {
+  BVH::BVH(CreateAABBInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
@@ -249,8 +249,7 @@ namespace met {
       prims[i] = prim;
     } // for (int i)
 
-    // return create_bvh_internal_varargs<2, 4, 8>({
-    return create_bvh_internal_varargs<8>({
+    *this = create_bvh_internal_varargs<8>({
       .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
     });
   }

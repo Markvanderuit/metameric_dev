@@ -1,12 +1,10 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/json.hpp>
 #include <metameric/core/record.hpp>
 #include <metameric/core/metamer.hpp>
-#include <metameric/core/spectrum.hpp>
-#include <metameric/core/detail/scene_fwd.hpp>
-#include <utility>
+#include <metameric/core/utility.hpp>
 
 namespace met {
   // Small helper struct; specifying linear illumination or observer constraints

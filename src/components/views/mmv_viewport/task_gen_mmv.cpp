@@ -1,8 +1,7 @@
+#include <metameric/core/convex.hpp>
 #include <metameric/core/distribution.hpp>
-#include <metameric/core/mesh.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/record.hpp>
-#include <metameric/core/mesh.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>

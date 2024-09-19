@@ -3,9 +3,6 @@
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
 #include <small_gl/fwd.hpp>
-#include <algorithm>
-#include <functional>
-#include <numeric>
 #include <random>
 
 namespace met {

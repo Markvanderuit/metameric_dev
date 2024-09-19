@@ -3,7 +3,6 @@
 #include <metameric/core/fwd.hpp>
 #include <metameric/core/constraints.hpp>
 #include <metameric/core/detail/scene_components.hpp>
-#include <vector>
 
 namespace met {
   /* Scene settings data layout. */

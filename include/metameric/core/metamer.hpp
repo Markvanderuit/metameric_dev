@@ -1,8 +1,6 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
-#include <metameric/core/convex.hpp>
-#include <metameric/core/spectrum.hpp>
+#include <metameric/core/fwd.hpp>
 
 namespace met {
   // Argument struct and method for generating a spectral reflectance, given one or more

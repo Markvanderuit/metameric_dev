@@ -1,12 +1,12 @@
 #pragma once
 
+#include <metameric/core/fwd.hpp>
+#include <metameric/core/atlas.hpp>
+#include <metameric/core/bvh.hpp>
+#include <metameric/core/components.hpp>
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/image.hpp>
-#include <metameric/core/spectrum.hpp>
-#include <metameric/core/components.hpp>
-#include <metameric/core/detail/bvh.hpp>
 #include <metameric/core/detail/packing.hpp>
-#include <metameric/core/detail/texture_atlas.hpp>
 #include <small_gl/array.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>

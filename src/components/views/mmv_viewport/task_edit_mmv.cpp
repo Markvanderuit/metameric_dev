@@ -1,10 +1,10 @@
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/detail/component_edit.hpp>
 #include <metameric/components/views/detail/file_dialog.hpp>
+#include <metameric/core/convex.hpp>
 #include <metameric/core/metamer.hpp>
 #include <metameric/core/moments.hpp>
-#include <metameric/core/mesh.hpp>
-#include <metameric/core/image.hpp>
+#include <metameric/core/scene.hpp>
 #include <metameric/core/ranges.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>

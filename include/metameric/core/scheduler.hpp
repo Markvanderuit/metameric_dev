@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/detail/scheduler_base.hpp>
 #include <metameric/core/detail/scheduler_handle.hpp>
 #include <unordered_map>

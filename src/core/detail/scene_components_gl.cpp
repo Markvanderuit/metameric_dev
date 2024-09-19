@@ -4,8 +4,8 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
-#include <ranges>
 #include <numbers>
+#include <numeric>
 
 namespace met::detail {
   // Buffer access flags for writeable, flusheable mapped buffer
@@ -175,7 +175,7 @@ namespace met::detail {
 
     // Test if the necessitated inputs match exactly to the atlas' reserved patches
     bool is_exact_fit = rng::equal(inputs, texture_coefficients.patches(),
-      eig::safe_approx_compare<eig::Array2u>, {}, &detail::TextureAtlasBase::PatchLayout::size);
+      eig::safe_approx_compare<eig::Array2u>, {}, &atlas_type_u::PatchLayout::size);
 
     // Regenerate atlas if inputs don't match the atlas' current layout
     // Note; barycentric weights will need a full rebuild, which is detected
@@ -335,9 +335,9 @@ namespace met::detail {
       m_meshes[i]   = simplified_mesh<met::Mesh>(value, 12288, 1e-3);
       txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
       transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_bvhs[i]     = create_bvh({ .mesh            = m_meshes[i], 
-                                   .n_node_children = 8, 
-                                   .n_leaf_children = 3 });
+      m_bvhs[i]     = {{ .mesh = m_meshes[i], 
+                         .n_node_children = 8, 
+                         .n_leaf_children = 3 }};
             
       // Set appropriate mesh transform in buffer
       m_mesh_info_map->data[i].trf = transforms[i];

@@ -16,15 +16,20 @@ namespace met {
   struct Uplifting;
 
   // Scene resources
+  struct BVH;
   struct Image;
   template <typename Vt, typename El>
   struct MeshBase;
+  template <typename Vt> 
+  struct ConvexHullBase;
   
-  // General mesh/delaunay types used throughout the application
-  using Mesh       = MeshBase<eig::Array3f,   eig::Array3u>;
-  using AlMesh     = MeshBase<eig::AlArray3f, eig::Array3u>;
-  using Delaunay   = MeshBase<eig::Array3f,   eig::Array4u>;
-  using AlDelaunay = MeshBase<eig::AlArray3f, eig::Array4u>;
+  // General mesh/delaunay/chull types used throughout the application
+  using Mesh         = MeshBase<eig::Array3f,   eig::Array3u>;
+  using AlMesh       = MeshBase<eig::AlArray3f, eig::Array3u>;
+  using Delaunay     = MeshBase<eig::Array3f,   eig::Array4u>;
+  using AlDelaunay   = MeshBase<eig::AlArray3f, eig::Array4u>;
+  using ConvexHull   = ConvexHullBase<eig::Array3f>;
+  using AlConvexHull = ConvexHullBase<eig::AlArray3f>;
 
   // Uplifting constraint vertices
   struct LinearConstraint;
@@ -33,12 +38,6 @@ namespace met {
   struct DirectColorConstraint;
   struct DirectSurfaceConstraint;
   struct IndirectSurfaceConstraint;
-
-  // Convex structure helpers
-  template <typename Vt> 
-  struct ConvexHullBase;
-  using ConvexHull   = ConvexHullBase<eig::Array3f>;
-  using AlConvexHull = ConvexHullBase<eig::AlArray3f>;
 
   // Sampling distribution helpers
   class PCGEngine;

@@ -56,7 +56,7 @@ namespace met {
       // because QHull can throw a fit on small inputs
       // if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .005f) {
       if (m_colr_samples.size() >= 6 && (maxb - minb).minCoeff() > .0005f) {
-        chull = ConvexHull::build(m_colr_samples | rng::to<std::vector>());
+        chull = {{ .data = m_colr_samples | rng::to<std::vector>() }};
       } else {
         chull = { };
       }

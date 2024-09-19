@@ -1,12 +1,7 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
-#include <metameric/core/mesh.hpp>
-#include <metameric/core/image.hpp>
-#include <metameric/core/spectrum.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/record.hpp>
-#include <metameric/core/utility.hpp>
-#include <metameric/core/components.hpp>
 #include <metameric/core/detail/scene_components_gl.hpp>
 #include <metameric/core/detail/scene_components_state.hpp>
 

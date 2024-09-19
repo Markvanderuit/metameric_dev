@@ -1,6 +1,6 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
 #include <nlopt.hpp>
 #include <autodiff/forward/real.hpp>

@@ -1,11 +1,8 @@
 #pragma once
 
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/serialization.hpp>
-#include <metameric/core/utility.hpp>
 #include <metameric/core/detail/scene_components_utility.hpp>
-#include <concepts>
-#include <functional>
-#include <type_traits>
 
 namespace met::detail {
   /* Scene component.

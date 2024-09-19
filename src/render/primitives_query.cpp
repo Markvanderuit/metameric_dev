@@ -1,4 +1,5 @@
 #include <metameric/core/distribution.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_query.hpp>
 

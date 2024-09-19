@@ -1,8 +1,7 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
-#include <metameric/core/detail/scene_fwd.hpp>
 
 namespace met::detail {
   // Base class for SceneGLHandler and template specializations; only specifies

@@ -11,11 +11,8 @@
 #include <metameric/render/primitives_query.hpp>
 #include <small_gl/texture.hpp>
 #include <small_gl/window.hpp>
-
-// TODO remove
 #include <algorithm>
 #include <execution>
-#include <implot.h>
 
 namespace met {
   class MeshViewportQueryInputTask : public detail::TaskNode {

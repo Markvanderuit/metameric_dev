@@ -1,51 +1,41 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/texture.hpp>
 
 namespace met {
-  namespace detail {
-    // TextureAtlasBase
-    // Common base of TextureAtlas<T, D> objects, defining related types and enums
-    struct TextureAtlasBase {
-      using vec2 = eig::Array2u;
-      using vec3 = eig::Array3u;
-
-      // Build methods; either prefer adding extra layers, or grow the texture
-      // horizontally/vertically if capacity is insufficient
-      enum BuildMethod {
-        eLayered, eSpread
-      };
-
-      // Object describing a single texture patch reserved inside the atlas,
-      // fit for std140/std430 buffer layout
-      struct PatchLayout {
-        alignas(4) uint layer_i;
-        alignas(8) eig::Array2u offs, size;
-        alignas(8) eig::Array2f uv0, uv1;
-      };
-
-      // Helper object for initializing TextureAtlas
-      struct CreateInfo {
-        std::vector<vec2> sizes;
-        uint              levels  = 1u;
-        uint              padding = 0u;
-        BuildMethod       method  = BuildMethod::eSpread;
-      };
-    };
-  } // namespace detail
-
+  // Object describing a single texture patch reserved inside an arbitrary
+  // atlas, fit for std140/std430 buffer layout. Kept separate as it is
+  // template-independent, and we use it between different-typed atlases.
+  struct TextureAtlasPatchLayout {
+    alignas(4) uint layer_i;
+    alignas(8) eig::Array2u offs, size;
+    alignas(8) eig::Array2f uv0, uv1;
+  };
+  
   /* TextureAtlas
      Simple wrapper around OpenGL-side array texture for handling of a number
      of similarly-sized textures.
    */
   template <typename T, uint D>
-  struct TextureAtlas : detail::TextureAtlasBase {
-    using InfoType    = TextureAtlasBase::CreateInfo;
+  struct TextureAtlas {
     using Texture     = gl::Texture2d<T, D, gl::TextureType::eImageArray>;
     using TextureView = gl::TextureView2d<T, D>;
+    using PatchLayout = TextureAtlasPatchLayout;
+
+    // Build methods; either prefer adding extra layers, or grow the texture
+    // horizontally/vertically if capacity is insufficient
+    enum BuildMethod { eLayered, eSpread };
+
+    // Helper object for construction of TextureAtlas
+    struct CreateInfo {
+      std::vector<eig::Array2u> sizes;
+      uint                      levels  = 1u;
+      uint                      padding = 0u;
+      BuildMethod               method  = BuildMethod::eSpread;
+    };
 
   private:
     // Current reserved spaces and remainder spaces
@@ -69,6 +59,8 @@ namespace met {
     void reserve_buffer(size_t size);
     
   public: // Construction
+    using InfoType = CreateInfo;
+
     TextureAtlas() = default;
    ~TextureAtlas() = default;
     TextureAtlas(InfoType info);
@@ -76,20 +68,20 @@ namespace met {
   public: // Texture space management
     // Given a range of sizes, ensure all sizes have a reserved space available.
     // Potentially grows the underlying texture, invalidating its contents
-    void resize(vec2 size, uint count);
-    void resize(std::span<vec2> sizes);
+    void resize(eig::Array2u size, uint count);
+    void resize(std::span<eig::Array2u> sizes);
 
     // Remove all reservations
     void clear();
 
     // Ensure the underlying texture's capacity is greater or equal than `size`
-    void reserve(vec3 size);
+    void reserve(eig::Array3u size);
 
     // Reduce the underlying texture's capacity to tightly fit the current patch sizes
     void shrink_to_fit();
 
     // Return the current underlying texture's capacity, ergo its full size
-    vec3 capacity() const;
+    eig::Array3u capacity() const;
 
   public:
     // Test if the last call to texture.resize()/reserve() invalidated

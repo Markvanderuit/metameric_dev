@@ -1,7 +1,6 @@
 #pragma once
 
 #include <metameric/core/spectrum.hpp>
-#include <metameric/core/detail/packing.hpp>
 
 namespace met {
   // Output moment coefficients

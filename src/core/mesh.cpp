@@ -7,12 +7,8 @@
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullVertexSet.h>
 #include <libqhullcpp/QhullPoints.h>
-#include <fmt/ranges.h>
-#include <oneapi/tbb/concurrent_vector.h>
 #include <algorithm>
 #include <execution>
-#include <ranges>
-#include <vector>
 
 namespace met {
   namespace detail {
