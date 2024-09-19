@@ -156,7 +156,6 @@ namespace met::detail {
       std::array<MeshBlockLayout, met_max_meshes> data;
     } *m_mesh_info_map;
 
-  private:
     // Caches of simplified meshes and generated acceleration data
     std::vector<met::Mesh> m_meshes;
     std::vector<met::BVH>  m_bvhs;

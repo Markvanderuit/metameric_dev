@@ -62,7 +62,15 @@ endif(MSVC)
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 
-# Include third party libraries provided through vcpkg
+# Include xAtlas/Autodiff/small_gl manually
+option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
+option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
+add_subdirectory(third_party/xatlas)
+add_subdirectory(third_party/autodiff)
+add_subdirectory(third_party/small_gl)
+add_subdirectory(third_party/embree)
+
+# Include third party libraries
 find_package(assimp    CONFIG REQUIRED)
 find_package(Catch2    CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
@@ -85,20 +93,13 @@ find_package(embree    CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_c_lexer.h")
 find_path(ZSTR_INCLUDE_DIRS "zstr.hpp")
 
-# Include xAtlas/Autodiff/small_gl manually
-option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
-option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
-add_subdirectory(third_party/xatlas)
-add_subdirectory(third_party/autodiff)
-add_subdirectory(third_party/small_gl)
-
 # Specify cmake modules/finds
 include(CTest)
 include(Catch)
 include(spirv)
 include(resource)
 
-# Gather all preprocessor values into one list
+# Gather all preprocessor values into one list; these are passed to cxx and glsl
 set(preprocessor_defines
   -DMET_WAVELENGTH_MIN=${MET_WAVELENGTH_MIN} 
   -DMET_WAVELENGTH_MAX=${MET_WAVELENGTH_MAX} 
