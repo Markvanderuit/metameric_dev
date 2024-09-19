@@ -71,6 +71,8 @@ namespace met {
 
   public: // Scene data helper functions
     // Realize the spectral data of a certain color system (or a pretty-printed name)
+    ColrSystem csys(const Uplifting &uplifting) const;
+    std::string csys_name(const Uplifting &uplifting) const;
     ColrSystem csys(uint cmfs_i, uint illm_i) const;
     std::string csys_name(uint cmfs_i, uint illm_i) const;
 
@@ -106,15 +108,14 @@ namespace met {
   constexpr
   auto & scene_data_by_type(Scene &scene) {
     using value_type = typename Ty::value_type;
-    if      constexpr (std::is_same_v<value_type, ColorSystem>)  return scene.components.colr_systems;
-    else if constexpr (std::is_same_v<value_type, Emitter>)      return scene.components.emitters;
-    else if constexpr (std::is_same_v<value_type, Object>)       return scene.components.objects;
-    else if constexpr (std::is_same_v<value_type, Uplifting>)    return scene.components.upliftings;
-    else if constexpr (std::is_same_v<value_type, View>) return scene.components.views;
-    else if constexpr (std::is_same_v<value_type, Mesh>)         return scene.resources.meshes;
-    else if constexpr (std::is_same_v<value_type, Image>)        return scene.resources.images;
-    else if constexpr (std::is_same_v<value_type, CMFS>)         return scene.resources.observers;
-    else if constexpr (std::is_same_v<value_type, Spec>)         return scene.resources.illuminants;
+    if      constexpr (std::is_same_v<value_type, Emitter>)   return scene.components.emitters;
+    else if constexpr (std::is_same_v<value_type, Object>)    return scene.components.objects;
+    else if constexpr (std::is_same_v<value_type, Uplifting>) return scene.components.upliftings;
+    else if constexpr (std::is_same_v<value_type, View>)      return scene.components.views;
+    else if constexpr (std::is_same_v<value_type, Mesh>)      return scene.resources.meshes;
+    else if constexpr (std::is_same_v<value_type, Image>)     return scene.resources.images;
+    else if constexpr (std::is_same_v<value_type, CMFS>)      return scene.resources.observers;
+    else if constexpr (std::is_same_v<value_type, Spec>)      return scene.resources.illuminants;
     else debug::check_expr(false, "scene_data_by_type<Ty> exhausted implemented options");
   }
 
@@ -123,15 +124,14 @@ namespace met {
   constexpr
   const auto & scene_data_by_type(const Scene &scene) {
     using value_type = typename Ty::value_type;
-    if      constexpr (std::is_same_v<value_type, ColorSystem>)  return scene.components.colr_systems;
-    else if constexpr (std::is_same_v<value_type, Emitter>)      return scene.components.emitters;
-    else if constexpr (std::is_same_v<value_type, Object>)       return scene.components.objects;
-    else if constexpr (std::is_same_v<value_type, Uplifting>)    return scene.components.upliftings;
-    else if constexpr (std::is_same_v<value_type, View>) return scene.components.views;
-    else if constexpr (std::is_same_v<value_type, Mesh>)         return scene.resources.meshes;
-    else if constexpr (std::is_same_v<value_type, Image>)        return scene.resources.images;
-    else if constexpr (std::is_same_v<value_type, CMFS>)         return scene.resources.observers;
-    else if constexpr (std::is_same_v<value_type, Spec>)         return scene.resources.illuminants;
+    if      constexpr (std::is_same_v<value_type, Emitter>)   return scene.components.emitters;
+    else if constexpr (std::is_same_v<value_type, Object>)    return scene.components.objects;
+    else if constexpr (std::is_same_v<value_type, Uplifting>) return scene.components.upliftings;
+    else if constexpr (std::is_same_v<value_type, View>)      return scene.components.views;
+    else if constexpr (std::is_same_v<value_type, Mesh>)      return scene.resources.meshes;
+    else if constexpr (std::is_same_v<value_type, Image>)     return scene.resources.images;
+    else if constexpr (std::is_same_v<value_type, CMFS>)      return scene.resources.observers;
+    else if constexpr (std::is_same_v<value_type, Spec>)      return scene.resources.illuminants;
     debug::check_expr(false, "scene_data_by_type<Ty> exhausted implemented options");
   }
 } // namespace met

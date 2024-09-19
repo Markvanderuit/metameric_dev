@@ -178,7 +178,7 @@ namespace met {
     // Gather all relevant color system spectra and corresponding color signals
     auto basis = scene.resources.bases[uplifting.basis_i].value();
     DirectSpectrumInfo spec_info = {
-      .linear_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
+      .linear_constraints = {{ scene.csys(uplifting), colr_i }},
       .basis              = basis
     };
     for (const auto &c : cstr_j)
@@ -197,7 +197,7 @@ namespace met {
     // Gather all relevant color system spectra and corresponding color signals
     auto basis = scene.resources.bases[uplifting.basis_i].value();
     DirectSpectrumInfo spec_info = {
-      .linear_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
+      .linear_constraints = {{ scene.csys(uplifting), colr_i }},
       .basis              = basis
     };
     for (const auto &c : cstr_j)
@@ -238,7 +238,7 @@ namespace met {
       
       auto basis = scene.resources.bases[uplifting.basis_i].value();
       DirectSpectrumInfo spec_info = {
-        .linear_constraints = {{ scene.csys(uplifting.csys_i), colr_i }},
+        .linear_constraints = {{ scene.csys(uplifting), colr_i }},
         .basis              = basis
       };
 
@@ -262,7 +262,7 @@ namespace met {
 
     // Base roundtrip objective
     if (is_base_active)
-      info.linear_objectives.push_back(scene.csys(uplifting.csys_i));
+      info.linear_objectives.push_back(scene.csys(uplifting));
 
     // Specify direct color systems forming objective
     rng::transform(direct_cstr, 
@@ -271,7 +271,7 @@ namespace met {
 
     // Base roundtrip constraint
     if (is_base_active)
-      info.linear_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      info.linear_constraints.push_back({ scene.csys(uplifting), colr_i });
 
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
@@ -296,7 +296,7 @@ namespace met {
 
     // Base roundtrip objective
     if (is_base_active)
-      info.linear_objectives.push_back(scene.csys(uplifting.csys_i));
+      info.linear_objectives.push_back(scene.csys(uplifting));
 
     // Specify direct color systems forming objective
     rng::transform(direct_cstr, 
@@ -305,7 +305,7 @@ namespace met {
 
     // Base roundtrip constraint
     if (is_base_active)
-      info.linear_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      info.linear_constraints.push_back({ scene.csys(uplifting), colr_i });
 
     // Specify direct color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(direct_cstr | vws::take(direct_cstr.size() - 1), 
@@ -343,7 +343,7 @@ namespace met {
 
     // Base roundtrip constraint
     if (is_base_active)
-      info.linear_constraints.push_back({ scene.csys(uplifting.csys_i), colr_i });
+      info.linear_constraints.push_back({ scene.csys(uplifting), colr_i });
       
     // Specify direct/indirect color constraints; all but the last constraint (the "free variable") are specified
     rng::transform(indrct_cstr | vws::take(indrct_cstr.size() - 1), 

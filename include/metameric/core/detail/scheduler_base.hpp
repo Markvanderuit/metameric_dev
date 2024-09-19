@@ -1,8 +1,8 @@
 #pragma once
 
+#include <metameric/core/fwd.hpp>
 #include <metameric/core/utility.hpp>
 #include <memory>
-#include <string>
 
 namespace met {
   // Forward declarations

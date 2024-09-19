@@ -72,7 +72,7 @@ namespace met {
         // CSYS editor column
         ImGui::TableSetColumnIndex(1);
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        ImGui::Text(e_scene.csys_name(uplf.value.csys_i).c_str());
+        ImGui::Text(e_scene.csys_name(*uplf).c_str());
 
         // lRGB/sRGB color column
         ImGui::TableSetColumnIndex(2);
@@ -81,7 +81,7 @@ namespace met {
         if (auto srgb = lrgb_to_srgb(cstr.colr_i); ImGui::ColorEdit3("##srgb", srgb.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float))
           cstr.colr_i = srgb_to_lrgb(srgb);
         ImGui::SameLine();
-        Colr err = (cstr.colr_i - e_scene.csys(uplf.value.csys_i)(spec)).abs();
+        Colr err = (cstr.colr_i - e_scene.csys(*uplf)(spec)).abs();
         ImGui::ColorEdit3("##err", err.data(), ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_Float);
         
         // Empty col, not deletable

@@ -100,7 +100,7 @@ namespace met {
                   + bary[2] * coeffs[2] + bary[3] * coeffs[3]).cwiseMax(-1.f).cwiseMin(1.f).eval();
         auto spec = scene.resources.bases[uplifting.basis_i].value()(coef);
         auto colr = vert.is_position_shifting()
-                  ? scene.csys(uplifting.csys_i)(spec)
+                  ? scene.csys(uplifting)(spec)
                   : vert.get_vertex_position();
 
         // Return all three

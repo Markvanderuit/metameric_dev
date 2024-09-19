@@ -74,15 +74,6 @@ namespace met {
     }
   }
 
-  // Legacy ColorSystem; needs to be removed after scene load
-  struct ColorSystem {
-    uint observer_i   = 0;
-    uint illuminant_i = 0;
-
-    friend
-    auto operator<=>(const ColorSystem &, const ColorSystem &) = default;
-  };
-
   void to_json(json &js, const Uplifting &uplifting) {
     met_trace();
     js = {{ "observer_i",   uplifting.observer_i   },
@@ -93,13 +84,10 @@ namespace met {
 
   void from_json(const json &js, Uplifting &uplifting) {
     met_trace();
-    
     if (js.contains("csys_i")) {
-      // Legacy code; todo remove
-      ColorSystem c;
-      js.at("csys_i").get_to(c);
-      uplifting.observer_i = c.observer_i;
-      uplifting.illuminant_i = c.illuminant_i;
+      // Legacy code; set to default for now
+      uplifting.observer_i = 0;
+      uplifting.illuminant_i = 0;
     } else {
       js.at("observer_i").get_to(uplifting.observer_i);
       js.at("illuminant_i").get_to(uplifting.illuminant_i);
@@ -205,25 +193,12 @@ namespace met {
     js.at("illuminant_scale").get_to(emitter.illuminant_scale);
   }
 
-  void to_json(json &js, const ColorSystem &csys) {
-    met_trace();
-    js = {{ "observer_i",   csys.observer_i   },
-          { "illuminant_i", csys.illuminant_i }};
-  }
-
-  void from_json(const json &js, ColorSystem &csys) {
-    met_trace();
-    js.at("observer_i").get_to(csys.observer_i);
-    js.at("illuminant_i").get_to(csys.illuminant_i);
-  }
-
   void to_json(json &js, const Scene &scene) {
     met_trace();
     js = {{ "settings",      scene.components.settings            },
           { "objects",       scene.components.objects.data()      },
           { "emitters",      scene.components.emitters.data()     },
           { "upliftings",    scene.components.upliftings.data()   },
-          { "colr_systems",  scene.components.colr_systems.data() },
           { "views",         scene.components.views.data()        }};
   }
 
@@ -233,7 +208,6 @@ namespace met {
     js.at("objects").get_to(scene.components.objects.data());
     js.at("emitters").get_to(scene.components.emitters.data());
     js.at("upliftings").get_to(scene.components.upliftings.data());
-    js.at("colr_systems").get_to(scene.components.colr_systems.data());
     js.at("views").get_to(scene.components.views.data());
   }
   
@@ -252,7 +226,7 @@ namespace met {
     }
   
     // Pre-supply some data for an initial scene
-    components.settings   = { .name  = "Settings", .value = {  }};
+    components.settings = { .name  = "Settings", .value = {  }};
     resources.illuminants.push("D65",              models::emitter_cie_d65,     false);
     resources.illuminants.push("D65 (normalized)", d65n,                        false);
     resources.illuminants.push("E",                models::emitter_cie_e,       false);
@@ -284,12 +258,8 @@ namespace met {
 
     // Default view, used by viewport
     components.views.push("Default view", View());
-
-    // Default color system
-    ColorSystem csys { .observer_i = 0, .illuminant_i = 0, };
-    components.colr_systems.push(csys_name(csys), csys);
     
-    // Default uplifting
+    // Default plane
     components.objects.emplace("Default object", { 
       .transform   = { .position = { 0.f, 0.f, 0.f },
                        .rotation = { 0.f, -90.f * std::numbers::pi_v<float> / 180.f, 0.f },
@@ -298,7 +268,13 @@ namespace met {
       .uplifting_i = 0,
       .diffuse     = Colr(0.5) 
     });
-    components.upliftings.emplace("Default uplifting", { .csys_i = 0, .basis_i = 0 });
+
+    // Default uplifting
+    components.upliftings.emplace("Default uplifting", { 
+      .observer_i   = 0,
+      .illuminant_i = 0,
+      .basis_i      = 0 
+    });
 
     // Default emitter
     components.emitters.push("Default emitter", {
@@ -395,7 +371,7 @@ namespace met {
     // Import scene objects/emitters/materials/etc, taking care to increment indexes while bookkeeping correctly
     std::transform(range_iter(other.components.upliftings), 
                    std::back_inserter(components.upliftings.data()), [&](auto component) {
-      component.value.csys_i += components.colr_systems.size();
+      // component.value.csys_i += components.colr_systems.size();
       // TODO update bookkeeping
       /* for (auto &vert : component.value.verts) {
         for (auto &j : vert.csys_j)
@@ -429,14 +405,14 @@ namespace met {
         component.value.illuminant_i += resources.illuminants.size();
       return component;
     });
-    std::transform(range_iter(other.components.colr_systems), 
-                   std::back_inserter(components.colr_systems.data()), [&](auto component) {
-      if (!other.resources.observers.empty())
-        component.value.observer_i   += resources.observers.size();
-      if (!other.resources.illuminants.empty())
-        component.value.illuminant_i += resources.illuminants.size();
-      return component;
-    });
+    // std::transform(range_iter(other.components.colr_systems), 
+    //                std::back_inserter(components.colr_systems.data()), [&](auto component) {
+    //   if (!other.resources.observers.empty())
+    //     component.value.observer_i   += resources.observers.size();
+    //   if (!other.resources.illuminants.empty())
+    //     component.value.illuminant_i += resources.illuminants.size();
+    //   return component;
+    // });
 
     // Append scene resources from other scene behind current scene's components
     resources.meshes.data().insert(resources.meshes.end(),           
@@ -885,6 +861,16 @@ namespace met {
 
     mods  = { };
     mod_i = -1;
+  }
+
+  met::ColrSystem Scene::csys(const Uplifting &uplifting) const {
+    met_trace();
+    return csys(uplifting.observer_i, uplifting.illuminant_i);
+  }
+
+  std::string Scene::csys_name(const Uplifting &uplifting) const {
+    met_trace();
+    return csys_name(uplifting.observer_i, uplifting.illuminant_i);
   }
 
   met::ColrSystem Scene::csys(uint cmfs_i, uint illm_i) const {

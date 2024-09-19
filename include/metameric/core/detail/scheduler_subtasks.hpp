@@ -1,7 +1,5 @@
 #pragma once
 
-#include <metameric/core/math.hpp>
-#include <metameric/core/detail/trace.hpp>
 #include <metameric/core/detail/scheduler_base.hpp>
 #include <functional>
 

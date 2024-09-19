@@ -8,12 +8,11 @@ namespace met {
   struct Scene;
 
   // Scene components
-  struct ColorSystem;
   struct Emitter;
   struct Object;
   struct Settings;
-  struct View;
   struct Uplifting;
+  struct View;
 
   // Scene resources
   struct BVH;

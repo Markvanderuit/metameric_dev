@@ -70,15 +70,17 @@ namespace met::detail {
   // for the members of met::Uplifting.
   template <>
   struct SceneStateHandler<Uplifting> : public SceneStateHandlerBase<Uplifting> {
-    SceneStateHandler<decltype(Uplifting::csys_i)>                 csys_i;
-    SceneStateHandler<decltype(Uplifting::basis_i)>                basis_i;
+    SceneStateHandler<decltype(Uplifting::observer_i)>              observer_i;
+    SceneStateHandler<decltype(Uplifting::illuminant_i)>            illuminant_i;
+    SceneStateHandler<decltype(Uplifting::basis_i)>                 basis_i;
     SceneStateVectorHandler<decltype(Uplifting::verts)::value_type> verts;
 
   public:
     bool update(const Uplifting &o) override {
       met_trace();
       return m_mutated = 
-      ( csys_i.update(o.csys_i)
+      ( observer_i.update(o.observer_i)
+      | illuminant_i.update(o.illuminant_i)
       | basis_i.update(o.basis_i) 
       | verts.update(o.verts)
       );

@@ -67,21 +67,25 @@ namespace met {
       = info.global("scene").getw<Scene>().components.upliftings[m_uplifting_i];
 
     // Get shared resources
-    const auto &e_csys    = e_scene.components.colr_systems[e_uplifting.csys_i];
     const auto &e_basis   = e_scene.resources.bases[e_uplifting.basis_i];
+    const auto &e_cmfs    = e_scene.resources.observers[e_uplifting.observer_i];
+    const auto &e_illm    = e_scene.resources.illuminants[e_uplifting.illuminant_i];
     const auto &e_objects = e_scene.components.objects;
     const auto &e_meshes  = e_scene.resources.meshes;
     const auto &e_images  = e_scene.resources.images;
     
     // Flag tells if the color system spectra have, in any way, been modified
-    bool csys_stale = is_first_eval() || e_state.basis_i || e_basis || e_state.csys_i || e_csys;
+    bool csys_stale = is_first_eval() 
+      || e_state.basis_i      || e_basis 
+      || e_state.observer_i   || e_cmfs
+      || e_state.illuminant_i || e_illm;
 
     // Flag tells if the resulting tesselation has, in any way, been modified;
     // this is set to true in step 2 if necessary
     bool tssl_stale = is_first_eval() || e_state.verts.is_resized() || csys_stale;
 
     // Color system spectra within which the 'uplifted' texture is defined
-    auto csys = e_scene.csys(e_csys.value);
+    auto csys = ColrSystem { .cmfs = *e_cmfs, .illuminant = *e_illm };
 
     // 1. Generate color system boundary (spectra)
     if (csys_stale) {

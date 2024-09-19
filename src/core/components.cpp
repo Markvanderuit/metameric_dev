@@ -48,7 +48,9 @@ namespace met {
   }
   
   bool Uplifting::operator==(const Uplifting &o) const {
-    return std::tie(csys_i, basis_i) == std::tie(o.csys_i, o.basis_i) && rng::equal(verts, o.verts);
+    return std::tie(observer_i, illuminant_i, basis_i)
+      == std::tie(o.observer_i, o.illuminant_i, o.basis_i) 
+      && rng::equal(verts, o.verts);
   }
 
   MismatchSample Uplifting::Vertex::realize(const Scene &scene, const Uplifting &uplifting) const {
@@ -61,7 +63,7 @@ namespace met {
     return constraint | visit([&](const auto &cstr) -> MismatchSample { 
       auto [s, c] = cstr.realize(scene, uplifting);
       auto p = is_position_shifting()
-             ? scene.csys(uplifting.csys_i)(s)
+             ? scene.csys(uplifting)(s)
              : get_vertex_position();
       return { p, s, c }; 
     });
@@ -258,29 +260,25 @@ namespace met {
     return constraint | visit { 
       [&](const DirectColorConstraint &c) {
         // Merge all known color system data
-        auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
         auto cstr = c.cstr_j
                   | vws::filter(&LinearConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
                   | rng::to<std::vector>();
-        cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
+        cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
 
         // Mismatching only occurs if there are two or more color systems, and all are unique
-        return cstr.size() > 1 
-            && !detail::has_duplicates(cstr);
+        return cstr.size() > 1 && !detail::has_duplicates(cstr);
       },
       [&](const DirectSurfaceConstraint &c) {
         // Merge all known color system data
-        auto cstr_i = scene.components.colr_systems[uplifting.csys_i].value;
         auto cstr = c.cstr_j
                   | vws::filter(&LinearConstraint::is_active)
                   | vws::transform([](const auto &v) { return std::pair { v.cmfs_j, v.illm_j }; })
                   | rng::to<std::vector>();
-        cstr.push_back({ cstr_i.observer_i, cstr_i.illuminant_i });
+        cstr.push_back(std::pair { uplifting.observer_i, uplifting.illuminant_i });
         
         // Mismatching only occurs if there are two or more color systems, and all are unique
-        return cstr.size() > 1
-            && !detail::has_duplicates(cstr);
+        return cstr.size() > 1 && !detail::has_duplicates(cstr);
       },
       [&](const IndirectSurfaceConstraint &c) {
         auto cstr = c.cstr_j
