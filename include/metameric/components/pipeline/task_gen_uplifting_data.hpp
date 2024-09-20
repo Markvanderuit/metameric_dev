@@ -4,6 +4,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/record.hpp>
 #include <metameric/core/convex.hpp>
+#include <metameric/core/ranges.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/detail/scheduler_subtasks.hpp>
 #include <small_gl/array.hpp>

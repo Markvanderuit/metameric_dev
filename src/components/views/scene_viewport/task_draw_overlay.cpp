@@ -12,12 +12,10 @@
 #include <small_gl/utility.hpp>
 
 namespace met {
-  static const auto  inforect_color_black = ImGui::ColorConvertFloat4ToU32({ 0.f, 0.f, 0.f, .35f });
-  static const auto  vertex_color_white   = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f  });
-  static const auto  vertex_color_valid   = ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f  });
-  static const auto  vertex_color_invalid = ImGui::ColorConvertFloat4ToU32({ 1.f, .5f, .5f, 1.f  });
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
+  static const auto inforect_color_black = ImGui::ColorConvertFloat4ToU32({ 0.f, 0.f, 0.f, .35f });
+  static const auto vertex_color_white   = ImGui::ColorConvertFloat4ToU32({ 1.f, 1.f, 1.f, 1.f  });
+  static const auto vertex_color_valid   = ImGui::ColorConvertFloat4ToU32({ .5f, .5f, 1.f, 1.f  });
+  static const auto vertex_color_invalid = ImGui::ColorConvertFloat4ToU32({ 1.f, .5f, .5f, 1.f  });
 
   bool MeshViewportDrawOverlayTask::is_active(SchedulerHandle &info) {
     return info.parent()("is_active").getr<bool>();

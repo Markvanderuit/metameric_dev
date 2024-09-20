@@ -4,9 +4,6 @@
 #include <format>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
   GenObjectDataTask:: GenObjectDataTask(uint object_i)
   : m_object_i(object_i),
     m_atlas_layer_i(0) { }
@@ -56,8 +53,7 @@ namespace met {
         .spec_const = {{ 0, false }} }});
                                 
     // Initialize uniform buffer and writeable, flushable mapping
-    m_unif_buffer = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-    m_unif_map    = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
+    std::tie(m_unif_buffer, m_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
     m_unif_map->object_i = m_object_i;
     m_unif_map->px_scale = 1.f;
     m_unif_buffer.flush();

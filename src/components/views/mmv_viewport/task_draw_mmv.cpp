@@ -7,9 +7,6 @@
 #include <small_gl/texture.hpp>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWrite | gl::BufferCreateFlags::eMapPersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWrite | gl::BufferAccessFlags::eMapPersistent | gl::BufferAccessFlags::eMapFlush;
-  
   void DrawMMVTask::eval_draw_constraint(SchedulerHandle &info) {
     met_trace();
     
@@ -121,8 +118,7 @@ namespace met {
                    .cross_path = "resources/shaders/views/mmv_viewport/draw_mmv_hull.frag.json" }};
     
     // Generate and set mapped uniform buffer
-    m_unif_buffer     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-    m_unif_buffer_map = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
+    std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
     m_unif_buffer_map->alpha = 1.f;
   }
 

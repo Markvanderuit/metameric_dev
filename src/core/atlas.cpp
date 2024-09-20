@@ -4,9 +4,6 @@
 #include <deque>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
   // Helper function to take a space, and a required size, and return
   // the split result and the set of remainder spaces
   constexpr auto atlas_split = [](auto padded_size, auto space) {
@@ -90,12 +87,8 @@ namespace met {
   template <typename T, uint D>
   void TextureAtlas<T, D>::reserve_buffer(size_t size) {
     met_trace_full();
-    
-    size_t buffer_size = size * sizeof(PatchLayout);
-    guard(!m_buffer.is_init() || m_buffer.size() < buffer_size);
-
-    m_buffer     = {{ .size = buffer_size, .flags = buffer_create_flags }};
-    m_buffer_map = m_buffer.map_as<PatchLayout>(buffer_access_flags);
+    guard(!m_buffer.is_init() || m_buffer.size() < size * sizeof(PatchLayout));
+    std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_span<PatchLayout>(size);
   }
   
   template <typename T, uint D>
@@ -230,11 +223,9 @@ namespace met {
     }
 
     // Ensure the underlying buffer data is properly sized up to a minimum
-    size_t minim_buffer_size = new_patches.size() * sizeof(PatchLayout);
-    if (!m_buffer.is_init() || m_buffer.size() < minim_buffer_size) {
-      m_buffer     = {{ .size = minim_buffer_size, .flags = buffer_create_flags }};
-      m_buffer_map = m_buffer.map_as<PatchLayout>(buffer_access_flags);
-    }
+    if (!m_buffer.is_init() || m_buffer.size() < new_patches.size() * sizeof(PatchLayout))
+      std::tie(m_buffer, m_buffer_map) 
+        = gl::Buffer::make_flusheable_span<PatchLayout>(new_patches.size());
     
     // Store new patches
     m_patches = new_patches;
@@ -242,7 +233,7 @@ namespace met {
 
     // Copy patch layouts to buffer storage
     rng::copy(new_patches, m_buffer_map.begin());
-    m_buffer.flush(minim_buffer_size);
+    m_buffer.flush(new_patches.size() * sizeof(PatchLayout));
   }
 
   template <typename T, uint D>

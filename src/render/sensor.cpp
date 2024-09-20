@@ -1,17 +1,12 @@
 #include <metameric/core/utility.hpp>
 #include <metameric/render/sensor.hpp>
 
-constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
 namespace met {
   void Sensor::flush() {
     met_trace_full();
     
-    if (!m_unif.is_init()) {
-      m_unif     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-      m_unif_map = m_unif.map_as<UnifLayout>(buffer_access_flags).data();
-    }
+    if (!m_unif.is_init())
+      std::tie(m_unif, m_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
 
     m_unif_map->full_trf  = proj_trf * view_trf;
     m_unif_map->proj_trf  = proj_trf;
@@ -24,10 +19,8 @@ namespace met {
   void PixelSensor::flush() {
     met_trace_full();
     
-    if (!m_unif.is_init()) {
-      m_unif     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-      m_unif_map = m_unif.map_as<UnifLayout>(buffer_access_flags).data();
-    }
+    if (!m_unif.is_init())
+      std::tie(m_unif, m_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
 
     m_unif_map->full_trf  = proj_trf * view_trf;
     m_unif_map->proj_trf  = proj_trf;
@@ -41,10 +34,8 @@ namespace met {
   void RaySensor::flush() {
     met_trace_full();
     
-    if (!m_unif.is_init()) {
-      m_unif     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-      m_unif_map = m_unif.map_as<UnifLayout>(buffer_access_flags).data();
-    }
+    if (!m_unif.is_init())
+      std::tie(m_unif, m_unif_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
 
     m_unif_map->origin    = origin;
     m_unif_map->direction = direction;

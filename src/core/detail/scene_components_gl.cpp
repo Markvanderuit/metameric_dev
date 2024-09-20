@@ -8,10 +8,6 @@
 #include <numeric>
 
 namespace met::detail {
-  // Buffer access flags for writeable, flusheable mapped buffer
-  constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
   // Packed BVH node data
   struct NodePack {
     uint aabb_pack_0;                 // lo.x, lo.y
@@ -68,8 +64,7 @@ namespace met::detail {
     met_trace_full();
 
     // Preallocate up to a number of objects and obtain writeable/flushable mapping
-    object_info       = {{ .size  = sizeof(BufferLayout), .flags = buffer_create_flags }};
-    m_object_info_map = object_info.map_as<BufferLayout>(buffer_access_flags).data();
+    std::tie(object_info, m_object_info_map) = gl::Buffer::make_flusheable_object<BufferLayout>();
   }
 
   void SceneGLHandler<met::Object>::update(const Scene &scene) {
@@ -204,19 +199,10 @@ namespace met::detail {
   SceneGLHandler<met::Emitter>::SceneGLHandler() {
     met_trace_full();
 
-    // Uniform layout which includes nr. of active components
-    struct EmitterUniformBufferLayout {
-      alignas(4)   uint n;
-      EmBlockLayout data[met_max_emitters];
-    };
-    
     // Preallocate up to a number of objects and obtain writeable/flushable mapping
-    emitter_info = {{ .size = sizeof(EmBufferLayout), .flags = buffer_create_flags }};
-    m_em_info_map = emitter_info.map_as<EmBufferLayout>(buffer_access_flags).data();
-
-    // Allocate buffer for envmap data and obtain writeable, flushable mapping
-    emitter_envm_info = {{ .size = sizeof(EnvBufferLayout), .flags = buffer_create_flags }};
-    m_envm_info_data = emitter_envm_info.map_as<EnvBufferLayout>(buffer_access_flags).data();
+    // for regular emitters and an envmap
+    std::tie(emitter_info, m_em_info_map) = gl::Buffer::make_flusheable_object<EmBufferLayout>();
+    std::tie(emitter_envm_info, m_envm_info_data) = gl::Buffer::make_flusheable_object<EnvBufferLayout>();
   }
 
   void SceneGLHandler<met::Emitter>::update(const Scene &scene) {
@@ -302,8 +288,7 @@ namespace met::detail {
     met_trace_full();
 
     // Preallocate up to a number of meshes and obtain writeable/flushable mapping
-    mesh_info       = {{ .size = sizeof(MeshBufferLayout), .flags = buffer_create_flags }};
-    m_mesh_info_map = mesh_info.map_as<MeshBufferLayout>(buffer_access_flags).data();
+    std::tie(mesh_info, m_mesh_info_map) = gl::Buffer::make_flusheable_object<MeshBufferLayout>();
   }
 
   void SceneGLHandler<met::Mesh>::update(const Scene &scene) {
@@ -463,8 +448,7 @@ namespace met::detail {
     met_trace_full();
 
     // Preallocate up to a number of blocks
-    texture_info = {{ .size = sizeof(BufferLayout), .flags = buffer_create_flags }};
-    m_texture_info_map = texture_info.map_as<BufferLayout>(buffer_access_flags).data();
+    std::tie(texture_info, m_texture_info_map) = gl::Buffer::make_flusheable_object<BufferLayout>();
   }
 
   void SceneGLHandler<met::Image>::update(const Scene &scene) {
@@ -558,8 +542,7 @@ namespace met::detail {
     met_trace_full();
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     spec_texture    = {{ .size = { wavelength_samples, n_layers } }};
-    spec_buffer     = {{ .size = spec_texture.size().prod() * sizeof(float), .flags = buffer_create_flags }};
-    spec_buffer_map = spec_buffer.map_as<Spec>(buffer_access_flags);
+    std::tie(spec_buffer, spec_buffer_map) = gl::Buffer::make_flusheable_span<Spec>(n_layers);
   }
 
   void SceneGLHandler<met::Spec>::update(const Scene &scene) {
@@ -582,8 +565,7 @@ namespace met::detail {
     met_trace_full();
     auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
     cmfs_texture    = {{ .size = { wavelength_samples, n_layers } }};
-    cmfs_buffer     = {{ .size = cmfs_texture.size().prod() * sizeof(eig::Array3f), .flags = buffer_create_flags }};
-    cmfs_buffer_map = cmfs_buffer.map_as<CMFS>(buffer_access_flags);
+    std::tie(cmfs_buffer, cmfs_buffer_map) = gl::Buffer::make_flusheable_span<CMFS>(n_layers);
   }
 
   void SceneGLHandler<met::CMFS>::update(const Scene &scene) {

@@ -11,10 +11,7 @@ namespace met {
 
   void DrawColorSystemTask::init(SchedulerHandle &info) {
     met_trace_full();
-      
-    constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-    constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
+    
     // Generate program object
     m_program = {{ .type = gl::ShaderType::eVertex,   
                    .spirv_path = "resources/shaders/views/uplifting_viewport/draw_color_system.vert.spv",
@@ -24,10 +21,8 @@ namespace met {
                    .cross_path = "resources/shaders/views/uplifting_viewport/draw_color_system.frag.json" }};
    
     // Generate and set mapped uniform buffers
-    m_unif_settings     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-    m_unif_settings_map = m_unif_settings.map_as<UnifLayout>(buffer_access_flags).data();
-
     // Set uniform alpha settings for now
+    std::tie(m_unif_settings, m_unif_settings_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
     m_unif_settings_map->alpha = 1.f;
   }
 

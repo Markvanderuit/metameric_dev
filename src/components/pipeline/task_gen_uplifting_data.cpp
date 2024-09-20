@@ -42,7 +42,7 @@ namespace met {
 
     // Initialize buffers to hold packed delaunay tesselation data; these buffers are used by
     // the gen_object_data task to generate barycentric weights for the objects' textures
-    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                              .flags = buffer_create_flags });
+    info("tesselation_data").init<gl::Buffer>({ .size = sizeof(MeshDataLayout),                               .flags = buffer_create_flags });
     info("tesselation_pack").init<gl::Buffer>({ .size = sizeof(MeshPackLayout) * detail::met_max_constraints, .flags = buffer_create_flags });
     info("tesselation_coef").init<gl::Buffer>({ .size = sizeof(SpecCoefLayout) * detail::met_max_constraints, .flags = buffer_create_flags });
     m_tesselation_data_map = info("tesselation_data").getw<gl::Buffer>().map_as<MeshDataLayout>(buffer_access_flags).data();

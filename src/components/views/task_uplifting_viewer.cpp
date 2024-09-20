@@ -124,9 +124,6 @@ namespace met {
     void init(SchedulerHandle &info) override {
       met_trace_full();
       
-      constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-      constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-      
       // Set up draw components for gamma correction
       m_sampler = {{ .min_filter = gl::SamplerMinFilter::eNearest, 
                      .mag_filter = gl::SamplerMagFilter::eNearest }};
@@ -135,8 +132,7 @@ namespace met {
                      .cross_path = "resources/shaders/misc/texture_resample.comp.json" }};
       
       // Initialize uniform buffer and writeable, flushable mapping
-      m_uniform_buffer = {{ .size = sizeof(UniformBuffer), .flags = buffer_create_flags }};
-      m_uniform_map    = &m_uniform_buffer.map_as<UniformBuffer>(buffer_access_flags)[0];
+      std::tie(m_uniform_buffer, m_uniform_map) = gl::Buffer::make_flusheable_object<UniformBuffer>();
       m_uniform_map->lrgb_to_srgb = true;
     }
 

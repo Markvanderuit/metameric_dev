@@ -4,9 +4,6 @@
 #include <metameric/render/primitives_render.hpp>
 
 namespace met {
-  constexpr static auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr static auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-  
   namespace detail {
     IntegrationRenderPrimitive::IntegrationRenderPrimitive()
     : m_sampler_state_i(0) {
@@ -14,8 +11,8 @@ namespace met {
       for (uint i = 0; i < m_sampler_state_buffs.size(); ++i) {
         auto &buff = m_sampler_state_buffs[i];
         auto &mapp = m_sampler_state_mapps[i];
-        buff = {{ .size = sizeof(SamplerState), .flags = buffer_create_flags }};
-        mapp = buff.map_as<SamplerState>(buffer_access_flags).data();
+        std::tie(m_sampler_state_buffs[i], m_sampler_state_mapps[i])
+          = gl::Buffer::make_flusheable_object<SamplerState>();
       }
     }
 
@@ -389,10 +386,9 @@ namespace met {
     m_pixel_checkerboard = info.pixel_checkerboard;
 
     // RGB value override space
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), detail::met_max_constraints);
+    auto n_layers = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), detail::met_max_constraints);
     m_illm_colr_texture    = {{ .size = { 1, n_layers } }};
-    m_illm_colr_buffer     = {{ .size = m_illm_colr_texture.size().prod() * sizeof(eig::Array4f), .flags = buffer_create_flags }};
-    m_illm_colr_buffer_map = m_illm_colr_buffer.map_as<eig::Array4f>(buffer_access_flags);
+    std::tie(m_illm_colr_buffer, m_illm_colr_buffer_map) = gl::Buffer::make_flusheable_span<eig::Array4f>(n_layers);
 
     // Linear texture sampler
     m_sampler = {{ .min_filter = gl::SamplerMinFilter::eLinear, .mag_filter = gl::SamplerMagFilter::eLinear }};

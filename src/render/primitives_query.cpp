@@ -4,17 +4,10 @@
 #include <metameric/render/primitives_query.hpp>
 
 namespace met {
-  constexpr static auto buffer_create_flags_read  = gl::BufferCreateFlags::eMapReadPersistent;
-  constexpr static auto buffer_access_flags_read  = gl::BufferAccessFlags::eMapReadPersistent;
-  constexpr static auto buffer_create_flags_write = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr static auto buffer_access_flags_write = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
   namespace detail {
     BaseQueryPrimitive::BaseQueryPrimitive() {
       met_trace_full();
-
-      m_query     = {{ .size = sizeof(QueryUnifLayout), .flags = buffer_create_flags_write }};
-      m_query_map = m_query.map_as<QueryUnifLayout>(buffer_access_flags_write).data();
+      std::tie(m_query, m_query_map) = gl::Buffer::make_flusheable_object<QueryUnifLayout>();
     }
   } // namespace detail
 
@@ -42,6 +35,8 @@ namespace met {
     size_t buffer_size = 4 * sizeof(uint) 
                        + spp * (m_max_depth - 1) * sizeof(PathRecord);
     if (!m_output.is_init() || m_output.size() < buffer_size) {
+      constexpr auto buffer_create_flags_read  = gl::BufferCreateFlags::eMapReadPersistent;
+      constexpr auto buffer_access_flags_read  = gl::BufferAccessFlags::eMapReadPersistent;
       m_output = {{ .size = buffer_size, .flags = buffer_create_flags_read }};
       auto map = m_output.map(buffer_access_flags_read);
       m_output_head_map = cast_span<uint>(map).data();
@@ -163,6 +158,8 @@ namespace met {
     // and generate read-only map
     size_t buffer_size = sizeof(RayRecord);
     if (!m_output.is_init() || m_output.size() != buffer_size) {
+      constexpr auto buffer_create_flags_read  = gl::BufferCreateFlags::eMapReadPersistent;
+      constexpr auto buffer_access_flags_read  = gl::BufferAccessFlags::eMapReadPersistent;
       m_output     = {{ .size = buffer_size, .flags = buffer_create_flags_read }};
       m_output_map = m_output.map_as<RayRecord>(buffer_access_flags_read).data();
     }

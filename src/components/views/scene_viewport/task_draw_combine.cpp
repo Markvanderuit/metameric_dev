@@ -8,10 +8,6 @@
 #include <small_gl/dispatch.hpp>
 
 namespace met {
-  constexpr auto buffer_create_flags = gl::BufferCreateFlags::eMapWritePersistent;
-  constexpr auto buffer_access_flags = gl::BufferAccessFlags::eMapWritePersistent | gl::BufferAccessFlags::eMapFlush;
-
-
   bool MeshViewportDrawCombineTask::is_active(SchedulerHandle &info) {
     return info.parent()("is_active").getr<bool>();
   }
@@ -25,8 +21,7 @@ namespace met {
                    .cross_path = "resources/shaders/views/draw_mesh_combine.comp.json" }};
 
     // Initialize uniform buffers and corresponding mappings
-    m_unif_buffer     = {{ .size = sizeof(UnifLayout), .flags = buffer_create_flags }};
-    m_unif_buffer_map = m_unif_buffer.map_as<UnifLayout>(buffer_access_flags).data();
+    std::tie(m_unif_buffer, m_unif_buffer_map) = gl::Buffer::make_flusheable_object<UnifLayout>();
   }
     
   void MeshViewportDrawCombineTask::eval(SchedulerHandle &info) {
