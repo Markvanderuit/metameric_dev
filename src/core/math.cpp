@@ -1,8 +1,5 @@
 #include <metameric/core/math.hpp>
 
-namespace met {
-} // namespace met
-
 namespace Eigen {
   Affine3f lookat_rh(const Vector3f &eye,
                      const Vector3f &cen,

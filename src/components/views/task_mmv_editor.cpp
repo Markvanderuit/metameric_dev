@@ -7,6 +7,7 @@
 #include <metameric/components/views/mmv_viewport/task_edit_mmv.hpp>
 #include <metameric/components/views/mmv_viewport/task_gen_patches.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/gizmo.hpp>
 #include <metameric/components/views/detail/task_arcball_input.hpp>
 #include <small_gl/buffer.hpp>
 #include <small_gl/dispatch.hpp>

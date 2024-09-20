@@ -6,7 +6,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
-#include <zstr.hpp>
 #include <algorithm>
 #include <deque>
 #include <execution>
@@ -371,28 +370,6 @@ namespace met::io {
     }
 
     return basis_from_data(wvls_mean, sgnl_mean, wvls_func, sgnl_func);
-  }
-
-  void save_spectral_data(const SpectralData &data, const fs::path &path) {
-    met_trace();
-    
-    // Attempt to open output file stream in binary mode using zlib stream wrapper
-    zstr::ofstream ofs(path.string(), std::ios::out | std::ios::trunc | std::ios::binary,  -1);
-
-    // Output header data
-    std::array<float, 2> header_f = { data.spec_min, data.spec_max };
-    std::array<uint, 4>  header_u = { data.spec_samples, data.bary_xres, data.bary_yres, data.bary_zres };
-    ofs.write((const char *) header_f.data(), header_f.size() * sizeof(decltype(header_f)::value_type));
-    ofs.write((const char *) header_u.data(), header_u.size() * sizeof(decltype(header_u)::value_type));
-
-    // Output bulk data
-    const size_t functions_size = data.functions.size() * sizeof(decltype(data.functions)::value_type);
-    const size_t weights_size   = data.weights.size() * sizeof(decltype(data.weights)::value_type);
-    ofs.write((const char *) data.functions.data(), functions_size);
-    ofs.write((const char *) data.weights.data(), weights_size);
-
-    // Flush only; ofs closes on destruction
-    ofs.flush();
   }
 
   // Src: Mitsuba 0.5, reimplements InterpolatedSpectrum::average(...) from libcore/spectrum.cpp

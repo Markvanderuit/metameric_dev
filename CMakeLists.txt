@@ -120,7 +120,7 @@ if(MET_ENABLE_TRACY)
 endif()
 
 # Gather list of third party libraries
-set(incl_dependencies include ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
+set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
   assimp::assimp
@@ -142,28 +142,64 @@ if(OpenMP_CXX_FOUND)
   list(APPEND core_dependencies OpenMP::OpenMP_CXX)
 endif()
 
+# Specify precompiled header file
+function(add_library_pch target)
+  file(GLOB_RECURSE incls ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
+  target_precompile_headers(${target}
+    PUBLIC ${incls}
+    PRIVATE <array> <algorithm> <deque> <iostream> <filesystem> <vector> <ranges> <unordered_map> <unordered_set>
+  )
+endfunction()
+
 # Simple function to add a library with consistent settings
 function(add_library_r target dir)
+  # Gather source files recursively
   file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/src/${dir}/*.cpp)
 
+  # Specify target
   add_library(${target} ${srcs})
 
-  target_include_directories(${target} PUBLIC ${incl_dependencies})
+  # Specify target includes/features/defines
+  target_include_directories(${target} PUBLIC include ${thrp_includes})
   target_compile_features(${target} PUBLIC cxx_std_23)
-  target_compile_definitions(core PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
+  target_compile_definitions(${target} PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
+
+  # # Specify unity build, batching 8 files per object
+  # set_target_properties(${target} PROPERTIES 
+  #   UNITY_BUILD ON 
+  #   UNITY_BUILD_MODE BATCH 
+  #   UNITY_BUILD_BATCH_SIZE 8
+  # )
+
+  # Enable /bigobj (or the closest thing for gcc)
+  # Src: https://stackoverflow.com/questions/69903253/cmake-bigobj-no-such-file-or-directory
+  if (MSVC)
+    target_compile_options(${target} PRIVATE /bigobj)
+  else ()
+    target_compile_options(${target} PRIVATE -Wa,-mbig-obj)
+  endif ()
 endfunction()
 
 # Set up core library
 add_library_r(core core)
 target_link_libraries(core PUBLIC ${core_dependencies})
+add_library_pch(core)
 
 # Set up render library
 add_library_r(render render)
 target_link_libraries(render PUBLIC core)
+target_precompile_headers(render REUSE_FROM core)
 
 # Set up components library
 add_library_r(components components)
 target_link_libraries(components PUBLIC render ${component_dependencies})
+target_precompile_headers(components REUSE_FROM core)
+
+# Ignore unity builds on scene.cpp
+# as zstr seems to have an incompatibility for now
+set_source_files_properties(
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/scene.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
+)
 
 # Specify shader/resource targets, link these as dependencies for preprocessing
 add_shader_target(shaders)

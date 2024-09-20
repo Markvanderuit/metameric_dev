@@ -6,6 +6,7 @@
 #include <metameric/render/sensor.hpp>
 #include <metameric/render/primitives_query.hpp>
 #include <metameric/components/views/detail/imgui.hpp>
+#include <metameric/components/views/detail/gizmo.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/texture.hpp>
 #include <ImGuizmo.h>

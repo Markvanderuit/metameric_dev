@@ -31,8 +31,6 @@ namespace met {
       std::span<const float> weights;   // Convex weights
     };
 
-    void save_spectral_data(const SpectralData &data, const fs::path &path);
-
     // Simple string load/save to/from file
     std::string load_string(const fs::path &path);
     void        save_string(const fs::path &path, const std::string &string);
