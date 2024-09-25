@@ -2,6 +2,7 @@
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
+#include <small_gl/detail/program_cache.hpp>
 
 namespace met {
   namespace detail {
@@ -114,7 +115,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object, if it doesn't yet exist
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({{ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({{ 
       .type       = gl::ShaderType::eVertex,
       .spirv_path = "resources/shaders/render/primitive_render_gbuffer.vert.spv",
       .cross_path = "resources/shaders/render/primitive_render_gbuffer.vert.json"
@@ -154,7 +155,7 @@ namespace met {
       reset(sensor, scene);
     
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
 
     // Assemble appropriate draw commands for each object in the scene
     // by taking the relevant draw command from its mesh data
@@ -198,7 +199,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object, if it doesn't yet exist
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_gbuffer_view.comp.json",
@@ -240,7 +241,7 @@ namespace met {
       reset(sensor, scene);
     
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();
@@ -264,7 +265,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object, if it doesn't yet exist
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_path.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_path.comp.json",
@@ -321,7 +322,7 @@ namespace met {
     guard(has_next_sample_state(), m_film);
 
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();
@@ -367,7 +368,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program object, if it doesn't yet exist
-    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::ProgramCache>().set({ 
+    std::tie(m_cache_key, std::ignore) = m_cache_handle.getw<gl::detail::ProgramCache>().set({ 
       .type       = gl::ShaderType::eCompute,
       .spirv_path = "resources/shaders/render/primitive_render_path_rgb.comp.spv",
       .cross_path = "resources/shaders/render/primitive_render_path_rgb.comp.json",
@@ -441,7 +442,7 @@ namespace met {
     guard(has_next_sample_state(), m_film);
 
     // Draw relevant program from cache
-    auto &program = m_cache_handle.getw<gl::ProgramCache>().at(m_cache_key);
+    auto &program = m_cache_handle.getw<gl::detail::ProgramCache>().at(m_cache_key);
 
     // Bind required resources to their corresponding targets
     program.bind();

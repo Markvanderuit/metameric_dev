@@ -10,6 +10,7 @@
 #include <small_gl/buffer.hpp>
 #include <small_gl/program.hpp>
 #include <small_gl/window.hpp>
+#include <small_gl/detail/program_cache.hpp>
 #include <string>
 
 namespace met {
@@ -80,14 +81,6 @@ namespace met {
       
       // Signal schedule re-creation and submit new schedule for main view
       submit_metameric_editor_schedule(info);
-    }
-
-    void handle_reload_shaders(SchedulerHandle &info) {
-      met_trace_full();
-
-      // Signal shader reload to gl program cache
-      auto &cache = info.global("cache").getw<gl::ProgramCache>();
-      cache.reload();
     }
 
     void handle_close(SchedulerHandle &info) {
@@ -177,7 +170,6 @@ namespace met {
         /* Debug section follows */
 
         if (ImGui::MenuItem("Reload (schedule)", nullptr, nullptr, is_loaded)) { detail::handle_reload_schedule(info); }
-        if (ImGui::MenuItem("Reload (shaders)", nullptr, nullptr, is_loaded))  { detail::handle_reload_shaders(info); }
 
         ImGui::Separator(); 
 

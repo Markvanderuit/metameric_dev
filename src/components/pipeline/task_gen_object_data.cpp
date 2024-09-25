@@ -1,6 +1,7 @@
 #include <metameric/core/scene.hpp>
 #include <metameric/components/pipeline/task_gen_object_data.hpp>
 #include <small_gl/texture.hpp>
+#include <small_gl/detail/program_cache.hpp>
 #include <format>
 
 namespace met {
@@ -34,7 +35,7 @@ namespace met {
     met_trace_full();
 
     // Initialize program objects in cache
-    auto &e_cache = info.global("cache").getw<gl::ProgramCache>();
+    auto &e_cache = info.global("cache").getw<gl::detail::ProgramCache>();
     std::tie(m_cache_key_txtr, std::ignore) = e_cache.set(
      {{ .type       = gl::ShaderType::eVertex,
         .spirv_path = "resources/shaders/pipeline/gen_texture.vert.spv",
@@ -66,7 +67,7 @@ namespace met {
     met_trace_full();
     
     // Get external resources
-    auto       &e_cache     = info.global("cache").getw<gl::ProgramCache>();
+    auto       &e_cache     = info.global("cache").getw<gl::detail::ProgramCache>();
     const auto &e_scene     = info.global("scene").getr<Scene>();
     const auto &e_object    = e_scene.components.objects[m_object_i].value;
     const auto &e_uplifting = e_scene.components.upliftings[e_object.uplifting_i];
