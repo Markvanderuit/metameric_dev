@@ -164,11 +164,11 @@ function(add_library_r target dir)
   target_compile_features(${target} PUBLIC cxx_std_23)
   target_compile_definitions(${target} PUBLIC _USE_MATH_DEFINES ${preprocessor_defines})
 
-  # # Specify unity build, batching 8 files per object
+  # Specify unity build, batching 8 files per object
   # set_target_properties(${target} PROPERTIES 
   #   UNITY_BUILD ON 
   #   UNITY_BUILD_MODE BATCH 
-  #   UNITY_BUILD_BATCH_SIZE 8
+  #   UNITY_BUILD_BATCH_SIZE 4
   # )
 
   # Enable /bigobj (or the closest thing for gcc)
@@ -195,14 +195,16 @@ add_library_r(components components)
 target_link_libraries(components PUBLIC render ${component_dependencies})
 target_precompile_headers(components REUSE_FROM core)
 
-# Ignore unity builds on scene.cpp
-# as zstr seems to have an incompatibility for now
-set_source_files_properties(
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/scene.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
-)
+# Ignore unity builds on scene.cpp/math.cpp
+# as some dependency seems to have an incompatibility for now
+# set_source_files_properties(
+#   ${CMAKE_CURRENT_SOURCE_DIR}/src/core/scene.cpp 
+#   ${CMAKE_CURRENT_SOURCE_DIR}/src/core/math.cpp 
+#   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
+# )
 
 # Specify shader/resource targets, link these as dependencies for preprocessing
-add_shader_target(shaders)
+add_shader_target(shaders shaders.bin)
 add_resource_target(resources misc)
 add_dependencies(core       resources)
 add_dependencies(render     shaders)

@@ -29,6 +29,8 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
   # TODO; adapt dependent on compiler
   add_custom_command(
     OUTPUT  ${spirv_parse_fp}
+
+    # First command; preprocessor stage
     COMMAND ${CMAKE_CXX_COMPILER}
             # Primary arguments
             -Tp                                                  # treat this as a c++ source file
@@ -43,9 +45,19 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
 
             # Define arguments
             ${preprocessor_defines}
+    
+    # Second command; nuke shader cache if exists
+    COMMAND ${CMAKE_COMMAND} 
+            -E remove 
+            -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/shaders.bin"
+
     DEPENDS ${glsl_src_fp} ${glsl_includes}
     VERBATIM
   )
+
+  
+  # add_custom_target(${target_name}_erase
+  #   COMMAND ${CMAKE_COMMAND} -E remove -f "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources/shaders/${cache_name}")
   
   # Generate spir-v binary using glslangValidator, store in .temp file
   add_custom_command(
@@ -91,7 +103,7 @@ function(compile_glsl_to_spirv_list glsl_srcs_fp spirv_dependencies)
   set(spirv_dependencies "${spirv_dependencies}" PARENT_SCOPE)
 endfunction()
 
-function(add_shader_target target_name)
+function(add_shader_target target_name cache_name)
   # Recursively find all shader files
   file(GLOB_RECURSE glsl_srcs
     ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/src/*.frag
@@ -102,7 +114,7 @@ function(add_shader_target target_name)
   file(GLOB_RECURSE glsl_includes 
     ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/include/*
   )
-
+  
   # Generate list of command functions
   set(spirv_dependencies ${glsl_includes})
   compile_glsl_to_spirv_list("${glsl_srcs}" "${spirv_dependencies}")
