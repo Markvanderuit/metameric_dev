@@ -43,20 +43,6 @@ message(STATUS "Metameric : Wavelength bases    = ${MET_WAVELENGTH_BASES}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-if(MSVC)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-endif(MSVC)
 
 # Ensure these are available for third parties
 find_package(OpenMP REQUIRED)
@@ -65,10 +51,11 @@ find_package(Threads REQUIRED)
 # Include xAtlas/Autodiff/small_gl manually
 option(gl_enable_exceptions  "" ${MET_ENABLE_EXCEPTIONS})
 option(gl_enable_tracy       "" ${MET_ENABLE_TRACY})
-add_subdirectory(third_party/xatlas)
 add_subdirectory(third_party/autodiff)
-add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/embree)
+add_subdirectory(third_party/rapidobj)
+add_subdirectory(third_party/small_gl)
+add_subdirectory(third_party/xatlas)
 
 # Include third party libraries
 find_package(assimp    CONFIG REQUIRED)
@@ -132,12 +119,18 @@ set(core_dependencies
   meshoptimizer::meshoptimizer
   Qhull::qhullcpp Qhull::qhull_r
   unofficial::tinyexr::tinyexr
+  rapidobj
   small_gl
   Tracy::TracyClient
   xatlas
   ZLIB::ZLIB
 )
-set(component_dependencies imgui::imgui imguizmo::imguizmo implot::implot unofficial::nativefiledialog::nfd)
+set(component_dependencies
+  imgui::imgui
+  imguizmo::imguizmo
+  implot::implot
+  unofficial::nativefiledialog::nfd
+)
 if(OpenMP_CXX_FOUND)
   list(APPEND core_dependencies OpenMP::OpenMP_CXX)
 endif()

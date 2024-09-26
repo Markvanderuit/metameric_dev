@@ -6,6 +6,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
+#include <rapidobj/rapidobj.hpp>
 #include <algorithm>
 #include <deque>
 #include <execution>
