@@ -14,23 +14,6 @@ namespace met {
       return path.replace_extension(ext);
     }
 
-    /* Data block for spectral texture export format */
-    struct SpectralData {
-      // Resolution of single spectral function
-      float spec_min     = wavelength_min;
-      float spec_max     = wavelength_max;
-      uint  spec_samples = wavelength_samples;
-
-      // Resolution of weights data
-      uint  bary_xres;
-      uint  bary_yres;
-      uint  bary_zres;
-
-      // Bulk data
-      std::span<const float> functions; // Spectral functions
-      std::span<const float> weights;   // Convex weights
-    };
-
     // Simple string load/save to/from file
     std::string load_string(const fs::path &path);
     void        save_string(const fs::path &path, const std::string &string);
@@ -54,7 +37,7 @@ namespace met {
 
     // Load scene data; meshes, objects, materials, textures
     // from a wavefront .obj file
-    Scene load_obj(const fs::path &path);
+    Scene load_obj(const fs::path &path, bool load_materials = true, bool flip_uvs = true);
 
     // Simple basis function load from file
     // Input should be a text file, containing a single wavelength and 'm' values per line, and

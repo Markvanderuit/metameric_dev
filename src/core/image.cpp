@@ -143,6 +143,8 @@ namespace met {
     const char *cpath = spath.c_str();
     
     if (info.path.extension() == ".exr") { /* Attempt load using TinyEXR */
+      met_trace_n("Load (TinyEXR)");
+
       EXRVersion exr_version;
       EXRHeader  exr_header;
       EXRImage   exr_image;
@@ -227,9 +229,11 @@ namespace met {
       FreeEXRImage(&exr_image);
       FreeEXRHeader(&exr_header);
     } else { /* Fall back to STBImage */
+      met_trace_n("Load (STBImage)");
+
       // Attempt load of sdr .bmp/.png/.jpg file
       int w, h, c;
-      std::byte *ptr = (std::byte *) stbi_load(cpath, &w, &h, &c, 0);
+      auto ptr = (std::byte *) stbi_load(cpath, &w, &h, &c, 0);
       
       // Specify header/image configuration
       m_pixel_type = PixelType::eUChar;

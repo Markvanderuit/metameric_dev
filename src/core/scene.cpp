@@ -356,51 +356,47 @@ namespace met {
   }
 
   void Scene::import_scene(Scene &&other) {
-    // Import scene objects/emitters/materials/etc, taking care to increment indexes while bookkeeping correctly
+    // Import scene objects/emitters/materials/etc, taking care to increment indices while bookkeeping correctly
+
+    // Import upliftings, and take care of index bookkeeping where necessary
     std::transform(range_iter(other.components.upliftings), 
-                   std::back_inserter(components.upliftings.data()), [&](auto component) {
-      // component.value.csys_i += components.colr_systems.size();
-      // TODO update bookkeeping
-      /* for (auto &vert : component.value.verts) {
-        for (auto &j : vert.csys_j)
-          j += components.colr_systems.size();
-        if (vert.type == UpliftingConstraint::Type::eColorOnMesh) {
-          vert.object_i += components.objects.size();
-        }
-      } */
-      return component;
-    });
-    std::transform(range_iter(other.components.objects), 
-                   std::back_inserter(components.objects.data()), [&](auto component) {
-      component.value.mesh_i += resources.meshes.size();
-      if (component.value.diffuse.index() == 1)
-        component.value.diffuse = static_cast<uint>(std::get<1>(component.value.diffuse) + resources.images.size());
-      /* if (component.value.roughness.index() == 1)
-        component.value.roughness = static_cast<uint>(std::get<1>(component.value.roughness) + resources.images.size());
-      if (component.value.metallic.index() == 1)
-        component.value.metallic = static_cast<uint>(std::get<1>(component.value.metallic) + resources.images.size());
-      if (component.value.opacity.index() == 1)
-        component.value.opacity = static_cast<uint>(std::get<1>(component.value.opacity) + resources.images.size());
-      if (component.value.normals.index() == 1)
-        component.value.normals = static_cast<uint>(std::get<1>(component.value.normals) + resources.images.size()); */
-      if (!other.components.upliftings.empty())
-        component.value.uplifting_i += components.upliftings.size();
-      return component;
-    });
-    std::transform(range_iter(other.components.emitters), 
-                   std::back_inserter(components.emitters.data()), [&](auto component) {
+      std::back_inserter(components.upliftings.data()), [&](auto component) {
+      if (!other.resources.observers.empty())
+        component->observer_i += resources.observers.size();
       if (!other.resources.illuminants.empty())
-        component.value.illuminant_i += resources.illuminants.size();
+        component->illuminant_i += resources.illuminants.size();
+      if (!other.resources.bases.empty())
+        component->basis_i += resources.bases.size();
       return component;
     });
-    // std::transform(range_iter(other.components.colr_systems), 
-    //                std::back_inserter(components.colr_systems.data()), [&](auto component) {
-    //   if (!other.resources.observers.empty())
-    //     component.value.observer_i   += resources.observers.size();
-    //   if (!other.resources.illuminants.empty())
-    //     component.value.illuminant_i += resources.illuminants.size();
-    //   return component;
-    // });
+
+    // Import objects, and take care of index bookkeeping where necessary
+    std::transform(range_iter(other.components.objects), 
+      std::back_inserter(components.objects.data()), [&](auto component) {
+      if (!other.resources.meshes.empty())
+        component->mesh_i += resources.meshes.size();
+      if (!other.components.upliftings.empty())
+        component->uplifting_i += components.upliftings.size();
+      if (component->diffuse.index() == 1)
+        component->diffuse = static_cast<uint>(std::get<1>(component->diffuse) + resources.images.size());
+      return component;
+    });
+
+    // Import emitters, and take care of index bookkeeping where necessary
+    std::transform(range_iter(other.components.emitters), 
+      std::back_inserter(components.emitters.data()), [&](auto component) {
+      if (!other.resources.illuminants.empty())
+        component->illuminant_i += resources.illuminants.size();
+      return component;
+    });
+
+    // Import views, and take care of index bookkeeping where necessary
+    std::transform(range_iter(other.components.views), 
+      std::back_inserter(components.views.data()), [&](auto component) {
+      if (!other.resources.observers.empty())
+        component->observer_i += resources.observers.size();
+      return component;
+    });
 
     // Append scene resources from other scene behind current scene's components
     resources.meshes.data().insert(resources.meshes.end(),           
@@ -440,184 +436,185 @@ namespace met {
       aiProcess_FlipUVs                 |
       aiProcess_RemoveRedundantMaterials);
 
-    debug::check_expr(file, 
-      std::format("File at \"{}\" could not be read. ASSIMP says: \"{}\"\n", 
-      path.string(), std::string(imp.GetErrorString())));
+    // debug::check_expr(file, 
+    //   std::format("File at \"{}\" could not be read. ASSIMP says: \"{}\"\n", 
+    //   path.string(), std::string(imp.GetErrorString())));
 
-    std::span file_meshes    = { file->mMeshes, file->mNumMeshes };
-    std::span file_textures  = { file->mTextures, file->mNumTextures };
-    std::span file_materials = { file->mMaterials, file->mNumMaterials };
+    // std::span file_meshes    = { file->mMeshes, file->mNumMeshes };
+    // std::span file_textures  = { file->mTextures, file->mNumTextures };
+    // std::span file_materials = { file->mMaterials, file->mNumMaterials };
 
-    // Temporary scene to which we add all imported objects
-    Scene scene;
+    // // Temporary scene to which we add all imported objects
+    // Scene scene;
 
-    // Loading caches; prevent unnecessary image and material loads
-    std::unordered_map<uint, uint>     material_uuid;
-    std::unordered_map<fs::path, uint> image_uuid;
+    // // Loading caches; prevent unnecessary image and material loads
+    // std::unordered_map<uint, uint>     material_uuid;
+    // std::unordered_map<fs::path, uint> image_uuid;
 
-    // First, build a list of used mesh objects by traversing assimp tree;
-    // not all materials in an OBJ file are used, and we don't want to clutter
-    // the scene with unused imports
-    {
-      struct QueueObject {
-        eig::Matrix4f trf;
-        aiNode       *node;
-      } root = { eig::Matrix4f::Identity(), file->mRootNode };
+    // // First, build a list of used mesh objects by traversing assimp tree;
+    // // not all materials in an OBJ file are used, and we don't want to clutter
+    // // the scene with unused imports
+    // {
+    //   struct QueueObject {
+    //     eig::Matrix4f trf;
+    //     aiNode       *node;
+    //   } root = { eig::Matrix4f::Identity(), file->mRootNode };
 
-      std::deque<QueueObject> queue = { root };
-      while (!queue.empty()) {
-        // Pop current node from work queue
-        auto [parent_trf, node] = queue.front();
-        queue.pop_front();
+    //   std::deque<QueueObject> queue = { root };
+    //   while (!queue.empty()) {
+    //     // Pop current node from work queue
+    //     auto [parent_trf, node] = queue.front();
+    //     queue.pop_front();
 
-        // Assemble recursive transformation to pass to children
-        eig::Matrix4f trf;
-        std::memcpy(trf.data(), (const void *) &(node->mTransformation), sizeof(aiMatrix4x4));
-        trf = parent_trf * trf;
-        eig::Affine3f aff(trf);
+    //     // Assemble recursive transformation to pass to children
+    //     eig::Matrix4f trf;
+    //     std::memcpy(trf.data(), (const void *) &(node->mTransformation), sizeof(aiMatrix4x4));
+    //     trf = parent_trf * trf;
+    //     eig::Affine3f aff(trf);
 
-        // If current node has meshes attached, register object(s)
-        for (uint i : std::span { node->mMeshes, node->mNumMeshes }) {
-          // Register mesh material if not yet registered
-          uint material_i = file->mMeshes[i]->mMaterialIndex;
-          if (!material_uuid.contains(material_i))
-            material_uuid[material_i] = material_uuid.size();
-          material_i = material_uuid[material_i];
+    //     // If current node has meshes attached, register object(s)
+    //     for (uint i : std::span { node->mMeshes, node->mNumMeshes }) {
+    //       // Register mesh material if not yet registered
+    //       uint material_i = file->mMeshes[i]->mMaterialIndex;
+    //       if (!material_uuid.contains(material_i))
+    //         material_uuid[material_i] = material_uuid.size();
+    //       material_i = material_uuid[material_i];
 
-          scene.components.objects.emplace(node->mName.C_Str(), {
-            .transform   = Transform::from_affine(aff),
-            .mesh_i      = i,
-            .uplifting_i = 0,
-          });
-        }
+    //       scene.components.objects.emplace(node->mName.C_Str(), {
+    //         .transform   = Transform::from_affine(aff),
+    //         .mesh_i      = i,
+    //         .uplifting_i = 0,
+    //       });
+    //     }
         
-        // Push child nodes on queue for processing
-        for (auto child : std::span { node->mChildren, node->mNumChildren })
-          queue.push_back({ trf, child });
-      }
-    }
+    //     // Push child nodes on queue for processing
+    //     for (auto child : std::span { node->mChildren, node->mNumChildren })
+    //       queue.push_back({ trf, child });
+    //   }
+    // }
 
-    // Process included meshes in order
-    for (const auto *mesh : file_meshes) {
-      Mesh m;
+    // // Process included meshes in order
+    // for (const auto *mesh : file_meshes) {
+    //   Mesh m;
 
-      if (mesh->HasPositions()) {
-        std::span verts = { mesh->mVertices, mesh->mNumVertices };
-        m.verts.resize(verts.size());
-        std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
-          [](const auto &v) { return Mesh::vert_type { v.x, v.y, v.z }; });
-      }
+    //   if (mesh->HasPositions()) {
+    //     std::span verts = { mesh->mVertices, mesh->mNumVertices };
+    //     m.verts.resize(verts.size());
+    //     std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
+    //       [](const auto &v) { return Mesh::vert_type { v.x, v.y, v.z }; });
+    //   }
     
-      if (mesh->HasNormals()) {
-        std::span norms = { mesh->mNormals, mesh->mNumVertices };
-        m.norms.resize(norms.size());
-        std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
-          [](const auto &v) { return Mesh::norm_type { v.x, v.y, v.z }; });
-      }
+    //   if (mesh->HasNormals()) {
+    //     std::span norms = { mesh->mNormals, mesh->mNumVertices };
+    //     m.norms.resize(norms.size());
+    //     std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
+    //       [](const auto &v) { return Mesh::norm_type { v.x, v.y, v.z }; });
+    //   }
 
-      uint tx_count = 0;
-      for (uint i = 0; i < 16; ++i)
-        tx_count += mesh->HasTextureCoords(i) ? 1 : 0;
-      fmt::print("num texture coords; {}\n", tx_count);
+    //   uint tx_count = 0;
+    //   for (uint i = 0; i < 16; ++i)
+    //     tx_count += mesh->HasTextureCoords(i) ? 1 : 0;
+    //   fmt::print("num texture coords; {}\n", tx_count);
       
-      // Assume first set of coords is used only
-      constexpr size_t default_texture_coord = 0;
-      if (mesh->HasTextureCoords(default_texture_coord)) {
-        std::span txuvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
-        m.txuvs.resize(txuvs.size());
-        std::transform(std::execution::par_unseq, range_iter(txuvs), m.txuvs.begin(),
-          [](const auto &v) { return Mesh::txuv_type { v.x, v.y }; });
-      }
+    //   // Assume first set of coords is used only
+    //   constexpr size_t default_texture_coord = 0;
+    //   if (mesh->HasTextureCoords(default_texture_coord)) {
+    //     std::span txuvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
+    //     m.txuvs.resize(txuvs.size());
+    //     std::transform(std::execution::par_unseq, range_iter(txuvs), m.txuvs.begin(),
+    //       [](const auto &v) { return Mesh::txuv_type { v.x, v.y }; });
+    //   }
 
-      if (mesh->HasFaces()) {
-        std::span elems = { mesh->mFaces, mesh->mNumFaces };
-        m.elems.resize(elems.size());
-        std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
-          [](const aiFace &v) { return Mesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
-      }
+    //   if (mesh->HasFaces()) {
+    //     std::span elems = { mesh->mFaces, mesh->mNumFaces };
+    //     m.elems.resize(elems.size());
+    //     std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
+    //       [](const aiFace &v) { return Mesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
+    //   }
 
-      // Ensure mesh data is properly mapped, redundant vertices are stripped where possible
-      remap_mesh(m);
-      compact_mesh(m);
-      // TODO perhaps move reparameterization here
+    //   // Ensure mesh data is properly mapped, redundant vertices are stripped where possible
+    //   remap_mesh(m);
+    //   compact_mesh(m);
+    //   // TODO perhaps move reparameterization here
 
-      scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));
+    //   scene.resources.meshes.emplace(mesh->mName.C_Str(), std::move(m));
 
-      // Overwrite existing scene data extracted from OBJ
-      for (const auto &mesh : scene.resources.meshes) {
-        auto it = rng::find(resources.meshes, mesh.name, [](const auto &m) { return m.name; });
-        if (it != resources.meshes.end())
-          resources.meshes.data()[std::distance(resources.meshes.begin(), it)].value() = mesh.value();
-      }
-      for (const auto &img : scene.resources.images) {
-        auto it = rng::find(resources.images, img.name, [](const auto &m) { return m.name; });
-        if (it != resources.images.end())
-          resources.images.data()[std::distance(resources.images.begin(), it)].value() = img.value();
-      }
-    }
+    //   // Overwrite existing scene data extracted from OBJ
+    //   for (const auto &mesh : scene.resources.meshes) {
+    //     auto it = rng::find(resources.meshes, mesh.name, [](const auto &m) { return m.name; });
+    //     if (it != resources.meshes.end())
+    //       resources.meshes.data()[std::distance(resources.meshes.begin(), it)].value() = mesh.value();
+    //   }
+    //   for (const auto &img : scene.resources.images) {
+    //     auto it = rng::find(resources.images, img.name, [](const auto &m) { return m.name; });
+    //     if (it != resources.images.end())
+    //       resources.images.data()[std::distance(resources.images.begin(), it)].value() = img.value();
+    //   }
+    // }
 
-    // Process object material data in order
-    for (auto &component : scene.components.objects) {
-      auto &object = component.value;
+    // // Process object material data in order
+    // for (auto &component : scene.components.objects) {
+    //   auto &object = component.value;
 
-      // Get referred material index of mesh
-      const auto *material = file_materials[file_meshes[object.mesh_i]->mMaterialIndex];
+    //   // Get referred material index of mesh
+    //   const auto *material = file_materials[file_meshes[object.mesh_i]->mMaterialIndex];
 
-      // First define default material properties, assuming no succesful loads
-      aiColor3D baseColorValue(1);
-      ai_real metallicValue(1), roughnessValue(1), opacityValue(1);
+    //   // First define default material properties, assuming no succesful loads
+    //   aiColor3D baseColorValue(1);
+    //   ai_real metallicValue(1), roughnessValue(1), opacityValue(1);
 
-      // Attempt to fetch a diffuse color property from the material
-      if (aiReturn_SUCCESS != material->Get(AI_MATKEY_BASE_COLOR, baseColorValue))
-        material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColorValue);
+    //   // Attempt to fetch a diffuse color property from the material
+    //   if (aiReturn_SUCCESS != material->Get(AI_MATKEY_BASE_COLOR, baseColorValue))
+    //     material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColorValue);
 
-      // Attempt to fetch miscellaneous properties
-      /* material->Get(AI_MATKEY_METALLIC_FACTOR, metallicValue);
-      material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessValue);
-      material->Get(AI_MATKEY_OPACITY, opacityValue); */
+    //   // Attempt to fetch miscellaneous properties
+    //   /* material->Get(AI_MATKEY_METALLIC_FACTOR, metallicValue);
+    //   material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessValue);
+    //   material->Get(AI_MATKEY_OPACITY, opacityValue); */
 
-      // Assuming texture file paths are available, next attempt to gather these
-      aiString baseColorTexture, metallicTexture, roughnessTexture, opacityTexture, normalTexture;
+    //   // Assuming texture file paths are available, next attempt to gather these
+    //   aiString baseColorTexture, metallicTexture, roughnessTexture, opacityTexture, normalTexture;
 
-      // Search for a corresponding texture path for diffuse
-      for (auto tag : { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE }) {
-        material->GetTexture(tag, 0, &baseColorTexture);
-        guard_break(baseColorTexture.length == 0);
-      }
+    //   // Search for a corresponding texture path for diffuse
+    //   for (auto tag : { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE }) {
+    //     material->GetTexture(tag, 0, &baseColorTexture);
+    //     guard_break(baseColorTexture.length == 0);
+    //   }
         
-      // Search for a corresponding texture path for normal maps
-      /* for (auto tag : { aiTextureType_NORMALS, aiTextureType_HEIGHT, aiTextureType_NORMAL_CAMERA }) {
-        material->GetTexture(tag, 0, &normalTexture);
-        guard_break(normalTexture.length == 0);
-      } */
+    //   // Search for a corresponding texture path for normal maps
+    //   /* for (auto tag : { aiTextureType_NORMALS, aiTextureType_HEIGHT, aiTextureType_NORMAL_CAMERA }) {
+    //     material->GetTexture(tag, 0, &normalTexture);
+    //     guard_break(normalTexture.length == 0);
+    //   } */
 
-      // Search for texture paths for miscellaneous values
-      /* material->GetTexture(aiTextureType_METALNESS,         0, &metallicTexture);
-      material->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTexture);
-      material->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture); */
+    //   // Search for texture paths for miscellaneous values
+    //   /* material->GetTexture(aiTextureType_METALNESS,         0, &metallicTexture);
+    //   material->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTexture);
+    //   material->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture); */
 
-      // Texture image load helper
-      auto image_load = [&](auto &target, std::string_view image_str, auto image_value) {
-        if (auto image_path = path.parent_path() / image_str; !image_str.empty() && fs::exists(image_path)) {
-          if (auto it = image_uuid.find(image_path); it != image_uuid.end()) {
-            target = it->second;
-          } else {
-            scene.resources.images.emplace(image_path.filename().string(), {{ .path = image_path }});
-            target = static_cast<uint>(scene.resources.images.size() - 1);
-          }
-        } else {
-          target = image_value;
-        }
-      };
+    //   // Texture image load helper
+    //   auto image_load = [&](auto &target, std::string_view image_str, auto image_value) {
+    //     if (auto image_path = path.parent_path() / image_str; !image_str.empty() && fs::exists(image_path)) {
+    //       if (auto it = image_uuid.find(image_path); it != image_uuid.end()) {
+    //         target = it->second;
+    //       } else {
+    //         scene.resources.images.emplace(image_path.filename().string(), {{ .path = image_path }});
+    //         target = static_cast<uint>(scene.resources.images.size() - 1);
+    //       }
+    //     } else {
+    //       target = image_value;
+    //     }
+    //   };
 
-      // Attempt to load all referred texture images into their variant, or instead use the provided value
-      image_load(object.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
-      /* image_load(object.metallic,  metallicTexture.C_Str(), metallicValue);
-      image_load(object.roughness, roughnessTexture.C_Str(), roughnessValue);
-      image_load(object.opacity,   opacityTexture.C_Str(), opacityValue);
-      image_load(object.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 }); */
-    }
+    //   // Attempt to load all referred texture images into their variant, or instead use the provided value
+    //   image_load(object.diffuse,   baseColorTexture.C_Str(), Colr { baseColorValue.r, baseColorValue.g, baseColorValue.b });
+    //   /* image_load(object.metallic,  metallicTexture.C_Str(), metallicValue);
+    //   image_load(object.roughness, roughnessTexture.C_Str(), roughnessValue);
+    //   image_load(object.opacity,   opacityTexture.C_Str(), opacityValue);
+    //   image_load(object.normals,   normalTexture.C_Str(), Colr { 0, 0, 1 }); */
+    // }
 
+    auto scene = io::load_obj(path);
     import_scene(std::move(scene));
   }
 

@@ -6,10 +6,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
-
-
-
-
 #include <rapidobj/rapidobj.hpp>
 #include <algorithm>
 #include <deque>
@@ -302,41 +298,128 @@ namespace met::io {
     return convert_mesh<Mesh>(m);
   }
   
-  Scene load_obj(const fs::path &path) {
+  Scene load_obj(const fs::path &obj_path, bool load_materials, bool flip_uvs) {
     met_trace();
 
     // Check that file path exists
-    debug::check_expr(fs::exists(path),
-      fmt::format("failed to resolve path \"{}\"", path.string()));
+    debug::check_expr(fs::exists(obj_path),
+      fmt::format("failed to resolve path \"{}\"", obj_path.string()));
 
     // Attempt to parse OBJ file using rapidobj
-    rapidobj::Result result = rapidobj::ParseFile(path);
+    rapidobj::Result result = rapidobj::ParseFile(obj_path);
     debug::check_expr(!result.error,
-      fmt::format("failed to parse obj file \"{}\" with error {}", path.string(), result.error.code.message()));
+      fmt::format("failed to parse obj file \"{}\" with error \"{}\"", obj_path.string(), result.error.code.message()));
 
     // Obtain triangulated result
     debug::check_expr(rapidobj::Triangulate(result),
-      fmt::format("failed to triangulate obj file \"{}\" with error {}", path.string(), result.error.code.message()));
+      fmt::format("failed to triangulate obj file \"{}\" with error \"{}\"", obj_path.string(), result.error.code.message()));
     
-    // Obtain data ranges; vertex color is discarded
+    // Obtain data soup ranges; vertex color is discarded
     auto obj_verts = cnt_span<eig::Array3f>(result.attributes.positions);
     auto obj_norms = cnt_span<eig::Array3f>(result.attributes.normals);
     auto obj_txuvs = cnt_span<eig::Array2f>(result.attributes.texcoords);
 
+    // Return object; create (empty) scene to store objects/meshes/textures for output
+    Scene scene;
+
+    // List of material textures to load, coupled
+    // to a compact list of scene texture IDs
+    std::unordered_map<std::string, uint> texture_load_list;
+
     // For each rapidobj shape, we attempt to 
     // 1 - create a mesh resource 
-    // 2 - load a referred texture resource or specify a single diffuse value
+    // 2 - identify a referred texture resource or specify a single diffuse value
     // 3 - create an object component referring to mesh/texture
-    // TODO parallelize
+    // 4 - store mesh and object in scene
+    // 5 - load referred textures and store them in scene
     for (const auto &shape : result.shapes) {
-      met::Object object;
-      met::Mesh   mesh;
+      // Skip non-polyhedral shapes
+      guard_continue(!shape.mesh.indices.empty());
 
-      const auto &obj_elems = shape.mesh.indices;
-      // TODO continue...
+      bool has_norms = shape.mesh.indices.front().normal_index >= 0 && !obj_norms.empty();
+      bool has_txuvs = shape.mesh.indices.front().texcoord_index >= 0 && !obj_txuvs.empty();
+      bool has_matrs = !shape.mesh.material_ids.empty() && !result.materials.empty();
+      
+      // 1 - create a mesh resource
+      met::Mesh mesh;
+      {
+        // First, allocate necessary vector sizes for duplicated mesh data; we deduplicate later
+        mesh.verts.resize(shape.mesh.indices.size());
+        if (has_norms)
+          mesh.norms.resize(shape.mesh.indices.size());
+        if (has_txuvs)
+          mesh.txuvs.resize(shape.mesh.indices.size());
+        mesh.elems.resize(shape.mesh.indices.size() / 3);
+
+        // Then, fill mesh indices from 0 to n; we deduplicate later
+        rng::iota(cnt_span<uint>(mesh.elems), 0u);
+
+        // Next, copy vertex data from data soup to mesh; we deduplicate later
+        #pragma omp parallel for
+        for (int i = 0; i < shape.mesh.indices.size(); ++i) {
+          const auto &obj_elem = shape.mesh.indices[i];
+          mesh.verts[i] = obj_verts[obj_elem.position_index];
+          if (has_norms)
+            mesh.norms[i] = obj_norms[obj_elem.normal_index];
+          if (has_txuvs)
+            mesh.txuvs[i] = obj_txuvs[obj_elem.texcoord_index];
+        } // for (i)
+
+        // Optionally, flip UV coordinates along the y-axis
+        if (flip_uvs)
+          std::for_each(
+            std::execution::par_unseq, 
+            range_iter(mesh.txuvs),
+            [](eig::Array2f &v) { v.y() = 1.f - v.y(); });
+
+        // Finally, remap/compact to deduplicate
+        remap_mesh(mesh);
+        compact_mesh(mesh);
+      }
+
+      // 2 - Identify referred texture resource or specify a single diffuse value
+      std::variant<Colr, uint> diffuse;
+      if (load_materials) {
+        if (!has_matrs) {
+          // No material specified; set to neutral gray
+          diffuse = Colr(0.5);
+        } else {
+          // Access first material only; we ignore per-face materials; 
+          const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
+
+          if (obj_mat.diffuse_texname.empty()) {
+            // Assign color value if there is no file path
+            diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
+          } else {
+            // Assign an allocated texture id from texture_load_list or get a new one
+            diffuse = texture_load_list.insert({ 
+              obj_mat.diffuse_texname,                    // filename of texture as key
+              static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+            }).first->second;
+          }
+        }
+      } else {
+        diffuse = Colr(0.5);
+      }
+
+      // 3 - create an object component referring to mesh/texture
+      met::Object object = {
+        .mesh_i      = static_cast<uint>(scene.resources.meshes.size()),
+        .uplifting_i = 0,
+        .diffuse     = diffuse
+      };
+
+      // 4 - store mesh and object in scene
+      scene.resources.meshes.push(shape.name, std::move(mesh));
+      scene.components.objects.push(shape.name, std::move(object));
+    } // for (shape)
+
+    // 5 - load required textures and store them in scene 
+    for (const auto &[texture_path, i] : texture_load_list) {
+      fs::path img_path = obj_path.parent_path() / texture_path;
+      met::Image img = {{ .path = img_path }};
+      scene.resources.images.push(img_path.filename().string(), std::move(img));
     }
-
-    Scene scene;
 
     return scene;
   }

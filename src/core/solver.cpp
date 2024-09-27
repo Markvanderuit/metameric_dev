@@ -33,9 +33,7 @@ namespace nlopt {
       // Only pass on gradient if present, not all algorithms require or provide gradient
       auto r_ = eig::Map<eig::VectorXd>(r, m);
       auto x_ = eig::Map<const vec>(x);
-      auto g_ = g 
-              ? eig::Map<mat>(g, N, m) 
-              : eig::Map<mat>(nullptr, 0, 0);
+      auto g_ = eig::Map<mat>(g ? g : nullptr, N, m);
       return static_cast<Wrapper<N>::ConstraintV::Capture *>(data)->operator()(r_, x_, g_);
     };
 
