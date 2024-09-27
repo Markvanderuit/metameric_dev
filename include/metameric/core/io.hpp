@@ -52,6 +52,10 @@ namespace met {
     template <typename Mesh>
     Mesh load_mesh(const fs::path &path);
 
+    // Load scene data; meshes, objects, materials, textures
+    // from a wavefront .obj file
+    Scene load_obj(const fs::path &path);
+
     // Simple basis function load from file
     // Input should be a text file, containing a single wavelength and 'm' values per line, and
     // optional comments marked with '#'. This is similar to the spectrum format described above.

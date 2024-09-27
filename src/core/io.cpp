@@ -6,6 +6,10 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
+
+
+
+
 #include <rapidobj/rapidobj.hpp>
 #include <algorithm>
 #include <deque>
@@ -296,6 +300,45 @@ namespace met::io {
     compact_mesh(m);
     
     return convert_mesh<Mesh>(m);
+  }
+  
+  Scene load_obj(const fs::path &path) {
+    met_trace();
+
+    // Check that file path exists
+    debug::check_expr(fs::exists(path),
+      fmt::format("failed to resolve path \"{}\"", path.string()));
+
+    // Attempt to parse OBJ file using rapidobj
+    rapidobj::Result result = rapidobj::ParseFile(path);
+    debug::check_expr(!result.error,
+      fmt::format("failed to parse obj file \"{}\" with error {}", path.string(), result.error.code.message()));
+
+    // Obtain triangulated result
+    debug::check_expr(rapidobj::Triangulate(result),
+      fmt::format("failed to triangulate obj file \"{}\" with error {}", path.string(), result.error.code.message()));
+    
+    // Obtain data ranges; vertex color is discarded
+    auto obj_verts = cnt_span<eig::Array3f>(result.attributes.positions);
+    auto obj_norms = cnt_span<eig::Array3f>(result.attributes.normals);
+    auto obj_txuvs = cnt_span<eig::Array2f>(result.attributes.texcoords);
+
+    // For each rapidobj shape, we attempt to 
+    // 1 - create a mesh resource 
+    // 2 - load a referred texture resource or specify a single diffuse value
+    // 3 - create an object component referring to mesh/texture
+    // TODO parallelize
+    for (const auto &shape : result.shapes) {
+      met::Object object;
+      met::Mesh   mesh;
+
+      const auto &obj_elems = shape.mesh.indices;
+      // TODO continue...
+    }
+
+    Scene scene;
+
+    return scene;
   }
 
   Basis load_basis(const fs::path &path) {

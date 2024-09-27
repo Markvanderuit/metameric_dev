@@ -329,6 +329,8 @@ namespace met {
   void simplify_mesh(MeshTy &mesh, uint target_elems, float target_error) {
     met_trace();
 
+    guard(target_elems < mesh.elems.size());
+
     // Generate output/input ranges
     auto dst = std::vector<eig::Array3u>(mesh.elems.size());
     auto src = cnt_span<uint>(mesh.elems);
