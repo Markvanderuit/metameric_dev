@@ -9,7 +9,7 @@ namespace met::io {
   // Simple serializable contract to avoid use of interfaces on currently
   // aggregate types such as MeshData
   template <typename Ty>
-  concept is_serializable = requires(Ty ty, const std::istream &is, std::ostream &os) {
+  concept is_serializable = requires(Ty ty, std::istream &is, std::ostream &os) {
     { ty.to_stream(os) };
     { ty.from_stream(is) };
   };
