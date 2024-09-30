@@ -36,12 +36,12 @@ namespace met {
       io::to_stream(txuvs, str);
     }
 
-    void fr_stream(std::istream &str) {
+    void from_stream(std::istream &str) {
       met_trace();
-      io::fr_stream(verts, str);
-      io::fr_stream(elems, str);
-      io::fr_stream(norms, str);
-      io::fr_stream(txuvs, str);
+      io::from_stream(verts, str);
+      io::from_stream(elems, str);
+      io::from_stream(norms, str);
+      io::from_stream(txuvs, str);
     }
   };
   

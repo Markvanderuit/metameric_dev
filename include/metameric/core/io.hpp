@@ -30,13 +30,8 @@ namespace met {
     CMFS load_cmfs(const fs::path &path);
     void save_cmfs(const fs::path &path, const CMFS &s);
 
-    // Simple mesh load from file
-    // Passes through to ASSIMP under the hood
-    template <typename Mesh>
-    Mesh load_mesh(const fs::path &path);
-
     // Load scene data; meshes, objects, materials, textures
-    // from a wavefront .obj file
+    // from a .obj file and optional accompanying .mtl file
     Scene load_obj(const fs::path &path, bool load_materials = true, bool flip_uvs = true);
 
     // Simple basis function load from file

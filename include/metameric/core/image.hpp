@@ -81,7 +81,7 @@ namespace met {
       str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
     }
 
-    void fr_stream(PixelFormat &ty, std::istream &str) {
+    void from_stream(PixelFormat &ty, std::istream &str) {
       met_trace();
       str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
     }
@@ -91,7 +91,7 @@ namespace met {
       str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
     }
 
-    void fr_stream(PixelType &ty, std::istream &str) {
+    void from_stream(PixelType &ty, std::istream &str) {
       met_trace();
       str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
     }
@@ -101,7 +101,7 @@ namespace met {
       str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
     }
 
-    void fr_stream(ColorFormat &ty, std::istream &str) {
+    void from_stream(ColorFormat &ty, std::istream &str) {
       met_trace();
       str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
     }
@@ -116,13 +116,13 @@ namespace met {
       io::to_stream(m_data, str);
     }
 
-    void fr_stream(std::istream &str) {
+    void from_stream(std::istream &str) {
       met_trace();
-      this->fr_stream(m_pixel_type, str);
-      this->fr_stream(m_pixel_frmt, str);
-      this->fr_stream(m_color_frmt, str);
-      io::fr_stream(m_size, str);
-      io::fr_stream(m_data, str);
+      this->from_stream(m_pixel_type, str);
+      this->from_stream(m_pixel_frmt, str);
+      this->from_stream(m_color_frmt, str);
+      io::from_stream(m_size, str);
+      io::from_stream(m_data, str);
     }
   };
 } // namespace met

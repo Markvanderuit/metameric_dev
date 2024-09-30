@@ -9,9 +9,9 @@ namespace met::io {
   // Simple serializable contract to avoid use of interfaces on currently
   // aggregate types such as MeshData
   template <typename Ty>
-  concept is_serializable = requires(Ty ty, std::istream &is, std::ostream &os) {
+  concept is_serializable = requires(Ty ty, const std::istream &is, std::ostream &os) {
     { ty.to_stream(os) };
-    { ty.fr_stream(is) };
+    { ty.from_stream(is) };
   };
 
   // Serialization for eigen dense types
@@ -20,7 +20,7 @@ namespace met::io {
     str.write(reinterpret_cast<const char *>(ty.data()), sizeof(std::decay_t<decltype(ty)>));
   }
   template <typename Ty> requires (!is_serializable<Ty> && eig::is_approx_comparable<Ty>)
-  void fr_stream(Ty &ty, std::istream &str) {
+  void from_stream(Ty &ty, std::istream &str) {
     str.read(reinterpret_cast<char *>(ty.data()), sizeof(std::decay_t<decltype(ty)>));
   }
 
@@ -31,7 +31,7 @@ namespace met::io {
     str.write(reinterpret_cast<const char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
   }
   template <typename Ty> requires (!is_serializable<Ty> && !eig::is_approx_comparable<Ty>)
-  void fr_stream(Ty &ty, std::istream &str) {
+  void from_stream(Ty &ty, std::istream &str) {
     met_trace();
     str.read(reinterpret_cast<char *>(&ty), sizeof(std::decay_t<decltype(ty)>));
   }
@@ -43,10 +43,10 @@ namespace met::io {
     to_stream(size, str);
     str.write(ty.data(), size);
   }
-  inline void fr_stream(std::string &ty, std::istream &str) {
+  inline void from_stream(std::string &ty, std::istream &str) {
     met_trace();
     size_t size = 0;
-    fr_stream(size, str);
+    from_stream(size, str);
     ty.resize(size);
     str.read(ty.data(), size);
   }
@@ -60,10 +60,10 @@ namespace met::io {
     str.write(reinterpret_cast<const char *>(v.data()), sizeof(std::decay_t<decltype(v)>::value_type) * v.size());
   }
   template <typename Ty> requires (!is_serializable<Ty> && !eig::is_approx_comparable<Ty>)
-  void fr_stream(std::vector<Ty> &v, std::istream &str) {
+  void from_stream(std::vector<Ty> &v, std::istream &str) {
     met_trace();
     size_t n = 0;
-    fr_stream(n, str);
+    from_stream(n, str);
     v.resize(n);
     str.read(reinterpret_cast<char *>(v.data()), sizeof(std::decay_t<decltype(v)>::value_type) * v.size());
   }
@@ -74,8 +74,8 @@ namespace met::io {
     ty.to_stream(str);
   }
   template <typename Ty> requires (is_serializable<Ty>)
-  void fr_stream(Ty &ty, std::istream &str) { 
-    ty.fr_stream(str);
+  void from_stream(Ty &ty, std::istream &str) { 
+    ty.from_stream(str);
   }
 
   // Serialization for vectors of objects fulfilling is_serializable contract
@@ -88,13 +88,13 @@ namespace met::io {
       to_stream(ty, str);
   }
   template <typename Ty> requires (is_serializable<Ty>)
-  void fr_stream(std::vector<Ty> &v, std::istream &str) {
+  void from_stream(std::vector<Ty> &v, std::istream &str) {
     met_trace();
     size_t n = 0;
-    fr_stream(n, str);
+    from_stream(n, str);
     v.resize(n);
     for (auto &ty : v)
-      fr_stream(ty, str);
+      from_stream(ty, str);
   }
 
   // Serialization for vectors of eigen types
@@ -106,10 +106,10 @@ namespace met::io {
     str.write(reinterpret_cast<const char *>(v.data()), sizeof(std::decay_t<decltype(v)>::value_type) * n);
   }
   template <typename Ty> requires (!is_serializable<Ty> && eig::is_approx_comparable<Ty>)
-  void fr_stream(std::vector<Ty> &v, std::istream &str) {
+  void from_stream(std::vector<Ty> &v, std::istream &str) {
     met_trace();
     size_t n = 0;
-    fr_stream(n, str);
+    from_stream(n, str);
     v.resize(n);
     str.read(reinterpret_cast<char *>(v.data()), sizeof(std::decay_t<decltype(v)>::value_type) * n);
   }

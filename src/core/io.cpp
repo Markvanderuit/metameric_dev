@@ -2,9 +2,6 @@
 #include <metameric/core/mesh.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include <nlohmann/json.hpp>
 #include <rapidobj/rapidobj.hpp>
 #include <algorithm>
@@ -147,156 +144,6 @@ namespace met::io {
 
     return save_string(path, ss.str());
   }
-
-  template <typename Mesh>
-  Mesh load_mesh(const fs::path &path) {
-    met_trace();
-
-    Assimp::Importer imp;
-    const auto *scene = imp.ReadFile(path.string(), 
-      aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals);
-    
-    debug::check_expr(scene/*  || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE */,
-      fmt::format("Could not load scnene data from {}. {}\n", 
-                  path.string(),
-                  std::string(imp.GetErrorString())));
-
-    {
-      struct QueueObject {
-        eig::Matrix4f trf;
-        aiNode       *node;
-      } root = { eig::Matrix4f::Identity(), scene->mRootNode };
-
-      std::unordered_set<uint> meshes, textures;
-
-      std::deque<QueueObject> queue = { root };
-      while (!queue.empty()) {
-        // Pop current node from work queue
-        auto [parent_trf, node] = queue.front();
-        queue.pop_front();
-
-        // Assemble recursive transformation to pass to children
-        eig::Matrix4f trf;
-        std::memcpy(trf.data(), (const void *) &(node->mTransformation), sizeof(aiMatrix4x4));
-        trf = parent_trf * trf;
-
-        // If current node has meshes attached, register object(s)
-        for (uint i : std::span { node->mMeshes, node->mNumMeshes }) {
-          
-        }
-        
-        // Push child nodes on work queue
-        for (auto child : std::span { node->mChildren, node->mNumChildren })
-          queue.push_back({ trf, child });
-      }
-    }
-
-
-    // For now, just load the base mesh
-    // TODO; actually handle scenes, not individual meshes
-    const auto *mesh = scene->mMeshes[0];
-
-    fmt::print("Meshes : {}\nMaterials : {}\nTextures : {}\n",
-      scene->mNumMeshes, scene->mNumMaterials, scene->mNumTextures);
-    
-    std::span materials = { scene->mMaterials, scene->mNumMaterials };
-    for (auto *mat : materials) {
-      std::string mat_name = mat->GetName().C_Str();
-      fmt::print("{}\n", mat_name);
-
-      fmt::print("Texture keys >\n", mat_name);
-      {
-        aiString baseColorTexture, metallicTexture, roughnessTexture, opacityTexture, normalTexture;
-
-        // Search for a corresponding texture value for diffuse
-        for (auto tag : { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE }) {
-          mat->GetTexture(tag, 0, &baseColorTexture);
-          guard_break(baseColorTexture.length == 0);
-        }
-        
-        // Search for a corresponding texture value for normal maps
-        for (auto tag : { aiTextureType_NORMALS, aiTextureType_HEIGHT, aiTextureType_NORMAL_CAMERA }) {
-          mat->GetTexture(tag, 0, &normalTexture);
-          guard_break(normalTexture.length == 0);
-        }
-
-        // Gather texture paths for miscellaneous values
-        mat->GetTexture(aiTextureType_METALNESS,         0, &metallicTexture);
-        mat->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTexture);
-        mat->GetTexture(aiTextureType_OPACITY,           0, &opacityTexture);
-
-        fmt::print("Base color {}\n", baseColorTexture.C_Str());
-        fmt::print("Metallic   {}\n", metallicTexture.C_Str());
-        fmt::print("Roughness  {}\n", roughnessTexture.C_Str());
-        fmt::print("Opacity    {}\n", opacityTexture.C_Str());
-        fmt::print("Normals    {}\n", normalTexture.C_Str());
-      }
-
-      fmt::print("Properties >\n", mat_name);
-      std::span properties = { mat->mProperties, mat->mNumProperties };
-      for (auto *prop : properties) {
-        std::string prop_name = prop->mKey.C_Str();
-        uint prop_semantic = prop->mSemantic;
-        std::string buffer(prop->mData, size_t(prop->mDataLength));
-
-        switch (prop->mType) {
-          case aiPTI_Float:
-            fmt::print("\t{} - F32 - {}\n", prop_name, "" /* mat->Get(prop->mKey, aiPTI_Float, ) */);
-            break;
-          case aiPTI_Double:
-            fmt::print("\t{} - F64 - {}\n", prop_name, "");
-            break;
-          case aiPTI_Integer:
-            fmt::print("\t{} - I32 - {}\n", prop_name, "");
-            break;
-          case aiPTI_String:
-            fmt::print("\t{} - Str - {} - {}\n", prop_name, buffer, prop_semantic);
-            break;
-          case aiPTI_Buffer:
-            fmt::print("\t{} - Buf - {}\n", prop_name, "");
-            break;
-        }
-      }
-    }
-
-    AlMesh m;
-    
-    if (mesh->HasPositions()) {
-      std::span verts = { mesh->mVertices, mesh->mNumVertices };
-      m.verts.resize(verts.size());
-      std::transform(std::execution::par_unseq, range_iter(verts), m.verts.begin(),
-        [](const auto &v) { return AlMesh::vert_type { v.x, v.y, v.z }; });
-    }
-    
-    if (mesh->HasNormals()) {
-      std::span norms = { mesh->mNormals, mesh->mNumVertices };
-      m.norms.resize(norms.size());
-      std::transform(std::execution::par_unseq, range_iter(norms), m.norms.begin(),
-        [](const auto &v) { return AlMesh::norm_type { v.x, v.y, v.z }; });
-    }
-
-    // Assume first set of coords only
-    constexpr size_t default_texture_coord = 0;
-    if (mesh->HasTextureCoords(default_texture_coord)) {
-      std::span txuvs = { mesh->mTextureCoords[default_texture_coord], mesh->mNumVertices };
-      m.txuvs.resize(txuvs.size());
-      std::transform(std::execution::par_unseq, range_iter(txuvs), m.txuvs.begin(),
-        [](const auto &v) { return AlMesh::txuv_type { v.x, v.y }; });
-    }
-
-    if (mesh->HasFaces()) {
-      std::span elems = { mesh->mFaces, mesh->mNumFaces };
-      m.elems.resize(elems.size());
-      std::transform(std::execution::par_unseq, range_iter(elems), m.elems.begin(),
-        [](const aiFace &v) { return AlMesh::elem_type { v.mIndices[0], v.mIndices[1], v.mIndices[2] }; });
-    }
-    
-    // Ensure mesh data is properly corrected and redundant vertices are stripped
-    remap_mesh(m);
-    compact_mesh(m);
-    
-    return convert_mesh<Mesh>(m);
-  }
   
   Scene load_obj(const fs::path &obj_path, bool load_materials, bool flip_uvs) {
     met_trace();
@@ -372,34 +219,30 @@ namespace met::io {
             range_iter(mesh.txuvs),
             [](eig::Array2f &v) { v.y() = 1.f - v.y(); });
 
-        // Finally, remap/compact to deduplicate
+        // Finally, deduplicate and prepare for rendering
         remap_mesh(mesh);
         compact_mesh(mesh);
       }
 
       // 2 - Identify referred texture resource or specify a single diffuse value
-      std::variant<Colr, uint> diffuse;
-      if (load_materials) {
-        if (!has_matrs) {
-          // No material specified; set to neutral gray
-          diffuse = Colr(0.5);
-        } else {
-          // Access first material only; we ignore per-face materials; 
-          const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
-
-          if (obj_mat.diffuse_texname.empty()) {
-            // Assign color value if there is no file path
-            diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
-          } else {
-            // Assign an allocated texture id from texture_load_list or get a new one
-            diffuse = texture_load_list.insert({ 
-              obj_mat.diffuse_texname,                    // filename of texture as key
-              static_cast<uint>(texture_load_list.size()) // New texture id at end of list
-            }).first->second;
-          }
-        }
-      } else {
+      std::variant<Colr, uint> diffuse = Colr(0.5);
+      if (!load_materials || !has_matrs) {
+        // No material specified; set to neutral gray
         diffuse = Colr(0.5);
+      } else {
+        // Access first material only; we ignore per-face materials; 
+        const auto &obj_mat = result.materials[shape.mesh.material_ids.front()];
+
+        if (obj_mat.diffuse_texname.empty()) {
+          // Assign color value if there is no file path
+          diffuse = Colr { obj_mat.diffuse[0], obj_mat.diffuse[1], obj_mat.diffuse[2] };
+        } else {
+          // Assign an allocated texture id from texture_load_list or get a new one
+          diffuse = texture_load_list.insert({ 
+            obj_mat.diffuse_texname,                    // filename of texture as key
+            static_cast<uint>(texture_load_list.size()) // New texture id at end of list
+          }).first->second;
+        }
       }
 
       // 3 - create an object component referring to mesh/texture
@@ -660,11 +503,4 @@ namespace met::io {
     
     return { wvls, values_x, values_y, values_z };
   }
-
-  /* Explicit template instantiations */
-
-  template
-  Mesh load_mesh<Mesh>(const fs::path &);
-  template
-  AlMesh load_mesh<AlMesh>(const fs::path &);
 } // namespace met::io

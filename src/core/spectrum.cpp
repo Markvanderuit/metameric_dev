@@ -115,10 +115,10 @@ namespace met {
     io::to_stream(illuminant, str);
   }
 
-  void ColrSystem::fr_stream(std::istream &str) {
+  void ColrSystem::from_stream(std::istream &str) {
     met_trace();
-    io::fr_stream(cmfs,       str);
-    io::fr_stream(illuminant, str);
+    io::from_stream(cmfs,       str);
+    io::from_stream(illuminant, str);
   }
   
   std::vector<CMFS> IndirectColrSystem::finalize(bool as_rgb) const {
@@ -174,10 +174,10 @@ namespace met {
     io::to_stream(powers, str);
   }
 
-  void IndirectColrSystem::fr_stream(std::istream &str) {
+  void IndirectColrSystem::from_stream(std::istream &str) {
     met_trace();
-    io::fr_stream(cmfs,   str);
-    io::fr_stream(powers, str);
+    io::from_stream(cmfs,   str);
+    io::from_stream(powers, str);
   }
   
   bool Basis::operator==(const Basis &o) const {
@@ -193,11 +193,11 @@ namespace met {
     io::to_stream(func, str);
   }
 
-  void Basis::fr_stream(std::istream &str) {
+  void Basis::from_stream(std::istream &str) {
     met_trace();
-    io::fr_stream(mean,  str);
-    io::fr_stream(scale, str);
-    io::fr_stream(func,  str);
+    io::from_stream(mean,  str);
+    io::from_stream(scale, str);
+    io::from_stream(func,  str);
   }
   
   std::vector<Spec> Basis::apply(std::span<const Basis::vec_type> cs) const { 

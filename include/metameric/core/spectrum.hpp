@@ -44,7 +44,7 @@ namespace met {
     auto operator()(std::span<const vec_type> cs) const { return apply(cs); }
     bool operator==(const Basis &o) const;
     void to_stream(std::ostream &str) const;
-    void fr_stream(std::istream &str);
+    void from_stream(std::istream &str);
   };
 
   // Concept for a color system, which can take a spectral distribution or set of spectra,
@@ -72,7 +72,7 @@ namespace met {
     auto operator()(std::span<const Spec> s, bool as_rgb = true) const { return apply(s, as_rgb); }
     bool operator==(const ColrSystem &o) const;
     void to_stream(std::ostream &str) const;
-    void fr_stream(std::istream &str);
+    void from_stream(std::istream &str);
   };
   static_assert(is_colr_system<ColrSystem>);
 
@@ -92,7 +92,7 @@ namespace met {
     auto operator()(std::span<const Spec> s, bool as_rgb = true) const { return apply(s, as_rgb); }
     bool operator==(const IndirectColrSystem &o) const;
     void to_stream(std::ostream &str) const;
-    void fr_stream(std::istream &str);
+    void from_stream(std::istream &str);
   };
   static_assert(is_colr_system<IndirectColrSystem>);
 

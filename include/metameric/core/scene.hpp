@@ -44,13 +44,6 @@ namespace met {
     void save(const fs::path &path); // Save scene data to path
     void unload();                   // Clear out scene data
 
-    // Export a specific uplifting model from the loaded scene to a texture file
-    void export_uplifting(const fs::path &path, uint uplifting_i) const;
-
-    // Import a wavefront .obj file, adding its components into the loaded scene
-    void import_wavefront_obj(const fs::path &path);
-    void overwrite_wavefront_obj(const fs::path &path);
-
     // Import an existing scene, adding its components into the loaded scene
     void import_scene(const fs::path &path);
     void import_scene(Scene &&other);
@@ -92,7 +85,7 @@ namespace met {
 
   public: // Serialization
     void to_stream(std::ostream &str) const;
-    void fr_stream(std::istream &str);
+    void from_stream(std::istream &str);
   };
 
   // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>

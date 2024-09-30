@@ -35,10 +35,10 @@ namespace met::detail {
       io::to_stream(value, str);
     }
 
-    void fr_stream(std::istream &str) {
+    void from_stream(std::istream &str) {
       met_trace();
-      io::fr_stream(name,  str);
-      io::fr_stream(value, str);
+      io::from_stream(name,  str);
+      io::from_stream(value, str);
     }
     
   public: // Structured binding; const auto &[ty, state] = component
@@ -101,10 +101,10 @@ namespace met::detail {
       io::to_stream(m_value, str);
     }
 
-    void fr_stream(std::istream &str) {
+    void from_stream(std::istream &str) {
       met_trace();
-      io::fr_stream(name,    str);
-      io::fr_stream(m_value, str);
+      io::from_stream(name,    str);
+      io::from_stream(m_value, str);
     }
   
   public: // Structured binding; const auto &[ty, state] = component
@@ -216,9 +216,9 @@ namespace met::detail {
       io::to_stream(m_data, str);
     }
 
-    void fr_stream(std::istream &str) {
+    void from_stream(std::istream &str) {
       met_trace();
-      io::fr_stream(m_data, str);
+      io::from_stream(m_data, str);
       set_mutated(true);
     }
   };
@@ -315,9 +315,9 @@ namespace met::detail {
       io::to_stream(m_data, str);
     }
 
-    void fr_stream(std::istream &str) {
+    void from_stream(std::istream &str) {
       met_trace();
-      io::fr_stream(m_data, str);
+      io::from_stream(m_data, str);
       set_mutated(true);
     }
   };
