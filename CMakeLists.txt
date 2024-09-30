@@ -205,6 +205,13 @@ add_executable(metameric_editor src/app/metameric_editor.cpp)
 target_compile_features(metameric_editor PUBLIC cxx_std_23)
 target_link_libraries(metameric_editor PRIVATE core render components)
 
+# Setup editor executable
+find_package(avcpp CONFIG REQUIRED)
+add_executable(ffw_video src/app/ffw_video.cpp)
+target_compile_features(ffw_video PUBLIC cxx_std_23)
+target_link_libraries(ffw_video PRIVATE core render components avcpp::FFmpeg avcpp::avcpp-static)
+
+
 # Optionally setup Catch2 tests
 if (MET_ENABLE_TESTS)
   # Find all test files

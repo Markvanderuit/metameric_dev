@@ -51,6 +51,7 @@ namespace met {
     bool operator==(const Image &o) const;
 
   public: // Pixel queries and format conversions
+    void         clear(eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
     void         set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt = ColorFormat::eNone);
     eig::Array4f get_pixel(const eig::Array2u &xy, ColorFormat output_frmt = ColorFormat::eNone) const;
     eig::Array4f sample(const eig::Array2f &uv, ColorFormat output_frmt = ColorFormat::eNone) const;

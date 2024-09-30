@@ -278,6 +278,17 @@ namespace met {
         && std::equal(std::execution::par_unseq, range_iter(m_data), range_iter(o.m_data));
   }
 
+  void Image::clear(eig::Array4f v, ColorFormat input_frmt) {
+    met_trace();
+    
+    #pragma omp parallel for
+    for (int y = 0; y < m_size.y(); ++y) {
+      for (int x = 0; x < m_size.x(); ++x) {
+        set_pixel({ x, y }, v, input_frmt);
+      }
+    }
+  }
+
   void Image::set_pixel(const eig::Array2u &xy, eig::Array4f v, ColorFormat input_frmt) {
     uint i = xy.y() * m_size.x() + xy.x();
 
