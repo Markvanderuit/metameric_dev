@@ -57,7 +57,6 @@ add_subdirectory(third_party/small_gl)
 add_subdirectory(third_party/xatlas)
 
 # Include third party libraries
-find_package(assimp    CONFIG REQUIRED)
 find_package(Catch2    CONFIG REQUIRED)
 find_package(Eigen3    CONFIG REQUIRED)
 find_package(fmt       CONFIG REQUIRED)
@@ -109,7 +108,6 @@ endif()
 set(thrp_includes ${STB_INCLUDE_DIRS} ${ZSTR_INCLUDE_DIRS})
 set(core_dependencies
   autodiff::autodiff
-  assimp::assimp
   Eigen3::Eigen
   embree
   fmt::fmt-header-only
