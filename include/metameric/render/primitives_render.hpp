@@ -129,7 +129,6 @@ namespace met {
     gl::ComputeInfo m_dispatch;
     gl::Sampler     m_sampler; // linear sampler
 
-
   public:
     using InfoType = PathRenderPrimitiveInfo;
     
