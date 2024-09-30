@@ -83,6 +83,9 @@ namespace met {
     const Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs) const;
     Uplifting::Vertex &uplifting_vertex(ConstraintRecord cs);
 
+    // Force update check of stale (gl-side) components and state-trackers
+    void update();
+
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void from_stream(std::istream &str);

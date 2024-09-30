@@ -202,7 +202,7 @@ namespace met {
         render_handle.getr<detail::IntegrationRenderPrimitive>()
                      .film().get(cast_span<float>(image.data()));
         image.save_exr(m_path);
-
+        
         // Destroy renderer
         render_handle.dstr();
 

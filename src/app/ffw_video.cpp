@@ -5,6 +5,7 @@
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
+#include <metameric/components/views/detail/arcball.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/detail/program_cache.hpp>
 #include <ffmpeg.h>
@@ -61,7 +62,7 @@ namespace met {
       m_encoder.setHeight(size.y());
       m_encoder.setPixelFormat(av::PixelFormat(output_fmt));
       m_encoder.setTimeBase(av::Rational(1, fps));
-      // encoder.setBitRate(1000'000);
+      m_encoder.setBitRate(1000'000);
       m_encoder.open();
 
       // Prepare stream for write
@@ -124,7 +125,7 @@ namespace met {
   };
 
   // Application setup function
-  void init(RunInfo info) {
+  void run(RunInfo info) {
     met_trace();
     
     fmt::print(
@@ -156,10 +157,109 @@ namespace met {
     }
 
     // Initialize program cache and scene data as resources owned by the scheduler
-    // and not a specific schedule task
-    scheduler.global("scene").set<Scene>({ });
+    // and not a specific schedule task. Load scene if a scene path is provided
+    auto &scene = scheduler.global("scene").set<Scene>({ }).getw<Scene>();
+    if (!info.scene_path.empty())
+      scene.load(info.scene_path);
+    scene.update();
 
+    // We use the scheduler to ensure spectral constraints are all handled properly;
+    // so run these two tasks a fair few times
+    scheduler.task("gen_upliftings").init<GenUpliftingsTask>(256);
+    scheduler.task("gen_objects").init<GenObjectsTask>();
+    scheduler.run();
+    scene.update();
+
+    // Initialize renderer sensor based on scene view
+    Sensor sensor;
     {
+      auto &view = scene.components.views("View").value;
+    
+      eig::Affine3f trf_rot = eig::Affine3f::Identity();
+      trf_rot *= eig::AngleAxisf(view.camera_trf.rotation.x(), eig::Vector3f::UnitY());
+      trf_rot *= eig::AngleAxisf(view.camera_trf.rotation.y(), eig::Vector3f::UnitX());
+      trf_rot *= eig::AngleAxisf(view.camera_trf.rotation.z(), eig::Vector3f::UnitZ());
+
+      auto dir = (trf_rot * eig::Vector3f(0, 0, 1)).normalized().eval();
+      auto eye = -dir; 
+      auto cen = (view.camera_trf.position + dir).eval();
+
+      detail::Arcball arcball = {{
+        .fov_y    = view.camera_fov_y * std::numbers::pi_v<float> / 180.f,
+        .aspect   = static_cast<float>(view.film_size.x()) / static_cast<float>(view.film_size.y()),
+        .dist     = 1,
+        .e_eye    = eye,
+        .e_center = cen,
+        .e_up     = { 0, -1, 0 } // flip for video output
+      }};
+      
+      sensor.film_size = view.film_size;
+      sensor.proj_trf  = arcball.proj().matrix();
+      sensor.view_trf  = arcball.view().matrix();
+      sensor.flush();
+    }
+
+    // Initialize renderer
+    PathRenderPrimitive renderer = {{
+      .spp_per_iter = 16u,
+      .max_depth    = PathRecord::path_max_depth,
+      .cache_handle = scheduler.global("cache")
+    }};
+
+    // Initialize output buffer for renderer
+    Image image = {{
+      .pixel_frmt = Image::PixelFormat::eRGBA,
+      .pixel_type = Image::PixelType::eFloat,
+      .color_frmt = Image::ColorFormat::eLRGB,
+      .size       = sensor.film_size
+    }};
+
+    // Begin video output
+    VideoOutputStream os("output.mp4", sensor.film_size, 60);
+
+    // scene.components.objects("Gnome")->transform.position.x() = -.3f;
+
+    // Make 10s, 60fps video
+    for (uint i = 0; i < 5; ++i) {
+      float dist = .25f;
+      
+      for (uint frame = 0; frame < 60; ++frame) {
+        fmt::print("Work on second = {}, frame = {}\n", i, frame);
+
+        // Move object
+        if (i == 2) {
+          float theta = 1.f / 60.f;
+          auto &gnome = scene.components.objects("Gnome").value;
+          gnome.transform.position.y() += dist * theta;
+        }
+
+        // Reset and render
+        scene.update();
+        renderer.reset(sensor, scene);
+        renderer.render(sensor, scene);
+
+        // Get frame data
+        renderer.film().get(cast_span<float>(image.data()));
+        
+        // Clamp HDR float data to prevent weird clipping
+        std::for_each(std::execution::par_unseq,
+          range_iter(cast_span<float>(image.data())),
+          [](float &f) { f = std::clamp(f, 0.f, 1.f); });
+
+        // Convert and write to stream
+        auto rgb8 = image.convert({ 
+          .pixel_frmt = Image::PixelFormat::eRGB,
+          .pixel_type = Image::PixelType::eUChar,
+          .color_frmt = Image::ColorFormat::eSRGB
+        });
+        os.write(rgb8);
+      }
+    } // for (uint i)
+
+    // End video output
+    os.close();
+
+    /* {
       VideoOutputStream os("output.mp4", { 512, 512 }, 60);
 
       Image image = {{
@@ -182,22 +282,7 @@ namespace met {
       }
 
       os.close();
-    }
-
-    /* // Load scene if a scene path is provided
-    if (!info.scene_path.empty())
-      scheduler.global("scene").getw<Scene>().load(info.scene_path);
-
-    // Initialize renderer
-    PathRenderPrimitive renderer = {{
-      .spp_per_iter = 1u,
-      .max_depth    = PathRecord::path_max_depth,
-      .cache_handle = scheduler.global("cache")
-    }}; */
-
-    // {
-    //   // ...
-    // }
+    } */
 
     // Attempt to save shader cache, if exists
     if (!info.shader_path.empty())
@@ -208,7 +293,9 @@ namespace met {
 // Application entry point
 int main() {
   try {
-    met::init({ /* .scene_path = "path/to/file.json" */ });
+    met::run({ 
+      .scene_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Metameric Scenes/animated_gnome/animated_gnome.json"
+    });
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;

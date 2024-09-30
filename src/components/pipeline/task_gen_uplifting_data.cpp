@@ -17,8 +17,8 @@ namespace met {
   // Nr. of points on the color system boundary; lower means more space available for constraints
   constexpr uint n_system_boundary_samples = 128;
   
-  GenUpliftingDataTask:: GenUpliftingDataTask(uint uplifting_i)
-  : m_uplifting_i(uplifting_i) { }
+  GenUpliftingDataTask::GenUpliftingDataTask(uint uplifting_i, uint mmv_builder_samples)
+  : m_uplifting_i(uplifting_i), m_mmv_builder_samples(mmv_builder_samples) { }
 
   bool GenUpliftingDataTask::is_active(SchedulerHandle &info) {
     met_trace();
@@ -31,7 +31,7 @@ namespace met {
     // if some uplifting is still in progress
     return is_first_eval() 
         || e_uplifting
-        || rng::any_of(m_mismatch_builders, [](const auto &builder) { return !builder.is_converged(); });
+        || rng::any_of(m_mmv_builders, [](const auto &builder) { return !builder.is_converged(); });
   }
 
   void GenUpliftingDataTask::init(SchedulerHandle &info) {
@@ -121,13 +121,13 @@ namespace met {
     // 2. Generate constraint spectra;
     // We rely on MetamerConstraintBuilder to make a nice shortcut
     if (e_state.verts.is_resized())
-      m_mismatch_builders.resize(e_uplifting.verts.size());
+      m_mmv_builders.resize(e_uplifting.verts.size(), m_mmv_builder_samples);
 
     // Note; disable top-level parallellism, as typically the user modified only one constraint,
     // and this way parallellism at the solver level remains... functional
     // #pragma omp parallel for
     for (int i = 0; i < e_uplifting.verts.size(); ++i) {
-      auto &builder = m_mismatch_builders[i];
+      auto &builder = m_mmv_builders[i];
       
       // If a state change occurred, restart spectrum builder
       if (csys_stale || !builder.matches_vertex(e_uplifting.verts[i]))
@@ -248,12 +248,12 @@ namespace met {
     }
 
     // 7. Expose mismatch volume hull data for visualization and UI parts
-    if (!m_mismatch_builders.empty() && rng::any_of(m_mismatch_builders, [](const auto &m) {
+    if (!m_mmv_builders.empty() && rng::any_of(m_mmv_builders, [](const auto &m) {
       return m.did_sample();
     })) {
       auto &i_mismatch_hull = info("mismatch_hulls").getw<std::vector<ConvexHull>>();
-      i_mismatch_hull.resize(m_mismatch_builders.size());
-      rng::transform(m_mismatch_builders, i_mismatch_hull.begin(), &MetamerConstraintBuilder::chull);
+      i_mismatch_hull.resize(m_mmv_builders.size());
+      rng::transform(m_mmv_builders, i_mismatch_hull.begin(), &MetamerConstraintBuilder::chull);
     }
   }
 

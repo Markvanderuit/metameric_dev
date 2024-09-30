@@ -45,49 +45,9 @@ namespace met {
 
     // Boilerplate task which triggers scene state updates, filters some edge cases, and
     // generally keeps everything running nicely.
-    scheduler.task("scene_handler").init<LambdaTask>([](SchedulerHandle &info) {
+    scheduler.task("scene_handler").init<LambdaTask>([](auto &info) {
       met_trace();
-
-      // Get shared resources
-      auto &e_scene = info.global("scene").getw<Scene>();
-
-      // Force check of scene indices to ensure linked components/resources still exist
-      for (auto [i, comp] : enumerate_view(e_scene.components.objects)) {
-        auto &obj = comp.value;
-        if (obj.mesh_i >= e_scene.resources.meshes.size())
-          obj.mesh_i = 0u;
-        if (obj.uplifting_i >= e_scene.components.upliftings.size())
-          obj.uplifting_i = 0u;
-      }
-      for (auto [i, comp] : enumerate_view(e_scene.components.emitters)) {
-        auto &emt = comp.value;
-        if (emt.illuminant_i >= e_scene.resources.illuminants.size())
-          emt.illuminant_i = 0u;
-      }
-      for (auto [i, comp] : enumerate_view(e_scene.components.upliftings)) {
-        auto &upl = comp.value;
-        if (upl.observer_i >= e_scene.resources.observers.size())
-          upl.observer_i = 0u;
-        if (upl.illuminant_i >= e_scene.resources.illuminants.size())
-          upl.illuminant_i = 0u;
-      }
-      {
-        auto &settings = e_scene.components.settings.value;
-        if (settings.view_i >= e_scene.components.views.size())
-          settings.view_i = 0u;
-      }
-
-      // Force update check of stale gl-side components and state tracking
-      e_scene.resources.meshes.update(e_scene);
-      e_scene.resources.images.update(e_scene);
-      e_scene.resources.illuminants.update(e_scene);
-      e_scene.resources.observers.update(e_scene);
-      e_scene.resources.bases.update(e_scene);
-      e_scene.components.settings.state.update(e_scene.components.settings.value);
-      e_scene.components.emitters.update(e_scene);
-      e_scene.components.objects.update(e_scene);
-      e_scene.components.upliftings.update(e_scene);
-      e_scene.components.views.update(e_scene);
+      info.global("scene").getw<Scene>().update();
     });
 
     // Pipeline tasks generate uplifting data and then bake a spectral texture per object

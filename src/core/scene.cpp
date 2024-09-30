@@ -513,6 +513,48 @@ namespace met {
   Uplifting::Vertex &Scene::uplifting_vertex(ConstraintRecord cs) {
     return components.upliftings[cs.uplifting_i]->verts[cs.vertex_i];
   }
+
+  void Scene::update() {
+    met_trace();
+
+    // Force check of scene indices to ensure linked components/resources still exist
+    for (auto [i, comp] : enumerate_view(components.objects)) {
+      auto &obj = comp.value;
+      if (obj.mesh_i >= resources.meshes.size())
+        obj.mesh_i = 0u;
+      if (obj.uplifting_i >= components.upliftings.size())
+        obj.uplifting_i = 0u;
+    }
+    for (auto [i, comp] : enumerate_view(components.emitters)) {
+      auto &emt = comp.value;
+      if (emt.illuminant_i >= resources.illuminants.size())
+        emt.illuminant_i = 0u;
+    }
+    for (auto [i, comp] : enumerate_view(components.upliftings)) {
+      auto &upl = comp.value;
+      if (upl.observer_i >= resources.observers.size())
+        upl.observer_i = 0u;
+      if (upl.illuminant_i >= resources.illuminants.size())
+        upl.illuminant_i = 0u;
+    }
+    {
+      auto &settings = components.settings.value;
+      if (settings.view_i >= components.views.size())
+        settings.view_i = 0u;
+    }
+
+    // Force update check of stale gl-side components and state tracking
+    resources.meshes.update(*this);
+    resources.images.update(*this);
+    resources.illuminants.update(*this);
+    resources.observers.update(*this);
+    resources.bases.update(*this);
+    components.settings.state.update(components.settings.value);
+    components.emitters.update(*this);
+    components.objects.update(*this);
+    components.upliftings.update(*this);
+    components.views.update(*this);
+  }
   
   void Scene::to_stream(std::ostream &str) const {
     met_trace();

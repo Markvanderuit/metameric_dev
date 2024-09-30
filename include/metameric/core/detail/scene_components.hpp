@@ -187,21 +187,23 @@ namespace met::detail {
       m_data.emplace_back(cmpnt_type { .name = std::string(name), .value = std::move(value) });
     }
 
-    // operator[uint] exposes throwing at()
+    // operator[i] exposes throwing at()
     constexpr const cmpnt_type &operator[](uint i) const { return m_data.at(i); }
     constexpr       cmpnt_type &operator[](uint i)       { return m_data.at(i); }
 
-    /* // operator[strn] exposes throwing at()
-    constexpr const cmpnt_type &operator[](std::string_view s) const {
+    // operator(s) exposes throwing at()
+    constexpr const cmpnt_type &operator()(std::string_view s) const {
       auto it = rng::find(m_data, s, &cmpnt_type::name);
-      debug::check_expr(it, fmt::format("Could not find component of name {}", s));
+      debug::check_expr(it != m_data.end(), 
+        fmt::format("Could not find component of name {}", s));
       return *it;
     }
-    constexpr cmpnt_type &operator[](std::string_view s) {
+    constexpr cmpnt_type &operator()(std::string_view s) {
       auto it = rng::find(m_data, s, &cmpnt_type::name);
-      debug::check_expr(it, fmt::format("Could not find component of name {}", s));
+      debug::check_expr(it != m_data.end(), 
+        fmt::format("Could not find component of name {}", s));
       return *it;
-    } */
+    }
 
     // Bookkeeping; expose the underlying std::vector, instead of a direct pointer
     constexpr const auto & data() const { return m_data; }
