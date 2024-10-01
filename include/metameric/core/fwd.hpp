@@ -15,6 +15,7 @@ namespace met {
   struct View;
 
   // Scene resources
+  template <uint K>
   struct BVH;
   struct Image;
   template <typename Vt, typename El>

@@ -20,7 +20,7 @@ namespace met::detail {
   static_assert(sizeof(NodePack) == 64);
 
   // Helper method to pack BVH node data tightly
-  NodePack pack(const BVH::Node &node) {
+  NodePack pack(const BVH<8>::Node &node) {
     met_trace();
 
     // Output node pack
@@ -28,7 +28,7 @@ namespace met::detail {
 
     // Generate a AABB over child AABBs
     auto aabb = *rng::fold_left_first(std::span(node.child_aabb.begin(), node.size()), 
-    [](const BVH::AABB &a, const BVH::AABB &b) -> BVH::AABB {
+    [](const AABB &a, const AABB &b) -> AABB {
       return { .minb = a.minb.cwiseMin(b.minb), .maxb = a.maxb.cwiseMax(b.maxb) };
     });
 
@@ -58,6 +58,30 @@ namespace met::detail {
     }
 
     return p;
+  }
+
+  // Helper to calculate (poorly) fitting AABB
+  AABB generate_rotated_aabb(const eig::Matrix4f &trf) {
+    // Corners of AABB
+    std::vector<eig::Array3f> corners = {
+      (trf * eig::Vector4f(0.f, 0.f, 0.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(0.f, 0.f, 1.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(0.f, 1.f, 0.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(0.f, 1.f, 1.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(1.f, 0.f, 0.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(1.f, 0.f, 1.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(1.f, 1.f, 0.f, 1.f)).head<3>().eval(),
+      (trf * eig::Vector4f(1.f, 1.f, 1.f, 1.f)).head<3>().eval(),
+    };
+    
+    // Establish poor bounnding box around rotated vertices
+    // (should probably just recalculate over entire mesh instead)
+    AABB aabb = {
+      .minb = *rng::fold_left_first(corners, [](auto a, auto b) { return a.cwiseMin(b).eval(); }),
+      .maxb = *rng::fold_left_first(corners, [](auto a, auto b) { return a.cwiseMax(b).eval(); })
+    };
+
+    return aabb;
   }
 
   SceneGLHandler<met::Object>::SceneGLHandler() {
@@ -322,9 +346,7 @@ namespace met::detail {
       m_meshes[i]   = simplified_mesh<met::Mesh>(value, 12288, 1e-3);
       txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
       transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
-      m_bvhs[i]     = {{ .mesh = m_meshes[i], 
-                         .n_node_children = 8, 
-                         .n_leaf_children = 3 }};
+      m_bvhs[i]     = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
             
       // Set appropriate mesh transform in buffer
       m_mesh_info_map->data[i].trf = transforms[i];
@@ -592,7 +614,9 @@ namespace met::detail {
 
   SceneGLHandler<met::Scene>::SceneGLHandler() {
     met_trace_full();
-    // ...
+
+    // Obtain writeable/flushable mapping for scene layout
+    std::tie(scene_info, m_scene_info_map) = gl::Buffer::make_flusheable_object<BufferLayout>();
   }
 
   void SceneGLHandler<met::Scene>::update(const Scene &scene) {
@@ -606,7 +630,7 @@ namespace met::detail {
     struct PrimData {
       bool is_object;
       uint i;
-      BVH::AABB aabb;
+      AABB aabb;
     };
     std::vector<PrimData> prims;
 
@@ -614,18 +638,15 @@ namespace met::detail {
     for (uint i = 0; i < objects.size(); ++i) {
       const auto &[object, state] = objects[i];
       guard_continue(object.is_active);
+
+      const auto &mesh = scene.resources.meshes[object.mesh_i].value();
       
-      // Get mesh transform
+      // Get object transform
       auto object_trf = object.transform.affine().matrix().eval();
       auto mesh_trf   = scene.resources.meshes.gl.transforms[object.mesh_i];
       auto full_trf   = (object_trf * mesh_trf).eval();
 
-      // Get AABB from mesh packing transform
-      BVH::AABB aabb;
-      aabb.minb = (full_trf * eig::Vector4f(0, 0, 0, 1)).head<3>().eval();
-      aabb.maxb = (full_trf * eig::Vector4f(1, 1, 1, 1)).head<3>().eval();
-      
-      prims.push_back({ .is_object = true, .i = i, .aabb = aabb });
+      prims.push_back({ .is_object = true, .i = i, .aabb = generate_rotated_aabb(full_trf) });
     }
 
     // Collect emitter data
@@ -638,23 +659,51 @@ namespace met::detail {
       auto trf = emitter.transform.affine();
       
       // Get AABB dependent on emitter shape
-      BVH::AABB aabb;
+      AABB aabb;
       if (emitter.type == Emitter::Type::eRect) {
-        aabb.minb = (trf * eig::Vector4f(-.5f, -.5f, -.5f, 1.f)).head<3>().eval();
-        aabb.maxb = (trf * eig::Vector4f(0.5f, 0.5f, 0.5f, 1.f)).head<3>().eval();
+        aabb.minb = (trf * eig::Vector4f(-.5f, -.5f, 0.f, 1.f)).head<3>().eval();
+        aabb.maxb = (trf * eig::Vector4f(0.5f, 0.5f, 0.f, 1.f)).head<3>().eval();
       } else if (emitter.type == Emitter::Type::eSphere) {
-        aabb.minb = (trf * eig::Vector4f(0.f, 0.f, 0.f, 1.f)).head<3>().eval();
-        aabb.maxb = (trf * eig::Vector4f(1.f, 1.f, 0.f, 1.f)).head<3>().eval();
+        auto transl = eig::Affine3f(eig::Translation3f({ -.5f, -.5f, -.5f })).matrix().eval();
+        aabb = generate_rotated_aabb((trf.matrix() * transl).matrix().eval());
       }
 
       prims.push_back({ .is_object = false, .i = i, .aabb = aabb });
     }
 
     // Get vector of AABBs only
-    auto aabbs = vws::transform(prims, &PrimData::aabb) | rng::to<std::vector>();
+    auto prim_aabbs = vws::transform(prims, &PrimData::aabb) | rng::to<std::vector>();
+
+    // Generate scene-enclosing bounding box
+    AABB scene_aabb = std::reduce(
+      std::execution::par_unseq,
+      range_iter(prim_aabbs),
+      prim_aabbs[0],
+      [](const auto& a, const auto &b) {
+        return AABB { a.minb.cwiseMin(b.minb).eval(), a.maxb.cwiseMax(b.maxb).eval() };
+      });
+    
+    // Generate transformation to cap scene to a [0, 1] bbox
+    auto scale = (scene_aabb.maxb - scene_aabb.minb).eval();
+    scale = (scale.array().abs() > 0.00001f).select(1.f / scale, eig::Array3f(1));
+    auto trf = (eig::Scaling((scale).matrix().eval()) * eig::Translation3f(-scene_aabb.minb)).matrix().eval();
+
+    // Apply transformation to interior AABBs
+    std::for_each(
+      std::execution::par_unseq,
+      range_iter(prim_aabbs),
+      [trf](AABB &aabb) {
+        aabb.minb = (trf * (eig::Vector4f() << aabb.minb, 1).finished()).head<3>().eval();
+        aabb.maxb = (trf * (eig::Vector4f() << aabb.maxb, 1).finished()).head<3>().eval();
+      });
+
+    // Push transformations to buffer
+    m_scene_info_map->trf     = trf.inverse().eval();
+    m_scene_info_map->trf_inv = trf;
+    scene_info.flush();
     
     // Create top-level BVH over AABBS
-    BVH bvh = {{ .aabb = aabbs }};
+    BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
 
     // Small helper to pack primitive data in a single integer
     constexpr auto pack_prim = [](bool is_object, uint object_i) -> uint {

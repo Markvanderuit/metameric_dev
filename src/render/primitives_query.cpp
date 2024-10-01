@@ -111,6 +111,9 @@ namespace met {
     program.bind("b_cmfs_3f",             m_sampler);
     program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
     program.bind("b_illm_1f",             m_sampler);
+    program.bind("b_buff_scene",          scene.gl.scene_info);
+    program.bind("b_buff_tlas_node",      scene.gl.tlas_nodes);
+    program.bind("b_buff_tlas_prim",      scene.gl.tlas_prims);
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
@@ -175,6 +178,9 @@ namespace met {
     program.bind("b_buff_objects",        scene.components.objects.gl.object_info);
     program.bind("b_buff_emitters",       scene.components.emitters.gl.emitter_info);
     program.bind("b_buff_envmap_info",    scene.components.emitters.gl.emitter_envm_info);
+    program.bind("b_buff_scene",          scene.gl.scene_info);
+    program.bind("b_buff_tlas_node",      scene.gl.tlas_nodes);
+    program.bind("b_buff_tlas_prim",      scene.gl.tlas_prims);
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",        scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node",     scene.resources.meshes.gl.bvh_nodes);

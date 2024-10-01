@@ -14,7 +14,7 @@ namespace met {
 
   template <uint K>
   struct BuildNodeInner : public BuildNode {
-    std::array<BVH::AABB,   K> child_aabbs;
+    std::array<AABB,        K> child_aabbs;
     std::array<BuildNode *, K> child_nodes;
     
   public:
@@ -29,7 +29,7 @@ namespace met {
 
   template <uint K>
   struct BuildNodeLeaf : public BuildNode {
-    std::array<BVH::AABB, K> child_aabbs;
+    std::array<AABB, K> child_aabbs;
     const RTCBuildPrimitive *prim_p;
     size_t n_prims;
 
@@ -82,7 +82,7 @@ namespace met {
   
   template <uint K>
   void bvh_set_bounds(void *node_p, const RTCBounds **bounds, uint n_children, void *user_p) {
-    static_assert(sizeof(BVH::AABB) == sizeof(RTCBounds));
+    static_assert(sizeof(AABB) == sizeof(RTCBounds));
     auto &node = *static_cast<BuildNodeInner<K> *>(node_p);
     for (size_t i = 0; i < n_children; ++i)
       std::memcpy(&node.child_aabbs[i], bounds[i], sizeof(RTCBounds));
@@ -90,12 +90,12 @@ namespace met {
   
   struct BVHCreateInternalInfo {
     std::span<const RTCBuildPrimitive> data; // Range of bounding boxes to build BVH over
-    uint n_node_children;                    // Maximum fan-out of BVH on each node
+    // uint n_node_children;                    // Maximum fan-out of BVH on each node
     uint n_leaf_children;                    // Maximum nr of primitives on each leaf
   };
   
   template <uint K>
-  BVH create_bvh_internal(BVHCreateInternalInfo info) {
+  BVH<K> create_bvh_internal(BVHCreateInternalInfo info) {
     met_trace();
 
     // Create modifiable copy of primitives; embree may re-order these freely
@@ -133,7 +133,7 @@ namespace met {
     auto root_p = static_cast<BuildNode *>(rtcBuildBVH(&args));
         
     // Prepare external BVH format and resize its blocks
-    BVH bvh;
+    BVH<K> bvh;
     bvh.nodes.reserve(prims.size() * 2 / K);
     bvh.prims.reserve(prims.size());
 
@@ -146,7 +146,7 @@ namespace met {
       work_queue.pop_front();
 
       // Generate base node data; nodes/leaves overlap
-      BVH::Node node;
+      typename BVH<K>::Node node;
 
       // Dependent on node type, do...
       if (auto node_p = dynamic_cast<BuildNodeInner<K> *>(next_p)) {
@@ -193,14 +193,30 @@ namespace met {
   }
 
   // Wrapper function to do templated generation with a runtime constant
-  template <uint... Ks>
+  /* template <uint... Ks>
   BVH create_bvh_internal_varargs(BVHCreateInternalInfo info) {
     using FTy = BVH(*)(BVHCreateInternalInfo);
     constexpr FTy f[] = { create_bvh_internal<Ks>... };
     return f[0](info);
-  }
+  } */
 
-  BVH::BVH(CreateMeshInfo info) {
+
+  /* template <uint K>
+  BVH create_bvh_internal_fwd(BVHCreateInternalInfo info) {
+    switch (info.n_node_children) {
+      case 2:
+        return create_bvh_internal<2>(info);
+      case 4:
+        return create_bvh_internal<4>(info);
+      case 8:
+        return create_bvh_internal<8>(info);
+      default:
+        debug::check_expr(false, "BVH node fan-out not supported");
+    }
+  } */
+
+  template <uint K>
+  BVH<K>::BVH(CreateMeshInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
@@ -226,13 +242,13 @@ namespace met {
       prims[i] = prim;
     } // for (int i)
 
-    // return create_bvh_internal_varargs<2, 4, 8>({
-    *this = create_bvh_internal_varargs<8>({
-      .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
+    *this = create_bvh_internal<K>({
+      .data = prims, /* .n_node_children = info.n_node_children, */ .n_leaf_children = info.n_leaf_children
     });
   }
   
-  BVH::BVH(CreateAABBInfo info) {
+  template <uint K>
+  BVH<K>::BVH(CreateAABBInfo info) {
     met_trace();
 
     // Build BVH primitive structs; use indexed iterator over mesh 
@@ -249,8 +265,14 @@ namespace met {
       prims[i] = prim;
     } // for (int i)
 
-    *this = create_bvh_internal_varargs<8>({
-      .data = prims, .n_node_children = info.n_node_children, .n_leaf_children = info.n_leaf_children
+    *this = create_bvh_internal<K>({
+      .data = prims, /* .n_node_children = info.n_node_children, */ .n_leaf_children = info.n_leaf_children
     });
   }
+
+  /* Explicit template instantiations follow for supported BVH fanouts */
+
+  template class BVH<2>;
+  template class BVH<4>;
+  template class BVH<8>;
 } // namespace met

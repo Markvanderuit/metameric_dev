@@ -49,9 +49,9 @@ layout(binding = 4) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[met_max_emitters];
 } buff_emitters;
-layout(binding = 5) restrict readonly buffer b_buff_coeffs {
-  BarycentricInfo data[met_max_objects];
-} buff_coeffs;
+layout(binding = 5) uniform b_buff_scene {
+  SceneInfo data;
+} buff_scene;
 layout(binding = 6) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
@@ -72,6 +72,9 @@ layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  dat
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
 layout(binding = 2) restrict readonly buffer b_buff_tlas_node { BVHNodePack  data[]; } buff_tlas_node;
 layout(binding = 3) restrict readonly buffer b_buff_tlas_prim { uint         data[]; } buff_tlas_prim;
+layout(binding = 4) restrict readonly buffer b_buff_coeffs {
+  BarycentricInfo data[met_max_objects];
+} buff_coeffs;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 2)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
@@ -100,7 +103,7 @@ declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data);
+declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_coef_4f);
 

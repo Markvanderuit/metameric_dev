@@ -8,21 +8,12 @@ void ray_intersect_object(inout Ray ray, uint object_i) {
     return;
 
   // Generate local ray
-  Ray ray_local;
-  ray_local.o = (object_info.trf_mesh_inv * vec4(ray.o, 1)).xyz;
-  ray_local.d = (object_info.trf_mesh_inv * vec4(ray.d, 0)).xyz;
-  
-  // Get length and normalize direction
-  // Reuse length to adjust ray_local.t if ray.t is not at infty
-  float dt = length(ray_local.d);
-  ray_local.d /= dt;
-  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
+  Ray ray_local = ray_to_local(ray, object_info.trf_mesh_inv);
 
   // Run intersection; on a hit, recover world-space distance,
   // and store intersection data in ray
   if (ray_intersect_bvh(ray_local, object_info.mesh_i)) {
-    ray.t    = length((object_info.trf_mesh * vec4(ray_local.d * ray_local.t, 0)).xyz);
-    ray.data = ray_local.data;
+    ray_to_world_inplace(ray, ray_local, object_info.trf_mesh);
     record_set_object(ray.data, object_i);
   }
 }
@@ -34,16 +25,9 @@ bool ray_intersect_object_any(in Ray ray, uint object_i) {
     return false;
   
   // Generate object space ray
-  Ray ray_local;
-  ray_local.o = (object_info.trf_mesh_inv * vec4(ray.o, 1)).xyz;
-  ray_local.d = (object_info.trf_mesh_inv * vec4(ray.d, 0)).xyz;
+  Ray ray_local = ray_to_local(ray, object_info.trf_mesh_inv);
   
-  // Get length and normalize direction
-  // Reuse length to adjust ray_local.t if ray.t is not at infty
-  float dt = length(ray_local.d);
-  ray_local.d /= dt;
-  ray_local.t = (ray.t == FLT_MAX) ? FLT_MAX : dt * ray.t;
-  
+  // Run intersection and return result
   return ray_intersect_bvh_any(ray_local, object_info.mesh_i);
 }
 

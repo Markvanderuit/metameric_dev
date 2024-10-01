@@ -163,8 +163,8 @@ namespace met::detail {
     } *m_mesh_info_map;
 
     // Caches of simplified meshes and generated acceleration data
-    std::vector<met::Mesh> m_meshes;
-    std::vector<met::BVH>  m_bvhs;
+    std::vector<met::Mesh>   m_meshes;
+    std::vector<met::BVH<8>> m_bvhs;
 
   public:
     // This buffer contains offsets/sizes, ergo layout info necessary to
@@ -287,7 +287,17 @@ namespace met::detail {
   };
 
   template <>
-  struct SceneGLHandler<met::Scene> : public SceneGLHandlerBase {
+  class SceneGLHandler<met::Scene> : public SceneGLHandlerBase {
+    // Block layout for std140 uniform buffer
+    struct alignas(16) BufferLayout {
+      alignas(16) eig::Matrix4f trf;
+      alignas(16) eig::Matrix4f trf_inv;
+    } *m_scene_info_map;
+    
+  public:
+    // Buffer storing one instance of BufferLayout
+    gl::Buffer scene_info;
+
     // Set of buffers storing scene top-level acceleration structure data
     gl::Buffer tlas_nodes, tlas_prims;
 

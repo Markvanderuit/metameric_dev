@@ -112,6 +112,12 @@ struct BRDFInfo {
   float metallic;  // Supplemental values for pbr shader
 };
 
+struct SceneInfo {
+  // Transform and inverse transform data, mostly used for TLAS
+  mat4 trf;
+  mat4 trf_inv;
+};
+
 #include <render/detail/packing.glsl>
 
 #endif // RENDER_DETAIL_SCENE_TYPES_GLSL_GUARD

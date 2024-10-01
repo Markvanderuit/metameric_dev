@@ -6,6 +6,7 @@
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
+#include <render/load/tlas.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/object.glsl>
 #include <render/load/rgb.glsl>
@@ -50,17 +51,20 @@ layout(binding = 5) uniform b_buff_emitters {
   uint n;
   EmitterInfo data[met_max_emitters];
 } buff_emitters;
-layout(binding = 6) uniform b_buff_wvls_distr {
+layout(binding = 6) uniform b_buff_scene {
+  SceneInfo data;
+} buff_scene;
+layout(binding = 7) uniform b_buff_wvls_distr {
   float func_sum;
   float func[wavelength_samples];
   float cdf[wavelength_samples + 1];
 } buff_wvls_distr;
-layout(binding = 7) uniform b_buff_emitters_distr {
+layout(binding = 8) uniform b_buff_emitters_distr {
   float func_sum;
   float func[met_max_emitters];
   float cdf[met_max_emitters + 1];
 } buff_emitters_distr;
-layout(binding = 8) uniform b_buff_envmap_info {
+layout(binding = 9) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
@@ -68,6 +72,8 @@ layout(binding = 8) uniform b_buff_envmap_info {
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 2) restrict readonly buffer b_buff_tlas_node { BVHNodePack  data[]; } buff_tlas_node;
+layout(binding = 3) restrict readonly buffer b_buff_tlas_prim { uint         data[]; } buff_tlas_prim;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0)          uniform sampler2DArray   b_txtr_3f; // RGB texture atlas
@@ -86,10 +92,12 @@ shared MeshInfo    s_mesh_info[met_max_meshes];
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
 declare_scene_traversal_stack(6); 
+declare_scene_tlas_stack(4); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
+declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_rgb_data(buff_textures.data, b_txtr_3f, b_illm_3f);
 
