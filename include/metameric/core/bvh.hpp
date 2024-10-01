@@ -38,7 +38,7 @@ namespace met {
       uint n_node_children = 8;        // Maximum fan-out of BVH on each node
       uint n_leaf_children = 4;        // Maximum nr of primitives on each leaf
     };
-
+    
     // BVH helper struct; create BVH from set of boxes
     struct CreateAABBInfo {
       std::span<const BVH::AABB> aabb; // Range of bounding boxes to build BVH over

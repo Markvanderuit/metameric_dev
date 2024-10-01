@@ -89,6 +89,10 @@ namespace met {
   public: // Serialization
     void to_stream(std::ostream &str) const;
     void from_stream(std::istream &str);
+  
+  public: // Scene-wide GL data, like the TLAS. Updated on update()
+    using gl_type = detail::SceneGLHandler<Scene>;
+    mutable gl_type gl;
   };
 
   // Component/Resource test helpers; check if Ty instantiates Component<>/Resource<>

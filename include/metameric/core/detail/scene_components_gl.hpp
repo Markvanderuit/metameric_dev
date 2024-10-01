@@ -141,10 +141,16 @@ namespace met::detail {
     // Per-mesh block layout for std140 uniform buffer
     struct alignas(16) MeshBlockLayout {
       alignas(16) eig::Matrix4f trf; // Model packing transform
+
+      // Offset/extent into mesh_verts buffer
       alignas(4)  uint verts_offs;
       alignas(4)  uint verts_size;
+
+      // Offset/extent into mesh_elems buffer
       alignas(4)  uint elems_offs;
       alignas(4)  uint elems_size;
+
+      // Offset/extent into bvh_nodes buffer
       alignas(4)  uint nodes_offs;
       alignas(4)  uint nodes_size;
     };
@@ -271,6 +277,19 @@ namespace met::detail {
     // Array texture which stores one full trio of color matching functions per layer,
     // s.t. one sample equals the color matching function at one wavelength
     texture_type cmfs_texture;
+
+  public:
+    // Class constructor
+    SceneGLHandler();
+
+    // Update GL-side data for objects indicated as changed
+    void update(const Scene &) override;
+  };
+
+  template <>
+  struct SceneGLHandler<met::Scene> : public SceneGLHandlerBase {
+    // Set of buffers storing scene top-level acceleration structure data
+    gl::Buffer tlas_nodes, tlas_prims;
 
   public:
     // Class constructor

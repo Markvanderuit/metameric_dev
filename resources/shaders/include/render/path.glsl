@@ -108,8 +108,8 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
       float          emtr_pdf = bs.is_delta ? 0.f : pdf_emitters(ps);
 
       // No division by sample density, as this is incorporated in path throughput
-      vec4 s = beta                                // throughput 
-             * eval_emitter(ps, wvls)              // emitted value
+      vec4 s = beta                         // throughput 
+             * eval_emitter(ps, wvls)       // emitted value
              * mis_power(bs.pdf, emtr_pdf); // mis weight
 
       // Store current path if requested

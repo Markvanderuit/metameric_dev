@@ -18,6 +18,12 @@ void scene_set_stack_value(uint i, uint v) {            }
 uint scene_get_stack_value(uint i)         {  return 0; }
 #endif // !SCENE_DATA_BVH
 
+#ifndef SCENE_DATA_TLAS
+void scene_set_tlas_stack_value(uint i, uint v) {            }
+uint scene_get_tlas_stack_value(uint i)         {  return 0; }
+#endif // !SCENE_DATA_TLAS
+
+
 #ifndef SCENE_DATA_EMITTER
 EmitterInfo scene_emitter_info(uint i) { EmitterInfo d; return d; }
 uint scene_emitter_count()             { return 0;                } 

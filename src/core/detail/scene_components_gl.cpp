@@ -107,6 +107,8 @@ namespace met::detail {
       // so we flush specific regions instead of the whole
       object_info.flush(sizeof(BlockLayout), sizeof(BlockLayout) * i + sizeof(uint));
     } // for (uint i)
+
+    // Generate top-level acceleration structure
   }
 
   SceneGLHandler<met::Uplifting>::SceneGLHandler() {
@@ -586,5 +588,90 @@ namespace met::detail {
 
     cmfs_buffer.flush();
     cmfs_texture.set(cmfs_buffer);
+  }
+
+  SceneGLHandler<met::Scene>::SceneGLHandler() {
+    met_trace_full();
+    // ...
+  }
+
+  void SceneGLHandler<met::Scene>::update(const Scene &scene) {
+    met_trace_full();
+
+    const auto &objects = scene.components.objects;
+    const auto &emitters = scene.components.emitters;
+    guard(objects || emitters);
+
+    // Collect bounding boxes for active scene emitters and objects as one shared type
+    struct PrimData {
+      bool is_object;
+      uint i;
+      BVH::AABB aabb;
+    };
+    std::vector<PrimData> prims;
+
+    // Collect object data
+    for (uint i = 0; i < objects.size(); ++i) {
+      const auto &[object, state] = objects[i];
+      guard_continue(object.is_active);
+      
+      // Get mesh transform
+      auto object_trf = object.transform.affine().matrix().eval();
+      auto mesh_trf   = scene.resources.meshes.gl.transforms[object.mesh_i];
+      auto full_trf   = (object_trf * mesh_trf).eval();
+
+      // Get AABB from mesh packing transform
+      BVH::AABB aabb;
+      aabb.minb = (full_trf * eig::Vector4f(0, 0, 0, 1)).head<3>().eval();
+      aabb.maxb = (full_trf * eig::Vector4f(1, 1, 1, 1)).head<3>().eval();
+      
+      prims.push_back({ .is_object = true, .i = i, .aabb = aabb });
+    }
+
+    // Collect emitter data
+    for (uint i = 0; i < emitters.size(); ++i) {
+      const auto &[emitter, state] = emitters[i];
+      guard_continue(emitter.is_active);
+      guard_continue(emitter.type != Emitter::Type::eConstant && emitter.type != Emitter::Type::ePoint);
+            
+      // Get emitter transform
+      auto trf = emitter.transform.affine();
+      
+      // Get AABB dependent on emitter shape
+      BVH::AABB aabb;
+      if (emitter.type == Emitter::Type::eRect) {
+        aabb.minb = (trf * eig::Vector4f(-.5f, -.5f, -.5f, 1.f)).head<3>().eval();
+        aabb.maxb = (trf * eig::Vector4f(0.5f, 0.5f, 0.5f, 1.f)).head<3>().eval();
+      } else if (emitter.type == Emitter::Type::eSphere) {
+        aabb.minb = (trf * eig::Vector4f(0.f, 0.f, 0.f, 1.f)).head<3>().eval();
+        aabb.maxb = (trf * eig::Vector4f(1.f, 1.f, 0.f, 1.f)).head<3>().eval();
+      }
+
+      prims.push_back({ .is_object = false, .i = i, .aabb = aabb });
+    }
+
+    // Get vector of AABBs only
+    auto aabbs = vws::transform(prims, &PrimData::aabb) | rng::to<std::vector>();
+    
+    // Create top-level BVH over AABBS
+    BVH bvh = {{ .aabb = aabbs }};
+
+    // Small helper to pack primitive data in a single integer
+    constexpr auto pack_prim = [](bool is_object, uint object_i) -> uint {
+      return (is_object ? 0x00000000 : 0x80000000) | (object_i & 0x00FFFFFF);
+    };
+
+    // Pack BVH node/prim data tightly
+    std::vector<NodePack> nodes_packed(bvh.nodes.size());
+    std::vector<uint>     prims_packed(bvh.prims.size());
+    std::transform(std::execution::par_unseq, range_iter(bvh.nodes), nodes_packed.begin(), pack);
+    std::transform(std::execution::par_unseq, range_iter(bvh.prims), prims_packed.begin(), [&](uint j) {
+      const auto &prim = prims[j];
+      return pack_prim(prim.is_object, prim.i);
+    });
+
+    // Push BVH data to buffer
+    tlas_nodes = {{ .data = cnt_span<const std::byte>(nodes_packed) }};
+    tlas_prims = {{ .data = cnt_span<const std::byte>(prims_packed) }};
   }
 } // namespace met::detail

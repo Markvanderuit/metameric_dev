@@ -554,6 +554,9 @@ namespace met {
     components.objects.update(*this);
     components.upliftings.update(*this);
     components.views.update(*this);
+
+    // Force update check of stale gl-side scene data
+    gl.update(*this);
   }
   
   void Scene::to_stream(std::ostream &str) const {

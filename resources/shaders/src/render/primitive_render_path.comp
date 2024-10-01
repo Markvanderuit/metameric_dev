@@ -6,6 +6,7 @@
 #include <render/detail/path_types.glsl>
 #include <render/detail/scene_types.glsl>
 #include <render/load/bvh.glsl>
+#include <render/load/tlas.glsl>
 #include <render/load/cmfs.glsl>
 #include <render/load/emitter.glsl>
 #include <render/load/illuminant.glsl>
@@ -69,6 +70,8 @@ layout(binding = 8) uniform b_buff_envmap_info {
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
+layout(binding = 2) restrict readonly buffer b_buff_tlas_node { BVHNodePack  data[]; } buff_tlas_node;
+layout(binding = 3) restrict readonly buffer b_buff_tlas_prim { uint         data[]; } buff_tlas_prim;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 2)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
@@ -90,12 +93,14 @@ shared MeshInfo        s_mesh_info[met_max_meshes];
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
 declare_scene_traversal_stack(6); 
+declare_scene_tlas_stack(4); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_scene_cmfs_data(b_cmfs_3f);
 declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
+declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_coef_4f);
 
