@@ -50,7 +50,7 @@ namespace met {
       av::init();
       av::setFFmpegLoggingLevel(AV_LOG_DEBUG);
 
-      m_ofmt.setFormat(std::string(), output_path.filename().string());
+      m_ofmt.setFormat("H.264", output_path.filename().string());
       m_octx.setFormat(m_ofmt);
 
       // Specify encoder and codec
@@ -62,7 +62,7 @@ namespace met {
       m_encoder.setHeight(size.y());
       m_encoder.setPixelFormat(av::PixelFormat(output_fmt));
       m_encoder.setTimeBase(av::Rational(1, fps));
-      m_encoder.setBitRate(1000'000);
+      m_encoder.setBitRate(48'000'000);
       m_encoder.open();
 
       // Prepare stream for write
@@ -112,20 +112,6 @@ namespace met {
   };
 
   namespace anim {
-    // Simple interval class; has a begin frame and an end frame
-    struct Interval {
-      uint frame_begin = 0;
-      uint frame_end = 1;
-
-    public:
-      static Interval from_time(float begin_time, float end_time, uint base_fps = 24) {
-        return { 
-          static_cast<uint>(std::floor(begin_time * base_fps)),
-          static_cast<uint>(std::floor(end_time * base_fps))
-        };
-      }
-    };
-    
     uint time_to_frame(float time, uint fps = 24) {
       return static_cast<uint>(std::floor(time * fps));
     }
@@ -145,43 +131,79 @@ namespace met {
     // Type of motion; linear or smoothstep (so almost sigmoidal)
     enum class MotionType { eLinear, eSmooth };
 
+    // Virtual base class of keyed motion types
+    struct EventBase {
+      virtual int eval(uint frame) = 0; // Return -1 before event, 0 during event, 1 after event
+    };
+
+    // Template for one-keyed event; set a value
+    // to a specified input at an indicated time
     template <typename Ty>
-    struct TwoKeyMotion {
-      // Handle to affected value that is updated on motion
-      Ty &value_handle;
+    struct OneKeyEvent : EventBase { 
+      // Aggregate type used internally for data
+      struct InfoType {
+        Ty &handle; // Handle to affected value that is updated on motion
+        Ty value;   // The then-set value
+        float time; // Time of set
+      } m_data;
 
-      // A/B values between motion keys
-      Ty value_a, value_b;
-    
-      // A/B keys, rounded to frames
-      float time_a, time_b;
+    public:
+      // Constructor accepts aggregate type
+      OneKeyEvent(InfoType &&data) : m_data(data) {}
 
-      // Type of motion; linear or smoothstep (so almost sigmoidal)
-      MotionType motion_type = MotionType::eSmooth;
+      // Operator performs motion between values in timeframe
+      int eval(uint frame) override {
+        uint frame_a = time_to_frame(m_data.time);
+
+        if (frame < frame_a) {
+          return -1;
+        } else if (frame > frame_a) {
+          return 1;
+       } else {
+          m_data.handle = m_data.value;
+          return 0;
+        }
+      }
+    };
+
+    // Template for two-keyed event; smoothly or linearly 
+    // moves a value from start to finish between two indicated times
+    template <typename Ty>
+    struct TwoKeyEvent : EventBase {
+      // Aggregate type used internally for data
+      struct InfoType {
+        Ty &handle;                                   // Handle to affected value that is updated on motion
+        std::array<Ty, 2> values;                     // A/B values between times
+        std::array<float, 2> times;                   // A/B times, rounded down to frames
+        MotionType motion_type = MotionType::eSmooth; // Linear or smoothstep
+      } m_data;
       
     public:
-      bool operator()(uint frame) {
+      // Constructor accepts aggregate type
+      TwoKeyEvent(InfoType &&data) : m_data(data) {}
+      
+      // Operator performs motion between values in timeframe
+      int eval(uint frame) override {
         // Compute frame interval
-        uint frame_a = time_to_frame(time_a), frame_b = time_to_frame(time_b);
+        uint frame_a = time_to_frame(m_data.times[0]), 
+             frame_b = time_to_frame(m_data.times[1]);
+        
+        if (frame < frame_a) {
+          return -1;
+        } else if (frame > frame_b) {
+          return 1;
+        } else {
+          // Compute interpolation
+          float x = (static_cast<float>(frame)   - static_cast<float>(frame_a))
+                  / (static_cast<float>(frame_b) - static_cast<float>(frame_a));
+          float y = m_data.motion_type == MotionType::eLinear 
+                  ? f_linear(x) : f_smooth(x);
 
-        // Return false after frame b; return true without effect before frame a
-        guard(frame <= frame_b, false);
-        guard(frame >= frame_a, true);
-
-        // Compute interpolation
-        float x = (static_cast<float>(frame)   - static_cast<float>(frame_a))
-                / (static_cast<float>(frame_b) - static_cast<float>(frame_a));
-        float y = motion_type == MotionType::eLinear 
-                ? f_linear(x) 
-                : f_smooth(x);
-
-        // Apply interpolation
-        if constexpr (eig::is_approx_comparable<Ty>)
-          value_handle = (value_a + (value_b - value_a) * y).eval();
-        else
-          value_handle = value_a + (value_b - value_a) * y;
-
-        return true;
+          // Apply interpolation
+          m_data.handle = m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y;
+          
+          return 0;
+        }
       }
     };
   } // namespace anim
@@ -203,6 +225,8 @@ namespace met {
     };
 
   private: // Private members
+    using RenderType = PathRenderPrimitive;
+  
     // Handles
     ResourceHandle m_scene_handle;
     ResourceHandle m_window_handle;
@@ -215,12 +239,86 @@ namespace met {
     Image           m_image;
 
     // Motion data
-    std::vector<anim::TwoKeyMotion<Colr>>           m_motion_colr;
-    std::vector<anim::TwoKeyMotion<eig::Vector3f>>  m_motion_vec3;
-    std::vector<anim::TwoKeyMotion<float>>          m_motion_float;
-    float                                           m_maximum_time = 0.f;
+    using KeyEvent = std::unique_ptr<anim::EventBase>;
+    std::vector<KeyEvent> m_events;
+    float                 m_maximum_time = 0.f;
 
   private: // Private functions
+    template <typename Ty>
+    void add_twokey(anim::TwoKeyEvent<Ty>::InfoType &&data) {
+      m_events.push_back(std::make_unique<anim::TwoKeyEvent<Ty>>(std::move(data)));
+    }
+
+    template <typename Ty>
+    void add_onekey(anim::OneKeyEvent<Ty>::InfoType &&data) {
+      m_events.push_back(std::make_unique<anim::OneKeyEvent<Ty>>(std::move(data)));
+    }
+
+    void init_events() {
+      met_trace()
+
+      auto &scene = m_scene_handle.getw<Scene>();
+      auto &gnome = scene.components.objects("Gnome").value;
+      auto &emitter1 = scene.components.emitters("Emitter1").value;
+      auto &emitter2 = scene.components.emitters("Emitter2").value;
+
+      gnome.transform.scaling = 0.5f;
+
+      add_twokey<eig::Vector3f>({
+        .handle = gnome.transform.position,
+        .values = { gnome.transform.position,  (gnome.transform.position + eig::Vector3f(0.8f, 0, 0)).eval() },
+        .times  = { .5f, 4.5f }
+      });
+      
+      add_twokey<eig::Vector3f>({
+        .handle = gnome.transform.scaling,
+        .values = { gnome.transform.scaling, (gnome.transform.scaling + eig::Vector3f(.5f)).eval() },
+        .times  = { .5f, 4.5f }
+      });
+      
+      // Phase between two emitters
+      emitter1.is_active        = true;
+      emitter2.is_active        = true;
+      emitter1.illuminant_scale = 1;
+      emitter2.illuminant_scale = 0;
+
+      add_twokey<float>({
+        .handle = emitter1.illuminant_scale,
+        .values = { 1.f, 0.f },
+        .times  = { .5f, 4.5f }
+      });
+      /* add_onekey<bool>({
+        .handle = emitter1.is_active,
+        .value  = false,
+        .time   = 4.f
+      }); */
+
+      /* add_onekey<bool>({
+        .handle = emitter2.is_active,
+        .value  = true,
+        .time   = .5f
+      }); */
+      add_twokey<float>({
+        .handle = emitter2.illuminant_scale,
+        .values = { 0.f, 1.f },
+        .times  = { .5f, 4.5f }
+      });
+
+      m_maximum_time = 5.0;
+    }
+
+    bool run_events(uint frame) {
+      // If maximum time is specified and exceeded, we kill the run; otherwise, we keep going
+      bool pass_time = m_maximum_time > 0.f && anim::time_to_frame(m_maximum_time) > frame;
+
+      // Exhaust motion data; return false if no motion is active anymore
+      bool pass_events = rng::fold_left(m_events, false, 
+        [frame](bool left, auto &f) { return f->eval(frame) <= 0 || left; });
+    
+      // Keep running while one is true
+      return pass_time || pass_events;
+    }
+
     void render() {
       met_trace_full();
 
@@ -229,7 +327,7 @@ namespace met {
       scene.update();
 
       // Reset renderer internal film
-      auto &renderer = m_render_handle.getw<PathRenderPrimitive>();
+      auto &renderer = m_render_handle.getw<RenderType>();
       renderer.reset(m_sensor, scene);
 
       // Render a few times
@@ -243,37 +341,6 @@ namespace met {
       std::for_each(std::execution::par_unseq,
         range_iter(cast_span<float>(m_image.data())),
         [](float &f) { f = std::clamp(f, 0.f, 1.f); });
-    }
-
-    void init_motions() {
-      met_trace();
-      
-      auto &scene = m_scene_handle.getw<Scene>();
-      auto &gnome = scene.components.objects("Gnome").value;
-
-      m_motion_vec3.push_back(anim::TwoKeyMotion<eig::Vector3f> {
-        .value_handle = gnome.transform.position,
-        .value_a = gnome.transform.position,
-        .value_b = (gnome.transform.position + eig::Vector3f(0.8f, 0, 0)).eval(),
-        .time_a  = 1.0,
-        .time_b  = 4.0
-      });
-
-      m_maximum_time = 5.0;
-    }
-
-    bool run_motions(uint frame) {
-      // If maximum time is specified and exceeded, we kill the run; otherwise, we keep going
-      bool under_max_time = m_maximum_time > 0.f && anim::time_to_frame(m_maximum_time) > frame;
-
-      // Exhaust motion data; return false if no motion is active anymore
-      auto f = [x = frame](auto &f) { return f(x); };
-      bool under_active_motion = 
-        !rng::none_of(m_motion_float, f) || 
-        !rng::none_of(m_motion_colr, f)  || 
-        !rng::none_of(m_motion_vec3, f);
-
-      return under_active_motion || under_max_time;
     }
 
   public:
@@ -340,7 +407,7 @@ namespace met {
       }
 
       // Initialize renderer and output buffer
-      m_render_handle = m_scheduler.global("render").init<PathRenderPrimitive>({
+      m_render_handle = m_scheduler.global("render").init<RenderType>({
         .spp_per_iter = info.spp_per_step,
         .max_depth    = PathRecord::path_max_depth,
         .cache_handle = m_scheduler.global("cache")
@@ -353,7 +420,7 @@ namespace met {
       }};
 
       // Instantiate motions for scene animation
-      init_motions();
+      init_events();
     }
 
     void run() {
@@ -366,10 +433,10 @@ namespace met {
       VideoOutputStream os("output.mp4", m_sensor.film_size, m_info.fps);
 
       for (uint frame = 0;;++frame) {
-        fmt::print("frame = {}\n", frame);
+        fmt::print("Next: {}/{}\n", frame / m_info.fps, frame);
 
         // Evaluate motion; exit loop if no more animations are left
-        guard_break(run_motions(frame));
+        guard_break(run_events(frame));
 
         // Perform render step
         render();
@@ -416,7 +483,7 @@ namespace met {
     Application app = {{
       .scene_path   = scene_path,
       .fps          = 24u,
-      .spp          = 4u,
+      .spp          = 32u,
       .spp_per_step = 4u      
     }};
 
