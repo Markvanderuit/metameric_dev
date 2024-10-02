@@ -124,8 +124,13 @@ namespace met {
       else               return 3 * x * x - 2 * x * x * x;
     }
 
+    // Harder runoff smoothstep function
+    float f_smoother(float x) {
+      return f_smooth(f_smooth(x));
+    }
+
     // Type of motion; linear or smoothstep (so almost sigmoidal)
-    enum class MotionType { eLinear, eSmooth };
+    enum class MotionType { eLinear, eSmooth, eSmoother };
 
     // Virtual base class of keyed motion types
     struct EventBase {
@@ -169,11 +174,11 @@ namespace met {
     struct TwoKeyEvent : EventBase {
       // Aggregate type used internally for data
       struct InfoType {
-        Ty &handle;                              // Handle to affected value that is updated on motion
-        std::array<Ty, 2> values;                // A/B values between times
-        std::array<float, 2> times;              // A/B times, rounded down to frames
-        MotionType motion = MotionType::eSmooth; // Linear or smoothstep
-        uint fps = 24;                           // Baseline fps
+        Ty &handle;                                // Handle to affected value that is updated on motion
+        std::array<Ty, 2> values;                  // A/B values between times
+        std::array<float, 2> times;                // A/B times, rounded down to frames
+        MotionType motion = MotionType::eSmoother; // Linear or smoothstep
+        uint fps = 24;                             // Baseline fps
       } m_data;
       
     public:
@@ -194,8 +199,12 @@ namespace met {
           // Compute interpolation
           float x = (static_cast<float>(frame)   - static_cast<float>(frame_a))
                   / (static_cast<float>(frame_b) - static_cast<float>(frame_a));
-          float y = m_data.motion == MotionType::eLinear 
-                  ? f_linear(x) : f_smooth(x);
+          float y;
+          switch (m_data.motion) {
+            case MotionType::eLinear:   y = f_linear(x);   break;
+            case MotionType::eSmooth:   y = f_smooth(x);   break;
+            case MotionType::eSmoother: y = f_smoother(x); break;
+          }
 
           // Apply interpolation
           m_data.handle = m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y;
@@ -210,11 +219,11 @@ namespace met {
     struct TwoKeyEvent<Uplifting::Vertex> : EventBase {
       // Aggregate type used internally for data
       struct InfoType {
-        Uplifting::Vertex  &handle;                   // Handle to affected value that is updated on motion
-        std::array<Colr, 2> values;                   // A/B values between times
-        std::array<float, 2> times;                   // A/B times, rounded down to frames
-        MotionType motion_type = MotionType::eSmooth; // Linear or smoothstep
-        uint fps = 24;                                // Baseline fps
+        Uplifting::Vertex  &handle;                // Handle to affected value that is updated on motion
+        std::array<Colr, 2> values;                // A/B values between times
+        std::array<float, 2> times;                // A/B times, rounded down to frames
+        MotionType motion = MotionType::eSmoother; // Linear or smoothstep
+        uint fps = 24;                             // Baseline fps
       } m_data;
       
     public:
@@ -235,8 +244,12 @@ namespace met {
           // Compute interpolation
           float x = (static_cast<float>(frame)   - static_cast<float>(frame_a))
                   / (static_cast<float>(frame_b) - static_cast<float>(frame_a));
-          float y = m_data.motion_type == MotionType::eLinear 
-                  ? f_linear(x) : f_smooth(x);
+          float y;
+          switch (m_data.motion) {
+            case MotionType::eLinear:   y = f_linear(x);   break;
+            case MotionType::eSmooth:   y = f_smooth(x);   break;
+            case MotionType::eSmoother: y = f_smoother(x); break;
+          }
 
           // Apply interpolation
           m_data.handle.set_mismatch_position(m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y);
@@ -549,7 +562,7 @@ namespace met {
       VideoOutputStream os(m_info.out_path.string(), m_sensor.film_size, m_info.fps);
       
       for (uint frame = anim::time_to_frame(m_info.start_time, m_info.fps); ; ++frame) {
-        fmt::print("Generating (s, frame): {}/{}\n", frame / m_info.fps, frame);
+        fmt::print("\tGenerating ({}): s={}, f={}\n", m_info.scene_path.filename().string(), frame / m_info.fps, frame);
 
         // Evaluate motion; exit loop if no more animations are left
         guard_break(run_events(frame));
@@ -601,9 +614,9 @@ int main() {
       .out_path     = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_0.mp4",
       .view_name    = "FFW view",
       .view_scale   = 0.25f,
-      .fps          = 60u,
-      .spp          = 1u,
-      .spp_per_step = 1u,
+      .fps          = 30u,
+      .spp          = 4u,
+      .spp_per_step = 4u,
       .start_time   = 0.f,
       .end_time     = 6.f,
       .init_events  = [](auto &info, Scene &scene) {
@@ -612,7 +625,7 @@ int main() {
         auto &cube1 = scene.components.objects("Cube 1").value;
         auto &cube2 = scene.components.objects("Cube 2").value;
 
-        float move_start_time = 1.5f, move_end_time = 3.f;
+        float move_start_time = 1.f, move_end_time = 3.5f;
 
         // Move cubes, left to right
         add_twokey<float>(info.events, {
@@ -644,10 +657,68 @@ int main() {
         });
       }
     };
+
+    ApplicationInfo scene_1a_info = {
+      .scene_path   = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_1a.json",
+      .out_path     = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_1a.mp4",
+      .view_name    = "FFW view",
+      .view_scale   = 0.5f,
+      .fps          = 30u,
+      .spp          = 4u,
+      .spp_per_step = 4u,
+      .start_time   = 0.f,
+      .end_time     = 6.f,
+      .init_events  = [](auto &info, Scene &scene) {
+        met_trace();
+
+        auto &cvert = scene.components.upliftings[0]->verts[0];
+        auto &light = scene.components.emitters[0].value;
+        
+        float move_start_time = 1.f, move_end_time = 4.f;
+        
+        // Rotate light around
+        add_twokey<eig::Vector3f>(info.events,{
+          .handle = light.transform.position,
+          .values = { light.transform.position, eig::Vector3f { 128, 200, 128 } },
+          .times  = { move_start_time, move_end_time },
+          .fps    = info.fps
+        });
+      }
+    };
+
+    ApplicationInfo scene_1b_info = {
+      .scene_path   = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_1b.json",
+      .out_path     = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_1b.mp4",
+      .view_name    = "FFW view",
+      .view_scale   = 0.5f,
+      .fps          = 30u,
+      .spp          = 4u,
+      .spp_per_step = 4u,
+      .start_time   = 0.f,
+      .end_time     = 6.f,
+      .init_events  = [](auto &info, Scene &scene) {
+        met_trace();
+
+        auto &cvert = scene.components.upliftings[0]->verts[0];
+        auto &light = scene.components.emitters[0].value;
+        
+        float move_start_time = 1.f, move_end_time = 3.5f;
+        
+        // Rotate light around
+        add_twokey<eig::Vector3f>(info.events,{
+          .handle = light.transform.position,
+          .values = { light.transform.position, eig::Vector3f { 128, 200, 128 } },
+          .times  = { move_start_time, move_end_time },
+          .fps    = info.fps
+        });
+      }
+    };
     
     // Queue processes all moved info objects
     std::queue<ApplicationInfo> queue;
     queue.push(std::move(scene_0_info));
+    queue.push(std::move(scene_1a_info));
+    queue.push(std::move(scene_1b_info));
 
     // Exhaust input
     while (!queue.empty()) {
@@ -656,6 +727,11 @@ int main() {
 
       debug::check_expr(fs::exists(task.scene_path));
       fmt::print("Starting {}\n", task.scene_path.string());
+
+      // Overwrite quality settings for consistenncy
+      task.view_scale   = 1.f;
+      task.spp          = 256u;
+      task.spp_per_step = 4u;
       
       // Application consumes task
       Application app(std::move(task));
