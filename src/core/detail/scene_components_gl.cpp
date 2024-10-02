@@ -84,6 +84,21 @@ namespace met::detail {
     return aabb;
   }
 
+  AABB generate_fitting_aabb(const Mesh &mesh, const eig::Matrix4f &trf) {
+    // Transform mesh data in parallel
+    std::vector<Mesh::vert_type> verts(mesh.verts.size());
+    std::transform(std::execution::par_unseq, range_iter(mesh.verts), verts.begin(),
+      [&trf](const auto &vt) { return (trf * (eig::Vector4f() << vt, 1).finished()).head<3>().eval(); });
+    
+    // Establish bounding box around mesh's vertices
+    eig::Array3f minb = std::reduce(std::execution::par_unseq, range_iter(verts), verts[0],
+      [](auto a, auto b) { return a.cwiseMin(b).eval(); });
+    eig::Array3f maxb = std::reduce(std::execution::par_unseq, range_iter(verts), verts[0],
+      [](auto a, auto b) { return a.cwiseMax(b).eval(); });
+    
+    return AABB { minb, maxb };
+  }
+
   SceneGLHandler<met::Object>::SceneGLHandler() {
     met_trace_full();
 
@@ -647,6 +662,7 @@ namespace met::detail {
       auto full_trf   = (object_trf * mesh_trf).eval();
 
       prims.push_back({ .is_object = true, .i = i, .aabb = generate_rotated_aabb(full_trf) });
+      // prims.push_back({ .is_object = true, .i = i, .aabb = generate_fitting_aabb(mesh, full_trf) });
     }
 
     // Collect emitter data
@@ -704,6 +720,11 @@ namespace met::detail {
     
     // Create top-level BVH over AABBS
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
+
+    fmt::print("BVH\n");
+    for (const auto &node : bvh.nodes) {
+      fmt::print("leaf : {}, [{}, {}]\n", node.is_leaf(), node.offs(), node.offs() + node.size());
+    }
 
     // Small helper to pack primitive data in a single integer
     constexpr auto pack_prim = [](bool is_object, uint object_i) -> uint {

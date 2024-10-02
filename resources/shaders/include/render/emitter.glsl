@@ -108,7 +108,7 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
   } else if (em.type == EmitterTypeRectangle) {
     hit = ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
   }
-
+  
   if (hit)
     record_set_emitter(ray.data, emitter_i);
 

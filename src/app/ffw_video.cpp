@@ -20,10 +20,6 @@
 #include "codeccontext.h"
 
 namespace met {
-  constexpr static uint video_output_w   = 256;
-  constexpr static uint video_output_h   = 256;
-  constexpr static uint video_output_fps = 24;
-
   class VideoOutputStream {
     constexpr static auto output_fmt = "yuv420p";
     constexpr static auto input_fmt  = "rgb24";
@@ -112,7 +108,7 @@ namespace met {
   };
 
   namespace anim {
-    uint time_to_frame(float time, uint fps = 24) {
+    uint time_to_frame(float time, uint fps) {
       return static_cast<uint>(std::floor(time * fps));
     }
 
@@ -142,9 +138,10 @@ namespace met {
     struct OneKeyEvent : EventBase { 
       // Aggregate type used internally for data
       struct InfoType {
-        Ty &handle; // Handle to affected value that is updated on motion
-        Ty value;   // The then-set value
-        float time; // Time of set
+        Ty &handle;    // Handle to affected value that is updated on motion
+        Ty value;      // The then-set value
+        float time;    // Time of set
+        uint fps = 24; // Baseline fps
       } m_data;
 
     public:
@@ -153,7 +150,7 @@ namespace met {
 
       // Operator performs motion between values in timeframe
       int eval(uint frame) override {
-        uint frame_a = time_to_frame(m_data.time);
+        uint frame_a = time_to_frame(m_data.time, m_data.fps);
 
         if (frame < frame_a) {
           return -1;
@@ -176,6 +173,7 @@ namespace met {
         std::array<Ty, 2> values;                     // A/B values between times
         std::array<float, 2> times;                   // A/B times, rounded down to frames
         MotionType motion_type = MotionType::eSmooth; // Linear or smoothstep
+        uint fps = 24;                                // Baseline fps
       } m_data;
       
     public:
@@ -185,8 +183,8 @@ namespace met {
       // Operator performs motion between values in timeframe
       int eval(uint frame) override {
         // Compute frame interval
-        uint frame_a = time_to_frame(m_data.times[0]), 
-             frame_b = time_to_frame(m_data.times[1]);
+        uint frame_a = time_to_frame(m_data.times[0], m_data.fps), 
+             frame_b = time_to_frame(m_data.times[1], m_data.fps);
         
         if (frame < frame_a) {
           return -1;
@@ -230,7 +228,6 @@ namespace met {
     // Handles
     ResourceHandle m_scene_handle;
     ResourceHandle m_window_handle;
-    ResourceHandle m_render_handle;
     
     // Objects
     CreateInfo      m_info;
@@ -241,7 +238,10 @@ namespace met {
     // Motion data
     using KeyEvent = std::unique_ptr<anim::EventBase>;
     std::vector<KeyEvent> m_events;
-    float                 m_maximum_time = 0.f;
+
+    // Start/end times of video; 0 means not enforced
+    float m_start_time = 0.f;
+    float m_end_time = 0.f; 
 
   private: // Private functions
     template <typename Ty>
@@ -267,13 +267,15 @@ namespace met {
       add_twokey<eig::Vector3f>({
         .handle = gnome.transform.position,
         .values = { gnome.transform.position,  (gnome.transform.position + eig::Vector3f(0.8f, 0, 0)).eval() },
-        .times  = { .5f, 4.5f }
+        .times  = { .5f, 4.5f },
+        .fps    = m_info.fps
       });
       
       add_twokey<eig::Vector3f>({
         .handle = gnome.transform.scaling,
         .values = { gnome.transform.scaling, (gnome.transform.scaling + eig::Vector3f(.5f)).eval() },
-        .times  = { .5f, 4.5f }
+        .times  = { .5f, 4.5f },
+        .fps    = m_info.fps
       });
       
       // Phase between two emitters
@@ -285,7 +287,8 @@ namespace met {
       add_twokey<float>({
         .handle = emitter1.illuminant_scale,
         .values = { 1.f, 0.f },
-        .times  = { .5f, 4.5f }
+        .times  = { .5f, 4.5f },
+        .fps    = m_info.fps
       });
       /* add_onekey<bool>({
         .handle = emitter1.is_active,
@@ -301,15 +304,17 @@ namespace met {
       add_twokey<float>({
         .handle = emitter2.illuminant_scale,
         .values = { 0.f, 1.f },
-        .times  = { .5f, 4.5f }
+        .times  = { .5f, 4.5f },
+        .fps    = m_info.fps
       });
 
-      m_maximum_time = 5.0;
+      m_start_time = 0.f;
+      m_end_time = 5.f;
     }
 
     bool run_events(uint frame) {
       // If maximum time is specified and exceeded, we kill the run; otherwise, we keep going
-      bool pass_time = m_maximum_time > 0.f && anim::time_to_frame(m_maximum_time) > frame;
+      bool pass_time = m_end_time > 0.f && anim::time_to_frame(m_end_time, m_info.fps) > frame;
 
       // Exhaust motion data; return false if no motion is active anymore
       bool pass_events = rng::fold_left(m_events, false, 
@@ -317,30 +322,6 @@ namespace met {
     
       // Keep running while one is true
       return pass_time || pass_events;
-    }
-
-    void render() {
-      met_trace_full();
-
-      // Push scene data to gl
-      auto &scene = m_scene_handle.getw<Scene>();
-      scene.update();
-
-      // Reset renderer internal film
-      auto &renderer = m_render_handle.getw<RenderType>();
-      renderer.reset(m_sensor, scene);
-
-      // Render a few times
-      for (uint i = 0; i < m_info.spp; i += m_info.spp_per_step)
-        renderer.render(m_sensor, scene);
-      
-      // Get frame data
-      renderer.film().get(cast_span<float>(m_image.data()));
-
-      // Clamp HDR float data to prevent weird clipping
-      std::for_each(std::execution::par_unseq,
-        range_iter(cast_span<float>(m_image.data())),
-        [](float &f) { f = std::clamp(f, 0.f, 1.f); });
     }
 
   public:
@@ -369,14 +350,36 @@ namespace met {
       debug::check_expr(fs::exists(info.scene_path));
       auto &scene = m_scene_handle.getw<Scene>();
       scene.load(info.scene_path);
-      scene.update();
 
-      // We use the scheduler to ensure spectral constraints are all handled properly;
-      // so run these two tasks a fair few times
-      m_scheduler.task("gen_upliftings").init<GenUpliftingsTask>(256);
+      // We use the scheduler to ensure scene data and spectral constraints are all handled properly
+      m_scheduler.task("scene_handler").init<LambdaTask>(
+        [](auto &info) { 
+          met_trace();
+          info.global("scene").getw<Scene>().update(); 
+      });
+      m_scheduler.task("gen_upliftings").init<GenUpliftingsTask>(256); // build many, not few
       m_scheduler.task("gen_objects").init<GenObjectsTask>();
-      m_scheduler.run();
-      scene.update();
+      m_scheduler.task("render").init<LambdaTask>([&](auto &info) {
+        met_trace();
+
+        const auto &scene = info.global("scene").getr<Scene>();
+        auto &renderer = info.global("renderer").getw<RenderType>();
+
+        // Reset renderer internal film
+        renderer.reset(m_sensor, scene);
+
+        // Render frame over several iterations
+        for (uint i = 0; i < m_info.spp; i += m_info.spp_per_step)
+          renderer.render(m_sensor, scene);
+        
+        // Get frame data
+        renderer.film().get(cast_span<float>(m_image.data()));
+
+        // Clip HDR output
+        std::for_each(std::execution::par_unseq,
+          range_iter(cast_span<float>(m_image.data())),
+          [](float &f) { f = std::clamp(f, 0.f, 1.f); });
+      });
 
       // Initialize sensor from scene view
       {
@@ -407,9 +410,9 @@ namespace met {
       }
 
       // Initialize renderer and output buffer
-      m_render_handle = m_scheduler.global("render").init<RenderType>({
+      m_scheduler.global("renderer").init<RenderType>({
         .spp_per_iter = info.spp_per_step,
-        .max_depth    = PathRecord::path_max_depth,
+        .max_depth    = 4u, // PathRecord::path_max_depth,
         .cache_handle = m_scheduler.global("cache")
       });
       m_image = {{
@@ -431,15 +434,15 @@ namespace met {
 
       // Begin video output
       VideoOutputStream os("output.mp4", m_sensor.film_size, m_info.fps);
-
-      for (uint frame = 0;;++frame) {
-        fmt::print("Next: {}/{}\n", frame / m_info.fps, frame);
+      
+      for (uint frame = anim::time_to_frame(m_start_time, m_info.fps); ; ++frame) {
+        fmt::print("Generating (s, frame): {}/{}\n", frame / m_info.fps, frame);
 
         // Evaluate motion; exit loop if no more animations are left
         guard_break(run_events(frame));
 
         // Perform render step
-        render();
+        m_scheduler.run();
           
         // Convert and write to stream
         auto rgb8 = m_image.convert({ 
@@ -461,40 +464,27 @@ namespace met {
       os.close();
     }
   };
-
-  // Application create settings
-  struct RunInfo {
-    // Direct load scene path
-    fs::path scene_path = "";
-
-    // Shader cache path
-    fs::path shader_path = "resources/shaders/shaders.bin";
-  };
-
-  // Application setup function
-  void run(std::string_view scene_path) {
-    met_trace();
-
-    fmt::print(
-      "Starting...\n  range   : {}-{} nm\n  samples : {}\n  bases   : {}\n  loading : {}\n",
-      wavelength_min, wavelength_max, wavelength_samples, wavelength_bases, 
-      scene_path);
-
-    Application app = {{
-      .scene_path   = scene_path,
-      .fps          = 24u,
-      .spp          = 32u,
-      .spp_per_step = 4u      
-    }};
-
-    app.run();
-  }
 } // namespace met
 
 // Application entry point
 int main() {
   try {
-    met::run("C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Metameric Scenes/animated_gnome/animated_gnome.json");
+    met_trace();
+    
+    met::fs::path scene_path = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Metameric Scenes/animated_gnome/animated_gnome.json";
+    met::debug::check_expr(met::fs::exists(scene_path));
+    fmt::print(
+      "Starting...\n  range   : {}-{} nm\n  samples : {}\n  bases   : {}\n  loading : {}\n",
+      met::wavelength_min, met::wavelength_max, met::wavelength_samples, met::wavelength_bases, scene_path.string());
+
+    met::Application app = {{
+      .scene_path   = scene_path,
+      .fps          = 24u,
+      .spp          = 1u,
+      .spp_per_step = 1u      
+    }};
+
+    app.run();
   } catch (const std::exception &e) {
     fmt::print(stderr, "{}\n", e.what());
     return EXIT_FAILURE;

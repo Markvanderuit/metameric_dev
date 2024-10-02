@@ -40,36 +40,32 @@ void ray_intersect_tlas(inout Ray ray_world, in Ray ray) {
     // If this was the last flagged bit, decrease stack count
     if ((stck_value & 0xFF000000) == 0)
       stckc--;
-    
-    // Index of next node in buffer
-    uint node_i = node_first + node_bit;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(scene_tlas_node(node_i));
+    BVHNode node = unpack(scene_tlas_node(node_first + node_bit));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
       // Iterate the node's primitives
       for (uint i = 0; i < bvh_size(node); ++i) {
-        // Index of next prim in buffer
-        uint prim_i = bvh_offs(node) + i;
+        // Obtain and unpack next prim
+        TLASPrimitive prim = unpack_tlas_primitive(scene_tlas_prim(bvh_offs(node) + i));
 
-        // Obtain and unpack next prim; then trace against it
-        TLASPrimitive prim = unpack_tlas_primitive(scene_tlas_prim(prim_i));
+        // Then trace against it, dependent on type. On hit, copy back closest-hit information
         if (prim.is_object) {
-          ray_intersect_object(ray_world, prim.object_i);
+          if (ray_intersect_object(ray_world, prim.object_i))
+            ray_transform_inplace(ray, ray_world, scene_info().trf_inv);
         } else {
-          ray_intersect_emitter(ray_world, prim.object_i);
+          if (ray_intersect_emitter(ray_world, prim.object_i))
+            ray_transform_inplace(ray, ray_world, scene_info().trf_inv);
         }
       }
     } else {
       // Iterate the node's children, test against each AABB, and
       // on a hit flag the index of the child in a bitmask
       uint mask = 0;
-      for (uint i = 0; i < bvh_size(node); ++i) {
-        AABB aabb = bvh_child_aabb(node, i);
-        if (ray_intersect_any(ray, d_inv, aabb))
+      for (uint i = 0; i < bvh_size(node); ++i)
+        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i)))
           mask |= (1u << i);
-      } // for (uint i)
 
       // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
       if (mask != 0) {
@@ -103,21 +99,15 @@ bool ray_intersect_tlas_any(in Ray ray_world, in Ray ray) {
     // If this was the last flagged bit, decrease stack count
     if ((stck_value & 0xFF000000) == 0)
       stckc--;
-    
-    // Index of next node in buffer
-    uint node_i = node_first + node_bit;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(scene_tlas_node(node_i));
+    BVHNode node = unpack(scene_tlas_node(node_first + node_bit));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
       // Iterate the node's primitives
       for (uint i = 0; i < bvh_size(node); ++i) {
-        // Index of next prim in buffer
-        uint prim_i = bvh_offs(node) + i;
-
         // Obtain and unpack next prim; then trace against it
-        TLASPrimitive prim = unpack_tlas_primitive(scene_tlas_prim(prim_i));
+        TLASPrimitive prim = unpack_tlas_primitive(scene_tlas_prim(bvh_offs(node) + i));
         if (prim.is_object) {
           if (ray_intersect_object_any(ray_world, prim.object_i))
             return true;
@@ -130,11 +120,9 @@ bool ray_intersect_tlas_any(in Ray ray_world, in Ray ray) {
       // Iterate the node's children, test against each AABB, and
       // on a hit flag the index of the child in a bitmask
       uint mask = 0;
-      for (uint i = 0; i < bvh_size(node); ++i) {
-        AABB aabb = bvh_child_aabb(node, i);
-        if (ray_intersect_any(ray, d_inv, aabb))
+      for (uint i = 0; i < bvh_size(node); ++i)
+        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i)))
           mask |= (1u << i);
-      } // for (uint i)
 
       // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
       if (mask != 0) {

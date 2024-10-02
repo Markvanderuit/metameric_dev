@@ -38,21 +38,43 @@ void path_finalize_envmap(in Path pt, in vec4 L, in vec4 wvls) {
 #define path_finalize_envmap(path, L, wvls)  {}
 #endif
 
+const vec3 debug_colors[8] = vec3[8](
+  vec3(27,158,119) / 255.f,
+  vec3(217,95,2) / 255.f,
+  vec3(117,112,179) / 255.f,
+  vec3(231,41,138) / 255.f,
+  vec3(102,166,30) / 255.f,
+  vec3(230,171,2) / 255.f,
+  vec3(166,118,29) / 255.f,
+  vec3(102,102,102) / 255.f
+);
+
 vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   // If the ray misses, terminate current path
-  if (!scene_intersect(ray))
-    return vec4(0);
+  scene_intersect(ray);
+  // if (!scene_intersect(ray))
+  //   return vec4(0);
+  
+  // uint n = scene_emitter_count() + scene_object_count();
+  uint i = ray.data; // record_get_object(ray.data);
+  uint n = 1024;
 
-  SurfaceInfo si = get_surface_info(ray);
-  if (!is_valid(si) || !is_object(si))
-    return vec4(0);
+  float s = float(i) / float(n);
+  return vec4(vec3(s), 1);
 
-  // Hope this is the right one; should be normalized d65
-  vec4 d65_n = scene_illuminant(1, wvls);
+  // return vec4(debug_colors[record_get_object(ray.data) % 8], 1);
+  // return vec4(1, 0, s, 1);
 
-  // Sample BRDF albedo at position, integrate, and return color
-  BRDFInfo brdf = get_brdf(si, wvls);
-  return d65_n * brdf.r / wvl_pdfs;
+  // SurfaceInfo si = get_surface_info(ray);
+  // if (!is_valid(si) || !is_object(si))
+  //   return vec4(0);
+
+  // // Hope this is the right one; should be normalized d65
+  // vec4 d65_n = scene_illuminant(1, wvls);
+
+  // // Sample BRDF albedo at position, integrate, and return color
+  // BRDFInfo brdf = get_brdf(si, wvls);
+  // return d65_n * brdf.r / wvl_pdfs;
 }
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout float alpha) {

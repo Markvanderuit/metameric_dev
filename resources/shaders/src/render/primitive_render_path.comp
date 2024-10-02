@@ -73,7 +73,7 @@ layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack dat
 layout(binding = 2) restrict readonly buffer b_buff_tlas_node { BVHNodePack  data[]; } buff_tlas_node;
 layout(binding = 3) restrict readonly buffer b_buff_tlas_prim { uint         data[]; } buff_tlas_prim;
 layout(binding = 4) restrict readonly buffer b_buff_coeffs {
-  BarycentricInfo data[met_max_objects];
+  BarycentricInfo data[met_max_objects]; // Set here due to std430 layout
 } buff_coeffs;
 
 // Texture/image units, ergo samplers and output images
@@ -95,7 +95,7 @@ shared MeshInfo        s_mesh_info[met_max_meshes];
 // Wavelength/emitter sampling distributions draw from uniform buffers
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
-declare_scene_traversal_stack(6); 
+declare_scene_traversal_stack(5); 
 declare_scene_tlas_stack(4); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
