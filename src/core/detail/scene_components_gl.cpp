@@ -721,11 +721,6 @@ namespace met::detail {
     // Create top-level BVH over AABBS
     BVH<8> bvh = {{ .aabb = prim_aabbs, .n_leaf_children = 1 }};
 
-    fmt::print("BVH\n");
-    for (const auto &node : bvh.nodes) {
-      fmt::print("leaf : {}, [{}, {}]\n", node.is_leaf(), node.offs(), node.offs() + node.size());
-    }
-
     // Small helper to pack primitive data in a single integer
     constexpr auto pack_prim = [](bool is_object, uint object_i) -> uint {
       return (is_object ? 0x00000000 : 0x80000000) | (object_i & 0x00FFFFFF);
