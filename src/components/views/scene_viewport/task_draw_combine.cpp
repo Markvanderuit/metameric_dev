@@ -41,7 +41,7 @@ namespace met {
     m_unif_buffer_map->viewport_size       = dispatch_n;
     m_unif_buffer_map->sample_checkerboard = static_cast<uint>(e_render.is_pixel_checkerboard() && e_render.iter() <= 1);
     m_unif_buffer.flush();
-
+    
     // Bind required resources to their corresponding targets
     m_program.bind("b_buff_unif",  m_unif_buffer);
     m_program.bind("b_render_4f",  e_render.film());

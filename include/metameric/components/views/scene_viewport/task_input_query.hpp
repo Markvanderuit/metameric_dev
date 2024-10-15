@@ -127,9 +127,7 @@ namespace met {
       }
       ImGui::End();
       
-      if (m_query_spp > 0) {
-        eval_path_query(info);
-      }
+      eval_path_query(info);
     }
   };
 } // namespace met

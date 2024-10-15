@@ -254,7 +254,6 @@ namespace met {
     const auto &e_query  = info.relative("viewport_input_query")("path_query").getr<PathQueryPrimitive>();
     auto &i_target       = info("target").getw<gl::Texture2d4f>();
 
-    guard(!e_query.data().empty());
 
     // Prepare output framebuffer
     if (!i_target.is_init() || !i_target.size().isApprox(e_target.size())) {
@@ -270,6 +269,9 @@ namespace met {
     m_fbo.clear(gl::FramebufferType::eColor, fbo_colr_value, 0);
     m_fbo.clear(gl::FramebufferType::eDepth, 1.f);
 
+    // Return instead of performing draw
+    guard(!e_query.data().empty());
+    
     // Prepare draw state
     gl::state::set_viewport(i_target.size());    
     gl::state::set_depth_range(0.f, 1.f);
