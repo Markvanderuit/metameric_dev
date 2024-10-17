@@ -1,265 +1,16 @@
 #pragma once
 
-#include <metameric/core/image.hpp>
 #include <metameric/core/scene.hpp>
 #include <metameric/core/scheduler.hpp>
 #include <metameric/core/utility.hpp>
 #include <metameric/render/primitives_render.hpp>
 #include <metameric/components/views/detail/arcball.hpp>
+#include <video.hpp>
+#include <animation.hpp>
 #include <small_gl/window.hpp>
 #include <small_gl/detail/program_cache.hpp>
-#include <ffmpeg.h>
-#include <av.h>
-#include <codec.h>
-#include <packet.h>
-#include "videorescaler.h"
-#include "avutils.h"
-#include "format.h"
-#include "formatcontext.h"
-#include "codec.h"
-#include "codeccontext.h"
 
 namespace met {
-  class VideoOutputStream {
-    constexpr static auto output_fmt = "yuv420p";
-    constexpr static auto input_fmt  = "rgb24";
-
-    av::OutputFormat        m_ofmt;
-    av::FormatContext       m_octx;
-    av::Codec               m_codec;
-    av::VideoEncoderContext m_encoder;
-    av::VideoRescaler       m_rescaler;
-    av::Stream              m_stream;
-    eig::Array2u            m_size;
-    int                     m_fps;
-    int                     m_curr_frame;
-    
-  public:
-    VideoOutputStream(fs::path output_path, eig::Array2u size, int fps = 24)
-    : m_size(size),
-      m_fps(fps),
-      m_curr_frame(0)
-    {
-      met_trace();
-
-      // Init ffmpeg
-      av::init();
-      av::setFFmpegLoggingLevel(AV_LOG_DEBUG);
-
-      m_ofmt.setFormat("H.264", output_path.filename().string());
-      m_octx.setFormat(m_ofmt);
-
-      // Specify encoder and codec
-      m_codec = av::findEncodingCodec(m_ofmt);
-      m_encoder = av::VideoEncoderContext { m_codec };
-
-      // Specify encoder settings
-      m_encoder.setWidth(size.x());
-      m_encoder.setHeight(size.y());
-      m_encoder.setPixelFormat(av::PixelFormat(output_fmt));
-      m_encoder.setTimeBase(av::Rational(1, fps));
-      m_encoder.setBitRate(48'000'000);
-      m_encoder.open();
-
-      // Prepare stream for write
-      av::Stream m_stream = m_octx.addStream(m_encoder);
-      m_stream.setFrameRate(fps);
-      m_stream.setAverageFrameRate(fps);
-      m_stream.setTimeBase(m_encoder.timeBase());
-
-      // Prepare output for write
-      m_octx.openOutput(output_path.string());
-      m_octx.dump();
-      m_octx.writeHeader();
-      m_octx.flush();
-
-      // Prepare rescaler
-      m_rescaler = av::VideoRescaler(size.x(), size.y(), av::PixelFormat(output_fmt));
-    }
-
-    void write(const Image &input) {
-      met_trace();
-
-      // Input matches to hardcoded iinput size and format
-      debug::check_expr(input.pixel_frmt() == Image::PixelFormat::eRGB);
-      debug::check_expr(input.pixel_type() == Image::PixelType::eUChar);
-      debug::check_expr(input.size().isApprox(m_size));
-
-      // Copy image data into frame
-      auto rgb24 = cast_span<const std::uint8_t>(input.data());
-      av::VideoFrame input_frame(rgb24.data(), rgb24.size(), av::PixelFormat(input_fmt), m_size.x(), m_size.y());
-      
-      // Perform rescale to output format
-      av::VideoFrame output_frame = m_rescaler.rescale(input_frame);
-
-      // Generate packet with appropriate time data, and write to stream
-      auto packet = m_encoder.encode(output_frame);
-      packet.setStreamIndex(0);
-      packet.setTimeBase(av::Rational(1, m_fps));
-      packet.setPts(m_curr_frame++);
-      packet.setDts(packet.pts());
-      m_octx.writePacket(packet);
-    }
-
-    void close() {
-      m_octx.writeTrailer();
-      m_octx.close();
-    }
-  };
-
-  namespace anim {
-    uint time_to_frame(float time, uint fps) {
-      return static_cast<uint>(std::floor(time * fps));
-    }
-
-    // Implementation of linear function
-    float f_linear(float x) {
-      return x;
-    }
-
-    // Implementation of smoothstep function
-    float f_smooth(float x) {
-      if (x <= 0.f)      return 0.f;
-      else if (x >= 1.f) return 1.f;
-      else               return 3 * x * x - 2 * x * x * x;
-    }
-
-    // Harder runoff smoothstep function
-    float f_smoother(float x) {
-      return f_smooth(f_smooth(x));
-    }
-
-    // Type of motion; linear or smoothstep (so almost sigmoidal)
-    enum class MotionType { eLinear, eSmooth, eSmoother };
-
-    // Virtual base class of keyed motion types
-    struct EventBase {
-      virtual int eval(uint frame) = 0; // Return -1 before event, 0 during event, 1 after event
-    };
-
-    // Template for one-keyed event; set a value
-    // to a specified input at an indicated time
-    template <typename Ty>
-    struct OneKeyEvent : EventBase { 
-      // Aggregate type used internally for data
-      struct InfoType {
-        Ty &handle;    // Handle to affected value that is updated on motion
-        Ty value;      // The then-set value
-        float time;    // Time of set
-        uint fps = 24; // Baseline fps
-      } m_data;
-
-    public:
-      // Constructor accepts aggregate type
-      OneKeyEvent(InfoType &&data) : m_data(data) {}
-
-      // Operator performs motion between values in timeframe
-      int eval(uint frame) override {
-        uint frame_a = time_to_frame(m_data.time, m_data.fps);
-
-        if (frame < frame_a) {
-          return -1;
-        } else if (frame > frame_a) {
-          return 1;
-       } else {
-          m_data.handle = m_data.value;
-          return 0;
-        }
-      }
-    };
-
-    // Template for two-keyed event; smoothly or linearly 
-    // moves a value from start to finish between two indicated times
-    template <typename Ty>
-    struct TwoKeyEvent : EventBase {
-      // Aggregate type used internally for data
-      struct InfoType {
-        Ty &handle;                                // Handle to affected value that is updated on motion
-        std::array<Ty, 2> values;                  // A/B values between times
-        std::array<float, 2> times;                // A/B times, rounded down to frames
-        MotionType motion = MotionType::eSmoother; // Linear or smoothstep
-        uint fps = 24;                             // Baseline fps
-      } m_data;
-      
-    public:
-      // Constructor accepts aggregate type
-      TwoKeyEvent(InfoType &&data) : m_data(data) {}
-      
-      // Operator performs motion between values in timeframe
-      int eval(uint frame) override {
-        // Compute frame interval
-        uint frame_a = time_to_frame(m_data.times[0], m_data.fps), 
-             frame_b = time_to_frame(m_data.times[1], m_data.fps);
-        
-        if (frame < frame_a) {
-          return -1;
-        } else if (frame > frame_b) {
-          return 1;
-        } else {
-          // Compute interpolation
-          float x = (static_cast<float>(frame)   - static_cast<float>(frame_a))
-                  / (static_cast<float>(frame_b) - static_cast<float>(frame_a));
-          float y;
-          switch (m_data.motion) {
-            case MotionType::eLinear:   y = f_linear(x);   break;
-            case MotionType::eSmooth:   y = f_smooth(x);   break;
-            case MotionType::eSmoother: y = f_smoother(x); break;
-          }
-
-          // Apply interpolation
-          m_data.handle = m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y;
-          
-          return 0;
-        }
-      }
-    };
-
-    // Explicit template instantiation for uplifting vertices, which hide std::variant but have accessor functions
-    template<>
-    struct TwoKeyEvent<Uplifting::Vertex> : EventBase {
-      // Aggregate type used internally for data
-      struct InfoType {
-        Uplifting::Vertex  &handle;                // Handle to affected value that is updated on motion
-        std::array<Colr, 2> values;                // A/B values between times
-        std::array<float, 2> times;                // A/B times, rounded down to frames
-        MotionType motion = MotionType::eSmoother; // Linear or smoothstep
-        uint fps = 24;                             // Baseline fps
-      } m_data;
-      
-    public:
-      // Constructor accepts aggregate type
-      TwoKeyEvent(InfoType &&data) : m_data(data) {}
-      
-      // Operator performs motion between values in timeframe
-      int eval(uint frame) override {
-        // Compute frame interval
-        uint frame_a = time_to_frame(m_data.times[0], m_data.fps), 
-             frame_b = time_to_frame(m_data.times[1], m_data.fps);
-        
-        if (frame < frame_a) {
-          return -1;
-        } else if (frame > frame_b) {
-          return 1;
-        } else {
-          // Compute interpolation
-          float x = (static_cast<float>(frame)   - static_cast<float>(frame_a))
-                  / (static_cast<float>(frame_b) - static_cast<float>(frame_a));
-          float y;
-          switch (m_data.motion) {
-            case MotionType::eLinear:   y = f_linear(x);   break;
-            case MotionType::eSmooth:   y = f_smooth(x);   break;
-            case MotionType::eSmoother: y = f_smoother(x); break;
-          }
-
-          // Apply interpolation
-          m_data.handle.set_mismatch_position(m_data.values[0] + (m_data.values[1] - m_data.values[0]) * y);
-
-          return 0;
-        }
-      }
-    };
-  } // namespace anim
-
   struct ApplicationInfo {
     // Direct load scene path
     fs::path scene_path = "";
@@ -311,7 +62,7 @@ namespace met {
 
     //   // Interpolate constraint color
     //   auto &cvert = scene.components.upliftings[0]->verts[0];
-    //   add_twokey<Uplifting::Vertex>({
+    //   anim::add_twokey<Uplifting::Vertex>({
     //     .handle = cvert,
     //     .values = { cvert.get_mismatch_position(), Colr { 0.110, 0.108, 0.105 } },
     //     .times  = { 0.f, 2.f },
@@ -321,7 +72,7 @@ namespace met {
     //   // Interpolate emitter position
     //   auto &emitter = scene.components.emitters[0].value;
     //   emitter.transform.position = { 96.f, 280.f, 96.f };
-    //   add_twokey<eig::Vector3f>({
+    //   anim::add_twokey<eig::Vector3f>({
     //     .handle = emitter.transform.position,
     //     .values = { emitter.transform.position, eig::Vector3f { 16.f, 360.f, 16.f }},
     //     .times  = { 0.f, 2.f },
@@ -338,13 +89,13 @@ namespace met {
     //   auto &cube2 = scene.components.objects("Cube 2").value;
 
     //   // Move cubes, left to right
-    //   add_twokey<float>({
+    //   anim::add_twokey<float>({
     //     .handle = cube1.transform.position[0],
     //     .values = {0.825f, -0.5f},
     //     .times  = { 2.f, 4.f },
     //     .fps    = m_info.fps
     //   });
-    //   add_twokey<float>({
+    //   anim::add_twokey<float>({
     //     .handle = cube2.transform.position[0],
     //     .values = {0.5, -0.825f},
     //     .times  = { 2.f, 4.f },
@@ -353,13 +104,13 @@ namespace met {
 
     //   // Rotate cubes, some degrees
     //   float angle = 1.571f - (2.f - 1.571f);
-    //   add_twokey<float>({
+    //   anim::add_twokey<float>({
     //     .handle = cube1.transform.rotation[0],
     //     .values = { 2.f, angle },
     //     .times  = { 2.f, 4.f },
     //     .fps    = m_info.fps
     //   });
-    //   add_twokey<float>({
+    //   anim::add_twokey<float>({
     //     .handle = cube1.transform.rotation[0],
     //     .values = { 2.f, angle },
     //     .times  = { 2.f, 4.f },
@@ -375,7 +126,7 @@ namespace met {
     //   auto &scene = m_scene_handle.getw<Scene>();
     //   auto &cvert = scene.components.upliftings("Default uplifting")->verts[1];
 
-    //   add_twokey<Uplifting::Vertex>({
+    //   anim::add_twokey<Uplifting::Vertex>({
     //     .handle = cvert,
     //     .values = { cvert.get_mismatch_position(), Colr { 0.090, 0.089, 0.068 } },
     //     .times  = { 0.f, 2.f },
@@ -391,14 +142,14 @@ namespace met {
 
     //   // gnome.transform.scaling = 0.5f;
 
-    //   /* add_twokey<eig::Vector3f>({
+    //   /* anim::add_twokey<eig::Vector3f>({
     //     .handle = gnome.transform.position,
     //     .values = { gnome.transform.position,  (gnome.transform.position + eig::Vector3f(0.8f, 0, 0)).eval() },
     //     .times  = { .5f, 4.5f },
     //     .fps    = m_info.fps
     //   });
       
-    //   add_twokey<eig::Vector3f>({
+    //   anim::add_twokey<eig::Vector3f>({
     //     .handle = gnome.transform.scaling,
     //     .values = { gnome.transform.scaling, (gnome.transform.scaling + eig::Vector3f(.5f)).eval() },
     //     .times  = { .5f, 4.5f },
@@ -411,7 +162,7 @@ namespace met {
     //   emitter1.illuminant_scale = 1;
     //   emitter2.illuminant_scale = 0; */
 
-    //  /*  add_twokey<float>({
+    //  /*  anim::add_twokey<float>({
     //     .handle = emitter1.illuminant_scale,
     //     .values = { 1.f, 0.f },
     //     .times  = { .5f, 4.5f },
@@ -428,7 +179,7 @@ namespace met {
     //     .value  = true,
     //     .time   = .5f
     //   }); */
-    //   /* add_twokey<float>({
+    //   /* anim::add_twokey<float>({
     //     .handle = emitter2.illuminant_scale,
     //     .values = { 0.f, 1.f },
     //     .times  = { .5f, 4.5f },
@@ -592,16 +343,6 @@ namespace met {
   };
 } // namespace met
 
-template <typename Ty>
-void add_twokey(auto &events, typename met::anim::TwoKeyEvent<Ty>::InfoType &&data) {
-  events.push_back(std::make_shared<met::anim::TwoKeyEvent<Ty>>(std::move(data)));
-}
-
-template <typename Ty>
-void add_onekey(auto &events, typename met::anim::OneKeyEvent<Ty>::InfoType &&data) {
-  events.push_back(std::make_shared<met::anim::OneKeyEvent<Ty>>(std::move(data)));
-}
-
 // Application entry point
 int main() {
   try {
@@ -628,13 +369,13 @@ int main() {
         float move_start_time = 1.f, move_end_time = 3.5f;
 
         // Move cubes, left to right
-        add_twokey<float>(info.events, {
+        anim::add_twokey<float>(info.events, {
           .handle = cube1.transform.position[0],
           .values = {0.825f, -0.5f},
           .times  = { move_start_time, move_end_time },
           .fps    = info.fps
         });
-        add_twokey<float>(info.events, {
+        anim::add_twokey<float>(info.events, {
           .handle = cube2.transform.position[0],
           .values = {0.5, -0.825f},
           .times  = { move_start_time, move_end_time },
@@ -643,13 +384,13 @@ int main() {
 
         // Rotate cubes, some degrees
         float angle = 1.571f - (2.f - 1.571f);
-        add_twokey<float>(info.events, {
+        anim::add_twokey<float>(info.events, {
           .handle = cube1.transform.rotation[0],
           .values = { 2.f, angle },
           .times  = { move_start_time, move_end_time },
           .fps    = info.fps
         });
-        add_twokey<float>(info.events, {
+        anim::add_twokey<float>(info.events, {
           .handle = cube2.transform.rotation[0],
           .values = { 2.f, angle },
           .times  = { move_start_time, move_end_time },
@@ -677,7 +418,7 @@ int main() {
         float move_start_time = 1.f, move_end_time = 4.f;
         
         // Rotate light around
-        add_twokey<eig::Vector3f>(info.events,{
+        anim::add_twokey<eig::Vector3f>(info.events,{
           .handle = light.transform.position,
           .values = { light.transform.position, eig::Vector3f { 128, 200, 128 } },
           .times  = { move_start_time, move_end_time },
@@ -705,7 +446,7 @@ int main() {
         float move_start_time = 1.f, move_end_time = 3.5f;
         
         // Rotate light around
-        add_twokey<eig::Vector3f>(info.events,{
+        anim::add_twokey<eig::Vector3f>(info.events,{
           .handle = light.transform.position,
           .values = { light.transform.position, eig::Vector3f { 128, 200, 128 } },
           .times  = { move_start_time, move_end_time },
