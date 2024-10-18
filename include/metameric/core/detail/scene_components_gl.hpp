@@ -36,6 +36,7 @@ namespace met::detail {
       alignas(4)  bool          is_active;
       alignas(4)  uint          mesh_i;
       alignas(4)  uint          uplifting_i;
+      alignas(4)  uint          brdf_type;
       alignas(4)  bool          is_albedo_sampled;
       alignas(4)  uint          albedo_i;
       alignas(16) Colr          albedo_v;

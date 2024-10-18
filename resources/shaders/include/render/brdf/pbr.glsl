@@ -54,8 +54,12 @@ float smith_g1(in float alpha, in vec3 v, in vec3 m) {
   return result;
 }
 
-vec3 schlick_fresnel(float ctheta, vec3 f0) {
-    return clamp(f0 + (vec3(1.f) - f0) * pow(1.f - ctheta, 5), vec3(0), vec3(1));
+float schlick_fresnel(float cos_theta, float f0) {
+    return clamp(f0 + (1.f - f0) * pow(1.f - cos_theta, 5), 0.f, 1.f);
+}
+
+vec4 schlick_fresnel(float cos_theta, vec4 f0) {
+    return clamp(f0 + (vec4(1.f) - f0) * pow(1.f - cos_theta, 5), vec4(0), vec4(1));
 }
 
 /* vec3 sample_ggx(in float alpha, in vec3 wi, in vec2 sample_2d) {
@@ -79,6 +83,8 @@ vec3 schlick_fresnel(float ctheta, vec3 f0) {
 
 void init_brdf_pbr(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   brdf.r = scene_sample_reflectance(record_get_object(si.data), si.tx, wvls);
+  brdf.roughness = 0.1f;
+  brdf.metallic  = 0.f;
 }
 
 BRDFSample sample_brdf_pbr(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo si) {
@@ -94,6 +100,7 @@ BRDFSample sample_brdf_pbr(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo s
   float sel   = 1.f - brdf.metallic;
   float alpha = max(0.001f, sdot(brdf.roughness));
   
+
   // Sample normal from specular lobe
   vec3 m_spec;
   {

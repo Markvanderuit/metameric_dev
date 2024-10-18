@@ -25,8 +25,10 @@ namespace met {
   }
  
   bool Object::operator==(const Object &o) const {
-    guard(std::tie(is_active, transform, mesh_i, uplifting_i) == 
-          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i), false);
+    guard(std::tie(is_active,   transform,   mesh_i,   uplifting_i,   brdf_type) == 
+          std::tie(o.is_active, o.transform, o.mesh_i, o.uplifting_i, o.brdf_type), 
+          false);
+
     /* guard(std::tie(roughness, metallic, opacity) == 
           std::tie(o.roughness, o.metallic, o.opacity), false); */
     guard(diffuse.index() == o.diffuse.index() /* && 
@@ -39,6 +41,7 @@ namespace met {
       case 0: guard(std::get<Colr>(normals).isApprox(std::get<Colr>(o.normals)), false); break;
       case 1: guard(std::get<uint>(normals) == std::get<uint>(o.normals), false); break;
     } */
+   
     return true;
   }
 

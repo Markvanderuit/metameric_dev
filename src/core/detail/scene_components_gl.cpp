@@ -137,6 +137,7 @@ namespace met::detail {
         .is_active         = object.is_active,
         .mesh_i            = object.mesh_i,
         .uplifting_i       = object.uplifting_i,
+        .brdf_type         = static_cast<uint>(object.brdf_type),
         .is_albedo_sampled = is_albedo_sampled,
         .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
         .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse)

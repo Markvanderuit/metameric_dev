@@ -26,7 +26,8 @@ struct ObjectInfo {
   uint mesh_i;              
   uint uplifting_i;
 
-  // Material data        // TODO expand
+  // Material data
+  uint brdf_type;         // BRDF Type
   bool is_albedo_sampled; // Use sampler or direct value?
   uint albedo_i;          // Sampler index
   vec3 albedo_v;          // Direct value
@@ -103,13 +104,14 @@ struct EmitterInfo {
 
 #define BRDFTypeNull    0
 #define BRDFTypeDiffuse 1
-#define BRDFTypePBR     2
+#define BRDFTypeMirror  2
+#define BRDFTypePBR     3
 
 struct BRDFInfo {
-  uint type;       // Type of BRDF: null, diffuse for now
-  vec4 r;          // Surface albedo for four wavelengths
-  float roughness; // Supplemental values for pbr shader
-  float metallic;  // Supplemental values for pbr shader
+  uint  type;      // Type of BRDF: null, diffuse for now
+  vec4  r;         // Surface albedo for four wavelengths
+  float roughness; // Supplemental values for principled brdf
+  float metallic;  // Supplemental values for principled brdf
 };
 
 struct SceneInfo {

@@ -57,17 +57,27 @@ namespace met {
 
   /* Object representation; 
      A shape represented by a surface mesh, material data, 
-     and an accompanying uplifting to handle spectral data. */
+     and an accompanying uplifting to handle spectral reflectance. */
   struct Object {
+    // Emitter type; only very basic BRDFs are supported
+    enum class BRDFType {
+      eNull     = 0,  // null is empty; object does not interact with scene
+      eDiffuse  = 1,  // diffuse is lambertian
+      eMirror   = 2   // mirror is perfect specular reflector
+    };
+    
+  public:
     // Scene properties
     bool      is_active = true;
     Transform transform;
 
-    // Indices to underlying mesh/surface
+    // Indices to underlying mesh/uplifting
     uint mesh_i;
     uint uplifting_i;
 
-    // Material data, packed with object; either a specified value, or a texture index
+    // Material data is packed with object; 
+    // some values are variant of a specified value, or a texture index
+    BRDFType                  brdf_type;
     std::variant<Colr,  uint> diffuse;
 
   public: // Boilerplate
@@ -162,6 +172,20 @@ namespace met {
 
 // Custom std::format overloads for some types
 namespace std {
+  // Format Object::BRDFType, wich is an enum class
+  template <>
+  struct std::formatter<met::Object::BRDFType> : std::formatter<string_view> {
+    auto format(const met::Object::BRDFType& ty, std::format_context& ctx) const {
+      std::string s;
+      switch (ty) {
+        case met::Object::BRDFType::eNull    : s = "null";    break;
+        case met::Object::BRDFType::eDiffuse : s = "diffuse"; break;
+        case met::Object::BRDFType::eMirror  : s = "mirror";  break;
+      };
+      return std::formatter<std::string_view>::format(s, ctx);
+    }
+  };
+
   // Format Emitter::Type, wich is an enum class
   template <>
   struct std::formatter<met::Emitter::Type> : std::formatter<string_view> {

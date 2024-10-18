@@ -59,9 +59,23 @@ namespace met {
       value.transform.scaling = value.transform.scaling.cwiseMax(0.001f);
 
       ImGui::Separator();
+
+      // Type selector
+      if (ImGui::BeginCombo("BRDF Type", std::format("{}", value.brdf_type).c_str())) {
+        for (uint i = 0; i < 3; ++i) {
+          auto type = static_cast<Object::BRDFType>(i);
+          auto name = std::format("{}", type);
+          if (ImGui::Selectable(name.c_str(), value.brdf_type == type)) {
+            value.brdf_type = type;
+          }
+        } // for (uint i)
+        ImGui::EndCombo();
+      }
         
       // Texture selectors
-      push_texture_variant_selector("Diffuse", scene.resources.images, value.diffuse);
+      if (value.brdf_type != Object::BRDFType::eNull) {
+        push_texture_variant_selector("Albedo", scene.resources.images, value.diffuse);
+      }
       // push_texture_variant_selector("Roughness", scene.resources.images, value.roughness);
       // push_texture_variant_selector("Metallic", scene.resources.images, value.metallic);
       // push_texture_variant_selector("Normals", scene.resources.images, value.normals);

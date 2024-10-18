@@ -130,8 +130,9 @@ namespace met {
     js = {{ "is_active",   object.is_active   },
           { "transform",   object.transform   },
           { "mesh_i",      object.mesh_i      },
-          { "uplifting_i", object.uplifting_i }};
-      
+          { "uplifting_i", object.uplifting_i },
+          { "brdf_type",   object.brdf_type   }};
+    
     js["diffuse"]   = {{ "index", object.diffuse.index() },   { "variant", object.diffuse }};
     /* js["roughness"] = {{ "index", object.roughness.index() }, { "variant", object.roughness }};
     js["metallic"]  = {{ "index", object.metallic.index() },  { "variant", object.metallic }};
@@ -145,6 +146,11 @@ namespace met {
     js.at("transform").get_to(object.transform);
     js.at("mesh_i").get_to(object.mesh_i);
     js.at("uplifting_i").get_to(object.uplifting_i);
+    if (!js.contains("brdf_type")) {
+      object.brdf_type = Object::BRDFType::eDiffuse;
+    } else {
+      js.at("brdf_type").get_to(object.brdf_type);
+    }
     switch (js.at("diffuse").at("index").get<size_t>()) {
       case 0: object.diffuse = js.at("diffuse").at("variant").get<Colr>(); break;
       case 1: object.diffuse = js.at("diffuse").at("variant").get<uint>(); break;

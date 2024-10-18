@@ -11,6 +11,7 @@ namespace met::detail {
     SceneStateHandler<decltype(Object::transform)>   transform;
     SceneStateHandler<decltype(Object::mesh_i)>      mesh_i;
     SceneStateHandler<decltype(Object::uplifting_i)> uplifting_i;
+    SceneStateHandler<decltype(Object::brdf_type)>   brdf_type;
     SceneStateHandler<decltype(Object::diffuse)>     diffuse;
 
   public:
@@ -21,6 +22,7 @@ namespace met::detail {
       | transform.update(o.transform)
       | mesh_i.update(o.mesh_i)
       | uplifting_i.update(o.uplifting_i)
+      | brdf_type.update(o.brdf_type)
       | diffuse.update(o.diffuse)
       );
     }

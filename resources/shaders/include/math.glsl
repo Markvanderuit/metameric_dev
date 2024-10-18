@@ -94,6 +94,30 @@ float sdot(in vec2  v) { return dot(v, v); }
 float sdot(in vec3  v) { return dot(v, v); }
 float sdot(in vec4  v) { return dot(v, v); }
 
+// rcp(...) for reciprocal
+#define RCP(v, type) ( type (1.f) / v )
+
+float rcp(in float v) { return RCP(v, float); }
+vec2  rcp(in vec2  v) { return RCP(v,  vec2); }
+vec3  rcp(in vec3  v) { return RCP(v,  vec3); }
+vec4  rcp(in vec4  v) { return RCP(v,  vec4); }
+
+// safe_rcp(...) for epsilon-checked reciprocal
+#define SAFE_RCP(v, type) ( type (1.f) / max(v, M_EPS) )
+
+float safe_rcp(in float v) { return SAFE_RCP(v, float); }
+vec2  safe_rcp(in vec2  v) { return SAFE_RCP(v,  vec2); }
+vec3  safe_rcp(in vec3  v) { return SAFE_RCP(v,  vec3); }
+vec4  safe_rcp(in vec4  v) { return SAFE_RCP(v,  vec4); }
+
+// safe_sqrt(...) for epsilon-checked sqrt
+#define SAFE_SQRT(v) sqrt(max(v, 0.f))
+
+float safe_sqrt(in float v) { return SAFE_SQRT(v); }
+vec2  safe_sqrt(in vec2  v) { return SAFE_SQRT(v); }
+vec3  safe_sqrt(in vec3  v) { return SAFE_SQRT(v); }
+vec4  safe_sqrt(in vec4  v) { return SAFE_SQRT(v); }
+
 // is_all_equal(...) for short, fast, component equality check
 
 #define IS_ALL_EQUAL(type, n)                \
@@ -154,4 +178,36 @@ float mis_power(in float pdf_a, in float pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
 }
 
+// Fresnel according to schlick's model
+vec4 schlick_fresnel(in vec4 r_0, in float cos_theta_i) {
+  float f_1 = 1.f - cos_theta_i;
+  float f_2 = f_1 * f_1;
+  float f_5 = f_2 * f_2 * f_1;
+  return r_0 + (vec4(1) - r_0) * pow(f_1, 5.f);
+}
+
+// Implementation of unpolarized complex fresnel reflection coefficient;
+// yarr-de-harred from Mitsuba 1.3
+/* vec4 fresnel_conductor(in float cos_theta_i, in vec2 eta) {
+  float cos_theta_i_2 = cos_theta_i * cos_theta_i,
+        sin_theta_i_2 = 1.f - cos_theta_i_2,
+        sin_theta_i_4 = sin_theta_i_2 * sin_theta_i_2;
+  
+  float temp_1   = eta.x * eta.x - eta.y * eta.y - sin_theta_i_2,
+        a_2_pb_2 = dr::safe_sqrt(temp_1*temp_1 + 4.f * eta.y * eta.y * eta.x * eta.x),
+        a        = dr::safe_sqrt(.5f * (a_2_pb_2 + temp_1));
+        
+  float term_1 = a_2_pb_2 + cos_theta_i_2,
+        term_2 = 2.f * cos_theta_i * a;
+
+  float r_s = (term_1 - term_2) / (term_1 + term_2);
+
+  float term_3 = a_2_pb_2 * cos_theta_i_2 + sin_theta_i_4,
+        term_4 = term_2 * sin_theta_i_2;
+
+  float r_p = r_s * (term_3 - term_4) / (term_3 + term_4);
+
+  return 0.5f * (r_s + r_p);
+}
+ */
 #endif // MATH_GLSL_GUARD
