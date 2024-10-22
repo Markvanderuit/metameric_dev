@@ -44,6 +44,12 @@ namespace met {
       m_output_data_map = cast_span<PathRecord>(map.subspan(4 * sizeof(uint)));
     }
 
+    // Return if output and request are both zilch; no work to be done
+    if (spp == 0 && *m_output_head_map == 0) {
+      m_output_sync = {};
+      return m_output;
+    }
+
     // (Re)generate sampling distribution for wavelengths
     bool rebuild_wavelength_distr 
       = !m_wavelength_distr_buffer.is_init() 
@@ -130,11 +136,12 @@ namespace met {
     // output data is made visible in mapped region
     gl::sync::memory_barrier(gl::BarrierFlags::eClientMappedBuffer);
     m_output_sync = gl::sync::Fence(gl::sync::time_s(1));
-
+    
     return m_output;
   }
 
   std::span<const PathRecord> PathQueryPrimitive::data() const {
+    met_trace();
     // Wait for output data to be visible, and then
     // return generated output data
     guard(m_output_sync.is_init(), std::span<const PathRecord>());

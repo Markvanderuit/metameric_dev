@@ -7,8 +7,8 @@
 
 void init_brdf_principled(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   // Temporary until I can connect them to parameters
-  float roughness = 0.01f;
-  float metallic  = 0.0f;
+  float roughness = 0.005f;
+  float metallic  = 1.0f;
   float eta       = 1.46f;
 
   brdf.r        = scene_sample_reflectance(record_get_object(si.data), si.tx, wvls);
@@ -87,7 +87,7 @@ float pdf_brdf_principled(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
     // pdf += lobe_probs[0]
     //      * _G1(si.wi, brdf.alpha);
     pdf += lobe_probs[0] 
-         * _G1(si.wi, brdf.alpha); // jacobian
+         * _G1(si.wi, brdf.alpha);
   }
 
   // Diffuse lobe
@@ -105,6 +105,8 @@ BRDFSample sample_brdf_principled(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
 
   BRDFSample bs;
   bs.is_delta = false;
+  bs.f        = vec4(0);
+  bs.pdf      = 0.f;
 
   // Select a lobe based on sample probabilities [spec, diffuse]
   vec2 lobe_probs = vec2(0.5f); // _get_principled_lobe_probs(brdf, si);
@@ -120,14 +122,24 @@ BRDFSample sample_brdf_principled(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
     // Validate same hemisphere
     if (bs.wo.z * si.wi.z <= 0.f)
       return brdf_sample_zero();
-
+    
     // Validate exitant angle
-    if (cos_theta(bs.wo) <= 0.f || ms.pdf == 0.f)
+    if (cos_theta(bs.wo) <= 0.f)
       return brdf_sample_zero();
+      
+    // Half vector of wi and wo
+    vec3 wh = normalize(si.wi + bs.wo);
+
+    float G = _G(si.wi, bs.wo, brdf.alpha);
+    vec4  F = schlick_fresnel(brdf.F0, abs(dot(si.wi, wh))); // recalculate for new normal
+    
+    bs.f += (F * G) / cos_theta(bs.wo);
+    // bs.f += schlick_fresnel(brdf.F0, abs(dot(si.wi, wh)))
+    //       * eval_microfacet(si.wi, wh, bs.wo, brdf.alpha);
 
     // Most of f/pdf is canceled out
-    // bs.pdf += lobe_probs[0] 
-    //         * ms.pdf;
+    bs.pdf += lobe_probs[0] 
+            * ms.pdf;
   } else { // Diffuse lobe
     bs.wo  = square_to_cos_hemisphere(sample_3d.yz);
     
@@ -135,30 +147,13 @@ BRDFSample sample_brdf_principled(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
     if (cos_theta(bs.wo) <= 0.f)
       return brdf_sample_zero();
 
-    // bs.pdf += lobe_probs[1]
-    //         * square_to_cos_hemisphere_pdf(bs.wo);
+    bs.f   += brdf.r * M_PI_INV;
+    bs.pdf += lobe_probs[1]
+            * square_to_cos_hemisphere_pdf(bs.wo);
   }
 
-  bs.f   = eval_brdf_principled(brdf, si, bs.wo);
-  bs.pdf = pdf_brdf_principled(brdf, si, bs.wo);
-
-  /* // Handle specular throughput
-  if (lobe_probs[0] > 0.f) {
-    // Half vector of wi and wo
-    vec3 wh = normalize(si.wi + bs.wo);
-
-    // float G = _G(si.wi, bs.wo, brdf.alpha);
-    // vec4  F = schlick_fresnel(brdf.F0, abs(dot(si.wi, wh))); // recalculate for new normal
-    
-    // bs.f += (F * G) / cos_theta(bs.wo);
-    bs.f += schlick_fresnel(brdf.F0, abs(dot(si.wi, wh)))
-          * eval_microfacet(si.wi, wh, bs.wo, brdf.alpha);
-  }
-
-  // Handle diffuse throughput
-  if (lobe_probs[1] > 0.f) {
-    bs.f += brdf.r * M_PI_INV;
-  } */
+  // bs.f   = eval_brdf_principled(brdf, si, bs.wo);
+  // bs.pdf = pdf_brdf_principled(brdf, si, bs.wo);
 
   return bs;
 }

@@ -91,13 +91,13 @@ SensorSample sample_sensor(in Sensor sensor, in ivec2 px, in uint sample_i, in v
   );
 
   // Sample wavelengths; stratified sample through invercse cdf, if available
+#ifndef TEMP_BASIS_AVAILABLE
   for (uint i = 0; i < 4; ++i) {
-    // ss.wvls[i] = rotate_sample_1d(sample_3d.z, i, 4);
-    // ss.pdfs[i] = 1.f;
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
   }
+#endif
 
   return ss;
 }
@@ -123,8 +123,6 @@ SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
   // Sample wavelengths; stratified sample through invercse cdf, if available
 #ifndef TEMP_BASIS_AVAILABLE
   for (uint i = 0; i < 4; ++i) {
-    // ss.wvls[i] = rotate_sample_1d(sample_3d.z, i, 4);
-    // ss.pdfs[i] = 1.f;
     DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_3d.z, i, 4));
     ss.wvls[i] = ds.f;
     ss.pdfs[i] = ds.pdf;
@@ -135,19 +133,11 @@ SensorSample sample_sensor(in PixelSensor sensor, in vec3 sample_3d) {
 }
 
 vec3 sensor_apply(in vec4 wvls, in vec4 L) {
-#ifdef TEMP_BASIS_AVAILABLE
-  return (s_bucket_cmfs[bucket_id] * L) * 0.25f * float(wavelength_samples);
-#else
-  return (scene_cmfs(0, wvls) * L) * 0.25f * float(wavelength_samples);
-#endif
+  return vec3(L * 0.25f * float(wavelength_samples)) * 0.25f * float(wavelength_samples);
 }
 
 vec3 sensor_apply(in SensorSample sensor_sample, in vec4 L) {
-#ifdef TEMP_BASIS_AVAILABLE
-  return (s_bucket_cmfs[bucket_id] * L) * 0.25f * float(wavelength_samples);
-#else
   return (scene_cmfs(0, sensor_sample.wvls) * L) * 0.25f * float(wavelength_samples);
-#endif
 }
 
 #endif // RENDER_SENSOR_GLSL_GUARD

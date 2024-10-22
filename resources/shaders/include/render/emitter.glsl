@@ -67,7 +67,6 @@ float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
     return pdf_emitter_point(em, ps);
   } else {
     return 0.f;
-    // return pdf_emitter_constant(em, ps);
   }
 }
 

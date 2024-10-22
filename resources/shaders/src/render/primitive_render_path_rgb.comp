@@ -92,23 +92,30 @@ shared MeshInfo    s_mesh_info[met_max_meshes];
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
 declare_scene_traversal_stack(6); 
-declare_scene_tlas_stack(4); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
 declare_scene_rgb_data(buff_textures.data, b_txtr_3f, b_illm_3f);
+// declare_scene_tlas_stack(4); 
+// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/path.glsl>
 
 void load_shared() {
+  // Step size for the coming loads
   const uint iter = hprod(gl_WorkGroupSize.xyz);
-  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
+
+  // Stride across the different objects/meshes/emitters
+  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  
+    s_objc_info[i] = buff_objects.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   
+    s_mesh_info[i] = buff_meshes.data[i];
+  for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) 
+    s_emtr_info[i] = buff_emitters.data[i];
+  
   memoryBarrierShared();
   barrier();
 }
@@ -129,44 +136,44 @@ void main() {
        * uvec2(2, 1) 
        + uvec2((xy.y + buff_sampler_state.pixel_curr) % 2, 0);
 
-  // Clamp invocations to requested size
-  guard(all(lessThan(xy, buff_sensor.film_size)));
-  
-  // Load sensor data
-  Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
-
-  // Running average rgba measure is current value in film
-  vec4 measure = imageLoad(b_film, ivec2(xy));
-  if (!use_alpha)
-    measure.w = 1.f;
-
   // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
             i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
           ++i) {
-    // Initialize sampler and generate sensor sample
-    SamplerState state         = get_sampler_state(xy, i);
-    SensorSample sensor_sample = sample_sensor(sensor, ivec2(xy), i, next_3d(state));
-    sensor_sample.pdfs         = vec4(1); // Override, ignored for rgb
+    // Initialize sampler state
+    SamplerState state = get_sampler_state(xy, i);
     
+    // Generate a sensor sample; initial ray and such
+    SensorSample sensor_sample = sample_sensor(
+      Sensor(buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size), 
+      ivec2(xy), i, next_3d(state));
+    sensor_sample.pdfs = vec4(1); // Override, ignored for rgb
+    
+    vec4 L;
+    float alpha;
     if (!use_debug) {
       // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity;
       // optionally capture alpha
-      float alpha;
-      vec4 L = Li(sensor_sample, state, alpha);
+      L = 0.05 * Li(sensor_sample, state, alpha);
 
       // If alpha is ignored, we output black
       if (!use_alpha)
         alpha = 1.f;
-
-      // Integrate over color system and add to measure in running average
-      measure += (vec4(L.xyz, alpha) - measure) / float(1 + i);
     } else {
       // Instead output debug value
-      measure += (vec4(Li_debug(sensor_sample, state).xyz, 1) - measure) / float(i + 1);
+      L = Li_debug(sensor_sample, state);
     }
+    
+    // Ignore invocations above requested film size; we keep invocations
+    // alive and path-tracing - even outside the exact film size - for subgroup shenanigans
+    guard_continue(all(lessThan(xy, buff_sensor.film_size)));
+    
+    // The accumulated rgba measure is the current value in the film. We integrate
+    // over the color system and add to this measure in a running average.
+    vec4 measure = imageLoad(b_film, ivec2(xy));
+    measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(i + 1);
+    if (!use_alpha)
+      measure.w = 1.f;
+    imageStore(b_film, ivec2(xy), measure);
   } // for (uint spp_iter)
-  
-  // Store running average measure to film
-  imageStore(b_film, ivec2(xy), measure);
 }

@@ -22,8 +22,6 @@ layout(local_size_x_id = 0, local_size_y_id = 1) in;
 layout(std140) uniform;
 layout(std430) buffer;
 
-extension(GL_KHR_shader_subgroup_basic, require)
-
 // Specialization constant declarations
 layout(constant_id = 2) const uint max_depth = 4;     // Maximum path depth
 layout(constant_id = 3) const bool use_alpha = false; // On initial ray miss, return 0 alpha?
@@ -95,13 +93,12 @@ shared EmitterInfo s_emtr_info[met_max_emitters];
 shared MeshInfo    s_mesh_info[met_max_meshes];
 
 // 4 buckets to preload and presample about 2.8kb of spectral data for the entire workgroup
-const uint n_wvl_buckets = 4;
+const uint n_wvl_buckets = 8;
       uint bucket_id;
-shared vec4   s_bucket_wvls[n_wvl_buckets];                    // Bucket of n wavelength samples
-shared vec4   s_bucket_pdfs[n_wvl_buckets];                    // Bucket of n wavelength sample pdfs
-shared vec4   s_bucket_basis[n_wvl_buckets][wavelength_bases]; // Bucket of basis coeffs
-shared mat4x3 s_bucket_cmfs[n_wvl_buckets];                    // Bucket of sensor coeffs
-shared vec4   s_bucket_illm[n_wvl_buckets][met_max_emitters];
+shared vec4 s_bucket_wvls[n_wvl_buckets];                    // Bucket of n wavelength samples
+shared vec4 s_bucket_pdfs[n_wvl_buckets];                    // Bucket of n wavelength sample pdfs
+shared vec4 s_bucket_basis[n_wvl_buckets][wavelength_bases]; // Bucket of basis coeffs
+shared vec4 s_bucket_illm[n_wvl_buckets][met_max_emitters];
 
 // Traversal stack lives in shared memory
 // Object and emitter data comes from shared memory
@@ -110,16 +107,16 @@ shared vec4   s_bucket_illm[n_wvl_buckets][met_max_emitters];
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
 declare_scene_traversal_stack(6); 
-// declare_scene_tlas_stack(4); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
-declare_scene_cmfs_data(b_cmfs_3f);
-declare_scene_illuminant_data(b_illm_1f);
 declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
-declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
+declare_scene_cmfs_data(b_cmfs_3f);
+declare_scene_illuminant_data(b_illm_1f);
 declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
+// declare_scene_tlas_stack(4); 
+// declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/path.glsl>
@@ -170,7 +167,7 @@ void load_wvl_buckets(in float sample_1d) {
     } // for (uint j)
   } // for (uint i)
   
-  // We pre-handle emitter spectrum sampling across the workgroup
+  // We pre-handle emission spectrum sampling across the workgroup
   const uint n_emitter_samples = n_wvl_buckets * scene_emitter_count();
   for (uint i = gl_LocalInvocationIndex; i < n_emitter_samples; i += iter) {
     uint bucket_i  = i / scene_emitter_count();
@@ -188,10 +185,6 @@ void load_wvl_buckets(in float sample_1d) {
     em.illuminant_i = emitter_i;
     s_emtr_info[emitter_i] = em;
   } // for (uint i)
-
-  // Sample cmfs data
-  for (uint i = gl_LocalInvocationIndex; i < n_wvl_buckets; i += iter)
-    s_bucket_cmfs[i] = scene_cmfs(0, s_bucket_wvls[i]);
 
   memoryBarrierShared();
   barrier();
@@ -232,7 +225,7 @@ void main() {
     bucket_id = uint(float(n_wvl_buckets) * next_1d(state)) % n_wvl_buckets;
     sensor_sample.wvls = s_bucket_wvls[bucket_id];
     sensor_sample.pdfs = s_bucket_pdfs[bucket_id];
-
+    
     vec4 L;
     float alpha;
     if (!use_debug) {      

@@ -603,7 +603,7 @@ namespace met::detail {
 
   SceneGLHandler<met::CMFS>::SceneGLHandler() {
     met_trace_full();
-    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), met_max_constraints);
+    auto n_layers   = std::min<uint>(gl::state::get_variable_int(gl::VariableName::eMaxArrayTextureLayers), 16);
     cmfs_texture    = {{ .size = { wavelength_samples, n_layers } }};
     std::tie(cmfs_buffer, cmfs_buffer_map) = gl::Buffer::make_flusheable_span<CMFS>(n_layers);
   }

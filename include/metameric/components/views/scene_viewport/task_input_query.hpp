@@ -39,7 +39,6 @@ namespace met {
       const auto &e_scene   = info.global("scene").getr<Scene>();
       const auto &io        = ImGui::GetIO();
       const auto &e_arcball = info.relative("viewport_input_camera")("arcball").getr<detail::Arcball>();
-      auto &i_path_query    = info("path_query").getw<PathQueryPrimitive>();
 
       // Escape for empty scenes
       guard(!e_scene.components.objects.empty());
@@ -58,6 +57,7 @@ namespace met {
       m_query_sensor.flush();
       
       // Perform path query and obtain path data
+      auto &i_path_query = info("path_query").getw<PathQueryPrimitive>();
       i_path_query.query(m_query_sensor, e_scene, m_query_spp);
       auto paths = i_path_query.data();
       guard(!paths.empty());

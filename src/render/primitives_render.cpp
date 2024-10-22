@@ -272,6 +272,7 @@ namespace met {
       .spec_const = {{ 0u, 16u                     },
                      { 1u, 16u                     },
                      { 2u, info.max_depth          },
+                      /* alpha */
                      { 4u, uint(info.enable_debug) }}
     });
 
@@ -335,14 +336,14 @@ namespace met {
     program.bind("b_buff_coeffs",         scene.components.upliftings.gl.texture_coefficients.buffer());
     program.bind("b_buff_wvls_distr",     get_wavelength_distr());
     program.bind("b_buff_emitters_distr", scene.components.emitters.gl.emitter_distr_buffer);
+    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
+    program.bind("b_illm_1f",             m_sampler);
     program.bind("b_bsis_1f",             scene.components.upliftings.gl.texture_basis);
     program.bind("b_bsis_1f",             m_sampler);
     program.bind("b_coef_4f",             scene.components.upliftings.gl.texture_coefficients.texture()); 
     program.bind("b_coef_4f",             m_sampler);
     program.bind("b_cmfs_3f",             scene.resources.observers.gl.cmfs_texture);
     program.bind("b_cmfs_3f",             m_sampler);
-    program.bind("b_illm_1f",             scene.resources.illuminants.gl.spec_texture);
-    program.bind("b_illm_1f",             m_sampler);
     program.bind("b_buff_scene",          scene.gl.scene_info);
     program.bind("b_buff_tlas_node",      scene.gl.tlas_nodes);
     program.bind("b_buff_tlas_prim",      scene.gl.tlas_prims);
@@ -378,6 +379,7 @@ namespace met {
       .spec_const = {{ 0u, 16u                     },
                      { 1u, 16u                     },
                      { 2u, info.max_depth          },
+                      /* alpha */
                      { 4u, uint(info.enable_debug) }}
     });
 
@@ -474,6 +476,7 @@ namespace met {
         program.bind("b_txtr_3f", scene.resources.images.gl.texture_atlas_3f.texture());
       }
     }
+
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);
