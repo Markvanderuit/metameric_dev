@@ -19,9 +19,9 @@ set(MET_WAVELENGTH_SAMPLES  64) # Nr. of bins used in discrete spectral represen
 set(MET_WAVELENGTH_BASES    12) # Maximum nr. of bases used in generative functions
 
 # Some object limits for renderer; inserted in code/shaders as preprocessor defines
-set(MET_SUPPORTED_MESHES        48) # Maximum supported scene meshes
-set(MET_SUPPORTED_OBJECTS       48) # Maximum supported scene objects
-set(MET_SUPPORTED_EMITTERS      48) # Maximum supported scene emitters
+set(MET_SUPPORTED_MESHES        32) # Maximum supported scene meshes
+set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
+set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
 set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported uplifting structures; multiple objects can share an uplifting
 set(MET_SUPPORTED_CONSTRAINTS 1024) # Maximum supported boundary spectra + constraint spectra
 set(MET_SUPPORTED_TEXTURES     256) # Maximum supported scene textures

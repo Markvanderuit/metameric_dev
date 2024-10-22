@@ -1,3 +1,5 @@
+#define RENDER_TLAS_GLSL_GUARD // disabled for now
+
 #ifndef RENDER_TLAS_GLSL_GUARD
 #define RENDER_TLAS_GLSL_GUARD
 

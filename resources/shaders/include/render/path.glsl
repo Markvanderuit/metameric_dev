@@ -35,19 +35,8 @@ void path_finalize_envmap(in Path pt, in vec4 L, in vec4 wvls) {
 #define path_extend(path, vt)                   {}
 #define path_finalize_direct(path, L, wvls)     {}
 #define path_finalize_emitter(path, r, L, wvls) {}
-#define path_finalize_envmap(path, L, wvls)  {}
+#define path_finalize_envmap(path, L, wvls)     {}
 #endif
-
-const vec3 debug_colors[8] = vec3[8](
-  vec3(27,158,119) / 255.f,
-  vec3(217,95,2) / 255.f,
-  vec3(117,112,179) / 255.f,
-  vec3(231,41,138) / 255.f,
-  vec3(102,166,30) / 255.f,
-  vec3(230,171,2) / 255.f,
-  vec3(166,118,29) / 255.f,
-  vec3(102,102,102) / 255.f
-);
 
 vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   // If the ray misses, terminate current path

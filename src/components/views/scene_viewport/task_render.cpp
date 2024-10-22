@@ -46,7 +46,7 @@ namespace met {
       switch (e_settings.renderer_type) {
         case Settings::RendererType::ePath:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                    .pixel_checkerboard  = false,
+                                                    .pixel_checkerboard  = true,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirect:

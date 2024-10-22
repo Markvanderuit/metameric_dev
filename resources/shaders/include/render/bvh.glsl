@@ -59,8 +59,6 @@ BVHNode unpack(in BVHNodePack p) {
 bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
-  MeshInfo mesh_info = scene_mesh_info(bvh_i);
-
   // Initiate stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes
@@ -84,13 +82,13 @@ bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
       stckc--;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(scene_mesh_node(mesh_info.nodes_offs + node_first + node_bit));
+    BVHNode node = unpack(scene_mesh_node(scene_mesh_info(bvh_i).nodes_offs + node_first + node_bit));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
       // Iterate the node's primitives
       for (uint i = 0; i < bvh_size(node); ++i) {
         // Index of next primitive
-        uint prim_i = mesh_info.prims_offs + bvh_offs(node) + i;
+        uint prim_i = scene_mesh_info(bvh_i).prims_offs + bvh_offs(node) + i;
         
         // Obtain and unpack next prim
         PrimitivePositions prim = unpack_positions(scene_mesh_prim(prim_i));
@@ -123,8 +121,6 @@ bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
 bool ray_intersect_bvh_any(in Ray ray, in uint bvh_i) {
   vec3 d_inv = 1.f / ray.d;
 
-  MeshInfo mesh_info = scene_mesh_info(bvh_i);
-
   // Initiate stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
   // and 24 bits to store the offset to these nodes
@@ -147,13 +143,13 @@ bool ray_intersect_bvh_any(in Ray ray, in uint bvh_i) {
       stckc--;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(scene_mesh_node(mesh_info.nodes_offs + node_first + node_bit));
+    BVHNode node = unpack(scene_mesh_node(scene_mesh_info(bvh_i).nodes_offs + node_first + node_bit));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
       // Iterate the node's primitives
       for (uint i = 0; i < bvh_size(node); ++i) {
         // Obtain and unpack next prim
-        PrimitivePositions prim = unpack_positions(scene_mesh_prim(mesh_info.prims_offs + bvh_offs(node) + i));
+        PrimitivePositions prim = unpack_positions(scene_mesh_prim(scene_mesh_info(bvh_i).prims_offs + bvh_offs(node) + i));
 
         // Test against primitive; store primitive index on hit
         if (ray_intersect(ray, prim)) {

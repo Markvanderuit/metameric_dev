@@ -25,7 +25,11 @@ vec4 eval_emitter_rectangle(in EmitterInfo em, in PositionSample ps, in vec4 wvl
   // If normal is not inclined along the ray, return nothing
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
+  #ifdef TEMP_BASIS_AVAILABLE
+  return s_bucket_illm[bucket_id][em.illuminant_i];
+  #else
   return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
+  #endif
 }
 
 float pdf_emitter_rectangle(in EmitterInfo em, in PositionSample ps) {
