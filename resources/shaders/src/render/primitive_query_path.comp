@@ -63,6 +63,10 @@ layout(binding = 8) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
+layout(binding = 9) uniform b_buff_coeffs {
+  uint n;
+  BarycentricInfo data[met_max_textures];
+} buff_coeffs;
 
 // Storage buffer declaration
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
@@ -74,9 +78,6 @@ layout(binding = 4) restrict coherent buffer b_buff_output {
   uint padd[3]; /* align head to 16 bytes */ 
   Path data[];
 } buff_output;
-layout(binding = 5) restrict readonly buffer b_buff_coeffs {
-  BarycentricInfo data[met_max_objects];
-} buff_coeffs;
 
 // Texture/image units, ergo samplers and output images
 layout(binding = 0) uniform sampler1DArray  b_illm_1f; // Illuminant function data, 1 component
@@ -85,10 +86,9 @@ layout(binding = 2) uniform sampler1DArray  b_bsis_1f; // Basis function data, 1
 layout(binding = 3) uniform usampler2DArray b_coef_4f; // Warp data for spectral MESE
 
 // Shared memory declarations
-shared ObjectInfo      s_objc_info[met_max_objects];
-shared EmitterInfo     s_emtr_info[met_max_emitters];
-shared BarycentricInfo s_bary_info[met_max_objects];
-shared MeshInfo        s_mesh_info[met_max_meshes];
+shared ObjectInfo  s_objc_info[met_max_objects];
+shared EmitterInfo s_emtr_info[met_max_emitters];
+shared MeshInfo    s_mesh_info[met_max_meshes];
 
 // Traversal stack lives in shared memory
 // Object and emitter data comes from shared memory
@@ -104,7 +104,7 @@ declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
-declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_coef_4f);
+declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_path_data(buff_output.head, buff_output.data);
@@ -117,7 +117,6 @@ declare_path_data(buff_output.head, buff_output.data);
 void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
   for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_bary_info[i] = buff_coeffs.data[i];
   for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
   for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
   memoryBarrierShared();

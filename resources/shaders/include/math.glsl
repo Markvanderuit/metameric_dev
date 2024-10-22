@@ -178,12 +178,49 @@ float mis_power(in float pdf_a, in float pdf_b) {
   return pdf_a / (pdf_a + pdf_b);
 }
 
+vec4 schlick_fresnel(in vec4 f0, in vec4 f90, in float cos_theta) {
+  float c1 = 1.f - cos_theta;
+  float c2 = c1 * c1;
+  float c5 = c2 * c2 * c1;
+  return clamp(f0 + (f90 - f0) * c5, vec4(0), vec4(1));
+}
+
 // Fresnel according to schlick's model
-vec4 schlick_fresnel(in vec4 r_0, in float cos_theta_i) {
-  float f_1 = 1.f - cos_theta_i;
-  float f_2 = f_1 * f_1;
-  float f_5 = f_2 * f_2 * f_1;
-  return r_0 + (vec4(1) - r_0) * pow(f_1, 5.f);
+vec4 schlick_fresnel(in vec4 f0, in float cos_theta) {
+  return schlick_fresnel(f0, vec4(1), cos_theta);
+}
+
+// https://github.com/blender/blender/blob/97f9e100546256b1f7432f85057de523724644eb/source/blender/draw/engines/eevee_next/shaders/eevee_bxdf_lib.glsl#L63
+float fresnel_dielectric(float eta, float cos_theta) {
+  float c = abs(cos_theta);
+  float g = eta * eta - 1.0 + c * c;
+  if (g > 0.0) {
+    g = sqrt(g);
+    float A = (g - c) / (g + c);
+    float B = (c * (g + c) - 1.0) / (c * (g - c) + 1.0);
+    return 0.5 * A * A * (1.0 + B * B);
+  }
+  return 1.0;
+}
+
+// https://github.com/dillongoostudios/goo-engine/blob/8457395892beec33d4605ef9d894a1aff4a8d79f/source/blender/draw/engines/eevee/shaders/bsdf_common_lib.glsl#L65
+/* Fresnel color blend base on fresnel factor */
+// vec3 F_color_blend(float eta, float fresnel, vec4 F0_refl) { // F)_refl should be white
+//   float F0 = F0_from_ior(eta);
+//   float fac = clamp((fresnel - F0) / (1.0 - F0), 0.f, 1.f);
+//   return mix(F0_refl, vec3(1.0), fac);
+// }
+
+// Convert between eta and principled specular
+float eta_to_specular(in float eta) {
+  float div = (eta - 1.f) / (eta + 1.f);
+  return div * div / .08f;
+}
+
+// Convert between eta and principled specular
+float specular_to_eta(in float spec) {
+  float div = sqrt(spec * 0.08f);
+  return 2.f / (1.f - div) - 1.f;
 }
 
 // Implementation of unpolarized complex fresnel reflection coefficient;

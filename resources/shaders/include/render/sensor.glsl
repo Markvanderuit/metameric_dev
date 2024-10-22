@@ -27,9 +27,9 @@ struct RaySensor {
 
 // Sample from sensor at a specific pixel
 struct SensorSample {
-  Ray   ray;  // Sensor ray
-  vec4  wvls; // Packet of wavelengths along ray
-  vec4  pdfs; // Packet of pdfs for each ray/wavelength pair
+  Ray  ray;  // Sensor ray
+  vec4 wvls; // Packet of wavelengths along ray
+  vec4 pdfs; // Packet of pdfs for each ray/wavelength pair
 };
 
 float rotate_sample_1d(in float sample_1d, in uint i, in uint n) {

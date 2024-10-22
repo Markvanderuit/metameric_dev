@@ -70,7 +70,7 @@ struct BRDFSample {
   // Exitant sampled direction, local space
   vec3  wo;
 
-  // BSDF value divided by (probability x cosine foreshortening)
+  // BSDF value
   vec4  f;
 
   // Is the sample some weird dirac
@@ -79,5 +79,37 @@ struct BRDFSample {
   // Sampling density
   float pdf;
 };
+
+struct MicrofacetSample {
+  // Microfacet surface normal, sampled from a probability density
+  vec3 n;
+
+  // Sampling density
+  float pdf;
+};
+
+// Create an invalid sample
+PositionSample position_sample_zero() {
+  PositionSample ps;
+  ps.pdf      = 0.f;
+  ps.is_delta = false;
+  return ps;
+}
+
+// Create an invalid sample
+BRDFSample brdf_sample_zero() {
+  BRDFSample bs;
+  bs.f    	  = vec4(0);
+  bs.pdf      = 0.f;
+  bs.is_delta = false;
+  return bs;
+}
+
+// Create an invalid sample
+MicrofacetSample microfacet_sample_zero() {
+  MicrofacetSample ms;
+  ms.pdf = 0.f;
+  return ms;
+}
 
 #endif RECORD_GLSL_GUARD

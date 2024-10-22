@@ -11,47 +11,22 @@
   float[wavelength_bases] scene_sample_reflectance_coeffs(in vec3 px) {
     return unpack_bases(scene_coefficients_data_texture(px));
   }
-
-  vec4 scene_sample_reflectance_bases_s(in uint object_i, in vec2 tx, in vec4 wvls) {
+  
+  vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
     ObjectInfo      object_info = scene_object_info(object_i);
     BarycentricInfo atlas_info  = scene_reflectance_atlas_info(object_i);
 
     // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
     // also handle single-color objects by sampling the center of their patch
-    vec3 tx_3d = vec3(atlas_info.uv0 + atlas_info.uv1 * (object_info.is_albedo_sampled ? tx : vec2(0.5f)),
-                      atlas_info.layer);
-
-    // Return value; reflectance for four wavelengths
-    vec4 r = vec4(0); 
-
-    // Mix four texels appropriately, sampling each of four wavelengths independently
-    float[wavelength_bases] c = scene_sample_reflectance_coeffs(tx_3d);
-
-    for (uint j = 0; j < 4; ++j)                  // four wavelengths
-      for (uint k = 0; k < wavelength_bases; ++k) // n bases
-        r[j] += c[k] * scene_basis_func(wvls[j], k);
-
-    // Should not be necessary, but just in case
-    return clamp(r, 0, 1);
-  }
-
-  vec4 scene_sample_reflectance_bases(in uint object_i, in vec2 tx, in vec4 wvls) {
-    // Load relevant info objects
-    ObjectInfo      object_info = scene_object_info(object_i);
-    BarycentricInfo atlas_info  = scene_reflectance_atlas_info(object_i);
-
-    // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
-    // also handle single-color objects by sampling the center of their patch
-    vec3 tx_3d = vec3(atlas_info.uv0 + atlas_info.uv1 * (object_info.is_albedo_sampled ? tx : vec2(0.5f)),
-                      atlas_info.layer) 
+    vec3 tx_3d = vec3(atlas_info.uv0 + atlas_info.uv1 * (object_info.is_albedo_sampled ? tx : vec2(0.5f)), atlas_info.layer) 
                * vec3(scene_barycentric_data_size(), 1) - vec3(0.5, 0.5, 0);
     vec2 alpha = mod(tx_3d.xy, 1.f);
 
     // Return value; reflectance for four wavelengths
     vec4 r = vec4(0); 
 
-    // Mix four texels appropriately, sampling each of four wavelengths independently
+    /* // Mix four texels appropriately, sampling each of four wavelengths independently
     for (uint i = 0; i < 4; ++i) { // four texel corners
       float[wavelength_bases] c = scene_sample_reflectance_coeffs(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0));
       float w = hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i])));
@@ -59,73 +34,38 @@
         for (uint k = 0; k < wavelength_bases; ++k) // n bases
           r[j] += w * c[k] * scene_basis_func(wvls[j], k);
       }
+    } */
+
+    // Mix four texels appropriately, sampling each of the four wavelengths independently
+    for (uint i = 0; i < 4; ++i) { // four texel corners
+      // Load packed basis coefficients
+      uvec4 cpack = scene_coefficients_data_fetch(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0));
+
+      // Texel mixing weights
+      float w = hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i])));
+
+      // Iterate n bases
+      for (uint k = 0; k < wavelength_bases; ++k) {
+        // Extract k'th basis coefficient, multiply by texel mixing weight
+        float a = w * extract_bases(cpack, k);
+        
+        // Iterate 4 wavelengths and perform matrix product with basis
+        for (uint j = 0; j < 4; ++j) {
+          #ifdef TEMP_BASIS_AVAILABLE
+          r[j] += a * s_bucket_basis[bucket_id][k][j];
+          #else
+          r[j] += a * scene_basis_func(wvls[j], k);
+          #endif
+        }
+      }
     }
 
     // Should not be necessary, but just in case
     return clamp(r, 0, 1);
   }
 
-  /* // Helper to perform spectrum interpolation given all relevant information;
-  // - what tetrahedron of spectra to access
-  // - what barycentrics to use
-  vec4 detail_mix_reflectances(in vec4 wvls, in vec4 bary, in uint index) {
-    vec4 r;
-    for (uint i = 0; i < 4; ++i)
-      r[i] = dot(bary, scene_spectral_data_texture(vec2(wvls[i], index)));
-    return r;
-  } */
-
-  /* vec4 scene_sample_reflectance_barycentrics(in uint object_i, in vec2 tx, in vec4 wvls) {
-    // Load relevant info objects
-    ObjectInfo      object_info       = scene_object_info(object_i);
-    BarycentricInfo barycentrics_info = scene_reflectance_atlas_info(object_i);
-
-    // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
-    // also handle single-color objects by sampling the center of their patch
-    vec2 tx_si = object_info.is_albedo_sampled ? tx : vec2(0.5f);
-    vec3 tx_uv = vec3(barycentrics_info.uv0 + barycentrics_info.uv1 * tx_si, barycentrics_info.layer);
-
-    // Fill atlas texture coordinates, and spectral index
-    vec4 r = vec4(0); 
-    if (is_all_equal(ivec4(scene_barycentric_data_gather_w(tx_uv)))) { // Hot path; all element indices are the same, so use the one index for texture lookups
-      // Sample barycentric weights
-      vec4 bary   = scene_barycentric_data_texture(tx_uv);
-      uint elem_i = uint(bary.w);
-      bary.w      = 1.f - hsum(bary.xyz);
-
-      // For each wvls, sample and compute reflectance
-      // Reflectance is dot product of barycentrics and reflectances
-      r = detail_mix_reflectances(wvls, bary, elem_i);
-    } else {  
-      // Scale up to full texture size
-      vec3 tx    = tx_uv * vec3(scene_barycentric_data_size(), 1) - vec3(0.5, 0.5, 0);
-      vec2 alpha = mod(tx.xy, 1.f);
-
-      // Output reflectance, manual mixture of four texels
-      for (uint i = 0; i < 4; ++i) {
-        // Sample barycentric weights
-        vec4 bary   = scene_barycentric_data_fetch(ivec3(tx) + ivec3(reflectance_tx_offsets[i], 0));
-        uint elem_i = uint(bary.w);
-        bary.w      = 1.f - hsum(bary.xyz);
-
-        // For each of four wvls, sample and compute reflectance
-        // Reflectance is dot product of barycentrics and reflectances
-        r += hprod(mix(vec2(1) - alpha, alpha, vec2(reflectance_tx_offsets[i]))) 
-           * detail_mix_reflectances(wvls, bary, elem_i);
-      } // for (uint i)
-    }
-
-    return clamp(r, 0, 1);
-  } */
-  
-  // Forward to whatever sampler we're experimenting with today
-  vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
-    // return scene_sample_reflectance_bases_s(object_i, tx, wvls);
-    return scene_sample_reflectance_bases(object_i, tx, wvls);
-    /* return scene_sample_reflectance_barycentrics(object_i, tx, wvls); */
-  }
-
 #elif defined(SCENE_DATA_RGB) 
+
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls /* ignored */) {
     // Load relevant info objects
     ObjectInfo  object_info = scene_object_info(object_i);
@@ -138,6 +78,7 @@
       return vec4(object_info.albedo_v, 1);
     }
   }
+
 #else  // SCENE_DATA_REFLECTANCE
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) { return vec4(1); }
 #endif // SCENE_DATA_REFLECTANCE

@@ -346,6 +346,7 @@ namespace met {
     program.bind("b_buff_scene",          scene.gl.scene_info);
     program.bind("b_buff_tlas_node",      scene.gl.tlas_nodes);
     program.bind("b_buff_tlas_prim",      scene.gl.tlas_prims);
+    
     if (!scene.resources.meshes.empty()) {
       program.bind("b_buff_meshes",    scene.resources.meshes.gl.mesh_info);
       program.bind("b_buff_bvhs_node", scene.resources.meshes.gl.bvh_nodes);

@@ -35,17 +35,22 @@ float[8] unpack_snorm_8(in uvec4 p) {
   vec2 f2;
   f2 = unpackSnorm2x16(p[0]);
   m[0] = f2.x;
-  m[1] = f2.x;
+  m[1] = f2.y;
   f2 = unpackSnorm2x16(p[1]);
   m[2] = f2.x;
-  m[3] = f2.x;
+  m[3] = f2.y;
   f2 = unpackSnorm2x16(p[2]);
   m[4] = f2.x;
-  m[5] = f2.x;
+  m[5] = f2.y;
   f2 = unpackSnorm2x16(p[3]);
   m[6] = f2.x;
-  m[7] = f2.x;
+  m[7] = f2.y;
   return m;
+}
+
+// Extract a single value instead of unpacking the whole lot
+float extract_snorm_8(in uvec4 p, in uint i) {
+  return unpackSnorm2x16(p[i / 2])[i % 2];
 }
 
 float[12] unpack_snorm_12(in uvec4 p) {
@@ -62,6 +67,17 @@ float[12] unpack_snorm_12(in uvec4 p) {
     m[i] = (float(j) / scale) * 2.f - 1.f;
   }
   return m;
+}
+
+// Extract a single value instead of unpacking the whole lot
+float extract_snorm_12(in uvec4 p, in uint i) {
+  uint j = bitfieldExtract(p[i / 3],                      // 0,  0,  0,  1,  1,  1,  ...
+                            (int(i) % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
+                            (int(i) % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
+  float scale = i % 3 == 2 
+              ? float((1 << 10) - 1) 
+              : float((1 << 11) - 1);
+  return (float(j) / scale) * 2.f - 1.f;
 }
 
 uvec4 pack_snorm_8(in float[8] v) {
@@ -114,6 +130,11 @@ float[16] unpack_snorm_16(in uvec4 p) {
   return m;
 }
 
+// Extract a single value instead of unpacking the whole lot
+float extract_snorm_16(in uvec4 p, in uint i) {
+  return unpackSnorm4x8(p[i / 4])[i % 4];
+}
+
 uvec4 pack_snorm_16(in float[16] v) {
   uvec4 p;
   p[0] = packSnorm4x8(vec4(v[0],  v[1],  v[2],  v[3]));
@@ -146,6 +167,20 @@ float[wavelength_bases] unpack_bases(in uvec4 p) {
   // ...
 #endif;
   return v;
+}
+
+float extract_bases(in uvec4 p, in uint i) {
+  float f;
+#if   MET_WAVELENGTH_BASES == 16
+  f = extract_snorm_16(p, i);
+#elif MET_WAVELENGTH_BASES == 12
+  f = extract_snorm_12(p, i);
+#elif MET_WAVELENGTH_BASES == 8
+  f = extract_snorm_8(p, i);
+#else
+  // ...
+#endif;
+  return f;
 }
 
 uvec4 pack_bases(in float[wavelength_bases] v) {

@@ -147,8 +147,7 @@ void main() {
     // Initialize sampler and generate sensor sample
     SamplerState state         = get_sampler_state(xy, i);
     SensorSample sensor_sample = sample_sensor(sensor, ivec2(xy), i, next_3d(state));
-    sensor_sample.pdfs         = vec4(1); // Override, ignored forn rgb
-
+    sensor_sample.pdfs         = vec4(1); // Override, ignored for rgb
     
     if (!use_debug) {
       // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity;

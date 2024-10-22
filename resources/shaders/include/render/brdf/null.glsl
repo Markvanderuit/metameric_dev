@@ -7,7 +7,7 @@ void init_brdf_null(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   brdf.r = vec4(1);
 }
 
-BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo si) {
+BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo si) {
   BRDFSample bs;
 
   bs.is_delta = true;

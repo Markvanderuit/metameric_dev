@@ -350,7 +350,7 @@ int main() {
 
     using namespace met;
 
-    ApplicationInfo scene_0_info = {
+   /*  ApplicationInfo scene_0_info = {
       .scene_path   = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_0.json",
       .out_path     = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_0.mp4",
       .view_name    = "FFW view",
@@ -363,8 +363,8 @@ int main() {
       .init_events  = [](auto &info, Scene &scene) {
         met_trace();
         
-        auto &cube1 = scene.components.objects("Cube 1").value;
-        auto &cube2 = scene.components.objects("Cube 2").value;
+        auto &gnome_left = scene.components.objects("Gnome left").value;
+        auto &gnome_right = scene.components.objects("Gnome right").value;
 
         float move_start_time = 1.f, move_end_time = 3.5f;
 
@@ -397,7 +397,7 @@ int main() {
           .fps    = info.fps
         });
       }
-    };
+    }; */
 
     ApplicationInfo scene_1a_info = {
       .scene_path   = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_1a.json",
@@ -443,7 +443,7 @@ int main() {
         auto &cvert = scene.components.upliftings[0]->verts[0];
         auto &light = scene.components.emitters[0].value;
         
-        float move_start_time = 1.f, move_end_time = 3.5f;
+        float move_start_time = 1.f, move_end_time = 4.f;
         
         // Rotate light around
         anim::add_twokey<eig::Vector3f>(info.events,{
@@ -455,11 +455,106 @@ int main() {
       }
     };
     
+
+    ApplicationInfo scene_2_info = {
+      .scene_path   = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_2.json",
+      .out_path     = "C:/Users/markv/Documents/Drive/TU Delft/Projects/Indirect uplifting/Fast forward/Scenes/scene_2.mp4",
+      .view_name    = "FFW view",
+      .view_scale   = 0.5f,
+      .fps          = 30u,
+      .spp          = 4u,
+      .spp_per_step = 4u,
+      .start_time   = 0.f,
+      .end_time     = 8.f,
+      .init_events  = [](auto &info, Scene &scene) {
+        met_trace();
+
+        float left_pos = -1.5f;
+        float right_pos = 1.5f;
+        float illuminant_scale = 12.f;
+
+        scene.components.emitters.push("FL11", scene.components.emitters[0].value);
+        scene.components.emitters.push("LED", scene.components.emitters[0].value);
+        
+        auto &light_fl2 = scene.components.emitters[0].value;
+        light_fl2.illuminant_i = 3;
+        light_fl2.illuminant_scale = 0.f;
+        light_fl2.transform.position[0] = left_pos;
+
+        auto &light_fl11 = scene.components.emitters[1].value;
+        light_fl11.illuminant_i = 4;
+        light_fl11.illuminant_scale = 0;
+        light_fl11.transform.position[0] = left_pos;
+
+        auto &light_led = scene.components.emitters[2].value;
+        light_led.illuminant_i = 5;
+        light_led.illuminant_scale = 0;
+        light_led.transform.position[0] = left_pos;
+        
+        float move_start_time = 1.f, move_end_time = 3.5f;
+        
+        // Move FL2 left-right while fading the light 
+        add_twokey<float>(info.events, {
+          .handle = light_fl2.illuminant_scale,
+          .values = { 0.f, illuminant_scale },
+          .times  = { 0.f, .25f },
+          .fps    = info.fps
+        });
+        add_twokey<float>(info.events, {
+          .handle = light_fl2.transform.position[0],
+          .values = { left_pos, right_pos },
+          .times  = { 0.f,  2.5f },
+          .fps    = info.fps
+        });
+        add_twokey<float>(info.events, {
+          .handle = light_fl2.illuminant_scale,
+          .values = { illuminant_scale, 0.f },
+          .times  = { 2.25f, 2.75f },
+          .fps    = info.fps
+        });
+
+        // Move FL11 left-right while fading the light 
+        add_twokey<float>(info.events, {
+          .handle = light_fl11.illuminant_scale,
+          .values = { 0.f, illuminant_scale },
+          .times  = { 2.25f, 2.75f },
+          .fps    = info.fps
+        });
+        add_twokey<float>(info.events, {
+          .handle = light_fl11.transform.position[0],
+          .values = { left_pos, right_pos },
+          .times  = { 2.5f, 5.f },
+          .fps    = info.fps
+        });
+        add_twokey<float>(info.events, {
+          .handle = light_fl11.illuminant_scale,
+          .values = { illuminant_scale, 0.f },
+          .times  = { 4.75f, 5.25f },
+          .fps    = info.fps
+        });
+
+        // Move LED to center
+        add_twokey<float>(info.events, {
+          .handle = light_led.transform.position[0],
+          .values = { left_pos, 0.f },
+          .times  = { 5.f, 7.f },
+          .fps    = info.fps
+        });
+        add_twokey<float>(info.events, {
+          .handle = light_led.illuminant_scale,
+          .values = { 0.f, illuminant_scale },
+          .times  = { 4.75f, 5.25f },
+          .fps    = info.fps
+        });
+      }
+    };
+    
     // Queue processes all moved info objects
     std::queue<ApplicationInfo> queue;
-    queue.push(std::move(scene_0_info));
+    // queue.push(std::move(scene_0_info));
     queue.push(std::move(scene_1a_info));
     queue.push(std::move(scene_1b_info));
+    // queue.push(std::move(scene_2_info));
 
     // Exhaust input
     while (!queue.empty()) {
@@ -470,9 +565,9 @@ int main() {
       fmt::print("Starting {}\n", task.scene_path.string());
 
       // Overwrite quality settings for consistenncy
-      task.view_scale   = 1.f;
-      task.spp          = 256u;
-      task.spp_per_step = 4u;
+      task.view_scale   = 1.0f;
+      task.spp          = 512;
+      task.spp_per_step = 16u;
       
       // Application consumes task
       Application app(std::move(task));

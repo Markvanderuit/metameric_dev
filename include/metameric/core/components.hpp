@@ -61,9 +61,10 @@ namespace met {
   struct Object {
     // Emitter type; only very basic BRDFs are supported
     enum class BRDFType {
-      eNull     = 0,  // null is empty; object does not interact with scene
-      eDiffuse  = 1,  // diffuse is lambertian
-      eMirror   = 2   // mirror is perfect specular reflector
+      eNull       = 0,  // null is empty; object does not interact with scene
+      eDiffuse    = 1,  // diffuse is lambertian
+      eMirror     = 2,  // mirror is perfect specular reflector
+      ePrincipled = 3,  // very very partial implementation of mprincipled brdf
     };
     
   public:
@@ -178,9 +179,10 @@ namespace std {
     auto format(const met::Object::BRDFType& ty, std::format_context& ctx) const {
       std::string s;
       switch (ty) {
-        case met::Object::BRDFType::eNull    : s = "null";    break;
-        case met::Object::BRDFType::eDiffuse : s = "diffuse"; break;
-        case met::Object::BRDFType::eMirror  : s = "mirror";  break;
+        case met::Object::BRDFType::eNull       : s = "null";        break;
+        case met::Object::BRDFType::eDiffuse    : s = "diffuse";     break;
+        case met::Object::BRDFType::eMirror     : s = "mirror";      break;
+        case met::Object::BRDFType::ePrincipled : s = "principled";  break;
       };
       return std::formatter<std::string_view>::format(s, ctx);
     }

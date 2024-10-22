@@ -14,10 +14,15 @@
 #include <render/load/reflectance.glsl>
 #include <render/load/defaults.glsl>
 
+// TODO REMOVE
+#define TEMP_BASIS_AVAILABLE
+
 // General layout rule declarations
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
 layout(std140) uniform;
 layout(std430) buffer;
+
+extension(GL_KHR_shader_subgroup_basic, require)
 
 // Specialization constant declarations
 layout(constant_id = 2) const uint max_depth = 4;     // Maximum path depth
@@ -66,28 +71,34 @@ layout(binding = 8) uniform b_buff_envmap_info {
   bool envm_is_present;
   uint envm_i;
 } buff_envmap_info;
+layout(binding = 9) uniform b_buff_coeffs {
+  uint n;
+  BarycentricInfo data[met_max_textures];
+} buff_coeffs;
 
 // Storage buffer declarations
 layout(binding = 0) restrict readonly buffer b_buff_bvhs_node { BVHNodePack  data[]; } buff_bvhs_node;
 layout(binding = 1) restrict readonly buffer b_buff_bvhs_prim { MeshPrimPack data[]; } buff_bvhs_prim;
 layout(binding = 2) restrict readonly buffer b_buff_tlas_node { BVHNodePack  data[]; } buff_tlas_node;
 layout(binding = 3) restrict readonly buffer b_buff_tlas_prim { uint         data[]; } buff_tlas_prim;
-layout(binding = 4) restrict readonly buffer b_buff_coeffs {
-  BarycentricInfo data[met_max_objects]; // Set here due to std430 layout
-} buff_coeffs;
 
 // Texture/image units, ergo samplers and output images
-layout(binding = 2)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
-layout(binding = 3)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
-layout(binding = 4)          uniform sampler1DArray   b_bsis_1f; // Basis function data, 1 component
-layout(binding = 5)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
+layout(binding = 0)          uniform sampler1DArray   b_illm_1f; // Illuminant function data, 1 component
+layout(binding = 1)          uniform sampler1DArray   b_cmfs_3f; // Observer function data, 3 components
+layout(binding = 2)          uniform sampler1DArray   b_bsis_1f; // Basis function data, 1 component
+layout(binding = 3)          uniform usampler2DArray  b_coef_4f; // Coefficient data for spectral MESE
 layout(binding = 0, rgba32f) uniform restrict image2D b_film;    // Target film, averaged over frames
 
 // Shared memory declarations
-shared ObjectInfo      s_objc_info[met_max_objects];
-shared EmitterInfo     s_emtr_info[met_max_emitters];
-shared BarycentricInfo s_bary_info[met_max_objects];
-shared MeshInfo        s_mesh_info[met_max_meshes];
+shared ObjectInfo  s_objc_info[met_max_objects];
+shared EmitterInfo s_emtr_info[met_max_emitters];
+shared MeshInfo    s_mesh_info[met_max_meshes];
+
+const uint n_wvl_buckets = 4;
+      uint bucket_id;
+shared vec4 s_bucket_wvls[n_wvl_buckets];                    // Bucket of n wavelength samples
+shared vec4 s_bucket_pdfs[n_wvl_buckets];                    // Bucket of n wavelength sample pdfs
+shared vec4 s_bucket_basis[n_wvl_buckets][wavelength_bases]; // Bucket of basis coeffs
 
 // Traversal stack lives in shared memory
 // Object and emitter data comes from shared memory
@@ -95,7 +106,7 @@ shared MeshInfo        s_mesh_info[met_max_meshes];
 // Wavelength/emitter sampling distributions draw from uniform buffers
 // Color system spectra and illuminant spectra draw from sampler arrays
 // Part of mesh data comes from storage buffers, part from shared memory
-declare_scene_traversal_stack(5); 
+declare_scene_traversal_stack(6); 
 declare_scene_tlas_stack(4); 
 declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
@@ -105,7 +116,7 @@ declare_scene_object_data(s_objc_info, buff_objects.n);
 declare_scene_bvh_data(buff_bvhs_prim.data, buff_bvhs_node.data, s_mesh_info, buff_meshes.n);
 declare_scene_tlas_data(buff_tlas_prim.data, buff_tlas_node.data, buff_scene.data);
 declare_scene_emitter_data(s_emtr_info, buff_emitters.n, buff_envmap_info);
-declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_coef_4f);
+declare_scene_reflectance_data(buff_coeffs.data, b_bsis_1f, b_coef_4f);
 
 // All includes from and in here rely on buffers/samplers to be declared
 #include <render/path.glsl>
@@ -113,9 +124,30 @@ declare_scene_reflectance_data(s_bary_info, b_bsis_1f, b_coef_4f);
 void load_shared() {
   const uint iter = hprod(gl_WorkGroupSize.xyz);
   for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_objc_info[i] = buff_objects.data[i];
-  for (uint i = gl_LocalInvocationIndex; i < buff_objects.n; i += iter)  s_bary_info[i] = buff_coeffs.data[i];
   for (uint i = gl_LocalInvocationIndex; i < buff_meshes.n; i += iter)   s_mesh_info[i] = buff_meshes.data[i];
   for (uint i = gl_LocalInvocationIndex; i < buff_emitters.n; i += iter) s_emtr_info[i] = buff_emitters.data[i];
+  memoryBarrierShared();
+  barrier();
+}
+
+void load_wvl_buckets(in float sample_1d) {
+  barrier();
+  if (gl_LocalInvocationIndex < n_wvl_buckets) {
+    // Sample wavelengths; stratified sample through invercse cdf, if available
+    for (uint i = 0; i < 4; ++i) {
+      DistributionSampleContinuous ds = sample_wavelength_continuous(rotate_sample_1d(sample_1d, i, 4));
+      s_bucket_wvls[gl_LocalInvocationIndex][i] = ds.f;
+      s_bucket_pdfs[gl_LocalInvocationIndex][i] = ds.pdf;
+    }
+
+    // Sample bases
+    for (uint i = 0; i < 4; ++i) {
+      for (uint j = 0; j < wavelength_bases; ++j) {
+        s_bucket_basis[gl_LocalInvocationIndex][j][i] = scene_basis_func(s_bucket_wvls[gl_LocalInvocationIndex][i], j);
+      }
+    }
+
+  }
   memoryBarrierShared();
   barrier();
 }
@@ -136,45 +168,49 @@ void main() {
        * uvec2(2, 1) 
        + uvec2((xy.y + buff_sampler_state.pixel_curr) % 2, 0);
 
-  // Clamp invocations to requested size
-  guard(all(lessThan(xy, buff_sensor.film_size)));
-  
-  // Load sensor data
-  Sensor sensor = { buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size };
-
-  // Running average rgba measure is current value in film
-  vec4 measure = imageLoad(b_film, ivec2(xy));
-  if (!use_alpha)
-    measure.w = 1.f;
-
   // Take spp_per_iter samples and add to target measure
   for (uint i = buff_sampler_state.spp_curr;
             i < buff_sampler_state.spp_curr + buff_sampler_state.spp_per_iter;
           ++i) {
     // Initialize sampler and generate sensor sample
     SamplerState state         = get_sampler_state(xy, i);
-    SensorSample sensor_sample = sample_sensor(sensor, ivec2(xy), i, next_3d(state));
+    SensorSample sensor_sample = sample_sensor(
+      Sensor(buff_sensor.proj_trf, buff_sensor.view_trf, buff_sensor.film_size), 
+      ivec2(xy), i, next_3d(state));
 
+    // Handle bucketed wavelength data for this shader invocation
+    load_wvl_buckets(next_1d(state));
+    
+    // Handle bucketed wavelength sampling
+    bucket_id = uint(float(n_wvl_buckets) * next_1d(state)) % n_wvl_buckets;
+    sensor_sample.wvls = s_bucket_wvls[bucket_id];
+    sensor_sample.pdfs = s_bucket_pdfs[bucket_id];
+
+    vec4 L;
+    float alpha;
     if (!use_debug) {      
       // Sample incident radiance along ray for given wavelengths, weighted by probabil;ity;
       // optionally capture alpha
-      float alpha;
-      vec4 L = Li(sensor_sample, state, alpha);
+      L = Li(sensor_sample, state, alpha);
 
       // If alpha is ignored, we output black
       if (!use_alpha)
         alpha = 1.f;
-      
-      // Integrate over color system and add to measure in running average
-      measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(1 + i);
     } else {
       // Instead output debug value
-      vec4 L = Li_debug(sensor_sample, state);
-      measure += (vec4(sensor_apply(sensor_sample, L), 1) - measure) / float(1 + i);
+      L = Li_debug(sensor_sample, state);
     }
+    
+    // Ignore invocations above requested film size; we keep invocations
+    // alive and path-tracing - even outside the exact film size - for subgroup shenanigans
+    guard_continue(all(lessThan(xy, buff_sensor.film_size)));
 
+    // The accumulated rgba measure is the current value in the film. We integrate
+    // over the color system and add to this measure in a running average.
+    vec4 measure = imageLoad(b_film, ivec2(xy));
+    measure += (vec4(sensor_apply(sensor_sample, L), alpha) - measure) / float(i + 1);
+    if (!use_alpha)
+      measure.w = 1.f;
+    imageStore(b_film, ivec2(xy), measure);
   } // for (uint spp_iter)
-  
-  // Store running average measure to film
-  imageStore(b_film, ivec2(xy), measure);
 }

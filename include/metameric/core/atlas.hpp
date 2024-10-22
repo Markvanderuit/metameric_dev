@@ -9,10 +9,16 @@ namespace met {
   // Object describing a single texture patch reserved inside an arbitrary
   // atlas, fit for std140/std430 buffer layout. Kept separate as it is
   // template-independent, and we use it between different-typed atlases.
-  struct TextureAtlasPatchLayout {
-    alignas(4) uint layer_i;
+  struct alignas(16) AtlasBlockLayout {
+    alignas(4) uint         layer_i;
     alignas(8) eig::Array2u offs, size;
     alignas(8) eig::Array2f uv0, uv1;
+  };
+
+  // Object describing an std140 buffer layout for atlas data
+  struct AtlasBufferLayout {
+    alignas(4) uint size;
+    std::array<AtlasBlockLayout, detail::met_max_textures> data;
   };
   
   /* TextureAtlas
@@ -23,7 +29,7 @@ namespace met {
   struct TextureAtlas {
     using Texture     = gl::Texture2d<T, D, gl::TextureType::eImageArray>;
     using TextureView = gl::TextureView2d<T, D>;
-    using PatchLayout = TextureAtlasPatchLayout;
+    using PatchLayout = AtlasBlockLayout;
 
     // Build methods; either prefer adding extra layers, or grow the texture
     // horizontally/vertically if capacity is insufficient
@@ -51,12 +57,11 @@ namespace met {
     Texture                  m_texture;
     std::vector<TextureView> m_texture_views;
     gl::Buffer               m_buffer;
-    std::span<PatchLayout>   m_buffer_map;
+    AtlasBufferLayout       *m_buffer_map;
 
     // Helper private methods
     void init_views();
     void dstr_views();
-    void reserve_buffer(size_t size);
     
   public: // Construction
     using InfoType = CreateInfo;
@@ -119,6 +124,7 @@ namespace met {
       swap(m_free,          o.m_free);
       swap(m_texture,       o.m_texture);
       swap(m_buffer,        o.m_buffer);
+      swap(m_buffer_map,    o.m_buffer_map);
       swap(m_texture_views, o.m_texture_views);
     }
 

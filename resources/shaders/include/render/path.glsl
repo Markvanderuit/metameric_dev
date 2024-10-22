@@ -52,29 +52,36 @@ const vec3 debug_colors[8] = vec3[8](
 vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
   // If the ray misses, terminate current path
   scene_intersect(ray);
-  // if (!scene_intersect(ray))
-  //   return vec4(0);
+  if (!scene_intersect(ray))
+    return vec4(0);
   
   // uint n = scene_emitter_count() + scene_object_count();
-  uint i = ray.data; // record_get_object(ray.data);
+ /*  uint i = ray.data; // record_get_object(ray.data);
   uint n = 1024;
 
   float s = float(i) / float(n);
-  return vec4(vec3(s), 1);
+  return vec4(vec3(s), 1); */
 
   // return vec4(debug_colors[record_get_object(ray.data) % 8], 1);
   // return vec4(1, 0, s, 1);
 
-  // SurfaceInfo si = get_surface_info(ray);
-  // if (!is_valid(si) || !is_object(si))
-  //   return vec4(0);
+  SurfaceInfo si = get_surface_info(ray);
+  if (!is_valid(si) || !is_object(si))
+    return vec4(0);
 
   // // Hope this is the right one; should be normalized d65
   // vec4 d65_n = scene_illuminant(1, wvls);
 
-  // // Sample BRDF albedo at position, integrate, and return color
-  // BRDFInfo brdf = get_brdf(si, wvls);
-  // return d65_n * brdf.r / wvl_pdfs;
+  // Sample BRDF albedo at position, integrate, and return color
+  BRDFInfo brdf = get_brdf(si, wvls);
+  // return brdf.r / wvl_pdfs;
+
+  BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
+  if (bs.pdf == 0.f)
+    return vec4(0);
+  return bs.f 
+      * cos_theta(bs.wo)
+      / (wvl_pdfs * bs.pdf);
 }
 
 vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout float alpha) {
@@ -96,13 +103,16 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
     // then terminate current path
     if (!scene_intersect(ray)) {
       if (scene_has_envm_emitter()) {
-        float emtr_pdf = (depth == 0 || bs.is_delta)  
-                       ? 1.f 
-                       : pdf_env_emitter(bs.wo);
-
+        float em_pdf = (depth == 0 || bs.is_delta)  
+                     ? 1.f 
+                     : pdf_env_emitter(bs.wo);
+        float mis_weight = depth == 0
+                         ? 1.f
+                         : mis_power(bs.pdf, em_pdf);
+        
         vec4 s = beta
                * eval_env_emitter(wvls)
-               * mis_power(bs.pdf, emtr_pdf); // mis weight
+               * mis_weight;
 
         // Store current path if requested
         path_finalize_envmap(pt, s, wvls);
@@ -126,13 +136,13 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
     // If an emitter is hit directly, add contribution to path, 
     // then terminate current path
     if (is_emitter(si)) {
-      PositionSample ps       = get_position_sample(si);
-      float          emtr_pdf = bs.is_delta ? 0.f : pdf_emitters(ps);
+      PositionSample ps     = get_position_sample(si);
+      float          em_pdf = bs.is_delta ? 0.f : pdf_emitters(ps);
 
       // No division by sample density, as this is incorporated in path throughput
-      vec4 s = beta                         // throughput 
-             * eval_emitter(ps, wvls)       // emitted value
-             * mis_power(bs.pdf, emtr_pdf); // mis weight
+      vec4 s = beta                       // throughput 
+             * eval_emitter(ps, wvls)     // emitted value
+             * mis_power(bs.pdf, em_pdf); // mis weight
 
       // Store current path if requested
       path_finalize_direct(pt, s, wvls);
@@ -153,28 +163,30 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
     {
       // Generate position sample on emitter
       // Importance sample emitter position
-      PositionSample ps       = sample_emitters(si, next_3d(state));
-      vec3           wo       = to_local(si, ps.d);
-      float          bsdf_pdf = bs.pdf * pdf_brdf(brdf, si, wo);
+      PositionSample pe     = sample_emitters(si, next_3d(state));
+      vec3           wo     = to_local(si, pe.d);
+      float          bs_pdf = bs.pdf * pdf_brdf(brdf, si, wo);
       
-      // Avoid diracs when calculating mis weight
-      float mis_weight = ps.is_delta 
-                       ? 1.f / ps.pdf 
-                       : mis_power(ps.pdf, bsdf_pdf) / ps.pdf;
-
       // If the sample position has potential throughput, 
       // evaluate a ray towards the position and add contribution to output
-      if (ps.pdf != 0.f && bsdf_pdf != 0.f && cos_theta(wo) > 0.f) {
-        Ray ray = ray_towards_point(si, ps.p);
+      if (pe.pdf != 0.f && bs_pdf != 0.f && cos_theta(wo) > 0.f) {
+        // Avoid diracs when calculating mis weight
+        float mis_weight = pe.is_delta 
+                         ? 1.f / pe.pdf 
+                         : mis_power(pe.pdf, bs_pdf) / pe.pdf;
+        
+        // Test for any hit closer than sample position
+        Ray ray = ray_towards_point(si, pe.p);
         if (!scene_intersect_any(ray)) {
+          // Assemble path throughput
           vec4 s = beta                    // Throughput
                  * eval_brdf(brdf, si, wo) // brdf value
-                 * cos_theta(wo)           // cosine attenuation
-                 * eval_emitter(ps, wvls)  // emitted value
+                 * abs(cos_theta(wo))      // cosine attenuation
+                 * eval_emitter(pe, wvls)  // emitted value
                  * mis_weight;             // mis weight
 
           // Store current path if requested
-          path_finalize_emitter(pt, ps, s, wvls);
+          path_finalize_emitter(pt, pe, s, wvls);
 
           // Add to output radiance
           S += s;
@@ -185,14 +197,14 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
     // BRDF sampling; 
     {
       // Importance sample brdf direction
-      bs = sample_brdf(brdf, next_2d(state), si);
+      bs = sample_brdf(brdf, next_3d(state), si);
       if (bs.pdf == 0.f)
         break;
       
       // Update throughput
-      beta *= bs.f              // brdf value
-            * cos_theta(bs.wo)  // cosine attenuation
-            / bs.pdf;           // sample density
+      beta *= bs.f                  // brdf value
+            * abs(cos_theta(bs.wo)) // cosine attenuation
+            / bs.pdf;               // sample density
       
       // Early exit on zero throughput
       if (all(is_zero(beta)))

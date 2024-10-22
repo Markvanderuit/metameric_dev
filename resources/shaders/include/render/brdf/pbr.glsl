@@ -5,13 +5,15 @@
 #include <render/record.glsl>
 
 vec2 sincos_phi(in vec3 v) {
-  float sin_theta_2 = fma(v.x, v.x, v.y * v.y);
+  float sin_theta_2   = fma(v.x, v.x, v.y * v.y);
   float inv_sin_theta = 1.f / sqrt(sin_theta_2);
 
   vec2 res = v.xy * inv_sin_theta;
+
   res = (abs(sin_theta_2) <= 4.f * M_EPS)
       ? vec2(1, 0)
       : clamp(res, -1, 1);
+      
   return res.yx;
 }
 
@@ -98,8 +100,7 @@ BRDFSample sample_brdf_pbr(in BRDFInfo brdf, in vec2 sample_2d, in SurfaceInfo s
   bs.is_delta = false;
 
   float sel   = 1.f - brdf.metallic;
-  float alpha = max(0.001f, sdot(brdf.roughness));
-  
+  float alpha = max(0.001f, sdot(brdf.roughness))
 
   // Sample normal from specular lobe
   vec3 m_spec;

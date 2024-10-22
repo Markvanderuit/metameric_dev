@@ -44,4 +44,17 @@ namespace met {
   template <typename E = PCGEngine> requires (std::uniform_random_bit_generator<E>)
   class UniformSampler;
   class Distribution;
+
+  namespace detail {
+    // Define maximum supported components for some types
+    // These aren't up to device limits, but mostly exist so some 
+    // sizes can be hardcoded shader-side in uniform buffers and
+    // can be crammed into shared memory in some places
+    constexpr static uint met_max_meshes      = MET_SUPPORTED_MESHES;
+    constexpr static uint met_max_objects     = MET_SUPPORTED_OBJECTS;
+    constexpr static uint met_max_emitters    = MET_SUPPORTED_EMITTERS;
+    constexpr static uint met_max_upliftings  = MET_SUPPORTED_UPLIFTINGS;
+    constexpr static uint met_max_constraints = MET_SUPPORTED_CONSTRAINTS;
+    constexpr static uint met_max_textures    = MET_SUPPORTED_TEXTURES;
+  } // namespace detail
 } // namespace met

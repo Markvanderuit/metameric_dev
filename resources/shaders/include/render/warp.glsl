@@ -3,6 +3,12 @@
 
 #include <math.glsl>
 
+vec2 square_to_unif_disk_polar(in vec2 sample_2d) {
+  float r     = sqrt(sample_2d.x);
+  float theta = 2.f * M_PI * sample_2d.y;
+  return vec2(r * cos(theta), r * sin(theta));
+}
+
 vec2 square_to_unif_disk_concentric(in vec2 sample_2d) {
   sample_2d = 2.f * sample_2d - 1.f;
 

@@ -46,8 +46,7 @@ namespace met {
       switch (e_settings.renderer_type) {
         case Settings::RendererType::ePath:
           render_handle.init<PathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                    .max_depth           = PathRecord::path_max_depth,
-                                                    .pixel_checkerboard  = true,
+                                                    .pixel_checkerboard  = false,
                                                     .cache_handle        = info.global("cache") });
           break;
         case Settings::RendererType::eDirect:
@@ -65,7 +64,6 @@ namespace met {
           break;
         case Settings::RendererType::ePathRGB:
           render_handle.init<RGBPathRenderPrimitive>({ .spp_per_iter        = render_spp_per_iter,
-                                                       .max_depth           = PathRecord::path_max_depth,
                                                        .pixel_checkerboard  = true,
                                                        .cache_handle        = info.global("cache") });
           break;

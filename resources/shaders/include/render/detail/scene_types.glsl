@@ -102,16 +102,17 @@ struct EmitterInfo {
   float sphere_r;     // Specific to sphere area emitters
 };
 
-#define BRDFTypeNull    0
-#define BRDFTypeDiffuse 1
-#define BRDFTypeMirror  2
-#define BRDFTypePBR     3
+#define BRDFTypeNull       0
+#define BRDFTypeDiffuse    1
+#define BRDFTypeMirror     2
+#define BRDFTypePrincipled 3
 
 struct BRDFInfo {
-  uint  type;      // Type of BRDF: null, diffuse for now
-  vec4  r;         // Surface albedo for four wavelengths
-  float roughness; // Supplemental values for principled brdf
+  uint  type;      // Type of BRDF: null, diffuse, principled for now
+  vec4  r;         // Underlying surface albedo for four wavelengths
+  float alpha;     // Supplemental values for principled brdf
   float metallic;  // Supplemental values for principled brdf
+  vec4  F0;        // Supplemental values for principled brdf
 };
 
 struct SceneInfo {

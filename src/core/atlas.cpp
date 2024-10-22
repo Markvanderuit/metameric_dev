@@ -33,6 +33,7 @@ namespace met {
     m_padding(info.padding),
     m_levels(info.levels) {
     met_trace();
+    std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_object<AtlasBufferLayout>();
     resize(info.sizes);
   }
   
@@ -82,13 +83,6 @@ namespace met {
   template <typename T, uint D>
   eig::Array3u TextureAtlas<T, D>::capacity() const { 
     return m_texture.is_init() ? m_texture.size() : 0;
-  }
-
-  template <typename T, uint D>
-  void TextureAtlas<T, D>::reserve_buffer(size_t size) {
-    met_trace_full();
-    guard(!m_buffer.is_init() || m_buffer.size() < size * sizeof(PatchLayout));
-    std::tie(m_buffer, m_buffer_map) = gl::Buffer::make_flusheable_span<PatchLayout>(size);
   }
   
   template <typename T, uint D>
@@ -221,19 +215,15 @@ namespace met {
       patch.uv0 = patch.offs.cast<float>() / m_texture.size().head<2>().cast<float>();
       patch.uv1 = patch.size.cast<float>() / m_texture.size().head<2>().cast<float>();
     }
-
-    // Ensure the underlying buffer data is properly sized up to a minimum
-    if (!m_buffer.is_init() || m_buffer.size() < new_patches.size() * sizeof(PatchLayout))
-      std::tie(m_buffer, m_buffer_map) 
-        = gl::Buffer::make_flusheable_span<PatchLayout>(new_patches.size());
     
     // Store new patches
     m_patches = new_patches;
     m_free    = new_free;
 
     // Copy patch layouts to buffer storage
-    rng::copy(new_patches, m_buffer_map.begin());
-    m_buffer.flush(new_patches.size() * sizeof(PatchLayout));
+    m_buffer_map->size = new_patches.size();
+    rng::copy(new_patches, m_buffer_map->data.begin());
+    m_buffer.flush();
   }
 
   template <typename T, uint D>
@@ -265,8 +255,9 @@ namespace met {
     }
     
     // Copy updated patch layouts to buffer storage
-    rng::copy(m_patches, m_buffer_map.begin());
-    m_buffer.flush(m_patches.size() * sizeof(PatchLayout));
+    m_buffer_map->size = m_patches.size();
+    rng::copy(m_patches, m_buffer_map->data.begin());
+    m_buffer.flush();
   }
 
   /* Explicit template instantiations */
