@@ -37,19 +37,20 @@
 
       // Iterate the bases
       for (uint k = 0; k < wavelength_bases; ++k) {
-#ifdef TEMP_BASIS_AVAILABLE
+#ifdef SCENE_DATA_REFLECTANCE_BUCKETED
         // Extract k'th basis coefficient, multiply with presampled basis, 
         // and then multiply by texel mixing weight
-        r += w * extract_bases(cpack, k) * s_bucket_basis[bucket_id][k];
-#else
+        r += w                       // texel mixing weight
+           * extract_bases(cpack, k) // next texture coefficient
+           * scene_basis_func(k);    // next basis weight
+#else // SCENE_DATA_REFLECTANCE_BUCKETED
         // Extract k'th coefficient, multiply by texel mixing weight
         float a = w * extract_bases(cpack, k);
 
         // Iterate 4 wavelengths and perform matrix product with basis
-        for (uint j = 0; j < 4; ++j) {
+        for (uint j = 0; j < 4; ++j)
           r[j] += a * scene_basis_func(wvls[j], k);
-        }
-#endif
+#endif // SCENE_DATA_REFLECTANCE_BUCKETED
       } // for (uint k)
     } // for (uint i)
 

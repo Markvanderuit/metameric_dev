@@ -29,10 +29,6 @@ struct ObjectInfo {
   // Material data
   uint  brdf_type;   // BRDF Type
   uvec4 albedo_data; // Albedo data record; see record.glsl to unpack a texture index or color value
-
-  // bool is_albedo_sampled; // Use sampler or direct value?
-  // uint albedo_i;          // Sampler index
-  // vec3 albedo_v;          // Direct value
 };
 
 // Info object for referred mesh.bvh data

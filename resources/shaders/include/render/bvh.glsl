@@ -6,7 +6,8 @@
 #include <render/shape/primitive.glsl>
 
 // Hardcoded constants
-#define bvh_stck_offset 24
+#define bvh_stck_init_value 0x01000000
+#define bvh_stck_offset     24
 
 // Partially unpacked BVH node with compressed 8-child bounding boxes
 // Child AABBs are unpacked when necessary
@@ -56,122 +57,183 @@ BVHNode unpack(in BVHNodePack p) {
   return n;
 }
 
-bool ray_intersect_bvh(inout Ray ray, in uint bvh_i) {
-  vec3 d_inv = 1.f / ray.d;
+bool ray_intersect_direct(inout Ray ray, in uint mesh_i) {
+  // Obtain object information
+  const MeshInfo mesh_info = scene_mesh_info(mesh_i);
 
-  // Initiate stack for traversal from root node
-  // Stack values use 8 bits to flag nodes of interest, 
-  // and 24 bits to store the offset to these nodes
-  scene_set_stack_value(0u, 1u << bvh_stck_offset);
-  uint stckc = 1; 
-  bool hit   = false;
+  // Return value
+  bool hit = false;
 
-  // Continue traversal until stack is once again empty
-  while (stckc > 0) {
-    // Read offset and bitmask from stack
-    uint stck_value = scene_get_stack_value(stckc - 1);
-    uint node_first = stck_value & 0x00FFFFFF;
-    int  node_bit   = findMSB(stck_value >> bvh_stck_offset);
+  // Range of primitives to intersect
+  uint prim_begin = mesh_info.prims_offs, 
+       prim_end   = prim_begin + mesh_info.prims_size;
 
-    // Remove bit from mask on stack
-    stck_value &= (~(1u << (bvh_stck_offset + node_bit)));
-    scene_set_stack_value(stckc - 1, stck_value);
-
-    // If this was the last flagged bit, decrease stack count
-    if ((stck_value & 0xFF000000) == 0)
-      stckc--;
-
-    // Obtain and unpack next node
-    BVHNode node = unpack(scene_mesh_node(scene_mesh_info(bvh_i).nodes_offs + node_first + node_bit));
-
-    if (bvh_is_leaf(node) || bvh_size(node) == 0) {
-      // Iterate the node's primitives
-      for (uint i = 0; i < bvh_size(node); ++i) {
-        // Index of next primitive
-        uint prim_i = scene_mesh_info(bvh_i).prims_offs + bvh_offs(node) + i;
-        
-        // Obtain and unpack next prim
-        PrimitivePositions prim = unpack_positions(scene_mesh_prim(prim_i));
-
-        // Test against primitive; store primitive index on hit
-        if (ray_intersect(ray, prim)) {
-          record_set_object_primitive(ray.data, prim_i); // TODO ENABLE
-          hit = true;
-        }
-      }
-    } else {
-      // Iterate the node's children, test against each AABB, and
-      // on a hit flag the index of the child in a bitmask
-      uint mask = 0;
-      for (uint i = 0; i < bvh_size(node); ++i)
-        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i)))
-          mask |= (1u << i);
-
-      // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
-      if (mask != 0) {
-        stckc++;
-        scene_set_stack_value(stckc - 1, (mask << bvh_stck_offset) | bvh_offs(node));
-      }
+  // Iterate the node's primitives
+  for (uint i = prim_begin; i < prim_end; ++i) {
+    // Obtain and unpack next prim, then test against it
+    if (ray_intersect(ray, unpack_positions(scene_mesh_prim(i)))) {
+      // Store primitive index on a hit
+      record_set_object_primitive(ray.data, i);
+      hit = true;
     }
-  } // while (stckc > 0)
+  }
 
   return hit;
 }
 
-bool ray_intersect_bvh_any(in Ray ray, in uint bvh_i) {
-  vec3 d_inv = 1.f / ray.d;
+bool ray_intersect_direct_any(in Ray ray, in uint mesh_i) {
+  // Obtain object information
+  const MeshInfo mesh_info = scene_mesh_info(mesh_i);
 
-  // Initiate stack for traversal from root node
+  // Range of primitives to intersect
+  uint prim_begin = mesh_info.prims_offs, 
+       prim_end   = prim_begin + mesh_info.prims_size;
+
+  // Iterate the node's primitives
+  for (uint i = prim_begin; i < prim_end; ++i) {
+    // Obtain and unpack next prim, then test against it
+    PrimitivePositions prim = unpack_positions(scene_mesh_prim(i));
+    if (ray_intersect(ray, prim)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
+  // Obtain object information
+  const MeshInfo mesh_info = scene_mesh_info(mesh_i);
+
+  // Return value
+  bool hit = false;
+  
+  // Initiate small stack for traversal from root node
   // Stack values use 8 bits to flag nodes of interest, 
-  // and 24 bits to store the offset to these nodes
-  scene_set_stack_value(0u, 1u << bvh_stck_offset);
-  uint stckc = 1;
+  // and 24 bits to store the offset to these nodes;
+  uvec4 stck;
+  stck[0] = bvh_stck_init_value;
 
   // Continue traversal until stack is once again empty
-  while (stckc > 0) {
+  int stckc = 0; 
+  while (stckc >= 0) {
     // Read offset and bitmask from stack
-    uint stck_value = scene_get_stack_value(stckc - 1);
-    uint node_first = stck_value & 0x00FFFFFF;
-    int  node_bit   = findMSB(stck_value >> bvh_stck_offset);
+    uint node_first = stck[stckc] & 0x00FFFFFF;
+    int  node_bit   = findMSB(stck[stckc] >> bvh_stck_offset);
 
     // Remove bit from mask on stack
-    stck_value &= (~(1u << (bvh_stck_offset + node_bit)));
-    scene_set_stack_value(stckc - 1, stck_value);
+    stck[stckc] &= (~(1u << (bvh_stck_offset + node_bit)));
 
     // If this was the last flagged bit, decrease stack count
-    if ((stck_value & 0xFF000000) == 0)
+    if ((stck[stckc] & 0xFF000000) == 0)
       stckc--;
 
     // Obtain and unpack next node
-    BVHNode node = unpack(scene_mesh_node(scene_mesh_info(bvh_i).nodes_offs + node_first + node_bit));
+    uint node_i  = mesh_info.nodes_offs + node_first + node_bit;
+    BVHNode node = unpack(scene_mesh_node(node_i));
 
     if (bvh_is_leaf(node) || bvh_size(node) == 0) {
+      // Range of primitives to intersect
+      uint prim_begin = mesh_info.prims_offs + bvh_offs(node);
+      uint prim_end   = prim_begin + bvh_size(node);
+      
       // Iterate the node's primitives
-      for (uint i = 0; i < bvh_size(node); ++i) {
-        // Obtain and unpack next prim
-        PrimitivePositions prim = unpack_positions(scene_mesh_prim(scene_mesh_info(bvh_i).prims_offs + bvh_offs(node) + i));
+      for (uint i = prim_begin; i < prim_end; ++i) {
+        // Obtain and unpack next prim, then test against it
+        if (ray_intersect(ray, unpack_positions(scene_mesh_prim(i)))) {
+          // Store primitive index on a hit
+          record_set_object_primitive(ray.data, i);
+          hit = true;
+        }
+      }
+    } else {
+      // Bitmask, initialized to all false
+      uint mask = 0;
 
-        // Test against primitive; store primitive index on hit
+      // Shorthand for rcp of ray
+      vec3 d_inv = 1.f / ray.d;
+      
+      // Iterate the node's children
+      for (uint i = 0; i < bvh_size(node); ++i) {
+        // Obtain and unpack next child, then test against it
+        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i))) {
+          // Flag child's index in bitmask on a hit
+          mask |= (1u << i);
+        }
+      } // for (uint i)
+
+      // If any children were flagged in the mask, push the child offset + mask on the stack
+      if (mask != 0) {
+        stck[++stckc] = (mask << bvh_stck_offset) | bvh_offs(node);
+      }
+    }
+  } // while (stckc >= 0)
+
+  return hit;
+}
+
+bool ray_intersect_bvh_any(in Ray ray, in uint mesh_i) {
+  // Obtain object information
+  const MeshInfo mesh_info = scene_mesh_info(mesh_i);
+
+  // Initiate small stack for traversal from root node
+  // Stack values use 8 bits to flag nodes of interest, 
+  // and 24 bits to store the offset to these nodes;
+  uvec4 stck;
+  stck[0] = bvh_stck_init_value;
+  
+  // Continue traversal until stack is once again empty
+  int stckc = 0; 
+  while (stckc >= 0) {
+    // Read offset and bitmask from stack
+    uint node_first = stck[stckc] & 0x00FFFFFF;
+    int  node_bit   = findMSB(stck[stckc] >> bvh_stck_offset);
+
+    // Remove bit from mask on stack
+    stck[stckc] &= (~(1u << (bvh_stck_offset + node_bit)));
+
+    // If this was the last flagged bit, decrease stack count
+    if ((stck[stckc] & 0xFF000000) == 0)
+      stckc--;
+
+    // Obtain and unpack next node
+    uint node_i  = mesh_info.nodes_offs + node_first + node_bit;
+    BVHNode node = unpack(scene_mesh_node(node_i));
+
+    if (bvh_is_leaf(node) || bvh_size(node) == 0) {
+      // Range of primitives to intersect
+      uint prim_begin = mesh_info.prims_offs + bvh_offs(node), prim_end = prim_begin + bvh_size(node);
+      
+      // Iterate the node's primitives
+      for (uint i = prim_begin; i < prim_end; ++i) {
+        // Obtain and unpack next prim, then test against it
+        PrimitivePositions prim = unpack_positions(scene_mesh_prim(i));
         if (ray_intersect(ray, prim)) {
           return true;
         }
       }
     } else {
-      // Iterate the node's children, test against each AABB, and
-      // on a hit flag the index of the child in a bitmask
+      // Bitmask, initialized to all false
       uint mask = 0;
+
+      // Shorthand for rcp of ray
+      vec3 d_inv = 1.f / ray.d;
+
+      // Iterate the node's children
       for (uint i = 0; i < bvh_size(node); ++i) {
-        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i)))
+        // Obtain and unpack next child, then test against it
+        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i))) {
+          // Flag child's index in bitmask on a hit
           mask |= (1u << i);
+        }
       } // for (uint i)
 
-      // If any children were hit, indicated by bitflips, push the child offset + mask on the stack
+      // If any children were flagged in the mask, push the child offset + mask on the stack
       if (mask != 0) {
-        stckc++;
-        scene_set_stack_value(stckc - 1, (mask << bvh_stck_offset) | bvh_offs(node));
+        stck[++stckc] = (mask << bvh_stck_offset) | bvh_offs(node);
       }
     }
-  } // while (stckc > 0)
+  } // while (stckc >= 0)
 
   return false;
 }

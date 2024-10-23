@@ -9,39 +9,39 @@
 
 // Macros for enabling/disabling path tracking
 #ifdef ENABLE_PATH_TRACKING
-#define path_initialize(pt) Path pt; { pt.path_depth = 0; }
-void path_extend(inout Path pt, in Ray r) {
+#define path_query_initialize(pt) Path pt; { pt.path_depth = 0; }
+void path_query_extend(inout Path pt, in Ray r) {
   pt.data[pt.path_depth++] = PathVertex(ray_get_position(r), r.data);
 }
-void path_finalize_direct(in Path pt, in vec4 L, in vec4 wvls) {
+void path_query_finalize_direct(in Path pt, in vec4 L, in vec4 wvls) {
   pt.wvls = wvls;
   pt.L    = L;
   set_path(pt, get_next_path_id());
 }
-void path_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 wvls) {
+void path_query_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 wvls) {
   pt.data[pt.path_depth++] = PathVertex(r.p, r.data);
   pt.wvls = wvls;
   pt.L    = L;
   set_path(pt, get_next_path_id());
 }
-void path_finalize_envmap(in Path pt, in vec4 L, in vec4 wvls) {
+void path_query_finalize_envmap(in Path pt, in vec4 L, in vec4 wvls) {
   // pt.data[pt.path_depth++] = PathVertex(r.p, r.data);
   pt.wvls = wvls;
   pt.L    = L;
   set_path(pt, get_next_path_id());
 }
 #else  
-#define path_initialize(pt)                     {}
-#define path_extend(path, vt)                   {}
-#define path_finalize_direct(path, L, wvls)     {}
-#define path_finalize_emitter(path, r, L, wvls) {}
-#define path_finalize_envmap(path, L, wvls)     {}
+#define path_query_initialize(pt)                     {}
+#define path_query_extend(path, vt)                   {}
+#define path_query_finalize_direct(path, L, wvls)     {}
+#define path_query_finalize_emitter(path, r, L, wvls) {}
+#define path_query_finalize_envmap(path, L, wvls)     {}
 #endif
 
-vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state) {
+vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   // If the ray misses, terminate current path
-  scene_intersect(ray);
-  if (!scene_intersect(ray))
+  scene_intersect(ss.ray);
+  if (!scene_intersect(ss.ray))
     return vec4(0);
   
   // uint n = scene_emitter_count() + scene_object_count();
@@ -54,7 +54,7 @@ vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state)
   // return vec4(debug_colors[record_get_object(ray.data) % 8], 1);
   // return vec4(1, 0, s, 1);
 
-  SurfaceInfo si = get_surface_info(ray);
+  SurfaceInfo si = get_surface_info(ss.ray);
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
 
@@ -62,7 +62,7 @@ vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state)
   // vec4 d65_n = scene_illuminant(1, wvls);
 
   // Sample BRDF albedo at position, integrate, and return color
-  BRDFInfo brdf = get_brdf(si, wvls);
+  BRDFInfo brdf = get_brdf(si, ss.wvls);
   // return brdf.r / wvl_pdfs;
 
   BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
@@ -70,41 +70,41 @@ vec4 Li_debug(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state)
     return vec4(0);
   return bs.f 
       * cos_theta(bs.wo)
-      / (wvl_pdfs * bs.pdf);
+      / (ss.pdfs * bs.pdf);
 }
 
-vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout float alpha) {
-  // Initialize path store if requested
-  path_initialize(pt);
+vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
+  // Initialize path store if requested for path queries
+  path_query_initialize(pt);
   
   // Path throughput information; we track 4 wavelengths simultaneously
-  vec4  S    = vec4(0.f);
-  vec4  beta = vec4(1.f / wvl_pdfs);
+  vec4 S    = vec4(0);
+  vec4 beta = vec4(1) / ss.pdfs;
 
   // Last brdf sample, default-initialized
   BRDFSample bs; 
-  bs.pdf      = 1.f;
+  bs.pdf      = 1;
   bs.is_delta = true;
   
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
     // If no surface object is visible, add contribution of envmap, 
     // then terminate current path
-    if (!scene_intersect(ray)) {
+    if (!scene_intersect(ss.ray)) {
       if (scene_has_envm_emitter()) {
         float em_pdf = (depth == 0 || bs.is_delta)  
                      ? 1.f 
                      : pdf_env_emitter(bs.wo);
-        float mis_weight = depth == 0
-                         ? 1.f
-                         : mis_power(bs.pdf, em_pdf);
+        // float mis_weight = depth == 0
+        //                  ? 1.f
+        //                  : mis_power(bs.pdf, em_pdf);
         
         vec4 s = beta
-               * eval_env_emitter(wvls)
-               * mis_weight;
+               * eval_env_emitter(ss.wvls)
+               * mis_power(bs.pdf, em_pdf) /* mis_weight */;
 
         // Store current path if requested
-        path_finalize_envmap(pt, s, wvls);
+        path_query_finalize_envmap(pt, s, ss.wvls);
 
         // Add to output radiance
         S += s;
@@ -117,10 +117,10 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
     }
 
     // Get info about next path vertex
-    SurfaceInfo si = get_surface_info(ray);
+    SurfaceInfo si = get_surface_info(ss.ray);
 
     // Store next vertex to path if requested
-    path_extend(pt, ray);
+    path_query_extend(pt, ss.ray);
 
     // If an emitter is hit directly, add contribution to path, 
     // then terminate current path
@@ -130,11 +130,11 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
 
       // No division by sample density, as this is incorporated in path throughput
       vec4 s = beta                       // throughput 
-             * eval_emitter(ps, wvls)     // emitted value
+             * eval_emitter(ps, ss.wvls)     // emitted value
              * mis_power(bs.pdf, em_pdf); // mis weight
 
       // Store current path if requested
-      path_finalize_direct(pt, s, wvls);
+      path_query_finalize_direct(pt, s, ss.wvls);
 
       // Add to output radiance and terminate path
       S += s;
@@ -146,7 +146,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
       break;
 
     // Sample BRDF at position
-    BRDFInfo brdf = get_brdf(si, wvls);
+    BRDFInfo brdf = get_brdf(si, ss.wvls);
     
     // Direct illumination sampling;
     {
@@ -165,17 +165,16 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
                          : mis_power(pe.pdf, bs_pdf) / pe.pdf;
         
         // Test for any hit closer than sample position
-        Ray ray = ray_towards_point(si, pe.p);
-        if (!scene_intersect_any(ray)) {
+        if (!scene_intersect_any(ray_towards_point(si, pe.p))) {
           // Assemble path throughput
           vec4 s = beta                    // Throughput
                  * eval_brdf(brdf, si, wo) // brdf value
                  * abs(cos_theta(wo))      // cosine attenuation
-                 * eval_emitter(pe, wvls)  // emitted value
+                 * eval_emitter(pe, ss.wvls)  // emitted value
                  * mis_weight;             // mis weight
 
           // Store current path if requested
-          path_finalize_emitter(pt, pe, s, wvls);
+          path_query_finalize_emitter(pt, pe, s, ss.wvls);
 
           // Add to output radiance
           S += s;
@@ -200,7 +199,7 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
         break;
 
       // Generate next scene ray
-      ray = ray_towards_direction(si, to_world(si, bs.wo));
+      ss.ray = ray_towards_direction(si, to_world(si, bs.wo));
     }
 
     // TODO RR goes here
@@ -208,14 +207,6 @@ vec4 Li(in Ray ray, in vec4 wvls, in vec4 wvl_pdfs, in SamplerState state, inout
   } // for (uint depth)
 
   return S;
-}
-
-vec4 Li(in SensorSample sensor_sample, in SamplerState state, inout float alpha) {
-  return Li(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state, alpha);
-}
-
-vec4 Li_debug(in SensorSample sensor_sample, in SamplerState state) {
-  return Li_debug(sensor_sample.ray, sensor_sample.wvls, sensor_sample.pdfs, state);
 }
 
 #endif // RENDER_PATH_GLSL_GUARD

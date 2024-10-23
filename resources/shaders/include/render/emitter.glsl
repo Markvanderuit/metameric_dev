@@ -83,6 +83,8 @@ PositionSample sample_emitters(in SurfaceInfo si, in vec3 sample_3d) {
   // Sample position on emitter surface
   PositionSample ps = sample_emitter(scene_emitter_info(ds.i), si, sample_3d.xy);
   record_set_emitter(ps.data, ds.i);
+
+  // Multiply sample pdfs
   ps.pdf *= ds.pdf;
 
   return ps;

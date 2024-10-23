@@ -161,9 +161,6 @@ namespace met::detail {
       const auto &[object, state] = objects[i];
       guard_continue(state);
       
-      // Get relevant texture info
-      bool is_albedo_sampled = object.diffuse.index() != 0;
-
       // Get mesh transform, incorporate into gl-side object transform
       auto object_trf = object.transform.affine().matrix().eval();
       auto mesh_trf   = (object_trf * scene.resources.meshes.gl.transforms[object.mesh_i]).eval();
@@ -404,6 +401,11 @@ namespace met::detail {
             
       // Set appropriate mesh transform in buffer
       m_mesh_info_map->data[i].trf = transforms[i];
+    }
+
+    for (int i = 0; i < meshes.size(); ++i) {
+      fmt::print("Mesh {} has {} nodes\n", meshes[i].name, m_bvhs[i].nodes.size());
+      fmt::print("{}\n", m_bvhs[i].nodes[0].offs());
     }
 
     // Pack mesh/BVH data tightly and fill in corresponding mesh layout info

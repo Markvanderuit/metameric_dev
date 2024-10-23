@@ -25,12 +25,8 @@ vec4 eval_emitter_sphere(in EmitterInfo em, in PositionSample ps, in vec4 wvls) 
   // If normal is not inclined along the ray, return nothing
   if (dot(ps.d, ps.n) >= 0)
     return vec4(0);
-  #ifdef TEMP_BASIS_AVAILABLE
-  return s_bucket_illm[bucket_id][em.illuminant_i];
-  #else
-  vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  return v * em.illuminant_scale;
-  #endif
+  
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
 }
 
 float pdf_emitter_sphere(in EmitterInfo em, in PositionSample ps) {

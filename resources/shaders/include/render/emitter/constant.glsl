@@ -21,8 +21,7 @@ PositionSample sample_emitter_constant(in EmitterInfo em, in SurfaceInfo si, in 
 }
 
 vec4 eval_emitter_constant(in EmitterInfo em, in vec4 wvls) {
-  vec4 v = scene_illuminant(em.illuminant_i, wvls);
-  return v * em.illuminant_scale;
+  return scene_illuminant(em.illuminant_i, wvls) * em.illuminant_scale;
 }
 
 float pdf_emitter_constant(in EmitterInfo em, in vec3 d_local) {

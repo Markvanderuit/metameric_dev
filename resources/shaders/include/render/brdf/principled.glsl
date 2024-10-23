@@ -7,7 +7,7 @@
 
 void init_brdf_principled(inout BRDFInfo brdf, in SurfaceInfo si, vec4 wvls) {
   // Temporary until I can connect them to parameters
-  float roughness = 0.005f;
+  float roughness = 0.15f;
   float metallic  = 1.0f;
   float eta       = 1.46f;
 
