@@ -71,7 +71,7 @@ layout(binding = 8) uniform b_buff_envmap_info {
 } buff_envmap_info;
 layout(binding = 9) uniform b_buff_coeffs {
   uint n;
-  BarycentricInfo data[met_max_textures];
+  TextureAtlasInfo data[met_max_textures];
 } buff_coeffs;
 
 // Storage buffer declarations

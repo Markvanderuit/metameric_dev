@@ -2,18 +2,27 @@
 #define REFLECTANCE_GLSL_GUARD
 
 #ifdef  SCENE_DATA_REFLECTANCE
-  // If element indices differ. Do costly interpolation manually :(
-  const ivec2 reflectance_tx_offsets[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
+  // Constant-expression texel corners used for manual texture interpolation
+  const vec2 tx_offsets[4] = { vec2(0, 0), vec2(1, 0), vec2(0, 1), vec2(1, 1) };
   
+  // Translate object texture coordinates to coordinates suited for a texture atlas;
+  // baked spectral texture coefficients live in an atlas in this implementation, 
+  // so this step is necessary.
+  vec3 tx_to_atlas(in TextureAtlasInfo atlas_info, in vec2 tx) {
+    vec3 tx_atlas;
+    tx_atlas = vec3(atlas_info.uv0 + atlas_info.uv1 * tx, atlas_info.layer);
+    tx_atlas.xy *= scene_barycentric_data_size(); // Scale [0,1] to texture size
+    tx_atlas.xy -= 0.5f;                          // Offset by half a pixel
+    return tx_atlas;
+  }
+
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls) {
     // Load relevant info objects
-    ObjectInfo      object_info = scene_object_info(object_i);
-    BarycentricInfo atlas_info  = scene_reflectance_atlas_info(object_i);
+    ObjectInfo       object_info = scene_object_info(object_i);
+    TextureAtlasInfo atlas_info  = scene_reflectance_atlas_info(object_i);
 
-    // Translate gbuffer uv to texture atlas coordinate for the barycentrics;
-    // also handle single-color objects by sampling the center of their patch
-    vec3 tx_3d = vec3(atlas_info.uv0 + atlas_info.uv1 * (object_info.is_albedo_sampled ? tx : vec2(0.5f)), atlas_info.layer) 
-               * vec3(scene_barycentric_data_size(), 1) - vec3(0.5, 0.5, 0);
+    // Translate object uv to texture atlas uv for the baked spectral texture coefficients
+    vec3 tx_atlas = tx_to_atlas(atlas_info, record_is_sampled(object_info.albedo_data) ? tx : vec2(0.5f));
 
     // Return value; reflectance for four wavelengths
     vec4 r = vec4(0);
@@ -21,16 +30,16 @@
     // Mix four texels appropriately, sampling each of the four wavelengths independently
     for (uint i = 0; i < 4; ++i) { // four texel corners
       // Texel mixing weight for a particular corner
-      float w = hprod(mix(vec2(1) - fract(tx_3d.xy), fract(tx_3d.xy), vec2(reflectance_tx_offsets[i])));
+      float w = hprod(mix(vec2(1) - fract(tx_atlas.xy), fract(tx_atlas.xy), tx_offsets[i]));
 
       // Load packed basis coefficients for a particular corner
-      uvec4 cpack = scene_coefficients_data_fetch(ivec3(tx_3d) + ivec3(reflectance_tx_offsets[i], 0));
+      uvec4 cpack = scene_coefficients_data_fetch(ivec3(tx_atlas) + ivec3(tx_offsets[i], 0));
 
       // Iterate the bases
       for (uint k = 0; k < wavelength_bases; ++k) {
 #ifdef TEMP_BASIS_AVAILABLE
-        // Extract k'th coefficient, multiply by texel mixing weight
-        // and then multiply with pre-sampled basis
+        // Extract k'th basis coefficient, multiply with presampled basis, 
+        // and then multiply by texel mixing weight
         r += w * extract_bases(cpack, k) * s_bucket_basis[bucket_id][k];
 #else
         // Extract k'th coefficient, multiply by texel mixing weight
@@ -52,14 +61,13 @@
 
   vec4 scene_sample_reflectance(in uint object_i, in vec2 tx, in vec4 wvls /* ignored */) {
     // Load relevant info objects
-    ObjectInfo  object_info = scene_object_info(object_i);
-    if (object_info.is_albedo_sampled) {
-      TextureInfo txtr  = scene_rgb_atlas_info(object_info.albedo_i);
-      // tx.xy = vec2(1) - vec2(tx.y, tx.x);
+    ObjectInfo object_info = scene_object_info(object_i);
+    if (record_is_sampled(object_info.albedo_data)) {
+      TextureInfo txtr  = scene_rgb_atlas_info(record_get_sampler_index(object_info.albedo_data));
       vec3 tx_uv = vec3(txtr.uv0 + txtr.uv1 * tx, txtr.layer);
       return vec4(scene_rgb_data_texture(tx_uv).xyz, 1); // Discard alpha for now
     } else {
-      return vec4(object_info.albedo_v, 1);
+      return vec4(record_get_direct_value(object_info.albedo_data), 1);
     }
   }
 

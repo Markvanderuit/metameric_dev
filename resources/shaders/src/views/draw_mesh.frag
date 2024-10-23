@@ -1,5 +1,6 @@
 #include <preamble.glsl>
 #include <render/load/defaults.glsl>
+#include <render/record.glsl>
 #include <render/scene.glsl>
 
 // Buffer layout declarations
@@ -53,9 +54,9 @@ void main() {
   float cos_theta = max(dot(l_dir, n_dir), 0);
 
   // Load diffuse data if provided
-  vec3 diffuse = object_info.is_albedo_sampled
-               ? sample_texture(object_info.albedo_i, in_value_tx).xyz
-               : object_info.albedo_v;
+  vec3 diffuse = record_is_sampled(object_info.albedo_data)
+               ? sample_texture(record_get_sampler_index(object_info.albedo_data), in_value_tx).xyz
+               : record_get_direct_value(object_info.albedo_data);
 
   vec3 v = /* vec3(mod(in_value_tx, 1), 0); */  diffuse * cos_theta;
   out_value_colr = vec4(v, 1);

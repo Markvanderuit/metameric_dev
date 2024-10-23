@@ -4,10 +4,50 @@
 #include <metameric/core/moments.hpp>
 #include <metameric/core/ranges.hpp>
 #include <metameric/core/utility.hpp>
+#include <bit>
 #include <numbers>
 #include <numeric>
 
 namespace met::detail {
+  eig::Array4u pack_material_3f(const std::variant<Colr,  uint> &v) {
+    union {
+      struct {
+        uint is_sampled;
+        float value[3];
+      } in_0;
+      struct {
+        uint is_sampled;
+        uint sample_i;
+        float padd[2];
+      } in_1;
+      uint out[4];
+    } u;
+    static_assert(sizeof(decltype(u)) == 16);
+    if (v.index()) u.in_1 = { 1, std::get<1>(v), { 0, 0} };
+    else           u.in_0 = { 0, { std::get<0>(v)[0], std::get<0>(v)[1], std::get<0>(v)[2] } };
+    return { u.out[0], u.out[1], u.out[2], u.out[3] };
+  }
+
+  eig::Array2u pack_material_1f(const std::variant<float,  uint> &v) {
+    union {
+      struct {
+        uint is_sampled;
+        float value;
+      } in_0;
+      struct {
+        uint is_sampled;
+        uint value;
+      } in_1;
+      uint out[2];
+    } u;
+    static_assert(sizeof(decltype(u)) == 8);
+    if (v.index()) u.in_1 = { 1, std::get<1>(v) };
+    else           u.in_0 = { 0, std::get<0>(v) };
+    return { u.out[0], u.out[1] };
+  }
+
+
+  
   // Packed BVH node data
   struct NodePack {
     uint aabb_pack_0;                 // lo.x, lo.y
@@ -138,9 +178,7 @@ namespace met::detail {
         .mesh_i            = object.mesh_i,
         .uplifting_i       = object.uplifting_i,
         .brdf_type         = static_cast<uint>(object.brdf_type),
-        .is_albedo_sampled = is_albedo_sampled,
-        .albedo_i          = is_albedo_sampled ? std::get<1>(object.diffuse) : 0,
-        .albedo_v          = is_albedo_sampled ? 0 : std::get<0>(object.diffuse)
+        .albedo_data       = pack_material_3f(object.diffuse),
       };
 
       // Flush change to buffer; most changes to objects are local,

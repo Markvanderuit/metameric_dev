@@ -1,5 +1,6 @@
 #include <preamble.glsl>
 #include <math.glsl>
+#include <render/record.glsl>
 #include <render/detail/scene_types.glsl>
 
 // Wrapper data packing tetrahedron data [x, y, z, w]; 64 bytes under std430
@@ -58,11 +59,11 @@ void main() {
   vec3 p;
   if (sample_albedo) { 
     // Color value is supplied by scene texture
-    TextureInfo txtr = buff_textures.data[object.albedo_i];
+    TextureInfo txtr = buff_textures.data[record_get_sampler_index(object.albedo_data)];
     p = texture(b_txtr_3f, vec3(txtr.uv0 + txtr.uv1 * in_txuv, txtr.layer)).xyz;
   } else {
     // Color value is specified directly
-    p = object.albedo_v;
+    p = record_get_direct_value(object.albedo_data);
   }
   
   // Next, brute-force search for the corresponding barycentric weights and tetrahedron's index

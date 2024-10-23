@@ -26,9 +26,7 @@ namespace met::detail {
       alignas(4)  uint          mesh_i;
       alignas(4)  uint          uplifting_i;
       alignas(4)  uint          brdf_type;
-      alignas(4)  bool          is_albedo_sampled;
-      alignas(4)  uint          albedo_i;
-      alignas(16) Colr          albedo_v;
+      alignas(16) eig::Array4u  albedo_data;
     };
     
     // All-object block layout for std140 uniform buffer, mapped for write

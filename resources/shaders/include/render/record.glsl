@@ -37,7 +37,8 @@ void record_set_anyhit(inout uint rc, in bool hit) {
   rc = uint(hit); 
 }
 
-// Getters to read stored record data
+// Getters to read stored ray hit record data;
+// uint records are used by intersection tests to store type and index of a hit
 bool record_is_valid(in uint rc)             { return rc != RECORD_INVALID_DATA;      }
 bool record_is_emitter(in uint rc)           { return (rc & RECORD_EMITTER_FLAG) != 0;}
 bool record_is_object(in uint rc)            { return (rc & RECORD_EMITTER_FLAG) == 0;}
@@ -45,6 +46,17 @@ uint record_get_object(in uint rc)           { return (rc >> 24) & 0x0000007F;  
 uint record_get_emitter(in uint rc)          { return (rc >> 24) & 0x0000007F;        }
 uint record_get_object_primitive(in uint rc) { return rc & 0x00FFFFFF;                }
 bool record_get_anyhit(in uint rc)           { return rc == 0x1;                      }
+
+// Getters to read stored material record data;
+// uvec4/vec2 records are used by objects to store material values/texture indices
+bool  record_is_sampled(in uvec4 rc)        { return rc.x != 0;               }
+bool  record_is_sampled(in uvec2 rc)        { return rc.x != 0;               }
+bool  record_is_direct(in uvec4 rc)         { return rc.x == 0;               }
+bool  record_is_direct(in uvec2 rc)         { return rc.x == 0;               }
+uint  record_get_sampler_index(in uvec4 rc) { return rc.y;                    }
+uint  record_get_sampler_index(in uvec2 rc) { return rc.y;                    }
+vec3  record_get_direct_value(in uvec4 rc)  { return uintBitsToFloat(rc.yzw); }
+float record_get_direct_value(in uvec2 rc)  { return uintBitsToFloat(rc.y);   }
 
 struct PositionSample {
   // Position/normal on surface of entity

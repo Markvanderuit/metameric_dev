@@ -27,10 +27,12 @@ struct ObjectInfo {
   uint uplifting_i;
 
   // Material data
-  uint brdf_type;         // BRDF Type
-  bool is_albedo_sampled; // Use sampler or direct value?
-  uint albedo_i;          // Sampler index
-  vec3 albedo_v;          // Direct value
+  uint  brdf_type;   // BRDF Type
+  uvec4 albedo_data; // Albedo data record; see record.glsl to unpack a texture index or color value
+
+  // bool is_albedo_sampled; // Use sampler or direct value?
+  // uint albedo_i;          // Sampler index
+  // vec3 albedo_v;          // Direct value
 };
 
 // Info object for referred mesh.bvh data
@@ -49,7 +51,7 @@ struct MeshInfo {
 
 // Info object for referred texture data
 struct TextureInfo {
-  bool  is_3f; // Is in the atlas_3f texture sampler, else atlas_1f?
+  bool  is_3f; // Is the patch in the atlas_3f texture sampler, or in atlas_1f?
   uint  layer; // layer in texture array in which the texture is located
   uvec2 offs;  // offset in pixels to layer's region storing this texture
   uvec2 size;  // size in pixels of layer's region storing this
@@ -57,20 +59,11 @@ struct TextureInfo {
   vec2  uv1;   // Maximum uv value, at region's pixel offset + size
 };
 
-// Texture atlas access info for the barycentric weights atlas
-struct BarycentricInfo {
-  uint  layer;  // layer in texture array in which a barycentric weight patch is located
-  uvec2 offs;   // offset in pixels to texture's region storing this patch
-  uvec2 size;   // size in pixels of texture's region storing this patch
-  vec2  uv0;    // Minimum uv value, at region's offset
-  vec2  uv1;    // Maximum uv value, at region's offset + size
-};
-
-// Atlas access info
-struct AtlasLayout {
-  uint  layer;  // layer in texture array in which the patch is located
-  uvec2 offs;   // offset in pixels to texture's region storing this patch
-  uvec2 size;   // size in pixels of texture's region storing this patch
+// Info object for referred texture atlas patch data
+struct TextureAtlasInfo {
+  uint  layer;  // layer in texture array in which a texture patch is located
+  uvec2 offs;   // offset in pixels to array's region storing this patch
+  uvec2 size;   // size in pixels of array's region storing this patch
   vec2  uv0;    // Minimum uv value, at region's offset
   vec2  uv1;    // Maximum uv value, at region's offset + size
 };

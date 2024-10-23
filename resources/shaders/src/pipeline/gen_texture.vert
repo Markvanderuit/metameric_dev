@@ -24,7 +24,7 @@ layout(binding = 0) uniform b_buff_unif {
 } unif;
 layout(binding = 1) uniform b_buff_atlas {
   uint n;
-  AtlasLayout data[met_max_textures];
+  TextureAtlasInfo data[met_max_textures];
 } buff_atlas;
 
 void main() {
@@ -32,6 +32,6 @@ void main() {
   out_txuv = unpackUnorm2x16(in_txuv_pack);
 
   // Vertex position becomes reparatemerized texture coordinates in relevant atlas patch
-  AtlasLayout atlas = buff_atlas.data[unif.object_i];
+  TextureAtlasInfo atlas = buff_atlas.data[unif.object_i];
   gl_Position = vec4(atlas.uv0 + atlas.uv1 * unpackUnorm2x16(in_vert_pack.w), 0, 1) * 2.f - 1.f;
 }
