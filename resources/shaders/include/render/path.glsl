@@ -58,19 +58,25 @@ vec4 Li_debug(in SensorSample ss, in SamplerState state) {
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
 
+
+  // float f = _G1(si.n, sdot(0.1));
+
+
+  return vec4(si.sh.n * 4.f / float(wavelength_samples), 1);
+
   // // Hope this is the right one; should be normalized d65
   // vec4 d65_n = scene_illuminant(1, wvls);
 
   // Sample BRDF albedo at position, integrate, and return color
-  BRDFInfo brdf = get_brdf(si, ss.wvls);
+  // BRDFInfo brdf = get_brdf(si, ss.wvls);
   // return brdf.r / wvl_pdfs;
 
-  BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
-  if (bs.pdf == 0.f)
-    return vec4(0);
-  return bs.f 
-      * cos_theta(bs.wo)
-      / (ss.pdfs * bs.pdf);
+  // BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
+  // if (bs.pdf == 0.f)
+  //   return vec4(0);
+  // return bs.f 
+  //     * cos_theta(bs.wo)
+  //     / (ss.pdfs * bs.pdf);
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
@@ -78,32 +84,29 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
   path_query_initialize(pt);
   
   // Path throughput information; we track 4 wavelengths simultaneously
-  vec4 S    = vec4(0);
-  vec4 beta = vec4(1) / ss.pdfs;
+  vec4 S    = vec4(0.f);
+  vec4 beta = vec4(1.f / ss.pdfs);
 
-  // Last brdf sample, default-initialized
+  // Prior brdf sample, default-initialized, kept for multiple importance sampling
   BRDFSample bs; 
   bs.pdf      = 1;
   bs.is_delta = true;
   
   // Iterate up to maximum depth
   for (uint depth = 0; depth < max_depth; ++depth) {
-    // If no surface object is visible, add contribution of envmap, 
-    // then terminate current path
+    // Ray-trace first. Then, if no surface is intersected by the ray, 
+    // add contribution of environment map, and terminate the current path
     if (!scene_intersect(ss.ray)) {
       if (scene_has_envm_emitter()) {
         float em_pdf = (depth == 0 || bs.is_delta)  
-                     ? 1.f 
+                     ? 0.f 
                      : pdf_env_emitter(bs.wo);
-        // float mis_weight = depth == 0
-        //                  ? 1.f
-        //                  : mis_power(bs.pdf, em_pdf);
-        
+            
         vec4 s = beta
                * eval_env_emitter(ss.wvls)
-               * mis_power(bs.pdf, em_pdf) /* mis_weight */;
+               * mis_power(bs.pdf, em_pdf);
 
-        // Store current path if requested
+        // Store current path query if requested
         path_query_finalize_envmap(pt, s, ss.wvls);
 
         // Add to output radiance
@@ -116,14 +119,14 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       break;
     }
 
-    // Get info about next path vertex
+    // Get info about the intersected surface
     SurfaceInfo si = get_surface_info(ss.ray);
 
-    // Store next vertex to path if requested
+    // Store the next vertex to path query if requested
     path_query_extend(pt, ss.ray);
 
-    // If an emitter is hit directly, add contribution to path, 
-    // then terminate current path
+    // If an emissive object is hit, add its contribution to the 
+    // current path, and then terminate said path
     if (is_emitter(si)) {
       PositionSample ps     = get_position_sample(si);
       float          em_pdf = bs.is_delta ? 0.f : pdf_emitters(ps);
@@ -133,7 +136,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
              * eval_emitter(ps, ss.wvls)     // emitted value
              * mis_power(bs.pdf, em_pdf); // mis weight
 
-      // Store current path if requested
+      // Store current path query if requested
       path_query_finalize_direct(pt, s, ss.wvls);
 
       // Add to output radiance and terminate path
@@ -141,14 +144,14 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       break;
     }
 
-    // Terminate at maximum path length
+    // If maximum path depth was reached at this point, terminate
     if (depth == max_depth - 1)
       break;
 
-    // Sample BRDF at position
+    // Construct the underlying BRDF at the intersected surface
     BRDFInfo brdf = get_brdf(si, ss.wvls);
     
-    // Direct illumination sampling;
+    // Direct illumination sampling
     {
       // Generate position sample on emitter
       // Importance sample emitter position
@@ -173,7 +176,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
                  * eval_emitter(pe, ss.wvls)  // emitted value
                  * mis_weight;             // mis weight
 
-          // Store current path if requested
+          // Store current path query if requested
           path_query_finalize_emitter(pt, pe, s, ss.wvls);
 
           // Add to output radiance
@@ -182,7 +185,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       }
     }
 
-    // BRDF sampling; 
+    // BRDF sampling
     {
       // Importance sample brdf direction
       bs = sample_brdf(brdf, next_3d(state), si);
@@ -198,7 +201,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       if (all(is_zero(beta)))
         break;
 
-      // Generate next scene ray
+      // Generate the next ray to trace through the scene
       ss.ray = ray_towards_direction(si, to_world(si, bs.wo));
     }
 

@@ -55,7 +55,9 @@ float pdf_env_emitter(vec3 d_local) {
   if (!scene_has_envm_emitter())
     return 0.f;
   EmitterInfo em = scene_emitter_info(scene_envm_emitter_idx());
-  return pdf_emitter_constant(em, d_local);
+  float pdf = pdf_emitter_constant(em, d_local);
+  pdf *= pdf_emitters_discrete(scene_envm_emitter_idx());
+  return pdf;
 }
 
 float pdf_emitter(in EmitterInfo em, in PositionSample ps) {
