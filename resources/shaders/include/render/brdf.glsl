@@ -8,7 +8,7 @@
 #include <render/brdf/mirror.glsl>
 #include <render/brdf/principled.glsl>
 
-BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls) {
+BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls, in vec2 sample_2d) {
   BRDFInfo brdf;
 
   if (is_object(si)) {
@@ -19,7 +19,7 @@ BRDFInfo get_brdf(in SurfaceInfo si, vec4 wvls) {
   }
 
   if (brdf.type == BRDFTypeDiffuse) {
-    init_brdf_diffuse(brdf, si, wvls);
+    init_brdf_diffuse(brdf, si, wvls, sample_2d);
   } else if (brdf.type == BRDFTypeNull) {
     init_brdf_null(brdf, si, wvls);
   } else if (brdf.type == BRDFTypeMirror) {

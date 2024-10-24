@@ -122,7 +122,7 @@ namespace met {
       gl::state::set(gl::DrawCapability::eDither,     false);
       gl::state::set_scissor(e_patch.size, e_patch.offs);
       gl::state::set_viewport(e_coefficients.texture().size().head<2>());
-      gl::state::set_line_width(2.f);
+      gl::state::set_line_width(3.f);
 
       // Prepare framebuffer, clear relevant patch (not necessary actually)
       m_fbo.bind();
@@ -137,12 +137,13 @@ namespace met {
         command = e_scene.resources.meshes.gl.draw_commands[0]; // Rectangle
       }
 
-      // Dispatch draw call
+      // Dispatch draw calls
       gl::sync::memory_barrier(gl::BarrierFlags::eFramebuffer        | 
                                gl::BarrierFlags::eTextureFetch       |
                                gl::BarrierFlags::eClientMappedBuffer |
                                gl::BarrierFlags::eStorageBuffer      | 
                                gl::BarrierFlags::eUniformBuffer      );
+                               
       gl::dispatch_draw({
         .type           = gl::PrimitiveType::eTriangles,
         .vertex_count   = command.vertex_count,

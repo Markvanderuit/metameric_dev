@@ -96,5 +96,5 @@ void main() {
   } // for (uint i)
 
   // Store result, outputting packed moment coefficients to 128 bytes
-  out_coeffs = pack_bases(coeffs);
+  out_coeffs = pack_basis_coeffs(coeffs);
 }

@@ -14,7 +14,8 @@ namespace met {
     alignas(8) eig::Array2u offs, size;
     alignas(8) eig::Array2f uv0, uv1;
   };
-
+  static_assert(sizeof(AtlasBlockLayout) == 16 + 2 * 8 + 2 * 8);
+  
   // Object describing an std140 buffer layout for atlas data
   struct AtlasBufferLayout {
     alignas(4) uint size;

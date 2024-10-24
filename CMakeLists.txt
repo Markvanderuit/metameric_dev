@@ -24,7 +24,7 @@ set(MET_SUPPORTED_OBJECTS       32) # Maximum supported scene objects
 set(MET_SUPPORTED_EMITTERS      32) # Maximum supported scene emitters
 set(MET_SUPPORTED_UPLIFTINGS     8) # Maximum supported uplifting structures; multiple objects can share an uplifting
 set(MET_SUPPORTED_CONSTRAINTS 1024) # Maximum supported boundary spectra + constraint spectra
-set(MET_SUPPORTED_TEXTURES     256) # Maximum supported scene textures
+set(MET_SUPPORTED_TEXTURES     128) # Maximum supported scene textures
 
 # TODO remove; inserted in code/shaders as preprocessor defines
 set(MET_MOMENT_COEFFICIENTS 12) # Nr. of coeffs used for moment-based spectral representation

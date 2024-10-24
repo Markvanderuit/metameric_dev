@@ -171,7 +171,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
       break;
 
     // Construct the underlying BRDF at the intersected surface
-    BRDFInfo brdf = get_brdf(si, ss.wvls);
+    BRDFInfo brdf = get_brdf(si, ss.wvls, next_2d(state));
     
     // Direct illumination sampling
     {

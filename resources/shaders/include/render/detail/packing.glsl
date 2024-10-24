@@ -56,28 +56,24 @@ float extract_snorm_8(in uvec4 p, in uint i) {
 float[12] unpack_snorm_12(in uvec4 p) {
   float[12] m;
   for (int i = 0; i < 12; ++i) {
+    int offs = i % 3 == 2 ? 10 : 11; // 11, 11, 10, 11, 11, 10, ...
     uint j = bitfieldExtract(p[i / 3],                // 0,  0,  0,  1,  1,  1,  ...
                              (i % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
-                             (i % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
-
-    float scale = i % 3 == 2 
-                ? float((1 << 10) - 1) 
-                : float((1 << 11) - 1);
-                
-    m[i] = (float(j) / scale) * 2.f - 1.f;
+                             offs);
+    float scale = float((1 << offs) - 1);
+    m[i] = fma(float(j) / scale, 2.f, - 1.f);
   }
   return m;
 }
 
 // Extract a single value instead of unpacking the whole lot
 float extract_snorm_12(in uvec4 p, in uint i) {
-  uint j = bitfieldExtract(p[i / 3],                      // 0,  0,  0,  1,  1,  1,  ...
-                            (int(i) % 3) * 11,            // 0,  11, 22, 0,  11, 22, ...
-                            (int(i) % 3) == 2 ? 10 : 11); // 11, 11, 10, 11, 11, 10, ...
-  float scale = i % 3 == 2 
-              ? float((1 << 10) - 1) 
-              : float((1 << 11) - 1);
-  return (float(j) / scale) * 2.f - 1.f;
+  int offs = i % 3 == 2 ? 10 : 11; // 11, 11, 10, 11, 11, 10, ...
+  uint j = bitfieldExtract(p[i / 3],          // 0,  0,  0,  1,  1,  1,  ...
+                           (int(i) % 3) * 11, // 0,  11, 22, 0,  11, 22, ...
+                           offs);                        
+  float scale = float((1 << offs) - 1);
+  return fma(float(j) / scale, 2.f, -1.f);
 }
 
 uvec4 pack_snorm_8(in float[8] v) {
@@ -155,7 +151,7 @@ uvec4 pack_half_8x16(in float[8] m) {
                packHalf2x16(vec2(m[4], m[5])), packHalf2x16(vec2(m[6], m[7])));
 }
 
-float[wavelength_bases] unpack_bases(in uvec4 p) {
+float[wavelength_bases] unpack_basis_coeffs(in uvec4 p) {
   float[wavelength_bases] v;
 #if   MET_WAVELENGTH_BASES == 16
   v = unpack_snorm_16(p);
@@ -169,7 +165,7 @@ float[wavelength_bases] unpack_bases(in uvec4 p) {
   return v;
 }
 
-float extract_bases(in uvec4 p, in uint i) {
+float extract_basis_coeff(in uvec4 p, in uint i) {
   float f;
 #if   MET_WAVELENGTH_BASES == 16
   f = extract_snorm_16(p, i);
@@ -183,7 +179,7 @@ float extract_bases(in uvec4 p, in uint i) {
   return f;
 }
 
-uvec4 pack_bases(in float[wavelength_bases] v) {
+uvec4 pack_basis_coeffs(in float[wavelength_bases] v) {
   uvec4 p;
 #if   MET_WAVELENGTH_BASES == 16
   p = pack_snorm_16(v);
