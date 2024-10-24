@@ -6,77 +6,99 @@
 #include <render/scene.glsl>
 #include <render/surface.glsl>
 #include <render/sensor.glsl>
+#include <render/detail/path_query.glsl>
 
-// Macros for enabling/disabling path tracking
-#ifdef ENABLE_PATH_TRACKING
-#define path_query_initialize(pt) Path pt; { pt.path_depth = 0; }
-void path_query_extend(inout Path pt, in Ray r) {
-  pt.data[pt.path_depth++] = PathVertex(ray_get_position(r), r.data);
+float fresnel_schlick(float f_0, float f_90, float lambert) {
+	float flip_1 = 1.0 - lambert;
+	float flip_2 = flip_1 * flip_1;
+	float flip_5 = flip_2 * flip_1 * flip_2;
+	return flip_5 * (f_90 - f_0) + f_0;
 }
-void path_query_finalize_direct(in Path pt, in vec4 L, in vec4 wvls) {
-  pt.wvls = wvls;
-  pt.L    = L;
-  set_path(pt, get_next_path_id());
-}
-void path_query_finalize_emitter(in Path pt, in PositionSample r, in vec4 L, in vec4 wvls) {
-  pt.data[pt.path_depth++] = PathVertex(r.p, r.data);
-  pt.wvls = wvls;
-  pt.L    = L;
-  set_path(pt, get_next_path_id());
-}
-void path_query_finalize_envmap(in Path pt, in vec4 L, in vec4 wvls) {
-  // pt.data[pt.path_depth++] = PathVertex(r.p, r.data);
-  pt.wvls = wvls;
-  pt.L    = L;
-  set_path(pt, get_next_path_id());
-}
-#else  
-#define path_query_initialize(pt)                     {}
-#define path_query_extend(path, vt)                   {}
-#define path_query_finalize_direct(path, L, wvls)     {}
-#define path_query_finalize_emitter(path, r, L, wvls) {}
-#define path_query_finalize_envmap(path, L, wvls)     {}
-#endif
 
 vec4 Li_debug(in SensorSample ss, in SamplerState state) {
-  // If the ray misses, terminate current path
+  // Ray-trace first. If no surface is intersected by the ray, return early
   scene_intersect(ss.ray);
   if (!scene_intersect(ss.ray))
     return vec4(0);
-  
-  // uint n = scene_emitter_count() + scene_object_count();
- /*  uint i = ray.data; // record_get_object(ray.data);
-  uint n = 1024;
 
-  float s = float(i) / float(n);
-  return vec4(vec3(s), 1); */
-
-  // return vec4(debug_colors[record_get_object(ray.data) % 8], 1);
-  // return vec4(1, 0, s, 1);
-
+  // Get info about the intersected surface; if an emitter was intersected, return early
   SurfaceInfo si = get_surface_info(ss.ray);
   if (!is_valid(si) || !is_object(si))
     return vec4(0);
 
+  // Output values
+  vec3  wo  = vec3(0);
+  float f   = 0.f;
+  float pdf = 0.f;
 
-  // float f = _G1(si.n, sdot(0.1));
+  // BRDF sampling and computation
+  while (pdf <= 0.f) { // To simplify debug, we forcibly loop a valid sample is found
+    // Sample cosine hemisphere for output
+    // wo  = square_to_cos_hemisphere(next_2d(state));
+    // pdf = square_to_cos_hemisphere_pdf(wo);
 
+    // Reflect specularly
+    wo  = vec3(-si.wi.xy, si.wi.z);
+    pdf = 1.f;
 
-  return vec4(si.sh.n * 4.f / float(wavelength_samples), 1);
+    // BRDF parameters
+    float f_0     = 0.3f;
+    float alpha   = 0.1f;
+    float alpha_2 = sdot(alpha);
 
-  // // Hope this is the right one; should be normalized d65
-  // vec4 d65_n = scene_illuminant(1, wvls);
+    // BRDF throughput 
+    vec3 wh = normalize(si.wi + wo);
 
-  // Sample BRDF albedo at position, integrate, and return color
-  // BRDFInfo brdf = get_brdf(si, ss.wvls);
-  // return brdf.r / wvl_pdfs;
+    if (record_get_object(si.data) == 1) { // Intersect with first sphere
+      // GGX normal distribution function
+      float ggx = (alpha_2 * cos_theta(wh) - cos_theta(wh)) * cos_theta(wh) + 1.f;
+      ggx = alpha_2 / (ggx * ggx);
 
-  // BRDFSample bs = sample_brdf(brdf, next_3d(state), si);
-  // if (bs.pdf == 0.f)
-  //   return vec4(0);
-  // return bs.f 
-  //     * cos_theta(bs.wo)
-  //     / (ss.pdfs * bs.pdf);
+      float g1_masking = cos_theta(wo)    
+                       * sqrt((cos_theta(si.wi) - alpha_2 * cos_theta(si.wi)) * cos_theta(si.wi) + alpha_2);
+      float g1_shadow  = cos_theta(si.wi) 
+                       * sqrt((cos_theta(wo)    - alpha_2 * cos_theta(wo))    * cos_theta(wo)    + alpha_2);
+      float g2 = 0.5f / (g1_masking + g1_shadow);
+
+      float fresnel = fresnel_schlick(f_0, 1.f, cos_theta(si.wi));
+
+      // D(N) = 1 / (pi * (...))
+      f = /* M_PI_INV * fresnel * ggx * */ g2;
+    } else if (record_get_object(si.data) == 2) { // Intersect with second sphere
+      // GGX normal distribution function
+      // Initial
+      // float ggx = sdot(wh.xy) / alpha_2 + sdot(wh.z);
+      // ggx = 1.f / (alpha_2 * (ggx * ggx));
+      // Rewrite confirmation; it really is the same as christoph's
+      float ggx = (alpha_2 * wh.z - wh.z) * wh.z + 1.f;
+      ggx = alpha_2 / (ggx * ggx);
+
+      float lambda_in
+        = -.5f + .5f * sqrt(
+          1.f + alpha_2 / (si.wi.z * si.wi.z) - alpha_2
+        );
+      float lambda_out
+        = -.5f + .5f * sqrt(
+          1.f + alpha_2 / (wo.z * wo.z) - alpha_2
+        );
+      float g1_in  = 1.f / (1.f + lambda_in);
+      float g1_out = 1.f / (1.f + lambda_out);
+      float g2_ = g1_in * g1_out;
+      float g2 = g2_ / (4.f * cos_theta(wo) * cos_theta(si.wi));
+
+      float fresnel = schlick_fresnel(vec4(f_0), vec4(1), cos_theta(si.wi)).x;
+
+      // D(N) = 1 / (pi * (...))
+      f = /* M_PI_INV * fresnel * ggx * */ g2;
+    } else { // Intersect with background plane, or other object
+      f = 0.f;
+      pdf = 1.f;
+    }
+  }
+
+  // Adjust for spectral intergration by doing 4 / n
+  float L = f * cos_theta(wo) / pdf;
+  return vec4(L * 4.f / float(wavelength_samples));
 }
 
 vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
@@ -133,7 +155,7 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
 
       // No division by sample density, as this is incorporated in path throughput
       vec4 s = beta                       // throughput 
-             * eval_emitter(ps, ss.wvls)     // emitted value
+             * eval_emitter(ps, ss.wvls)  // emitted value
              * mis_power(bs.pdf, em_pdf); // mis weight
 
       // Store current path query if requested
@@ -170,11 +192,11 @@ vec4 Li(in SensorSample ss, in SamplerState state, inout float alpha) {
         // Test for any hit closer than sample position
         if (!scene_intersect_any(ray_towards_point(si, pe.p))) {
           // Assemble path throughput
-          vec4 s = beta                    // Throughput
-                 * eval_brdf(brdf, si, wo) // brdf value
-                 * abs(cos_theta(wo))      // cosine attenuation
+          vec4 s = beta                       // Throughput
+                 * eval_brdf(brdf, si, wo)    // brdf value
+                 * abs(cos_theta(wo))         // cosine attenuation
                  * eval_emitter(pe, ss.wvls)  // emitted value
-                 * mis_weight;             // mis weight
+                 * mis_weight;                // mis weight
 
           // Store current path query if requested
           path_query_finalize_emitter(pt, pe, s, ss.wvls);

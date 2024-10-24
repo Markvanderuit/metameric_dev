@@ -77,7 +77,7 @@ function(compile_glsl_to_spirv glsl_src_fp spirv_dependencies)
     COMMAND ${spirv-opt} ${spirv_temp_fp} 
             -o ${spirv_bin_fp} 
             -O 
-            -Os
+            # -Os
     DEPENDS ${spirv_temp_fp}
     VERBATIM 
   )

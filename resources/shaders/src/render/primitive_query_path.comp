@@ -109,9 +109,8 @@ declare_distr_sampler(wavelength, buff_wvls_distr, wavelength_samples)
 declare_distr_sampler(emitters, buff_emitters_distr, met_max_emitters)
 declare_path_data(buff_output.head, buff_output.data);
 
-// All includes from here on rely on buffers/samplers to be declared
-#define ENABLE_PATH_TRACKING
-#define ENABLE_FULL_PATH_TRACKING
+// All includes from here on rely on the necessary buffers/samplers to be declared
+#define ENABLE_PATH_QUERY
 #include <render/path.glsl>
 
 void load_shared() {

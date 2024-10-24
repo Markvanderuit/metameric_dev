@@ -88,7 +88,7 @@ shared MeshInfo    s_mesh_info[met_max_meshes];
 #define WAVELENGTH_SAMPLING_BUCKETED
 
 // buckets to preload and presample about 4kb of spectral data for the entire workgroup
-const uint n_wvl_buckets = 8;
+const uint n_wvl_buckets = 16;
       uint bucket_i; // sampled per-invocation index of a selected bucket 
 shared vec4 s_bucket_wvls[n_wvl_buckets];                    // Bucket of n wavelength samples
 shared vec4 s_bucket_pdfs[n_wvl_buckets];                    // Bucket of n wavelength sample pdfs
