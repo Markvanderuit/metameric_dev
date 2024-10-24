@@ -150,16 +150,13 @@ bool ray_intersect_bvh(inout Ray ray, in uint mesh_i) {
       // Bitmask, initialized to all false
       uint mask = 0;
 
-      // Shorthand for rcp of ray
-      vec3 d_inv = 1.f / ray.d;
+      // Shorthand for reciprocal of ray direction
+      vec3 d_rcp = 1.f / ray.d;
       
       // Iterate the node's children
       for (uint i = 0; i < bvh_size(node); ++i) {
-        // Obtain and unpack next child, then test against it
-        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i))) {
-          // Flag child's index in bitmask on a hit
-          mask |= (1u << i);
-        }
+        // Unpack a child, then intersect with it; on hit, its index is flagged in the bitmask
+        mask |= uint(ray_intersect_any(ray, d_rcp, bvh_child_aabb(node, i))) << i;
       } // for (uint i)
 
       // If any children were flagged in the mask, push the child offset + mask on the stack
@@ -216,16 +213,13 @@ bool ray_intersect_bvh_any(in Ray ray, in uint mesh_i) {
       // Bitmask, initialized to all false
       uint mask = 0;
 
-      // Shorthand for rcp of ray
-      vec3 d_inv = 1.f / ray.d;
+      // Shorthand for reciprocal of ray direction
+      vec3 d_rcp = 1.f / ray.d;
 
       // Iterate the node's children
       for (uint i = 0; i < bvh_size(node); ++i) {
-        // Obtain and unpack next child, then test against it
-        if (ray_intersect_any(ray, d_inv, bvh_child_aabb(node, i))) {
-          // Flag child's index in bitmask on a hit
-          mask |= (1u << i);
-        }
+        // Unpack a child, then intersect with it; on hit, its index is flagged in the bitmask
+        mask |= uint(ray_intersect_any(ray, d_rcp, bvh_child_aabb(node, i))) << i;
       } // for (uint i)
 
       // If any children were flagged in the mask, push the child offset + mask on the stack

@@ -61,13 +61,8 @@ bool ray_intersect(inout Ray ray, in Primitive prim) {
   vec3 ca = prim.v0.p - prim.v2.p;
   vec3 n  = normalize(cross(bc, ab));
   
-  // Backface test
-  float cos_theta = dot(n, ray.d);
-  /* if (cos_theta <= 0)
-    return false; */
-
   // Ray/plane distance test
-  float t = dot(((prim.v0.p + prim.v1.p + prim.v2.p) / 3.f - ray.o), n) / cos_theta;
+  float t = dot(((prim.v0.p + prim.v1.p + prim.v2.p) / 3.f - ray.o), n) / dot(n, ray.d);
   if (t < 0.f || t > ray.t)
     return false;
   
@@ -89,13 +84,8 @@ bool ray_intersect(inout Ray ray, in PrimitivePositions prim) {
   vec3 ca = prim.p0 - prim.p2;
   vec3 n  = normalize(cross(bc, ab));
   
-  // Backface test
-  float cos_theta = dot(n, ray.d);
-  /* if (cos_theta <= 0)
-    return false; */
-
   // Ray/plane distance test
-  float t = dot(((prim.p0 + prim.p1 + prim.p2) / 3.f - ray.o), n) / cos_theta;
+  float t = dot(((prim.p0 + prim.p1 + prim.p2) / 3.f - ray.o), n) / dot(n, ray.d);
   if (t < 0.f || t > ray.t)
     return false;
   
