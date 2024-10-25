@@ -106,10 +106,17 @@ bool ray_intersect_emitter(inout Ray ray, in uint emitter_i) {
 
   bool hit = false;
   if (em.type == EmitterTypeSphere) {
-    Sphere sphere = { em.center, em.sphere_r };
+    Sphere sphere = { em.trf[3].xyz, .5f * length(em.trf[0].xyz) };
     hit = ray_intersect(ray, sphere);
   } else if (em.type == EmitterTypeRectangle) {
-    hit = ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
+    /* Rectangle rect = {
+      em.trf[3].xyz,
+      em.trf[0].xyz,
+      em.trf[1].xyz,
+      normalize(em.trf[2].xyz)
+    };
+    hit = ray_intersect(ray, rect); */
+    hit = ray_intersect(ray, em.trf[3].xyz, normalize(em.trf[2].xyz), em.trf_inv);
   }
   
   if (hit)
@@ -126,10 +133,17 @@ bool ray_intersect_emitter_any(in Ray ray, in uint emitter_i) {
   
   // Run intersection; on a hit, simply return
   if (em.type == EmitterTypeSphere) {
-    Sphere sphere = { em.center, em.sphere_r };
+    Sphere sphere = { em.trf[3].xyz, .5f * length(em.trf[0].xyz) };
     return ray_intersect(ray, sphere);
   } else if (em.type == EmitterTypeRectangle) {
-    return ray_intersect(ray, em.center, em.rect_n, em.trf_inv);
+    /* Rectangle rect = {
+      em.trf[3].xyz,
+      em.trf[0].xyz,
+      em.trf[1].xyz,
+      normalize(em.trf[2].xyz)
+    };
+    return ray_intersect_any(ray, rect); */
+    return ray_intersect(ray, em.trf[3].xyz, normalize(em.trf[2].xyz), em.trf_inv);
   }
 }
 

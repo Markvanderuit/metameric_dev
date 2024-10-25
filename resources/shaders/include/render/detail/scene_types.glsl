@@ -14,8 +14,7 @@ const uint met_max_textures    = MET_SUPPORTED_TEXTURES;
 // Info object to gather Scene::Object data
 struct ObjectInfo {
   // Transform and inverse transform data
-  mat4 trf;                
-  mat4 trf_inv; 
+  mat4 trf;          // Object transform only        
   mat4 trf_mesh;     // Multiplied by mesh packing transform    
   mat4 trf_mesh_inv; // Multiplied by mesh packing transform
 
@@ -33,14 +32,15 @@ struct ObjectInfo {
 
 // Info object for referred mesh.bvh data
 struct MeshInfo {
-  mat4 trf;
-  
+  // Range of indices for vertex data
   uint verts_offs;
   uint verts_size;
 
+  // Range of indices for primitive data
   uint prims_offs;
   uint prims_size;
   
+  // Range of indices for blas node data
   uint nodes_offs;
   uint nodes_size;
 };
@@ -49,19 +49,15 @@ struct MeshInfo {
 struct TextureInfo {
   bool  is_3f; // Is the patch in the atlas_3f texture sampler, or in atlas_1f?
   uint  layer; // layer in texture array in which the texture is located
-  uvec2 offs;  // offset in pixels to layer's region storing this texture
-  uvec2 size;  // size in pixels of layer's region storing this
   vec2  uv0;   // Minimum uv value, at region's pixel offset
   vec2  uv1;   // Maximum uv value, at region's pixel offset + size
 };
 
 // Info object for referred texture atlas patch data
 struct TextureAtlasInfo {
-  uint  layer;  // layer in texture array in which a texture patch is located
-  uvec2 offs;   // offset in pixels to array's region storing this patch
-  uvec2 size;   // size in pixels of array's region storing this patch
-  vec2  uv0;    // Minimum uv value, at region's offset
-  vec2  uv1;    // Maximum uv value, at region's offset + size
+  uint layer;  // layer in texture array in which a texture patch is located
+  vec2 uv0;    // Minimum uv value, at region's offset
+  vec2 uv1;    // Maximum uv value, at region's offset + size
 };
 
 #define EmitterTypeConstant  0
@@ -83,12 +79,6 @@ struct EmitterInfo {
   // Spectral data
   uint  illuminant_i;     // Index of spd
   float illuminant_scale; // Scalar multiplier applied to values  
-
-  // Precomputed data
-  vec3  center;
-  float srfc_area_inv;
-  vec3  rect_n;       // Specific to rectangle area emitters
-  float sphere_r;     // Specific to sphere area emitters
 };
 
 #define BRDFTypeNull       0

@@ -4,7 +4,7 @@
 PositionSample sample_emitter_point(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   PositionSample ps;
 
-  ps.p = (em.trf * vec4(0, 0, 0, 1)).xyz;
+  ps.p = em.trf[3].xyz;
   ps.n = vec3(0, 0, 1); // Indeterminate?
   
   ps.d = ps.p - si.p;

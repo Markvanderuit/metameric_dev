@@ -3,10 +3,13 @@
 
 PositionSample sample_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   PositionSample ps;
+
+  vec2 scale = vec2(length(em.trf[0]), length(em.trf[1]));
+  float srfc_area_rcp = 1.f / hprod(scale);
   
   // Sample point on rectangle, with (0, 0) at its center
   ps.p = (em.trf * vec4(sample_2d - .5f, 0, 1)).xyz;
-  ps.n = em.rect_n;
+  ps.n = normalize(em.trf[2].xyz);
 
   // Store direction to point, normalize, and keep distance
   ps.d = ps.p - si.p;
@@ -15,7 +18,7 @@ PositionSample sample_emitter_rectangle(in EmitterInfo em, in SurfaceInfo si, in
 
   // Set pdf to non-zero if we are not approaching from a back-face
   float dp = abs(dot(-ps.d, ps.n));
-  ps.pdf = em.srfc_area_inv * sdot(ps.t) / dp;
+  ps.pdf = srfc_area_rcp * sdot(ps.t) / dp;
   ps.is_delta = false;
 
   return ps;
@@ -31,7 +34,9 @@ vec4 eval_emitter_rectangle(in EmitterInfo em, in PositionSample ps, in vec4 wvl
 
 float pdf_emitter_rectangle(in EmitterInfo em, in PositionSample ps) {
   float dp = abs(dot(-ps.d, ps.n));
-  return em.srfc_area_inv * sdot(ps.t) / dp;
+  vec2 scale = vec2(length(em.trf[0]), length(em.trf[1]));
+  float srfc_area_rcp = 1.f / hprod(scale);
+  return srfc_area_rcp * sdot(ps.t) / dp;
 }
 
 #endif // RENDER_EMITTER_RECTANGLE_GLSL_GUARD

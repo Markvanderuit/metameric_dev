@@ -4,19 +4,21 @@
 PositionSample sample_emitter_sphere(in EmitterInfo em, in SurfaceInfo si, in vec2 sample_2d) {
   PositionSample ps;
 
+  float sphere_r      = .5f * length(em.trf[0].xyz);
+  float srfc_area_rcp = M_PI_INV * .25f / sdot(sphere_r);
+
   // Sample position on hemisphere facing surface, point may not be nearest
-  Frame frm = get_frame(normalize(si.p - em.center));
-  ps.p = em.center 
-       + em.sphere_r * to_world(frm, square_to_unif_hemisphere(sample_2d));
+  Frame frm = get_frame(normalize(si.p - em.trf[3].xyz));
+  ps.p = em.trf[3].xyz + sphere_r * to_world(frm, square_to_unif_hemisphere(sample_2d));
 
   // Generate direction to point
   ps.d = ps.p - si.p;
   ps.t = length(ps.d);
   ps.d /= ps.t;
   
-  ps.n   = normalize(ps.p - em.center);
-  ps.pdf = (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
-  ps.is_delta = em.sphere_r == 0.f;
+  ps.n   = normalize(ps.p - em.trf[3].xyz);
+  ps.pdf = (2.f * srfc_area_rcp) * sdot(ps.t) / abs(dot(ps.d, ps.n));
+  ps.is_delta = sphere_r == 0.f;
 
   return ps;
 }
@@ -30,7 +32,9 @@ vec4 eval_emitter_sphere(in EmitterInfo em, in PositionSample ps, in vec4 wvls) 
 }
 
 float pdf_emitter_sphere(in EmitterInfo em, in PositionSample ps) {
-  return (2.f * em.srfc_area_inv) * sdot(ps.t) / abs(dot(ps.d, ps.n));
+  float sphere_r      = .5f * length(em.trf[0].xyz);
+  float srfc_area_rcp = M_PI_INV * .25f / sdot(sphere_r);
+  return (2.f * srfc_area_rcp) * sdot(ps.t) / abs(dot(ps.d, ps.n));
 }
 
 #endif // RENDER_EMITTER_SPHERE_GLSL_GUARD

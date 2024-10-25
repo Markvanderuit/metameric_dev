@@ -45,8 +45,6 @@ namespace met::detail {
     else           u.in_0 = { 0, std::get<0>(v) };
     return { u.out[0], u.out[1] };
   }
-
-
   
   // Packed BVH node data
   struct NodePack {
@@ -168,7 +166,6 @@ namespace met::detail {
       // Fill in object struct data
       m_object_info_map->data[i] = {
         .trf               = object_trf,
-        .trf_inv           = object_trf.inverse().eval(),
         .trf_mesh          = mesh_trf,
         .trf_mesh_inv      = mesh_trf.inverse().eval(),
         .is_active         = object.is_active,
@@ -247,7 +244,7 @@ namespace met::detail {
 
     // Test if the necessitated inputs match exactly to the atlas' reserved patches
     bool is_exact_fit = rng::equal(inputs, texture_coefficients.patches(),
-      eig::safe_approx_compare<eig::Array2u>, {}, &atlas_type_u::PatchLayout::size);
+      eig::safe_approx_compare<eig::Array2u>, {}, &PatchLayout::size);
 
     // Regenerate atlas if inputs don't match the atlas' current layout
     // Note; barycentric weights will need a full rebuild, which is detected
@@ -284,7 +281,7 @@ namespace met::detail {
 
   void SceneGLHandler<met::Emitter>::update(const Scene &scene) {
     met_trace_full();
-
+    
     const auto &emitters = scene.components.emitters;
     guard(!emitters.empty() && emitters);
 
@@ -297,33 +294,15 @@ namespace met::detail {
       const auto &[emitter, state] = emitters[i];
       guard_continue(state);
 
-      // Precompute some data based on type
       auto trf = emitter.transform.affine();
-      eig::Vector3f rect_n = 0.f;
-      float srfc_area_inv  = 0.f, 
-            sphere_r       = 0.f;
-      
-      if (emitter.type == Emitter::Type::eSphere) {
-        sphere_r      = 0.5 * emitter.transform.scaling.x();
-        srfc_area_inv = 1.f / (4.f * std::numbers::pi_v<float> * sphere_r * sphere_r);
-      } else if (emitter.type == Emitter::Type::eRect) {
-        rect_n        = (trf * eig::Vector4f(0, 0, 1, 0)).head<3>().normalized();
-        srfc_area_inv = 1.f / emitter.transform.scaling.head<2>().prod();
-      }
       
       m_em_info_map->data[i] = {
         .trf              = trf.matrix(),
         .trf_inv          = trf.matrix().inverse().eval(),
-        
         .type             = static_cast<uint>(emitter.type),
         .is_active        = emitter.is_active,
         .illuminant_i     = emitter.illuminant_i,
-        .illuminant_scale = emitter.illuminant_scale,
-
-        .center        = (trf * eig::Vector4f(0, 0, 0, 1)).head<3>().eval(),
-        .srfc_area_inv = srfc_area_inv,
-        .rect_n        = rect_n,
-        .sphere_r      = sphere_r,
+        .illuminant_scale = emitter.illuminant_scale
       };
 
       // Flush change to buffer; most changes to objects are local,
@@ -398,9 +377,6 @@ namespace met::detail {
       txuvs[i]      = parameterize_mesh<met::Mesh>(m_meshes[i]);
       transforms[i] = unitize_mesh<met::Mesh>(m_meshes[i]);
       m_bvhs[i]     = {{ .mesh = m_meshes[i], .n_leaf_children = 4 }};
-            
-      // Set appropriate mesh transform in buffer
-      m_mesh_info_map->data[i].trf = transforms[i];
     }
 
     for (int i = 0; i < meshes.size(); ++i) {
@@ -586,9 +562,8 @@ namespace met::detail {
                    uv1 = resrv.size.cast<float>() / size.head<2>().cast<float>();
 
       // Fill in info object in mapped buffer
-      m_texture_info_map->data[i] = { .is_3f = is_3f,      .layer = resrv.layer_i,
-                                      .offs  = resrv.offs, .size  = resrv.size,
-                                      .uv0   = uv0,        .uv1   = uv1 };
+      m_texture_info_map->data[i] = { .is_3f = is_3f, .layer = resrv.layer_i,
+                                      .uv0   = uv0,   .uv1   = uv1 };
 
       // Flush change to buffer; most changes to objects are local,
       // so we flush specific regions instead of the whole

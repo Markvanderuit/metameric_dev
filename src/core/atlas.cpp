@@ -222,7 +222,8 @@ namespace met {
 
     // Copy patch layouts to buffer storage
     m_buffer_map->size = new_patches.size();
-    rng::copy(new_patches, m_buffer_map->data.begin());
+    rng::transform(new_patches, m_buffer_map->data.begin(), 
+      [](PatchLayout p) { return AtlasBlockLayout { p.layer_i, p.uv0, p.uv1 }; });
     m_buffer.flush();
   }
 
@@ -256,7 +257,8 @@ namespace met {
     
     // Copy updated patch layouts to buffer storage
     m_buffer_map->size = m_patches.size();
-    rng::copy(m_patches, m_buffer_map->data.begin());
+    rng::transform(m_patches, m_buffer_map->data.begin(), 
+      [](PatchLayout p) { return AtlasBlockLayout { p.layer_i, p.uv0, p.uv1 }; });
     m_buffer.flush();
   }
 

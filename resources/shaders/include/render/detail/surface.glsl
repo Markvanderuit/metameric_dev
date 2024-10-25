@@ -19,7 +19,6 @@ vec3 detail_gen_barycentric_coords(in vec3 p, in Primitive prim) {
 void detail_fill_surface_info_object(inout SurfaceInfo si, in Ray ray) {
   // On a valid surface, fill in surface info
   ObjectInfo object_info = scene_object_info(record_get_object(si.data));
-  MeshInfo   mesh_info   = scene_mesh_info(object_info.mesh_i);
 
   // Obtain and unpack intersected primitive data
   Primitive prim = unpack(scene_mesh_prim(record_get_object_primitive(ray.data)));
@@ -75,9 +74,9 @@ void detail_fill_surface_info_emitter(inout SurfaceInfo si, in Ray ray) {
 
   // Fill normal data based on type of area emitters
   if (em.type == EmitterTypeSphere) {
-    si.n = normalize(si.p - em.center);
+    si.n = normalize(si.p - em.trf[3].xyz);
   } else if (em.type == EmitterTypeRectangle) {
-    si.n = em.rect_n;
+    si.n = normalize(em.trf[2].xyz);
   }
 
   // Generate shading frame based on geometric normal

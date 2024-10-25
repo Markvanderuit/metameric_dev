@@ -17,15 +17,14 @@ BRDFSample sample_brdf_mirror(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInf
 
   bs.is_delta = true;
   bs.wo       = vec3(-si.wi.xy, si.wi.z);
-  bs.f        = schlick_fresnel(brdf.r, cos_theta(si.wi)) 
-              / cos_theta(bs.wo);
   bs.pdf      = 1.f;
 
   return bs;
 }
 
 vec4 eval_brdf_mirror(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {
-  return vec4(0);
+  // Assume throughput, but let pdf fall to 0
+  return schlick_fresnel(brdf.r, cos_theta(si.wi)) / cos_theta(wo);
 }
 
 float pdf_brdf_mirror(in BRDFInfo brdf, in SurfaceInfo si, in vec3 wo) {

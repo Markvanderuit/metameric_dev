@@ -127,7 +127,6 @@ BRDFSample sample_brdf_principled(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
 
   BRDFSample bs;
   bs.is_delta = false;
-  bs.f        = vec4(0);
   bs.pdf      = 0.f;
 
   // Select a lobe based on sample probabilities [spec, diffuse]
@@ -170,7 +169,7 @@ BRDFSample sample_brdf_principled(in BRDFInfo brdf, in vec3 sample_3d, in Surfac
             * square_to_cos_hemisphere_pdf(bs.wo); */
   }
 
-  bs.f   = eval_brdf_principled(brdf, si, bs.wo);
+  // bs.f   = eval_brdf_principled(brdf, si, bs.wo);
   bs.pdf = pdf_brdf_principled(brdf, si, bs.wo);
 
   return bs;

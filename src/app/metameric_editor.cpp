@@ -46,6 +46,7 @@ namespace met {
       .title = info.app_title, 
       .flags = window_flags
     }).getw<gl::Window>();
+    window.set_swap_interval(0);
 
     // Enable OpenGL debug messages, if requested
     if constexpr (met_enable_debug) {

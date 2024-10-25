@@ -19,7 +19,6 @@ namespace met::detail {
     // Per-object block layout for std140 uniform buffer
     struct alignas(16) BlockLayout {
       alignas(16) eig::Matrix4f trf;
-      alignas(16) eig::Matrix4f trf_inv;
       alignas(16) eig::Matrix4f trf_mesh;
       alignas(16) eig::Matrix4f trf_mesh_inv;
       alignas(4)  bool          is_active;
@@ -59,11 +58,8 @@ namespace met::detail {
       alignas(4)  bool          is_active;
       alignas(4)  uint          illuminant_i;
       alignas(4)  float         illuminant_scale;
-      alignas(4)  eig::Array3f  center; // center for sphere/point, corner for rect
-      alignas(4)  float         srfc_area_inv;
-      alignas(4)  eig::Array3f  rect_n;
-      alignas(4)  float         sphere_r;
     };
+    static_assert(sizeof(EmBlockLayout) == 144);
     
     // All-object block layout for std140 uniform buffer, mapped for write
     struct EmBufferLayout {
@@ -128,21 +124,19 @@ namespace met::detail {
   class SceneGLHandler<met::Mesh> : public SceneGLHandlerBase {
     // Per-mesh block layout for std140 uniform buffer
     struct alignas(16) MeshBlockLayout {
-      alignas(16) eig::Matrix4f trf; // Model packing transform
-
       // Offset/extent into mesh_verts buffer
-      alignas(4)  uint verts_offs;
-      alignas(4)  uint verts_size;
+      alignas(4) uint verts_offs;
+      alignas(4) uint verts_size;
 
       // Offset/extent into mesh_elems buffer
-      alignas(4)  uint elems_offs;
-      alignas(4)  uint elems_size;
+      alignas(4) uint elems_offs;
+      alignas(4) uint elems_size;
 
       // Offset/extent into bvh_nodes buffer
-      alignas(4)  uint nodes_offs;
-      alignas(4)  uint nodes_size;
+      alignas(4) uint nodes_offs;
+      alignas(4) uint nodes_size;
     };
-    static_assert(sizeof(MeshBlockLayout) == 96);
+    static_assert(sizeof(MeshBlockLayout) == 32);
     
     // All-mesh block layout for std140 uniform buffer, mapped for write
     struct MeshBufferLayout {
@@ -199,9 +193,9 @@ namespace met::detail {
     struct alignas(16) BlockLayout {
       alignas(4) bool         is_3f;
       alignas(4) uint         layer;
-      alignas(8) eig::Array2u offs, size;
       alignas(8) eig::Array2f uv0, uv1;
     };
+    static_assert(sizeof(BlockLayout) == 32);
 
     // All-texture block layout for std140 uniform buffer, mapped for write
     struct BufferLayout {

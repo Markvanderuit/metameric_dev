@@ -11,7 +11,6 @@ BRDFSample sample_brdf_null(in BRDFInfo brdf, in vec3 sample_3d, in SurfaceInfo 
   BRDFSample bs;
 
   bs.is_delta = true;
-  bs.f        = vec4(1);
   bs.wo       = -si.wi;
   bs.pdf      = 1.f;
 
